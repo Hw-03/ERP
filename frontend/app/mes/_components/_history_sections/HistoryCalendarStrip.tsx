@@ -251,17 +251,17 @@ export function HistoryCalendarStrip({
                   )}
                   <div className="mt-1 flex w-full flex-col gap-0.5 px-1">
                     {warehouseCount > 0 && (
-                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.green }}>
+                      <span className="whitespace-nowrap text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.green }}>
                         창고 {warehouseCount}건
                       </span>
                     )}
                     {deptCount > 0 && (
-                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.cyan }}>
+                      <span className="whitespace-nowrap text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.cyan }}>
                         부서 {deptCount}건
                       </span>
                     )}
                     {adjustCount > 0 && (
-                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
+                      <span className="whitespace-nowrap text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
                         조정 {adjustCount}건
                       </span>
                     )}
