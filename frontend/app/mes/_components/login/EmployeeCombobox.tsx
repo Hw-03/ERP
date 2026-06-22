@@ -11,6 +11,9 @@ import {
 } from "react";
 import { ChevronDown, User as UserIcon } from "lucide-react";
 import type { Employee } from "@/lib/api";
+import { toHangul, toQwerty } from "@/lib/hangul";
+
+const isHangulChar = (c: string) => /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(c);
 
 export interface EmployeeComboboxProps {
   employees: Employee[];
@@ -35,6 +38,8 @@ export function EmployeeCombobox({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // 영타 조립 전 원본 키 버퍼 (직원코드 등 라틴 검색 폴백용)
+  const rawRef = useRef("");
 
   const sortedEmployees = useMemo(
     () => [...employees].sort((a, b) => a.name.localeCompare(b.name, "ko-KR")),
@@ -43,12 +48,14 @@ export function EmployeeCombobox({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const raw = rawRef.current.trim();
     if (!q) return sortedEmployees;
     return sortedEmployees.filter(
       (e) =>
         e.name.toLowerCase().includes(q) ||
         e.department.toLowerCase().includes(q) ||
-        e.employee_code.toLowerCase().includes(q),
+        e.employee_code.toLowerCase().includes(q) ||
+        e.employee_code.toLowerCase().includes(raw),
     );
   }, [sortedEmployees, query]);
 
@@ -62,6 +69,7 @@ export function EmployeeCombobox({
       if (!containerRef.current?.contains(e.target as Node)) {
         setOpen(false);
         setQuery("");
+        rawRef.current = "";
       }
     };
     window.addEventListener("mousedown", handleOutside);
@@ -80,6 +88,7 @@ export function EmployeeCombobox({
     (emp: Employee) => {
       onChange(emp);
       setQuery("");
+      rawRef.current = "";
       setOpen(false);
       inputRef.current?.blur();
     },
@@ -119,6 +128,7 @@ export function EmployeeCombobox({
         e.preventDefault();
         setOpen(false);
         setQuery("");
+        rawRef.current = "";
       }
     }
   };
@@ -161,7 +171,13 @@ export function EmployeeCombobox({
           value={displayValue}
           onClick={() => setOpen(true)}
           onChange={(e) => {
-            setQuery(e.target.value);
+            // 이미 표시된 한글은 키로 되돌리고, 새로 입력된 라틴 문자는 그대로 이어붙여
+            // 전체를 다시 한글로 조립한다 (Caps Lock 대비 대소문자 무시).
+            const raw = Array.from(e.target.value)
+              .map((c) => (isHangulChar(c) ? toQwerty(c) : c))
+              .join("");
+            rawRef.current = raw;
+            setQuery(toHangul(raw));
             setOpen(true);
           }}
           onKeyDown={handleKey}
