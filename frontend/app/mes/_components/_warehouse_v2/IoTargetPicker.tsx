@@ -258,7 +258,8 @@ export function IoTargetPicker({
             </label>
           </div>
           {operator?.employee_id && (
-            <div className="shrink-0 self-end pb-0.5">
+            // 항목 4-5 — 순서 편집은 드래그 UX 라 모바일에서 숨김(PC 만 노출). 기능 코드는 보존.
+            <div className="hidden shrink-0 self-end pb-0.5 lg:block">
               {editMode ? (
                 <button
                   type="button"
@@ -367,7 +368,8 @@ export function IoTargetPicker({
       {/* 하단 advance 버튼 — 선택 품목 없으면 비활성.
           항목 10 — 모바일은 sticky 로 하단 네비 위에 항상 고정(이중 스크롤에 묻히지 않게),
           데스크톱(lg)은 기존 정적 배치 그대로. */}
-      <div className="sticky bottom-0 z-20 -mx-3 shrink-0 border-t border-[var(--c-border)] bg-[var(--c-s1)] px-4 pb-3 pt-3 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
+      {/* 항목 4-6 — 모바일 띠 배경/상단선 제거(버튼만 떠 보이게). 버튼 자체 솔리드색으로 가독성 확보. */}
+      <div className="sticky bottom-0 z-20 -mx-3 shrink-0 px-4 pb-3 pt-3 lg:static lg:mx-0 lg:p-0">
         <button
           type="button"
           onClick={onAdvance}
