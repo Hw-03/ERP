@@ -13,7 +13,6 @@ export function WizardProgress({
   current: number;
   className?: string;
 }) {
-  const active = steps[current];
   return (
     <div className={clsx("flex flex-col gap-1.5", className)}>
       {/* 항목 17 — 완료=진한 채움, 현재=더 두껍게+링 강조, 미래=흐리게 */}
@@ -39,15 +38,13 @@ export function WizardProgress({
           );
         })}
       </div>
-      <div className="flex items-center justify-between gap-2">
+      {/* 항목 4-8 — 단계명 텍스트 제거, STEP N/N 만 우측 정렬(좌측 뒤로 버튼과 겹치지 않게). */}
+      <div className="flex items-center justify-end">
         <span
           className={clsx(TYPO.caption, "shrink-0 font-bold uppercase tracking-[1px]")}
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           Step {current + 1} / {steps.length}
-        </span>
-        <span className={clsx(TYPO.caption, "truncate font-black")} style={{ color: LEGACY_COLORS.blue }}>
-          {active?.label}
         </span>
       </div>
     </div>
