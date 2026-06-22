@@ -52,6 +52,7 @@ export const itemsApi = {
     min_stock?: number;
     initial_quantity?: number;
     model_slots?: number[];
+    initial_locations?: { department: string; quantity: number }[];
   }) => postJson<Item>(toApiUrl("/api/items"), payload),
 
   updateItem: async (

@@ -1,8 +1,10 @@
 "use client";
 
+import { X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect } from "../../common/AppSelect";
 import { PROCESS_TYPE_OPTIONS, UNIT_OPTIONS } from "../adminShared";
+import { useDepartments } from "../../DepartmentsContext";
 import type { ProductModel } from "@/lib/api";
 
 export type ItemFormData = {
@@ -15,12 +17,14 @@ export type ItemFormData = {
   model_slots: number[];
   initial_quantity?: string;
   mes_code?: string;
+  initial_locations?: { department: string; quantity: string }[];
 };
 
 interface Props {
   form: ItemFormData;
   setForm: (updater: (f: ItemFormData) => ItemFormData) => void;
   showInitialQuantity?: boolean;
+  showInitialLocations?: boolean;
   showMesCode?: boolean;
   productModels?: ProductModel[];
 }
@@ -132,7 +136,13 @@ function MesCodeSection({
   );
 }
 
-export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode, productModels = [] }: Props) {
+export function ItemFormFields({ form, setForm, showInitialQuantity, showInitialLocations, showMesCode, productModels = [] }: Props) {
+  const departments = useDepartments();
+  const deptOptions = departments.map((d) => ({ value: d.name, label: d.name }));
+
+  const locs = form.initial_locations ?? [];
+  const totalQty = locs.reduce((s, r) => s + Number(r.quantity || 0), 0);
+
   return (
     <>
       {/* 텍스트/숫자 필드 */}
@@ -152,19 +162,80 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode
         </div>
       ))}
 
-      {showInitialQuantity && (
+      {showInitialLocations && (
         <div>
-          <FieldLabel label="현재 수량" badge="선택" />
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={form.initial_quantity ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, initial_quantity: e.target.value }))}
-            placeholder="0"
-            className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-            style={inputStyle}
-          />
+          <FieldLabel label="초기 재고 위치" badge="선택" />
+          <div className="flex flex-col gap-2">
+            {locs.map((row, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <div className="flex-1">
+                  <AppSelect
+                    value={row.department}
+                    onChange={(v) =>
+                      setForm((f) => {
+                        const next = [...(f.initial_locations ?? [])];
+                        next[idx] = { ...next[idx], department: v };
+                        return { ...f, initial_locations: next };
+                      })
+                    }
+                    size="lg"
+                    triggerStyle={{ background: LEGACY_COLORS.s1 }}
+                    options={deptOptions}
+                  />
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={row.quantity}
+                  onChange={(e) =>
+                    setForm((f) => {
+                      const next = [...(f.initial_locations ?? [])];
+                      next[idx] = { ...next[idx], quantity: e.target.value };
+                      return { ...f, initial_locations: next };
+                    })
+                  }
+                  placeholder="수량"
+                  className="w-24 rounded-[18px] border px-3 py-3 text-base outline-none"
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      initial_locations: (f.initial_locations ?? []).filter((_, i) => i !== idx),
+                    }))
+                  }
+                  className="flex items-center justify-center rounded-full p-1 hover:bg-red-500/10"
+                  style={{ color: LEGACY_COLORS.red }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setForm((f) => ({
+                ...f,
+                initial_locations: [
+                  ...(f.initial_locations ?? []),
+                  { department: deptOptions[0]?.value ?? "", quantity: "" },
+                ],
+              }))
+            }
+            className="mt-2 rounded-[14px] border px-3 py-1.5 text-sm font-bold"
+            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s1 }}
+          >
+            + 위치 추가
+          </button>
+          {totalQty > 0 && (
+            <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              현재 수량: {totalQty}
+            </p>
+          )}
         </div>
       )}
 

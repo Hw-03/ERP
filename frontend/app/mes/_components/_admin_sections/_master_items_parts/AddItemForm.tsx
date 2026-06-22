@@ -35,7 +35,7 @@ export function AddItemForm() {
       <ItemFormFields
         form={addForm as ItemFormData & { initial_quantity: string }}
         setForm={setAddForm as (u: (f: ItemFormData) => ItemFormData) => void}
-        showInitialQuantity
+        showInitialLocations
         productModels={productModels}
       />
 

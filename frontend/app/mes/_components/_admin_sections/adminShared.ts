@@ -26,6 +26,7 @@ export const EMPTY_ADD_FORM = {
   supplier: "",
   min_stock: "",
   initial_quantity: "",
+  initial_locations: [] as { department: string; quantity: string }[],
 };
 
 export type AddForm = typeof EMPTY_ADD_FORM;

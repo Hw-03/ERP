@@ -52,6 +52,11 @@ export function useAdminMasterItemsCommands({
       return;
     }
     try {
+      const allLocs = addForm.initial_locations ?? [];
+      const builtLocs = allLocs
+        .filter((r) => r.department && Number(r.quantity) > 0 && r.department !== "창고")
+        .map((r) => ({ department: r.department, quantity: Number(r.quantity) }));
+      const totalQty = allLocs.reduce((s, r) => s + Number(r.quantity || 0), 0);
       const created = await createMutation.mutateAsync({
         item_name: addForm.item_name.trim(),
         process_type_code: addForm.process_type_code || undefined,
@@ -60,7 +65,8 @@ export function useAdminMasterItemsCommands({
         legacy_item_type: addForm.legacy_item_type || undefined,
         supplier: addForm.supplier || undefined,
         min_stock: addForm.min_stock ? Number(addForm.min_stock) : undefined,
-        initial_quantity: addForm.initial_quantity ? Number(addForm.initial_quantity) : undefined,
+        initial_quantity: totalQty > 0 ? totalQty : undefined,
+        initial_locations: builtLocs.length > 0 ? builtLocs : undefined,
       });
       setItems((current) => [created, ...current]);
       setSelectedItem(created);
