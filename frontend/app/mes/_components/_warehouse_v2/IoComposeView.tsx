@@ -963,7 +963,11 @@ export function IoComposeView({
         </div>
       )}
 
-      <IoSubmitModals result={result} onClose={() => setResult(null)} />
+      <IoSubmitModals
+        result={result}
+        onClose={() => setResult(null)}
+        onGoToMap={() => router.push("?tab=warehouseMap", { scroll: false })}
+      />
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );

@@ -13,10 +13,11 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Eye, Pencil, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Eye, Pencil, ShieldCheck } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { employeesApi } from "@/lib/api/employees";
 import { itemsApi } from "@/lib/api/items";
+import { warehouseMapApi, type ReconcileRow } from "@/lib/api/warehouse-map";
 import { registerOperatorCredsProvider } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useCurrentOperator } from "./login/useCurrentOperator";
@@ -47,6 +48,17 @@ export function DesktopWarehouseMapTab({
   const [items, setItems] = useState<Item[]>([]);
   const [editorTab, setEditorTab] = useState<"map" | "placement" | "structure">("map");
   const [editorError, setEditorError] = useState<string | null>(null);
+  // 박스 합 ≠ 창고 총재고인 품목(미배치/불일치) — 전환기 배치 진행 가늠용.
+  const [mismatches, setMismatches] = useState<ReconcileRow[]>([]);
+
+  async function refreshMismatches() {
+    try {
+      const res = await warehouseMapApi.reconcile();
+      setMismatches(res.rows.filter((r) => r.status !== "ok"));
+    } catch {
+      /* 대조는 보조 정보 — 실패해도 편집은 계속 */
+    }
+  }
 
   // operator 자격증명을 ref 로 보관하고 provider 는 ref 를 읽게 해 stale 클로저 방지.
   const credsRef = useRef<{ code: string; pin: string } | null>(null);
@@ -67,6 +79,7 @@ export function DesktopWarehouseMapTab({
       credsRef.current = { code: operator.employee_code, pin };
       const list = await itemsApi.getItems({});
       setItems(list);
+      void refreshMismatches();
       setEditMode(true);
       setPinOpen(false);
       setPin("");
@@ -197,6 +210,28 @@ export function DesktopWarehouseMapTab({
               >
                 {editorError}
               </div>
+            )}
+            {mismatches.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setEditorTab("placement")}
+                className="mb-3 flex shrink-0 items-start gap-2 rounded-[12px] border px-4 py-2.5 text-left transition-colors hover:brightness-[1.02]"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 32%, transparent)`,
+                }}
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                    배치 확인 필요 {mismatches.length}건 — 박스 합과 창고 재고가 다릅니다
+                  </div>
+                  <div className="mt-0.5 truncate text-[12px] font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
+                    {mismatches.slice(0, 4).map((r) => `${r.mes_code ?? r.item_name}(${r.placed_total}/${r.warehouse_qty})`).join("  ·  ")}
+                    {mismatches.length > 4 ? "  …" : ""} — 위치 배정에서 정리하기 →
+                  </div>
+                </div>
+              </button>
             )}
             {editorTab === "map" && (
               <div
