@@ -50,7 +50,7 @@ export function MobileWorkTypeStep({
             type="button"
             aria-pressed={active}
             onClick={() => onWorkTypeChange(row.id)}
-            className="flex min-h-[96px] flex-1 items-center gap-5 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+            className="flex min-h-[96px] flex-1 items-center gap-6 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
             style={{
               background: active ? tint(accent, 14) : LEGACY_COLORS.s2,
               borderColor: active ? accent : LEGACY_COLORS.border,
@@ -59,16 +59,16 @@ export function MobileWorkTypeStep({
             }}
           >
             <span
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"
+              className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[20px]"
               style={{ background: active ? tint(accent, 20) : tint(accent, 10) }}
             >
-              {/* 항목 3-6 — 입출고 아이콘에도 색(입고=blue/출고=red accent). */}
-              <Icon className="h-8 w-8" style={{ color: active ? accentText : accent }} />
+              {/* 항목 3-6 — 입출고 아이콘에도 색(입고=blue/출고=red accent). 4-3 크기 확대. */}
+              <Icon className="h-12 w-12" style={{ color: active ? accentText : accent }} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-xl font-black leading-tight">{row.label}</span>
+              <span className="block text-3xl font-black leading-tight">{row.label}</span>
               <span
-                className="block text-base font-semibold"
+                className="mt-1 block text-lg font-semibold"
                 style={{ color: active ? accentText : LEGACY_COLORS.muted2 }}
               >
                 {row.description}
@@ -102,9 +102,10 @@ function DeptGrid({
   onChange: (v: string) => void;
 }) {
   return (
-    <div>
+    // 항목 4-4A — 섹션 높이를 채우도록 grid 를 flex-1 + auto-rows-fr 로(버튼 균등 확대).
+    <div className="flex flex-1 flex-col">
       <Label text={label} />
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
         {PROD_DEPTS.map((d) => {
           const active = d === value;
           const color =
@@ -116,7 +117,7 @@ function DeptGrid({
               aria-label={d}
               aria-pressed={active}
               onClick={() => onChange(d)}
-              className="min-h-[48px] rounded-[14px] border text-base font-black transition-[transform] active:scale-95"
+              className="min-h-[48px] rounded-[14px] border text-lg font-black transition-[transform] active:scale-95"
               style={{
                 background: active ? tint(color, 14) : LEGACY_COLORS.s2,
                 borderColor: active ? color : LEGACY_COLORS.border,
@@ -163,12 +164,12 @@ export function MobileSubTypeStep({
     return (
       // 항목 7 — 부서/방향/입력방식 섹션이 화면 높이를 균등 분할(버튼은 과대 stretch 없이 중앙 정렬).
       <div className="flex min-h-full flex-col gap-4">
-        <div className="flex flex-1 flex-col justify-center">
+        <div className="flex flex-1 flex-col">
           <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} />
         </div>
-        <div className="flex flex-1 flex-col justify-center">
+        <div className="flex flex-1 flex-col">
           <Label text="방향" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-3">
             {(["in", "out"] as DeptIoDirection[]).map((dir) => {
               const active = deptIoDirection === dir;
               const color = dir === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -192,9 +193,9 @@ export function MobileSubTypeStep({
           </div>
         </div>
         {curDir != null && (
-          <div className="flex flex-1 flex-col justify-center">
+          <div className="flex flex-1 flex-col">
             <Label text="입력 방식" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-3">
               {(["bom", "single"] as const).map((m) => {
                 const active = (isSingleInlineSubType(subType) ? "single" : "bom") === m;
                 const label = m === "bom" ? "BOM 전개" : "단품 빠른 입력";
@@ -213,9 +214,9 @@ export function MobileSubTypeStep({
                       color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
                     }}
                   >
-                    <span className="text-base font-black leading-tight">{label}</span>
+                    <span className="text-lg font-black leading-tight">{label}</span>
                     <span
-                      className="text-xs font-semibold leading-tight"
+                      className="text-sm font-semibold leading-tight"
                       style={{ color: LEGACY_COLORS.muted2 }}
                     >
                       {desc}
@@ -239,9 +240,9 @@ export function MobileSubTypeStep({
   return (
     // 항목 7 — 세부 작업/부서 섹션이 화면 높이를 균등 분할.
     <div className="flex min-h-full flex-col gap-4">
-      <div className="flex flex-1 flex-col justify-center">
+      <div className="flex flex-1 flex-col">
         <Label text="세부 작업" />
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5">
           {subRows.map((row) => {
             const active = subType === row.id;
             return (
@@ -256,9 +257,9 @@ export function MobileSubTypeStep({
                   color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
                 }}
               >
-                <span className="text-base font-black leading-tight">{row.label}</span>
+                <span className="text-lg font-black leading-tight">{row.label}</span>
                 <span
-                  className="text-[11px] font-semibold leading-tight"
+                  className="text-xs font-semibold leading-tight"
                   style={{ color: LEGACY_COLORS.muted2 }}
                 >
                   {row.description}
@@ -270,7 +271,7 @@ export function MobileSubTypeStep({
       </div>
 
       {showAnyDept && dept.from && (
-        <div className="flex flex-1 flex-col justify-center">
+        <div className="flex flex-1 flex-col">
           <DeptGrid
             label={
               subType === "supplier_return"
@@ -285,7 +286,7 @@ export function MobileSubTypeStep({
         </div>
       )}
       {showAnyDept && dept.to && (
-        <div className="flex flex-1 flex-col justify-center">
+        <div className="flex flex-1 flex-col">
           <DeptGrid
             label={subType === "warehouse_to_dept" ? "도착 부서" : "대상 부서"}
             value={toDepartment}
