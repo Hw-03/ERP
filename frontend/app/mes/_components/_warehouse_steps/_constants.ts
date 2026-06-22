@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Department, DepartmentRole, EmployeeLevel, Item, WarehouseRole } from "@/lib/api";
+import { matchesItemSearch } from "@/lib/itemSearch";
 
 // ───────────────────────────── Types ─────────────────────────────
 
@@ -83,16 +84,7 @@ export const PROCESS_TYPE_LABEL: Record<string, string> = {
 // ─────────────────────────── Helpers ─────────────────────────────
 
 export function matchesSearch(item: Item, keyword: string) {
-  if (!keyword) return true;
-  const haystack = [
-    item.mes_code,
-    item.item_name,
-    item.legacy_part ?? "",
-    item.location ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(keyword);
+  return matchesItemSearch(item, keyword);
 }
 
 export function workTypeNeedsDept(wt: WorkType): boolean {

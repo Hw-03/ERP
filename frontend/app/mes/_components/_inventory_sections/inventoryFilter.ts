@@ -1,4 +1,5 @@
 import type { Item } from "@/lib/api";
+import { matchesItemSearch } from "@/lib/itemSearch";
 import type { KpiFilter } from "./InventoryKpiPanel";
 
 /**
@@ -16,16 +17,7 @@ export function safeQty(item: Item): number {
 }
 
 export function matchesSearch(item: Item, keyword: string): boolean {
-  if (!keyword) return true;
-  const haystack = [
-    item.mes_code,
-    item.item_name,
-    item.location ?? "",
-    item.supplier ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(keyword);
+  return matchesItemSearch(item, keyword);
 }
 
 export function matchesKpi(item: Item, kpi: KpiFilter): boolean {
