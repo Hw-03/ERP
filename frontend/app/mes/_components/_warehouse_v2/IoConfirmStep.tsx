@@ -193,34 +193,34 @@ export function IoConfirmStep({
     <div className="flex h-full min-h-0 flex-col gap-5">
       {/* 작업 요약 */}
       <div
-        className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border px-5 py-4"
+        className="flex flex-wrap items-center justify-between gap-2 lg:gap-4 rounded-[18px] border px-5 py-3 lg:py-4"
         style={{
           background: tint(accent, 6),
           borderColor: tint(accent, 24),
         }}
       >
         <div>
-          <div className="mb-2 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mb-1 lg:mb-2 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
             {meta.summaryLabel}
           </div>
-          <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
+          <div className="text-lg lg:text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
             {headerLabel} · 반영 {visibleIncludedLines.length}건 · 총 {formatQty(totalQty)}
           </div>
         </div>
         {isApproval ? (
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-black"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 lg:px-4 lg:py-2 text-sm font-black"
             style={{ background: tint(accent, 14), color: accent }}
           >
-            <AlertTriangle className="h-5 w-5" />
+            <AlertTriangle className="h-4 w-4 lg:h-5 lg:w-5" />
             {meta.badgeText}
           </span>
         ) : (
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-black"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 lg:px-4 lg:py-2 text-sm font-black"
             style={{ background: tint(accent, 14), color: accent }}
           >
-            <CheckCircle2 className="h-5 w-5" />
+            <CheckCircle2 className="h-4 w-4 lg:h-5 lg:w-5" />
             {meta.badgeText}
           </span>
         )}
@@ -270,7 +270,7 @@ export function IoConfirmStep({
           }}
         >
           <Save className="h-4 w-4 lg:h-5 lg:w-5" />
-          {saving ? "저장 중..." : "저장하기"}
+          {saving ? "저장 중..." : "저장"}
         </button>
         <button
           type="button"
