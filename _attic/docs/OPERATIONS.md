@@ -5,15 +5,15 @@
 ## 표준 실행 경로
 
 - **표준은 `start.bat`**. `docker-compose.yml`은 실험 용도로만 두며 정규 운영에 사용하지 않는다(포트 정렬 등은 다음 단계 작업으로 미뤄둔 상태).
-- 백엔드 포트: **8010** (uvicorn 직접 실행)
-- 프론트엔드 포트: **3000** (Next.js dev)
+- 백엔드 포트: **8011** (dev) / **8010** (prod) — `start.bat` 는 dev 포트로 띄운다 (`scripts/dev/start-backend.ps1` 도 동일)
+- 프론트엔드 포트: **3001** (dev) / **3000** (prod) — `start.bat` 의 PORT 환경변수가 3001 로 설정됨
 - 처음 실행 시 의존성이 자동 설치된다.
 
 ```bat
 start.bat
 ```
 
-LAN IP는 자동 감지된다. 같은 사설망의 다른 PC에서도 `http://<LAN IP>:3000` 으로 접근 가능.
+LAN IP는 자동 감지된다. 같은 사설망의 다른 PC에서도 `http://<LAN IP>:3001` 으로 접근 가능 (dev 기준 — prod 는 3000).
 
 ## 매일 정상 동작 확인 (1분)
 
@@ -91,9 +91,9 @@ scripts\ops\cleanup_backups.bat 60     rem 60일로 변경
 증상: `start.bat` 실행 후 백엔드/프론트가 안 뜸 또는 "EADDRINUSE"
 
 ```bat
-rem 사용 중인 프로세스 확인 (PID 추출)
-netstat -ano | findstr :8010
-netstat -ano | findstr :3000
+rem 사용 중인 프로세스 확인 (PID 추출) — dev 포트 기준
+netstat -ano | findstr :8011
+netstat -ano | findstr :3001
 
 rem 해당 PID 종료
 taskkill /PID <PID> /F
@@ -106,17 +106,17 @@ taskkill /PID <PID> /F
 | 증상 | 원인 후보 | 1차 조치 |
 |---|---|---|
 | 화면이 안 뜬다 | 백엔드/프론트가 죽음 | `start.bat` 재실행 |
-| pill이 빨강 "데이터를 불러오지 못했습니다" | 백엔드 미기동 / 네트워크 / 포트 점유 | `scripts\healthcheck.bat` → 포트 충돌 절차 |
+| pill이 빨강 "데이터를 불러오지 못했습니다" | 백엔드 미기동 / 네트워크 / 포트 점유 | `scripts\ops\healthcheck.bat` → 포트 충돌 절차 |
 | pill이 노랑 "부족 N · 품절 M" | 안전재고 미달 — 정상 알림 | 대시보드 "조치 필요" 확인 |
 | 입출고 일부만 처리됨 | 단건 처리 중 일부 실패 (재고 부족, 음수 등) | 결과 모달에서 "실패 항목만 다시 시도" |
 | 결과 모달이 닫히지 않음 | submit 진행 중 (의도된 잠금) | "처리 중..." 표시가 사라질 때까지 대기 |
 | `/health/detailed` 가 `inventory_mismatch_count > 0` | Inventory 합계와 위치별 합계 불일치 | DB 백업 후 운영 담당에게 보고 (수정은 별도 절차) |
-| 다른 PC에서 접속 안 됨 | LAN IP 변경 / 방화벽 | start.bat 콘솔에 표시된 새 IP 확인, Windows 방화벽에서 8010·3000 인바운드 허용 |
+| 다른 PC에서 접속 안 됨 | LAN IP 변경 / 방화벽 | start.bat 콘솔에 표시된 새 IP 확인, Windows 방화벽에서 8011·3001 (dev) 또는 8010·3000 (prod) 인바운드 허용 |
 
 ## 데이터 정합성 점검(수동)
 
 ```bash
-curl http://127.0.0.1:8010/health/detailed
+curl http://127.0.0.1:8011/health/detailed
 ```
 
 응답 필드:

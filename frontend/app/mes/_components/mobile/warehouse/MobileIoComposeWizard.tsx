@@ -47,7 +47,11 @@ import {
   shortageLines,
 } from "../../_warehouse_v2/pullFromWarehouse";
 
-/** IoComposeView 의 로컬 헬퍼 — 모바일에서도 동일 동작이 필요해 복제. */
+/**
+ * IoComposeView 의 로컬 헬퍼 복제. utils 로 추출하지 않은 이유:
+ * 헬퍼가 4줄짜리 데이터 접근이고 두 컴포넌트만의 사용처라, 공용 모듈을 만드는 비용
+ * (위치·이름·테스트 1곳 증가)이 복제 1개 유지 비용보다 크다. 더 손이 가면 그때 추출.
+ */
 function locationQuantity(
   item: Item,
   department: string | null | undefined,
@@ -611,7 +615,7 @@ export function MobileIoComposeWizard({
             subType={state.subType}
             itemMap={itemMap}
             getAvailable={getAvailable}
-            pullEnabled={state.subType === "produce"}
+            pullEnabled={state.subType === "produce" || state.subType === "disassemble"}
             pullSelected={pullSelected}
             onTogglePull={togglePull}
             onPullFromWarehouse={pullFromWarehouse}
