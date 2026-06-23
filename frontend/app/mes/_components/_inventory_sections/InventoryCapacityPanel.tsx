@@ -180,9 +180,9 @@ function AfPanel({
                     </td>
                     <td
                       className="py-0.5 font-black"
-                      style={{ color: pinned && pinned.fast_assembly > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+                      style={{ color: pinned && pinned.fast_production > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
                     >
-                      {pinned ? formatQty(pinned.fast_assembly) : "—"}
+                      {pinned ? formatQty(pinned.fast_production) : "—"}
                     </td>
                     <td
                       className="py-0.5 font-bold"
@@ -272,7 +272,7 @@ function ModelChip({
 }: {
   group: ModelCapacityGroup;
   showSep: boolean;
-  pinned: { ship_ready: number; fast_assembly: number; total_production: number } | null;
+  pinned: { ship_ready: number; fast_production: number; total_production: number } | null;
 }) {
   return (
     <span className="inline-flex shrink-0 items-baseline gap-1 text-sm">
@@ -289,7 +289,7 @@ function ModelChip({
       </span>
       <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
       <span className="font-black" style={{ color: pinned ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>
-        {pinned ? formatQty(pinned.fast_assembly) : "—"}
+        {pinned ? formatQty(pinned.fast_production) : "—"}
       </span>
       <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
       <span className="font-bold" style={{ color: pinned ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}>

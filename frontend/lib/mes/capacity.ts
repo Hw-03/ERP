@@ -17,7 +17,7 @@ export interface ModelCapacityGroup {
   /** 모델 내 AF 합계. 공유 자재가 있으면 동시 보장은 아님(표시용 합산). */
   totals: {
     ship_ready: number;
-    fast_assembly: number;
+    fast_production: number;
     total_production: number;
   };
 }
@@ -45,11 +45,11 @@ export function groupAfByModel(
       const totals = arr.reduce(
         (acc, it) => {
           acc.ship_ready += it.ship_ready;
-          acc.fast_assembly += it.fast_assembly;
+          acc.fast_production += it.fast_production;
           acc.total_production += it.total_production;
           return acc;
         },
-        { ship_ready: 0, fast_assembly: 0, total_production: 0 },
+        { ship_ready: 0, fast_production: 0, total_production: 0 },
       );
       const label =
         key === UNCLASSIFIED ? UNCLASSIFIED : getModelLabel(key, sorted[0]?.af_name) || `모델${key}`;
@@ -65,21 +65,20 @@ export function groupAfByModel(
 
 /**
  * 핀이 지정된 PF 의 3수량을 반환. 핀 없거나 variant 못 찾으면 null.
- * ship_ready 는 pf_variant 값, fast_assembly/total_production 은 부모 AF 값 사용.
+ * 3수량 모두 pf_variant 에서 직접 읽는다.
  */
 export function getPinnedPfNumbers(
   modelKey: string,
   pfPins: Record<string, string>,
   af: ProductionCapacityAfBlock,
-): { ship_ready: number; fast_assembly: number; total_production: number } | null {
+): { ship_ready: number; fast_production: number; total_production: number } | null {
   const pinId = pfPins[modelKey];
   if (!pinId) return null;
   const variant = af.pf_variants.find((v) => v.pf_item_id === pinId);
   if (!variant) return null;
-  const parentAf = af.items.find((it) => it.af_item_id === variant.af_item_id);
   return {
     ship_ready: variant.ship_ready,
-    fast_assembly: parentAf?.fast_assembly ?? 0,
-    total_production: parentAf?.total_production ?? 0,
+    fast_production: variant.fast_production,
+    total_production: variant.total_production,
   };
 }

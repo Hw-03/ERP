@@ -210,15 +210,15 @@ def test_capacity_response_has_legacy_and_af_block(
     assert data["af"]["basis"] == "AF"
     assert set(data["af"]["summary"].keys()) == {
         "ship_ready",
-        "fast_assembly",
+        "fast_production",
         "total_production",
     }
     assert isinstance(data["af"]["items"], list)
     assert isinstance(data["af"]["pf_variants"], list)
 
 
-def test_capacity_af_block_ship_ready_via_api(client, db_session, make_item, make_bom):
-    """AF→PF 연결이 있으면 af 블록에 ship_ready·pf_variants 가 채워진다."""
+def test_capacity_af_block_fast_production_via_api(client, db_session, make_item, make_bom):
+    """AF→PF 연결이 있으면 af 블록에 fast_production·pf_variants 가 채워진다."""
     af = make_item(name="조립완제품", process_type_code="AF", warehouse_qty=Decimal("5"))
     pf = make_item(name="출하완제품", process_type_code="PF", warehouse_qty=Decimal("0"))
     make_bom(pf.item_id, af.item_id, Decimal("1"))
@@ -229,13 +229,15 @@ def test_capacity_af_block_ship_ready_via_api(client, db_session, make_item, mak
     af_block = resp.json()["af"]
 
     af_row = next(r for r in af_block["items"] if r["af_item_id"] == str(af.item_id))
-    assert af_row["ship_ready"] == 5
+    assert af_row["ship_ready"] == 0  # PF 재고 없음
+    assert af_row["fast_production"] == 5  # AF 재고 = 빠른 생산
     assert af_row["has_pf_path"] is True
 
     variants = [v for v in af_block["pf_variants"] if v["af_item_id"] == str(af.item_id)]
     assert len(variants) == 1
     assert variants[0]["pf_item_id"] == str(pf.item_id)
-    assert variants[0]["ship_ready"] == 5
+    assert variants[0]["ship_ready"] == 0  # PF 재고 없음
+    assert variants[0]["fast_production"] == 5  # AF 재고 = 빠른 생산
 
 
 def test_capacity_multi_path_bottleneck(client, db_session, make_item, make_bom):

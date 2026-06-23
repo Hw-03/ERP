@@ -805,7 +805,7 @@
         "type": "object"
       },
       "CapacityAfBlock": {
-        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_assembly / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
+        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
         "properties": {
           "basis": {
             "const": "AF",
@@ -880,12 +880,12 @@
             "title": "Bom Status",
             "type": "string"
           },
-          "fast_assembly": {
-            "description": "기존 AF 재고 ＋ 직계 자재로 추가 조립 가능한 수(1레벨). 총 대응량(기존 재고 포함).",
-            "title": "Fast Assembly",
+          "fast_production": {
+            "description": "빠른 생산 — AF재고 + AF 직계 1단계 부품 → 이 PF 환산. 포장 구간 포함.",
+            "title": "Fast Production",
             "type": "integer"
           },
-          "fast_assembly_limiting_item": {
+          "fast_production_limiting_item": {
             "anyOf": [
               {
                 "type": "string"
@@ -894,7 +894,7 @@
                 "type": "null"
               }
             ],
-            "title": "Fast Assembly Limiting Item"
+            "title": "Fast Production Limiting Item"
           },
           "has_direct_children": {
             "title": "Has Direct Children",
@@ -938,7 +938,7 @@
             "title": "Ship Ready Limiting Item"
           },
           "total_production": {
-            "description": "AF 아래 전체 BOM 재귀 이론 최대(기존 AF 재고 포함).",
+            "description": "총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.",
             "title": "Total Production",
             "type": "integer"
           },
@@ -958,7 +958,7 @@
           "af_item_id",
           "af_name",
           "ship_ready",
-          "fast_assembly",
+          "fast_production",
           "total_production",
           "bom_status",
           "has_direct_children",
@@ -970,25 +970,25 @@
       },
       "CapacityAfSummary": {
         "properties": {
-          "fast_assembly": {
-            "description": "빠른 조립 가능 (AF별 총 대응량 합계).",
-            "title": "Fast Assembly",
+          "fast_production": {
+            "description": "빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 합계.",
+            "title": "Fast Production",
             "type": "integer"
           },
           "ship_ready": {
-            "description": "출하 준비 가능 (AF별 대표값 합계).",
+            "description": "출하 대기 — 창고에 있는 완성 PF 재고 합계.",
             "title": "Ship Ready",
             "type": "integer"
           },
           "total_production": {
-            "description": "총 생산 가능 (AF별 이론 최대 합계).",
+            "description": "총생산 — PF 루트 BOM 전체 재귀 이론 최대 합계.",
             "title": "Total Production",
             "type": "integer"
           }
         },
         "required": [
           "ship_ready",
-          "fast_assembly",
+          "fast_production",
           "total_production"
         ],
         "title": "CapacityAfSummary",
@@ -1015,7 +1015,12 @@
             "title": "Bom Status",
             "type": "string"
           },
-          "limiting_item": {
+          "fast_production": {
+            "description": "빠른 생산 — AF재고 + 1단계 부품 → 이 PF 환산.",
+            "title": "Fast Production",
+            "type": "integer"
+          },
+          "fast_production_limiting_item": {
             "anyOf": [
               {
                 "type": "string"
@@ -1024,7 +1029,7 @@
                 "type": "null"
               }
             ],
-            "title": "Limiting Item"
+            "title": "Fast Production Limiting Item"
           },
           "model_symbol": {
             "anyOf": [
@@ -1057,15 +1062,33 @@
             "type": "string"
           },
           "ship_ready": {
-            "description": "이 PF 1종 주문 기준 출하 준비 가능 수(AF 재고 cap + 출하/포장 자재 제한).",
+            "description": "출하 대기 — 이 PF 완성 재고.",
             "title": "Ship Ready",
             "type": "integer"
+          },
+          "total_production": {
+            "description": "총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.",
+            "title": "Total Production",
+            "type": "integer"
+          },
+          "total_production_limiting_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Limiting Item"
           }
         },
         "required": [
           "pf_item_id",
           "pf_name",
           "ship_ready",
+          "fast_production",
+          "total_production",
           "bom_status"
         ],
         "title": "CapacityPfVariant",
@@ -1083,7 +1106,7 @@
                 "type": "null"
               }
             ],
-            "description": "AF(조립 완제품) 기준 신규 생산 가능 수량 블록. ship_ready/fast_assembly/total_production."
+            "description": "AF(조립 완제품) 기준 신규 생산 가능 수량 블록. ship_ready/fast_production/total_production."
           },
           "immediate": {
             "description": "직계 자식 available 기준 즉시 생산 가능량 (모든 top_item 합).",
@@ -13405,7 +13428,7 @@
     },
     "/api/production/capacity": {
       "get": {
-        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_assembly / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
+        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
         "operationId": "get_production_capacity_api_production_capacity_get",
         "responses": {
           "200": {
@@ -13533,7 +13556,7 @@
     },
     "/api/production/possible": {
       "get": {
-        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_assembly / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
+        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
         "operationId": "get_production_capacity_api_production_possible_get",
         "responses": {
           "200": {

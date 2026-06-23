@@ -8,10 +8,10 @@ function mk(p: Partial<ProductionCapacityAfItem> & { af_item_id: string }): Prod
     af_name: p.af_name ?? "AF",
     model_symbol: null,
     ship_ready: 0,
-    fast_assembly: 0,
+    fast_production: 0,
     total_production: 0,
     ship_ready_limiting_item: null,
-    fast_assembly_limiting_item: null,
+    fast_production_limiting_item: null,
     total_production_limiting_item: null,
     bom_status: "complete",
     has_direct_children: true,
@@ -24,17 +24,17 @@ function mk(p: Partial<ProductionCapacityAfItem> & { af_item_id: string }): Prod
 describe("groupAfByModel", () => {
   it("모델별로 묶고 3수량을 합산한다", () => {
     const groups = groupAfByModel([
-      mk({ af_item_id: "a", model_symbol: "4", ship_ready: 100, fast_assembly: 200, total_production: 300 }),
-      mk({ af_item_id: "b", model_symbol: "4", ship_ready: 50, fast_assembly: 100, total_production: 150 }),
-      mk({ af_item_id: "c", model_symbol: "3", ship_ready: 10, fast_assembly: 20, total_production: 30 }),
+      mk({ af_item_id: "a", model_symbol: "4", ship_ready: 100, fast_production: 200, total_production: 300 }),
+      mk({ af_item_id: "b", model_symbol: "4", ship_ready: 50, fast_production: 100, total_production: 150 }),
+      mk({ af_item_id: "c", model_symbol: "3", ship_ready: 10, fast_production: 20, total_production: 30 }),
     ]);
 
     const m4 = groups.find((g) => g.key === "4")!;
-    expect(m4.totals).toEqual({ ship_ready: 150, fast_assembly: 300, total_production: 450 });
+    expect(m4.totals).toEqual({ ship_ready: 150, fast_production: 300, total_production: 450 });
     expect(m4.items).toHaveLength(2);
 
     const m3 = groups.find((g) => g.key === "3")!;
-    expect(m3.totals).toEqual({ ship_ready: 10, fast_assembly: 20, total_production: 30 });
+    expect(m3.totals).toEqual({ ship_ready: 10, fast_production: 20, total_production: 30 });
   });
 
   it("model_symbol 표시명을 getModelLabel 로 매핑한다", () => {

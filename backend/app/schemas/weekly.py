@@ -156,9 +156,9 @@ CapacityAfStatus = Literal[
 
 
 class CapacityAfSummary(BaseModel):
-    ship_ready: int = Field(..., description="출하 준비 가능 (AF별 대표값 합계).")
-    fast_assembly: int = Field(..., description="빠른 조립 가능 (AF별 총 대응량 합계).")
-    total_production: int = Field(..., description="총 생산 가능 (AF별 이론 최대 합계).")
+    ship_ready: int = Field(..., description="출하 대기 — 창고에 있는 완성 PF 재고 합계.")
+    fast_production: int = Field(..., description="빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 합계.")
+    total_production: int = Field(..., description="총생산 — PF 루트 BOM 전체 재귀 이론 최대 합계.")
 
 
 class CapacityAfItem(BaseModel):
@@ -174,15 +174,15 @@ class CapacityAfItem(BaseModel):
             "연결된 PF 가 없으면 0."
         ),
     )
-    fast_assembly: int = Field(
+    fast_production: int = Field(
         ...,
-        description="기존 AF 재고 ＋ 직계 자재로 추가 조립 가능한 수(1레벨). 총 대응량(기존 재고 포함).",
+        description="빠른 생산 — AF재고 + AF 직계 1단계 부품 → 이 PF 환산. 포장 구간 포함.",
     )
     total_production: int = Field(
-        ..., description="AF 아래 전체 BOM 재귀 이론 최대(기존 AF 재고 포함)."
+        ..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대."
     )
     ship_ready_limiting_item: Optional[str] = None
-    fast_assembly_limiting_item: Optional[str] = None
+    fast_production_limiting_item: Optional[str] = None
     total_production_limiting_item: Optional[str] = None
     bom_status: Literal["complete", "incomplete"] = Field(
         ..., description="has_direct_children 이면 complete, 아니면 incomplete."
@@ -198,10 +198,11 @@ class CapacityPfVariant(BaseModel):
     pf_name: str
     model_symbol: Optional[str] = None
     af_item_id: Optional[str] = None
-    ship_ready: int = Field(
-        ..., description="이 PF 1종 주문 기준 출하 준비 가능 수(AF 재고 cap + 출하/포장 자재 제한)."
-    )
-    limiting_item: Optional[str] = None
+    ship_ready: int = Field(..., description="출하 대기 — 이 PF 완성 재고.")
+    fast_production: int = Field(..., description="빠른 생산 — AF재고 + 1단계 부품 → 이 PF 환산.")
+    total_production: int = Field(..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.")
+    fast_production_limiting_item: Optional[str] = None
+    total_production_limiting_item: Optional[str] = None
     bom_status: Literal["complete", "incomplete"]
 
 
@@ -211,7 +212,7 @@ class CapacityAfBlock(BaseModel):
     재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.
     생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.
 
-    주의: summary.ship_ready / fast_assembly / total_production 은 'AF별 독립 계산의 합계'다.
+    주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.
     여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.
     """
 
@@ -270,7 +271,7 @@ class CapacityResponse(BaseModel):
     )
     af: Optional[CapacityAfBlock] = Field(
         None,
-        description="AF(조립 완제품) 기준 신규 생산 가능 수량 블록. ship_ready/fast_assembly/total_production.",
+        description="AF(조립 완제품) 기준 신규 생산 가능 수량 블록. ship_ready/fast_production/total_production.",
     )
 
 

@@ -204,7 +204,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
     """생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.
 
     - **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).
-    - **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_assembly / total_production).
+    - **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).
 
     계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.
     """

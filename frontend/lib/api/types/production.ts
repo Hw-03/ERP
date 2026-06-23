@@ -99,46 +99,51 @@ export type ProductionCapacityAfStatus =
   | "not_producible"
   | "producible";
 
-/** AF 기준 요약 3수량. AF별 독립 계산의 합계(공유 자재 시 동시 보장 아님). */
+/** PF 기준 요약 3수량. PF 변형별 독립 계산의 합계(공유 자재 시 동시 보장 아님). */
 export interface ProductionCapacityAfSummary {
-  /** 출하 준비 가능 (AF 재고를 출하까지 마무리). */
+  /** 출하 대기 — 창고에 있는 완성 PF 재고. */
   ship_ready: number;
-  /** 빠른 조립 가능 (기존 AF 재고 + 직계 자재로 추가 조립 가능 — 총 대응량). */
-  fast_assembly: number;
-  /** 총 생산 가능 (AF 아래 전체 BOM 재귀 이론 최대). */
+  /** 빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 (포장 구간 포함). */
+  fast_production: number;
+  /** 총생산 — PF 루트로 BOM 전체 재귀 이론 최대. */
   total_production: number;
 }
 
-/** AF 1종의 생산 가능 수량 + 병목 + BOM 상태 근거. */
+/** AF 1종의 생산 가능 수량 + 병목 + BOM 상태 근거. 수치는 연결된 PF 변형 best 값. */
 export interface ProductionCapacityAfItem {
   af_item_id: string;
   af_code: string | null;
   af_name: string;
   model_symbol?: string | null;
   ship_ready: number;
-  fast_assembly: number;
+  fast_production: number;
   total_production: number;
   ship_ready_limiting_item?: string | null;
-  fast_assembly_limiting_item?: string | null;
+  fast_production_limiting_item?: string | null;
   total_production_limiting_item?: string | null;
   bom_status: "complete" | "incomplete";
   has_direct_children: boolean;
-  /** 역방향 BOM 상 출하 경로(PF)가 1개 이상 존재. false 면 ship_ready=0. */
+  /** 역방향 BOM 상 출하 경로(PF)가 1개 이상 존재. false 면 모든 수치 0. */
   has_pf_path: boolean;
   /** bom_completed_at 기록 여부(표시 신호 — 계산 게이팅 아님). */
   marked_complete: boolean;
 }
 
-/** AF 에 연결된 PF 변형 — 특정 PF 주문 기준 ship_ready. */
+/** AF 에 연결된 PF 변형 — PF 1종 기준 3수량. */
 export interface ProductionCapacityPfVariant {
   pf_item_id: string;
   pf_code: string | null;
   pf_name: string;
   model_symbol?: string | null;
   af_item_id: string | null;
-  /** 이 PF 1종 주문 기준 출하 준비 가능 수(요약 대표값과 구분 — 주문 판단은 이 값). */
+  /** 출하 대기 — 이 PF 완성 재고. */
   ship_ready: number;
-  limiting_item?: string | null;
+  /** 빠른 생산 — AF재고 + 1단계 부품 → 이 PF로 환산. */
+  fast_production: number;
+  /** 총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대. */
+  total_production: number;
+  fast_production_limiting_item?: string | null;
+  total_production_limiting_item?: string | null;
   bom_status: "complete" | "incomplete";
 }
 

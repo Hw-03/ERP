@@ -63,15 +63,15 @@ export function CapacityDetailModal({
           <div className="mt-3 space-y-1.5">
             <div className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[3px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 지금 바로 고객에게 보낼 수 있는 수량이에요. 창고에 완성된 AF가 있고, 포장·출하 단계 부품도 준비됐을 때만 카운트돼요.</span>
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 창고에 이미 완성된 PF(출하 완제품) 재고예요. 부품 확인 없이 지금 당장 고객에게 보낼 수 있어요.</span>
             </div>
             <div className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[3px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 조립</span> — 지금 있는 AF 재고 + 바로 연결된 1단계 부품으로 만들 수 있는 수량이에요. 하위 부품 깊이는 확인 안 해서 실제보다 낙관적일 수 있어요.</span>
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span> — AF 재고 + AF 직계 1단계 부품으로 만들 수 있는 AF를 PF로 환산한 수량이에요. 포장 구간 부품도 함께 확인해요.</span>
             </div>
             <div className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[3px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.purple }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — BOM을 끝까지 다 펼쳐서 이론적으로 만들 수 있는 최대 수량이에요. 부품 공유로 인한 중복은 제거하지만, 시간·생산 순서는 반영 안 해요.</span>
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — PF를 기준으로 BOM 전체를 끝까지 펼쳐서 이론적으로 만들 수 있는 최대 수량이에요. 부품 공유로 인한 중복은 제거해요.</span>
             </div>
           </div>
           <div
@@ -133,7 +133,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
   const producibleCount = useMemo(
     () =>
       items.filter(
-        (it) => it.ship_ready > 0 || it.fast_assembly > 0 || it.total_production > 0,
+        (it) => it.ship_ready > 0 || it.fast_production > 0 || it.total_production > 0,
       ).length,
     [items],
   );
@@ -143,7 +143,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
   const filtered = useMemo(() => {
     if (filterMode === "producible")
       return items.filter(
-        (it) => it.ship_ready > 0 || it.fast_assembly > 0 || it.total_production > 0,
+        (it) => it.ship_ready > 0 || it.fast_production > 0 || it.total_production > 0,
       );
     if (filterMode === "incomplete") return items.filter(isIncomplete);
     return items;
@@ -301,13 +301,13 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                 {pinnedNumbers ? (
                   <>
                     <QtyLabelCell label="출하 대기" value={pinnedNumbers.ship_ready} color={LEGACY_COLORS.cyan} />
-                    <QtyLabelCell label="빠른 조립" value={pinnedNumbers.fast_assembly} color={LEGACY_COLORS.blue} />
+                    <QtyLabelCell label="빠른 생산" value={pinnedNumbers.fast_production} color={LEGACY_COLORS.blue} />
                     <QtyLabelCell label="총생산" value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
                   </>
                 ) : (
                   <>
                     <DashLabelCell label="출하 대기" />
-                    <DashLabelCell label="빠른 조립" />
+                    <DashLabelCell label="빠른 생산" />
                     <DashLabelCell label="총생산" />
                   </>
                 )}
@@ -349,7 +349,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         )}
                         <div className="mt-2 grid grid-cols-3 gap-1">
                           <QtyLabelCell label="출하 대기" value={it.ship_ready} color={LEGACY_COLORS.cyan} />
-                          <QtyLabelCell label="빠른 조립" value={it.fast_assembly} color={LEGACY_COLORS.blue} />
+                          <QtyLabelCell label="빠른 생산" value={it.fast_production} color={LEGACY_COLORS.blue} />
                           <QtyLabelCell label="총생산" value={it.total_production} color={LEGACY_COLORS.purple} />
                         </div>
                       </div>
@@ -408,7 +408,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           <span />
           <span>조립 완제품 · 병목</span>
           <span className="text-right">출하 대기</span>
-          <span className="text-right">빠른 조립</span>
+          <span className="text-right">빠른 생산</span>
           <span className="text-right">총생산</span>
         </div>
 
@@ -481,7 +481,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
               {pinnedNumbers ? (
                 <>
                   <QtyCell value={pinnedNumbers.ship_ready} color={LEGACY_COLORS.cyan} />
-                  <QtyCell value={pinnedNumbers.fast_assembly} color={LEGACY_COLORS.blue} />
+                  <QtyCell value={pinnedNumbers.fast_production} color={LEGACY_COLORS.blue} />
                   <QtyCell value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
                 </>
               ) : (
@@ -528,7 +528,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       )}
                     </div>
                     <QtyCell value={it.ship_ready} color={LEGACY_COLORS.cyan} />
-                    <QtyCell value={it.fast_assembly} color={LEGACY_COLORS.blue} />
+                    <QtyCell value={it.fast_production} color={LEGACY_COLORS.blue} />
                     <QtyCell value={it.total_production} color={LEGACY_COLORS.purple} />
                   </button>
 
@@ -639,21 +639,23 @@ function PfVariants({
         출하 변형(PF)별 출하 준비 가능 — 특정 주문 기준
       </div>
       <div
-        className="grid grid-cols-[minmax(0,1fr)_90px_64px_28px] gap-2 px-2 pb-1 text-xs font-bold uppercase tracking-[0.12em]"
+        className="grid grid-cols-[minmax(0,1fr)_72px_72px_72px_64px_28px] gap-2 px-2 pb-1 text-xs font-bold uppercase tracking-[0.12em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         <span>출하 완제품 · 병목</span>
         <span className="text-right">출하 대기</span>
+        <span className="text-right">빠른 생산</span>
+        <span className="text-right">총생산</span>
         <span />
         <span />
       </div>
       {variants.map((v) => {
-        const ok = v.ship_ready > 0;
+        const ok = v.ship_ready > 0 || v.fast_production > 0;
         const isPinned = pinnedPfId === v.pf_item_id;
         return (
           <div
             key={v.pf_item_id}
-            className="grid grid-cols-[minmax(0,1fr)_90px_64px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
+            className="grid grid-cols-[minmax(0,1fr)_72px_72px_72px_64px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
             style={{
               background: isPinned
                 ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 10%, transparent)`
@@ -672,17 +674,34 @@ function PfVariants({
                   {v.pf_code}
                 </div>
               )}
-              {v.limiting_item && (
+              {v.fast_production_limiting_item && (
                 <div className="truncate text-xs" style={{ color: LEGACY_COLORS.yellow }}>
-                  병목: {v.limiting_item}
+                  병목(빠른): {v.fast_production_limiting_item}
+                </div>
+              )}
+              {v.total_production_limiting_item && (
+                <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  병목(총): {v.total_production_limiting_item}
                 </div>
               )}
             </div>
             <div
               className="text-right text-sm font-bold"
-              style={{ color: ok ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
+              style={{ color: v.ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
             >
               {formatQty(v.ship_ready)}
+            </div>
+            <div
+              className="text-right text-sm font-bold"
+              style={{ color: v.fast_production > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+            >
+              {formatQty(v.fast_production)}
+            </div>
+            <div
+              className="text-right text-sm font-bold"
+              style={{ color: v.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
+            >
+              {formatQty(v.total_production)}
             </div>
             <div className="flex justify-end">
               {isPinned ? (

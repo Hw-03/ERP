@@ -6,18 +6,14 @@
    (`immediate` / `maximum` / `top_items` / `representative_items`).
    라우터에서 1:1 이전한 것으로 **값·의미를 완전히 보존**한다.
 2. `compute_af_capacity` — 신규 AF(조립 완제품) 기준
-   (`ship_ready` / `fast_assembly` / `total_production`).
+   (`ship_ready` / `fast_production` / `total_production`).
 
-세 AF 수량 정의:
+세 PF 수량 정의 (모두 PF 기준):
 
-- **fast_assembly**(빠른 조립 가능) : 기존 AF 재고 ＋ 직계 자재로 추가 조립 가능한 수.
-  1레벨만 본다(자식의 하위 BOM 미전개). *순수 추가 생산량이 아니라 기존 AF 재고를
-  포함한 총 대응량*이다.
-- **total_production**(총 생산 가능) : AF 아래 전체 BOM 을 재귀로 펼친 이론 최대
-  (기존 AF 재고 포함).
-- **ship_ready**(출하 준비 가능) : 특정 PF 주문 기준. PF 한 종을 만들 때의 AF 요구량으로
-  AF 재고를 cap 하고, PF→AF 상위 출하/포장 구간 자재 부족분으로 제한한다.
-  PF별 값이 1차 정의이고, AF 요약값은 그 변형들 중 **최대값**(낙관적 대표)이다.
+- **ship_ready**(출하 대기) : PF 완성 재고. 부품 확인 없이 즉시 출하 가능.
+- **fast_production**(빠른 생산) : AF재고 ＋ AF 직계 1단계 부품으로 만들 수 있는 AF 수
+  를 PF로 환산. 포장 구간 부품도 확인한다.
+- **total_production**(총생산) : PF 루트로 BOM 전체 재귀 이론 최대.
 
 모든 수량은 `StockFigures.available`(warehouse＋production−pending)을 기준으로 한다.
 이는 **계획/대응 수량 지표**이며, 생산 등록 가능성 검증(backflush, `warehouse_available`)이
@@ -419,7 +415,7 @@ def _requirements_below(
     return req
 
 
-def _ship_ready_variant(
+def _fast_production_variant(
     pf_id: uuid.UUID,
     af_id: uuid.UUID,
     af_ids: set[uuid.UUID],
@@ -427,33 +423,28 @@ def _ship_ready_variant(
     bom_cache: BomCache,
     fig_by_id: FigById,
 ) -> Tuple[int, uuid.UUID | None]:
-    """특정 PF 1종 + 대상 AF 1종 기준 출하 준비 가능 수.
+    """AF재고 + AF 직계 1단계 부품 → PF로 환산 (포장 구간 부품 cap 포함).
 
-    = PF 자체 재고 + min( AF 재고 / PF당 AF요구량,  PF→AF 출하/포장 구간 각 자재 / 요구량 ).
-    이미 완성된 PF 재고는 부품 없이 즉시 출하 가능하므로 조립 가능량과 합산한다.
-    형제 AF(피어 완제품)는 cap 대상에서 제외한다.
+    빠른 생산: _fast_assembly 로 구한 AF 총량을 PF 요구량으로 나누고
+    포장 구간 부품이 추가로 제한하면 그 값으로 cap 한다.
+    형제 AF 는 cap 대상에서 제외.
     """
-    pf_own = _own_available(pf_id, fig_by_id)
-
+    fast_af_qty, fast_af_btl = _fast_assembly(af_id, bom_cache=bom_cache, fig_by_id=fig_by_id)
     req = _requirements_below(pf_id, af_ids, bom_cache)
     af_req = req.get(af_id)
     if not af_req or af_req <= 0:
-        return pf_own, None
-
-    af_own = _own_available(af_id, fig_by_id)
-    best = int(Decimal(af_own) / af_req)
-    bottleneck: uuid.UUID | None = af_id
-
+        return 0, None
+    best = int(Decimal(fast_af_qty) / af_req)
+    # AF 조립 병목을 기본으로 사용(없으면 AF 자체). 포장 구간 부품이 더 타이트하면 교체.
+    bottleneck: uuid.UUID | None = fast_af_btl if fast_af_btl is not None else af_id
     for node, qty in req.items():
         if node == af_id or qty <= 0 or node in af_ids:
-            continue  # 대상 AF 는 위에서 cap, 형제 AF 는 이 변형 cap 대상 아님
-        node_own = _own_available(node, fig_by_id)
-        can = int(Decimal(node_own) / qty)
+            continue
+        can = int(Decimal(_own_available(node, fig_by_id)) / qty)
         if can < best:
             best = can
             bottleneck = node
-
-    return best + pf_own, bottleneck
+    return best, bottleneck
 
 
 def _pf_variant_ancestors(
@@ -500,7 +491,7 @@ def compute_af_capacity(
         return {
             "basis": "AF",
             "status": "no_target",
-            "summary": {"ship_ready": 0, "fast_assembly": 0, "total_production": 0},
+            "summary": {"ship_ready": 0, "fast_production": 0, "total_production": 0},
             "items": [],
             "pf_variants": [],
         }
@@ -521,19 +512,22 @@ def compute_af_capacity(
         else:
             any_incomplete = True
 
-        fast_qty, fast_btl = _fast_assembly(af_id, bom_cache=bom_cache, fig_by_id=fig_by_id)
-        total_qty, total_btl = _max_buildable(
-            af_id, bom_cache=bom_cache, fig_by_id=fig_by_id
-        )
-
         pf_ids = _pf_variant_ancestors(af_id, reverse_bom, items_map)
         has_pf_path = bool(pf_ids)
 
         best_ship = 0
-        best_ship_btl: uuid.UUID | None = None
+        best_fast = 0
+        best_total = 0
+        best_fast_btl: uuid.UUID | None = None
+        best_total_btl: uuid.UUID | None = None
+
         for pf_id in pf_ids:
-            v_qty, v_btl = _ship_ready_variant(
+            pf_own = _own_available(pf_id, fig_by_id)
+            fast_qty, fast_btl = _fast_production_variant(
                 pf_id, af_id, af_id_set, bom_cache=bom_cache, fig_by_id=fig_by_id
+            )
+            total_qty, total_btl = _max_buildable(
+                pf_id, bom_cache=bom_cache, fig_by_id=fig_by_id
             )
             pf = items_map.get(pf_id)
             variant_rows.append({
@@ -542,13 +536,21 @@ def compute_af_capacity(
                 "pf_name": pf.item_name if pf else "(알 수 없는 품목)",
                 "model_symbol": pf.model_symbol if pf else None,
                 "af_item_id": str(af_id),
-                "ship_ready": v_qty,
-                "limiting_item": _bottleneck_name(v_btl, items_map),
+                "ship_ready": pf_own,
+                "fast_production": fast_qty,
+                "total_production": total_qty,
+                "fast_production_limiting_item": _bottleneck_name(fast_btl, items_map),
+                "total_production_limiting_item": _bottleneck_name(total_btl, items_map),
                 "bom_status": "complete" if (pf and bom_cache.get(pf_id)) else "incomplete",
             })
-            if v_qty > best_ship:
-                best_ship = v_qty
-                best_ship_btl = v_btl
+            if pf_own > best_ship:
+                best_ship = pf_own
+            if fast_qty > best_fast:
+                best_fast = fast_qty
+                best_fast_btl = fast_btl
+            if total_qty > best_total:
+                best_total = total_qty
+                best_total_btl = total_btl
 
         af_rows.append({
             "af_item_id": str(af_id),
@@ -556,11 +558,11 @@ def compute_af_capacity(
             "af_name": af.item_name,
             "model_symbol": af.model_symbol,
             "ship_ready": best_ship,
-            "fast_assembly": fast_qty,
-            "total_production": total_qty,
-            "ship_ready_limiting_item": _bottleneck_name(best_ship_btl, items_map),
-            "fast_assembly_limiting_item": _bottleneck_name(fast_btl, items_map),
-            "total_production_limiting_item": _bottleneck_name(total_btl, items_map),
+            "fast_production": best_fast,
+            "total_production": best_total,
+            "ship_ready_limiting_item": None,
+            "fast_production_limiting_item": _bottleneck_name(best_fast_btl, items_map),
+            "total_production_limiting_item": _bottleneck_name(best_total_btl, items_map),
             "bom_status": bom_status,
             "has_direct_children": has_direct_children,
             "has_pf_path": has_pf_path,
@@ -569,7 +571,7 @@ def compute_af_capacity(
 
     summary = {
         "ship_ready": sum(r["ship_ready"] for r in af_rows),
-        "fast_assembly": sum(r["fast_assembly"] for r in af_rows),
+        "fast_production": sum(r["fast_production"] for r in af_rows),
         "total_production": sum(r["total_production"] for r in af_rows),
     }
 
@@ -579,7 +581,7 @@ def compute_af_capacity(
     elif any_incomplete:
         status = "incomplete"
     elif any(
-        r["ship_ready"] > 0 or r["fast_assembly"] > 0 or r["total_production"] > 0
+        r["ship_ready"] > 0 or r["fast_production"] > 0 or r["total_production"] > 0
         for r in af_rows
     ):
         status = "producible"
