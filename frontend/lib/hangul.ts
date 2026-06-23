@@ -63,6 +63,21 @@ export function toQwerty(text: string): string {
   return out;
 }
 
+// 완성형 음절 → 초성 자모(예: "김건호" → "ㄱㄱㅎ"). 자모/라틴/기타 문자는 그대로 통과.
+// 이름 초성검색에 사용 — 매칭 시 query 와 비교한다.
+export function toChosung(text: string): string {
+  let out = '';
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      out += CHO_LIST[Math.floor((code - 0xac00) / 28 / 21)];
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
 // QWERTY → 한글. 두벌식 오토마타로 음절을 조립한다.
 // 매핑되지 않는 문자(숫자/공백 등)는 그대로 통과시킨다.
 export function toHangul(input: string): string {

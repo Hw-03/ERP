@@ -11,7 +11,7 @@ import {
 } from "react";
 import { ChevronDown, User as UserIcon } from "lucide-react";
 import type { Employee } from "@/lib/api";
-import { toHangul, toQwerty } from "@/lib/hangul";
+import { toChosung, toHangul, toQwerty } from "@/lib/hangul";
 
 const isHangulChar = (c: string) => /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(c);
 
@@ -55,7 +55,9 @@ export function EmployeeCombobox({
         e.name.toLowerCase().includes(q) ||
         e.department.toLowerCase().includes(q) ||
         e.employee_code.toLowerCase().includes(q) ||
-        e.employee_code.toLowerCase().includes(raw),
+        e.employee_code.toLowerCase().includes(raw) ||
+        // 초성검색: q 가 초성 자모열("ㄱㄱㅎ")일 때만 이름 초성("김건호"→"ㄱㄱㅎ")에 매칭.
+        toChosung(e.name).includes(q),
     );
   }, [sortedEmployees, query]);
 
