@@ -36,11 +36,11 @@ Top MCP Servers:
 
 ## Team Tips
 
-- **시작 / 중지 스크립트**: 백엔드는 항상 `scripts/dev/start-backend.ps1` (좀비 워커 자동 정리 + /health/live 확인) 와 `scripts/dev/stop-backend.ps1` (포트 8010 PID 강제 종료) 를 사용한다. 백엔드 로그가 0줄이면 좀비 의심 — stop 후 start 로 재기동.
+- **시작 / 중지 스크립트**: 백엔드는 항상 `scripts/dev/start-backend.ps1` (좀비 워커 자동 정리 + /health/live 확인) 와 `scripts/dev/stop-backend.ps1` (포트 8011 PID 강제 종료 — dev) 를 사용한다. 백엔드 로그가 0줄이면 좀비 의심 — stop 후 start 로 재기동.
 - **커밋 / 푸시는 명시 요청 시에만**: AI 가 자동으로 커밋·푸시하지 않는다. 커밋 메시지는 `YYYY-MM-DD area: 요약` 형식 (예: `2026-05-29 backend: 시리얼 부여 수정`).
 - **검증 게이트**: 커밋 전 `powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1` 통과. backend pytest / frontend lint·tsc·vitest / next build / OpenAPI drift 5게이트.
 - **DB 변경**: 서버 기동만으로 DB 가 바뀌면 안 됨. 스키마 변경·시드는 `cd backend && python bootstrap_db.py --all`.
-- **동결 영역**: `frontend/app/legacy/_components/_weekly_sections/` 와 `DesktopWeeklyReportView.tsx` 는 동결 (2026-05-24). 명시 요청 없으면 우회.
+- **동결 영역**: `frontend/app/mes/_components/_weekly_sections/` 와 `DesktopWeeklyReportView.tsx` 는 동결 (2026-05-24). 명시 요청 없으면 우회.
 - **응답 규칙**: AI 는 한국어, 결론 먼저, 짧고 명확하게.
 
 자세한 작업 규칙은 [CLAUDE.md](CLAUDE.md) 참조.

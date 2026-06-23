@@ -51,7 +51,7 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 
 ## 입출고 (Io) — V2
 
-현재 활성 입력 UI: `frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx`.
+현재 활성 입력 UI: `frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx`.
 
 작업 분기는 4 work type:
 1. **`receive`** — 원자재 입고 (창고 정/부만 가능)
@@ -97,7 +97,7 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 
 | 이름 | 실제 | 주의 |
 |---|---|---|
-| `frontend/app/legacy/` | **현재 메인 운영 UI** | "legacy"=구식이 아님. 모든 데스크탑/모바일 화면이 여기 있다 |
+| `legacy_part`, `legacy_item_type` | Item 모델의 **현역 필드** | "legacy" 접두사는 historical 이유 — CSV 호환·검색용으로 의도 보존(CLAUDE.md 명시) |
 | `routers/models.py` | 제품 모델(ProductSymbol) **라우터** | DB 모델은 `models/` 폴더 |
 | `_warehouse_v2/` | 현재 활성 입출고 컴포넌트 | V1은 `_warehouse_sections/` 등에 분산(별도 V1 폴더 없음) |
 | `services/inventory.py` | re-export 레이어(공개 API) | 실제 로직은 `inv_base/calc/transfer/defective.py` |
