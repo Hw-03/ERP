@@ -24,6 +24,8 @@ type Stage = "floor" | "front" | "row";
 type PanelCell = { angle: WarehouseAngle; row: number; layer: number };
 type SearchHit = { angle_id: number; row: number; layer: number; items: WarehouseBoxItem[] };
 type LocGuide = { hits: Array<{ hit: SearchHit; angle: WarehouseAngle; qty: number }> };
+// 검색 후보 1건 = 한 품목 + 그 품목이 들어있는 칸들. 칸 단위가 아니라 품목 단위로 묶는다.
+type ItemMatch = { item_id: string; item_name: string; mes_code: string | null; hits: SearchHit[]; totalQty: number };
 
 export function DesktopWarehouseMapView({
   onStatusChange,
@@ -53,7 +55,10 @@ export function DesktopWarehouseMapView({
   const [busy, setBusy] = useState(false);
 
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchHit[] | null>(null);
+  // 품목 단위 후보(드롭다운). 선택 전에는 여기에 후보들이, 선택 후에는 null.
+  const [itemMatches, setItemMatches] = useState<ItemMatch[] | null>(null);
+  // 현재 선택된 품목(칩 스트립 라벨·선택 상태 표시용). 선택 전 null.
+  const [selectedItem, setSelectedItem] = useState<ItemMatch | null>(null);
   const [hitAngles, setHitAngles] = useState<Map<number, number> | null>(null);
   const [pulse, setPulse] = useState<{ angleId?: number; cellKey?: string; layer?: number } | null>(null);
   const [locGuide, setLocGuide] = useState<LocGuide | null>(null);
@@ -346,7 +351,8 @@ export function DesktopWarehouseMapView({
   // ── Search ──
   function clearSearch() {
     setQuery("");
-    setResults(null);
+    setItemMatches(null);
+    setSelectedItem(null);
     setHitAngles(null);
     setPulse(null);
     setMatchQuery("");
@@ -356,58 +362,103 @@ export function DesktopWarehouseMapView({
 
   function runSearch(q: string) {
     setQuery(q);
-    setResults(null);
     setPulse(null);
     const lq = q.trim().toLowerCase();
     if (!lq || !map) {
+      setItemMatches(null);
+      setSelectedItem(null);
       setHitAngles(null);
+      setLocGuide(null);
+      setActiveHitKey(null);
       return;
     }
-    const grouped = new Map<string, SearchHit>();
+    // item_id 로 1차 그룹핑(품목 단위), 그 안에서 칸(cellKey)으로 2차 그룹핑.
+    const byItem = new Map<string, { name: string; code: string | null; cells: Map<string, SearchHit> }>();
     for (const b of map.boxes) {
       for (const it of b.items) {
         if (
           it.item_name.toLowerCase().includes(lq) ||
           (it.mes_code || "").toLowerCase().includes(lq)
         ) {
+          let g = byItem.get(it.item_id);
+          if (!g) {
+            g = { name: it.item_name, code: it.mes_code, cells: new Map() };
+            byItem.set(it.item_id, g);
+          }
           const k = cellKey(b.angle_id, b.row_no, b.layer_no);
-          const g = grouped.get(k);
-          if (g) g.items.push(it);
-          else grouped.set(k, { angle_id: b.angle_id, row: b.row_no, layer: b.layer_no, items: [it] });
+          const cell = g.cells.get(k);
+          if (cell) cell.items.push(it);
+          else g.cells.set(k, { angle_id: b.angle_id, row: b.row_no, layer: b.layer_no, items: [it] });
         }
       }
     }
-    const hits = Array.from(grouped.values());
-    const hitA = new Map<number, number>();
-    for (const h of hits) hitA.set(h.angle_id, (hitA.get(h.angle_id) ?? 0) + 1);
-    setHitAngles(hitA);
+    const matches: ItemMatch[] = Array.from(byItem, ([item_id, g]) => {
+      const hits = Array.from(g.cells.values());
+      return {
+        item_id,
+        item_name: g.name,
+        mes_code: g.code,
+        hits,
+        totalQty: hits.reduce((s, h) => s + h.items.reduce((t, x) => t + x.quantity, 0), 0),
+      };
+    }).sort((a, b) => a.item_name.localeCompare(b.item_name));
 
-    if (hits.length > 0) {
-      setLocGuide({
-        hits: hits
-          .map((h) => ({ hit: h, angle: angles.find((a) => a.id === h.angle_id)!, qty: h.items.reduce((s, it) => s + it.quantity, 0) }))
-          .filter((x) => x.angle != null),
-      });
-    } else {
+    if (matches.length === 0) {
+      setItemMatches([]); // 0건 — 아래 "찾을 수 없음" 분기용
+      setSelectedItem(null);
+      setHitAngles(new Map());
       setLocGuide(null);
+      setActiveHitKey(null);
+      return;
     }
-
-    if (hits.length === 0) return;
-    if (hits.length === 1) navigateToHit(hits[0], q);
-    else setResults(hits);
+    if (matches.length === 1) {
+      // 1개로 좁혀지면 자동 선택(입력창에 친 글자는 보존)
+      selectItem(matches[0], { keepQuery: true });
+      return;
+    }
+    // 여러 후보: 품목 드롭다운만. 칩 스트립·강조는 선택 전까지 비움.
+    setItemMatches(matches);
+    setSelectedItem(null);
+    setLocGuide(null);
+    setActiveHitKey(null);
+    setMatchQuery("");
+    const hitA = new Map<number, number>();
+    for (const m of matches) for (const h of m.hits) hitA.set(h.angle_id, (hitA.get(h.angle_id) ?? 0) + 1);
+    setHitAngles(hitA);
   }
 
-  function navigateToHit(hit: SearchHit, q: string) {
+  // 품목 후보 하나 선택 — 그 품목 칸만 칩 스트립에 남기고 첫 칸으로 이동.
+  function selectItem(m: ItemMatch, opts?: { keepQuery?: boolean }) {
+    setItemMatches(null);
+    setSelectedItem(m);
+    if (!opts?.keepQuery) setQuery(m.item_name);
+    // 박스 강조: 고유한 mes_code 우선(비슷한 이름 0015/0016 정밀 구분), 없으면 품목명 폴백.
+    const highlight = m.mes_code ?? m.item_name;
+    setMatchQuery(highlight);
+    setLocGuide({
+      hits: m.hits
+        .map((h) => ({ hit: h, angle: angles.find((a) => a.id === h.angle_id)!, qty: h.items.reduce((s, it) => s + it.quantity, 0) }))
+        .filter((x) => x.angle != null),
+    });
+    const hitA = new Map<number, number>();
+    for (const h of m.hits) hitA.set(h.angle_id, (hitA.get(h.angle_id) ?? 0) + 1);
+    setHitAngles(hitA);
+    if (m.hits.length > 0) navigateToHit(m.hits[0], highlight, { fromSelect: true });
+  }
+
+  function navigateToHit(hit: SearchHit, q: string, opts?: { fromSelect?: boolean }) {
     const a = angles.find((x) => x.id === hit.angle_id);
     if (!a) return;
-    setResults(null);
-    setQuery(hit.items[0]?.item_name ?? q);
     setActiveHitKey(`${hit.angle_id}-${hit.row}-${hit.layer}`);
+    if (!opts?.fromSelect) {
+      // 칩 직접 클릭 등으로 들어온 경우에만 입력/강조 동기화(선택 흐름에선 selectItem 이 소유).
+      setQuery(hit.items[0]?.item_name ?? q);
+      setMatchQuery(q);
+    }
     setCurAngle(a);
     setCurRow(hit.row);
     setStage("row");
     setPanel({ angle: a, row: hit.row, layer: hit.layer });
-    setMatchQuery(q);
     setPulse({ layer: hit.layer });
     window.setTimeout(() => setPulse(null), 1600);
     const d1 = wmDepthRef.current + 1;
@@ -575,8 +626,8 @@ export function DesktopWarehouseMapView({
               )}
             </div>
 
-            {/* multi-result dropdown */}
-            {results && results.length > 1 && (
+            {/* 품목 후보 드롭다운 (품목 단위) */}
+            {itemMatches && itemMatches.length > 1 && (
               <div
                 style={{
                   position: "absolute",
@@ -593,29 +644,30 @@ export function DesktopWarehouseMapView({
                 }}
               >
                 <div style={{ padding: "8px 12px", fontSize: 11, color: LEGACY_COLORS.muted, borderBottom: `1px solid ${LEGACY_COLORS.border}`, fontWeight: 600 }}>
-                  {results.length}개 위치에서 발견
+                  {itemMatches.length}개 품목
                 </div>
-                {results.map((res) => {
-                  const a = angles.find((x) => x.id === res.angle_id);
-                  const col = cellColor(cellIndex.get(cellKey(res.angle_id, res.row, res.layer))) || LEGACY_COLORS.muted2;
-                  const qty = res.items.reduce((s, it) => s + it.quantity, 0);
+                {itemMatches.map((m) => {
+                  const first = m.hits[0];
+                  const col =
+                    (first && cellColor(cellIndex.get(cellKey(first.angle_id, first.row, first.layer)))) ||
+                    LEGACY_COLORS.muted2;
                   return (
                     <div
-                      key={`${res.angle_id}-${res.row}-${res.layer}`}
-                      onClick={() => navigateToHit(res, query)}
+                      key={m.item_id}
+                      onClick={() => selectItem(m)}
                       style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                     >
                       <div style={{ width: 4, height: 30, borderRadius: 2, background: col, flexShrink: 0 }} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 12, color: LEGACY_COLORS.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {res.items.map((it) => it.item_name).join(", ")}
+                          {m.item_name}
                         </div>
                         <div style={{ fontSize: 11, color: LEGACY_COLORS.muted2 }}>
-                          {a?.label} · {rowLabel(res.row)}열 · {res.layer}층
+                          {m.mes_code ?? "코드 없음"} · {m.hits.length}곳
                         </div>
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2, borderRadius: 6, padding: "2px 6px", flexShrink: 0 }}>
-                        ×{qty}
+                        ×{m.totalQty}
                       </div>
                     </div>
                   );
@@ -623,7 +675,7 @@ export function DesktopWarehouseMapView({
               </div>
             )}
             {/* 0 results */}
-            {query.trim() && hitAngles && hitAngles.size === 0 && !results && (
+            {query.trim() && hitAngles && hitAngles.size === 0 && (!itemMatches || itemMatches.length === 0) && (
               <div
                 style={{
                   position: "absolute",
@@ -660,6 +712,23 @@ export function DesktopWarehouseMapView({
             }}
           >
             <MapPin size={13} style={{ color: LEGACY_COLORS.blue, flexShrink: 0 }} />
+            {selectedItem && (
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: LEGACY_COLORS.text,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  maxWidth: 240,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {selectedItem.item_name}
+                {selectedItem.mes_code ? ` · ${selectedItem.mes_code}` : ""}
+              </span>
+            )}
             <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, overflowX: "auto" }}>
               {locGuide.hits.map(({ hit, angle, qty }) => {
                 const k = `${hit.angle_id}-${hit.row}-${hit.layer}`;
@@ -667,7 +736,7 @@ export function DesktopWarehouseMapView({
                 return (
                   <button
                     key={k}
-                    onClick={() => navigateToHit(hit, query)}
+                    onClick={() => navigateToHit(hit, matchQuery, { fromSelect: true })}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -723,7 +792,7 @@ export function DesktopWarehouseMapView({
         )}
 
         {/* Stage */}
-        <div style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, display: "flex" }}>
+        <div style={{ flex: 1, minWidth: 0, position: "relative", overflow: "hidden", minHeight: 0, display: "flex" }}>
           {loading ? (
             <div style={{ flex: 1, padding: 24 }}>
               <LoadingSkeleton variant="card" rows={6} />
@@ -733,7 +802,7 @@ export function DesktopWarehouseMapView({
               {error}
             </div>
           ) : (
-            <div key={stage} className={styles.stageEnter} style={{ flex: 1, display: "flex", minHeight: 0 }}>
+            <div key={stage} className={styles.stageEnter} style={{ flex: 1, minWidth: 0, display: "flex", minHeight: 0 }}>
               {stage === "floor" && (
                 <FloorStage angles={angles} hitAngles={hitAngles ?? undefined} pulseAngleId={pulse?.angleId} onAngleClick={openAngle} />
               )}
