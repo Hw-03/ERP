@@ -233,7 +233,7 @@ def set_pf_pin(
     db: Session = Depends(get_db),
 ):
     """주어진 model_symbol 에 pf_item_id 를 기준 PF 로 지정한다."""
-    pf_id = str(payload.pf_item_id)
+    pf_id = payload.pf_item_id.hex  # DB stores item_id without dashes
     row = db.execute(
         text("SELECT item_id FROM items WHERE item_id = :id AND process_type_code = 'PF'"),
         {"id": pf_id},

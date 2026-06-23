@@ -167,7 +167,6 @@ function AfPanel({
             <tbody>
               {groups.map((g) => {
                 const pinned = getPinnedPfNumbers(g.key, pfPins, af);
-                const { ship_ready, fast_assembly, total_production } = pinned ?? g.totals;
                 return (
                   <tr key={g.key}>
                     <td className="max-w-0 py-0.5 pr-2 text-left font-bold" style={{ color: LEGACY_COLORS.text }}>
@@ -175,21 +174,21 @@ function AfPanel({
                     </td>
                     <td
                       className="py-0.5 font-black"
-                      style={{ color: ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
+                      style={{ color: pinned && pinned.ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
                     >
-                      {formatQty(ship_ready)}
+                      {pinned ? formatQty(pinned.ship_ready) : "—"}
                     </td>
                     <td
                       className="py-0.5 font-black"
-                      style={{ color: fast_assembly > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+                      style={{ color: pinned && pinned.fast_assembly > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
                     >
-                      {formatQty(fast_assembly)}
+                      {pinned ? formatQty(pinned.fast_assembly) : "—"}
                     </td>
                     <td
                       className="py-0.5 font-bold"
-                      style={{ color: total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
+                      style={{ color: pinned && pinned.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
                     >
-                      {formatQty(total_production)}
+                      {pinned ? formatQty(pinned.total_production) : "—"}
                     </td>
                   </tr>
                 );
@@ -275,7 +274,6 @@ function ModelChip({
   showSep: boolean;
   pinned: { ship_ready: number; fast_assembly: number; total_production: number } | null;
 }) {
-  const { ship_ready, fast_assembly, total_production } = pinned ?? group.totals;
   return (
     <span className="inline-flex shrink-0 items-baseline gap-1 text-sm">
       {showSep && (
@@ -286,16 +284,16 @@ function ModelChip({
       <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
         {group.label}
       </span>
-      <span className="font-black" style={{ color: LEGACY_COLORS.cyan }}>
-        {formatQty(ship_ready)}
+      <span className="font-black" style={{ color: pinned ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>
+        {pinned ? formatQty(pinned.ship_ready) : "—"}
       </span>
       <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-      <span className="font-black" style={{ color: LEGACY_COLORS.blue }}>
-        {formatQty(fast_assembly)}
+      <span className="font-black" style={{ color: pinned ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>
+        {pinned ? formatQty(pinned.fast_assembly) : "—"}
       </span>
       <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-      <span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>
-        {formatQty(total_production)}
+      <span className="font-bold" style={{ color: pinned ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}>
+        {pinned ? formatQty(pinned.total_production) : "—"}
       </span>
     </span>
   );

@@ -8,7 +8,7 @@ import type {
   ProductionCapacityAfItem,
   ProductionCapacityPfVariant,
 } from "@/lib/api/types/production";
-import { groupAfByModel } from "@/lib/mes/capacity";
+import { groupAfByModel, getPinnedPfNumbers } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import {
@@ -146,6 +146,15 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
       return next;
     });
 
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setExpandedGroups((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const variantsByAf = useMemo(() => {
     const map = new Map<string, ProductionCapacityPfVariant[]>();
     for (const v of af.pf_variants) {
@@ -215,24 +224,32 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           const pinnedVariant = pinnedPfId
             ? af.pf_variants.find((v) => v.pf_item_id === pinnedPfId)
             : null;
+          const pinnedNumbers = getPinnedPfNumbers(group.key, pfPins, af);
+          const groupCollapsed = !expandedGroups.has(group.key);
           return (
           <div key={group.key}>
             {/* 모델 그룹 헤더 */}
             <div
-              className="border-t px-4 py-2.5 first:border-t-0"
+              className="border-t px-4 py-2.5 first:border-t-0 cursor-pointer select-none"
               style={{
                 borderColor: LEGACY_COLORS.border,
                 background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
               }}
+              onClick={() => toggleGroup(group.key)}
             >
               <div className="flex flex-wrap items-center gap-2">
+                {groupCollapsed ? (
+                  <ChevronRight className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+                )}
                 <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
                   {group.label}{" "}
                   <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                     · {group.items.length}종
                   </span>
                 </span>
-                {pinnedVariant && (
+                {pinnedVariant ? (
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
                     style={{
@@ -240,27 +257,47 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       color: LEGACY_COLORS.cyan,
                     }}
                   >
-                    기준 PF: {pinnedVariant.pf_code || pinnedVariant.pf_name}
+                    {pinnedVariant.pf_name || pinnedVariant.pf_code}
                     <button
                       type="button"
                       disabled={isPinLoading}
-                      onClick={() => clearPfPin.mutate(group.key)}
+                      onClick={(e) => { e.stopPropagation(); clearPfPin.mutate(group.key); }}
                       className="ml-0.5"
                       aria-label="기준 PF 해제"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </span>
+                ) : (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 12%, transparent)`,
+                      color: LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    출고처 미지정
+                  </span>
                 )}
               </div>
               <div className="mt-1.5 grid grid-cols-3 gap-1">
-                <QtyLabelCell label="출하 대기" value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
-                <QtyLabelCell label="빠른 조립" value={group.totals.fast_assembly} color={LEGACY_COLORS.blue} />
-                <QtyLabelCell label="총생산" value={group.totals.total_production} color={LEGACY_COLORS.purple} />
+                {pinnedNumbers ? (
+                  <>
+                    <QtyLabelCell label="출하 대기" value={pinnedNumbers.ship_ready} color={LEGACY_COLORS.cyan} />
+                    <QtyLabelCell label="빠른 조립" value={pinnedNumbers.fast_assembly} color={LEGACY_COLORS.blue} />
+                    <QtyLabelCell label="총생산" value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
+                  </>
+                ) : (
+                  <>
+                    <DashLabelCell label="출하 대기" />
+                    <DashLabelCell label="빠른 조립" />
+                    <DashLabelCell label="총생산" />
+                  </>
+                )}
               </div>
             </div>
             {/* AF 아이템 카드 */}
-            {group.items.map((it) => {
+            {!groupCollapsed && group.items.map((it) => {
               const expanded = expandedIds.has(it.af_item_id);
               const variants = variantsByAf.get(it.af_item_id) ?? [];
               const bottleneck =
@@ -362,16 +399,23 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           const pinnedVariant = pinnedPfId
             ? af.pf_variants.find((v) => v.pf_item_id === pinnedPfId)
             : null;
+          const pinnedNumbers = getPinnedPfNumbers(group.key, pfPins, af);
+          const groupCollapsed = !expandedGroups.has(group.key);
           return (
           <div key={group.key}>
             <div
-              className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-2"
+              className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-2 cursor-pointer select-none"
               style={{
                 borderColor: LEGACY_COLORS.border,
                 background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
               }}
+              onClick={() => toggleGroup(group.key)}
             >
-              <span />
+              {groupCollapsed ? (
+                <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
+              ) : (
+                <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
                   {group.label}{" "}
@@ -379,7 +423,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                     · {group.items.length}종
                   </span>
                 </span>
-                {pinnedVariant && (
+                {pinnedVariant ? (
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
                     style={{
@@ -387,25 +431,45 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       color: LEGACY_COLORS.cyan,
                     }}
                   >
-                    기준 PF: {pinnedVariant.pf_code || pinnedVariant.pf_name}
+                    {pinnedVariant.pf_name || pinnedVariant.pf_code}
                     <button
                       type="button"
                       disabled={isPinLoading}
-                      onClick={() => clearPfPin.mutate(group.key)}
+                      onClick={(e) => { e.stopPropagation(); clearPfPin.mutate(group.key); }}
                       className="ml-0.5"
                       aria-label="기준 PF 해제"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </span>
+                ) : (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 12%, transparent)`,
+                      color: LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    출고처 미지정
+                  </span>
                 )}
               </div>
-              <QtyCell value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
-              <QtyCell value={group.totals.fast_assembly} color={LEGACY_COLORS.blue} />
-              <QtyCell value={group.totals.total_production} color={LEGACY_COLORS.purple} />
+              {pinnedNumbers ? (
+                <>
+                  <QtyCell value={pinnedNumbers.ship_ready} color={LEGACY_COLORS.cyan} />
+                  <QtyCell value={pinnedNumbers.fast_assembly} color={LEGACY_COLORS.blue} />
+                  <QtyCell value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
+                </>
+              ) : (
+                <>
+                  <div className="text-right text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
+                  <div className="text-right text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
+                  <div className="text-right text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
+                </>
+              )}
             </div>
 
-            {group.items.map((it) => {
+            {!groupCollapsed && group.items.map((it) => {
               const expanded = expandedIds.has(it.af_item_id);
               const variants = variantsByAf.get(it.af_item_id) ?? [];
               const bottleneck =
@@ -491,6 +555,15 @@ function QtyLabelCell({ label, value, color }: { label: string; value: number; c
       <div className="text-sm font-bold" style={{ color: value > 0 ? color : LEGACY_COLORS.muted2 }}>
         {formatQty(value)}
       </div>
+    </div>
+  );
+}
+
+function DashLabelCell({ label }: { label: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+      <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
     </div>
   );
 }

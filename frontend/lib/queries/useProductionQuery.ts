@@ -36,7 +36,12 @@ export function useSetPfPinMutation() {
   return useMutation({
     mutationFn: ({ modelSymbol, pfItemId }: { modelSymbol: string; pfItemId: string }) =>
       productionApi.setPfPin(modelSymbol, pfItemId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.production.pfPins() }),
+    onSuccess: (_, { modelSymbol, pfItemId }) => {
+      qc.setQueryData<Record<string, string>>(
+        queryKeys.production.pfPins(),
+        (old) => ({ ...(old ?? {}), [modelSymbol]: pfItemId }),
+      );
+    },
   });
 }
 
@@ -45,7 +50,16 @@ export function useClearPfPinMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (modelSymbol: string) => productionApi.clearPfPin(modelSymbol),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.production.pfPins() }),
+    onSuccess: (_, modelSymbol) => {
+      qc.setQueryData<Record<string, string>>(
+        queryKeys.production.pfPins(),
+        (old) => {
+          const next = { ...(old ?? {}) };
+          delete next[modelSymbol];
+          return next;
+        },
+      );
+    },
   });
 }
 
