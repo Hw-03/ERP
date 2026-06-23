@@ -2,13 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, MapPin, Search, X } from "lucide-react";
+import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SlidePanel } from "./common/SlidePanel";
 import { LoadingSkeleton } from "./common/LoadingSkeleton";
-import { warehouseMapApi, type WarehouseAngle, type WarehouseBoxItem, type WarehouseMap } from "@/lib/api/warehouse-map";
+import {
+  warehouseMapApi,
+  type BoxSize,
+  type WarehouseAngle,
+  type WarehouseBox,
+  type WarehouseBoxItem,
+  type WarehouseMap,
+} from "@/lib/api/warehouse-map";
 import { buildCellIndex, cellColor, cellKey, rowLabel } from "./_warehouse_map_sections/helpers";
 import { FloorStage, FrontStage, RowStage } from "./_warehouse_map_sections/WarehouseStages";
 import { WarehouseJariPanel } from "./_warehouse_map_sections/WarehouseJariPanel";
+import { AddBoxScreen } from "./_warehouse_map_sections/AddBoxScreen";
 import styles from "./_warehouse_map_sections/warehouseMap.module.css";
 
 type Stage = "floor" | "front" | "row";
@@ -19,10 +28,16 @@ type LocGuide = { hits: Array<{ hit: SearchHit; angle: WarehouseAngle; qty: numb
 export function DesktopWarehouseMapView({
   onStatusChange,
   editable,
+  items,
+  onMapMutated,
 }: {
   onStatusChange?: (msg: string) => void;
-  /** 편집 모드(창고 관리자): 줄확대 화면에서 박스를 드래그해 다른 자리로 이동. */
+  /** 편집 모드(창고 관리자): 줄확대 화면에서 박스 드래그 이동 + 칸 패널에서 박스 넣기/편집/빼기. */
   editable?: boolean;
+  /** 편집 모드의 "박스 넣기" 품목 선택용 전체 품목. editable=false면 불필요. */
+  items?: Item[];
+  /** 박스 생성/수정/삭제 성공 시 호출 — 부모(탭)가 미배치 배너 등을 갱신. */
+  onMapMutated?: () => void;
 }) {
   const [map, setMap] = useState<WarehouseMap | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,6 +48,9 @@ export function DesktopWarehouseMapView({
   const [curRow, setCurRow] = useState(1);
   const [panel, setPanel] = useState<PanelCell | null>(null);
   const [matchQuery, setMatchQuery] = useState("");
+  // 편집 모드: 박스 넣기/편집 오버레이(좌측 지도 카드를 AddBoxScreen으로 덮음). null이면 지도 표시.
+  const [addBox, setAddBox] = useState<{ jariIndex: number; remaining: number; editBox?: WarehouseBox } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[] | null>(null);
@@ -72,6 +90,62 @@ export function DesktopWarehouseMapView({
 
   const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
   const angles = map?.angles ?? [];
+
+  // 박스 생성/수정/삭제는 서버가 box_id·재배치를 돌려주므로 낙관적 대신 reload(정확성 우선).
+  async function reloadMap() {
+    const data = await warehouseMapApi.getMap();
+    setMap(data);
+  }
+
+  // 편집 모드: 칸 패널 "박스 넣기"/"박스 편집" → AddBoxScreen 제출.
+  async function handleSubmitBox(args: {
+    jariIndex: number;
+    size: BoxSize;
+    lines: { item_id: string; quantity: number }[];
+  }) {
+    if (!panel) return;
+    const editBox = addBox?.editBox;
+    setBusy(true);
+    try {
+      if (editBox) {
+        await warehouseMapApi.updateBox(editBox.box_id, { items: args.lines });
+        onStatusChange?.("박스를 수정했습니다.");
+      } else {
+        await warehouseMapApi.createBox({
+          angle_id: panel.angle.id,
+          row_no: panel.row,
+          layer_no: panel.layer,
+          jari_index: args.jariIndex,
+          size: args.size,
+          items: args.lines,
+        });
+        onStatusChange?.("박스를 배치했습니다.");
+      }
+      await reloadMap();
+      onMapMutated?.();
+      setAddBox(null);
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : editBox ? "수정 실패" : "배치 실패");
+      throw e; // AddBoxScreen이 catch 해 화면 유지
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 편집 모드: 칸 패널 "박스 빼기"(휴지통).
+  async function handleDeleteBox(boxId: string) {
+    setBusy(true);
+    try {
+      await warehouseMapApi.deleteBox(boxId);
+      onStatusChange?.("박스를 뺐습니다.");
+      await reloadMap();
+      onMapMutated?.();
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : "빼기 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // 편집 모드: 박스 드래그 이동. 낙관적 업데이트(즉시 반영) → 서버 확정 → 실패 시 되돌림.
   const handleMoveBox = (
@@ -196,20 +270,22 @@ export function DesktopWarehouseMapView({
         e.preventDefault();
         searchInputRef.current?.focus();
       } else if (e.key === "Escape") {
-        if (panel) setPanel(null);
+        if (addBox) setAddBox(null);
+        else if (panel) setPanel(null);
         else if (query) clearSearch();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panel, query]);
+  }, [panel, query, addBox]);
 
   // ── Browser back/forward ──
   useEffect(() => {
     if (typeof window === "undefined") return;
     type WmState = { wm?: { stage: Stage; angleId: number; row?: number }; wmDepth?: number } | null;
     const onPop = (e: PopStateEvent) => {
+      setAddBox(null); // 뒤로가기 시 박스 넣기 오버레이 닫힘
       const s = e.state as WmState;
       wmDepthRef.current = s?.wmDepth ?? 0;
       const wm = s?.wm;
@@ -365,7 +441,22 @@ export function DesktopWarehouseMapView({
 
   return (
     <div style={{ display: "flex", minHeight: 0, flex: 1, minWidth: 0 }}>
-      {/* Map card */}
+      {/* 편집 모드: 박스 넣기/편집 오버레이가 좌측 지도 카드를 대체. 아니면 지도 카드. */}
+      {addBox && panel && editable ? (
+        <AddBoxScreen
+          angle={panel.angle}
+          row={panel.row}
+          layer={panel.layer}
+          jariIndex={addBox.jariIndex}
+          remaining={addBox.remaining}
+          editBox={addBox.editBox}
+          items={items ?? []}
+          busy={busy}
+          onSubmit={handleSubmitBox}
+          onCancel={() => setAddBox(null)}
+        />
+      ) : (
+      /* Map card */
       <div
         style={{
           flex: 1,
@@ -669,6 +760,7 @@ export function DesktopWarehouseMapView({
           )}
         </div>
       </div>
+      )}
 
       {/* Detail slide panel */}
       <SlidePanel open={!!panel} onClose={() => setPanel(null)}>
@@ -679,6 +771,17 @@ export function DesktopWarehouseMapView({
             layer={panel.layer}
             cellIndex={cellIndex}
             matchQuery={matchQuery}
+            editable={editable}
+            busy={busy}
+            onDeleteBox={editable ? handleDeleteBox : undefined}
+            onRequestAddBox={
+              editable && !addBox ? (jariIndex, remaining) => setAddBox({ jariIndex, remaining }) : undefined
+            }
+            onRequestEditBox={
+              editable && !addBox
+                ? (box) => setAddBox({ jariIndex: box.jari_index, remaining: 0, editBox: box })
+                : undefined
+            }
           />
         )}
       </SlidePanel>

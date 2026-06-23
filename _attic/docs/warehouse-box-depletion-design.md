@@ -116,9 +116,9 @@
 |------|-----------|
 | `AdminSidebar.tsx` | "창고" 섹션 제거 |
 | `AdminSectionContent.tsx` | warehouse 분기 제거 |
-| `AdminWarehouseStructureSection.tsx` | 창고 지도 탭으로 이동 (파일 경로 변경) |
-| `AdminWarehousePlacementSection.tsx` | 창고 지도 탭으로 이동 (파일 경로 변경) |
-| `DesktopWarehouseMapView.tsx` | 편집 모드 토글, 권한 체크, 미배치 알림 섹션, 드래그 이동, 품목별/위치별 뷰 전환 추가 |
+| `AdminWarehouseStructureSection.tsx` | 창고 지도 탭 "앵글 편집"에서 재사용(파일은 `_admin_sections/`에 유지, 제목만 "앵글 편집") |
+| `AdminWarehousePlacementSection.tsx` | **삭제** — `AddBoxScreen`은 `_warehouse_map_sections/AddBoxScreen.tsx`로 분해, 박스 넣기/빼기/편집은 `DesktopWarehouseMapView`(editable)에 통합(2026-06-23) |
+| `DesktopWarehouseMapView.tsx` | 편집 모드 토글, 권한 체크, 미배치 알림 섹션, 드래그 이동 + 칸 패널 박스 넣기/빼기/편집 통합 |
 | `IoComposeView.tsx` / `IoSubmitModals.tsx` | R5 에러 시 창고 지도 이동 버튼 추가 |
 
 ---
@@ -128,7 +128,8 @@
 ### 구조 변경 — 관리자 탭 창고 섹션 제거
 
 현재 관리자 탭의 "창고" 섹션(`AdminWarehouseStructureSection`, `AdminWarehousePlacementSection`)을  
-**창고 지도 탭으로 통합**한다. 관리자 탭에서 창고 관련 메뉴는 삭제.
+**창고 지도 탭으로 통합**한다. 관리자 탭에서 창고 관련 메뉴는 삭제.  
+※ 후속(2026-06-23): 편집 탭은 "박스 관리"(이동·넣기·빼기·편집 통합) / "앵글 편집" 2개로 정리. `AdminWarehousePlacementSection`은 삭제되고 `AddBoxScreen`만 `_warehouse_map_sections/`로 분해됨.
 
 ### 권한
 

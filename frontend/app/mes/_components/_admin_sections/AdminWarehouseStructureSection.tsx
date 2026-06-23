@@ -188,7 +188,7 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
       <AdminPageHeader
         icon={Warehouse}
-        title="창고 구조 편집"
+        title="앵글 편집"
         description="앵글을 드래그해 위치를 옮기고, 우하단 모서리로 크기를 조절하세요. 손을 떼는 순간 자동 저장됩니다."
         actions={
           <Button variant="secondary" onClick={addAngle}>

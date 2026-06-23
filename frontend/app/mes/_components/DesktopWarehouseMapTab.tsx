@@ -5,11 +5,11 @@
  *
  * 일반 직원: 읽기 전용 지도(DesktopWarehouseMapView)만.
  * 창고 정/부 관리자(warehouse_role primary/deputy): "편집 모드" 토글 → 본인 PIN 확인 →
- *   구조 편집 / 위치 배정 편집기 노출. 편집 쓰기는 X-Employee-Code + X-Operator-Pin 으로
+ *   박스 관리(이동·넣기·빼기·편집) / 앵글 편집 노출. 편집 쓰기는 X-Employee-Code + X-Operator-Pin 으로
  *   백엔드 require_warehouse_manager 가 검증(api-core operator 자격증명 주입).
  *
- * 편집기 본체(AdminWarehouseStructureSection / AdminWarehousePlacementSection)는
- * 기존 관리자 탭 컴포넌트를 그대로 재사용한다(관리자 탭에서는 제거됨).
+ * "박스 관리"는 DesktopWarehouseMapView(editable)에서 드래그 이동 + 칸 패널 박스 넣기/빼기를
+ *   한 화면에 통합한다. "앵글 편집"(AdminWarehouseStructureSection)은 골조 단위라 분리 유지.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -23,12 +23,10 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useCurrentOperator } from "./login/useCurrentOperator";
 import { DesktopWarehouseMapView } from "./DesktopWarehouseMapView";
 import { AdminWarehouseStructureSection } from "./_admin_sections/AdminWarehouseStructureSection";
-import { AdminWarehousePlacementSection } from "./_admin_sections/AdminWarehousePlacementSection";
 
 const EDITOR_TABS = [
-  { id: "map" as const, label: "지도 이동" },
-  { id: "placement" as const, label: "위치 배정" },
-  { id: "structure" as const, label: "구조 편집" },
+  { id: "map" as const, label: "박스 관리" },
+  { id: "structure" as const, label: "앵글 편집" },
 ];
 
 export function DesktopWarehouseMapTab({
@@ -46,7 +44,7 @@ export function DesktopWarehouseMapTab({
   const [verifying, setVerifying] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
-  const [editorTab, setEditorTab] = useState<"map" | "placement" | "structure">("map");
+  const [editorTab, setEditorTab] = useState<"map" | "structure">("map");
   const [editorError, setEditorError] = useState<string | null>(null);
   // 박스 합 ≠ 창고 총재고인 품목(미배치/불일치) — 전환기 배치 진행 가늠용.
   const [mismatches, setMismatches] = useState<ReconcileRow[]>([]);
@@ -214,7 +212,7 @@ export function DesktopWarehouseMapTab({
             {mismatches.length > 0 && (
               <button
                 type="button"
-                onClick={() => setEditorTab("placement")}
+                onClick={() => setEditorTab("map")}
                 className="mb-3 flex shrink-0 items-start gap-2 rounded-[12px] border px-4 py-2.5 text-left transition-colors hover:brightness-[1.02]"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, transparent)`,
@@ -228,7 +226,7 @@ export function DesktopWarehouseMapTab({
                   </div>
                   <div className="mt-0.5 truncate text-[12px] font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
                     {mismatches.slice(0, 4).map((r) => `${r.mes_code ?? r.item_name}(${r.placed_total}/${r.warehouse_qty})`).join("  ·  ")}
-                    {mismatches.length > 4 ? "  …" : ""} — 위치 배정에서 정리하기 →
+                    {mismatches.length > 4 ? "  …" : ""} — 박스 관리에서 정리하기 →
                   </div>
                 </div>
               </button>
@@ -238,20 +236,19 @@ export function DesktopWarehouseMapTab({
                 className="mb-2 shrink-0 text-[12px] font-bold"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
-                줄 확대 화면에서 박스를 드래그하세요 — 빈 자리에 놓으면 이동, 다른 박스의 위/아래에 놓으면 그 사이에 끼워넣습니다. 추가·삭제는 “위치 배정”에서.
+                줄 확대 화면에서 박스를 드래그해 자리를 옮기고(위/아래에 놓으면 중간 삽입), 칸을 클릭해 박스를 넣거나 뺍니다.
               </div>
             )}
             <div className="flex min-h-0 flex-1 flex-col overflow-auto">
               {editorTab === "map" ? (
-                <DesktopWarehouseMapView editable onStatusChange={onStatusChange} />
-              ) : editorTab === "structure" ? (
-                <AdminWarehouseStructureSection
-                  onStatusChange={onStatusChange ?? (() => {})}
-                  onError={setEditorError}
+                <DesktopWarehouseMapView
+                  editable
+                  items={items}
+                  onStatusChange={onStatusChange}
+                  onMapMutated={() => void refreshMismatches()}
                 />
               ) : (
-                <AdminWarehousePlacementSection
-                  items={items}
+                <AdminWarehouseStructureSection
                   onStatusChange={onStatusChange ?? (() => {})}
                   onError={setEditorError}
                 />
