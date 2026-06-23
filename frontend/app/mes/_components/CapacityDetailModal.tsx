@@ -47,7 +47,7 @@ export function CapacityDetailModal({
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
-          maxHeight: "min(900px, 92vh)",
+          height: "min(900px, 92vh)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -72,7 +72,7 @@ export function CapacityDetailModal({
         </div>
 
         {/* ── 본문 (스크롤) ───────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-7">
+        <div className="flex-1 overflow-y-auto px-4 py-8 sm:px-7">
           {af ? (
             <AfCapacityView af={af} />
           ) : (
@@ -183,7 +183,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
   return (
     <>
       {/* 필터 토글 */}
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-6 flex items-center gap-2">
         {(
           [
             { key: "producible", label: "생산 가능", count: producibleCount, color: LEGACY_COLORS.cyan },
@@ -368,7 +368,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
       {/* 데스크톱 테이블 레이아웃 (≥ 640px) */}
       <div className="hidden sm:block rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
         <div
-          className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] border-b px-4 py-2 text-xs font-bold uppercase tracking-[0.12em]"
+          className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] border-b px-4 py-4 text-xs font-bold uppercase tracking-[0.12em]"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
         >
           <span />
@@ -394,7 +394,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           return (
           <div key={group.key}>
             <div
-              className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-2 cursor-pointer select-none"
+              className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-5 cursor-pointer select-none"
               style={{
                 borderColor: LEGACY_COLORS.border,
                 background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
