@@ -498,8 +498,8 @@ export function MobileIoComposeWizard({
         {stepTitle}
       </h2>
 
-      {/* 본문: 현재 스텝만 스크롤. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      {/* 본문: 현재 스텝만 스크롤. 항목 5-4·5-5 — 하단 pb 축소해 sticky 푸터를 네비바에 근접. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-1">
         {error && (
           <div
             className="mb-3 rounded-[12px] border px-4 py-3 text-sm font-bold"
