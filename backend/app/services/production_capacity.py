@@ -429,13 +429,16 @@ def _ship_ready_variant(
 ) -> Tuple[int, uuid.UUID | None]:
     """특정 PF 1종 + 대상 AF 1종 기준 출하 준비 가능 수.
 
-    = min( AF 재고 / PF당 AF요구량,  PF→AF 출하/포장 구간 각 자재 / 요구량 ).
-    AF 재고를 절대 넘지 않는다. 형제 AF(피어 완제품)는 cap 대상에서 제외한다.
+    = PF 자체 재고 + min( AF 재고 / PF당 AF요구량,  PF→AF 출하/포장 구간 각 자재 / 요구량 ).
+    이미 완성된 PF 재고는 부품 없이 즉시 출하 가능하므로 조립 가능량과 합산한다.
+    형제 AF(피어 완제품)는 cap 대상에서 제외한다.
     """
+    pf_own = _own_available(pf_id, fig_by_id)
+
     req = _requirements_below(pf_id, af_ids, bom_cache)
     af_req = req.get(af_id)
     if not af_req or af_req <= 0:
-        return 0, None
+        return pf_own, None
 
     af_own = _own_available(af_id, fig_by_id)
     best = int(Decimal(af_own) / af_req)
@@ -450,7 +453,7 @@ def _ship_ready_variant(
             best = can
             bottleneck = node
 
-    return best, bottleneck
+    return best + pf_own, bottleneck
 
 
 def _pf_variant_ancestors(
