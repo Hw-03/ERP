@@ -219,7 +219,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
 def get_pf_pins(db: Session = Depends(get_db)):
     """model_symbol → pf_item_id 전체 맵 반환. 지정 없으면 빈 dict."""
     rows = db.execute(text("SELECT model_symbol, pf_item_id FROM model_pf_pins")).fetchall()
-    return {r[0]: r[1] for r in rows}
+    return {r[0]: str(uuid.UUID(r[1])) for r in rows}
 
 
 @router.put(
