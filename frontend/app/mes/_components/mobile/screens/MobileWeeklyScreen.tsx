@@ -95,8 +95,10 @@ export function MobileWeeklyScreen({ weekMon }: { weekMon: Date }) {
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
-      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
+      {/* 항목 5-8 — min-w-0 로 flex 자식이 main(414) 폭으로 줄어들게(없으면 콘텐츠 min-content=490 으로 부풀어
+          공정별 변화 카드 우측 '현재/±0'가 잘림). 공정 전환과 무관하게 폭 고정. */}
+      <div className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
         <AsyncState
           loading={loading && !data}
           error={error}
