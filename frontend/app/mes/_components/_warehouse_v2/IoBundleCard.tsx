@@ -297,11 +297,11 @@ export function IoBundleCard({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRemoveBundle(); }}
-          className="absolute right-0 top-0 flex h-12 w-12 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:shrink-0 lg:self-center"
+          className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:h-12 lg:w-12 lg:shrink-0 lg:self-center"
           style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
           title="묶음 삭제"
         >
-          <Trash2 className="h-7 w-7" />
+          <Trash2 className="h-5 w-5 lg:h-7 lg:w-7" />
         </button>
       </div>
 

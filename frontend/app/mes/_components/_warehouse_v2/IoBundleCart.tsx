@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Save } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
@@ -149,9 +149,10 @@ export function IoBundleCart({
               <button
                 type="button"
                 onClick={onSaveDraft}
-                className="shrink-0 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform] active:scale-[0.99]"
+                className="flex shrink-0 items-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform] active:scale-[0.99]"
                 style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
               >
+                <Save className="h-4 w-4" />
                 저장
               </button>
               <button
