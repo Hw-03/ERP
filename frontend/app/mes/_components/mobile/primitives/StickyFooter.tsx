@@ -18,7 +18,7 @@ export function StickyFooter({
     <div
       className={clsx("sticky bottom-0 z-30 px-4 pt-3", !flat && "border-t", className)}
       style={{
-        background: flat ? "transparent" : LEGACY_COLORS.s1,
+        background: flat ? LEGACY_COLORS.bg : LEGACY_COLORS.s1,
         borderColor: flat ? undefined : LEGACY_COLORS.border,
         paddingBottom: "calc(env(safe-area-inset-bottom, 12px) + 12px)",
         boxShadow: flat ? undefined : "0 -12px 24px rgba(0,0,0,.24)",

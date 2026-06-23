@@ -369,7 +369,7 @@ export function IoTargetPicker({
           항목 10 — 모바일은 sticky 로 하단 네비 위에 항상 고정(이중 스크롤에 묻히지 않게),
           데스크톱(lg)은 기존 정적 배치 그대로. */}
       {/* 항목 4-6 — 모바일 띠 배경/상단선 제거(버튼만 떠 보이게). 버튼 자체 솔리드색으로 가독성 확보. */}
-      <div className="sticky bottom-0 z-20 -mx-3 shrink-0 px-4 pb-1 pt-2 lg:static lg:mx-0 lg:p-0">
+      <div className="sticky bottom-0 z-20 -mx-3 shrink-0 bg-[var(--c-bg)] px-4 pb-1 pt-2 lg:static lg:mx-0 lg:bg-transparent lg:p-0">
         <button
           type="button"
           onClick={onAdvance}
