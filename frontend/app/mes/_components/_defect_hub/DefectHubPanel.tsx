@@ -259,16 +259,7 @@ export function DefectHubPanel({
 
   return (
     <div className="flex min-h-full flex-col gap-4">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
-          불량 처리 허브
-        </h2>
-        <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {currentEmployee.name} · {currentEmployee.department}
-        </span>
-      </div>
-
+      {/* 항목 7-3 — 헤더("불량 처리 허브" 제목 + 우상단 이름·부서) 제거(불필요). */}
       {view === "hub" ? (
         /* 항목 2-5 — 첫 화면은 키오스크식 카드 3장(격리·폐기·목록)만. PC(DesktopDefectView)
            처럼 "무엇을 할지 선택만" 하게 한다. KPI/필터/격리 목록은 카드 선택 후 list 화면에서만.

@@ -45,7 +45,8 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(tab.id)}
             className={clsx(
               "flex flex-1 items-center justify-center gap-1.5 rounded-[10px] font-bold transition-[background-color]",
-              size === "lg" ? "px-3 py-3" : "px-2 py-[7px]",
+              // 항목 7-6 — lg 는 불량 격리 Step1 출처 토글 단일 사용처. 격리 부서 버튼 높이와 맞추려 py 확대.
+              size === "lg" ? "px-3 py-4" : "px-2 py-[7px]",
               size === "lg" ? TYPO.title : TYPO.caption,
             )}
             style={{
