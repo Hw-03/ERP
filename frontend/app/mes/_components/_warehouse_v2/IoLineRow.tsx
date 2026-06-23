@@ -248,6 +248,8 @@ export function IoLineRow({
         </div>
       </div>
 
+      {/* 항목 5-6 — 모바일만 가능재고+실행후를 가운데 정렬·간격 확보. lg:contents 로 데스크톱 7열 그리드 유지. */}
+      <div className="flex w-full items-start justify-center gap-10 lg:contents">
       {/* 5. 현재 재고 */}
       <div className="text-center lg:text-right">
         <div
@@ -306,6 +308,7 @@ export function IoLineRow({
             가져오기
           </button>
         )}
+      </div>
       </div>
 
       {/* 7. 삭제 (manual 또는 forceShowRemove) */}
