@@ -47,6 +47,10 @@ export function useDesktopInventoryDerivations({
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
+  // 전체 KPI도 소프트삭제 품목을 제외해 정상/부족/품절(scopedItems 기준) 합과 일치시킨다.
+  // (필터와 무관한 전체 카운트라 items 에서 deleted_at 만 제외.)
+  const activeTotal = useMemo(() => items.filter((item) => !item.deleted_at).length, [items]);
+
   useEffect(() => {
     onSummaryChange?.({ low: summary.lowCount, zero: summary.zeroCount });
   }, [summary.lowCount, summary.zeroCount, onSummaryChange]);
@@ -65,8 +69,8 @@ export function useDesktopInventoryDerivations({
   const kpiCards: KpiCard[] = [
     {
       label: "전체",
-      value: isFiltered ? scopedItems.length : items.length,
-      hint: isFiltered ? `전체 ${items.length}건 · 클릭하면 초기화` : "전체 품목",
+      value: isFiltered ? scopedItems.length : activeTotal,
+      hint: isFiltered ? `전체 ${activeTotal}건 · 클릭하면 초기화` : "전체 품목",
       tone: LEGACY_COLORS.blue,
       key: "ALL",
     },
