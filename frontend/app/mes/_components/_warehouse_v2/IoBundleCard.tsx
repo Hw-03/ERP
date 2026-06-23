@@ -263,7 +263,7 @@ export function IoBundleCard({
           </div>
         </div>
         {directParentLine && (
-          <div className="flex items-center gap-6 self-start lg:shrink-0 lg:self-center">
+          <div className="flex items-center gap-6 self-center lg:shrink-0 lg:self-center">
             <div className="text-center lg:text-right">
               <div
                 className="text-[9px] font-bold uppercase tracking-[1.5px]"
