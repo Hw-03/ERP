@@ -51,6 +51,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         department_role: emp.department_role ?? "none",
         theme: emp.theme ?? null,
         assigned_model_slots: emp.assigned_model_slots ?? [],
+        io_enabled: emp.io_enabled ?? true,
       };
 
       // 백엔드에서 받은 theme을 DOM과 localStorage에 적용

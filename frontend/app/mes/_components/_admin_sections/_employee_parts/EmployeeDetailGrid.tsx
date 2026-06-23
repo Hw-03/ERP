@@ -129,14 +129,10 @@ export function EmployeeDetailGrid({
                 }}
               />
               <span
-                className="text-[13px] font-bold"
-                style={{
-                  color: form.io_enabled ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
-                }}
+                className="text-[13px]"
+                style={{ color: LEGACY_COLORS.text }}
               >
-                {form.io_enabled
-                  ? "사용 가능 (입출고 화면 접근 허용)"
-                  : "사용 불가 (입출고 화면 차단)"}
+                입출고 화면 접근 허용
               </span>
             </label>
             <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>

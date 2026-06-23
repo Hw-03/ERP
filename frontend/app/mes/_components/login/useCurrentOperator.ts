@@ -22,6 +22,8 @@ export interface Operator {
   theme?: string | null;
   /** 조립 부서 직원의 담당 모델 slot 목록 (priority 순서). 누락 시 []. */
   assigned_model_slots: number[];
+  /** 입출고 화면 접근 권한. 누락 시 true (기존 세션 호환). */
+  io_enabled: boolean;
 }
 
 const OPERATOR_KEY = "dexcowin_mes_operator";
@@ -57,6 +59,7 @@ function readOperator(): Operator | null {
       department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
       theme: parsed.theme ?? null,
       assigned_model_slots: slots,
+      io_enabled: parsed.io_enabled ?? true,
     };
   } catch {
     return null;
