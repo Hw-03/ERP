@@ -300,11 +300,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
             {!groupCollapsed && group.items.map((it) => {
               const expanded = expandedIds.has(it.af_item_id);
               const variants = variantsByAf.get(it.af_item_id) ?? [];
-              const bottleneck =
-                it.total_production_limiting_item ||
-                it.fast_assembly_limiting_item ||
-                it.ship_ready_limiting_item ||
-                null;
               return (
                 <div key={it.af_item_id} className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
                   <button
@@ -333,11 +328,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         {it.af_code && (
                           <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                             {it.af_code}
-                          </div>
-                        )}
-                        {bottleneck && (
-                          <div className="truncate text-xs" style={{ color: LEGACY_COLORS.yellow }}>
-                            병목: {bottleneck}
                           </div>
                         )}
                         <div className="mt-2 grid grid-cols-3 gap-1">
@@ -472,11 +462,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
             {!groupCollapsed && group.items.map((it) => {
               const expanded = expandedIds.has(it.af_item_id);
               const variants = variantsByAf.get(it.af_item_id) ?? [];
-              const bottleneck =
-                it.total_production_limiting_item ||
-                it.fast_assembly_limiting_item ||
-                it.ship_ready_limiting_item ||
-                null;
               return (
                 <div key={it.af_item_id}>
                   <button
@@ -505,11 +490,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       {it.af_code && (
                         <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                           {it.af_code}
-                        </div>
-                      )}
-                      {bottleneck && (
-                        <div className="truncate text-xs" style={{ color: LEGACY_COLORS.yellow }}>
-                          병목: {bottleneck}
                         </div>
                       )}
                     </div>
