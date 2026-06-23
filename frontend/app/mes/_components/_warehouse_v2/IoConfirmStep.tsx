@@ -237,52 +237,54 @@ export function IoConfirmStep({
         ))}
       </div>
 
-      {/* 메모 */}
-      <div className="mt-auto flex flex-col gap-5">
-        <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
+      {/* 항목 7-4 — 메모를 액션 푸터 밖(스크롤 영역 바로 아래 정적 요소)으로 분리해 버튼 위에 끼지 않게 한다.
+          버튼 행은 Step4(IoBundleCart) 와 동일한 sticky 푸터로 통일 → 두 단계 버튼의 화면상 위치(네비바와의 간격)가 일치. */}
+      <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
 
-      {/* blocker */}
-      {blockerText && (
-        <div
-          className="rounded-[16px] border px-4 py-3 text-center text-sm font-bold"
-          style={{
-            background: tint(LEGACY_COLORS.yellow, 10),
-            borderColor: tint(LEGACY_COLORS.yellow, 40),
-            color: LEGACY_COLORS.yellow,
-          }}
-        >
-          {blockerText}
+      {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
+      <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-1 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
+        {/* blocker */}
+        {blockerText && (
+          <div
+            className="rounded-[16px] border px-4 py-3 text-center text-sm font-bold"
+            style={{
+              background: tint(LEGACY_COLORS.yellow, 10),
+              borderColor: tint(LEGACY_COLORS.yellow, 40),
+              color: LEGACY_COLORS.yellow,
+            }}
+          >
+            {blockerText}
+          </div>
+        )}
+
+        {/* 액션 버튼 행 — [저장] + [제출확인].
+            항목 4-9 — 모바일은 Step4 버튼과 동일 크기/모서리(작게), PC(lg)는 기존 대형 그대로(lg: 페어로 PC 무변경). */}
+        <div className="flex items-stretch gap-2 lg:gap-3">
+          <button
+            type="button"
+            onClick={onSaveDraft}
+            disabled={saveDisabled}
+            className="flex shrink-0 items-center justify-center gap-2 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:rounded-[22px] lg:border-2 lg:px-6 lg:py-7 lg:text-base"
+            style={{
+              borderColor: LEGACY_COLORS.border,
+              background: LEGACY_COLORS.s2,
+              color: LEGACY_COLORS.text,
+            }}
+          >
+            <Save className="h-4 w-4 lg:h-5 lg:w-5" />
+            {saving ? "저장 중..." : "저장"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            disabled={submitDisabled}
+            className="flex flex-1 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:rounded-[22px] lg:px-7 lg:py-7 lg:text-xl"
+            style={{ background: accent }}
+          >
+            <ClipboardCheck className="h-4 w-4 lg:h-6 lg:w-6" />
+            {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
+          </button>
         </div>
-      )}
-
-      {/* 액션 버튼 행 — [저장하기] + [제출확인].
-          항목 4-9 — 모바일은 Step4 버튼과 동일 크기/모서리(작게), PC(lg)는 기존 대형 그대로(lg: 페어로 PC 무변경). */}
-      <div className="flex items-stretch gap-2 lg:gap-3">
-        <button
-          type="button"
-          onClick={onSaveDraft}
-          disabled={saveDisabled}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:rounded-[22px] lg:border-2 lg:px-6 lg:py-7 lg:text-base"
-          style={{
-            borderColor: LEGACY_COLORS.border,
-            background: LEGACY_COLORS.s2,
-            color: LEGACY_COLORS.text,
-          }}
-        >
-          <Save className="h-4 w-4 lg:h-5 lg:w-5" />
-          {saving ? "저장 중..." : "저장"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirmOpen(true)}
-          disabled={submitDisabled}
-          className="flex flex-1 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:rounded-[22px] lg:px-7 lg:py-7 lg:text-xl"
-          style={{ background: accent }}
-        >
-          <ClipboardCheck className="h-4 w-4 lg:h-6 lg:w-6" />
-          {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
-        </button>
-      </div>
       </div>
 
       <ConfirmModal
