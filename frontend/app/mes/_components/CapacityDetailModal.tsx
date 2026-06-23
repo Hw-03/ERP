@@ -53,15 +53,29 @@ export function CapacityDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── 헤더 ───────────────────────────────────────── */}
-        <div className="border-b px-4 pb-4 pt-5 sm:px-7 sm:pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-            생산 가능수량 상세 · 조립 완제품(AF) 기준
+        <div className="border-b px-4 pb-5 pt-5 sm:px-7 sm:pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
+            생산 가능수량
           </div>
-          <div className="mt-1 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-            출하 대기: AF 재고를 출하까지 마무리 · 빠른 조립: 기존 재고＋직계 자재로 추가 조립 · 총생산: 하위 BOM 끝까지 투입 이론치
+          <div className="mt-0.5 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+            조립 완제품(AF) 기준
+          </div>
+          <div className="mt-3 space-y-1.5">
+            <div className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+              <span className="mt-[3px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 지금 바로 고객에게 보낼 수 있는 수량이에요. 창고에 완성된 AF가 있고, 포장·출하 단계 부품도 준비됐을 때만 카운트돼요.</span>
+            </div>
+            <div className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+              <span className="mt-[3px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 조립</span> — 지금 있는 AF 재고 + 바로 연결된 1단계 부품으로 만들 수 있는 수량이에요. 하위 부품 깊이는 확인 안 해서 실제보다 낙관적일 수 있어요.</span>
+            </div>
+            <div className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+              <span className="mt-[3px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.purple }} />
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — BOM을 끝까지 다 펼쳐서 이론적으로 만들 수 있는 최대 수량이에요. 부품 공유로 인한 중복은 제거하지만, 시간·생산 순서는 반영 안 해요.</span>
+            </div>
           </div>
           <div
-            className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`,
               color: LEGACY_COLORS.yellow,
