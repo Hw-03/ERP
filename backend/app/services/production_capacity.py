@@ -101,6 +101,21 @@ def _bottleneck_name(
     return item.item_name if item else None
 
 
+def _bottleneck_label(
+    bottleneck_id: uuid.UUID | None,
+    items_map: Dict[uuid.UUID, Item],
+) -> Optional[str]:
+    """이름 (mes_code) 형식. mes_code 없으면 이름만."""
+    if not bottleneck_id:
+        return None
+    item = items_map.get(bottleneck_id)
+    if not item:
+        return None
+    if item.mes_code:
+        return f"{item.item_name} ({item.mes_code})"
+    return item.item_name
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Legacy (PF 합산) — 값·의미 1:1 보존
 # ─────────────────────────────────────────────────────────────────────────────
@@ -539,8 +554,8 @@ def compute_af_capacity(
                 "ship_ready": pf_own,
                 "fast_production": fast_qty,
                 "total_production": total_qty,
-                "fast_production_limiting_item": _bottleneck_name(fast_btl, items_map),
-                "total_production_limiting_item": _bottleneck_name(total_btl, items_map),
+                "fast_production_limiting_item": _bottleneck_label(fast_btl, items_map),
+                "total_production_limiting_item": _bottleneck_label(total_btl, items_map),
                 "bom_status": "complete" if (pf and bom_cache.get(pf_id)) else "incomplete",
             })
             if pf_own > best_ship:
@@ -561,8 +576,8 @@ def compute_af_capacity(
             "fast_production": best_fast,
             "total_production": best_total,
             "ship_ready_limiting_item": None,
-            "fast_production_limiting_item": _bottleneck_name(best_fast_btl, items_map),
-            "total_production_limiting_item": _bottleneck_name(best_total_btl, items_map),
+            "fast_production_limiting_item": _bottleneck_label(best_fast_btl, items_map),
+            "total_production_limiting_item": _bottleneck_label(best_total_btl, items_map),
             "bom_status": bom_status,
             "has_direct_children": has_direct_children,
             "has_pf_path": has_pf_path,

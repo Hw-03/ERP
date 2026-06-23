@@ -160,7 +160,7 @@ function AfPanel({
               <tr>
                 <th className="pb-1 text-left text-xs font-bold" />
                 <th className="w-16 whitespace-nowrap pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</th>
-                <th className="w-16 whitespace-nowrap pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 조립</th>
+                <th className="w-16 whitespace-nowrap pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</th>
                 <th className="w-16 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</th>
               </tr>
             </thead>
@@ -215,9 +215,6 @@ function AfPanel({
           {groups.map((g, idx) => (
             <ModelChip key={g.key} group={g} showSep={idx > 0} pinned={getPinnedPfNumbers(g.key, pfPins, af)} />
           ))}
-          <span className="inline-flex shrink-0" aria-label={SHARED_HINT} title={SHARED_HINT}>
-            <AlertTriangle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
-          </span>
         </div>
       ) : (
         subline && (
@@ -229,7 +226,7 @@ function AfPanel({
       {interactive && (
         <span
           className="mt-0.5 hidden w-full shrink-0 text-right text-sm sm:block lg:mt-0 lg:ml-auto lg:w-auto"
-          style={{ color: LEGACY_COLORS.muted2 }}
+          style={{ color: accent }}
         >
           자세히 보기
         </span>
@@ -251,13 +248,13 @@ function AfPanel({
   );
 }
 
-// 색 의미 안내(한 번): 출하(청록)/조립(파랑)/총생산(보라).
+// 색 의미 안내(한 번): 출하 대기(청록)/빠른 생산(파랑)/총생산(보라).
 function ModelLegend() {
   return (
     <span className="inline-flex shrink-0 items-baseline gap-1 text-xs font-bold">
-      <span style={{ color: LEGACY_COLORS.cyan }}>출하</span>
+      <span style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span>
       <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-      <span style={{ color: LEGACY_COLORS.blue }}>조립</span>
+      <span style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span>
       <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
       <span style={{ color: LEGACY_COLORS.purple }}>총생산</span>
     </span>
