@@ -225,6 +225,7 @@ export function MobileDefectCartFlow({
                 ]}
                 active={source}
                 onChange={(s) => setSource(s as SourceKind)}
+                size="lg"
               />
               <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted }}>
                 {source === "warehouse"

@@ -19,16 +19,19 @@ export function SegmentedControl<T extends string>({
   active,
   onChange,
   className,
+  size = "md",
 }: {
   tabs: SegmentedTab<T>[];
   active: T;
   onChange: (next: T) => void;
   className?: string;
+  /** 항목 5-1 — opt-in 확대. 기본 md(현행), lg는 호출처에서만 키움(타 화면 무영향). */
+  size?: "md" | "lg";
 }) {
   return (
     <div
       role="tablist"
-      className={clsx("flex gap-1 rounded-[14px] border p-1", className)}
+      className={clsx("flex gap-1 rounded-[14px] border", size === "lg" ? "p-1.5" : "p-1", className)}
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
       {tabs.map((tab) => {
@@ -41,8 +44,9 @@ export function SegmentedControl<T extends string>({
             aria-selected={isActive}
             onClick={() => onChange(tab.id)}
             className={clsx(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 py-[7px] font-bold transition-[background-color]",
-              TYPO.caption,
+              "flex flex-1 items-center justify-center gap-1.5 rounded-[10px] font-bold transition-[background-color]",
+              size === "lg" ? "px-3 py-3" : "px-2 py-[7px]",
+              size === "lg" ? TYPO.title : TYPO.caption,
             )}
             style={{
               background: isActive ? (LEGACY_COLORS.s1 as string) : "transparent",
