@@ -564,8 +564,8 @@ export function IoComposeView({
   })();
   const includedCount = state.includedLines.length;
   const excludedCount = state.excludedLines.length;
-  // 항목 7 — 생산(produce) 4단계에서만 '창고에서 가져오기' 노출. (데스크톱 전용)
-  const pullEnabled = state.subType === "produce";
+  // 항목 7 — 생산(produce)·출고(disassemble) 4단계에서 '창고에서 가져오기' 노출. (데스크톱 전용)
+  const pullEnabled = state.subType === "produce" || state.subType === "disassemble";
   // 버튼 라벨 개수 — 선택이 있으면 선택 수, 없으면 부족 라인 전체 수.
   const pullCount = pullEnabled
     ? pullSelected.size > 0

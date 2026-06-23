@@ -615,7 +615,7 @@ export function MobileIoComposeWizard({
             subType={state.subType}
             itemMap={itemMap}
             getAvailable={getAvailable}
-            pullEnabled={state.subType === "produce"}
+            pullEnabled={state.subType === "produce" || state.subType === "disassemble"}
             pullSelected={pullSelected}
             onTogglePull={togglePull}
             onPullFromWarehouse={pullFromWarehouse}
