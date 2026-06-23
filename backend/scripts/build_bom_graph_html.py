@@ -14,12 +14,14 @@
 import json
 import os
 import sys
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sqlalchemy import text
+
 from app.database import SessionLocal
 from app.models import Item
-from app.routers.production import get_production_capacity
 from app.services.bom import build_bom_cache
 
 MODEL_LABEL = {"3": "DX3000", "4": "ADX4000W", "6": "ADX6000FB", "7": "COCOON", "8": "SOLO", "9": "신제품"}
@@ -57,23 +59,22 @@ def main():
 
     db = SessionLocal()
     try:
-        caps = get_production_capacity(db)
-        reps = caps.get("representative_items", [])
+        pins = db.execute(
+            text("SELECT model_symbol, pf_item_id FROM model_pf_pins ORDER BY CAST(model_symbol AS INTEGER)")
+        ).fetchall()
         bom_cache = build_bom_cache(db)
         items_map = {i.item_id: i for i in db.query(Item).all()}
-        by_code = {i.mes_code: i for i in items_map.values() if i.mes_code}
 
         models = []
         summary = []
-        for rep in reps:
-            root = by_code.get(rep.get("mes_code"))
-            if not root:
+        for ms, pf_id in pins:
+            item = items_map.get(uuid.UUID(pf_id))
+            if not item:
                 continue
-            tree = build_tree(root.item_id, bom_cache, items_map, frozenset(), 0)
-            ms = rep.get("model_symbol") or ""
-            label = MODEL_LABEL.get(ms) or (root.item_name or "").split("_")[0]
-            models.append({"key": ms, "label": label, "code": root.mes_code, "tree": tree})
-            summary.append(f"{label} ({root.mes_code}): {count_nodes(tree)} 노드")
+            tree = build_tree(item.item_id, bom_cache, items_map, frozenset(), 0)
+            label = MODEL_LABEL.get(str(ms)) or (item.item_name or "").split("_")[0]
+            models.append({"key": str(ms), "label": label, "code": item.mes_code, "tree": tree})
+            summary.append(f"{label} ({item.mes_code}): {count_nodes(tree)} 노드")
     finally:
         db.close()
 
