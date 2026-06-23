@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { OperatorLoginCard } from "./OperatorLoginCard";
 import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
@@ -19,6 +19,8 @@ type LogoState = "center" | "above-card";
  */
 const SHRINK_TRANSFORM = "scale(0.45) translateY(calc(-55.56vh - 311.11px))";
 const CENTER_TRANSFORM = "scale(1) translateY(0)";
+// 항목 5-2 — 모바일만 인트로를 작게 시작(작게→크게 반전). 데스크톱은 CENTER_TRANSFORM(scale 1) 유지.
+const MOBILE_CENTER_TRANSFORM = "scale(0.33) translateY(0)";
 
 interface MesLoginGateProps {
   children: React.ReactNode;
@@ -27,6 +29,8 @@ interface MesLoginGateProps {
 export function MesLoginGate({ children }: MesLoginGateProps) {
   const [phase, setPhase] = useState<GatePhase>("loading");
   const [logoState, setLogoState] = useState<LogoState>("center");
+  // 항목 5-2 — 모바일(<1024px)만 인트로 시작 스케일을 작게(작게→크게 반전). 데스크톱은 현행 유지.
+  const [isNarrow, setIsNarrow] = useState(false);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const clearTimers = () => {
@@ -35,6 +39,12 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   };
 
   // 초기 인증 상태 확인
+  // 페인트 전에 뷰포트 폭을 확정해 인트로 첫 프레임이 데스크톱 기본값(scale 1=840px)으로
+  // 잠깐 떴다가 축소되는 플래시를 방지(항목 5-2).
+  useLayoutEffect(() => {
+    setIsNarrow(window.matchMedia("(max-width: 1023px)").matches);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const goToLogin = () => {
@@ -130,7 +140,9 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       <div
         className="pointer-events-none absolute"
         style={{
-          transform: logoState === "above-card" ? SHRINK_TRANSFORM : CENTER_TRANSFORM,
+          transform: logoState === "above-card"
+            ? SHRINK_TRANSFORM
+            : isNarrow ? MOBILE_CENTER_TRANSFORM : CENTER_TRANSFORM,
           transition: "transform 0.9s cubic-bezier(0.4, 0, 0.2, 1)",
           transformOrigin: "center center",
         }}
@@ -146,7 +158,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
             alt="DEXCOWIN"
             width={840}
             draggable={false}
-            style={{ width: 840, height: "auto", userSelect: "none" }}
+            style={{ width: 840, maxWidth: "none", height: "auto", userSelect: "none" }}
           />
         </div>
       </div>
