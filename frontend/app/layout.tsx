@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -19,6 +19,16 @@ export const metadata: Metadata = {
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>X</text></svg>",
   },
+};
+
+// 항목 7-2 — 모바일에서 입력 포커스 시 화면 자동확대(iOS 줌) + 핀치줌 차단으로 뷰포트를 고정한다.
+// 검색창 글자가 16px 미만이라 포커스 때 확대되던 문제를 viewport 잠금으로 근본 차단.
+// 데스크톱 브라우저는 user-scalable/maximum-scale 을 대체로 무시하므로 실질 영향은 모바일 한정.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
