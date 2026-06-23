@@ -16,6 +16,7 @@ import {
   useSetPfPinMutation,
   useClearPfPinMutation,
 } from "@/lib/queries/useProductionQuery";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 type AfFilterMode = "producible" | "incomplete" | "all";
 
@@ -146,6 +147,8 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
       return next;
     });
 
+  const [unpinTarget, setUnpinTarget] = useState<string | null>(null);
+
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const toggleGroup = (key: string) =>
     setExpandedGroups((cur) => {
@@ -261,7 +264,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                     <button
                       type="button"
                       disabled={isPinLoading}
-                      onClick={(e) => { e.stopPropagation(); clearPfPin.mutate(group.key); }}
+                      onClick={(e) => { e.stopPropagation(); setUnpinTarget(group.key); }}
                       className="ml-0.5"
                       aria-label="기준 PF 해제"
                     >
@@ -365,6 +368,23 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         })}
       </div>
 
+      <ConfirmModal
+        open={unpinTarget !== null}
+        title="기준 PF 해제"
+        tone="caution"
+        confirmLabel="해제"
+        onClose={() => setUnpinTarget(null)}
+        onConfirm={() => {
+          if (unpinTarget) clearPfPin.mutate(unpinTarget);
+          setUnpinTarget(null);
+        }}
+        busy={isPinLoading}
+      >
+        <p className="mb-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+          기준 PF 지정을 해제하시겠습니까?
+        </p>
+      </ConfirmModal>
+
       {/* 데스크톱 테이블 레이아웃 (≥ 640px) */}
       <div className="hidden sm:block rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
         <div
@@ -425,7 +445,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                     <button
                       type="button"
                       disabled={isPinLoading}
-                      onClick={(e) => { e.stopPropagation(); clearPfPin.mutate(group.key); }}
+                      onClick={(e) => { e.stopPropagation(); setUnpinTarget(group.key); }}
                       className="ml-0.5"
                       aria-label="기준 PF 해제"
                     >
