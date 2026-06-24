@@ -5,6 +5,8 @@ import { Bell } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { AppNotification } from "@/lib/api/types";
 import {
+  useDeleteNotificationMutation,
+  useDeleteReadNotificationsMutation,
   useMarkNotificationsReadMutation,
   useNotificationsQuery,
 } from "@/lib/queries/useNotificationsQuery";
@@ -21,6 +23,8 @@ export function NotificationBell({
   const employeeId = operator?.employee_id;
   const { data } = useNotificationsQuery(employeeId);
   const markRead = useMarkNotificationsReadMutation();
+  const deleteNotification = useDeleteNotificationMutation();
+  const deleteRead = useDeleteReadNotificationsMutation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -53,6 +57,14 @@ export function NotificationBell({
     if (employeeId) markRead.mutate({ recipient_employee_id: employeeId });
   }
 
+  function handleDeleteItem(notificationId: string) {
+    if (employeeId) deleteNotification.mutate({ notificationId, employeeId });
+  }
+
+  function handleDeleteRead() {
+    if (employeeId) deleteRead.mutate(employeeId);
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -82,6 +94,8 @@ export function NotificationBell({
           unread={unread}
           onItemClick={handleItemClick}
           onMarkAll={handleMarkAll}
+          onDeleteItem={handleDeleteItem}
+          onDeleteRead={handleDeleteRead}
         />
       )}
     </div>

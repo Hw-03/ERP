@@ -2,7 +2,7 @@
  * 결재 알림 도메인 API — `@/lib/api/notifications`.
  */
 
-import { fetcher, postJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, postJson, toApiUrl } from "../api-core";
 import type { NotificationListResponse, NotificationMarkReadPayload } from "./types";
 
 export const notificationsApi = {
@@ -24,5 +24,19 @@ export const notificationsApi = {
     postJson<NotificationListResponse>(
       toApiUrl("/api/notifications/mark-read"),
       payload,
+    ),
+
+  deleteNotification: (notificationId: string, employeeId: string) =>
+    deleteJson<void>(
+      toApiUrl(
+        `/api/notifications/${notificationId}?recipient_employee_id=${encodeURIComponent(employeeId)}`,
+      ),
+    ),
+
+  deleteReadNotifications: (employeeId: string) =>
+    deleteJson<void>(
+      toApiUrl(
+        `/api/notifications/read?recipient_employee_id=${encodeURIComponent(employeeId)}`,
+      ),
     ),
 };

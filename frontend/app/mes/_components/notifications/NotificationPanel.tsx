@@ -37,12 +37,18 @@ export function NotificationPanel({
   unread,
   onItemClick,
   onMarkAll,
+  onDeleteItem,
+  onDeleteRead,
 }: {
   items: AppNotification[];
   unread: number;
   onItemClick: (n: AppNotification) => void;
   onMarkAll: () => void;
+  onDeleteItem: (notificationId: string) => void;
+  onDeleteRead: () => void;
 }) {
+  const hasRead = items.some((n) => n.is_read);
+
   return (
     <div
       className="absolute right-0 top-full z-50 mt-2 w-[320px] max-w-[calc(100vw-1.5rem)] rounded-[20px] border p-2 shadow-lg"
@@ -52,15 +58,26 @@ export function NotificationPanel({
         <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
           알림
         </div>
-        {unread > 0 && (
-          <button
-            onClick={onMarkAll}
-            className="text-xs font-bold transition-opacity hover:opacity-80"
-            style={{ color: LEGACY_COLORS.blue }}
-          >
-            모두 읽음
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {hasRead && (
+            <button
+              onClick={onDeleteRead}
+              className="text-xs font-bold transition-opacity hover:opacity-80"
+              style={{ color: LEGACY_COLORS.muted }}
+            >
+              읽은 알림 삭제
+            </button>
+          )}
+          {unread > 0 && (
+            <button
+              onClick={onMarkAll}
+              className="text-xs font-bold transition-opacity hover:opacity-80"
+              style={{ color: LEGACY_COLORS.blue }}
+            >
+              모두 읽음
+            </button>
+          )}
+        </div>
       </div>
       <div className="my-1 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
       <div className="max-h-[360px] overflow-y-auto">
@@ -72,29 +89,47 @@ export function NotificationPanel({
           items.map((n) => {
             const tone = TONE[n.type] ?? LEGACY_COLORS.blue;
             return (
-              <button
+              <div
                 key={n.notification_id}
-                onClick={() => onItemClick(n)}
-                className="flex w-full flex-col gap-0.5 rounded-[14px] px-3 py-2 text-left transition-opacity hover:opacity-80"
+                className="flex items-start rounded-[14px]"
                 style={{ background: n.is_read ? "transparent" : tint(tone, 10) }}
               >
-                <div className="flex items-center gap-2">
-                  {!n.is_read && (
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tone }} />
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onItemClick(n)}
+                  onKeyDown={(e) => e.key === "Enter" && onItemClick(n)}
+                  className="flex flex-1 cursor-pointer flex-col gap-0.5 px-3 py-2 text-left transition-opacity hover:opacity-80"
+                >
+                  <div className="flex items-center gap-2">
+                    {!n.is_read && (
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tone }} />
+                    )}
+                    <span className="text-sm font-bold" style={{ color: tone }}>
+                      {n.title}
+                    </span>
+                    <span className="ml-auto shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted }}>
+                      {timeLabel(n.created_at)}
+                    </span>
+                  </div>
+                  {n.body && (
+                    <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
+                      {humanizeBody(n.body)}
+                    </span>
                   )}
-                  <span className="text-sm font-bold" style={{ color: tone }}>
-                    {n.title}
-                  </span>
-                  <span className="ml-auto shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                    {timeLabel(n.created_at)}
-                  </span>
                 </div>
-                {n.body && (
-                  <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                    {humanizeBody(n.body)}
-                  </span>
-                )}
-              </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteItem(n.notification_id);
+                  }}
+                  className="shrink-0 px-2 py-2 text-xs opacity-30 transition-opacity hover:opacity-70"
+                  style={{ color: LEGACY_COLORS.muted }}
+                  aria-label="알림 삭제"
+                >
+                  ✕
+                </button>
+              </div>
             );
           })
         )}

@@ -33,3 +33,25 @@ export function useMarkNotificationsReadMutation() {
       qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
   });
 }
+
+/** 알림 개별 삭제. */
+export function useDeleteNotificationMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ notificationId, employeeId }: { notificationId: string; employeeId: string }) =>
+      notificationsApi.deleteNotification(notificationId, employeeId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+  });
+}
+
+/** 읽은 알림 전체 삭제. */
+export function useDeleteReadNotificationsMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (employeeId: string) =>
+      notificationsApi.deleteReadNotifications(employeeId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+  });
+}
