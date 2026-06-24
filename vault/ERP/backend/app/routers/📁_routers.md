@@ -36,21 +36,22 @@ project: DEXCOWIN MES
 - [[ERP/backend/app/routers/_errors.py]] — `_errors.py`는 `_errors` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 - [[ERP/backend/app/routers/admin_audit.py]] — `admin_audit.py`는 `admin_audit` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 
-> [!info]- 추가 파일 (전체 15개 도메인 라우터)
-> - [[ERP/backend/app/routers/admin_audit_csv.py]] — admin_audit_csv.py
-> - [[ERP/backend/app/routers/bom.py]] — bom.py
-> - [[ERP/backend/app/routers/codes.py]] — codes.py
-> - [[ERP/backend/app/routers/defects.py]] — defects.py
-> - [[ERP/backend/app/routers/departments.py]] — departments.py
-> - [[ERP/backend/app/routers/dept_adjustment.py]] — dept_adjustment.py
-> - [[ERP/backend/app/routers/employees.py]] — employees.py
-> - [[ERP/backend/app/routers/handover.py]] — 인수인계서 (작성·제출·인수확인). 받는 부서(고압/진공)만 인수 가능
-> - [[ERP/backend/app/routers/io.py]] — io.py
-> - [[ERP/backend/app/routers/items.py]] — items.py
-> - [[ERP/backend/app/routers/models.py]] — models.py (ProductSymbol 라우터 — DB 모델 아님)
-> - [[ERP/backend/app/routers/production.py]] — production.py
-> - [[ERP/backend/app/routers/variance.py]] — variance.py
-> - [[ERP/backend/app/routers/warehouse_map/]] — 창고 지도·앵글·박스 API
+> [!info]- 추가 파일 (전체 도메인 라우터)
+> - [[ERP/backend/app/routers/admin_audit_csv.py.md]] — 감사로그 CSV 내보내기
+> - [[ERP/backend/app/routers/bom.py.md]] — BOM CRUD·트리 조회
+> - [[ERP/backend/app/routers/codes.py.md]] — 제품기호·공정코드
+> - [[ERP/backend/app/routers/defects.py.md]] — 불량 유형·처리
+> - [[ERP/backend/app/routers/departments.py.md]] — 부서 마스터
+> - [[ERP/backend/app/routers/dept_adjustment.py.md]] — 부서 이동 기타 유형
+> - [[ERP/backend/app/routers/employees.py.md]] — 직원 CRUD·PIN·테마
+> - [[ERP/backend/app/routers/handover.py.md]] — 인수인계서 (작성·제출·인수확인). 받는 부서(고압/진공)만 인수 가능
+> - [[ERP/backend/app/routers/io.py.md]] — 입출고 V2 (미리보기·임시저장·제출)
+> - [[ERP/backend/app/routers/items.py.md]] — 품목 마스터 CRUD
+> - [[ERP/backend/app/routers/models.py.md]] — ProductSymbol 라우터 (DB 모델 파일 아님)
+> - [[ERP/backend/app/routers/production.py.md]] — 생산 입고·BOM 차감
+> - [[ERP/backend/app/routers/employee_item_order.py.md]] — 직원별 품목 순서 커스터마이징
+> - [[ERP/backend/app/routers/warehouse_map/angles.py.md]] — 앵글(구획) CRUD
+> - [[ERP/backend/app/routers/warehouse_map/boxes.py.md]] — 박스 CRUD·이동·차감
 
 ## 조심할 점
 
