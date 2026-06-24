@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PA·PF 출하 관리 개선안</title>
+  <style>
+    :root{
+      --ink:#10213b;--navy:#142b4e;--blue:#1769e0;--blue2:#4c91f4;
+      --sky:#eaf2ff;--sky2:#f5f8fd;--line:#d9e4f0;--muted:#66768c;
+      --green:#15966f;--green-bg:#e8f8f2;--red:#dc3343;--red-bg:#fff0f2;
+      --amber:#d9890c;--amber-bg:#fff5dc;--white:#fff;--shadow:0 14px 40px rgba(16,33,59,.08);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:#f3f7fc;color:var(--ink);font-family:"Malgun Gothic","Noto Sans KR",system-ui,sans-serif;word-break:keep-all;line-height:1.65}
+    a{color:inherit;text-decoration:none}
+    button{font:inherit}
+    .progress{position:fixed;z-index:50;left:0;top:0;height:4px;background:linear-gradient(90deg,var(--blue),#6ba8ff);width:0}
+    .topbar{position:sticky;z-index:40;top:0;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);border-bottom:1px solid rgba(217,228,240,.9)}
+    .topbar-inner{max-width:1180px;margin:auto;height:72px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+    .brand{display:flex;align-items:center;gap:13px;font-weight:950;letter-spacing:-.03em}
+    .wordmark{display:flex;align-items:center;gap:8px;color:#1473c9;font-size:16px;font-style:italic;letter-spacing:-.06em}
+    .wordmark svg{width:30px;height:22px}
+    .brand-divider{width:1px;height:22px;background:var(--line)}
+    .brand-title{font-size:15px}
+    .nav{display:flex;gap:5px;color:var(--muted);font-size:12px;font-weight:850}
+    .nav a{padding:8px 10px;border-radius:9px}.nav a:hover{color:var(--blue);background:var(--sky)}
+    .print{border:1px solid var(--line);background:#fff;color:var(--navy);padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer}
+    main{overflow:hidden}
+    .hero{position:relative;background:radial-gradient(circle at 82% 18%,#d9eaff 0,transparent 28%),linear-gradient(145deg,#fff 0,#f5f9ff 75%);border-bottom:1px solid var(--line)}
+    .hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:9px;background:linear-gradient(var(--blue) 62%,var(--red) 62%)}
+    .hero-inner{max-width:1180px;min-height:620px;margin:auto;padding:88px 28px 74px;display:grid;grid-template-columns:1.04fr .96fr;gap:70px;align-items:center}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--blue);font-size:13px;font-weight:950;letter-spacing:.12em}
+    .eyebrow:before{content:"";width:24px;border-top:4px solid}
+    h1{font-size:clamp(44px,5.2vw,74px);line-height:1.06;letter-spacing:-.06em;margin:18px 0 22px;font-weight:950}
+    h1 em{font-style:normal;color:var(--blue)}
+    .lead{font-size:20px;color:var(--muted);font-weight:700;margin:0;max-width:650px}
+    .hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:30px}
+    .tag{padding:8px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:12px;font-weight:900;color:var(--muted)}
+    .hero-map{position:relative;border:2px solid #cfe0f5;border-radius:28px;background:rgba(255,255,255,.86);box-shadow:var(--shadow);padding:30px}
+    .hero-map h2{margin:0 0 22px;font-size:17px;color:var(--navy)}
+    .mini-flow{display:flex;flex-direction:column;gap:14px}
+    .mini-row{display:grid;grid-template-columns:72px 1fr;gap:14px;align-items:center}
+    .code{height:62px;border-radius:16px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:950;font-size:19px}
+    .mini-copy{padding:13px 16px;background:var(--sky2);border:1px solid var(--line);border-radius:14px}
+    .mini-copy b{display:block;font-size:15px}.mini-copy span{display:block;color:var(--muted);font-size:12px;font-weight:700;margin-top:2px}
+    .hero-map .downline{height:14px;border-left:3px solid var(--blue);margin:-14px 0 -14px 35px}
+    .hero-question{margin-top:20px;padding:14px 16px;border-radius:14px;background:var(--red-bg);color:var(--red);font-weight:900;font-size:13px;text-align:center}
+    .wrap{max-width:1180px;margin:auto;padding:0 28px}
+    section.block{padding:92px 0;border-bottom:1px solid var(--line)}
+    section.block:last-child{border-bottom:0}
+    .section-head{display:grid;grid-template-columns:92px 1fr;gap:18px;align-items:start;margin-bottom:42px}
+    .num{font-size:13px;color:var(--blue);font-weight:950;letter-spacing:.13em;padding-top:8px}
+    .section-head h2{margin:0;font-size:clamp(30px,3.5vw,48px);line-height:1.16;letter-spacing:-.045em}
+    .section-head h2 em{font-style:normal;color:var(--blue)}
+    .section-head p{margin:10px 0 0;color:var(--muted);font-size:17px;font-weight:700}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 7px 22px rgba(16,33,59,.045);padding:26px}
+    .card h3{margin:0 0 8px;font-size:21px;letter-spacing:-.025em}.card p{margin:0;color:var(--muted);font-weight:700}
+    .card.problem{border-top:5px solid var(--red)}.card.answer{border-top:5px solid var(--blue)}
+    .list{display:flex;flex-direction:column;gap:8px;margin-top:20px}.list span{padding:10px 12px;background:var(--sky2);border-radius:10px;font-size:13px;font-weight:850;color:var(--muted)}
+    .center-message{margin-top:18px;padding:17px 20px;border-radius:14px;background:var(--navy);color:#fff;text-align:center;font-size:16px;font-weight:900}.center-message b{color:#87baff}
+    .process{display:grid;grid-template-columns:1fr 54px 1fr 54px 1fr 54px 1fr;align-items:center}
+    .process-node{min-height:190px;padding:24px 18px;background:#fff;border:2px solid var(--line);border-radius:20px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .process-node strong{font-size:25px}.process-node small{display:block;color:var(--muted);font-size:13px;font-weight:750;margin-top:5px}.process-node.current{border-color:var(--blue);background:linear-gradient(180deg,#fff,var(--sky))}
+    .round{width:58px;height:58px;border-radius:18px;background:var(--sky);color:var(--blue);display:grid;place-items:center;font-weight:950;font-size:18px;margin-bottom:13px}
+    .arr{text-align:center;color:var(--blue);font-size:34px;font-weight:950}
+    .tabmock{background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);overflow:hidden}
+    .apphead{height:72px;background:var(--navy);color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between}.apphead b{font-size:20px}.apphead span{font-size:12px;color:#cfe1ff;font-weight:800}
+    .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:18px;background:#f7faff;border-bottom:1px solid var(--line)}
+    .tab{padding:14px 8px;border:1px solid var(--line);border-radius:12px;text-align:center;color:var(--muted);font-size:13px;font-weight:900}.tab.active{background:var(--sky);border-color:var(--blue);color:var(--blue)}
+    .workspace{padding:24px;display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+    .panel{border:1px solid var(--line);border-radius:16px;padding:18px}.panel h4{margin:0 0 13px;font-size:15px}.field{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid #edf2f7;font-size:12px}.field:last-child{border-bottom:0}.field b{color:var(--muted)}.field span{font-weight:850}
+    .status-row{display:flex;gap:8px;flex-wrap:wrap}.status{padding:6px 9px;border-radius:999px;background:var(--green-bg);color:var(--green);font-size:11px;font-weight:900}.status.edit{background:var(--amber-bg);color:var(--amber)}
+    .timeline{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:12px}.timeline:before{content:"";position:absolute;left:11%;right:11%;top:30px;border-top:5px solid #d5e3f4}.time-node{position:relative;text-align:center;z-index:1}.time-dot{width:64px;height:64px;margin:auto;border:5px solid var(--blue);background:#fff;border-radius:50%;display:grid;place-items:center;color:var(--blue);font-size:12px;font-weight:950}.time-node:last-child .time-dot{border-color:var(--green);color:var(--green)}.time-node h3{font-size:17px;margin:10px 0 2px}.time-node p{margin:0;color:var(--muted);font-size:12px;font-weight:700}
+    .decision{display:grid;grid-template-columns:1fr 64px 1fr;align-items:center;gap:8px}.base-box{padding:28px;border:2px solid var(--line);border-radius:22px;background:#fff;text-align:center}.base-box h3{font-size:24px;margin:0 0 8px}.base-box p{margin:0;color:var(--muted);font-weight:700}.fork{font-size:48px;color:#c7d5e6;text-align:center;font-weight:950}.routes{display:flex;flex-direction:column;gap:12px}.route-card{padding:18px 20px;border:2px solid var(--line);border-radius:16px;background:#fff}.route-card b{display:block;font-size:17px}.route-card span{display:block;color:var(--muted);font-size:12px;font-weight:750;margin-top:3px}.route-card.same{border-color:var(--green);background:var(--green-bg)}.route-card.change{border-color:var(--blue);background:var(--sky)}
+    .compare{display:grid;grid-template-columns:1fr 76px 1fr;align-items:stretch}.bom{border:2px solid var(--line);border-radius:20px;background:#fff;padding:24px}.bom.changed{border-color:var(--blue)}.bom-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.bom-head h3{margin:0;font-size:20px}.badge{padding:6px 9px;border-radius:999px;background:var(--sky2);color:var(--muted);font-size:10px;font-weight:950}.changed .badge{background:var(--sky);color:var(--blue)}
+    .tree{display:flex;flex-direction:column;gap:7px}.tree-line{padding:9px 11px;background:var(--sky2);border-radius:9px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:850}.tree-line.sub{margin-left:22px}.tree-line.diff{background:var(--amber-bg);color:#8b5b04}.tree-line.off{background:var(--red-bg);color:var(--red);text-decoration:line-through}.to{display:grid;place-items:center;color:var(--blue);font-size:35px;font-weight:950}
+    .created{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.created div{padding:14px;border-radius:12px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:900}.created small{display:block;color:var(--muted);font-weight:700;margin-top:3px}
+    .shipment{display:grid;grid-template-columns:.9fr 50px 1.1fr;align-items:center}.carton{border:3px solid #b98943;background:#fffaf0;border-radius:14px;padding:24px;box-shadow:inset 0 0 0 8px #f5e7cd;text-align:center}.carton strong{font-size:24px}.carton p{margin:5px 0 0;color:#8b6a37;font-weight:800}.ship-lines{display:flex;flex-direction:column;gap:9px}.ship-line{padding:13px 16px;border:1px solid var(--line);border-radius:12px;background:#fff;display:flex;justify-content:space-between;font-size:13px;font-weight:900}.ship-line b{color:var(--blue)}
+    .history-card{background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden}.history-head{padding:18px 22px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between}.history-head b{font-size:17px}.history-head span{font-size:12px;color:#cfe1ff;font-weight:800}.history-grid{display:grid;grid-template-columns:repeat(4,1fr)}.history-cell{padding:18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.history-cell:nth-child(4n){border-right:0}.history-cell b{display:block;color:var(--muted);font-size:10px;margin-bottom:5px}.history-cell span{font-size:14px;font-weight:900}.history-detail{padding:18px 22px}.history-detail h4{margin:0 0 11px}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{padding:7px 10px;border-radius:9px;background:var(--sky2);font-size:11px;font-weight:850;color:var(--muted)}
+    .report{background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden}.report-title{padding:17px 20px;display:flex;justify-content:space-between;border-bottom:1px solid var(--line)}.report-title b{font-size:17px}.report-title span{color:var(--muted);font-size:11px;font-weight:800}.report-row{display:grid;grid-template-columns:1.8fr repeat(4,.7fr);align-items:center;border-bottom:1px solid #edf2f7}.report-row:last-child{border-bottom:0}.report-row>*{padding:13px 15px}.report-row.head{background:var(--sky2);color:var(--muted);font-size:10px;font-weight:950}.report-row:not(.head){font-size:12px;font-weight:850}.report-row .indent{padding-left:34px;color:var(--muted)}.report-row .blue-num{color:var(--blue);font-size:16px;font-weight:950}
+    .conclusion{background:linear-gradient(135deg,var(--navy),#1b4377);color:#fff;border-radius:28px;padding:42px;box-shadow:var(--shadow)}.conclusion h2{font-size:36px;line-height:1.22;margin:0 0 26px;letter-spacing:-.04em}.conclusion h2 em{font-style:normal;color:#83b8ff}.final-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.final-step{padding:17px;border-radius:14px;background:#ffffff12;border:1px solid #ffffff24}.final-step b{display:block;color:#8fc0ff;font-size:11px;margin-bottom:7px}.final-step strong{font-size:15px}.final-note{margin-top:22px;padding-top:20px;border-top:1px solid #ffffff2e;color:#dceaff;font-size:14px;font-weight:750}
+    footer{padding:38px 28px;text-align:center;color:var(--muted);font-size:12px;font-weight:700}
+    @media(max-width:900px){.nav{display:none}.hero-inner{grid-template-columns:1fr;gap:38px;min-height:auto;padding-top:64px}.hero-map{max-width:620px}.grid2,.grid3,.workspace{grid-template-columns:1fr}.process{grid-template-columns:1fr}.arr{transform:rotate(90deg);height:46px}.timeline{grid-template-columns:1fr}.timeline:before{left:31px;right:auto;top:30px;bottom:30px;border-top:0;border-left:5px solid #d5e3f4}.time-node{display:grid;grid-template-columns:64px 1fr;text-align:left;gap:14px}.time-dot{margin:0}.decision,.compare,.shipment{grid-template-columns:1fr}.fork,.to,.shipment>.arr{transform:rotate(90deg);height:58px}.history-grid{grid-template-columns:1fr 1fr}.history-cell:nth-child(2n){border-right:0}.report-row{grid-template-columns:1.5fr repeat(4,.65fr)}.final-flow{grid-template-columns:1fr 1fr}.section-head{grid-template-columns:1fr;gap:3px}.num{padding:0}}
+    @media(max-width:560px){.topbar-inner,.wrap{padding-left:18px;padding-right:18px}.brand-title,.brand-divider{display:none}.hero-inner{padding-left:20px;padding-right:20px}.tabs{grid-template-columns:1fr 1fr}.created,.final-flow{grid-template-columns:1fr}.history-grid{grid-template-columns:1fr}.history-cell{border-right:0}.report{overflow-x:auto}.report-row{min-width:680px}.conclusion{padding:28px}.grid3{grid-template-columns:1fr}}
+    @media print{body{background:#fff}.progress,.topbar,.print{display:none!important}.hero-inner{min-height:auto;padding-top:42px}.hero{break-after:page}.block{break-inside:avoid;padding:48px 0!important}.wrap{max-width:none;padding:0 18mm}.card,.tabmock,.history-card,.report,.conclusion{box-shadow:none}.conclusion{print-color-adjust:exact;-webkit-print-color-adjust:exact}footer{padding:20px}}
+  </style>
+</head>
+<body>
+  <div class="progress" id="progress"></div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="wordmark">
+          <svg viewBox="0 0 60 40" aria-hidden="true"><path d="M3 20h22L17 11h12l9 9-9 9H17l8-9H3z" fill="#1d79cb"/><path d="M31 20h26" stroke="#e12f3f" stroke-width="4"/></svg>
+          DEXCOWIN
+        </div>
+        <div class="brand-divider"></div><div class="brand-title">PA·PF 출하 관리 개선안</div>
+      </div>
+      <nav class="nav"><a href="#background">배경</a><a href="#proposal">개선안</a><a href="#flow">업무 흐름</a><a href="#report">이력·보고</a></nav>
+      <button class="print" onclick="window.print()">인쇄</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <div class="eyebrow">담당자 협의용</div>
+          <h1>PA·PF<br><em>출하 관리 개선안</em></h1>
+          <p class="lead">오더마다 달라지는 부속품 구성을 기존 BOM·재고·주간보고와 자연스럽게 연결하기 위한 업무 기준안입니다.</p>
+          <div class="hero-tags"><span class="tag">출하 탭 신설</span><span class="tag">오더 전용 PA·PF</span><span class="tag">BOM 자동 생성</span><span class="tag">출하 이력 추적</span></div>
+        </div>
+        <div class="hero-map">
+          <h2>현재 실물 준비 단계</h2>
+          <div class="mini-flow">
+            <div class="mini-row"><div class="code">AF</div><div class="mini-copy"><b>완제품</b><span>조립 완료 후 앵글에 보관</span></div></div>
+            <div class="downline"></div>
+            <div class="mini-row"><div class="code">PA</div><div class="mini-copy"><b>가방·악세사리 준비</b><span>자주 나가는 구성은 미리 보관</span></div></div>
+            <div class="downline"></div>
+            <div class="mini-row"><div class="code">PF</div><div class="mini-copy"><b>제품박스 포장</b><span>PA + 에어셀 + 제품박스</span></div></div>
+          </div>
+          <div class="hero-question">같은 출고처라도 악세사리 종류와 수량은 매번 달라질 수 있습니다.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <section class="block" id="background">
+        <div class="section-head"><div class="num">01 · 배경</div><div><h2>왜 이 개선안이 <em>필요한가</em></h2><p>표준 BOM은 필요하지만 실제 오더는 표준과 항상 같지 않습니다.</p></div></div>
+        <div class="grid2">
+          <div class="card problem"><h3>현재 발생하는 문제</h3><p>기존 BOM을 매번 고치면 과거 출하 구성을 알 수 없고, 가능한 조합을 모두 미리 만들면 관리 대상이 끝없이 늘어납니다.</p><div class="list"><span>배터리 2개 → 이번 주문은 1개</span><span>실드 포함 → 이번 주문은 미포함</span><span>국가별 충전기·전원 코드 변경</span><span>별도 악세사리·카톤 포장 추가</span></div></div>
+          <div class="card answer"><h3>정리해야 할 기준</h3><p>표준 구성은 그대로 재사용하고, 변경 주문은 그 오더만의 PA·PF와 BOM으로 남겨 실제 출하 내용을 추적합니다.</p><div class="list"><span>변경 없음 → 기존 PA·PF 사용</span><span>PA 내부 변경 → 오더 전용 PA·PF 생성</span><span>PF 단계만 변경 → 오더 전용 PF 생성</span><span>출하 완료 후에도 BOM과 이력 유지</span></div></div>
+        </div>
+        <div class="center-message"><b>핵심 질문</b> · “이번에 실제로 무엇을 넣어 출하했는가?”를 BOM과 재고 이력으로 함께 남깁니다.</div>
+      </section>
+
+      <section class="block">
+        <div class="section-head"><div class="num">02 · 현행</div><div><h2>실무 흐름은 <em>바꾸지 않습니다</em></h2><p>미리 준비해 두는 AF·PA와 오더 직전의 PF 역할을 그대로 유지합니다.</p></div></div>
+        <div class="process">
+          <div class="process-node"><div class="round">AF</div><strong>완제품 보관</strong><small>조립 완료품을 앵글에 보관</small></div><div class="arr">→</div>
+          <div class="process-node"><div class="round">PA</div><strong>가방 준비</strong><small>가방과 악세사리까지 준비</small></div><div class="arr">→</div>
+          <div class="process-node current"><div class="round">PF</div><strong>제품박스 준비</strong><small>에어셀·제품박스 포장</small></div><div class="arr">→</div>
+          <div class="process-node"><div class="round">출하</div><strong>배송업체 픽업</strong><small>실제 출고일자와 품목 확정</small></div>
+        </div>
+      </section>
+
+      <section class="block" id="proposal">
+        <div class="section-head"><div class="num">03 · 화면</div><div><h2>입출고와 분리된 <em>출하 탭</em>을 만듭니다</h2><p>오더 구성부터 실제 픽업까지 하나의 출하 건으로 이어집니다.</p></div></div>
+        <div class="tabmock">
+          <div class="apphead"><b>출하</b><span>DEXCOWIN MES System</span></div>
+          <div class="tabs"><div class="tab active">출하 준비 요청</div><div class="tab">출하 준비 중</div><div class="tab">출하 완료 처리</div><div class="tab">출하 이력</div></div>
+          <div class="workspace">
+            <div class="panel"><h4>출하 준비 요청</h4><div class="field"><b>제품</b><span>ADX4000W · 60kV 2mA</span></div><div class="field"><b>국가·출고처</b><span>일본 · Dexcowin Japan</span></div><div class="field"><b>수량</b><span>2대</span></div><div class="field"><b>출하 예정일</b><span>2026-06-30</span></div></div>
+            <div class="panel"><h4>구성 상태</h4><div class="status-row"><span class="status">기준 PF 불러옴</span><span class="status edit">구성 2건 변경</span></div><div class="field"><b>배터리</b><span>2개 → 1개</span></div><div class="field"><b>실드</b><span>포함 → 제외</span></div><div class="field"><b>생성 결과</b><span>오더 전용 PA·PF</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" id="flow">
+        <div class="section-head"><div class="num">04 · 흐름</div><div><h2>작성부터 픽업까지 <em>네 단계</em>로 관리합니다</h2><p>요청은 고정 문서가 아니라 준비 과정에서 수정 가능한 살아 있는 작업 건입니다.</p></div></div>
+        <div class="timeline">
+          <div class="time-node"><div class="time-dot">작성</div><div><h3>출하 준비 요청</h3><p>영업·생산·출하 중 담당자가 작성</p></div></div>
+          <div class="time-node"><div class="time-dot">확정</div><div><h3>구성 확정</h3><p>PA·PF BOM 선택·수정·자동 생성</p></div></div>
+          <div class="time-node"><div class="time-dot">준비</div><div><h3>출하 준비 중</h3><p>국가·출고처·부속품을 보고 실물 준비</p></div></div>
+          <div class="time-node"><div class="time-dot">완료</div><div><h3>배송업체 픽업</h3><p>실제 출하 처리·출고일자 기록</p></div></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="section-head"><div class="num">05 · BOM</div><div><h2>변경이 있을 때만 <em>오더 전용 BOM</em>을 만듭니다</h2><p>별도 구성 이력 체계를 만들지 않고 PA·PF BOM 자체가 실제 출하 구성의 기록이 됩니다.</p></div></div>
+        <div class="decision">
+          <div class="base-box"><h3>기준 PF 선택</h3><p>기존에 등록된 국가·출고처별 PA·PF 구성 전체를 불러옵니다.</p></div><div class="fork">≫</div>
+          <div class="routes"><div class="route-card same"><b>변경 없음</b><span>기존 PA·PF와 BOM을 그대로 사용</span></div><div class="route-card change"><b>변경 있음</b><span>구성을 복사해 오더 전용 PA·PF와 BOM 자동 생성</span></div></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="section-head"><div class="num">06 · 예시</div><div><h2>사용자는 <em>달라진 품목만</em> 수정합니다</h2><p>내부에서는 필요한 PA·PF 품목과 BOM이 자연스럽게 생성됩니다.</p></div></div>
+        <div class="compare">
+          <div class="bom"><div class="bom-head"><h3>일본 기본 PF</h3><span class="badge">기준 구성</span></div><div class="tree"><div class="tree-line"><span>PA</span><b>× 1</b></div><div class="tree-line sub"><span>배터리</span><b>× 2</b></div><div class="tree-line sub"><span>실드</span><b>× 1</b></div><div class="tree-line sub"><span>일본용 충전기·AC 코드</span><b>각 1</b></div><div class="tree-line"><span>상·하단 에어셀</span><b>각 1</b></div><div class="tree-line"><span>제품박스</span><b>× 1</b></div></div></div>
+          <div class="to">→</div>
+          <div class="bom changed"><div class="bom-head"><h3>OUT-2026-001</h3><span class="badge">오더 전용</span></div><div class="tree"><div class="tree-line"><span>PA</span><b>× 1</b></div><div class="tree-line sub diff"><span>배터리</span><b>× 1</b></div><div class="tree-line sub off"><span>실드</span><b>제외</b></div><div class="tree-line sub"><span>일본용 충전기·AC 코드</span><b>각 1</b></div><div class="tree-line"><span>상·하단 에어셀</span><b>각 1</b></div><div class="tree-line"><span>제품박스</span><b>× 1</b></div></div><div class="created"><div>오더 전용 PA 생성<small>PA 내부 품목이 변경됨</small></div><div>오더 전용 PF 생성<small>새 PA를 하위 품목으로 연결</small></div></div></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="section-head"><div class="num">07 · 카톤</div><div><h2>카톤은 BOM이 아니라 <em>출하 품목</em>으로 처리합니다</h2><p>PF 안에 PF를 넣지 않고 같은 출하 건에 낱개 품목으로 묶습니다.</p></div></div>
+        <div class="shipment">
+          <div class="carton"><strong>카톤 1박스</strong><p>제품박스 2개 묶음</p></div><div class="arr">→</div>
+          <div class="ship-lines"><div class="ship-line"><span>오더 전용 PF</span><b>× 2</b></div><div class="ship-line"><span>추가 악세사리</span><b>× 2</b></div><div class="ship-line"><span>카톤박스</span><b>× 1</b></div></div>
+        </div>
+        <div class="center-message"><b>BOM 규칙 유지</b> · PF 여러 개와 카톤박스를 하나의 출하번호로 연결합니다.</div>
+      </section>
+
+      <section class="block" id="report">
+        <div class="section-head"><div class="num">08 · 이력</div><div><h2>출고일자와 실제 구성을 <em>한 건으로 추적</em>합니다</h2><p>출하 목록은 간단하게, 상세에서는 BOM과 변경 이력을 모두 확인합니다.</p></div></div>
+        <div class="history-card">
+          <div class="history-head"><b>OUT-2026-001 · 출하 완료</b><span>2026-06-30 15:20 픽업</span></div>
+          <div class="history-grid"><div class="history-cell"><b>제품</b><span>ADX4000W</span></div><div class="history-cell"><b>국가·출고처</b><span>일본 · Dexcowin Japan</span></div><div class="history-cell"><b>수량</b><span>2대</span></div><div class="history-cell"><b>출고일자</b><span>2026-06-30</span></div></div>
+          <div class="history-detail"><h4>상세에서 확인할 내용</h4><div class="chips"><span class="chip">사용한 PA·PF</span><span class="chip">전체 BOM</span><span class="chip">배터리 2→1</span><span class="chip">실드 제외</span><span class="chip">카톤박스 ×1</span><span class="chip">작성·변경·완료 담당자</span></div></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="section-head"><div class="num">09 · 주간보고</div><div><h2>새로 생긴 PF도 <em>기존 PF처럼</em> 표시합니다</h2><p>상세 목록은 실제 PF별로, 상단 생산 매트릭스는 모델별 합계로 봅니다.</p></div></div>
+        <div class="report">
+          <div class="report-title"><b>출하 공정완료 · PF</b><span>2026-06-29 ~ 2026-07-05</span></div>
+          <div class="report-row head"><div>품목</div><div>전주재고</div><div>준비</div><div>출하</div><div>현재재고</div></div>
+          <div class="report-row"><div><b>ADX4000W 합계</b></div><div>1</div><div class="blue-num">6</div><div>5</div><div>2</div></div>
+          <div class="report-row"><div class="indent">일본 기본 PF</div><div>1</div><div>3</div><div>3</div><div>1</div></div>
+          <div class="report-row"><div class="indent">OUT-001 · 배터리 1개</div><div>0</div><div>2</div><div>1</div><div>1</div></div>
+          <div class="report-row"><div class="indent">OUT-002 · 실드 미포함</div><div>0</div><div>1</div><div>1</div><div>0</div></div>
+        </div>
+        <div class="center-message"><b>표시 원칙</b> · 오더 전용 PF는 실적에 포함하고, 생산 가능 수량의 기준 PF에서는 제외합니다.</div>
+      </section>
+
+      <section class="block">
+        <div class="conclusion">
+          <h2>표준은 재사용하고,<br><em>변경 주문은 새 BOM으로 추적합니다</em></h2>
+          <div class="final-flow"><div class="final-step"><b>01</b><strong>기존 PF 구성 불러오기</strong></div><div class="final-step"><b>02</b><strong>오더에 맞게 추가·제외·수정</strong></div><div class="final-step"><b>03</b><strong>PA·PF와 BOM 자동 생성</strong></div><div class="final-step"><b>04</b><strong>픽업 시 출하·이력 완료</strong></div></div>
+          <div class="final-note">실제 PA·PF 준비 방식은 유지하면서 주문별 구성, 재고, 출고일자, 주간보고를 하나의 출하번호로 연결하는 것이 목표입니다.</div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer>DEXCOWIN MES · PA·PF 출하 관리 개선안 · 담당자 협의용</footer>
+  <script>
+    const bar=document.getElementById('progress');
+    function updateProgress(){const h=document.documentElement;const max=h.scrollHeight-h.clientHeight;bar.style.width=(max?window.scrollY/max*100:0)+'%'}
+    addEventListener('scroll',updateProgress,{passive:true});addEventListener('resize',updateProgress);updateProgress();
+  </script>
+</body>
+</html>
