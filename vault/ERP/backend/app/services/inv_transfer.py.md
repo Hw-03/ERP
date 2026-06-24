@@ -12,11 +12,13 @@
 
 ## 중요한 내용
 
-- `receive_to_warehouse(db, item_id, qty, ...)` — 창고 입고 (warehouse_qty 증가)
+- `receive_confirmed(db, item_id, qty, ...)` — 창고 입고 확정 (warehouse_qty 증가)
 - `consume_warehouse(db, item_id, qty, ...)` — 창고 출고 (warehouse_qty 차감) + 박스 추적
-- `transfer_to_dept(db, item_id, dept, qty, ...)` — 창고 → 부서 PRODUCTION 이동
-- `transfer_dept_to_warehouse(db, item_id, dept, qty, ...)` — 부서 → 창고 반환
-- `_deplete_boxes_if_tracking(db, item_id, qty)` — 박스 추적 활성 시 박스별 차감
+- `transfer_to_production(db, item_id, dept, qty, ...)` — 창고 → 부서 PRODUCTION 이동
+- `transfer_to_warehouse(db, item_id, dept, qty, ...)` — 부서 → 창고 반환
+- `transfer_between_departments(db, item_id, src_dept, dst_dept, qty, ...)` — 부서 간 재고 이동
+- `consume_from_department(db, item_id, dept, qty, ...)` — 부서 PRODUCTION 수량 차감
+- `_deplete_boxes_if_tracking(db, item_id, qty)` — 박스 추적 활성 시 박스별 차감 (내부 함수)
 
 ## 위험도
 
@@ -27,10 +29,10 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/inv_calc.py.md]] — _sync_total 제공자
-- [[ERP/backend/app/services/stock_math.py.md]] — 사용 가능 수량 계산
-- [[ERP/backend/app/routers/inventory/transfer.py.md]] — 이동 API
+- [[ERP/backend/app/services/inv_calc.py]] — _sync_total 제공자
+- [[ERP/backend/app/services/stock_math.py]] — 사용 가능 수량 계산
+- [[ERP/backend/app/routers/inventory/transfer.py]] — 이동 API
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/inv_base.py.md]]
-> - [[ERP/backend/app/services/inv_defective.py.md]]
+> - [[ERP/backend/app/services/inv_base.py]]
+> - [[ERP/backend/app/services/inv_defective.py]]

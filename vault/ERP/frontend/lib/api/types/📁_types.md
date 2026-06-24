@@ -36,6 +36,8 @@ project: DEXCOWIN MES
 > - [[ERP/frontend/lib/api/types/inventory.ts]] — inventory.ts
 > - [[ERP/frontend/lib/api/types/io.ts]] — io.ts
 > - [[ERP/frontend/lib/api/types/items.ts]] — items.ts
+> - [[ERP/frontend/lib/api/types/notifications.ts]] — notifications.ts
+> - [[ERP/frontend/lib/api/types/handover.ts]] — handover.ts
 > - [[ERP/frontend/lib/api/types/production.ts]] — production.ts
 > - [[ERP/frontend/lib/api/types/shared.ts]] — shared.ts
 > - [[ERP/frontend/lib/api/types/stock-requests.ts]] — stock-requests.ts

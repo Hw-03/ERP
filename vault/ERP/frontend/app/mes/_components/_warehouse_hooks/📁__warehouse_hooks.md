@@ -17,8 +17,8 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/frontend/app/mes/_components/_warehouse_sections/📁__warehouse_sections.md]] — 이 훅을 소비하는 UI
-- [[ERP/frontend/lib/queries/useStockRequestsQuery.ts.md]] — 결재 요청 React Query 훅
+- [[ERP/frontend/app/mes/_components/_warehouse_sections/📁__warehouse_sections]] — 이 훅을 소비하는 UI
+- [[ERP/frontend/lib/queries/useStockRequestsQuery.ts]] — 결재 요청 React Query 훅
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/stock_requests.py.md]] — 결재 요청 API
+> - [[ERP/backend/app/routers/stock_requests.py]] — 결재 요청 API

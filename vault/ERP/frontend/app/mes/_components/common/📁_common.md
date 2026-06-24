@@ -27,4 +27,4 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/frontend/lib/ui/📁_ui.md]] — 더 하위 수준의 UI 라이브러리 (`Button`, `Toast`, `BottomSheet` 등)
+- [[ERP/frontend/lib/ui/📁_ui]] — 더 하위 수준의 UI 라이브러리 (`Button`, `Toast`, `BottomSheet` 등)

@@ -30,11 +30,12 @@
 
 - `DesktopMesShell.tsx` — 탭 라우터 (7개 탭: 대시보드·입출고·창고맵·불량·내역·주간·관리자)
 - `DesktopInventoryView.tsx` — 재고 대시보드 탭
-- `DesktopWarehouseView.tsx` — V1 입출고 탭 (레거시, `_warehouse_v2/`로 대체 중)
+- `DesktopWarehouseView.tsx` — 입출고 탭 (내부에서 `_warehouse_v2/IoComposeView` 사용)
 - `DesktopHistoryView.tsx` — 거래 내역 탭
 - `DesktopDefectView.tsx` — 불량 관리 탭
 - `DesktopAdminView.tsx` — 관리자 탭
-- `DesktopWarehouseMapView.tsx` — 창고 지도 탭
+- `DesktopWarehouseMapTab.tsx` — 창고 지도 탭 진입 컨테이너 (편집 권한·PIN 확인 담당)
+- `DesktopWarehouseMapView.tsx` — 창고 지도 실제 뷰 (읽기·편집 공용)
 - `DesktopWeeklyReportView.tsx` — 주간 보고 탭 (동결)
 - `ItemDetailSheet.tsx` — 품목 상세 슬라이드 패널
 - `BarcodeScannerModal.tsx` — 바코드 스캔 모달
@@ -49,8 +50,8 @@
 ### 먼저 볼 파일
 - [[ERP/frontend/app/mes/page.tsx]] — 이 폴더를 조합하는 진입점
 - [[ERP/frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx]] — 입출고 핵심
-- [[ERP/frontend/lib/queries/📁_queries.md]] — 데이터 페칭 훅
+- [[ERP/frontend/lib/queries/📁_queries]] — 데이터 페칭 훅
 
 > [!info]- 더 연결된 파일
-> - [[ERP/frontend/lib/api/📁_api.md]] — API 클라이언트
-> - [[ERP/backend/app/routers/📁_routers.md]] — 백엔드 엔드포인트
+> - [[ERP/frontend/lib/api/📁_api]] — API 클라이언트
+> - [[ERP/backend/app/routers/📁_routers]] — 백엔드 엔드포인트

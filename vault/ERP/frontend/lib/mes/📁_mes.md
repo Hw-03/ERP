@@ -35,6 +35,8 @@ project: DEXCOWIN MES
 > - [[ERP/frontend/lib/mes/index.ts]] — index.ts
 > - [[ERP/frontend/lib/mes/inventory.ts]] — inventory.ts
 > - [[ERP/frontend/lib/mes/item.ts]] — item.ts
+> - [[ERP/frontend/lib/mes/model-labels.ts]] — model-labels.ts
+> - [[ERP/frontend/lib/mes/capacity.ts]] — capacity.ts
 > - [[ERP/frontend/lib/mes/process.ts]] — process.ts
 > - [[ERP/frontend/lib/mes/status.ts]] — status.ts
 > - [[ERP/frontend/lib/mes/transaction.ts]] — transaction.ts

@@ -15,8 +15,8 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/frontend/app/mes/_components/_inventory_sections/📁__inventory_sections.md]] — UI 섹션
-- [[ERP/frontend/lib/queries/useInventoryQuery.ts.md]] — React Query 훅
+- [[ERP/frontend/app/mes/_components/_inventory_sections/📁__inventory_sections]] — UI 섹션
+- [[ERP/frontend/lib/queries/useInventoryQuery.ts]] — React Query 훅
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/inventory/query.py.md]] — 재고 조회 API
+> - [[ERP/backend/app/routers/inventory/query.py]] — 재고 조회 API

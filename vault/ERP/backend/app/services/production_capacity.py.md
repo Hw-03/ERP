@@ -49,7 +49,7 @@ project: DEXCOWIN MES
 - [[ERP/backend/app/services/bom.py]] — BomCache·build_bom_cache 사용
 
 > [!info]- 더 연결된 파일
-> - [[ERP/_attic/docs/PRODUCTION_CAPACITY_REDEFINITION.md]] — AF→PF 재정의 배경 설계 문서
+> - `_attic/docs/PRODUCTION_CAPACITY_REDEFINITION.md` — AF→PF 재정의 배경 설계 문서
 
 ## 조심할 점
 

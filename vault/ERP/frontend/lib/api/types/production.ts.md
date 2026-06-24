@@ -60,7 +60,7 @@ import type { TransactionType } from "./shared";
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   item_process_type_code: string | null;
   item_unit: string;
@@ -93,7 +93,7 @@ export interface TransactionEditLog {
 }
 
 export interface ProductionCheckComponent {
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   process_type_code: string | null;
   unit: string;

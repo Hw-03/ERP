@@ -17,10 +17,10 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/routers/warehouse_map/query.py.md]] — 조회 API
-- [[ERP/backend/app/routers/warehouse_map/angles.py.md]] — 앵글 CRUD
-- [[ERP/backend/app/routers/warehouse_map/boxes.py.md]] — 박스 CRUD
-- [[ERP/frontend/app/mes/_components/_warehouse_map_sections/📁__warehouse_map_sections.md]] — 지도 UI
+- [[ERP/backend/app/routers/warehouse_map/query.py]] — 조회 API
+- [[ERP/backend/app/routers/warehouse_map/angles.py]] — 앵글 CRUD
+- [[ERP/backend/app/routers/warehouse_map/boxes.py]] — 박스 CRUD
+- [[ERP/frontend/app/mes/_components/_warehouse_map_sections/📁__warehouse_map_sections]] — 지도 UI
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/models/warehouse.py.md]] — WarehouseAngle·WarehouseBox·WarehouseBoxItem
+> - [[ERP/backend/app/models/warehouse.py]] — WarehouseAngle·WarehouseBox·WarehouseBoxItem

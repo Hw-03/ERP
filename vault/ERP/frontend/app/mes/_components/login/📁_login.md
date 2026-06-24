@@ -22,5 +22,5 @@ MES 로그인 게이트 UI입니다. 직원이 PIN을 입력해 인증하는 화
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/pin_auth.py.md]] — PIN 인증 서비스
-- [[ERP/frontend/lib/auth/📁_auth.md]] — 인증 공용 로직
+- [[ERP/backend/app/services/pin_auth.py]] — PIN 인증 서비스
+- [[ERP/frontend/lib/auth/📁_auth]] — 인증 공용 로직

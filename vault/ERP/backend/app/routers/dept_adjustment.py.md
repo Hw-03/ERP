@@ -37,7 +37,7 @@ project: DEXCOWIN MES
 - `_line_to_response`
 - `get_bom_template`
 - `expand_component`
-- 그 외 4개 항목
+- 그 외 1개 항목
 
 ## 연결되는 파일
 

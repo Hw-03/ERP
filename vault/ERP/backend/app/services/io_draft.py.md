@@ -20,6 +20,6 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/io_persist.py.md]] — 영속화 헬퍼
-- [[ERP/backend/app/routers/io.py.md]] — draft API 진입점
-- [[ERP/frontend/app/mes/_components/_warehouse_v2/📁__warehouse_v2.md]] — 프론트 임시저장 훅
+- [[ERP/backend/app/services/io_persist.py]] — 영속화 헬퍼
+- [[ERP/backend/app/routers/io.py]] — draft API 진입점
+- [[ERP/frontend/app/mes/_components/_warehouse_v2/📁__warehouse_v2]] — 프론트 임시저장 훅

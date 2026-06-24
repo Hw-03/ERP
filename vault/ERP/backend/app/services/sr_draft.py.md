@@ -12,15 +12,15 @@
 
 ## 중요한 내용
 
-- `create_draft(db, employee, lines, ...)` — 새 StockRequest(draft) 생성
-- `update_draft(db, request_id, lines, ...)` — 기존 draft 라인 수정
-- `submit_draft(db, request_id)` — draft → submitted 상태 전환
+- `upsert_draft_request(db, *, requester, request_type, lines_input, ...)` — 새 StockRequest(draft) 생성 또는 갱신
+- `get_draft_request(db, ...)` — 기존 draft 조회
+- `submit_draft_request(db, request_id)` — draft → submitted 상태 전환
 
 `sr_validation`의 검증 함수를 호출해 라인 유효성을 먼저 확인합니다.
 
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/sr_validation.py.md]] — 검증 로직
-- [[ERP/backend/app/routers/stock_requests.py.md]] — 결재 요청 API
-- [[ERP/backend/app/models/stock_request.py.md]] — StockRequest 모델
+- [[ERP/backend/app/services/sr_validation.py]] — 검증 로직
+- [[ERP/backend/app/routers/stock_requests.py]] — 결재 요청 API
+- [[ERP/backend/app/models/stock_request.py]] — StockRequest 모델

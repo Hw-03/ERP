@@ -57,9 +57,12 @@ JSON 최상위 키:
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "check:bundle-size": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.100.13",
     "@zxing/browser": "^0.1.5",
     "axe-playwright": "^2.2.2",
     "clsx": "^2.1.1",
@@ -72,6 +75,7 @@ JSON 최상위 키:
     "swr": "^2.2.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
@@ -84,6 +88,7 @@ JSON 최상위 키:
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.3",
     "jsdom": "^25.0.1",
+    "msw": "^2.14.6",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.5",

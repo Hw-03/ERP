@@ -36,8 +36,8 @@ project: DEXCOWIN MES
 
 ### 먼저 볼 파일
 - [[ERP/📁_ERP]] — 이 파일이 속한 폴더의 안내판입니다.
-- [[ERP/_attic/docs/OPERATIONS.md]] — 운영 매뉴얼 (포트 충돌, 백업, 헬스체크 등)
-- [[ERP/_attic/ONBOARDING.md]] — 신규 합류자 셋업 가이드
+- `_attic/docs/OPERATIONS.md` — 운영 매뉴얼 (포트 충돌, 백업, 헬스체크 등)
+- `_attic/ONBOARDING.md` — 신규 합류자 셋업 가이드
 
 ## 조심할 점
 

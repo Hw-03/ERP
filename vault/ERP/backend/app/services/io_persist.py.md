@@ -20,7 +20,7 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/io_preview.py.md]] — 헬퍼 원천
-- [[ERP/backend/app/services/io_draft.py.md]] — 이 파일 재사용
-- [[ERP/backend/app/services/io_dispatch.py.md]] — 이 파일 재사용
-- [[ERP/backend/app/models/io_batch.py.md]] — IoBatch·IoBundle·IoLine 모델
+- [[ERP/backend/app/services/io_preview.py]] — 헬퍼 원천
+- [[ERP/backend/app/services/io_draft.py]] — 이 파일 재사용
+- [[ERP/backend/app/services/io_dispatch.py]] — 이 파일 재사용
+- [[ERP/backend/app/models/io_batch.py]] — IoBatch·IoBundle·IoLine 모델

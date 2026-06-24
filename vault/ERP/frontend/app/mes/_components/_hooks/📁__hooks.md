@@ -27,4 +27,4 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/frontend/lib/mes/📁_mes.md]] — MES 비즈니스 로직 (훅보다 하위 수준)
+- [[ERP/frontend/lib/mes/📁_mes]] — MES 비즈니스 로직 (훅보다 하위 수준)

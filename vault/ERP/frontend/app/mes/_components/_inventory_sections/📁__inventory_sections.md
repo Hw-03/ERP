@@ -29,9 +29,9 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/inventory.py.md]] — 재고 공개 API
-- [[ERP/backend/app/services/stock_math.py.md]] — 수량 계산 수식
+- [[ERP/backend/app/services/inventory.py]] — 재고 공개 API
+- [[ERP/backend/app/services/stock_math.py]] — 수량 계산 수식
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/inventory/query.py.md]] — 재고 조회 API
-> - [[ERP/backend/app/services/production_capacity.py.md]] — 생산 가능 수량 계산
+> - [[ERP/backend/app/routers/inventory/query.py]] — 재고 조회 API
+> - [[ERP/backend/app/services/production_capacity.py]] — 생산 가능 수량 계산

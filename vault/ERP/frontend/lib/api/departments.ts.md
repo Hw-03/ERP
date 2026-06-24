@@ -67,6 +67,7 @@ export const departmentsApi = {
     display_order?: number;
     pin: string;
     color_hex?: string;
+    io_enabled?: boolean;
   }) => postJson<DepartmentMaster>(toApiUrl("/api/departments"), payload),
 
   updateDepartment: (
@@ -76,6 +77,7 @@ export const departmentsApi = {
       display_order?: number;
       is_active?: boolean;
       color_hex?: string | null;
+      io_enabled?: boolean;
       pin: string;
     },
   ) => putJson<DepartmentMaster>(toApiUrl(`/api/departments/${id}`), payload),

@@ -30,7 +30,7 @@ project: DEXCOWIN MES
 - `BoolAsString` — 참/거짓을 DB 엔 'true'/'false' 문자열로 저장하고 코드에선 bool 로 다루는 타입. 기존 스키마를 안 바꾸려는 장치.
 - `IntQuantity` — 수량 전용 정수 타입. 바인딩 시 Decimal/float/str 을 int 로 강제. 전 품목 EA 단위라 수량에 소수가 없습니다.
 - `UUIDString` — UUID 를 하이픈 없는 32자 hex 로 일관 저장·조회하는 타입.
-- `DepartmentEnum` — 부서 목록(조립/고압/진공/튜닝/튜브/AS/연구/영업/출하/기타).
+- `DepartmentEnum` — 부서 목록(조립/고압/진공/튜닝/튜브/AS/연구/영업/출하/기타/창고).
 - `DeptAdjSubTypeEnum` — 부서 보정 종류(생산/분해/수량보정).
 
 ## 연결되는 파일

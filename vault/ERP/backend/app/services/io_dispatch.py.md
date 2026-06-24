@@ -26,11 +26,11 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/approval_rules.py.md]] — 결재 분기 규칙 원천
-- [[ERP/backend/app/services/io_preview.py.md]] — 미리보기 헬퍼
-- [[ERP/backend/app/services/io_persist.py.md]] — 배치 영속화
-- [[ERP/backend/app/routers/io.py.md]] — 제출 API 진입점
+- [[ERP/backend/app/services/approval_rules.py]] — 결재 분기 규칙 원천
+- [[ERP/backend/app/services/io_preview.py]] — 미리보기 헬퍼
+- [[ERP/backend/app/services/io_persist.py]] — 배치 영속화
+- [[ERP/backend/app/routers/io.py]] — 제출 API 진입점
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/inventory.py.md]]
-> - [[ERP/backend/app/services/stock_requests.py.md]]
+> - [[ERP/backend/app/services/inventory.py]]
+> - [[ERP/backend/app/services/stock_requests.py]]

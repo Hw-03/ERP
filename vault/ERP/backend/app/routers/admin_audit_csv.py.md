@@ -37,7 +37,7 @@ project: DEXCOWIN MES
 - `API GET "/audit-csv/files"`
 - `API GET "/audit-csv/{month}.csv"`
 - `API GET "/audit-csv/{month}.xlsx"`
-- 그 외 1개 항목
+- `API POST "/audit-csv/backfill"`
 
 ## 연결되는 파일
 
@@ -64,12 +64,13 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from openpyxl import Workbook
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.routers._errors import ErrorCode, http_error
 from app.services import audit_csv as svc
 from app.services.export_helpers import csv_streaming_response
 from app.utils.excel import apply_header, auto_width, make_xlsx_response
@@ -83,7 +84,7 @@ _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 def _validate_month(month: str) -> str:
     if not _MONTH_RE.match(month):
-        raise HTTPException(status_code=400, detail="month 는 YYYY-MM 형식이어야 합니다.")
+        raise http_error(400, ErrorCode.BAD_REQUEST, "month 는 YYYY-MM 형식이어야 합니다.")
     return month
 
 

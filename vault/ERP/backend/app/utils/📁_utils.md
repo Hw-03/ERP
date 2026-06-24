@@ -27,7 +27,7 @@ API, DB, 서비스 규칙 중 한 영역과 연결됩니다.
 
 - [[ERP/backend/app/utils/__init__.py]] — `__init__.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/utils/__init__.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 - [[ERP/backend/app/utils/excel.py]] — `excel.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/utils/excel.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
-- [[ERP/backend/app/utils/item_code.py]] — `item_code.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/utils/item_code.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/backend/app/utils/mes_code.py]] — `mes_code.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/utils/mes_code.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
 ## 조심할 점
 

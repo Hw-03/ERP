@@ -30,7 +30,7 @@ project: DEXCOWIN MES
 - `formatQty`
 - `formatDateTime`
 - `formatDate`
-- `formatItemCode`
+- `formatMesCode`
 - `formatPercent`
 
 ## 연결되는 파일

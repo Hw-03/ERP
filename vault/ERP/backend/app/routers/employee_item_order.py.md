@@ -20,5 +20,5 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/models/employee_item_order.py.md]] — EmployeeItemOrder 모델
-- [[ERP/frontend/lib/queries/useMyItemOrderQuery.ts.md]] — React Query 훅
+- [[ERP/backend/app/models/employee_item_order.py]] — EmployeeItemOrder 모델
+- [[ERP/frontend/lib/queries/useMyItemOrderQuery.ts]] — React Query 훅

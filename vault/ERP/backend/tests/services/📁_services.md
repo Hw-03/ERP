@@ -33,6 +33,15 @@ API, DB, 서비스 규칙 중 한 영역과 연결됩니다.
 
 > [!info]- 추가 파일
 > - [[ERP/backend/tests/services/test_stock_math.py]] — test_stock_math.py
+> - [[ERP/backend/tests/services/test_reorder.py]] — test_reorder.py
+> - [[ERP/backend/tests/services/test_inv_transfer.py]] — test_inv_transfer.py
+> - [[ERP/backend/tests/services/test_inv_defective.py]] — test_inv_defective.py
+> - [[ERP/backend/tests/services/test_sr_approval.py]] — test_sr_approval.py
+> - [[ERP/backend/tests/services/test_inv_calc.py]] — test_inv_calc.py
+> - [[ERP/backend/tests/services/test_io_dispatch.py]] — test_io_dispatch.py
+> - [[ERP/backend/tests/services/test_mes_code_partial_unique.py]] — test_mes_code_partial_unique.py
+> - [[ERP/backend/tests/services/test_sr_execution.py]] — test_sr_execution.py
+> - [[ERP/backend/tests/services/test_production_capacity.py]] — test_production_capacity.py
 
 ## 조심할 점
 

@@ -55,7 +55,7 @@ import { Tooltip } from "./Tooltip";
  *     {item_name}
  *   </TruncatedText>
  *
- * suffix 가 붙는 composite 케이스(예: `{item_code} · 자식 N개`)에서 풀텍스트를 따로
+ * suffix 가 붙는 composite 케이스(예: `{mes_code} · 자식 N개`)에서 풀텍스트를 따로
  * 보여주고 싶으면 `tooltipContent` 로 override.
  */
 interface Props {

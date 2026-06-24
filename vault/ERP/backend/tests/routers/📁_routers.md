@@ -32,14 +32,21 @@ API, DB, 서비스 규칙 중 한 영역과 연결됩니다.
 - [[ERP/backend/tests/routers/test_capacity.py]] — `test_capacity.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
 
 > [!info]- 추가 파일
+> - [[ERP/backend/tests/routers/test_capacity_pins.py]] — test_capacity_pins.py
+> - [[ERP/backend/tests/routers/test_department_io_enabled.py]] — test_department_io_enabled.py
 > - [[ERP/backend/tests/routers/test_dept_adjustment.py]] — test_dept_adjustment.py
+> - [[ERP/backend/tests/routers/test_employee_io_enabled.py]] — test_employee_io_enabled.py
 > - [[ERP/backend/tests/routers/test_employee_pin.py]] — test_employee_pin.py
 > - [[ERP/backend/tests/routers/test_health_smoke.py]] — test_health_smoke.py
 > - [[ERP/backend/tests/routers/test_inventory_smoke.py]] — test_inventory_smoke.py
+> - [[ERP/backend/tests/routers/test_items_create.py]] — test_items_create.py
+> - [[ERP/backend/tests/routers/test_items_reorder.py]] — test_items_reorder.py
 > - [[ERP/backend/tests/routers/test_items_update.py]] — test_items_update.py
+> - [[ERP/backend/tests/routers/test_models.py]] — test_models.py
 > - [[ERP/backend/tests/routers/test_pin_hardening.py]] — test_pin_hardening.py
 > - [[ERP/backend/tests/routers/test_settings_integrity.py]] — test_settings_integrity.py
 > - [[ERP/backend/tests/routers/test_transaction_edit.py]] — test_transaction_edit.py
+> - [[ERP/backend/tests/routers/test_transactions_monthly_counts.py]] — test_transactions_monthly_counts.py
 > - [[ERP/backend/tests/routers/test_transactions_summary.py]] — test_transactions_summary.py
 > - [[ERP/backend/tests/routers/test_weekly_report.py]] — test_weekly_report.py
 

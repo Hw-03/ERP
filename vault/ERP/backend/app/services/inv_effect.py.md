@@ -21,9 +21,9 @@
 ```
 `delta`는 정방향에서 그 셀이 변한 양. 취소는 `-delta`를 적용합니다.
 
-- `capture_before(db, item_id)` — 변경 전 스냅샷 기록
-- `capture_effect(before, db, item_id)` — 변경 후 차이 계산·반환
-- `replay_reversed(db, item_id, effect)` — 취소 시 역재생
+- `snapshot_cells(db, item_id)` — 변경 전 스냅샷 기록
+- `capture_effect(db, item_id, before)` — 변경 후 차이 계산·반환
+- `apply_effect_reverse(db, item_id, effect)` — 취소 시 역재생
 
 ## 위험도
 
@@ -34,8 +34,8 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/sr_execution.py.md]] — inv_effect를 호출하는 실행 서비스
-- [[ERP/backend/app/models/transaction.py.md]] — TransactionLog.inventory_effect 필드
+- [[ERP/backend/app/services/sr_execution.py]] — inv_effect를 호출하는 실행 서비스
+- [[ERP/backend/app/models/transaction.py]] — TransactionLog.inventory_effect 필드
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/inv_base.py.md]]
+> - [[ERP/backend/app/services/inv_base.py]]

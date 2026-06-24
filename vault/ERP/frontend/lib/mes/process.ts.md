@@ -28,8 +28,8 @@ project: DEXCOWIN MES
 이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
 - `processStageLabel`
-- `itemCodeDept`
-- `itemCodeDeptBadge`
+- `mesCodeDept`
+- `mesCodeDeptBadge`
 - `displayPart`
 - `PROCESS_LABEL`
 - `PROCESS_TO_DEPT`
@@ -50,7 +50,7 @@ project: DEXCOWIN MES
  * MES 공정 (Process Stage) 모듈 — `@/lib/mes/process`.
  *
  * Round-10D (#5) 신설. 품목코드 2번째 segment (TR/TA/TF/HR/...) → 라벨 매핑.
- * Round-10E (#1) 추가: `PROCESS_TO_DEPT` + `itemCodeDept` + `itemCodeDeptBadge`
+ * Round-10E (#1) 추가: `PROCESS_TO_DEPT` + `mesCodeDept` + `mesCodeDeptBadge`
  * — 부서명 매핑은 품목코드 static 매핑이라 부서 정규화 충돌과 무관.
  */
 

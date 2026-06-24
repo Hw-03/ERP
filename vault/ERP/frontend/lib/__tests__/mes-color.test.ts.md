@@ -87,6 +87,6 @@ describe("mes/color barrel — LEGACY_COLORS", () => {
 
 describe("employeeColor (Round-10F 정책 (A))", () => {
   it("returns MES_DEPARTMENT_COLORS hex for known 부서", () => {
-    expect(employeeColor("조립")).toBe("#1d4ed8");
-    expect(employeeColor("고압")).toBe("#c2410c");
+    expect(employeeColor("조립")).toBe("#3b82f6");
+    expect(employeeColor("고압")).toBe("#d97706");
 ```

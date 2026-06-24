@@ -12,11 +12,10 @@
 |------|------|
 | `MobileShell.tsx` | 5탭 바텀 내비게이션 + 슬라이딩 pill |
 | `MobileUserMenuSheet.tsx` | 상단 사용자 메뉴 시트 |
-| `screens/` | 9개 화면 (대시보드·입출고·불량·내역·주간·창고·창고맵·더보기·모바일더보기) |
+| `screens/` | 7개 화면 (대시보드·입출고·불량·내역·주간·창고맵·더보기) |
 | `warehouse/` | 모바일 창고 탭 전용 UI |
 | `primitives/` | 모바일 전용 원자 컴포넌트 (45개+) |
 | `hooks/` | 모바일 전용 훅 (4개) |
-| `weekly/` | 모바일 주간 보고 UI |
 | `history/` | 모바일 내역 UI |
 | `tokens.ts` | 모바일 디자인 토큰 |
 
@@ -33,4 +32,4 @@
 - [[ERP/frontend/app/mes/_components/mobile/warehouse/MobileIoComposeWizard.tsx]] — 모바일 입출고 wizard
 
 > [!info]- 더 연결된 파일
-> - [[ERP/frontend/app/globals.css.md]] — `button.no-btn-inset` 모바일 opt-out 규칙 (동결)
+> - [[ERP/frontend/app/globals.css]] — `button.no-btn-inset` 모바일 opt-out 규칙 (동결)

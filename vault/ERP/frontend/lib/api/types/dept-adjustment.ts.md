@@ -55,7 +55,7 @@ export type AdjDirection = "in" | "out" | "defective" | "scrap";
 export interface AdjLineTemplate {
   item_id: string;
   item_name: string;
-  item_code: string | null;
+  mes_code: string | null;
   process_type_code: string | null;
   unit: string;
   direction: AdjDirection;

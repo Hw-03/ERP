@@ -12,7 +12,7 @@ project: DEXCOWIN MES
 
 ## 이 파일은 뭐예요?
 
-데스크톱 입출고 화면의 핵심 컴포넌트입니다. 작업 유형 선택 → 품목 선택 → 수량 확인 → 제출까지 4단계 흐름을 담당합니다.
+데스크톱 입출고 화면의 핵심 컴포넌트입니다. 작업 유형 선택 → 세부 작업 → 대상 선택 → 실제 반영 → 제출까지 5단계 흐름을 담당합니다.
 
 2022년 이후 최대 규모 파일 중 하나(900줄+)이며, 박스 차감 기능(2026-06-22~)까지 통합됐습니다.
 
@@ -53,7 +53,7 @@ IoComposeView와 MobileIoComposeWizard 양쪽에 동일한 4줄 헬퍼가 복제
 - [[ERP/frontend/app/mes/_components/_warehouse_v2/IoTargetPicker.tsx]] — 품목 선택 단계
 - [[ERP/frontend/app/mes/_components/mobile/warehouse/MobileIoComposeWizard.tsx]] — 모바일 동일 흐름
 - [[ERP/frontend/lib/io/glossary.ts]] — work/sub/transaction type 라벨 단일 소스
-- [[ERP/_attic/docs/adr/ADR-0001-io-compose-v2-work-types.md]] — 작업 유형 설계 결정
+- `_attic/docs/adr/ADR-0001-io-compose-v2-work-types.md` — 작업 유형 설계 결정
 
 > [!info]- 더 연결된 파일
 > - [[ERP/backend/app/routers/io.py]] — 제출 API 엔드포인트

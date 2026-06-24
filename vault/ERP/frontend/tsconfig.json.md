@@ -82,7 +82,10 @@ JSON 최상위 키:
     "**/_archive/**",
     "**/__tests__/**",
     "**/*.test.ts",
-    "**/*.test.tsx"
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "tests/e2e/**",
+    "playwright.config.ts"
   ]
 }
 ```

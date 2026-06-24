@@ -37,7 +37,7 @@ project: DEXCOWIN MES
 - `delete_employee`
 - `verify_employee_pin`
 - `change_employee_pin`
-- 그 외 8개 항목
+- 그 외 3개 항목
 
 ## 연결되는 파일
 

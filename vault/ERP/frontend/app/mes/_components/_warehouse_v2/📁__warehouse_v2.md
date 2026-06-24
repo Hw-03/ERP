@@ -29,16 +29,22 @@
 | `itemPickerShared.tsx` | 품목 선택 공용 유틸 |
 | `_atoms.tsx` | 원자 컴포넌트 (라디오·카드) |
 
-**훅 (하위 `hooks/` 또는 루트 훅 파일):**
+| `ioWorkType.ts` | 작업 유형 라우팅 규칙 (**백엔드 `approval_rules.py`와 동기 필수**) |
+| `bomSync.ts` | BOM 동기화 유틸 |
+| `pullFromWarehouse.ts` | 창고 출고 흐름 유틸 |
+| `types.ts` | V2 전용 타입 정의 |
+| `useItemOrderDrag.ts` | 품목 순서 드래그 훅 |
+
+**훅 (루트 레벨 .ts 파일):**
 | 훅 | 역할 |
 |----|------|
-| `useIoWorkState` | 전체 워크플로우 상태 머신 |
-| `useIoPreview` | 미리보기 API 호출·결과 처리 |
-| `useIoDraft` | 임시저장 CRUD |
-| `useIoSubmit` | 제출·결과 처리 |
-| `useIoUrlSync` | URL과 상태 동기화 |
-| `useIoPreselect` | URL 파라미터 사전 선택 |
-| `useIoDraftRestore` | 임시저장 자동 복원 |
+| `useIoWorkState.ts` | 전체 워크플로우 상태 머신 |
+| `useIoPreview.ts` | 미리보기 API 호출·결과 처리 |
+| `useIoDraft.ts` | 임시저장 CRUD |
+| `useIoSubmit.ts` | 제출·결과 처리 |
+| `useIoUrlSync.ts` | URL과 상태 동기화 |
+| `useIoPreselect.ts` | URL 파라미터 사전 선택 |
+| `useIoDraftRestore.ts` | 임시저장 자동 복원 |
 
 ## 위험도
 
@@ -50,11 +56,11 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/io_dispatch.py.md]] — 제출 분기 서비스
-- [[ERP/backend/app/services/io_preview.py.md]] — 미리보기 서비스
-- [[ERP/backend/app/services/approval_rules.py.md]] — 결재 라우팅 규칙
-- [[ERP/frontend/lib/api/io.ts.md]] — API 클라이언트
+- [[ERP/backend/app/services/io_dispatch.py]] — 제출 분기 서비스
+- [[ERP/backend/app/services/io_preview.py]] — 미리보기 서비스
+- [[ERP/backend/app/services/approval_rules.py]] — 결재 라우팅 규칙
+- [[ERP/frontend/lib/api/io.ts]] — API 클라이언트
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/io_draft.py.md]] — 임시저장 서비스
-> - [[ERP/backend/app/routers/io.py.md]] — 입출고 V2 라우터
+> - [[ERP/backend/app/services/io_draft.py]] — 임시저장 서비스
+> - [[ERP/backend/app/routers/io.py]] — 입출고 V2 라우터

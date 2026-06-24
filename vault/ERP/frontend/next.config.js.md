@@ -55,7 +55,7 @@ module.exports = (phase) => {
       return [
         {
           source: "/api/:path*",
-          destination: `${process.env.BACKEND_INTERNAL_URL || "http://localhost:8010"}/api/:path*`,
+          destination: `${(process.env.BACKEND_INTERNAL_URL || "http://localhost:8010").trim()}/api/:path*`,
         },
       ];
     },

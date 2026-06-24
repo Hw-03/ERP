@@ -26,6 +26,6 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/warehouse_map.py.md]] — 지도 데이터 조립 서비스
-- [[ERP/backend/app/routers/warehouse_map/angles.py.md]] — 앵글 CRUD API
-- [[ERP/backend/app/routers/warehouse_map/boxes.py.md]] — 박스 CRUD API
+- [[ERP/backend/app/services/warehouse_map.py]] — 지도 데이터 조립 서비스
+- [[ERP/backend/app/routers/warehouse_map/angles.py]] — 앵글 CRUD API
+- [[ERP/backend/app/routers/warehouse_map/boxes.py]] — 박스 CRUD API

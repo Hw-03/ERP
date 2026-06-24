@@ -13,4 +13,4 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/routers/inventory/weekly_report.py.md]] — 주간 보고 API (동결 2026-05-29)
+- [[ERP/backend/app/routers/inventory/weekly_report.py]] — 주간 보고 API (동결 2026-05-29)

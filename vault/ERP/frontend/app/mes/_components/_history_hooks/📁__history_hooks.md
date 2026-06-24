@@ -16,8 +16,8 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/frontend/app/mes/_components/_history_sections/📁__history_sections.md]] — UI 섹션
-- [[ERP/frontend/lib/queries/useTransactionsQuery.ts.md]] — 거래 내역 React Query 훅
+- [[ERP/frontend/app/mes/_components/_history_sections/📁__history_sections]] — UI 섹션
+- [[ERP/frontend/lib/queries/useTransactionsQuery.ts]] — 거래 내역 React Query 훅
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/inventory/transactions.py.md]] — 거래 내역 API
+> - [[ERP/backend/app/routers/inventory/transactions.py]] — 거래 내역 API

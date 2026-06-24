@@ -67,8 +67,9 @@ describe("normalizeDepartmentName", () => {
 
 describe("getDepartmentFallbackColor", () => {
   it("부서명 기준 hex 반환", () => {
-    expect(getDepartmentFallbackColor("조립")).toBe("#1d4ed8");
-    expect(getDepartmentFallbackColor("고압")).toBe("#c2410c");
+    expect(getDepartmentFallbackColor("조립")).toBe("#3b82f6");
+    expect(getDepartmentFallbackColor("고압")).toBe("#d97706");
+    expect(getDepartmentFallbackColor("튜브")).toBe("#16a34a");
     expect(getDepartmentFallbackColor("연구")).toBe("#b45309");
   });
 

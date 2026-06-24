@@ -39,10 +39,11 @@ project: DEXCOWIN MES
 ## 핵심 발췌
 
 ```python
-"""dept_hierarchy 단위 테스트 — 라인 상수 기반 결재 권한.
+"""dept_hierarchy 단위 테스트.
 
-2026-05-22 불량 처리 흐름 재설계 (docs/defect-handling-redesign.md).
-사용자 정의: "부서 결재 역할 = 생산 라인 6개 결재".
+2026-05-27 그릴 합의:
+    "부서 정/부 = 창고 외 모든 부서 결재 가능 (생산부 전체 1쌍)"
+    이전 룰("생산 6공정 한정")에서 확장됨. 비-공정 부서(경영지원/AS 등) 요청도 결재 가능.
 """
 
 from __future__ import annotations

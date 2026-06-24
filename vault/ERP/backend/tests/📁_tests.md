@@ -26,6 +26,7 @@ API, DB, 서비스 규칙 중 한 영역과 연결됩니다.
 ## 주요 하위 폴더
 
 - [[ERP/backend/tests/concurrency/📁_concurrency]] — `backend/tests/concurrency`는 백엔드 안의 세부 폴더입니다.
+- [[ERP/backend/tests/dependencies/📁_dependencies]] — `backend/tests/dependencies`는 백엔드 안의 세부 폴더입니다.
 - [[ERP/backend/tests/routers/📁_routers]] — `backend/tests/routers`는 백엔드 안의 세부 폴더입니다.
 - [[ERP/backend/tests/services/📁_services]] — `backend/tests/services`는 백엔드 안의 세부 폴더입니다.
 

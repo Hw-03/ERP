@@ -34,10 +34,10 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/routers/stock_requests.py.md]] — 결재 요청 API
-- [[ERP/backend/app/routers/handover.py.md]] — 인수인계 API
-- [[ERP/frontend/lib/api/stock-requests.ts.md]] — API 클라이언트
+- [[ERP/backend/app/routers/stock_requests.py]] — 결재 요청 API
+- [[ERP/backend/app/routers/handover.py]] — 인수인계 API
+- [[ERP/frontend/lib/api/stock-requests.ts]] — API 클라이언트
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/sr_approval.py.md]] — 승인 규칙 서비스
-> - [[ERP/backend/app/services/sr_execution.py.md]] — 실행·점유 해제
+> - [[ERP/backend/app/services/sr_approval.py]] — 승인 규칙 서비스
+> - [[ERP/backend/app/services/sr_execution.py]] — 실행·점유 해제

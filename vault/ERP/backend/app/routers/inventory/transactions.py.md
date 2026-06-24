@@ -31,16 +31,19 @@ project: DEXCOWIN MES
 이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
 - `TransactionSummaryResponse`
-- `_department_label_expr`
-- `_process_step_filter`
-- `_model_filter`
-- `_department_filter`
-- `_operation_filter`
 - `_require_export_range`
 - `_enforce_export_limit`
-- `_to_log_response`
 - `_log_snapshot`
-- 그 외 8개 항목
+- `_verify_editor`
+- `monthly_counts`
+- `list_transactions`
+- `get_transactions_summary`
+- `export_transactions_csv`
+- `export_transactions_xlsx`
+- `meta_edit_transaction`
+- `list_transaction_edits`
+- `quantity_correct_transaction`
+- `cancel_transaction`
 
 ## 연결되는 파일
 

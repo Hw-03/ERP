@@ -27,10 +27,10 @@ UI 섹션(`_admin_sections/`)은 이 훅을 통해 데이터를 받고, 직접 A
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/frontend/app/mes/_components/_admin_sections/📁__admin_sections.md]] — 이 훅을 소비하는 UI
+- [[ERP/frontend/app/mes/_components/_admin_sections/📁__admin_sections]] — 이 훅을 소비하는 UI
 - [[ERP/frontend/lib/api/admin.ts]] — 실제 API 호출
-- [[ERP/frontend/lib/queries/useAdminQuery.ts.md]] — React Query 통합
+- [[ERP/frontend/lib/queries/useAdminQuery.ts]] — React Query 통합
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/admin_audit.py.md]] — 감사 로그 API
-> - [[ERP/backend/app/routers/settings.py.md]] — 설정 API
+> - [[ERP/backend/app/routers/admin_audit.py]] — 감사 로그 API
+> - [[ERP/backend/app/routers/settings.py]] — 설정 API

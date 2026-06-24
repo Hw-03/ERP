@@ -29,15 +29,15 @@
 
 ## 건드릴 때 조심할 점
 
-- `AdminDangerZone.tsx` — DB 초기화·재고 리셋 버튼이 있음. 수정 시 특히 주의
+- `AdminDangerZone.tsx` — 관리자 PIN 변경 UI만 있음. 수정 시 특히 주의
 - BOM 관련 변경은 백엔드 `bom.py` 라우터·서비스와 함께 확인
 
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/frontend/app/mes/_components/_admin_hooks/📁__admin_hooks.md]] — 데이터 훅
-- [[ERP/backend/app/routers/bom.py.md]] — BOM API
+- [[ERP/frontend/app/mes/_components/_admin_hooks/📁__admin_hooks]] — 데이터 훅
+- [[ERP/backend/app/routers/bom.py]] — BOM API
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/items.py.md]] — 품목 API
-> - [[ERP/backend/app/routers/employees.py.md]] — 직원 API
+> - [[ERP/backend/app/routers/items.py]] — 품목 API
+> - [[ERP/backend/app/routers/employees.py]] — 직원 API

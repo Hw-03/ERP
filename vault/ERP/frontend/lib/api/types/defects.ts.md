@@ -32,6 +32,8 @@ project: DEXCOWIN MES
 - `QuarantinePayload`
 - `UnquarantinePayload`
 
+> 참고: `DefectKpi`는 `quarantined`·`over_one_year` 2개 필드만 존재 (`pending_approval`·`processed_today` 없음).
+
 ## 연결되는 파일
 
 ### 먼저 같이 볼 파일
@@ -53,19 +55,19 @@ project: DEXCOWIN MES
 export interface DefectLocation {
   item_id: string;
   item_name: string;
-  item_code: string;
+  mes_code: string;
   department: string;
   quantity: number;
-  defective_at: string; // ISO 8601 datetime string
+  defective_at: string | null; // ISO 8601 datetime string. 레거시 데이터로 NULL 가능 — UI 방어 필수.
   reason_category?: string | null;
   reason_memo?: string | null;
+  /** BOM 자식 보유 여부. 격리 처리 "재작업" 옵션 노출 조건. */
+  has_bom: boolean;
 }
 
 export interface DefectKpi {
   quarantined: number;
   over_one_year: number;
-  pending_approval: number;
-  processed_today: number;
 }
 
 export interface QuarantinePayload {
@@ -74,17 +76,18 @@ export interface QuarantinePayload {
   source: "warehouse" | "production";
   source_dept?: string;
   target_dept: string;
-  reason_category: string;
+  reason_category?: string | null;
   reason_memo: string;
   actor_employee_id: string;
+  client_request_id?: string;
 }
 
 export interface UnquarantinePayload {
   item_id: string;
   qty: number;
   dept: string;
-  reason_category: string;
-  reason_memo: string;
+  reason_category?: string | null;
+  reason_memo?: string | null;
   actor_employee_id: string;
 }
 ```

@@ -39,8 +39,8 @@ import {
   PROCESS_LABEL,
   PROCESS_TO_DEPT,
   processStageLabel,
-  itemCodeDept,
-  itemCodeDeptBadge,
+  mesCodeDept,
+  mesCodeDeptBadge,
   displayPart,
 } from "../mes/process";
 
@@ -68,22 +68,22 @@ describe("PROCESS_LABEL", () => {
   });
 });
 
-describe("itemCodeDept", () => {
+describe("mesCodeDept", () => {
   it("maps stage code 첫 글자 → 부서", () => {
-    expect(itemCodeDept("ITM-TR-00001")).toBe("튜브");
-    expect(itemCodeDept("ITM-HA-00010")).toBe("고압");
-    expect(itemCodeDept("ITM-VF-00099")).toBe("진공");
-    expect(itemCodeDept("ITM-NR-00001")).toBe("튜닝");
-    expect(itemCodeDept("ITM-AA-00001")).toBe("조립");
-    expect(itemCodeDept("ITM-PF-00001")).toBe("출하");
+    expect(mesCodeDept("ITM-TR-00001")).toBe("튜브");
+    expect(mesCodeDept("ITM-HA-00010")).toBe("고압");
+    expect(mesCodeDept("ITM-VF-00099")).toBe("진공");
+    expect(mesCodeDept("ITM-NR-00001")).toBe("튜닝");
+    expect(mesCodeDept("ITM-AA-00001")).toBe("조립");
+    expect(mesCodeDept("ITM-PF-00001")).toBe("출하");
   });
 
   it("returns null for missing/short/unknown code", () => {
-    expect(itemCodeDept(undefined)).toBeNull();
-    expect(itemCodeDept(null)).toBeNull();
-    expect(itemCodeDept("")).toBeNull();
-    expect(itemCodeDept("ONLYONE")).toBeNull();
-    expect(itemCodeDept("ITM-XX-00001")).toBeNull();
+    expect(mesCodeDept(undefined)).toBeNull();
+    expect(mesCodeDept(null)).toBeNull();
+    expect(mesCodeDept("")).toBeNull();
+    expect(mesCodeDept("ONLYONE")).toBeNull();
+    expect(mesCodeDept("ITM-XX-00001")).toBeNull();
   });
 });
 

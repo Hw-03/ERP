@@ -31,10 +31,10 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/inv_calc.py.md]] — 이 파일에만 의존하는 집계 계산
-- [[ERP/backend/app/services/inv_transfer.py.md]] — 이동·입고·출고
-- [[ERP/backend/app/models/inventory.py.md]] — Inventory·InventoryLocation 모델
+- [[ERP/backend/app/services/inv_calc.py]] — 이 파일에만 의존하는 집계 계산
+- [[ERP/backend/app/services/inv_transfer.py]] — 이동·입고·출고
+- [[ERP/backend/app/models/inventory.py]] — Inventory·InventoryLocation 모델
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/inv_defective.py.md]]
-> - [[ERP/backend/app/services/inv_effect.py.md]]
+> - [[ERP/backend/app/services/inv_defective.py]]
+> - [[ERP/backend/app/services/inv_effect.py]]

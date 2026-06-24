@@ -16,6 +16,6 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/routers/notifications.py.md]] — 알림 API
-- [[ERP/backend/app/services/notifications.py.md]] — 알림 발송 서비스
-- [[ERP/frontend/lib/queries/useNotificationsQuery.ts.md]] — 알림 React Query 훅
+- [[ERP/backend/app/routers/notifications.py]] — 알림 API
+- [[ERP/backend/app/services/notifications.py]] — 알림 발송 서비스
+- [[ERP/frontend/lib/queries/useNotificationsQuery.ts]] — 알림 React Query 훅

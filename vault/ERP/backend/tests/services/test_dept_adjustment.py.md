@@ -37,7 +37,7 @@ project: DEXCOWIN MES
 - `test_expand_component_no_children_raises`
 - `test_submit_production`
 - `test_submit_production_manual_edit`
-- 그 외 5개 항목
+- 그 외 2개 항목
 
 ## 연결되는 파일
 

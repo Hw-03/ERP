@@ -12,9 +12,9 @@
 
 ## 중요한 내용
 
-- `execute_request(db, request_id, approver)` — StockRequest 실행·완료 처리
-- 실행 시 `pending_quantity` 해제 → 재고 실반영 → TransactionLog 기록
-- `_TX_TYPE_BY_REQUEST` — 요청 유형별 거래 타입 매핑
+- `release_reservation(db, request)` — RESERVED 상태 라인의 pending 원복
+- `_execute_all_lines(db, request, approver)` — 모든 라인 재고 실반영 + TransactionLog 기록
+- `_finalize_submission(db, request, ...)` — 실행 완료 처리
 
 **StockRequest 상태 흐름:**
 ```
@@ -31,10 +31,10 @@ draft → submitted → reserved → completed
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/sr_validation.py.md]] — 검증
-- [[ERP/backend/app/services/inv_effect.py.md]] — 재고 효과 캡처
-- [[ERP/backend/app/routers/stock_requests.py.md]] — 승인 API 진입점
+- [[ERP/backend/app/services/sr_validation.py]] — 검증
+- [[ERP/backend/app/services/inv_effect.py]] — 재고 효과 캡처
+- [[ERP/backend/app/routers/stock_requests.py]] — 승인 API 진입점
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/inventory.py.md]]
-> - [[ERP/backend/app/models/stock_request.py.md]]
+> - [[ERP/backend/app/services/inventory.py]]
+> - [[ERP/backend/app/models/stock_request.py]]

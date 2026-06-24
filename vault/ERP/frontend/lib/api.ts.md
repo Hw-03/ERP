@@ -1,94 +1,44 @@
 ---
 type: file-explanation
 source_path: "frontend/lib/api.ts"
-importance: normal
+importance: important
 layer: frontend
-graph: file
-updated: 2026-05-22
+graph: hub
+updated: 2026-06-24
 project: DEXCOWIN MES
 ---
 
-# api.ts — api.ts 설명
+# api.ts
 
-## 이 파일은 무엇을 책임지나
+## 이 파일은 뭐예요?
 
-`api.ts`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/lib/api.ts` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+프론트엔드 API 호출의 **통합 re-export 허브**입니다. 도메인별로 분리된 11개+ API 모듈을 한 곳에서 내보내 화면이 `@/lib/api`만 import하면 모든 API에 접근할 수 있게 합니다.
 
-## 업무 흐름에서의 의미
+> 새 코드를 작성할 때는 `@/lib/api-core`를 직접 사용하는 것을 권장합니다(주석 참고).
 
-사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+## 통합 도메인 목록
 
-## 언제 보면 좋나
+| 도메인 | 진입점 |
+|--------|--------|
+| 품목 | `itemsApi` |
+| 재고 | `inventoryApi` |
+| 직원 | `employeesApi` |
+| 관리자·설정 | `adminApi` |
+| 모델·BOM | `catalogApi` |
+| 생산·내역·내보내기 | `productionApi` |
+| 결재 요청 | `stockRequestsApi` |
+| 부서·세션 | `departmentsApi` |
+| 주간보고 | `weeklyApi` |
+| 부서 이동 기타 | `deptAdjustmentApi` |
+| 입출고 V2 | `ioApi` |
+| 알림 | `notificationsApi` |
+| 인수인계 | `handoverApi` |
 
-- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
-- 수정 전에 영향 범위를 빠르게 파악해야 할 때
-
-## 중요한 내용
-
-이 파일에서 눈에 띄는 구조는 다음과 같습니다.
-
-- `api`
+fetch 헬퍼(`postJson`, `putJson`, `patchJson`, `fetcher` 등)와 타입(`api/types.ts`)도 함께 re-export합니다.
 
 ## 연결되는 파일
 
-- [[ERP/frontend/lib/📁_lib]] — 이 파일이 속한 폴더의 안내판입니다.
-
-## 핵심 발췌
-
-```ts
-// 5.6-A: fetch wrapper / URL 빌더 / 에러 파서를 lib/api-core.ts 로 분리.
-//        외부 import 호환을 위해 동일 이름을 re-export 한다.
-import {
-  toApiUrl,
-  extractErrorMessage,
-  parseError,
-  fetcher,
-  postJson,
-  putJson,
-  patchJson,
-  FALLBACK_SERVER_API_BASE,
-} from "./api-core";
-
-// R5-5: 도메인별 API 분리 시작 (items).
-import { itemsApi } from "./api/items";
-// R6-D1: inventory 도메인 분리.
-import { inventoryApi } from "./api/inventory";
-// R6-D2: employees 도메인 분리.
-import { employeesApi } from "./api/employees";
-// R6-D3: admin / settings 도메인 분리.
-import { adminApi } from "./api/admin";
-// R6-D6: catalog (models + ship-packages + BOM) 도메인 분리.
-import { catalogApi } from "./api/catalog";
-// R6-D7: production / transactions / exports 도메인 분리.
-import { productionApi } from "./api/production";
-// R6-D8: stock-requests 도메인 분리.
-import { stockRequestsApi } from "./api/stock-requests";
-// R6-D9: departments + app-session 도메인 분리 (마지막).
-import { departmentsApi } from "./api/departments";
-// weekly-report 도메인.
-import { weeklyApi } from "./api/weekly";
-// dept-adjustment 도메인.
-import { deptAdjustmentApi } from "./api/dept-adjustment";
-// 입출고 2.0 도메인.
-import { ioApi } from "./api/io";
-
-// 외부 import 호환을 위해 동일 이름 그대로 re-export.
-// parseError 는 도메인 API (직접 fetch 사용처) 가 본 파일 내부에서 사용 — 이번 PR 에선 그대로.
-export {
-  extractErrorMessage,
-  fetcher,
-  postJson,
-  putJson,
-  patchJson,
-  FALLBACK_SERVER_API_BASE,
-};
-
-// R4-2: 모든 type / interface 정의는 lib/api/types.ts 로 분리.
-// 외부 호환을 위해 본 파일이 동일 이름으로 re-export 한다.
-import type {
-  ProcessTypeCode,
-  TransactionType,
-  LocationStatus,
-  InventoryLocationRow,
-  Department,
-```
+### 먼저 볼 파일
+- [[ERP/frontend/lib/api-core.ts]] — fetch wrapper 원천 (toApiUrl, postJson, patchJson, 에러 파서)
+- [[ERP/frontend/lib/api/📁_api]] — 도메인별 API 파일 디렉터리 (11개+ 파일)
+- [[ERP/frontend/lib/queries/📁_queries]] — 이 api를 사용하는 React Query 훅 모음

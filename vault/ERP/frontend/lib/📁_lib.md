@@ -4,7 +4,7 @@ source_path: "frontend/lib"
 importance: important
 layer: frontend
 graph: hub
-updated: 2026-05-22
+updated: 2026-06-24
 project: DEXCOWIN MES
 ---
 
@@ -25,10 +25,13 @@ project: DEXCOWIN MES
 
 ## 주요 하위 폴더
 
-- [[ERP/frontend/lib/__tests__/📁___tests__]] — `frontend/lib/__tests__`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
-- [[ERP/frontend/lib/api/📁_api]] — 프론트엔드가 백엔드 API를 부르는 도메인별 통로입니다.
-- [[ERP/frontend/lib/mes/📁_mes]] — `frontend/lib/mes`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
-- [[ERP/frontend/lib/ui/📁_ui]] — `frontend/lib/ui`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/lib/api/📁_api]] — 도메인별 API 클라이언트 (11개+ 도메인)
+- [[ERP/frontend/lib/queries/📁_queries]] — React Query 훅 모음 (20개 훅). 화면 데이터 페칭의 핵심
+- [[ERP/frontend/lib/auth/📁_auth]] — 관리자 PIN 세션 관리 (X-Admin-Pin 헤더 자동 주입)
+- [[ERP/frontend/lib/io/📁_io]] — 입출고 라벨 사전 (glossary.ts)
+- [[ERP/frontend/lib/mes/📁_mes]] — MES 공용 포맷·상태·부서 헬퍼
+- [[ERP/frontend/lib/ui/📁_ui]] — 공용 UI 컴포넌트 (5개)
+- [[ERP/frontend/lib/__tests__/📁___tests__]] — lib 단위 테스트
 
 ## 먼저 볼 파일 5개
 

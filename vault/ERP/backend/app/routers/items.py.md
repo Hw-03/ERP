@@ -37,7 +37,7 @@ project: DEXCOWIN MES
 - `get_item`
 - `update_item`
 - `update_bom_completion`
-- 그 외 7개 항목
+- 그 외 3개 항목
 
 ## 연결되는 파일
 

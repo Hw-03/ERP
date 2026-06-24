@@ -38,7 +38,7 @@ project: DEXCOWIN MES
 - `upsert_stock_request_draft`
 - `get_stock_request_draft`
 - `list_stock_request_drafts`
-- 그 외 8개 항목
+- 그 외 11개 항목
 
 ## 연결되는 파일
 

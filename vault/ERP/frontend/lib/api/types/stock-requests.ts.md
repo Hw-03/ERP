@@ -78,7 +78,9 @@ export type StockRequestType =
   | "manual_adjustment"
   | "defect_scrap"
   | "defect_return"
-  | "defect_disassemble";
+  | "defect_disassemble"
+  | "scrap_normal"
+  | "return_normal";
 
 export type RequestBucket = "warehouse" | "production" | "defective" | "none";
 
@@ -87,7 +89,7 @@ export interface StockRequestLine {
   request_id: string;
   item_id: string;
   item_name_snapshot: string;
-  item_code_snapshot: string | null;
+  mes_code_snapshot: string | null;
   quantity: number;
   from_bucket: RequestBucket;
   from_department: Department | null;

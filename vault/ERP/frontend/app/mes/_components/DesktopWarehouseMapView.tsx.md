@@ -44,7 +44,7 @@ project: DEXCOWIN MES
 ### 먼저 볼 파일
 - [[ERP/frontend/app/mes/_components/_warehouse_map_sections/WarehouseStages.tsx]] — 층/줄/앵글 단계 컴포넌트
 - [[ERP/frontend/lib/api/warehouse-map.ts]] — 창고 지도 API 클라이언트
-- [[ERP/backend/app/routers/warehouse_map/]] — 창고 지도 백엔드 API
+- [[ERP/backend/app/routers/warehouse_map/📁_warehouse_map]] — 창고 지도 백엔드 API
 
 > [!info]- 더 연결된 파일
-> - [[ERP/_attic/docs/warehouse-box-depletion-design.md]] — 박스 차감 설계 문서
+> - `_attic/docs/warehouse-box-depletion-design.md` — 박스 차감 설계 문서

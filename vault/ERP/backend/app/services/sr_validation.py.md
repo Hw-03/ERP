@@ -20,8 +20,8 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/sr_draft.py.md]] — 이 검증을 호출하는 draft 서비스
-- [[ERP/backend/app/services/stock_math.py.md]] — 가용 재고 계산
+- [[ERP/backend/app/services/sr_draft.py]] — 이 검증을 호출하는 draft 서비스
+- [[ERP/backend/app/services/stock_math.py]] — 가용 재고 계산
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/models/stock_request.py.md]]
+> - [[ERP/backend/app/models/stock_request.py]]

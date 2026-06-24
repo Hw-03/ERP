@@ -64,17 +64,22 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Pretendard", "Noto Sans KR", "system-ui", "sans-serif"],
-        mono: ["Pretendard", "Noto Sans KR", "system-ui", "sans-serif"],
+        sans: ["var(--font-pretendard)", "Noto Sans KR", "system-ui", "sans-serif"],
+        mono: ["var(--font-pretendard)", "Noto Sans KR", "system-ui", "sans-serif"],
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "fade-in": "fadeIn 0.3s ease-in-out",
+        "view-fade": "viewFade 150ms ease-out",
       },
       keyframes: {
         fadeIn: {
           "0%": { opacity: "0", transform: "translateY(-8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        viewFade: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
         },
         scan: {
           "0%":   { top: "8px" },

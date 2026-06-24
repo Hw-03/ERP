@@ -34,8 +34,8 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/routers/inventory/transactions.py.md]] — 거래 내역 API
-- [[ERP/frontend/app/mes/_components/_history_hooks/📁__history_hooks.md]] — 데이터 훅
+- [[ERP/backend/app/routers/inventory/transactions.py]] — 거래 내역 API
+- [[ERP/frontend/app/mes/_components/_history_hooks/📁__history_hooks]] — 데이터 훅
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/models/transaction.py.md]] — TransactionLog 모델
+> - [[ERP/backend/app/models/transaction.py]] — TransactionLog 모델

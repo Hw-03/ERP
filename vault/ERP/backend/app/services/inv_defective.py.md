@@ -12,10 +12,13 @@
 
 ## 중요한 내용
 
-- `register_defective(db, item_id, dept, qty, ...)` — 정상 PRODUCTION → DEFECTIVE 이동
-- `return_defective(db, item_id, dept, qty, ...)` — DEFECTIVE → PRODUCTION 복귀
-- `discard_defective(db, item_id, dept, qty, ...)` — DEFECTIVE 수량 소각(폐기)
-- `supplier_return(db, item_id, qty, ...)` — 창고 재고 → 공급업체 반품 (warehouse_qty 차감)
+- `mark_defective(db, item_id, dept, qty, ...)` — 정상 PRODUCTION → DEFECTIVE 이동 (불량 격리)
+- `unmark_defective(db, item_id, dept, qty, ...)` — DEFECTIVE → PRODUCTION 복귀 (정상화)
+- `scrap_defective(db, item_id, dept, qty, ...)` — DEFECTIVE 수량 소각(폐기)
+- `receive_defective(db, item_id, dept, qty, ...)` — 외부에서 DEFECTIVE 위치로 바로 적재
+- `return_to_supplier(db, item_id, dept, qty, ...)` — DEFECTIVE → 공급업체 반품
+- `scrap_normal(db, item_id, qty, ...)` — 정상(창고) 재고 직접 폐기
+- `return_to_supplier_from_normal(db, item_id, qty, ...)` — 정상(창고) 재고 → 공급업체 반품
 
 ## 위험도
 
@@ -26,9 +29,9 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/inv_transfer.py.md]] — 이 서비스의 내부 의존
-- [[ERP/backend/app/routers/inventory/defective.py.md]] — 불량 API 진입점
+- [[ERP/backend/app/services/inv_transfer.py]] — 이 서비스의 내부 의존
+- [[ERP/backend/app/routers/inventory/defective.py]] — 불량 API 진입점
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/defects.py.md]] — 불량 유형 관리
-> - [[ERP/frontend/app/mes/_components/_defect_hub/📁__defect_hub.md]]
+> - [[ERP/backend/app/routers/defects.py]] — 불량 유형 관리
+> - [[ERP/frontend/app/mes/_components/_defect_hub/📁__defect_hub]]

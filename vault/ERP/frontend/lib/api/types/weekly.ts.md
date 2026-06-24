@@ -48,10 +48,11 @@ project: DEXCOWIN MES
 ```ts
 export interface WeeklyItemReport {
   item_id: string;
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   prev_qty: number;
-  in_qty: number;
+  produce_qty: number;
+  receive_qty: number;
   out_qty: number;
   current_qty: number;
   delta: number;
@@ -63,7 +64,8 @@ export interface WeeklyGroupReport {
   label: string;
   item_count: number;
   prev_qty: number;
-  in_qty: number;
+  produce_qty: number;
+  receive_qty: number;
   out_qty: number;
   current_qty: number;
   delta: number;
@@ -78,7 +80,8 @@ export interface WeeklyWarning {
 
 export interface WeeklyReportSummary {
   total_current_qty: number;
-  total_in_qty: number;
+  total_produce_qty: number;
+  total_receive_qty: number;
   total_out_qty: number;
   groups_increasing: number;
   groups_decreasing: number;

@@ -27,5 +27,5 @@ reorder_by_display_order(
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/routers/warehouse_map/angles.py.md]] — 앵글 정렬 사용
-- [[ERP/backend/app/routers/departments.py.md]] — 부서 정렬 사용
+- [[ERP/backend/app/routers/warehouse_map/angles.py]] — 앵글 정렬 사용
+- [[ERP/backend/app/routers/departments.py]] — 부서 정렬 사용

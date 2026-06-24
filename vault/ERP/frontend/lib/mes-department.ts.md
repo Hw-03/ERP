@@ -75,11 +75,11 @@ const DEPARTMENT_ALIAS: Record<string, string> = {
  * 키는 정규화된 부서 이름.
  */
 export const MES_DEPARTMENT_COLORS: Record<string, string> = {
-  "조립": "#1d4ed8", // blue-700
-  "고압": "#c2410c", // orange-700
+  "조립": "#3b82f6", // blue-500 — 가시성 개선 (라이트/다크 양쪽 mid-tone)
+  "고압": "#d97706", // amber-600 — 가시성 개선
+  "튜브": "#16a34a", // green-600 — 가시성 개선
   "진공": "#6d28d9", // violet-700
   "튜닝": "#0e7490", // cyan-700
-  "튜브": "#4d7c0f", // lime-700
   "서비스": "#047857", // emerald-700
   "AS": "#be185d", // pink-700
   "연구": "#b45309", // amber-700

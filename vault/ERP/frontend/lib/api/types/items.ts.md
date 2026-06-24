@@ -69,13 +69,13 @@ export interface Item {
   legacy_item_type: string | null;
   supplier: string | null;
   min_stock: number | null;
-  item_code: string | null;
+  mes_code: string | null;
   model_symbol: string | null;
   model_slots: number[];
   process_type_code: string | null;
-  option_code: string | null;
   serial_no: number | null;
   bom_completed_at: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
   department: Department | string | null;
@@ -86,5 +86,6 @@ export interface ProductModel {
   symbol: string | null;
   model_name: string | null;
   is_reserved: boolean;
+  display_order?: number;
 }
 ```

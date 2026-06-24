@@ -79,7 +79,7 @@ export interface IoLine {
   line_id: string;
   item_id: string;
   item_name: string;
-  item_code: string | null;
+  mes_code: string | null;
   unit: string;
   direction: IoLineDirection;
   from_bucket: IoBucket;
@@ -101,6 +101,7 @@ export interface IoBundle {
   source_kind: IoSourceKind;
   title: string;
   source_item_id: string | null;
+  source_mes_code: string | null;
   quantity: number;
   expanded_level: number;
   lines: IoLine[];

@@ -5,8 +5,8 @@
 불량 처리 전용 UI 폴더입니다. "불량" 탭(`DesktopDefectView`)의 모든 UI 조각이 여기 있습니다.
 
 불량 유형에 따라 흐름이 다릅니다:
-- **R(발주) 품목 불량** — `PaPfDefectWizard` / `PaPfDefectWizardPanel`
-- **A/F(조립/완제) 품목 불량** — `RDefectActionPanel` / `RDefectActionModal`
+- **PA/PF(조립/완제) 품목 불량** — `PaPfDefectWizard` / `PaPfDefectWizardPanel`
+- **R(발주/원자재) 품목 불량** — `RDefectActionPanel` / `RDefectActionModal`
 - **재작업(Rework) 격리** — 창고로 반환 또는 폐기
 - **출고출하(disassemble) 분해** — `DisassembleTree`
 
@@ -31,9 +31,9 @@
 ## 관련 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/routers/defects.py.md]] — 불량 API
-- [[ERP/backend/app/services/inv_defective.py.md]] — 불량 재고 처리 로직
+- [[ERP/backend/app/routers/defects.py]] — 불량 API
+- [[ERP/backend/app/services/inv_defective.py]] — 불량 재고 처리 로직
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/routers/inventory/defective.py.md]] — 재고 불량 엔드포인트
-> - [[ERP/backend/app/services/inv_transfer.py.md]] — 이동 로직
+> - [[ERP/backend/app/routers/inventory/defective.py]] — 재고 불량 엔드포인트
+> - [[ERP/backend/app/services/inv_transfer.py]] — 이동 로직

@@ -37,7 +37,6 @@ project: DEXCOWIN MES
 - `_collect_descendants`
 - `_build_tree_cached`
 - `_is_circular`
-- 그 외 7개 항목
 
 ## 연결되는 파일
 
@@ -96,10 +95,10 @@ def get_all_bom(db: Session = Depends(get_db)):
             bom_id=entry.bom_id,
             parent_item_id=entry.parent_item_id,
             parent_item_name=parent.item_name,
-            parent_item_code=parent.item_code,
+            parent_mes_code=parent.mes_code,
             child_item_id=entry.child_item_id,
             child_item_name=child.item_name,
-            child_item_code=child.item_code,
+            child_mes_code=child.mes_code,
             quantity=entry.quantity,
             unit=entry.unit,
         ))

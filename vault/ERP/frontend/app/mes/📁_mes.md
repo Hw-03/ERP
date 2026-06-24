@@ -34,7 +34,7 @@ project: DEXCOWIN MES
 ## 주요 파일
 
 - [[ERP/frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx]] — 입출고 조합 UI 본체
-- [[ERP/frontend/app/mes/_components/DesktopWarehouseMapView.tsx]] — 창고 지도 데스크톱 뷰 (2탭: 박스 관리·앵글 편집)
+- [[ERP/frontend/app/mes/_components/DesktopWarehouseMapTab.tsx]] — 창고 지도 데스크톱 탭 컨테이너 (2탭: 박스 관리·앵글 편집)
 - [[ERP/frontend/app/mes/_components/mobile/MobileShell.tsx]] — 모바일 탭 네비게이션 (동결)
 - [[ERP/frontend/app/mes/_components/mobile/warehouse/MobileIoComposeWizard.tsx]] — 모바일 입출고 마법사
 
@@ -48,9 +48,9 @@ project: DEXCOWIN MES
 
 ### 먼저 볼 파일
 - [[ERP/frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx]] — 입출고 UI 핵심
-- [[ERP/_attic/docs/adr/ADR-0003-mobile-reuses-desktop-v2.md]] — 모바일·데스크톱 분리 설계 결정
+- `_attic/docs/adr/ADR-0003-mobile-reuses-desktop-v2.md` — 모바일·데스크톱 분리 설계 결정
 
 > [!info]- 더 연결된 파일
 > - [[ERP/frontend/app/layout.tsx]] — App Router 루트 레이아웃
 > - [[ERP/frontend/app/page.tsx]] — 루트 진입점 (→ `/mes` 리디렉트)
-> - [[ERP/frontend/lib/api/]] — 프론트 API 클라이언트 (15 도메인 모듈)
+> - [[ERP/frontend/lib/api.ts]] — 프론트 API 클라이언트 (15 도메인 모듈)

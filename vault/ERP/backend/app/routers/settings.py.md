@@ -38,7 +38,7 @@ project: DEXCOWIN MES
 - `require_admin`
 - `_inventory_integrity_payload`
 - `check_inventory_integrity`
-- 그 외 8개 항목
+- 그 외 3개 항목
 
 ## 연결되는 파일
 

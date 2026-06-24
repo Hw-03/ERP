@@ -31,10 +31,10 @@
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/approval_rules.py.md]] — 결재 규칙 원천
-- [[ERP/backend/app/services/io_persist.py.md]] — 이 파일의 헬퍼 재사용
-- [[ERP/backend/app/routers/io.py.md]] — 미리보기 API 진입점
+- [[ERP/backend/app/services/approval_rules.py]] — 결재 규칙 원천
+- [[ERP/backend/app/services/io_persist.py]] — 이 파일의 헬퍼 재사용
+- [[ERP/backend/app/routers/io.py]] — 미리보기 API 진입점
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/services/bom.py.md]] — BOM 트리 조회
-> - [[ERP/backend/app/services/inventory.py.md]]
+> - [[ERP/backend/app/services/bom.py]] — BOM 트리 조회
+> - [[ERP/backend/app/services/inventory.py]]

@@ -31,7 +31,7 @@ _RECEIVE_DEPTS = ("고압", "진공")
 
 인수 확인은 현장 물리 인수 행위입니다. 따라서:
 - 생산부 결재권자(이필욱·김건호)라도 고압/진공 소속이 아니면 인수 대기함을 볼 수 없습니다.
-- 이는 의도된 설계입니다 (`can_receive(actor, to_department)` 조건 확인).
+- 이는 의도된 설계입니다 (`_inbox_query` 내부에서 `_RECEIVE_DEPTS` 멤버십으로 직접 확인).
 
 **인수 확인 시 재고 이동**
 
@@ -44,9 +44,9 @@ _RECEIVE_DEPTS = ("고압", "진공")
 - [[ERP/backend/app/models/handover.py]] — HandoverDoc·HandoverLine 모델
 
 > [!info]- 더 연결된 파일
-> - [[ERP/backend/app/schemas/handover.py]] — 요청/응답 스키마
+> - [[ERP/backend/app/schemas/📁_schemas]] — 요청/응답 스키마 (HandoverCreate, HandoverReceiveRequest 등)
 > - [[ERP/backend/app/services/notifications.py]] — 인수인계 도착 알림
 
 ## 조심할 점
 
-인수 확인 API(`PUT /{id}/receive`)를 건드릴 때는 재고 이동(`transfer_between_departments`)과 거래 로그까지 함께 검증해야 합니다. 재고 정합성이 흔들릴 수 있습니다.
+인수 확인 API(`POST /{handover_id}/receive`)를 건드릴 때는 재고 이동(`transfer_between_departments`)과 거래 로그까지 함께 검증해야 합니다. 재고 정합성이 흔들릴 수 있습니다.

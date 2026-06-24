@@ -34,7 +34,7 @@ IoComposeView와 동일한 4줄 헬퍼가 이 파일에도 있습니다. 두 컴
 
 ### 먼저 볼 파일
 - [[ERP/frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx]] — 데스크톱 동일 흐름
-- [[ERP/_attic/docs/adr/ADR-0003-mobile-reuses-desktop-v2.md]] — 분리 설계 근거
+- `_attic/docs/adr/ADR-0003-mobile-reuses-desktop-v2.md` — 분리 설계 근거
 
 > [!info]- 더 연결된 파일
 > - [[ERP/frontend/app/mes/_components/mobile/MobileShell.tsx]] — 모바일 네비게이션 (동결)

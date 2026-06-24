@@ -67,7 +67,7 @@ export const catalogApi = {
   createModel: (payload: { model_name: string; symbol?: string }) =>
     postJson<ProductModel>(toApiUrl("/api/models"), payload),
 
-  deleteModel: (slot: number) => deleteJson<void>(toApiUrl(`/api/models/${slot}`)),
+  deleteModel: (slot: number, pin: string) => deleteJson<void>(toApiUrl(`/api/models/${slot}`), { pin }),
 
   // BOM --------------------------------------------------------------------
   getAllBOM: () => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom")),

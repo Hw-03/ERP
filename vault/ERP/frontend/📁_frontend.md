@@ -26,9 +26,9 @@ Next.js 프론트엔드입니다. 현장 직원과 관리자가 실제로 보는
 
 ## 주요 하위 폴더
 
-- [[ERP/frontend/app/📁_app]] — Next.js App Router의 진입 폴더입니다. 실제 활성 화면은 대부분 legacy 하위에서 실행됩니다.
-- [[ERP/frontend/components/📁_components]] — `frontend/components`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
-- [[ERP/frontend/features/📁_features]] — `frontend/features`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/app/📁_app]] — Next.js App Router의 진입 폴더입니다. 실제 활성 화면은 대부분 mes 하위에서 실행됩니다.
+- [[ERP/frontend/app/mes/_components/📁__components]] — `frontend/components`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/app/mes/_components/📁__components]] — `frontend/features`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 - [[ERP/frontend/lib/📁_lib]] — 프론트 화면이 공통으로 쓰는 API 호출, 포맷, 상태/색상 규칙, UI 보조 로직입니다.
 - [[ERP/frontend/public/📁_public]] — `frontend/public`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 - [[ERP/frontend/scripts/📁_scripts]] — `frontend/scripts`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
@@ -51,7 +51,7 @@ Next.js 프론트엔드입니다. 현장 직원과 관리자가 실제로 보는
 
 ## 조심할 점
 
-현재 실제 데스크톱 화면은 app/legacy 쪽이 중심입니다. 이름만 보고 legacy라 버리면 안 됩니다.
+현재 실제 데스크톱 화면은 app/mes 쪽이 중심입니다. 이름만 보고 mes라 버리면 안 됩니다.
 
 ## 다음에 볼 위치
 

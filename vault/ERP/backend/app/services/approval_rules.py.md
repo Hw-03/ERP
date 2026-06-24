@@ -25,6 +25,6 @@ APPROVAL_SUB_TYPES            # 전체 승인 필요: 위 + {"defect_quarantine"
 ## 연결되는 파일
 
 ### 먼저 볼 파일
-- [[ERP/backend/app/services/io_preview.py.md]] — 이 상수 재사용
-- [[ERP/backend/app/services/io_dispatch.py.md]] — 이 상수 기반 분기
-- [[ERP/backend/app/_attic/docs/adr/ADR-0005.md]] — 통합 결정 배경
+- [[ERP/backend/app/services/io_preview.py]] — 이 상수 재사용
+- [[ERP/backend/app/services/io_dispatch.py]] — 이 상수 기반 분기
+- `_attic/docs/adr/ADR-0005-approval-rules-single-source.md` — 통합 결정 배경

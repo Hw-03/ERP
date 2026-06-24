@@ -37,7 +37,6 @@ project: DEXCOWIN MES
 - `get_defect_kpi`
 - `quarantine`
 - `unquarantine`
-- 그 외 4개 항목
 
 ## 연결되는 파일
 
