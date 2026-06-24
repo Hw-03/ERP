@@ -44,14 +44,17 @@ function formatRelative(iso: string): string {
 export function MyRequestRow({
   req,
   onCancelRequest,
+  onRevertToDraft,
 }: {
   req: StockRequest;
   onCancelRequest: () => void;
+  onRevertToDraft?: () => void;
 }) {
   const cancelable = req.status === "submitted" || req.status === "reserved";
   const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
   const statusColor = STATUS_COLOR[req.status] ?? LEGACY_COLORS.muted2;
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [linesExpanded, setLinesExpanded] = useState(false);
   const displayNotes = formatRequestNotes(req.notes);
   const notesLong = (displayNotes ?? "").length > 60;
 
@@ -96,8 +99,9 @@ export function MyRequestRow({
       )}
 
       <div className="mt-3 flex flex-col text-sm" style={{ color: LEGACY_COLORS.text }}>
-        {req.lines.slice(0, 5).map((line, idx) => {
-          const isLast = idx === Math.min(req.lines.length, 5) - 1 && req.lines.length <= 5;
+        {(linesExpanded ? req.lines : req.lines.slice(0, 5)).map((line, idx) => {
+          const displayedCount = linesExpanded ? req.lines.length : Math.min(req.lines.length, 5);
+          const isLast = idx === displayedCount - 1 && (linesExpanded || req.lines.length <= 5);
           return (
             <div
               key={line.line_id}
@@ -111,9 +115,14 @@ export function MyRequestRow({
           );
         })}
         {req.lines.length > 5 && (
-          <div className="pt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-            외 {req.lines.length - 5}건
-          </div>
+          <button
+            type="button"
+            onClick={() => setLinesExpanded((v) => !v)}
+            className="pt-1.5 text-left text-xs underline-offset-2 hover:underline"
+            style={{ color: LEGACY_COLORS.cyan }}
+          >
+            {linesExpanded ? "접기" : `외 ${req.lines.length - 5}건 더보기`}
+          </button>
         )}
       </div>
 
@@ -150,7 +159,21 @@ export function MyRequestRow({
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-3 flex items-center gap-2">
+        {cancelable && onRevertToDraft && (
+          <button
+            type="button"
+            className="rounded-[10px] border px-3 py-1.5 text-xs font-bold"
+            style={{
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 50%, transparent)`,
+              color: LEGACY_COLORS.cyan,
+              background: LEGACY_COLORS.s1,
+            }}
+            onClick={onRevertToDraft}
+          >
+            수정
+          </button>
+        )}
         {cancelable && (
           <button
             type="button"

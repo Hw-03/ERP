@@ -130,6 +130,24 @@ export function useCancelStockRequestMutation() {
   });
 }
 
+/** 요청을 draft로 복원 (수정 후 재제출용) */
+export function useRevertToDraftMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      payload,
+    }: {
+      requestId: string;
+      payload: StockRequestActionPayload;
+    }) => stockRequestsApi.revertToDraft(requestId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all });
+      qc.invalidateQueries({ queryKey: ["io-drafts"] });
+    },
+  });
+}
+
 /** 새 요청 생성 */
 export function useCreateStockRequestMutation() {
   const qc = useQueryClient();

@@ -9,6 +9,7 @@ import { MyRequestRow } from "./MyRequestRow";
 import {
   useCancelStockRequestMutation,
   useMyStockRequestsQuery,
+  useRevertToDraftMutation,
 } from "@/lib/queries/useStockRequestsQuery";
 
 interface Props {
@@ -21,6 +22,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
   const { data: items = [], isLoading: loading, error: qError, refetch } =
     useMyStockRequestsQuery(employeeId ?? "");
   const cancelMutation = useCancelStockRequestMutation();
+  const revertMutation = useRevertToDraftMutation();
   const loadError = qError
     ? qError instanceof Error
       ? qError.message
@@ -29,6 +31,9 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
   const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
   const [cancelPin, setCancelPin] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [revertTarget, setRevertTarget] = useState<StockRequest | null>(null);
+  const [revertPin, setRevertPin] = useState("");
+  const [revertError, setRevertError] = useState<string | null>(null);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거). 30초 폴링은 훅의 refetchInterval 이 담당.
   useEffect(() => {
@@ -46,6 +51,38 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
     setCancelTarget(null);
     setCancelPin("");
     setCancelError(null);
+  };
+
+  const openRevert = (request: StockRequest) => {
+    setRevertTarget(request);
+    setRevertPin("");
+    setRevertError(null);
+  };
+
+  const closeRevert = () => {
+    setRevertTarget(null);
+    setRevertPin("");
+    setRevertError(null);
+  };
+
+  const submitRevert = () => {
+    if (!revertTarget || !revertPin.trim() || revertMutation.isPending) return;
+    setRevertError(null);
+    revertMutation.mutate(
+      {
+        requestId: revertTarget.request_id,
+        payload: { actor_employee_id: revertTarget.requester_employee_id, pin: revertPin },
+      },
+      {
+        onSuccess: () => {
+          closeRevert();
+          onChanged();
+        },
+        onError: (err) => {
+          setRevertError(err instanceof Error ? err.message : "수정 전환에 실패했습니다.");
+        },
+      },
+    );
   };
 
   const submitCancel = () => {
@@ -90,8 +127,44 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
           key={req.request_id}
           req={req}
           onCancelRequest={() => openCancel(req)}
+          onRevertToDraft={() => openRevert(req)}
         />
       ))}
+
+      <ConfirmModal
+        open={revertTarget !== null}
+        title="요청 수정 — PIN 확인"
+        tone="normal"
+        confirmLabel="수정하기"
+        cancelLabel="닫기"
+        busy={revertMutation.isPending}
+        onClose={closeRevert}
+        onConfirm={submitRevert}
+      >
+        <p className="mb-3 text-sm" style={{ color: LEGACY_COLORS.text }}>
+          요청이 취소되고 작업 중 목록으로 이동합니다. 내용을 수정한 뒤 다시 제출하세요.
+        </p>
+        {revertError && (
+          <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>
+            {revertError}
+          </p>
+        )}
+        <input
+          type="password"
+          inputMode="numeric"
+          placeholder="PIN"
+          value={revertPin}
+          onChange={(e) => setRevertPin(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submitRevert(); }}
+          className="w-full rounded-[10px] border px-3 py-2 text-sm outline-none"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+          }}
+          autoFocus
+        />
+      </ConfirmModal>
 
       <ConfirmModal
         open={cancelTarget !== null}
