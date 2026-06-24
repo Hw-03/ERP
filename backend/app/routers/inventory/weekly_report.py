@@ -201,7 +201,7 @@ def get_weekly_report(
             produce_map[iid] = produce_map.get(iid, Decimal("0")) + val
         elif tx_type == TransactionTypeEnum.RECEIVE:
             receive_map[iid] = receive_map.get(iid, Decimal("0")) + val
-        elif tx_type in _OUT_TYPES:
+        elif tx_type in _OUT_TYPES or (tx_type == TransactionTypeEnum.ADJUST and val < 0):
             out_map[iid] = out_map.get(iid, Decimal("0")) + abs(val)
 
     group_items: dict[str, list[WeeklyItemReport]] = {code: [] for code in _F_CODES}

@@ -14762,6 +14762,53 @@
         ]
       }
     },
+    "/api/stock-requests/{request_id}/revert-to-draft": {
+      "post": {
+        "description": "제출된 요청을 취소하고 연결된 IoBatch를 draft로 복원 — 수정 후 재제출용.\n권한: 요청자 본인만.",
+        "operationId": "revert_stock_request_to_draft_api_stock_requests__request_id__revert_to_draft_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRequestActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Stock Request To Draft",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
     "/api/stock-requests/{request_id}/submit": {
       "post": {
         "description": "DRAFT → 제출 전환. status=DRAFT 만 허용, 본인만, 빈 lines 거부.",

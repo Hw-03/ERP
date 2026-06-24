@@ -40,9 +40,10 @@ def _seed_product_symbols(db_session):
 
 def _make_prod_item(db_session, *, name: str, process_code: str,
                     model_symbol: str | None = None,
+                    serial_no: int | None = None,
                     qty: Decimal = Decimal("0")) -> Item:
     item = Item(item_name=name, process_type_code=process_code, unit="EA",
-                model_symbol=model_symbol)
+                model_symbol=model_symbol, serial_no=serial_no)
     db_session.add(item)
     db_session.flush()
     db_session.add(Inventory(
@@ -302,6 +303,30 @@ def test_prev_qty_reflects_all_transactions(client, db_session):
     assert _dec(row["produce_qty"]) == _dec(0)     # PRODUCE 없음 → 생산 0 (입출고 내역과 일치)
     assert _dec(row["receive_qty"]) == _dec(13)
     assert _dec(row["out_qty"]) == _dec(20)        # SHIP+BACKFLUSH 만 (DEFECT_SCRAP 은 출고 칸 제외)
+
+
+def test_adjust_out_counted_in_out_qty(client, db_session):
+    """낱개 출고(adjust_out)는 ADJUST+qty음수 → 출하 집계(out_qty)에 반영돼야 한다.
+    adjust_in(ADJUST+qty양수)은 out_qty에 포함되지 않아야 한다.
+    NOTE: weekly_report 는 (item_id, tx_type) GROUP BY 집계 — 두 케이스를 별도 품목으로 테스트."""
+    item_out = _make_prod_item(db_session, name="VF 낱개출고", process_code="VF",
+                               model_symbol="6", serial_no=9901, qty=_dec(50))
+    _add_log(db_session, item_out.item_id, tx_type=TransactionTypeEnum.ADJUST, qty=_dec(-3), at=_WEEK_MID)
+
+    item_in = _make_prod_item(db_session, name="VF 수량보정입고", process_code="VF",
+                              model_symbol="6", serial_no=9902, qty=_dec(50))
+    _add_log(db_session, item_in.item_id, tx_type=TransactionTypeEnum.ADJUST, qty=_dec(2), at=_WEEK_MID)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+    assert resp.status_code == 200
+    groups = {g["process_code"]: g for g in resp.json()["groups"]}
+    items_by_id = {i["item_id"]: i for i in groups["VF"]["items"]}
+
+    row_out = items_by_id[str(item_out.item_id)]
+    row_in = items_by_id[str(item_in.item_id)]
+    assert _dec(row_out["out_qty"]) == _dec(3)   # adjust_out(-3) → 출하 3
+    assert _dec(row_in["out_qty"]) == _dec(0)    # adjust_in(+2) → 출하 0 (입고이므로 미집계)
 
 
 # ── 회귀 방어 — 신규 enum 추가 시 분류 누락 검출 ─────────────────────────
