@@ -13320,6 +13320,48 @@
         ]
       }
     },
+    "/api/notifications/read": {
+      "delete": {
+        "description": "읽은 알림 전체 하드 삭제.",
+        "operationId": "delete_read_notifications_api_notifications_read_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "recipient_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Read Notifications",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/api/notifications/unread-count": {
       "get": {
         "operationId": "unread_count_api_notifications_unread_count_get",
@@ -13360,6 +13402,58 @@
           }
         },
         "summary": "Unread Count",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/notifications/{notification_id}": {
+      "delete": {
+        "description": "알림 개별 하드 삭제. 본인 소유 확인.",
+        "operationId": "delete_notification_api_notifications__notification_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notification_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notification Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "recipient_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Notification",
         "tags": [
           "Notifications"
         ]
