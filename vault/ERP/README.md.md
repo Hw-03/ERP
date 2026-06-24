@@ -4,7 +4,7 @@ source_path: "README.md"
 importance: important
 layer: meta
 graph: file
-updated: 2026-05-22
+updated: 2026-06-24
 project: DEXCOWIN MES
 ---
 
@@ -20,88 +20,34 @@ project: DEXCOWIN MES
 
 ## 언제 보면 좋나
 
-- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
-- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 처음 셋업할 때 실행 방법을 확인할 때
+- 포트나 접속 주소가 맞는지 확인할 때
+- 폴더 구조 전체를 한눈에 볼 때
 
 ## 중요한 내용
 
-이 파일에서 눈에 띄는 구조는 다음과 같습니다.
-
-- `DEXCOWIN MES`
-- `현재 기준`
-- `빠른 시작 (Windows · 권장)`
-- `수동 실행`
-- `운영 보조 스크립트`
-- `품목코드 핵심 규칙`
-- `한눈에 보는 폴더 구조`
-- `문서 허브`
-- `검증`
-- `5게이트 일괄 검증 (commit 전 권장)`
+- **주 사용 화면**: `/mes` (2026-06-05 이전에는 `/legacy`였으나 개명됨)
+- **dev 포트**: 백엔드 `8011`, 프론트엔드 `3001` (`start.bat` 기준)
+- **prod 포트**: 백엔드 `8010`, 프론트엔드 `3000` (prod 환경 별도 운영)
+- **프론트 API 도메인 모듈**: `frontend/lib/api/` 하위 15개
+- **품목 수 등 수치는 문서에 박지 않음** — `python _attic/backend-scripts/facts.py` 로 확인
 
 ## 연결되는 파일
 
+### 먼저 볼 파일
 - [[ERP/📁_ERP]] — 이 파일이 속한 폴더의 안내판입니다.
+- [[ERP/_attic/docs/OPERATIONS.md]] — 운영 매뉴얼 (포트 충돌, 백업, 헬스체크 등)
+- [[ERP/_attic/ONBOARDING.md]] — 신규 합류자 셋업 가이드
 
 ## 조심할 점
 
-README가 오래되면 새 사람이 잘못된 실행법을 따라갈 수 있습니다. 큰 구조가 바뀌면 같이 갱신해야 합니다.
+README가 오래되면 새 사람이 잘못된 실행법·포트·경로를 따라갈 수 있습니다. 큰 구조가 바뀌면 같이 갱신해야 합니다.
 
 ## 핵심 발췌
 
 ```md
-# DEXCOWIN MES
-
-DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
-
-**현재 안정성 점수**: ~96/100 (Round-10A 완료, 2026-05-02). 세부 추적: [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md)
-
-## 현재 기준
-
-- 기준 품목 수: 722건
-- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
-- 프론트엔드: Next.js 14 + Tailwind CSS
-- 주 사용 화면: `/legacy` (데스크톱 셸: 대시보드 / 입출고 / 입출고 내역 / 관리자)
-- 품목코드 기준 문서: `docs/ITEM_CODE_RULES.md`
-
-## 빠른 시작 (Windows · 권장)
-
-루트의 `start.bat` 한 번 실행으로 백엔드·프론트가 함께 뜨고 LAN IP 기준 브라우저가 자동 실행된다.
-
-```bat
-start.bat
-```
-
-- 백엔드: `http://0.0.0.0:8010` (로컬 호출은 `http://127.0.0.1:8010`)
-- 프론트엔드: `http://<LAN IP>:3000` 또는 `http://localhost:3000`
-- 같은 사설망 안의 다른 PC에서도 `http://<LAN IP>:3000` 으로 접속 가능
-
-처음 실행 시 `npm install` 과 `pip install -r backend/requirements.txt` 가 자동 수행된다.
-
-## 수동 실행
-
-백엔드:
-
-```bash
-cd backend
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
-```
-
-프론트엔드:
-
-```bash
-cd frontend
-npm run dev
-```
-
-대표 접속:
-
-```text
-http://localhost:3000
-```
-
-## 운영 보조 스크립트
-
-| 스크립트 | 역할 |
-|---|---|
-| `scripts/ops/backup_db.bat` | `backend/mes.db` 를 `backend/_backup/mes_YYYYMMDD_HHMMSS.db` 로 복사 |
+- 백엔드: http://0.0.0.0:8011 (로컬: http://127.0.0.1:8011) — dev 기준. prod는 8010.
+- 프론트엔드: http://<LAN IP>:3001 또는 http://localhost:3001 — dev 기준. prod는 3000.
+- 주 사용 화면: /mes
+- 프론트 API 모듈: frontend/lib/api/ 하위 15개 도메인 모듈
 ```

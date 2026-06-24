@@ -4,7 +4,7 @@ source_path: "frontend/app"
 importance: important
 layer: frontend
 graph: hub
-updated: 2026-05-22
+updated: 2026-06-24
 project: DEXCOWIN MES
 ---
 
@@ -12,7 +12,9 @@ project: DEXCOWIN MES
 
 ## 이 폴더는 무엇을 위한 곳인가
 
-Next.js App Router의 진입 폴더입니다. 실제 활성 화면은 대부분 legacy 하위에서 실행됩니다.
+Next.js App Router의 진입 폴더입니다. 실제 활성 화면은 `mes/` 하위에서 실행됩니다.
+
+> **주의**: 2026-06-05 이전 이름이 `legacy/`였고, vault 일부 노트에 `legacy` 표현이 남아 있을 수 있습니다. 현재 활성 경로는 `/mes`입니다.
 
 ## 현장 업무와의 관계
 
@@ -25,7 +27,7 @@ Next.js App Router의 진입 폴더입니다. 실제 활성 화면은 대부분 
 
 ## 주요 하위 폴더
 
-- [[ERP/frontend/app/legacy/📁_legacy]] — 현재 운영 중인 실제 MES 화면입니다. 이름은 legacy지만 지금 사용자가 보는 핵심 UI입니다.
+- [[ERP/frontend/app/mes/📁_mes]] — 현재 운영 중인 실제 MES 화면입니다. 브라우저에서 `/mes`로 접속합니다.
 
 ## 먼저 볼 파일 5개
 

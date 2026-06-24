@@ -4,7 +4,7 @@ source_path: "backend/app/routers"
 importance: important
 layer: backend
 graph: hub
-updated: 2026-05-22
+updated: 2026-06-24
 project: DEXCOWIN MES
 ---
 
@@ -36,7 +36,7 @@ project: DEXCOWIN MES
 - [[ERP/backend/app/routers/_errors.py]] — `_errors.py`는 `_errors` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 - [[ERP/backend/app/routers/admin_audit.py]] — `admin_audit.py`는 `admin_audit` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 
-> [!info]- 추가 파일
+> [!info]- 추가 파일 (전체 15개 도메인 라우터)
 > - [[ERP/backend/app/routers/admin_audit_csv.py]] — admin_audit_csv.py
 > - [[ERP/backend/app/routers/bom.py]] — bom.py
 > - [[ERP/backend/app/routers/codes.py]] — codes.py
@@ -44,11 +44,13 @@ project: DEXCOWIN MES
 > - [[ERP/backend/app/routers/departments.py]] — departments.py
 > - [[ERP/backend/app/routers/dept_adjustment.py]] — dept_adjustment.py
 > - [[ERP/backend/app/routers/employees.py]] — employees.py
+> - [[ERP/backend/app/routers/handover.py]] — 인수인계서 (작성·제출·인수확인). 받는 부서(고압/진공)만 인수 가능
 > - [[ERP/backend/app/routers/io.py]] — io.py
 > - [[ERP/backend/app/routers/items.py]] — items.py
-> - [[ERP/backend/app/routers/models.py]] — models.py
+> - [[ERP/backend/app/routers/models.py]] — models.py (ProductSymbol 라우터 — DB 모델 아님)
 > - [[ERP/backend/app/routers/production.py]] — production.py
 > - [[ERP/backend/app/routers/variance.py]] — variance.py
+> - [[ERP/backend/app/routers/warehouse_map/]] — 창고 지도·앵글·박스 API
 
 ## 조심할 점
 

@@ -36,7 +36,7 @@ project: DEXCOWIN MES
 > - [[ERP/backend/app/routers/inventory/__init__.py]] — __init__.py
 > - [[ERP/backend/app/routers/inventory/_shared.py]] — _shared.py
 > - [[ERP/backend/app/routers/inventory/query.py]] — query.py
-> - [[ERP/backend/app/routers/inventory/weekly_report.py]] — weekly_report.py
+> - [[ERP/backend/app/routers/inventory/weekly_report.py]] — 주간보고 API (**동결 영역** 2026-05-29. 명시 요청 없으면 수정 금지)
 
 ## 조심할 점
 
