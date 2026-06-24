@@ -1,20 +1,31 @@
-# _attic/
+# `_attic/`
 
-`_attic/` is the repository's archive area for files that are not required for
-app runtime or the current development verification flow.
+`_attic/` is the repository's archive and reference area for material that is
+not part of the runtime app tree.
 
 Keep runtime files out of this folder. In particular:
 
-- `backend/erp.db` stays in `backend/`.
-- `backend/data/audit_csv/` stays in `backend/data/`.
+- `backend/mes.db` stays in `backend/`.
+- `backend/schema.sql` stays in `backend/`.
+- `docker/docker-compose.yml` and `docker/docker-compose.nas.yml` stay in `docker/`.
 - Development baselines stay in `_dev/baselines/`.
 
 ## Current Split
 
-- `_attic/data/`: raw spreadsheets, extracted image sources, old DB snapshots.
-- `_attic/docs/`: old plans, reviews, presentations, regression screenshots.
-- `_attic/ai/`: AI handoff and progress notes that are not active runtime inputs.
-- `_attic/vault/`: local/personal vault material.
+- `_attic/docs/`: current reference docs plus archived plans, reviews, research,
+  and prototypes.
+- `_attic/ai/`: historical AI handoff notes. Treat these as archive unless a
+  file explicitly says otherwise.
+- `_attic/data/`: raw spreadsheets, extracted image sources, and old DB
+  snapshots.
+
+There is no active `vault/` folder in the current repository layout.
+
+## Where To Look First
+
+- Root `README.md`: project entry point and startup guide.
+- `_attic/docs/README.md`: docs index.
+- `_attic/docs/REPO_LAYOUT.md`: current live paths, moved files, and archive boundaries.
 
 ## Development Baselines
 

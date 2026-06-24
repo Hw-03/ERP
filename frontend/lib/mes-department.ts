@@ -23,6 +23,33 @@ const DEPARTMENT_ALIAS: Record<string, string> = {
 };
 
 /**
+ * DepartmentEnum 멤버명 → 한국어 값 (backend app/models/base.py 와 일치).
+ * 일부 경로에서 백엔드가 enum 을 `str()`/f-string 으로 흘려 "DepartmentEnum.ASSEMBLY"
+ * 형태가 데이터에 섞이는 경우를 화면에서 방어한다(정상값 "조립" 등엔 무영향).
+ */
+const DEPARTMENT_ENUM_NAME_TO_LABEL: Record<string, string> = {
+  ASSEMBLY: "조립",
+  HIGH_VOLTAGE: "고압",
+  VACUUM: "진공",
+  TUNING: "튜닝",
+  TUBE: "튜브",
+  AS: "AS",
+  RESEARCH: "연구",
+  SALES: "영업",
+  SHIPPING: "출하",
+  ETC: "기타",
+  WAREHOUSE: "창고",
+};
+
+function coerceDepartmentValue(value: string): string {
+  if (value.startsWith("DepartmentEnum.")) {
+    const member = value.slice("DepartmentEnum.".length);
+    return DEPARTMENT_ENUM_NAME_TO_LABEL[member] ?? value;
+  }
+  return value;
+}
+
+/**
  * 부서별 fallback 색상 (DB color_hex 부재 시에만 사용).
  * 키는 정규화된 부서 이름.
  *
@@ -72,7 +99,7 @@ const MES_DEPARTMENT_INITIALS: Record<string, string> = {
  */
 export function normalizeDepartmentName(value: string | null | undefined): string {
   if (value === null || value === undefined) return "기타";
-  const trimmed = value.trim();
+  const trimmed = coerceDepartmentValue(value.trim());
   if (trimmed === "") return "기타";
   return DEPARTMENT_ALIAS[trimmed] ?? trimmed;
 }
@@ -141,5 +168,6 @@ export const DEPARTMENT_ICONS: Record<string, string> = {
  */
 export function normalizeDepartment(value?: string | null): string {
   if (!value) return "기타";
-  return DEPARTMENT_LABELS[value] ?? value;
+  const v = coerceDepartmentValue(value.trim());
+  return DEPARTMENT_LABELS[v] ?? v;
 }

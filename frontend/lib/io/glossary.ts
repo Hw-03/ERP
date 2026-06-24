@@ -49,7 +49,7 @@ export const SUB_TYPE_LABEL: Record<IoSubType, string> = {
   produce: "생산",
   disassemble: "분해",
   adjust_in: "수량보정 입고",
-  adjust_out: "수량보정 출고",
+  adjust_out: "출고",
   defect_quarantine: "새 불량",
   defect_restore: "불량 해제",
   defect_process: "불량 처리",
@@ -108,9 +108,13 @@ export const REQUEST_TYPE_LABEL: Record<string, string> = {
   mark_defective_prod: "생산 불량 등록",
   supplier_return: "원자재 반품",
   manual_adjustment: "수동 조정",
+  package_out: "출하",
   defect_scrap: "불량 처리",
   defect_return: "원자재 반품",
   defect_disassemble: "불량 분해",
+  // R 정상 재고 바로 처리 (격리 미경유)
+  scrap_normal: "정상 폐기",
+  return_normal: "정상 반품",
 };
 
 // ──────────────────────────────────────────────────────────────────

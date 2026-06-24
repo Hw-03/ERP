@@ -22,6 +22,8 @@ from app.models import DepartmentEnum, DeptAdjSubTypeEnum, Item
 from app.routers._errors import ErrorCode, http_error
 from app.services import dept_adjustment as svc
 from app._evt import emit as _evt_emit
+from app.repositories import item_repository
+from app.routers.inventory._tx_helper import resolve_producer
 
 router = APIRouter()
 
@@ -71,6 +73,7 @@ class DeptAdjSubmitRequest(BaseModel):
     sub_type: Literal["production", "disassembly", "correction"]
     lines: List[AdjLineInput] = Field(..., min_length=1)
     operator_name: Optional[str] = None
+    operator_employee_code: Optional[str] = Field(None, max_length=50)
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
 
@@ -117,7 +120,7 @@ def get_bom_template(
     db: Session = Depends(get_db),
 ):
     """BOM 기반 초기 라인 세트 반환."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -177,12 +180,15 @@ def submit_adjustment(
             bom_expected=ln.bom_expected,
         ))
 
+    _, producer_id = resolve_producer(db, payload.operator_employee_code)
+
     try:
         log_ids = svc.submit_adjustment(
             db,
             sub_type_enum,
             adj_lines,
             operator_name=payload.operator_name,
+            producer_employee_id=producer_id,
             reference_no=payload.reference_no,
             notes=payload.notes,
         )

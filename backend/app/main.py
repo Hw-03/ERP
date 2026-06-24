@@ -40,6 +40,7 @@ from app.routers import (
     defects,
     departments,
     dept_adjustment,
+    employee_item_order,
     employees,
     handover,
     inventory,
@@ -257,7 +258,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
     # FastAPI 가 HTTPException 은 자체 처리하므로 여기에는 진짜 unhandled 만 옴.
     rid = _rid(request)
     emp = get_actor_emp(request)
-    _log.exception("Unhandled rid=%s emp=%s path=%s", rid, emp, request.url.path)
+    _log.error("Unhandled rid=%s emp=%s path=%s", rid, emp, request.url.path, exc_info=exc)
     return JSONResponse(
         status_code=500,
         content=_error_payload(
@@ -268,6 +269,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
     )
 
 
+app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])

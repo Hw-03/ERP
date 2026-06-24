@@ -1,6 +1,10 @@
 # MES 진행 기록
 
-이 문서는 큰 기능 단위의 진행 이력을 요약한다. 최신 업무 규칙은 `docs/ITEM_CODE_RULES.md`를 우선한다.
+> Path note (2026-06-15): the active item-code rules live at
+> `_attic/docs/ITEM_CODE_RULES.md`.
+> Any `docs/...` path mentioned below refers to the older pre-move layout.
+
+이 문서는 큰 기능 단위의 진행 이력을 요약한다. 최신 업무 규칙은 `_attic/docs/ITEM_CODE_RULES.md`를 우선한다.
 
 ## 현재 기준
 

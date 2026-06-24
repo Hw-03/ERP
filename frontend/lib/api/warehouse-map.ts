@@ -1,7 +1,9 @@
 /**
  * 창고 지도 도메인 API — `@/lib/api/warehouse-map`.
  *
- * 보기(GET)는 공개, 편집(POST/PUT/DELETE)은 admin PIN(api-core 가 X-Admin-Pin 자동 주입).
+ * 보기(GET)는 공개. 박스·앵글 편집은 창고 정/부 관리자(warehouse_role) 인증
+ * — api-core 가 X-Employee-Code + X-Operator-Pin 자동 주입(편집 모드 진입 시 등록).
+ * box-tracking 토글만 admin PIN.
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
@@ -100,6 +102,17 @@ export const warehouseMapApi = {
   }) => postJson<WarehouseBox>(toApiUrl("/api/warehouse-map/boxes"), payload),
   updateBox: (boxId: string, payload: { size?: BoxSize; items?: BoxItemPayload[] }) =>
     putJson<WarehouseBox>(toApiUrl(`/api/warehouse-map/boxes/${boxId}`), payload),
+  moveBox: (
+    boxId: string,
+    payload: { angle_id: number; row_no: number; layer_no: number; jari_index: number },
+  ) => patchJson<WarehouseBox>(toApiUrl(`/api/warehouse-map/boxes/${boxId}/move`), payload),
+  restackJari: (payload: {
+    angle_id: number;
+    row_no: number;
+    layer_no: number;
+    jari_index: number;
+    box_ids: string[]; // 아래→위 최종 순서
+  }) => patchJson<WarehouseBox[]>(toApiUrl("/api/warehouse-map/boxes/restack"), payload),
   deleteBox: (boxId: string) =>
     deleteJson<void>(toApiUrl(`/api/warehouse-map/boxes/${boxId}`)),
 };

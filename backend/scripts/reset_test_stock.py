@@ -36,10 +36,13 @@ from app.models import (  # noqa: E402
     IoLine,
     Item,
     LocationStatusEnum,
+    StockRequest,
+    StockRequestStatusEnum,
     TransactionEditLog,
     TransactionLog,
 )
 from app.services.inventory import PROCESS_TYPE_TO_DEPT  # noqa: E402
+from app.services.sr_approval import cancel_open_stock_requests  # noqa: E402
 
 
 R_CODES = {"TR", "HR", "VR", "NR", "AR", "PR"}
@@ -83,6 +86,26 @@ def main() -> int:
             if ans not in ("y", "yes"):
                 print("취소.")
                 return 1
+
+        # 0. 미결 stock_request 정리 — inventory pending 리셋 전에 먼저 취소해야
+        #    "요청은 있는데 예약 장부는 0"인 고아 상태가 생기지 않는다.
+        cancelled = cancel_open_stock_requests(db, reason="재고 리셋(reset_test_stock) 전 자동 취소")
+        if cancelled:
+            print(f"  미결 요청 자동 취소       : {cancelled} 건")
+        db.flush()
+
+        # 가드: cancel 이 조용히 실패해 미결 요청이 남으면 pending 리셋을 중단(예약 고아 방지).
+        open_left = (
+            db.query(StockRequest)
+            .filter(StockRequest.status.in_(
+                [StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED]
+            ))
+            .count()
+        )
+        if open_left:
+            raise SystemExit(
+                f"미결 RESERVED/SUBMITTED 요청 {open_left}건이 남아 재고 리셋을 중단합니다. (예약 고아 방지)"
+            )
 
         # 1. 입출고 내역 / 배치 삭제 (FK 안전 순서)
         db.query(TransactionEditLog).delete(synchronize_session=False)

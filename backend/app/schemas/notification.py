@@ -51,6 +51,25 @@ class HandoverCreate(BaseModel):
     lines: List[HandoverLineCreate] = Field(default_factory=list)
 
 
+class HandoverDraftUpsert(BaseModel):
+    """인수인계 임시저장 — handover_id 없으면 신규 draft, 있으면 기존 draft 갱신."""
+    handover_id: Optional[uuid.UUID] = None
+    author_employee_id: uuid.UUID
+    to_department: Optional[str] = Field(None, max_length=50)
+    title: Optional[str] = Field(None, max_length=200)
+    process_content: Optional[str] = None
+    product_name: Optional[str] = Field(None, max_length=200)
+    doc_date: Optional[UtcDatetime] = None
+    analysis_text: Optional[str] = None
+    notes: Optional[str] = None
+    lines: List[HandoverLineCreate] = Field(default_factory=list)
+
+
+class HandoverSubmitRequest(BaseModel):
+    """임시저장(DRAFT) → 제출(SUBMITTED) 전환 요청."""
+    author_employee_id: uuid.UUID
+
+
 class HandoverReceiveRequest(BaseModel):
     actor_employee_id: uuid.UUID
     pin: str = Field(..., min_length=1, max_length=32)

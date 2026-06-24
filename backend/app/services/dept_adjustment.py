@@ -26,6 +26,8 @@ from app.models import (
 )
 from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
+from app.repositories import item_repository
 
 AdjDirection = Literal["in", "out", "defective"]
 
@@ -92,7 +94,7 @@ def build_production_template(
     결과품: direction="in", 마지막 라인.
     BOM 직계 구성품: direction="out".
     """
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -101,7 +103,7 @@ def build_production_template(
 
     lines: list[AdjLine] = []
     for row in bom_rows:
-        child = db.query(Item).filter(Item.item_id == row.child_item_id).first()
+        child = item_repository.get(db, row.child_item_id)
         child_dept = base_dept or (_dept_for_item(child) if child else result_dept)
         lines.append(AdjLine(
             item_id=row.child_item_id,
@@ -133,7 +135,7 @@ def build_disassembly_template(
     분해 대상품: direction="out".
     BOM 직계 구성품: direction="in" (사용자가 in/defective/scrap으로 변경 가능).
     """
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -150,7 +152,7 @@ def build_disassembly_template(
     ]
 
     for row in bom_rows:
-        child = db.query(Item).filter(Item.item_id == row.child_item_id).first()
+        child = item_repository.get(db, row.child_item_id)
         child_dept = base_dept or (_dept_for_item(child) if child else target_dept)
         lines.append(AdjLine(
             item_id=row.child_item_id,
@@ -211,6 +213,7 @@ def submit_adjustment(
     lines: list[AdjLine],
     *,
     operator_name: Optional[str] = None,
+    producer_employee_id: Optional[uuid.UUID] = None,
     reference_no: Optional[str] = None,
     notes: Optional[str] = None,
 ) -> list[uuid.UUID]:
@@ -245,6 +248,7 @@ def submit_adjustment(
         log_notes = f"{tag} {op_str}: {reason_str}".strip(": ").strip()
 
         tx_type = _TRANSACTION_TYPE_MAP[(ln.direction, sub_str)]
+        cells_before = inv_effect.snapshot_cells(db, ln.item_id)
 
         if ln.direction == "out":
             inv = inventory_svc.consume_from_department(db, ln.item_id, qty, dept_enum)
@@ -275,7 +279,9 @@ def submit_adjustment(
             quantity_after=inv.quantity,
             reference_no=reference_no,
             produced_by=operator_name,
+            producer_employee_id=producer_employee_id,
             notes=log_notes or None,
+            inventory_effect=inv_effect.capture_effect(db, ln.item_id, cells_before),
         )
         db.add(log)
         db.flush()
@@ -321,8 +327,6 @@ def submit_defective_disassemble(
     """
     if parent_qty <= 0:
         raise ValueError("분해 수량은 0보다 커야 합니다.")
-    if not reason_category:
-        raise ValueError("reason_category 는 필수입니다.")
     if not child_decisions:
         raise ValueError("자식 결정이 비어 있습니다.")
 
@@ -331,7 +335,12 @@ def submit_defective_disassemble(
     # 대신 reference_no 에 batch_id 를 기록해 그룹 식별자로 활용한다.
     batch_ref = f"defect-disassemble:{batch_id}"
 
+    # TransactionLog.department(String) 에는 enum repr("DepartmentEnum.X")이 아니라
+    # 한국어 값("조립")이 들어가야 한다. str(enum) 금지 — .value 사용.
+    parent_dept_value = getattr(parent_dept, "value", parent_dept)
+
     # 1) 부모 DEFECTIVE 차감
+    parent_cells_before = inv_effect.snapshot_cells(db, parent_item_id)
     parent_inv = inventory_svc.scrap_defective(
         db, parent_item_id, parent_qty, parent_dept,
         inventory_svc.ReasonContext(
@@ -353,7 +362,8 @@ def submit_defective_disassemble(
         reason_category=reason_category,
         reason_memo=reason_memo,
         reference_no=batch_ref,
-        department=str(parent_dept),
+        department=parent_dept_value,
+        inventory_effect=inv_effect.capture_effect(db, parent_item_id, parent_cells_before),
     )
     db.add(parent_log)
     db.flush()
@@ -392,6 +402,7 @@ def submit_defective_disassemble(
         child_note = decision.get("reason_memo") or reason_memo or ""
 
         if keep_qty > 0:
+            keep_cells_before = inv_effect.snapshot_cells(db, item_id)
             child_inv = inventory_svc.receive_confirmed(
                 db, item_id, keep_qty,
                 bucket="production",
@@ -409,7 +420,8 @@ def submit_defective_disassemble(
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
-                department=str(parent_dept),
+                department=parent_dept_value,
+                inventory_effect=inv_effect.capture_effect(db, item_id, keep_cells_before),
             )
             db.add(log)
             db.flush()
@@ -419,6 +431,7 @@ def submit_defective_disassemble(
             # 회수하지 않은 잔량은 폐기로 소실시키지 않고 분해 부서의 격리(DEFECTIVE)로
             # 적재한다. keep_qty(PRODUCTION 입고)와 대칭으로 신규 적재 → 총량 증가.
             # 이후 폐기 여부는 불량 허브의 격리→폐기(결재) 흐름에서 결정한다.
+            scrap_cells_before = inv_effect.snapshot_cells(db, item_id)
             q_inv = inventory_svc.receive_defective(
                 db,
                 item_id,
@@ -442,7 +455,8 @@ def submit_defective_disassemble(
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
-                department=str(parent_dept),
+                department=parent_dept_value,
+                inventory_effect=inv_effect.capture_effect(db, item_id, scrap_cells_before),
             )
             db.add(log)
             db.flush()

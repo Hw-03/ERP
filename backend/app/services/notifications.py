@@ -49,10 +49,32 @@ def recipients_for_department_approval(db: Session, target_dept: str | None) -> 
     return [e for e in _active_employees(db) if can_approve_department(e, target_dept)]
 
 
+# 결재 요청 유형 → 한국어 라벨. 프론트 frontend/lib/io/glossary.ts REQUEST_TYPE_LABEL 미러
+# (StockRequestTypeEnum 전 멤버). 알림 본문에 원시값(warehouse_to_dept 등)이 노출되지 않게 한다.
+_REQUEST_TYPE_LABEL: dict[str, str] = {
+    "raw_receive": "원자재 입고",
+    "raw_ship": "원자재 출고",
+    "warehouse_to_dept": "창고 → 부서",
+    "dept_to_warehouse": "부서 → 창고",
+    "dept_internal": "부서 내부 이동",
+    "mark_defective_wh": "창고 불량 등록",
+    "mark_defective_prod": "생산 불량 등록",
+    "supplier_return": "원자재 반품",
+    "package_out": "출하",
+    "manual_adjustment": "수동 조정",
+    "defect_scrap": "불량 처리",
+    "defect_return": "원자재 반품",
+    "defect_disassemble": "불량 분해",
+    "scrap_normal": "정상 폐기",
+    "return_normal": "정상 반품",
+}
+
+
 def _summary(request: StockRequest) -> str:
     code = request.request_code or str(request.request_id)[:8]
     rtype = getattr(request.request_type, "value", str(request.request_type))
-    return f"{request.requester_name} · {rtype} · {code}"
+    label = _REQUEST_TYPE_LABEL.get(rtype, rtype)
+    return f"{request.requester_name} · {label} · {code}"
 
 
 def _add(
@@ -119,18 +141,13 @@ def notify_request_arrived(db: Session, request: StockRequest) -> None:
 
 
 def recipients_for_handover(db: Session, to_department: str | None) -> list[Employee]:
-    """인수인계 도착 알림 수신자 — 받는 부서(고압/진공) 소속 + 부서 결재자(이필욱·김건호).
+    """인수인계 도착 알림 수신자 — 받는 부서(고압/진공) 소속만.
 
-    창고 정/부·admin 은 인수 권한은 있으나 실제 인수 당사자가 아니라 알림에서 제외(노이즈).
+    인수 확인 권한이 받는 부서 소속에 한정되므로, 인수할 수 없는 결재권자에게는
+    도착 알림을 보내지 않는다(노이즈 방지).
     """
     target = (to_department or "").strip()
-    out: list[Employee] = []
-    for e in _active_employees(db):
-        same_dept = (e.department or "").strip() == target
-        dept_appr = (getattr(e, "department_role", None) or "none").lower() in ("primary", "deputy")
-        if same_dept or dept_appr:
-            out.append(e)
-    return out
+    return [e for e in _active_employees(db) if (e.department or "").strip() == target]
 
 
 def notify_handover_arrived(db: Session, doc: HandoverDoc) -> None:

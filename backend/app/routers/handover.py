@@ -11,13 +11,21 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Employee, HandoverDoc, HandoverStatusEnum
 from app.routers._errors import ErrorCode, http_error
-from app.schemas import HandoverCreate, HandoverReceiveRequest, HandoverResponse
+from app.schemas import (
+    HandoverCreate,
+    HandoverDraftUpsert,
+    HandoverReceiveRequest,
+    HandoverResponse,
+    HandoverSubmitRequest,
+)
 from app.services import handover as handover_svc
 from app.services import notifications as notifications_svc
 from app.services._tx import commit_and_refresh
-from app.services.dept_hierarchy import approvable_departments
 
 router = APIRouter()
+
+# 인수인계를 받는(인수 확인하는) 부서 — 이 부서 소속만 대기함을 보고 인수할 수 있다.
+_RECEIVE_DEPTS = ("고압", "진공")
 
 
 def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
@@ -30,25 +38,18 @@ def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
 
 
 def _inbox_query(db: Session, actor: Employee):
-    """인수 대기함 쿼리 — submitted + 인수 가능 부서 범위. None=권한 없음.
+    """인수 대기함 쿼리 — submitted + 본인 소속 부서 대상. None=권한 없음.
 
-    인수 가능 부서 = 결재 가능 부서(approvable_departments) ∪ 본인 소속 부서.
-    받는 부서(고압/진공) 소속이면 결재자가 아니어도 자기 부서 인수인계를 본다.
+    받는 부서(고압/진공) 소속만 자기 부서로 온 인수인계를 본다. 인수 확인은 현장
+    물리 인수 행위이므로 결재권자라도 받는 부서 소속이 아니면 대기함을 보지 못한다.
     """
-    visible = approvable_departments(actor)
     own = (actor.department or "").strip()
-    if visible is None:
-        # 전체 권한(admin) — 부서 필터 없음.
-        return db.query(HandoverDoc).filter(HandoverDoc.status == HandoverStatusEnum.SUBMITTED)
-    depts = set(visible)
-    if own:
-        depts.add(own)
-    if len(depts) == 0:
+    if own not in _RECEIVE_DEPTS:
         return None
     return (
         db.query(HandoverDoc)
         .filter(HandoverDoc.status == HandoverStatusEnum.SUBMITTED)
-        .filter(HandoverDoc.to_department.in_(list(depts)))
+        .filter(HandoverDoc.to_department == own)
     )
 
 
@@ -64,6 +65,65 @@ def create_handover(payload: HandoverCreate, db: Session = Depends(get_db)):
     notifications_svc.notify_handover_arrived(db, doc)
     commit_and_refresh(db, doc)
     return doc
+
+
+@router.put("/draft", response_model=HandoverResponse)
+def save_handover_draft(payload: HandoverDraftUpsert, db: Session = Depends(get_db)):
+    """인수인계 임시저장 — handover_id 없으면 신규 draft, 있으면 본인 기존 draft 갱신."""
+    author = _load_actor(db, payload.author_employee_id)
+    try:
+        doc = handover_svc.save_handover_draft(db, author=author, payload=payload)
+    except PermissionError as exc:
+        db.rollback()
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except ValueError as exc:
+        db.rollback()
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    commit_and_refresh(db, doc)
+    return doc
+
+
+@router.post("/{handover_id}/submit", response_model=HandoverResponse)
+def submit_handover(
+    handover_id: uuid.UUID,
+    payload: HandoverSubmitRequest,
+    db: Session = Depends(get_db),
+):
+    """임시저장(DRAFT) → 제출(SUBMITTED). 제출 시 받는 부서에 도착 알림."""
+    doc = db.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).first()
+    if doc is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "인수인계서를 찾을 수 없습니다.")
+    author = _load_actor(db, payload.author_employee_id)
+    try:
+        handover_svc.submit_handover(db, doc, author=author)
+    except PermissionError as exc:
+        db.rollback()
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except ValueError as exc:
+        db.rollback()
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    # 받는 부서 인수 담당자에게 도착 알림 (커밋 전 세션 add → 제출과 원자적).
+    notifications_svc.notify_handover_arrived(db, doc)
+    commit_and_refresh(db, doc)
+    return doc
+
+
+@router.delete("/draft/{handover_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_handover_draft(
+    handover_id: uuid.UUID,
+    author_employee_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+):
+    """임시저장 폐기 — 본인 DRAFT 만 삭제 가능. 이미 없으면 멱등 통과."""
+    doc = db.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).first()
+    if doc is None:
+        return
+    if doc.author_employee_id != author_employee_id:
+        raise http_error(403, ErrorCode.FORBIDDEN, "본인 임시저장만 삭제할 수 있습니다.")
+    if doc.status != HandoverStatusEnum.DRAFT:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "임시저장 상태만 삭제할 수 있습니다.")
+    db.delete(doc)
+    db.commit()
 
 
 @router.get("", response_model=List[HandoverResponse])

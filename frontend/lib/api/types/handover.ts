@@ -55,3 +55,21 @@ export interface HandoverReceivePayload {
   actor_employee_id: string;
   pin: string;
 }
+
+export interface HandoverDraftPayload {
+  /** 없으면 신규 draft, 있으면 기존 draft 갱신 */
+  handover_id?: string | null;
+  author_employee_id: string;
+  to_department?: string | null;
+  title?: string | null;
+  process_content?: string | null;
+  product_name?: string | null;
+  doc_date?: string | null;
+  analysis_text?: string | null;
+  notes?: string | null;
+  lines: HandoverLineCreate[];
+}
+
+export interface HandoverSubmitPayload {
+  author_employee_id: string;
+}

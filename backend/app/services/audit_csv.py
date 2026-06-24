@@ -24,7 +24,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.database import BACKEND_DIR, SessionLocal
-from app.models import Item, TransactionLog, TransactionTypeEnum
+from app.models import Employee, Item, TransactionLog, TransactionTypeEnum
 
 _log = logging.getLogger(__name__)
 
@@ -68,6 +68,7 @@ CSV_HEADERS: list[str] = [
     "변경후 재고",
     "참조번호",
     "처리자",
+    "처리자사번",
     "비고",
     "거래ID",
 ]
@@ -101,14 +102,21 @@ def _fmt_num(value) -> str:
     return s or "0"
 
 
-def row_from_log(log: TransactionLog, item: Item | None) -> list[str]:
-    """`TransactionLog` 1건 → CSV 한 줄 (11컬럼)."""
+def row_from_log(
+    log: TransactionLog,
+    item: Item | None,
+    emp_code_by_id: dict | None = None,
+) -> list[str]:
+    """`TransactionLog` 1건 → CSV 한 줄 (12컬럼)."""
     tx_value = log.transaction_type.value if hasattr(log.transaction_type, "value") else str(log.transaction_type)
     mes_code = ""
     item_name = ""
     if item:
         mes_code = item.mes_code or ""
         item_name = item.item_name or ""
+    emp_code = ""
+    if log.producer_employee_id is not None and emp_code_by_id:
+        emp_code = emp_code_by_id.get(log.producer_employee_id, "") or ""
     return [
         log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
         TX_TYPE_LABEL_KO.get(tx_value, tx_value),
@@ -119,6 +127,7 @@ def row_from_log(log: TransactionLog, item: Item | None) -> list[str]:
         _fmt_num(log.quantity_after),
         log.reference_no or "",
         log.produced_by or "",
+        emp_code,
         (log.notes or "").replace("\r", " ").replace("\n", " "),
         str(log.log_id),
     ]
@@ -140,7 +149,11 @@ def _append_rows(rows_by_month: dict[Path, list[list[str]]]) -> None:
                 _log.exception("audit_csv append 실패 path=%s rows=%d", path, len(rows))
 
 
-def _append_logs(logs: Iterable[TransactionLog], items_by_id: dict) -> None:
+def _append_logs(
+    logs: Iterable[TransactionLog],
+    items_by_id: dict,
+    emp_code_by_id: dict | None = None,
+) -> None:
     """주어진 TransactionLog 들을 월별로 묶어 한 번에 append."""
     rows_by_month: dict[Path, list[list[str]]] = defaultdict(list)
     for log in logs:
@@ -149,7 +162,9 @@ def _append_logs(logs: Iterable[TransactionLog], items_by_id: dict) -> None:
         if log.created_at is None:
             continue
         item = items_by_id.get(log.item_id)
-        rows_by_month[path_for_month(log.created_at)].append(row_from_log(log, item))
+        rows_by_month[path_for_month(log.created_at)].append(
+            row_from_log(log, item, emp_code_by_id)
+        )
     _append_rows(rows_by_month)
 
 
@@ -198,6 +213,9 @@ def backfill_all(db: Session, *, overwrite: bool = True) -> dict:
     item_cache: dict = {}
     total = 0
 
+    # 직원 테이블은 작으므로 사번 맵을 한 번에 구성 (producer_employee_id → employee_code).
+    emp_code_by_id = {e.employee_id: e.employee_code for e in db.query(Employee).all()}
+
     q = (
         db.query(TransactionLog)
         .filter(TransactionLog.transaction_type.in_(AUDIT_TX_TYPES))
@@ -211,7 +229,9 @@ def backfill_all(db: Session, *, overwrite: bool = True) -> dict:
         if item is None:
             item = db.query(Item).filter(Item.item_id == log.item_id).one_or_none()
             item_cache[log.item_id] = item
-        rows_by_month[path_for_month(log.created_at)].append(row_from_log(log, item))
+        rows_by_month[path_for_month(log.created_at)].append(
+            row_from_log(log, item, emp_code_by_id)
+        )
         total += 1
 
     _append_rows(rows_by_month)
@@ -257,7 +277,12 @@ def _emit_after_commit(session: Session) -> None:
         item_ids = {log.item_id for log in logs}
         items = db.query(Item).filter(Item.item_id.in_(item_ids)).all()
         items_by_id = {it.item_id: it for it in items}
-        _append_logs(logs, items_by_id)
+        emp_ids = {log.producer_employee_id for log in logs if log.producer_employee_id is not None}
+        emp_code_by_id = {}
+        if emp_ids:
+            emps = db.query(Employee).filter(Employee.employee_id.in_(emp_ids)).all()
+            emp_code_by_id = {e.employee_id: e.employee_code for e in emps}
+        _append_logs(logs, items_by_id, emp_code_by_id)
     except Exception:
         _log.exception("audit_csv after_commit 처리 실패 log_ids=%s", log_ids)
     finally:

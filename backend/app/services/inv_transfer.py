@@ -24,6 +24,19 @@ from app.services.inv_base import (
     get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
+from app.repositories import inventory_repository
+
+
+def _deplete_boxes_if_tracking(db: Session, item_id: uuid.UUID, qty: Decimal) -> None:
+    """창고 박스 추적이 켜져 있으면 warehouse_qty 감소분만큼 박스도 R1 순서로 차감.
+
+    플래그 OFF면 무동작(현행 동작 유지). 박스 합 부족 시 ValueError → 호출 측 롤백.
+    순환 import 회피를 위해 warehouse_map 서비스를 지역 import 한다.
+    """
+    from app.services import warehouse_map as _wm
+
+    if _wm.is_box_tracking_enabled(db):
+        _wm.deplete_boxes_by_order(db, item_id, qty)
 
 
 def receive_confirmed(
@@ -76,7 +89,7 @@ def transfer_to_production(
     )
     db.flush()
     if result.rowcount == 0:
-        inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        inv_check = inventory_repository.get(db, item_id)
         wh = inv_check.warehouse_qty or Decimal("0")
         pending = inv_check.pending_quantity or Decimal("0")
         raise ValueError(
@@ -93,8 +106,9 @@ def transfer_to_production(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
+    _deplete_boxes_if_tracking(db, item_id, qty)
     return inv
 
 
@@ -138,7 +152,7 @@ def transfer_to_warehouse(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -189,7 +203,7 @@ def transfer_between_departments(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -216,13 +230,14 @@ def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[In
     db.flush()
 
     if result.rowcount == 0:
-        inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        inv_check = inventory_repository.get(db, item_id)
         wh = inv_check.warehouse_qty if inv_check else Decimal("0")
         raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
 
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
+    _deplete_boxes_if_tracking(db, item_id, qty)
     qty_before = inv.quantity + qty
     return inv, qty_before
 

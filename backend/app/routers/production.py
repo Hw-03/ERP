@@ -3,72 +3,43 @@
 import logging
 import uuid
 from decimal import Decimal
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import BOM, Inventory, Item, ProcessType, TransactionLog, TransactionTypeEnum
+from app.models import Item
 from app.schemas import (
-    BackflushDetail,
     BomCheckResponse,
     CapacityResponse,
     ProductionReceiptRequest,
     ProductionReceiptResponse,
 )
-from app.services import inventory as inventory_svc
 from app.services import stock_math
-from app.services.bom import BomCache, build_bom_cache
+from app.services import production_receipt as production_receipt_svc
+from app.services.production_receipt import (
+    ProductionBadRequest,
+    ProductionItemNotFound,
+    ProductionShortage,
+)
+from app.services.bom import BomCache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
+from app.services.production_capacity import compute_capacity
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_helper import resolve_producer
+from app.repositories import item_repository
+
+
+class PfPinPayload(BaseModel):
+    pf_item_id: uuid.UUID
 
 router = APIRouter()
 
 logger = logging.getLogger("mes")
-
-# BOM 재귀 전개 최대 깊이 — 사이클/과도한 깊이 방어용.
-_BUILDABLE_MAX_DEPTH = 10
-# immediate 모드에서 "완제품/반제품"으로 간주하는 stage_order 하한.
-# 이 미만(원자재 등)은 추가 생산 없이 보유 재고만 인정한다.
-_NF_STAGE_ORDER = 60
-
-
-def _own_available(
-    item_id: uuid.UUID,
-    fig_by_id: Dict[uuid.UUID, "stock_math.StockFigures"],
-) -> int:
-    """해당 품목의 가용 재고(음수 클램프, 정수)."""
-    return max(int(fig_by_id.get(item_id, stock_math.StockFigures()).available), 0)
-
-
-def _reduce_children(
-    children: List[Tuple[uuid.UUID, Decimal]],
-    *,
-    recurse,
-) -> Tuple[int, uuid.UUID | None]:
-    """자식 BOM 으로부터 추가 생산 가능량과 병목 부품을 산정.
-
-    각 자식의 가용 생산량 / per_unit 의 최솟값이 추가 생산 가능량(병목 기준)이다.
-    추가 생산이 불가능하면 0 을 반환한다.
-    """
-    extra_qty = float("inf")
-    bottleneck_id: uuid.UUID | None = None
-
-    for child_id, per_unit in children:
-        child_qty = recurse(child_id)
-        if per_unit > 0:
-            can_make = int(child_qty / per_unit)
-            if can_make < extra_qty:
-                extra_qty = can_make
-                bottleneck_id = child_id
-
-    if extra_qty == float("inf"):
-        extra_qty = 0
-
-    return int(extra_qty), bottleneck_id
 
 
 @router.post(
@@ -81,38 +52,36 @@ def production_receipt(
     payload: ProductionReceiptRequest,
     db: Session = Depends(get_db),
 ):
-    produced_item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    produced_item = item_repository.get(db, payload.item_id)
     if not produced_item:
         raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
 
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
 
-    merged = _load_and_merge_requirements(db, payload, produced_item)
-
-    items_map, invs_map = _preload_components(db, merged)
-    _assert_no_shortage(merged, items_map, invs_map)
-
-    transaction_ids: List[uuid.UUID] = []
-    backflushed: List[BackflushDetail] = []
-
     try:
-        _backflush_components(
-            db, payload, produced_item, merged, items_map,
-            producer_name, producer_id, transaction_ids, backflushed,
-        )
-        _record_production(
-            db, payload, produced_item, producer_name, producer_id, transaction_ids,
+        result = production_receipt_svc.execute_production_receipt(
+            db, payload, produced_item, producer_name, producer_id,
         )
         db.commit()
-    except HTTPException:
-        # WS9: 엔드포인트가 의도적으로 던진 404/4xx(예: 부품 미존재, 위 분기)를
-        # 아래 except Exception 이 500 으로 재포장하지 않도록 그대로 통과.
-        raise
+    except ProductionItemNotFound as exc:
+        db.rollback()
+        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, str(exc))
+    except ProductionBadRequest as exc:
+        db.rollback()
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
+    except ProductionShortage as exc:
+        # 사전 재고 부족 — 상세 목록(shortages)을 그대로 422 로 전달.
+        db.rollback()
+        raise http_error(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code=ErrorCode.STOCK_SHORTAGE,
+            message=str(exc),
+            shortages=exc.shortages,
+        )
     except ValueError as exc:
-        # WS9: 동시 같은-부품 입고 경합에서 진 쪽 — consume_warehouse 의
-        # 원자적 가드(UPDATE ... WHERE qty>=n)가 늦게 ValueError 를 던진다.
-        # 사전 검사와 동일하게 깨끗한 422 STOCK_SHORTAGE 로 매핑(기존엔 아래
-        # except Exception 이 삼켜 500 으로 나갔음). db 는 롤백되어 loser 의
+        # WS9: 동시 같은-부품 입고 경합에서 진 쪽 — consume_warehouse 의 원자적
+        # 가드(UPDATE ... WHERE qty>=n)가 늦게 ValueError 를 던진다. 사전 검사와
+        # 동일하게 깨끗한 422 STOCK_SHORTAGE 로 매핑. db 는 롤백되어 loser 의
         # 부분 배치/orphan TransactionLog 가 남지 않는다.
         db.rollback()
         raise http_error(
@@ -131,6 +100,7 @@ def production_receipt(
             f"생산 처리 중 오류가 발생했습니다: {exc}",
         )
 
+    backflushed = result["backflushed"]
     return ProductionReceiptResponse(
         success=True,
         message=(
@@ -142,171 +112,8 @@ def production_receipt(
         produced_quantity=payload.quantity,
         reference_no=payload.reference_no,
         backflushed_components=backflushed,
-        transaction_ids=transaction_ids,
+        transaction_ids=result["transaction_ids"],
     )
-
-
-def _load_and_merge_requirements(
-    db: Session,
-    payload: ProductionReceiptRequest,
-    produced_item: Item,
-) -> Dict[uuid.UUID, Decimal]:
-    """BOM 전개 → 순환참조/빈 BOM 검증 → 부품별 소요량 합산."""
-    try:
-        component_requirements = _explode_bom(db, payload.item_id, payload.quantity)
-    except RecursionError:
-        raise http_error(
-            status.HTTP_400_BAD_REQUEST,
-            ErrorCode.BAD_REQUEST,
-            "BOM 구조에 순환 참조가 있습니다. BOM 구성을 확인해 주세요.",
-        )
-
-    if not component_requirements:
-        raise http_error(
-            status.HTTP_400_BAD_REQUEST,
-            ErrorCode.BAD_REQUEST,
-            f"'{produced_item.item_name}'에 등록된 BOM이 없습니다.",
-        )
-
-    merged: Dict[uuid.UUID, Decimal] = {}
-    for item_id, req_qty in component_requirements:
-        merged[item_id] = merged.get(item_id, Decimal("0")) + req_qty
-    return merged
-
-
-def _preload_components(
-    db: Session,
-    merged: Dict[uuid.UUID, Decimal],
-) -> Tuple[Dict[uuid.UUID, Item], Dict[uuid.UUID, Inventory]]:
-    """부품 Item / Inventory 를 bulk 로드.
-
-    5.4-E: Items / Inventory 각 1회 IN 쿼리. 기존엔 component 마다
-    db.query 가 반복되어 N+1 였음. Inventory 는 다품목 동시 backflush
-    TOCTOU 방지를 위해 한 번에 FOR UPDATE 로 잠근다.
-    """
-    comp_ids = list(merged.keys())
-    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
-    invs_map = inventory_svc.lock_inventories(db, comp_ids)
-    return items_map, invs_map
-
-
-def _assert_no_shortage(
-    merged: Dict[uuid.UUID, Decimal],
-    items_map: Dict[uuid.UUID, Item],
-    invs_map: Dict[uuid.UUID, Inventory],
-) -> None:
-    """창고 가용분 기준 사전 재고 검사 — 부족 시 422 STOCK_SHORTAGE."""
-    shortage_errors = []
-    for comp_item_id, required_qty in merged.items():
-        inv = invs_map.get(comp_item_id)
-        # 생산 BACKFLUSH는 창고 가용분(warehouse - pending) 기준 사전 검사 — stock_math 단일 소스.
-        current_avail = stock_math.figures_from_inventory(inv).warehouse_available
-        if current_avail < required_qty:
-            comp_item = items_map.get(comp_item_id)
-            shortage_errors.append(
-                f"[{comp_item.mes_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
-                f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
-            )
-
-    if shortage_errors:
-        raise http_error(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            code=ErrorCode.STOCK_SHORTAGE,
-            message="재고 부족으로 생산 입고를 진행할 수 없습니다.",
-            shortages=shortage_errors,
-        )
-
-
-def _backflush_components(
-    db: Session,
-    payload: ProductionReceiptRequest,
-    produced_item: Item,
-    merged: Dict[uuid.UUID, Decimal],
-    items_map: Dict[uuid.UUID, Item],
-    producer_name: str | None,
-    producer_id,
-    transaction_ids: List[uuid.UUID],
-    backflushed: List[BackflushDetail],
-) -> None:
-    """각 부품의 창고 차감 + BACKFLUSH 로그 기록 (transaction_ids/backflushed 누적)."""
-    for comp_item_id, required_qty in merged.items():
-        # items_map 재사용 (5.4-E)
-        comp_item = items_map.get(comp_item_id)
-        if comp_item is None:
-            raise http_error(
-                status.HTTP_404_NOT_FOUND,
-                ErrorCode.NOT_FOUND,
-                f"부품 {comp_item_id} 을 찾을 수 없습니다.",
-            )
-
-        # 재고 변경은 서비스 레이어로 위임 (창고 차감 + _sync_total 은 내부 책임)
-        inv, qty_before = inventory_svc.consume_warehouse(db, comp_item_id, required_qty)
-
-        log = TransactionLog(
-            item_id=comp_item_id,
-            transaction_type=TransactionTypeEnum.BACKFLUSH,
-            quantity_change=-required_qty,
-            quantity_before=qty_before,
-            quantity_after=inv.quantity,
-            reference_no=payload.reference_no,
-            produced_by=producer_name or payload.produced_by,
-            producer_employee_id=producer_id,
-            notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
-        )
-        db.add(log)
-        db.flush()
-
-        transaction_ids.append(log.log_id)
-        backflushed.append(
-            BackflushDetail(
-                item_id=comp_item_id,
-                mes_code=comp_item.mes_code,
-                item_name=comp_item.item_name,
-                process_type_code=comp_item.process_type_code,
-                required_quantity=required_qty,
-                stock_before=qty_before,
-                stock_after=inv.quantity,
-            )
-        )
-
-
-def _record_production(
-    db: Session,
-    payload: ProductionReceiptRequest,
-    produced_item: Item,
-    producer_name: str | None,
-    producer_id,
-    transaction_ids: List[uuid.UUID],
-) -> None:
-    """생산 결과 적재 + PRODUCE 로그 기록.
-
-    process_type_code 기반 부서의 PRODUCTION 으로 적재 (R 시리즈/없음 → 창고 폴백).
-    """
-    target_dept = inventory_svc.dept_for_process_type(produced_item.process_type_code)
-    produced_inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    prod_qty_before = produced_inv.quantity or Decimal("0")
-    if target_dept is not None:
-        inventory_svc.receive_confirmed(
-            db, payload.item_id, payload.quantity,
-            bucket="production", dept=target_dept,
-        )
-    else:
-        inventory_svc.receive_confirmed(db, payload.item_id, payload.quantity)
-
-    produce_log = TransactionLog(
-        item_id=payload.item_id,
-        transaction_type=TransactionTypeEnum.PRODUCE,
-        quantity_change=payload.quantity,
-        quantity_before=prod_qty_before,
-        quantity_after=produced_inv.quantity,
-        reference_no=payload.reference_no,
-        produced_by=producer_name or payload.produced_by,
-        producer_employee_id=producer_id,
-        notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
-    )
-    db.add(produce_log)
-    db.flush()
-    transaction_ids.append(produce_log.log_id)
 
 
 @router.get(
@@ -319,14 +126,12 @@ def check_production_feasibility(
     quantity: Decimal = 1,
     db: Session = Depends(get_db),
 ):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     component_requirements = _explode_bom(db, item_id, quantity)
-    merged: Dict[uuid.UUID, Decimal] = {}
-    for cid, qty in component_requirements:
-        merged[cid] = merged.get(cid, Decimal("0")) + qty
+    merged = merge_requirements(component_requirements)
 
     result = []
     all_ok = True
@@ -396,220 +201,68 @@ def _explode_bom(
 )
 @router.get("/possible", response_model=CapacityResponse, summary="Production capacity alias")
 def get_production_capacity(db: Session = Depends(get_db)):
-    """BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.
+    """생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.
 
-    - **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.
-      NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.
-    - **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.
+    - **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).
+    - **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).
 
-    응답 status 4단계:
-      no_target / bom_not_registered / not_producible / producible.
+    계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.
     """
+    return compute_capacity(db)
 
-    def _buildable(
-        item_id: uuid.UUID,
-        *,
-        bom_cache: BomCache,
-        fig_by_id: Dict[uuid.UUID, stock_math.StockFigures],
-        stage_by_item: Dict[uuid.UUID, int | None],
-        immediate_mode: bool,
-        memo: Dict[uuid.UUID, int],
-        visiting: frozenset,
-        depth: int = 0,
-    ) -> Tuple[int, uuid.UUID | None]:
-        """재귀 누적 가용 생산량(buildable).
 
-        Returns: (qty, bottleneck_item_id)
-        """
-        if item_id in memo:
-            return memo[item_id], None
+@router.get(
+    "/capacity/pf-pins",
+    response_model=dict[str, str],
+    summary="모델별 기준 PF 조회",
+)
+def get_pf_pins(db: Session = Depends(get_db)):
+    """model_symbol → pf_item_id 전체 맵 반환. 지정 없으면 빈 dict."""
+    rows = db.execute(text("SELECT model_symbol, pf_item_id FROM model_pf_pins")).fetchall()
+    return {r[0]: str(uuid.UUID(r[1])) for r in rows}
 
-        own = _own_available(item_id, fig_by_id)
 
-        # 사이클 / 과도한 깊이 — memo 없이 보유분만 반환 (기존 동작 유지)
-        if depth > _BUILDABLE_MAX_DEPTH or item_id in visiting:
-            return own, None
-
-        stage = stage_by_item.get(item_id)
-        # immediate_mode에서 stage < NF 이면 자식 전개 안 함 (원자재는 추가 생산 안 함)
-        if immediate_mode and stage is not None and stage < _NF_STAGE_ORDER:
-            memo[item_id] = own
-            return own, None
-
-        children = bom_cache.get(item_id, [])
-        if not children:
-            memo[item_id] = own
-            return own, None
-
-        # 각 자식 재귀 → 병목 기준 추가 생산 가능량 산정
-        new_visiting = visiting | frozenset([item_id])
-        extra_qty, bottleneck_id = _reduce_children(
-            children,
-            recurse=lambda child_id: _buildable(
-                child_id,
-                bom_cache=bom_cache,
-                fig_by_id=fig_by_id,
-                stage_by_item=stage_by_item,
-                immediate_mode=immediate_mode,
-                memo=memo,
-                visiting=new_visiting,
-                depth=depth + 1,
-            )[0],
-        )
-
-        total = own + extra_qty
-        memo[item_id] = total
-        return total, bottleneck_id
-
-    empty_response = {
-        "immediate": 0,
-        "maximum": 0,
-        "limiting_item": None,
-        "status": "no_target",
-        "top_items": [],
-        "representative_items": [],
-    }
-
-    # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
-    all_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).distinct().all()}
-    all_child_ids = {row[0] for row in db.query(BOM.child_item_id).distinct().all()}
-    top_level_ids = all_parent_ids - all_child_ids
-
-    if not top_level_ids:
-        return empty_response
-
-    # 모든 top-level PF 조회 (limit 제거).
-    # process_type_code='PF' 추가 필터 — BOM 트리 최상위에 AF/AA 등 중간 단계가
-    # 잡혀도 시연/대시보드에서는 완성품(PF)만 의미가 있음. KPI 합산도 PF 기준.
-    top_items_db = (
-        db.query(Item)
-        .filter(Item.item_id.in_(list(top_level_ids)), Item.process_type_code == "PF")
-        .all()
+@router.put(
+    "/capacity/pf-pins/{model_symbol}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="모델 기준 PF 지정",
+)
+def set_pf_pin(
+    model_symbol: str,
+    payload: PfPinPayload,
+    db: Session = Depends(get_db),
+):
+    """주어진 model_symbol 에 pf_item_id 를 기준 PF 로 지정한다."""
+    pf_id = payload.pf_item_id.hex  # DB stores item_id without dashes
+    row = db.execute(
+        text("SELECT item_id FROM items WHERE item_id = :id AND process_type_code = 'PF'"),
+        {"id": pf_id},
+    ).fetchone()
+    if not row:
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "PF 품목을 찾을 수 없습니다.")
+    db.execute(
+        text("DELETE FROM model_pf_pins WHERE model_symbol = :ms"),
+        {"ms": model_symbol},
     )
-
-    if not top_items_db:
-        return empty_response
-
-    # 1) BOM 전체를 한 번만 읽어 캐시
-    bom_cache = build_bom_cache(db)
-
-    # 2) top_item 및 BOM 구조의 모든 item에 대해 재고 조회
-    all_item_ids: set[uuid.UUID] = {item.item_id for item in top_items_db}
-
-    def _collect_all_items(iid: uuid.UUID, visited: set[uuid.UUID] | None = None) -> None:
-        if visited is None:
-            visited = set()
-        if iid in visited:
-            return
-        visited.add(iid)
-        all_item_ids.add(iid)
-        for child_id, _ in bom_cache.get(iid, []):
-            _collect_all_items(child_id, visited)
-
-    for item in top_items_db:
-        _collect_all_items(item.item_id)
-
-    # 3) bulk으로 재고 + 품목 정보 조회 (N+1 제거)
-    fig_by_id = stock_math.bulk_compute(db, all_item_ids)
-    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(list(all_item_ids))).all()}
-
-    # 4) 각 item의 stage_order 맵
-    stage_by_item: Dict[uuid.UUID, int | None] = {}
-    for iid in all_item_ids:
-        item = items_map.get(iid)
-        if item and item.process_type_code:
-            pt = db.query(ProcessType).filter(ProcessType.code == item.process_type_code).first()
-            if pt:
-                stage_by_item[iid] = pt.stage_order
-        stage_by_item.setdefault(iid, None)
-
-    # 5) top 각각에 대해 immediate/maximum 계산
-    top_results = []
-    for item in top_items_db:
-        imm, imm_btl = _buildable(
-            item.item_id,
-            bom_cache=bom_cache,
-            fig_by_id=fig_by_id,
-            stage_by_item=stage_by_item,
-            immediate_mode=True,
-            memo={},
-            visiting=frozenset(),
-        )
-        mx, _ = _buildable(
-            item.item_id,
-            bom_cache=bom_cache,
-            fig_by_id=fig_by_id,
-            stage_by_item=stage_by_item,
-            immediate_mode=False,
-            memo={},
-            visiting=frozenset(),
-        )
-
-        bottleneck_name: str | None = None
-        if imm_btl:
-            btl_item = items_map.get(imm_btl)
-            if btl_item:
-                bottleneck_name = btl_item.item_name
-
-        top_results.append({
-            "item_id": str(item.item_id),
-            "item_name": item.item_name,
-            "mes_code": item.mes_code,
-            "model_symbol": item.model_symbol,
-            "is_representative": False,
-            "immediate": imm,
-            "maximum": mx,
-            "limiting_item": bottleneck_name,
-        })
-
-    if not top_results:
-        return {
-            "immediate": 0,
-            "maximum": 0,
-            "limiting_item": None,
-            "status": "bom_not_registered",
-            "top_items": [],
-            "representative_items": [],
-        }
-
-    # 모델별 대표 PF 선정: model_symbol 별 그룹화 → 자연 정렬 첫 PF.
-    # 정렬 키는 mes_code (있으면), 없으면 item_name.
-    representatives: Dict[str, dict] = {}
-    for r in top_results:
-        ms = r.get("model_symbol")
-        if not ms:
-            continue
-        sort_key = (r.get("mes_code") or r.get("item_name") or "")
-        cur = representatives.get(ms)
-        if cur is None:
-            representatives[ms] = r
-        else:
-            cur_key = (cur.get("mes_code") or cur.get("item_name") or "")
-            if sort_key < cur_key:
-                representatives[ms] = r
-    for r in representatives.values():
-        r["is_representative"] = True
-
-    representative_items = sorted(
-        representatives.values(),
-        key=lambda r: (r.get("model_symbol") or ""),
+    db.execute(
+        text(
+            "INSERT INTO model_pf_pins (model_symbol, pf_item_id, updated_at) "
+            "VALUES (:ms, :pid, CURRENT_TIMESTAMP)"
+        ),
+        {"ms": model_symbol, "pid": pf_id},
     )
+    db.commit()
 
-    total_immediate = sum(r["immediate"] for r in top_results)
-    total_maximum = sum(r["maximum"] for r in top_results)
 
-    # 전체 병목: immediate 가 가장 작은 top_item 의 병목 부품
-    min_item = min(top_results, key=lambda r: r["immediate"])
-    bottleneck_name = min_item.get("limiting_item")
-
-    is_producible = any(r["immediate"] > 0 or r["maximum"] > 0 for r in top_results)
-    status_value = "producible" if is_producible else "not_producible"
-
-    return {
-        "immediate": total_immediate,
-        "maximum": total_maximum,
-        "limiting_item": bottleneck_name,
-        "status": status_value,
-        "top_items": sorted(top_results, key=lambda r: r["immediate"]),
-        "representative_items": representative_items,
-    }
+@router.delete(
+    "/capacity/pf-pins/{model_symbol}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="모델 기준 PF 해제",
+)
+def clear_pf_pin(model_symbol: str, db: Session = Depends(get_db)):
+    """model_symbol 의 기준 PF 지정을 제거한다. 없어도 OK."""
+    db.execute(
+        text("DELETE FROM model_pf_pins WHERE model_symbol = :ms"),
+        {"ms": model_symbol},
+    )
+    db.commit()

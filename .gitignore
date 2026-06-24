@@ -81,8 +81,10 @@ _attic/verify_out.log
 _dev/demo-verify/
 
 # Local / personal files
+/.tmp/
 workspace.ahk
 backend/query_test.py
+backend/query_warehouse.py
 skills-lock.json
 
 # Obsidian vault (vault-sync 브랜치 전용, main에서 제외)
@@ -102,6 +104,8 @@ backend/_backup/
 # Heavy source/extracted materials isolated out of the runtime tree.
 _attic/data/이미지 추출을 위한 원본/
 _attic/data/db_backups/
+# 모바일/MCP 화면 캡처 스크린샷 (앱 재실행으로 재생성 가능한 로컬 산출물)
+_attic/screenshots/
 # _attic/ 은 의도적으로 추적·커밋한다(정리 후 나중에 일괄 삭제 예정).
 # DB 백업만 위 규칙으로 자동 제외되고 나머지(스크립트·문서·데이터·카탈로그)는 커밋됨.
 

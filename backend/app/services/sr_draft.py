@@ -17,6 +17,7 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
+from app.repositories import item_repository
 from app.services.sr_validation import (
     LineInput,
     _generate_request_code,
@@ -78,7 +79,7 @@ def upsert_draft_request(
         # request_code 는 DRAFT 동안 NULL 유지 — submit 시점에만 발급.
 
         for li in lines_input:
-            item = db.query(Item).filter(Item.item_id == li.item_id).first()
+            item = item_repository.get(db, li.item_id)
             if item is None:
                 raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
             db.add(

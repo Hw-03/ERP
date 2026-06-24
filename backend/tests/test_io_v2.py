@@ -819,3 +819,52 @@ def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_it
         batch_id=str(uuid.uuid4()),
     )
     assert res.status_code == 422, res.json()
+
+
+# ---------------------------------------------------------------------------
+# 원자성 회귀 — io 제출 실패 시 부분 상태 없음
+# ---------------------------------------------------------------------------
+
+
+def test_io_submit_rolls_back_fully_on_shortage(client, db_session, make_item, make_bom):
+    """원자성 회귀: 제출이 재고 부족으로 422가 나면 batch/stock_request/재고 어느 것도
+    영속되지 않는다(라우터 except ValueError → db.rollback). '성공 전엔 커밋 안 함'
+    설계의 증명 — 누가 성급한 commit을 서비스 층에 넣으면 이 테스트가 깨진다."""
+    parent = make_item(name="Parent", warehouse_qty=Decimal("0"))
+    child = make_item(name="Child", warehouse_qty=Decimal("1"))  # 요청 6 > 가용 1 → 부족
+    make_bom(parent.item_id, child.item_id, Decimal("2"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(parent.item_id), "quantity": "3"}
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 422, res.json()  # 재고 부족
+
+    # 원자성: 실패한 제출은 아무 것도 남기지 않는다.
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(StockRequest).count() == 0
+    inv_child = db_session.query(Inventory).filter(Inventory.item_id == child.item_id).first()
+    assert inv_child.warehouse_qty == Decimal("1")   # 차감 없음
+    assert inv_child.pending_quantity == Decimal("0")  # 예약 없음

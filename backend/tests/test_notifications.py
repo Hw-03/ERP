@@ -108,7 +108,7 @@ def test_department_recipients_follow_can_approve_rule(db_session):
     line_codes = {
         e.employee_code for e in notif_svc.recipients_for_department_approval(db_session, "조립")
     }
-    assert line_codes == {"DP", "WP", "AD"}  # 일반 직원(PL) 제외
+    assert line_codes == {"DP", "WP"}  # admin level 단독(AD)·일반 직원(PL) 제외
 
     # 창고 부서 대상이면 부서 정/부는 제외(can_approve_department 룰), 창고 정/부는 포함
     wh_codes = {

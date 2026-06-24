@@ -63,6 +63,8 @@ from app.models.warehouse import (
     WarehouseBox,
     WarehouseBoxItem,
 )
+from app.models.employee_item_order import EmployeeItemOrder
+
 __all__ = [
     # Base / 공통
     "Base",
@@ -113,4 +115,6 @@ __all__ = [
     "WarehouseBox",
     "WarehouseBoxItem",
     "BoxSizeEnum",
+    # employee item order
+    "EmployeeItemOrder",
 ]

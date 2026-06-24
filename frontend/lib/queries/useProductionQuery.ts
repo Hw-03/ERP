@@ -22,6 +22,47 @@ export function useProductionCapacityQuery() {
   });
 }
 
+/** 모델별 기준 PF 조회 */
+export function usePfPinsQuery() {
+  return useQuery({
+    queryKey: queryKeys.production.pfPins(),
+    queryFn: () => productionApi.getPfPins(),
+  });
+}
+
+/** 기준 PF 지정 */
+export function useSetPfPinMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelSymbol, pfItemId }: { modelSymbol: string; pfItemId: string }) =>
+      productionApi.setPfPin(modelSymbol, pfItemId),
+    onSuccess: (_, { modelSymbol, pfItemId }) => {
+      qc.setQueryData<Record<string, string>>(
+        queryKeys.production.pfPins(),
+        (old) => ({ ...(old ?? {}), [modelSymbol]: pfItemId }),
+      );
+    },
+  });
+}
+
+/** 기준 PF 해제 */
+export function useClearPfPinMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modelSymbol: string) => productionApi.clearPfPin(modelSymbol),
+    onSuccess: (_, modelSymbol) => {
+      qc.setQueryData<Record<string, string>>(
+        queryKeys.production.pfPins(),
+        (old) => {
+          const next = { ...(old ?? {}) };
+          delete next[modelSymbol];
+          return next;
+        },
+      );
+    },
+  });
+}
+
 /** 입출고 트랜잭션 목록 */
 export function useTransactionsQuery(
   params?: Parameters<typeof productionApi.getTransactions>[0],

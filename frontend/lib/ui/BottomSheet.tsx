@@ -120,6 +120,9 @@ export function BottomSheet({
     const drag = dragRef.current;
     dragRef.current = null;
     if (!drag) return;
+    // 이동 없는 단순 탭은 스냅백 불필요 — snapping 토글이 sheetUp 진입
+    // 애니메이션을 재생시켜 화면이 깜빡이는 것을 막는다.
+    if (dragY === 0) return;
     const elapsed = Math.max(1, performance.now() - drag.t0);
     const velocity = dragY / elapsed; // px/ms
     if (dragY > dismissThresholdPx || velocity > dismissVelocity) {

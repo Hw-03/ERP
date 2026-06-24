@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, time
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
@@ -288,31 +288,48 @@ def _apply_common_filters(
     return query
 
 
+class _BatchInfo(NamedTuple):
+    """배치별 요청자/승인자 이름과 요청/승인 시각 묶음."""
+    requester_name: Optional[str]
+    approver_name: Optional[str]
+    requested_at: Optional[datetime]
+    approved_at: Optional[datetime]
+
+
 def _batch_name_map(
     db: Session, batch_ids: set
-) -> dict[uuid.UUID, tuple[Optional[str], Optional[str]]]:
-    """operation_batch_id 집합 → (requester_name, approver_name) 매핑.
+) -> dict[uuid.UUID, _BatchInfo]:
+    """operation_batch_id 집합 → _BatchInfo(이름+시각) 매핑.
 
-    list_transactions 와 export(csv/xlsx) 가 공유 — 요청자/승인자명을 동일 규칙으로 채운다.
-    요청자=결재자(자동결재/즉시처리)면 승인자 null(별도 승인 없음).
+    list_transactions 와 export(csv/xlsx) 가 공유 — 요청자/승인자명·시각을 동일 규칙으로 채운다.
+    요청자=결재자(자동결재/즉시처리)면 승인자 null, approved_at null(별도 승인 없음).
+    approved_at null 시 호출부에서 log.created_at fallback 적용.
     """
-    batch_map: dict[uuid.UUID, tuple[Optional[str], Optional[str]]] = {}
+    batch_map: dict[uuid.UUID, _BatchInfo] = {}
     if not batch_ids:
         return batch_map
     batches = (
-        db.query(IoBatch.batch_id, IoBatch.requester_name, IoBatch.stock_request_id)
+        db.query(
+            IoBatch.batch_id,
+            IoBatch.requester_name,
+            IoBatch.stock_request_id,
+            IoBatch.submitted_at,
+            IoBatch.created_at,
+        )
         .filter(IoBatch.batch_id.in_(batch_ids))
         .all()
     )
     sr_ids = [b.stock_request_id for b in batches if b.stock_request_id]
     sr_approver: dict[uuid.UUID, Optional[str]] = {}
+    sr_approved_at: dict[uuid.UUID, Optional[datetime]] = {}
     if sr_ids:
-        for sr_id, app_name, app_emp_id, req_emp_id in (
+        for sr_id, app_name, app_emp_id, req_emp_id, app_at in (
             db.query(
                 StockRequest.request_id,
                 StockRequest.approved_by_name,
                 StockRequest.approved_by_employee_id,
                 StockRequest.requester_employee_id,
+                StockRequest.approved_at,
             )
             .filter(StockRequest.request_id.in_(sr_ids))
             .all()
@@ -320,11 +337,15 @@ def _batch_name_map(
             # 요청자와 결재자가 다른 경우만 별도 승인자로 인정.
             if app_emp_id and app_emp_id != req_emp_id:
                 sr_approver[sr_id] = app_name
+                sr_approved_at[sr_id] = app_at
             else:
                 sr_approver[sr_id] = None
+                sr_approved_at[sr_id] = None  # 즉시 처리 → approved_at fallback은 호출부에서 log.created_at
     for b in batches:
         approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
-        batch_map[b.batch_id] = (b.requester_name, approver)
+        approved_at = sr_approved_at.get(b.stock_request_id) if b.stock_request_id else None
+        requested_at = b.submitted_at or b.created_at
+        batch_map[b.batch_id] = _BatchInfo(b.requester_name, approver, requested_at, approved_at)
     return batch_map
 
 
@@ -334,6 +355,8 @@ def _to_log_response(
     edit_count: int = 0,
     requester_name: Optional[str] = None,
     approver_name: Optional[str] = None,
+    requested_at: Optional[datetime] = None,
+    approved_at: Optional[datetime] = None,
 ) -> TransactionLogResponse:
     return TransactionLogResponse(
         log_id=log.log_id,
@@ -346,13 +369,23 @@ def _to_log_response(
         quantity_change=log.quantity_change,
         quantity_before=log.quantity_before,
         quantity_after=log.quantity_after,
+        warehouse_qty_before=log.warehouse_qty_before,
+        warehouse_qty_after=log.warehouse_qty_after,
         transfer_qty=log.transfer_qty,
+        department=log.department,
         reference_no=log.reference_no,
         produced_by=log.produced_by,
+        producer_employee_id=log.producer_employee_id,
         requester_name=requester_name,
         approver_name=approver_name,
+        requested_at=requested_at if requested_at is not None else log.created_at,
+        approved_at=approved_at if approved_at is not None else log.created_at,
         notes=log.notes,
         operation_batch_id=log.operation_batch_id,
         created_at=log.created_at,
         edit_count=edit_count,
+        cancelled=bool(log.cancelled),
+        cancel_reason=log.cancel_reason,
+        cancelled_by=log.cancelled_by,
+        cancelled_at=log.cancelled_at,
     )

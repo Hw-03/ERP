@@ -27,6 +27,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
 from app._evt import emit as _evt_emit
+from app.repositories import inventory_repository
 from app.models import (
     Employee,
     Inventory,
@@ -107,7 +108,7 @@ def reserve(
     db.flush()
 
     if result.rowcount == 0:
-        inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        inv = inventory_repository.get(db, item_id)
         wh = inv.warehouse_qty or Decimal("0")
         pending = inv.pending_quantity or Decimal("0")
         avail_wh = wh - pending
@@ -116,7 +117,7 @@ def reserve(
         )
 
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
 
     if employee is not None:
         inv.last_reserver_employee_id = employee.employee_id

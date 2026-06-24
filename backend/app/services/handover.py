@@ -24,17 +24,15 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import inventory as inventory_svc
-from app.services.dept_hierarchy import can_approve_department
+from app.services import inv_effect
 from app.services.pin_auth import verify_pin
 
 _FROM_DEPARTMENT = "튜브"
 
 
 def can_receive(actor: Employee, to_department: str) -> bool:
-    """인수 확인 권한 — 받는 부서 소속이거나, 그 부서 결재 권한자."""
-    if (actor.department or "").strip() == (to_department or "").strip():
-        return True
-    return can_approve_department(actor, to_department)
+    """인수 확인 권한 — 받는 부서 소속만(고압/진공). 현장 물리 인수 행위이므로 결재권자는 제외."""
+    return (actor.department or "").strip() == (to_department or "").strip()
 
 
 def _gen_code() -> str:
@@ -87,6 +85,98 @@ def create_handover(db: Session, *, author: Employee, payload) -> HandoverDoc:
     return doc
 
 
+def _apply_doc_fields(doc: HandoverDoc, payload) -> None:
+    """양식 필드를 문서에 반영 (title 은 NOT NULL — 빈 값이면 임시 라벨)."""
+    doc.to_department = payload.to_department
+    doc.title = payload.title or "(작성 중)"
+    doc.process_content = payload.process_content
+    doc.product_name = payload.product_name
+    doc.doc_date = payload.doc_date
+    doc.analysis_text = payload.analysis_text
+    doc.notes = payload.notes
+
+
+def _replace_lines(db: Session, doc: HandoverDoc, payload_lines) -> None:
+    """기존 라인 전부 제거 후 payload 라인으로 재생성 (draft 갱신용)."""
+    for ln in list(doc.lines):
+        db.delete(ln)
+    db.flush()
+    if not payload_lines:
+        return
+    item_ids = [ln.item_id for ln in payload_lines]
+    items = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(item_ids)).all()}
+    for ln in payload_lines:
+        item = items.get(ln.item_id)
+        if item is None:
+            raise ValueError(f"품목을 찾을 수 없습니다: {ln.item_id}")
+        db.add(
+            HandoverLine(
+                handover_id=doc.handover_id,
+                item_id=ln.item_id,
+                item_name_snapshot=item.item_name,
+                mes_code_snapshot=item.mes_code,
+                quantity=ln.quantity,
+            )
+        )
+
+
+def save_handover_draft(db: Session, *, author: Employee, payload) -> HandoverDoc:
+    """인수인계 임시저장 — 신규 draft 생성 또는 본인 기존 draft 갱신(status=DRAFT 유지)."""
+    if not payload.to_department:
+        raise ValueError("인수 부서를 먼저 선택하세요.")
+    if payload.to_department == _FROM_DEPARTMENT:
+        raise ValueError("인수 부서는 튜브가 아니어야 합니다.")
+
+    if payload.handover_id is not None:
+        doc = (
+            db.query(HandoverDoc)
+            .filter(HandoverDoc.handover_id == payload.handover_id)
+            .first()
+        )
+        if doc is None:
+            raise ValueError("임시저장 문서를 찾을 수 없습니다.")
+        if doc.author_employee_id != author.employee_id:
+            raise PermissionError("본인이 작성한 임시저장만 수정할 수 있습니다.")
+        if doc.status != HandoverStatusEnum.DRAFT:
+            raise ValueError("이미 제출된 문서는 임시저장으로 수정할 수 없습니다.")
+    else:
+        doc = HandoverDoc(
+            handover_code=_gen_code(),
+            status=HandoverStatusEnum.DRAFT,
+            author_employee_id=author.employee_id,
+            author_name=author.name,
+            from_department=_FROM_DEPARTMENT,
+            to_department=payload.to_department,
+            title=payload.title or "(작성 중)",
+        )
+        db.add(doc)
+        db.flush()
+
+    _apply_doc_fields(doc, payload)
+    _replace_lines(db, doc, payload.lines)
+    db.flush()
+    db.refresh(doc)
+    return doc
+
+
+def submit_handover(db: Session, doc: HandoverDoc, *, author: Employee) -> HandoverDoc:
+    """임시저장(DRAFT) → 제출(SUBMITTED). 제출 필수값 검증."""
+    if doc.author_employee_id != author.employee_id:
+        raise PermissionError("본인이 작성한 문서만 제출할 수 있습니다.")
+    if doc.status == HandoverStatusEnum.SUBMITTED:
+        return doc  # 멱등
+    if doc.status != HandoverStatusEnum.DRAFT:
+        raise ValueError("임시저장 상태만 제출할 수 있습니다.")
+    if not doc.lines:
+        raise ValueError("인수인계 품목을 1개 이상 추가하세요.")
+    if not doc.title or doc.title == "(작성 중)":
+        raise ValueError("제목을 입력하세요.")
+    doc.status = HandoverStatusEnum.SUBMITTED
+    db.flush()
+    db.refresh(doc)
+    return doc
+
+
 def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
     """인수 확인 — PIN + 인수부서 권한 검증 후 재고 이동(튜브→인수부서)."""
     if doc.status == HandoverStatusEnum.RECEIVED:
@@ -105,6 +195,7 @@ def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str
         qty = Decimal(line.quantity)
         inv = inventory_svc.get_or_create_inventory(db, line.item_id)
         qty_before = inv.quantity or Decimal("0")
+        cells_before = inv_effect.snapshot_cells(db, line.item_id)
         # 튜브 PRODUCTION 부족 시 ValueError → 라우터가 422 변환(상태 불변).
         inventory_svc.transfer_between_departments(db, line.item_id, qty, from_dept, to_dept)
         db.add(
@@ -120,6 +211,7 @@ def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str
                 department=doc.to_department,
                 reference_no=doc.handover_code,
                 notes=f"인수인계 {doc.from_department}→{doc.to_department}",
+                inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
             )
         )
 

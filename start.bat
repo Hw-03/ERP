@@ -124,8 +124,9 @@ echo [MES] Detected IP: %IP%
 echo [MES] URL: http://%IP%:3001
 echo.
 
-rem preflight - 포트 8011 좀비 정리 (워커 고아화 재발 방지)
+rem preflight - 포트 8011/3001 좀비 정리 (워커 고아화 재발 방지)
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-backend.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-frontend.ps1"
 start "Backend" cmd /k "cd /d "%~dp0backend" && py -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload"
 start "Frontend" cmd /k "cd /d "%~dp0frontend" && set "PORT=3001" && set "BACKEND_INTERNAL_URL=http://localhost:8011" && npm run dev"
 timeout /t 5 /nobreak >nul

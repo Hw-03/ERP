@@ -19,8 +19,6 @@ export interface DefectLocation {
 export interface DefectKpi {
   quarantined: number;
   over_one_year: number;
-  pending_approval: number;
-  processed_today: number;
 }
 
 export interface QuarantinePayload {
@@ -29,16 +27,17 @@ export interface QuarantinePayload {
   source: "warehouse" | "production";
   source_dept?: string;
   target_dept: string;
-  reason_category: string;
+  reason_category?: string | null;
   reason_memo: string;
   actor_employee_id: string;
+  client_request_id?: string;
 }
 
 export interface UnquarantinePayload {
   item_id: string;
   qty: number;
   dept: string;
-  reason_category: string;
-  reason_memo: string;
+  reason_category?: string | null;
+  reason_memo?: string | null;
   actor_employee_id: string;
 }

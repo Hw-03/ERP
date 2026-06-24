@@ -50,8 +50,9 @@ class Item(Base):
         server_default=func.now(),
     )
 
-    # Legacy UI display fields (populated from ERP_Master_DB.csv or rule-based defaults)
-
+    # legacy_* 접두사는 **historical 이유**이지 deprecated 가 아니다 — ERP_Master_DB.csv
+    # 의 옛 분류 컬럼을 그대로 보존해야 사내 검색·필터·CSV 왕복 호환이 깨지지 않는다.
+    # 제거 금지(CLAUDE.md 명시). 새 코드에서도 list/filter API 가 이 필드로 동작 중.
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
     legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
     supplier = Column(String(200), nullable=True)

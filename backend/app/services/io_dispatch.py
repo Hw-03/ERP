@@ -24,6 +24,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
 from app.services.io_preview import (
@@ -262,6 +263,11 @@ def _log_immediate(
     before: Decimal,
     after: Decimal,
     operator_name: str,
+    producer_employee_id: uuid.UUID | None = None,
+    wh_before: Decimal | None = None,
+    wh_after: Decimal | None = None,
+    department: str | None = None,
+    inventory_effect: list[dict] | None = None,
 ) -> None:
     db.add(
         TransactionLog(
@@ -270,11 +276,16 @@ def _log_immediate(
             quantity_change=quantity_change,
             quantity_before=before,
             quantity_after=after,
+            warehouse_qty_before=wh_before,
+            warehouse_qty_after=wh_after,
             transfer_qty=line.quantity if line.direction in ("move", "defective") else None,
+            department=department,
             reference_no=batch.reference_no,
             produced_by=operator_name,
+            producer_employee_id=producer_employee_id,
             notes=batch.notes,
             operation_batch_id=batch.batch_id,
+            inventory_effect=inventory_effect,
         )
     )
 
@@ -365,10 +376,33 @@ def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionT
     return TransactionTypeEnum.ADJUST, quantity_change
 
 
+def _dept_for_line(line: IoLine, tx_type: TransactionTypeEnum) -> str | None:
+    """로그에 기록할 부서명 — 취소 롤백 시 어느 부서를 되돌릴지 결정하는 핵심 필드."""
+    def _val(v: object) -> str | None:
+        if v is None:
+            return None
+        return v.value if hasattr(v, "value") else str(v)
+
+    if tx_type in (TransactionTypeEnum.PRODUCE,):
+        return _val(line.to_department)
+    if tx_type in (TransactionTypeEnum.BACKFLUSH, TransactionTypeEnum.SUPPLIER_RETURN):
+        return _val(line.from_department)
+    if tx_type == TransactionTypeEnum.TRANSFER_TO_PROD:
+        return _val(line.to_department)
+    if tx_type == TransactionTypeEnum.TRANSFER_TO_WH:
+        return _val(line.from_department)
+    if tx_type == TransactionTypeEnum.TRANSFER_DEPT:
+        return _val(line.from_department)
+    return None
+
+
 def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employee) -> None:
     qty = _d(line.quantity)
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     before = _d(inv.quantity)
+    wh_before = _d(inv.warehouse_qty) if line.direction == "move" else None
+    # 취소 역재생용 — mutation 전 재고 셀 스냅샷.
+    cells_before = inv_effect.snapshot_cells(db, line.item_id)
 
     if line.direction == "in":
         tx_type, quantity_change = _apply_in(db, line, qty)
@@ -386,6 +420,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     after = _d(inv.quantity)
+    wh_after = _d(inv.warehouse_qty) if line.direction == "move" else None
     _log_immediate(
         db,
         batch=batch,
@@ -395,6 +430,11 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         before=before,
         after=after,
         operator_name=requester.name,
+        producer_employee_id=requester.employee_id,
+        wh_before=wh_before,
+        wh_after=wh_after,
+        department=_dept_for_line(line, tx_type),
+        inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
     )
 
 
@@ -423,6 +463,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         else:
             _submit_immediate(db, requester=requester, batch=batch)
     except Exception:
+        # 어느 분기서 실패하든 batch 를 failed 로 확정(flush)한 뒤 그대로 전파 — 부분상태 방지.
         batch.status = "failed"
         db.flush()
         raise

@@ -15,6 +15,7 @@ from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
 from app._evt import emit as _evt_emit
 from app.services.bom import BomCache, build_bom_cache
+from app.repositories import item_repository
 
 router = APIRouter()
 
@@ -63,11 +64,11 @@ def create_bom(payload: BOMCreate, request: Request, db: Session = Depends(get_d
             "상위 품목과 하위 품목은 같을 수 없습니다.",
         )
 
-    parent = db.query(Item).filter(Item.item_id == payload.parent_item_id).first()
+    parent = item_repository.get(db, payload.parent_item_id)
     if not parent:
         raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
 
-    child = db.query(Item).filter(Item.item_id == payload.child_item_id).first()
+    child = item_repository.get(db, payload.child_item_id)
     if not child:
         raise http_error(404, ErrorCode.NOT_FOUND, "하위 품목을 찾을 수 없습니다.")
 
@@ -165,7 +166,7 @@ def update_bom(bom_id: uuid.UUID, payload: BOMUpdate, request: Request, db: Sess
 def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
     """Return direct child BOM rows for a given parent item."""
 
-    item = db.query(Item).filter(Item.item_id == parent_item_id).first()
+    item = item_repository.get(db, parent_item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -240,7 +241,7 @@ def get_where_used(item_id: uuid.UUID, db: Session = Depends(get_db)):
     - 직접 사용처만 반환 (1단계). 다단계 추적은 호출측에서 재귀.
     - 응답은 `BOMDetailResponse` 배열 — 기존 BOM 조회와 동일 모양.
     """
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

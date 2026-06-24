@@ -17,6 +17,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -27,16 +28,15 @@ from app.models import (
     InventoryLocation,
     Item,
     LocationStatusEnum,
-    StockRequest,
-    StockRequestStatusEnum,
-    StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
 from app.routers._errors import ErrorCode, http_error
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app._evt import emit as _evt_emit
 from app._actor import set_actor
+from app.repositories import item_repository
 
 router = APIRouter()
 
@@ -62,8 +62,6 @@ class DefectLocationItem(BaseModel):
 class DefectKpi(BaseModel):
     quarantined: int
     over_one_year: int
-    pending_approval: int
-    processed_today: int
 
 
 class QuarantineRequest(BaseModel):
@@ -72,17 +70,18 @@ class QuarantineRequest(BaseModel):
     source: str                          # "warehouse" | "production"
     source_dept: Optional[str] = None
     target_dept: str
-    reason_category: str
+    reason_category: Optional[str] = None
     reason_memo: str
     actor_employee_id: uuid.UUID
+    client_request_id: Optional[str] = None
 
 
 class UnquarantineRequest(BaseModel):
     item_id: uuid.UUID
     qty: Decimal
     dept: str
-    reason_category: str
-    reason_memo: str
+    reason_category: Optional[str] = None
+    reason_memo: Optional[str] = None
     actor_employee_id: uuid.UUID
 
 
@@ -181,16 +180,12 @@ def list_defect_locations(
 
 @router.get("/kpi", response_model=DefectKpi)
 def get_defect_kpi(db: Session = Depends(get_db)):
-    """KPI 카드 4개:
+    """KPI 카드 2개:
     - quarantined: DEFECTIVE 위치 수 (quantity > 0)
     - over_one_year: defective_at <= now - 365 days
-    - pending_approval: requires_department_approval=true AND status IN (SUBMITTED, RESERVED)
-                        AND request_type IN (DEFECT_SCRAP, DEFECT_RETURN, DEFECT_DISASSEMBLE)
-    - processed_today: 오늘 생성된 UNMARK_DEFECTIVE, DEFECT_SCRAP, SUPPLIER_RETURN 트랜잭션 수
     """
     now = datetime.utcnow()
     one_year_ago = now - timedelta(days=365)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     quarantined = (
         db.query(func.count(InventoryLocation.location_id))
@@ -213,43 +208,9 @@ def get_defect_kpi(db: Session = Depends(get_db)):
         or 0
     )
 
-    pending_approval = (
-        db.query(func.count(StockRequest.request_id))
-        .filter(
-            StockRequest.requires_department_approval.is_(True),
-            StockRequest.status.in_([
-                StockRequestStatusEnum.SUBMITTED,
-                StockRequestStatusEnum.RESERVED,
-            ]),
-            StockRequest.request_type.in_([
-                StockRequestTypeEnum.DEFECT_SCRAP,
-                StockRequestTypeEnum.DEFECT_RETURN,
-                StockRequestTypeEnum.DEFECT_DISASSEMBLE,
-            ]),
-        )
-        .scalar()
-        or 0
-    )
-
-    processed_today = (
-        db.query(func.count(TransactionLog.log_id))
-        .filter(
-            TransactionLog.transaction_type.in_([
-                TransactionTypeEnum.UNMARK_DEFECTIVE,
-                TransactionTypeEnum.DEFECT_SCRAP,
-                TransactionTypeEnum.SUPPLIER_RETURN,
-            ]),
-            TransactionLog.created_at >= today_start,
-        )
-        .scalar()
-        or 0
-    )
-
     return DefectKpi(
         quarantined=quarantined,
         over_one_year=over_one_year,
-        pending_approval=pending_approval,
-        processed_today=processed_today,
     )
 
 
@@ -261,15 +222,22 @@ def get_defect_kpi(db: Session = Depends(get_db)):
 @router.post("/quarantine", response_model=DefectActionResult)
 def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
-    if not payload.reason_category:
-        raise http_error(422, ErrorCode.VALIDATION_ERROR, "reason_category 는 필수입니다.")
+    # 멱등성: 동일 client_request_id로 이미 처리된 요청이면 즉시 반환.
+    if payload.client_request_id:
+        existing = (
+            db.query(TransactionLog)
+            .filter(TransactionLog.client_request_id == payload.client_request_id)
+            .first()
+        )
+        if existing:
+            return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
 
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     set_actor(http_request, actor)
 
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -281,6 +249,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
 
     inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inv.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
 
     try:
         inventory_svc.mark_defective(
@@ -311,21 +280,31 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
     # TransactionLog 기록
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    db.add(
-        TransactionLog(
-            item_id=payload.item_id,
-            transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
-            quantity_change=Decimal("0"),
-            quantity_before=qty_before,
-            quantity_after=inv.quantity,
-            produced_by=actor.name,
-            notes=f"격리: {payload.source} → {payload.target_dept}",
-            reason_category=payload.reason_category,
-            reason_memo=payload.reason_memo or None,
-            department=str(target_dept),
+    try:
+        db.add(
+            TransactionLog(
+                item_id=payload.item_id,
+                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+                quantity_change=Decimal("0"),
+                quantity_before=qty_before,
+                quantity_after=inv.quantity,
+                produced_by=actor.name,
+                producer_employee_id=actor.employee_id,
+                notes=f"격리: {payload.source} → {payload.target_dept}",
+                reason_category=payload.reason_category,
+                reason_memo=payload.reason_memo or None,
+                client_request_id=payload.client_request_id,
+                # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
+                department=getattr(target_dept, "value", target_dept),
+                inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
+            )
         )
-    )
-    db.commit()
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if payload.client_request_id:
+            return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
+        raise http_error(409, ErrorCode.CONFLICT, "격리 처리 중 충돌이 발생했습니다.")
     _evt_emit(
         "defect_mark",
         request=http_request,
@@ -350,15 +329,12 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
 @router.post("/unquarantine", response_model=DefectActionResult)
 def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
-    if not payload.reason_category:
-        raise http_error(422, ErrorCode.VALIDATION_ERROR, "reason_category 는 필수입니다.")
-
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     set_actor(http_request, actor)
 
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -369,6 +345,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
 
     inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inv.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
 
     try:
         inventory_svc.unmark_defective(
@@ -377,7 +354,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             payload.qty,
             dept,
             inventory_svc.ReasonContext(
-                category=payload.reason_category,
+                category=payload.reason_category or "",
                 memo=payload.reason_memo or "",
                 actor=actor.name,
             ),
@@ -395,10 +372,13 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             quantity_before=qty_before,
             quantity_after=inv.quantity,
             produced_by=actor.name,
+            producer_employee_id=actor.employee_id,
             notes=f"정상 복귀: {payload.dept}",
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo or None,
-            department=str(dept),
+            # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
+            department=getattr(dept, "value", dept),
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     db.commit()

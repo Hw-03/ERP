@@ -776,9 +776,338 @@
         "title": "BomTemplateResponse",
         "type": "object"
       },
-      "CapacityResponse": {
-        "description": "전체 생산 가능 수량 응답.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 각 직계 자식의 available(=warehouse+PRODUCTION-pending)\n  을 per-unit 수량으로 나눈 값의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.\n  불량(DEFECTIVE) 재고는 제외.",
+      "BoxTrackingResponse": {
+        "description": "창고 박스 자동 차감 활성 여부.",
         "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "BoxTrackingResponse",
+        "type": "object"
+      },
+      "BoxTrackingUpdate": {
+        "description": "박스 추적 토글 (admin PIN 은 X-Admin-Pin 헤더로).",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "BoxTrackingUpdate",
+        "type": "object"
+      },
+      "CapacityAfBlock": {
+        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
+        "properties": {
+          "basis": {
+            "const": "AF",
+            "default": "AF",
+            "title": "Basis",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityAfItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "pf_variants": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityPfVariant"
+            },
+            "title": "Pf Variants",
+            "type": "array"
+          },
+          "status": {
+            "default": "no_target",
+            "description": "no_target=AF 품목 없음 / bom_not_registered=모든 AF 직계 BOM 없음 / incomplete=일부 AF BOM 미등록 / not_producible=계산됐지만 모두 0 / producible=하나 이상 생산 가능.",
+            "enum": [
+              "no_target",
+              "bom_not_registered",
+              "incomplete",
+              "not_producible",
+              "producible"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CapacityAfSummary"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "title": "CapacityAfBlock",
+        "type": "object"
+      },
+      "CapacityAfItem": {
+        "properties": {
+          "af_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Af Code"
+          },
+          "af_item_id": {
+            "title": "Af Item Id",
+            "type": "string"
+          },
+          "af_name": {
+            "title": "Af Name",
+            "type": "string"
+          },
+          "bom_status": {
+            "description": "has_direct_children 이면 complete, 아니면 incomplete.",
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "title": "Bom Status",
+            "type": "string"
+          },
+          "fast_production": {
+            "description": "빠른 생산 — AF재고 + AF 직계 1단계 부품 → 이 PF 환산. 포장 구간 포함.",
+            "title": "Fast Production",
+            "type": "integer"
+          },
+          "fast_production_limiting_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production Limiting Item"
+          },
+          "has_direct_children": {
+            "title": "Has Direct Children",
+            "type": "boolean"
+          },
+          "has_pf_path": {
+            "description": "역방향 BOM 상 PF 변형이 1개 이상.",
+            "title": "Has Pf Path",
+            "type": "boolean"
+          },
+          "marked_complete": {
+            "description": "bom_completed_at 기록 여부(표시 신호).",
+            "title": "Marked Complete",
+            "type": "boolean"
+          },
+          "model_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Symbol"
+          },
+          "ship_ready": {
+            "description": "이 AF 에 연결된 PF 변형들의 ship_ready 중 최대값(낙관적 대표). 특정 PF 주문 판단은 pf_variants[].ship_ready 를 봐야 한다. 연결된 PF 가 없으면 0.",
+            "title": "Ship Ready",
+            "type": "integer"
+          },
+          "ship_ready_limiting_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ship Ready Limiting Item"
+          },
+          "total_production": {
+            "description": "총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.",
+            "title": "Total Production",
+            "type": "integer"
+          },
+          "total_production_limiting_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Limiting Item"
+          }
+        },
+        "required": [
+          "af_item_id",
+          "af_name",
+          "ship_ready",
+          "fast_production",
+          "total_production",
+          "bom_status",
+          "has_direct_children",
+          "has_pf_path",
+          "marked_complete"
+        ],
+        "title": "CapacityAfItem",
+        "type": "object"
+      },
+      "CapacityAfSummary": {
+        "properties": {
+          "fast_production": {
+            "description": "빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 합계.",
+            "title": "Fast Production",
+            "type": "integer"
+          },
+          "ship_ready": {
+            "description": "출하 대기 — 창고에 있는 완성 PF 재고 합계.",
+            "title": "Ship Ready",
+            "type": "integer"
+          },
+          "total_production": {
+            "description": "총생산 — PF 루트 BOM 전체 재귀 이론 최대 합계.",
+            "title": "Total Production",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ship_ready",
+          "fast_production",
+          "total_production"
+        ],
+        "title": "CapacityAfSummary",
+        "type": "object"
+      },
+      "CapacityPfVariant": {
+        "properties": {
+          "af_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Af Item Id"
+          },
+          "bom_status": {
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "title": "Bom Status",
+            "type": "string"
+          },
+          "fast_production": {
+            "description": "빠른 생산 — AF재고 + 1단계 부품 → 이 PF 환산.",
+            "title": "Fast Production",
+            "type": "integer"
+          },
+          "fast_production_limiting_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Production Limiting Item"
+          },
+          "model_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Symbol"
+          },
+          "pf_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pf Code"
+          },
+          "pf_item_id": {
+            "title": "Pf Item Id",
+            "type": "string"
+          },
+          "pf_name": {
+            "title": "Pf Name",
+            "type": "string"
+          },
+          "ship_ready": {
+            "description": "출하 대기 — 이 PF 완성 재고.",
+            "title": "Ship Ready",
+            "type": "integer"
+          },
+          "total_production": {
+            "description": "총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.",
+            "title": "Total Production",
+            "type": "integer"
+          },
+          "total_production_limiting_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Production Limiting Item"
+          }
+        },
+        "required": [
+          "pf_item_id",
+          "pf_name",
+          "ship_ready",
+          "fast_production",
+          "total_production",
+          "bom_status"
+        ],
+        "title": "CapacityPfVariant",
+        "type": "object"
+      },
+      "CapacityResponse": {
+        "description": "전체 생산 가능 수량 응답.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 각 직계 자식의 available(=warehouse+PRODUCTION-pending)\n  을 per-unit 수량으로 나눈 값의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.\n  불량(DEFECTIVE) 재고는 제외.\n- **af**: AF(조립 완제품) 기준 신규 블록. immediate/maximum 은 전환 기간 호환용으로 유지.",
+        "properties": {
+          "af": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CapacityAfBlock"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "AF(조립 완제품) 기준 신규 생산 가능 수량 블록. ship_ready/fast_production/total_production."
+          },
           "immediate": {
             "description": "직계 자식 available 기준 즉시 생산 가능량 (모든 top_item 합).",
             "title": "Immediate",
@@ -938,14 +1267,6 @@
             "title": "Over One Year",
             "type": "integer"
           },
-          "pending_approval": {
-            "title": "Pending Approval",
-            "type": "integer"
-          },
-          "processed_today": {
-            "title": "Processed Today",
-            "type": "integer"
-          },
           "quarantined": {
             "title": "Quarantined",
             "type": "integer"
@@ -953,9 +1274,7 @@
         },
         "required": [
           "quarantined",
-          "over_one_year",
-          "pending_approval",
-          "processed_today"
+          "over_one_year"
         ],
         "title": "DefectKpi",
         "type": "object"
@@ -1318,6 +1637,18 @@
               }
             ],
             "title": "Notes"
+          },
+          "operator_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Employee Code"
           },
           "operator_name": {
             "anyOf": [
@@ -2006,6 +2337,121 @@
         "title": "HandoverCreate",
         "type": "object"
       },
+      "HandoverDraftUpsert": {
+        "description": "인수인계 임시저장 — handover_id 없으면 신규 draft, 있으면 기존 draft 갱신.",
+        "properties": {
+          "analysis_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Text"
+          },
+          "author_employee_id": {
+            "format": "uuid",
+            "title": "Author Employee Id",
+            "type": "string"
+          },
+          "doc_date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doc Date"
+          },
+          "handover_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handover Id"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/HandoverLineCreate"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "process_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Content"
+          },
+          "product_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          }
+        },
+        "required": [
+          "author_employee_id"
+        ],
+        "title": "HandoverDraftUpsert",
+        "type": "object"
+      },
       "HandoverLineCreate": {
         "properties": {
           "item_id": {
@@ -2253,6 +2699,43 @@
           "updated_at"
         ],
         "title": "HandoverResponse",
+        "type": "object"
+      },
+      "HandoverSubmitRequest": {
+        "description": "임시저장(DRAFT) → 제출(SUBMITTED) 전환 요청.",
+        "properties": {
+          "author_employee_id": {
+            "format": "uuid",
+            "title": "Author Employee Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "author_employee_id"
+        ],
+        "title": "HandoverSubmitRequest",
+        "type": "object"
+      },
+      "InitialLocationInput": {
+        "properties": {
+          "department": {
+            "description": "부서명 (창고 제외)",
+            "maxLength": 50,
+            "title": "Department",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "해당 부서 초기 배분 수량",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "department",
+          "quantity"
+        ],
+        "title": "InitialLocationInput",
         "type": "object"
       },
       "IntegrityCheckBody": {
@@ -3415,6 +3898,21 @@
       },
       "ItemCreate": {
         "properties": {
+          "initial_locations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InitialLocationInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "부서별 초기 배분. 합계 ≤ initial_quantity, 나머지는 창고.",
+            "title": "Initial Locations"
+          },
           "initial_quantity": {
             "anyOf": [
               {
@@ -4062,6 +4560,48 @@
         "title": "ItemWithInventory",
         "type": "object"
       },
+      "JariRestackPayload": {
+        "description": "한 자리의 박스 스택 순서를 통째로 재배치(중간 삽입 포함).\n\nbox_ids 는 아래→위(stack_order 0→) 최종 전체 순서. 다른 자리에서 끌어온\n박스도 포함될 수 있으며, 그 박스는 이 자리로 이동된다.",
+        "properties": {
+          "angle_id": {
+            "title": "Angle Id",
+            "type": "integer"
+          },
+          "box_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Box Ids",
+            "type": "array"
+          },
+          "jari_index": {
+            "minimum": 0.0,
+            "title": "Jari Index",
+            "type": "integer"
+          },
+          "layer_no": {
+            "minimum": 1.0,
+            "title": "Layer No",
+            "type": "integer"
+          },
+          "row_no": {
+            "minimum": 1.0,
+            "title": "Row No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "angle_id",
+          "row_no",
+          "layer_no",
+          "jari_index",
+          "box_ids"
+        ],
+        "title": "JariRestackPayload",
+        "type": "object"
+      },
       "LocationStatusEnum": {
         "enum": [
           "PRODUCTION",
@@ -4089,6 +4629,19 @@
               }
             ],
             "title": "Operator"
+          },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "작업자 사번 (audit)",
+            "title": "Producer Employee Code"
           },
           "quantity": {
             "exclusiveMinimum": 0.0,
@@ -4227,6 +4780,47 @@
         "title": "MessageResponse",
         "type": "object"
       },
+      "MyItemOrderEntry": {
+        "properties": {
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "display_order"
+        ],
+        "title": "MyItemOrderEntry",
+        "type": "object"
+      },
+      "MyItemOrderPut": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyItemOrderEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "employee_id",
+          "items"
+        ],
+        "title": "MyItemOrderPut",
+        "type": "object"
+      },
       "NotificationListResponse": {
         "properties": {
           "items": {
@@ -4361,6 +4955,20 @@
           "created_at"
         ],
         "title": "NotificationResponse",
+        "type": "object"
+      },
+      "PfPinPayload": {
+        "properties": {
+          "pf_item_id": {
+            "format": "uuid",
+            "title": "Pf Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pf_item_id"
+        ],
+        "title": "PfPinPayload",
         "type": "object"
       },
       "PinVerifyRequest": {
@@ -4889,6 +5497,17 @@
             "title": "Actor Employee Id",
             "type": "string"
           },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -4907,8 +5526,15 @@
             "title": "Qty"
           },
           "reason_category": {
-            "title": "Reason Category",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
           },
           "reason_memo": {
             "title": "Reason Memo",
@@ -4939,7 +5565,6 @@
           "qty",
           "source",
           "target_dept",
-          "reason_category",
           "reason_memo",
           "actor_employee_id"
         ],
@@ -5859,6 +6484,36 @@
         "title": "SupplierReturnRequest",
         "type": "object"
       },
+      "TransactionCancelRequest": {
+        "properties": {
+          "employee_code": {
+            "description": "처리자 사번",
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Employee Code",
+            "type": "string"
+          },
+          "pin": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Pin",
+            "type": "string"
+          },
+          "reason": {
+            "description": "취소 사유 (필수)",
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "employee_code",
+          "pin"
+        ],
+        "title": "TransactionCancelRequest",
+        "type": "object"
+      },
       "TransactionEditLogResponse": {
         "properties": {
           "after_payload": {
@@ -5925,6 +6580,18 @@
       },
       "TransactionLogResponse": {
         "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
           "approver_name": {
             "anyOf": [
               {
@@ -5936,10 +6603,61 @@
             ],
             "title": "Approver Name"
           },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "cancelled": {
+            "default": false,
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
           },
           "edit_count": {
             "default": 0,
@@ -6069,6 +6787,18 @@
             ],
             "title": "Reference No"
           },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
           "requester_name": {
             "anyOf": [
               {
@@ -6093,6 +6823,28 @@
               }
             ],
             "title": "Transfer Qty"
+          },
+          "warehouse_qty_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty After"
+          },
+          "warehouse_qty_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty Before"
           }
         },
         "required": [
@@ -6385,20 +7137,32 @@
             "title": "Qty"
           },
           "reason_category": {
-            "title": "Reason Category",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
           },
           "reason_memo": {
-            "title": "Reason Memo",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
           }
         },
         "required": [
           "item_id",
           "qty",
           "dept",
-          "reason_category",
-          "reason_memo",
           "actor_employee_id"
         ],
         "title": "UnquarantineRequest",
@@ -6846,6 +7610,38 @@
         "title": "WarehouseBoxItemResponse",
         "type": "object"
       },
+      "WarehouseBoxMove": {
+        "description": "박스를 다른 자리로 이동(드래그). 대상 좌표만 지정 — 크기·내용물은 보존.",
+        "properties": {
+          "angle_id": {
+            "title": "Angle Id",
+            "type": "integer"
+          },
+          "jari_index": {
+            "minimum": 0.0,
+            "title": "Jari Index",
+            "type": "integer"
+          },
+          "layer_no": {
+            "minimum": 1.0,
+            "title": "Layer No",
+            "type": "integer"
+          },
+          "row_no": {
+            "minimum": 1.0,
+            "title": "Row No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "angle_id",
+          "row_no",
+          "layer_no",
+          "jari_index"
+        ],
+        "title": "WarehouseBoxMove",
+        "type": "object"
+      },
       "WarehouseBoxResponse": {
         "properties": {
           "angle_id": {
@@ -6977,10 +7773,6 @@
             "title": "Dept Name",
             "type": "string"
           },
-          "in_qty": {
-            "title": "In Qty",
-            "type": "integer"
-          },
           "item_count": {
             "title": "Item Count",
             "type": "integer"
@@ -7007,6 +7799,14 @@
           "process_code": {
             "title": "Process Code",
             "type": "string"
+          },
+          "produce_qty": {
+            "title": "Produce Qty",
+            "type": "integer"
+          },
+          "receive_qty": {
+            "title": "Receive Qty",
+            "type": "integer"
           }
         },
         "required": [
@@ -7015,7 +7815,8 @@
           "label",
           "item_count",
           "prev_qty",
-          "in_qty",
+          "produce_qty",
+          "receive_qty",
           "out_qty",
           "current_qty",
           "delta",
@@ -7032,10 +7833,6 @@
           },
           "delta": {
             "title": "Delta",
-            "type": "integer"
-          },
-          "in_qty": {
-            "title": "In Qty",
             "type": "integer"
           },
           "item_id": {
@@ -7064,6 +7861,14 @@
           "prev_qty": {
             "title": "Prev Qty",
             "type": "integer"
+          },
+          "produce_qty": {
+            "title": "Produce Qty",
+            "type": "integer"
+          },
+          "receive_qty": {
+            "title": "Receive Qty",
+            "type": "integer"
           }
         },
         "required": [
@@ -7071,7 +7876,8 @@
           "mes_code",
           "item_name",
           "prev_qty",
-          "in_qty",
+          "produce_qty",
+          "receive_qty",
           "out_qty",
           "current_qty",
           "delta"
@@ -7196,18 +8002,23 @@
             "title": "Total Current Qty",
             "type": "integer"
           },
-          "total_in_qty": {
-            "title": "Total In Qty",
-            "type": "integer"
-          },
           "total_out_qty": {
             "title": "Total Out Qty",
+            "type": "integer"
+          },
+          "total_produce_qty": {
+            "title": "Total Produce Qty",
+            "type": "integer"
+          },
+          "total_receive_qty": {
+            "title": "Total Receive Qty",
             "type": "integer"
           }
         },
         "required": [
           "total_current_qty",
-          "total_in_qty",
+          "total_produce_qty",
+          "total_receive_qty",
           "total_out_qty",
           "groups_increasing",
           "groups_decreasing",
@@ -8019,7 +8830,7 @@
     },
     "/api/defects/kpi": {
       "get": {
-        "description": "KPI 카드 4개:\n- quarantined: DEFECTIVE 위치 수 (quantity > 0)\n- over_one_year: defective_at <= now - 365 days\n- pending_approval: requires_department_approval=true AND status IN (SUBMITTED, RESERVED)\n                    AND request_type IN (DEFECT_SCRAP, DEFECT_RETURN, DEFECT_DISASSEMBLE)\n- processed_today: 오늘 생성된 UNMARK_DEFECTIVE, DEFECT_SCRAP, SUPPLIER_RETURN 트랜잭션 수",
+        "description": "KPI 카드 2개:\n- quarantined: DEFECTIVE 위치 수 (quantity > 0)\n- over_one_year: defective_at <= now - 365 days",
         "operationId": "get_defect_kpi_api_defects_kpi_get",
         "responses": {
           "200": {
@@ -9254,6 +10065,95 @@
         ]
       }
     },
+    "/api/handovers/draft": {
+      "put": {
+        "description": "인수인계 임시저장 — handover_id 없으면 신규 draft, 있으면 본인 기존 draft 갱신.",
+        "operationId": "save_handover_draft_api_handovers_draft_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverDraftUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoverResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Handover Draft",
+        "tags": [
+          "Handover"
+        ]
+      }
+    },
+    "/api/handovers/draft/{handover_id}": {
+      "delete": {
+        "description": "임시저장 폐기 — 본인 DRAFT 만 삭제 가능. 이미 없으면 멱등 통과.",
+        "operationId": "delete_handover_draft_api_handovers_draft__handover_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handover_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Handover Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "author_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Author Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Handover Draft",
+        "tags": [
+          "Handover"
+        ]
+      }
+    },
     "/api/handovers/inbox": {
       "get": {
         "operationId": "list_inbox_api_handovers_inbox_get",
@@ -9449,6 +10349,60 @@
           }
         },
         "summary": "Receive Handover",
+        "tags": [
+          "Handover"
+        ]
+      }
+    },
+    "/api/handovers/{handover_id}/submit": {
+      "post": {
+        "description": "임시저장(DRAFT) → 제출(SUBMITTED). 제출 시 받는 부서에 도착 알림.",
+        "operationId": "submit_handover_api_handovers__handover_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handover_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Handover Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoverResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Handover",
         "tags": [
           "Handover"
         ]
@@ -10474,6 +11428,60 @@
         ]
       }
     },
+    "/api/inventory/transactions/{log_id}/cancel": {
+      "post": {
+        "description": "거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.\n\n권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).\nBOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.",
+        "operationId": "cancel_transaction_api_inventory_transactions__log_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "log_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Log Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionLogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Transaction",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/inventory/transactions/{log_id}/edits": {
       "get": {
         "description": "특정 거래의 수정 이력 (최신순).",
@@ -11479,6 +12487,136 @@
         ]
       }
     },
+    "/api/items/my-order": {
+      "delete": {
+        "description": "직원의 품목 표시 순서 전체 삭제.",
+        "operationId": "delete_my_order_api_items_my_order_delete",
+        "parameters": [
+          {
+            "description": "직원 ID",
+            "in": "query",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "description": "직원 ID",
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete My Order",
+        "tags": [
+          "Items"
+        ]
+      },
+      "get": {
+        "description": "직원의 품목 표시 순서 조회. 행 없으면 빈 배열.",
+        "operationId": "get_my_order_api_items_my_order_get",
+        "parameters": [
+          {
+            "description": "직원 ID",
+            "in": "query",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "description": "직원 ID",
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MyItemOrderEntry"
+                  },
+                  "title": "Response Get My Order Api Items My Order Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Order",
+        "tags": [
+          "Items"
+        ]
+      },
+      "put": {
+        "description": "직원의 품목 표시 순서 전체 교체.\n\n기존 행 전부 삭제 후 bulk insert (upsert 효과).\n존재하지 않는 item_id는 조용히 skip.",
+        "operationId": "put_my_order_api_items_my_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyItemOrderPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put My Order",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
     "/api/items/reorder": {
       "patch": {
         "description": "드래그 reorder 결과를 영구 저장. 모델 reorder 와 동일 패턴.\n\n- PIN 검증 후 payload.items 의 (item_id, display_order) 쌍을 Item.sort_order 로 일괄 갱신.\n- 존재하지 않는 item_id 는 조용히 스킵 (부분 갱신 허용).",
@@ -12290,7 +13428,7 @@
     },
     "/api/production/capacity": {
       "get": {
-        "description": "BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.\n\n- **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.\n  NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.\n- **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.\n\n응답 status 4단계:\n  no_target / bom_not_registered / not_producible / producible.",
+        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
         "operationId": "get_production_capacity_api_production_capacity_get",
         "responses": {
           "200": {
@@ -12310,9 +13448,115 @@
         ]
       }
     },
+    "/api/production/capacity/pf-pins": {
+      "get": {
+        "description": "model_symbol → pf_item_id 전체 맵 반환. 지정 없으면 빈 dict.",
+        "operationId": "get_pf_pins_api_production_capacity_pf_pins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Pf Pins Api Production Capacity Pf Pins Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "모델별 기준 PF 조회",
+        "tags": [
+          "Production"
+        ]
+      }
+    },
+    "/api/production/capacity/pf-pins/{model_symbol}": {
+      "delete": {
+        "description": "model_symbol 의 기준 PF 지정을 제거한다. 없어도 OK.",
+        "operationId": "clear_pf_pin_api_production_capacity_pf_pins__model_symbol__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_symbol",
+            "required": true,
+            "schema": {
+              "title": "Model Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "모델 기준 PF 해제",
+        "tags": [
+          "Production"
+        ]
+      },
+      "put": {
+        "description": "주어진 model_symbol 에 pf_item_id 를 기준 PF 로 지정한다.",
+        "operationId": "set_pf_pin_api_production_capacity_pf_pins__model_symbol__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_symbol",
+            "required": true,
+            "schema": {
+              "title": "Model Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PfPinPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "모델 기준 PF 지정",
+        "tags": [
+          "Production"
+        ]
+      }
+    },
     "/api/production/possible": {
       "get": {
-        "description": "BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.\n\n- **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.\n  NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.\n- **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.\n\n응답 status 4단계:\n  no_target / bom_not_registered / not_producible / producible.",
+        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
         "operationId": "get_production_capacity_api_production_possible_get",
         "responses": {
           "200": {
@@ -13518,6 +14762,53 @@
         ]
       }
     },
+    "/api/stock-requests/{request_id}/revert-to-draft": {
+      "post": {
+        "description": "제출된 요청을 취소하고 연결된 IoBatch를 draft로 복원 — 수정 후 재제출용.\n권한: 요청자 본인만.",
+        "operationId": "revert_stock_request_to_draft_api_stock_requests__request_id__revert_to_draft_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRequestActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Stock Request To Draft",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
     "/api/stock-requests/{request_id}/submit": {
       "post": {
         "description": "DRAFT → 제출 전환. status=DRAFT 만 허용, 본인만, 빈 lines 거부.",
@@ -13577,8 +14868,8 @@
         "operationId": "create_angle_api_warehouse_map_angles_post",
         "parameters": [
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13589,12 +14880,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13605,7 +14896,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -13652,8 +14943,8 @@
         "operationId": "reorder_angles_api_warehouse_map_angles_reorder_patch",
         "parameters": [
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13664,12 +14955,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13680,7 +14971,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -13734,8 +15025,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13746,12 +15037,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13762,7 +15053,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -13799,8 +15090,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13811,12 +15102,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13827,7 +15118,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -13869,9 +15160,30 @@
         ]
       }
     },
-    "/api/warehouse-map/boxes": {
-      "post": {
-        "operationId": "create_box_api_warehouse_map_boxes_post",
+    "/api/warehouse-map/box-tracking": {
+      "get": {
+        "description": "창고 박스 자동 차감 활성 여부 — 프론트가 편집/경고 UI 노출 결정에 사용.",
+        "operationId": "get_box_tracking_api_warehouse_map_box_tracking_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoxTrackingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Box Tracking",
+        "tags": [
+          "Warehouse Map"
+        ]
+      },
+      "put": {
+        "description": "창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).\n\n켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.",
+        "operationId": "set_box_tracking_api_warehouse_map_box_tracking_put",
         "parameters": [
           {
             "in": "query",
@@ -13903,6 +15215,81 @@
                 }
               ],
               "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoxTrackingUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoxTrackingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Box Tracking",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/boxes": {
+      "post": {
+        "operationId": "create_box_api_warehouse_map_boxes_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -13944,6 +15331,86 @@
         ]
       }
     },
+    "/api/warehouse-map/boxes/restack": {
+      "patch": {
+        "description": "한 자리의 스택 순서를 통째로 재배치(중간 삽입 포함). box_ids = 아래→위 최종 순서.\n\n다른 자리에서 끌어온 박스도 이 자리로 이동된다. 합계 높이 초과 시 422.",
+        "operationId": "restack_jari_api_warehouse_map_boxes_restack_patch",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JariRestackPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WarehouseBoxResponse"
+                  },
+                  "title": "Response Restack Jari Api Warehouse Map Boxes Restack Patch",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restack Jari",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
     "/api/warehouse-map/boxes/{box_id}": {
       "delete": {
         "operationId": "delete_box_api_warehouse_map_boxes__box_id__delete",
@@ -13958,8 +15425,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13970,12 +15437,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -13986,7 +15453,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -14023,8 +15490,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14035,12 +15502,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14051,7 +15518,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -14088,6 +15555,91 @@
           }
         },
         "summary": "Update Box",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/boxes/{box_id}/move": {
+      "patch": {
+        "description": "박스를 다른 자리로 이동(드래그). 같은 자리면 맨 위로 올림(스택 순서 변경).\n\n대상 자리 용량 초과 시 422 차단. 어느 경우든 박스는 대상 자리의 맨 위로 간다\n(stack_order 최대+1) — 차감 시 위 박스부터 빠지는 R1 순서와 일치.",
+        "operationId": "move_box_api_warehouse_map_boxes__box_id__move_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "box_id",
+            "required": true,
+            "schema": {
+              "title": "Box Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseBoxMove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseBoxResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Box",
         "tags": [
           "Warehouse Map"
         ]

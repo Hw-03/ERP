@@ -3,7 +3,7 @@
 /**
  * React Query Provider — W4-A.
  *
- * 전역에서 단일 QueryClient를 사용. `frontend/app/legacy/page.tsx`의
+ * 전역에서 단일 QueryClient를 사용. `frontend/app/mes/page.tsx`의
  * `<AdminSessionProvider>` 안쪽에서 mount.
  *
  * 기본 옵션:

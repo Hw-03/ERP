@@ -121,12 +121,38 @@ function adminPinHeaders(): Record<string, string> {
 }
 
 /**
+ * 창고 관리자(operator) 자격증명 헤더 주입 — 창고 지도 편집용.
+ *
+ * 창고 지도 편집 모드 진입 시 `registerOperatorCredsProvider(() => ({code, pin}))`
+ * 로 등록한다. warehouse-map 쓰기 엔드포인트는 `X-Employee-Code` + `X-Operator-Pin`
+ * 으로 warehouse_role(primary/deputy)을 검증한다. 다른 라우터는 헤더 무시.
+ * in-memory only — sessionStorage / localStorage 사용 안 함.
+ */
+let getOperatorCreds: () => { code: string; pin: string } | null = () => null;
+
+export function registerOperatorCredsProvider(
+  fn: () => { code: string; pin: string } | null,
+): void {
+  getOperatorCreds = fn;
+}
+
+function operatorCredsHeaders(): Record<string, string> {
+  const creds = getOperatorCreds();
+  return creds ? { "X-Employee-Code": creds.code, "X-Operator-Pin": creds.pin } : {};
+}
+
+/** admin PIN + operator 자격증명을 합친 인증 헤더. 둘 다 있으면 둘 다 주입. */
+function authHeaders(): Record<string, string> {
+  return { ...adminPinHeaders(), ...operatorCredsHeaders() };
+}
+
+/**
  * 일반 GET 페치 — JSON 응답 반환. AbortSignal 지원.
  */
 export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    const headers = adminPinHeaders();
+    const headers = authHeaders();
     const init: RequestInit = { signal };
     if (Object.keys(headers).length > 0) init.headers = headers;
     res = await fetch(url, init);
@@ -159,14 +185,20 @@ async function writeJson<T>(
   body?: unknown,
 ): Promise<T> {
   const init: RequestInit = { method };
-  const pinHeaders = adminPinHeaders();
+  const pinHeaders = authHeaders();
   if (body !== undefined) {
     init.headers = { "Content-Type": "application/json", ...pinHeaders };
     init.body = JSON.stringify(body);
   } else if (Object.keys(pinHeaders).length > 0) {
     init.headers = pinHeaders;
   }
-  const res = await fetch(url, init);
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error("요청 시간이 초과되었습니다. 네트워크 연결을 확인하고 다시 시도해 주세요.")),
+      15_000,
+    ),
+  );
+  const res = await Promise.race([fetch(url, init), timeout]);
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
   if (res.status === 204) return undefined as T;
   const text = await res.text();

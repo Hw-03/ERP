@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -40,6 +40,7 @@ from app.services._tx import commit_and_refresh
 from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
 from app.services.reorder import reorder_by_display_order
+from app.repositories import item_repository, inventory_repository
 
 router = APIRouter()
 
@@ -170,8 +171,36 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     db.flush()
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
-    inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)
+    locs = payload.initial_locations or []
+
+    # 부서별 분배 검증
+    seen_depts: set[str] = set()
+    for ln in locs:
+        try:
+            dept_enum = DepartmentEnum(ln.department)
+        except ValueError:
+            raise http_error(422, ErrorCode.UNPROCESSABLE, f"유효하지 않은 부서: {ln.department}")
+        if dept_enum == DepartmentEnum.WAREHOUSE:
+            raise http_error(422, ErrorCode.UNPROCESSABLE, "창고는 분배 대상이 아닙니다. 남는 수량은 자동으로 창고에 들어갑니다.")
+        if ln.department in seen_depts:
+            raise http_error(422, ErrorCode.UNPROCESSABLE, f"부서 중복: {ln.department}")
+        seen_depts.add(ln.department)
+
+    alloc_sum = sum(ln.quantity for ln in locs)
+    if alloc_sum > init_qty:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, f"배분 합계({alloc_sum})가 초기 수량({init_qty})을 초과합니다.")
+
+    warehouse = init_qty - alloc_sum
+    inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=warehouse)
     db.add(inventory)
+
+    for ln in locs:
+        db.add(InventoryLocation(
+            item_id=item.item_id,
+            department=DepartmentEnum(ln.department),
+            status=LocationStatusEnum.PRODUCTION,
+            quantity=ln.quantity,
+        ))
 
     audit.record(
         db,
@@ -179,7 +208,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         action="item.create",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'}, init {init_qty})",
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'}, init {init_qty}, 분배 {alloc_sum}, 창고 {warehouse})",
     )
 
     commit_and_refresh(db, item)
@@ -438,7 +467,7 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.put("/{item_id}", response_model=ItemWithInventory)
 def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -522,7 +551,7 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         )
     # 응답에 inventory 동봉 — 좌측 list API 와 동일한 ItemWithInventory 형태로 보내
     # 저장 직후 우측 카드의 재고/창고 표시가 빈칸이 되는 잔여 UI 버그 방지.
-    inventory = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inventory = inventory_repository.get(db, item.item_id)
     return _to_item_with_inventory(db, item, inventory)
 
 
@@ -534,7 +563,7 @@ def update_bom_completion(
     db: Session = Depends(get_db),
 ):
     """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -557,7 +586,7 @@ def update_bom_completion(
 @router.patch("/{item_id}/soft-delete", response_model=ItemResponse)
 def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is not None:
@@ -592,7 +621,7 @@ def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends
 @router.patch("/{item_id}/restore", response_model=ItemResponse)
 def restore_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     """삭제된 품목 복구 — deleted_at 초기화."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is None:

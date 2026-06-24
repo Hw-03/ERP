@@ -104,3 +104,34 @@ class WarehouseBoxResponse(BaseModel):
 class WarehouseMapResponse(BaseModel):
     angles: List[WarehouseAngleResponse]
     boxes: List[WarehouseBoxResponse]
+
+
+class WarehouseBoxMove(BaseModel):
+    """박스를 다른 자리로 이동(드래그). 대상 좌표만 지정 — 크기·내용물은 보존."""
+    angle_id: int
+    row_no: int = Field(..., ge=1)
+    layer_no: int = Field(..., ge=1)
+    jari_index: int = Field(..., ge=0)
+
+
+class JariRestackPayload(BaseModel):
+    """한 자리의 박스 스택 순서를 통째로 재배치(중간 삽입 포함).
+
+    box_ids 는 아래→위(stack_order 0→) 최종 전체 순서. 다른 자리에서 끌어온
+    박스도 포함될 수 있으며, 그 박스는 이 자리로 이동된다.
+    """
+    angle_id: int
+    row_no: int = Field(..., ge=1)
+    layer_no: int = Field(..., ge=1)
+    jari_index: int = Field(..., ge=0)
+    box_ids: List[uuid.UUID] = Field(..., min_length=1)
+
+
+class BoxTrackingResponse(BaseModel):
+    """창고 박스 자동 차감 활성 여부."""
+    enabled: bool
+
+
+class BoxTrackingUpdate(BaseModel):
+    """박스 추적 토글 (admin PIN 은 X-Admin-Pin 헤더로)."""
+    enabled: bool

@@ -10,17 +10,21 @@ import { loginAsOperator } from "./_helpers";
 
 test.describe("불량 — 격리 / 해제", () => {
   test.beforeEach(async ({ page }) => {
-    // "창고 재고" 출처 격리를 위해 창고 역할로 로그인(격리 부서 기본=내 부서 조립).
+    // 창고 역할로 로그인 — 기본 출처 "창고 재고", 격리 위치 "창고", 목록 기본 스코프 "전체".
     await loginAsOperator(page, { role: "warehouse" });
   });
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
-    await page.goto("/legacy?tab=defect");
-    await expect(page.getByRole("heading", { name: "불량 처리" })).toBeVisible();
+    await page.goto("/mes?tab=defect");
+    // hub 3장 카드 진입 화면 확인 — cold next dev 라우트 컴파일 흡수를 위해 첫 단언만 넉넉히.
+    await expect(page.getByRole("button").filter({ hasText: "불량 격리" })).toBeVisible({ timeout: 30_000 });
 
     // ── 격리 ──────────────────────────────────────────────
-    await page.getByRole("button", { name: "+ 새 불량 추가" }).click();
-    // 출처(창고 재고)·격리 부서(조립) 기본값 유지. 시드 원자재 행 "추가".
+    // 사이드바 탭과 구분: 카드 description "정상 재고" 텍스트까지 filter.
+    await page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }).click();
+    // Step 1: 출처(창고 재고)·격리 부서(조립) 기본값 유지 → Step 2로 이동
+    await page.getByRole("button", { name: /다음/ }).click();
+    // Step 2: 시드 원자재 행 "추가".
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "추가", exact: true })
@@ -32,23 +36,42 @@ test.describe("불량 — 격리 / 해제", () => {
       .filter({ hasText: "외관 불량" })
       .first()
       .selectOption("외관 불량");
-    await page.getByRole("button", { name: /격리하기/ }).click();
+    // 제출 → ConfirmModal → 확인
+    await page.getByRole("button", { name: /격리하기 \(1건\)/ }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "격리하기", exact: true })
+      .click();
 
-    // 격리 목록에 항목 등장(즉시 처리)
-    await expect(page.getByText(/불량 1건/)).toBeVisible();
-    await expect(page.getByText("E2E원자재튜브")).toBeVisible();
+    // 격리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 진입 (재로드 경합 flaky 방지)
+    await expect(
+      page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
+    ).toBeVisible();
+    await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
+    // mes 는 모바일·데스크톱 셸을 CSS(lg:hidden)로 둘 다 DOM 에 렌더. 모바일 불량 허브가
+    // 첫 화면에서 격리 목록을 함께 보여주므로 같은 품목명/버튼/빈 메시지가 (숨은) 모바일 셸에도
+    // 존재 → 보이는(데스크톱) 요소만 골라야 strict 위반을 피한다. [[project_e2e_dual_shell_visible_filter]]
+    await expect(page.getByText("E2E원자재튜브").filter({ visible: true }).first()).toBeVisible();
 
     // ── 해제(정상 복귀) ───────────────────────────────────
-    await page.getByRole("button", { name: "처리", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /정상 복귀/ })).toBeVisible();
+    await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
+    await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
     await page
       .locator("select")
       .filter({ hasText: "외관 불량" })
       .first()
       .selectOption("외관 불량");
-    await page.getByRole("button", { name: /정상 복귀/ }).click();
+    // 정상 복귀는 ConfirmModal 없이 직접 제출.
+    // 재설계 후 "정상 복귀" ActionCard 와 제출 버튼이 공존 → 화살표 포함 제출 버튼만 정확히 겨냥.
+    await page.getByRole("button", { name: "정상 복귀 →" }).click();
 
-    // 격리 재고 0 으로 복귀 (KPI — 빈상태 <p>는 레이아웃 중복으로 hidden 일 수 있어 KPI 로 검증)
-    await expect(page.getByRole("button", { name: /격리 중 0/ })).toBeVisible();
+    // 처리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 재진입 (재로드 경합 flaky 방지)
+    await expect(
+      page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
+    ).toBeVisible();
+    await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
+    await expect(
+      page.getByText("격리된 불량 재고가 없습니다.").filter({ visible: true }).first(),
+    ).toBeVisible();
   });
 });

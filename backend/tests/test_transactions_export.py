@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from app.models import (
@@ -81,7 +81,9 @@ def _seed_batch_transaction(db) -> Item:
 
 
 def _range():
-    today = date.today().isoformat()
+    # 시드 거래는 created_at=datetime.utcnow() (UTC). 필터 범위도 UTC 날짜로 맞춰야
+    # KST 자정~오전9시 구간에서 로컬 날짜(today)와 어긋나 빈 결과가 나오지 않는다.
+    today = datetime.utcnow().date().isoformat()
     return f"start_date={today}&end_date={today}"
 
 

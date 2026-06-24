@@ -71,15 +71,22 @@ export async function loginAsOperator(
   return op;
 }
 
-/** 입출고 V2 작성(compose) 화면으로 진입하고 "작업 유형 선택" 단계를 기다린다. */
+/**
+ * 입출고 V2 작성(compose) 화면으로 진입하고 "작업 유형 선택" 단계를 기다린다.
+ *
+ * mes 페이지는 모바일/데스크톱을 CSS(lg:hidden)로 분기하므로 두 셸이 모두 DOM 에 존재한다.
+ * ?tab=warehouse 딥링크에선 모바일 io 위저드의 "작업 유형 선택" h2 도 (숨김 상태로) 함께
+ * 렌더돼 DOM 상 데스크톱 것보다 먼저 온다 → 단순 first() 는 숨은 모바일 요소를 잡아 실패.
+ * 따라서 보이는(=현재 뷰포트의) 요소만 필터한다.
+ */
 export async function gotoWarehouseCompose(page: Page): Promise<void> {
-  await page.goto("/legacy?tab=warehouse");
-  await expect(page.getByText("작업 유형 선택").first()).toBeVisible();
+  await page.goto("/mes?tab=warehouse");
+  await expect(page.getByText("작업 유형 선택").filter({ visible: true }).first()).toBeVisible();
 }
 
-/** 작업 유형 카드 클릭(원자재 입고 / 창고 입출고 / 부서 입출고). 반응형 중복 회피로 first(). */
+/** 작업 유형 카드 클릭(원자재 입고 / 창고 입출고 / 부서 입출고). 반응형 숨김 중복 회피로 visible 필터. */
 export async function pickWorkType(page: Page, label: RegExp): Promise<void> {
-  await page.getByRole("button", { name: label }).first().click();
+  await page.getByRole("button", { name: label }).filter({ visible: true }).first().click();
 }
 
 /** globalSetup 이 저장한 시드(.e2e-seed.json) 를 읽어 테스트에서 품목/직원 식별자에 접근. */

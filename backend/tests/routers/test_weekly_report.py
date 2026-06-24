@@ -40,9 +40,10 @@ def _seed_product_symbols(db_session):
 
 def _make_prod_item(db_session, *, name: str, process_code: str,
                     model_symbol: str | None = None,
+                    serial_no: int | None = None,
                     qty: Decimal = Decimal("0")) -> Item:
     item = Item(item_name=name, process_type_code=process_code, unit="EA",
-                model_symbol=model_symbol)
+                model_symbol=model_symbol, serial_no=serial_no)
     db_session.add(item)
     db_session.flush()
     db_session.add(Inventory(
@@ -164,19 +165,21 @@ def test_production_matrix_excludes_non_produce(client, db_session, tx_type):
     assert _dec(matrix["COCOON"]["total_qty"]) == _dec(0)
 
 
-# ── 부서이동/출하 거래도 생산 실적으로 집계 (2026-05-29~) ─────────────────
+# ── 생산 매트릭스는 PRODUCE 전용 (2026-06-16~) ────────────────────────────
+# 입출고 내역 화면의 '생산'(PRODUCE)과 동일 기준으로 통일. 입고·이동·출하는 제외.
 
 @pytest.mark.parametrize(
     "tx_type,raw_qty",
     [
-        (TransactionTypeEnum.RECEIVE, Decimal("40")),        # 외부 입고도 생산 실적
+        (TransactionTypeEnum.RECEIVE, Decimal("40")),        # 입고는 '생산' 아님
         (TransactionTypeEnum.TRANSFER_TO_WH, Decimal("3")),
-        (TransactionTypeEnum.TRANSFER_DEPT, Decimal("-4")),  # 음수 → abs
-        (TransactionTypeEnum.SHIP, Decimal("-5")),           # 음수 → abs
+        (TransactionTypeEnum.TRANSFER_DEPT, Decimal("-4")),
+        (TransactionTypeEnum.SHIP, Decimal("-5")),
     ],
 )
-def test_production_matrix_includes_outbound_flows(client, db_session, tx_type, raw_qty):
-    """TRANSFER_TO_WH·TRANSFER_DEPT·SHIP 도 매트릭스에 합산되며 부호는 절댓값으로 정규화된다."""
+def test_production_matrix_excludes_non_produce_flows(client, db_session, tx_type, raw_qty):
+    """RECEIVE·TRANSFER_TO_WH·TRANSFER_DEPT·SHIP 는 매트릭스('생산')에 집계되지 않는다.
+    매트릭스 '생산'은 PRODUCE 전용(2026-06-16~)."""
     item = _make_prod_item(db_session, name="DX3000 HF 완료품", process_code="HF",
                            model_symbol="3", qty=_dec(0))
     _add_log(db_session, item.item_id, tx_type=tx_type, qty=raw_qty, at=_WEEK_MID)
@@ -185,8 +188,8 @@ def test_production_matrix_includes_outbound_flows(client, db_session, tx_type, 
     resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
     assert resp.status_code == 200
     row = {r["model_key"]: r for r in resp.json()["production_matrix"]}["DX3000"]
-    assert _dec(row["hf_qty"]) == abs(raw_qty)
-    assert _dec(row["total_qty"]) == abs(raw_qty)
+    assert _dec(row["hf_qty"]) == _dec(0)
+    assert _dec(row["total_qty"]) == _dec(0)
 
 
 # ── 매칭 불가 → 매트릭스 비노출 ──────────────────────────────────────────
@@ -259,6 +262,71 @@ def test_existing_groups_structure_unchanged(client, db_session):
     assert "production_matrix" in body
     assert isinstance(body["groups"], list)
     assert isinstance(body["production_matrix"], list)
+
+
+# ── 품목 상세: 생산(PRODUCE) vs 입고(RECEIVE) 분리 + 전주재고 정확화 (2026-06-16~) ──
+
+def test_item_produce_and_receive_separated(client, db_session):
+    """품목 상세에서 생산(produce_qty=PRODUCE)과 입고(receive_qty=RECEIVE)가 분리 집계된다.
+    입출고 내역 화면의 '생산'(PRODUCE만)과 동일 기준."""
+    item = _make_prod_item(db_session, name="VF 분리검증", process_code="VF",
+                           model_symbol="6", qty=_dec(50))
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(1), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.RECEIVE, qty=_dec(13), at=_WEEK_MID)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+    assert resp.status_code == 200
+    groups = {g["process_code"]: g for g in resp.json()["groups"]}
+    row = {i["item_id"]: i for i in groups["VF"]["items"]}[str(item.item_id)]
+    assert _dec(row["produce_qty"]) == _dec(1)    # 생산 = PRODUCE 만
+    assert _dec(row["receive_qty"]) == _dec(13)   # 입고 = RECEIVE (생산과 분리)
+
+
+def test_prev_qty_reflects_all_transactions(client, db_session):
+    """전주재고/증감은 기간 내 '전체 거래'(폐기·분해 포함)로 역산된다.
+    7-VF-0007 실데이터 시나리오: 현재 193, RECEIVE+13·BACKFLUSH-20·DEFECT_SCRAP-27 → 전주 227."""
+    item = _make_prod_item(db_session, name="VF 전주검증", process_code="VF",
+                           model_symbol="6", qty=_dec(193))
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.RECEIVE, qty=_dec(13), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.BACKFLUSH, qty=_dec(-20), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.DEFECT_SCRAP, qty=_dec(-27), at=_WEEK_MID)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+    assert resp.status_code == 200
+    groups = {g["process_code"]: g for g in resp.json()["groups"]}
+    row = {i["item_id"]: i for i in groups["VF"]["items"]}[str(item.item_id)]
+    assert _dec(row["current_qty"]) == _dec(193)
+    assert _dec(row["prev_qty"]) == _dec(227)     # 193 - (13-20-27) = 193 + 34
+    assert _dec(row["delta"]) == _dec(-34)         # 전체 net (폐기 27 반영)
+    assert _dec(row["produce_qty"]) == _dec(0)     # PRODUCE 없음 → 생산 0 (입출고 내역과 일치)
+    assert _dec(row["receive_qty"]) == _dec(13)
+    assert _dec(row["out_qty"]) == _dec(20)        # SHIP+BACKFLUSH 만 (DEFECT_SCRAP 은 출고 칸 제외)
+
+
+def test_adjust_out_counted_in_out_qty(client, db_session):
+    """낱개 출고(adjust_out)는 ADJUST+qty음수 → 출하 집계(out_qty)에 반영돼야 한다.
+    adjust_in(ADJUST+qty양수)은 out_qty에 포함되지 않아야 한다.
+    NOTE: weekly_report 는 (item_id, tx_type) GROUP BY 집계 — 두 케이스를 별도 품목으로 테스트."""
+    item_out = _make_prod_item(db_session, name="VF 낱개출고", process_code="VF",
+                               model_symbol="6", serial_no=9901, qty=_dec(50))
+    _add_log(db_session, item_out.item_id, tx_type=TransactionTypeEnum.ADJUST, qty=_dec(-3), at=_WEEK_MID)
+
+    item_in = _make_prod_item(db_session, name="VF 수량보정입고", process_code="VF",
+                              model_symbol="6", serial_no=9902, qty=_dec(50))
+    _add_log(db_session, item_in.item_id, tx_type=TransactionTypeEnum.ADJUST, qty=_dec(2), at=_WEEK_MID)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+    assert resp.status_code == 200
+    groups = {g["process_code"]: g for g in resp.json()["groups"]}
+    items_by_id = {i["item_id"]: i for i in groups["VF"]["items"]}
+
+    row_out = items_by_id[str(item_out.item_id)]
+    row_in = items_by_id[str(item_in.item_id)]
+    assert _dec(row_out["out_qty"]) == _dec(3)   # adjust_out(-3) → 출하 3
+    assert _dec(row_in["out_qty"]) == _dec(0)    # adjust_in(+2) → 출하 0 (입고이므로 미집계)
 
 
 # ── 회귀 방어 — 신규 enum 추가 시 분류 누락 검출 ─────────────────────────

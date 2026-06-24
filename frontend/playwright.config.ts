@@ -28,6 +28,10 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
+  // CI 러너 부하 + next dev 라우트 컴파일 + SQLite 경합으로 기본 타임아웃이 가끔 초과돼
+  // flaky 발생 → per-test·assertion 타임아웃을 넉넉히 상향해 완충.
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   use: {
     baseURL: process.env.E2E_BASE_URL ?? `http://127.0.0.1:${FRONT_PORT}`,
     trace: "on-first-retry",

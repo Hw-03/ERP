@@ -1,23 +1,31 @@
-# MES 문서 목차
+# Docs Index
 
-이 폴더에는 현재 개발과 운영 판단에 필요한 문서만 둔다.
+This folder now mixes two kinds of material:
 
-## 현재 기준 문서
+- current reference docs that still describe the live repository, and
+- archived plans, reviews, and research kept for historical context.
 
-| 문서 | 용도 |
-|---|---|
-| `ITEM_CODE_RULES.md` | 품목코드와 공정코드의 최종 기준. `AF` 기준과 `AF` 사용 금지를 명시한다. |
-| `AI_HANDOVER.md` | Claude/Codex가 이어받을 때 보는 최신 인수인계 문서. |
-| `CODEX_PROGRESS.md` | 큰 기능 단위의 진행 이력과 최근 변경 요약. |
+## Start Here
 
-## 참고 자료
+- [Root README](../../README.md): project entry point and startup guide.
+- [Repo Layout](REPO_LAYOUT.md): current live paths, moved files, and archive boundaries.
+- [Context](CONTEXT.md): business/domain overview.
+- [Glossary](GLOSSARY.md): shared terms and process vocabulary.
+- [Item Code Rules](ITEM_CODE_RULES.md): current item-code rules. Assembly F
+  type is `AF`; `BF` is deprecated and must not be reintroduced.
+- [Codex Progress](CODEX_PROGRESS.md): rolling implementation/progress log.
+- [Operations](OPERATIONS.md): operator/runtime procedures.
 
-| 경로 | 용도 |
-|---|---|
-| `design/` | 레거시/데스크톱 UI 디자인 참고 자료, 스크린샷, 발표 자료. 현재 업무 규칙의 기준 문서는 아니다. |
+## Historical Notes
 
-## 정리 기준
+- [AI Handover](../ai/AI_HANDOVER.md): older Claude/Codex handoff notes. Treat
+  this as archive context.
+- `research/`, one-off plans, review notes, and prototypes remain here for
+  reference only unless a file explicitly says it is current.
 
-- 현재 규칙과 충돌하거나 인코딩이 깨진 초기 산출물은 삭제한다.
-- 과거 내용이 필요하면 git 히스토리에서 확인한다.
-- 품목코드 기준은 항상 `ITEM_CODE_RULES.md`를 우선한다.
+## Current Repo Facts
+
+- There is no active root `docs/` folder.
+- There is no active `vault/` folder.
+- `schema.sql` lives at `backend/schema.sql`.
+- Docker compose files live under `docker/`.

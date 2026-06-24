@@ -35,7 +35,7 @@ test.describe("결재 풀사이클 — 창고 승인", () => {
     const ctxB = await browser.newContext();
     const b = await ctxB.newPage();
     await loginAsOperator(b, { code: "E22" });
-    await b.goto("/legacy?tab=warehouse");
+    await b.goto("/mes?tab=warehouse");
     await b.getByRole("tab", { name: /창고 승인함/ }).click();
 
     // 대기 요청(창고 → 부서 · 김민재) 등장

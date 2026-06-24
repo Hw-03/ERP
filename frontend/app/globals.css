@@ -100,8 +100,11 @@
   }
 
   html {
-    font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    font-family: var(--font-pretendard), "Noto Sans KR", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    /* 항목 7-1 — 빈 배경 당김 고무줄(rubber-band) 바운스 차단. 셸이 이미 뷰포트 잠금(overflow-hidden)
+       이라 이 한 줄로 페이지 전체가 출렁이는 현상이 사라진다. 데스크톱 영향 없음. */
+    overscroll-behavior: none;
   }
 
   body {
@@ -109,6 +112,7 @@
     color: var(--c-text);
     min-height: 100vh; /* fallback */
     min-height: 100dvh; /* iOS Safari: 하단 툴바 포함 동적 뷰포트 — 하단 탭바 가림 방지 */
+    overscroll-behavior: none;
   }
 
   /* 스크롤바 스타일 */
@@ -182,9 +186,15 @@
     box-shadow: inset 0 2px 8px rgba(255, 255, 255, 0.18);
   }
 
-  /* opt-out — 아이콘 X 버튼·드래그 핸들·색상 팔레트 등에 적용 */
+  /* opt-out — 아이콘 X 버튼·드래그 핸들·색상 팔레트 등에 적용.
+     aria-current/aria-pressed 규칙보다 specificity 가 낮아 덮어쓰이므로
+     해당 속성 조합도 함께 명시해 완전히 제거한다. */
   button.no-btn-inset,
-  :root[data-theme="dark"] button.no-btn-inset {
+  button.no-btn-inset[aria-current]:not([aria-current="false"]),
+  button.no-btn-inset[aria-pressed="true"],
+  :root[data-theme="dark"] button.no-btn-inset,
+  :root[data-theme="dark"] button.no-btn-inset[aria-current]:not([aria-current="false"]),
+  :root[data-theme="dark"] button.no-btn-inset[aria-pressed="true"] {
     box-shadow: none;
   }
 }
@@ -224,6 +234,16 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* === 불량 탭 뷰 전환 페이드 === */
+@keyframes viewSlide {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-view-fade {
+  animation: viewSlide 200ms ease-out;
+}
+
 /* === Admin PIN Lock (DesktopPinLock) === */
 @keyframes admin-pin-shake {
   0%, 100% { transform: translateX(0); }
@@ -233,6 +253,17 @@
 
 .animate-admin-pin-shake {
   animation: admin-pin-shake 0.4s ease-in-out;
+}
+
+/* === 입출고 Step3 진입 시 선택 품목 '줄 전체' 강조 (대시보드 빠른작업으로 들어온 조립품) === */
+@keyframes rowFlash {
+  0%, 100% { background-color: transparent; }
+  50%      { background-color: color-mix(in srgb, var(--c-blue) 28%, transparent); }
+}
+
+.animate-row-flash {
+  /* 3회 깜빡 — 버튼이 아니라 행 배경 전체가 또렷이 점멸 (0.5s × 3회) */
+  animation: rowFlash 0.5s ease-in-out 3;
 }
 
 /* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */
@@ -247,6 +278,7 @@
   }
   .flow-arrow,
   .animate-fade-in,
+  .animate-view-fade,
   .animate-pulse-slow,
   [data-anim="sheetUp"] {
     animation: none !important;

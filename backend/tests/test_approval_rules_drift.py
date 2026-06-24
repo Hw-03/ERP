@@ -15,7 +15,7 @@ from app.services.approval_rules import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_IO_WORK_TYPE_TS = _REPO_ROOT / "frontend/app/legacy/_components/_warehouse_v2/ioWorkType.ts"
+_IO_WORK_TYPE_TS = _REPO_ROOT / "frontend/app/mes/_components/_warehouse_v2/ioWorkType.ts"
 
 
 def _ts() -> str:

@@ -5,11 +5,13 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
     Index,
+    JSON,
     String,
     Text,
     func,
@@ -54,6 +56,8 @@ class TransactionLog(Base):
     quantity_change = Column(IntQuantity, nullable=False)
     quantity_before = Column(IntQuantity, nullable=True)
     quantity_after = Column(IntQuantity, nullable=True)
+    warehouse_qty_before = Column(IntQuantity, nullable=True)
+    warehouse_qty_after = Column(IntQuantity, nullable=True)
     transfer_qty = Column(IntQuantity, nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
@@ -68,6 +72,7 @@ class TransactionLog(Base):
     # 카테고리 enum 은 프론트 상수로만 정의, 백엔드는 자유 문자열로 받음.
     reason_category = Column(String(32), nullable=True, index=True)
     reason_memo = Column(Text, nullable=True)
+    client_request_id = Column(String(36), nullable=True, unique=True)
     operation_batch_id = Column(
         UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
@@ -75,6 +80,18 @@ class TransactionLog(Base):
         index=True,
     )
     department = Column(String(50), nullable=True, index=True)
+    cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
+    cancel_reason = Column(Text, nullable=True)
+    cancelled_by = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    cancelled_at = Column(DateTime, nullable=True)
+    # 이 거래가 건드린 재고 셀의 증감 기록 — 취소 시 부호 반전해 일반적으로 역재생.
+    # 예: [{"scope":"warehouse","delta":-100},{"scope":"location","department":"조립","status":"DEFECTIVE","delta":100}]
+    # 이번 재구현 이전 로그는 None → _cancel_one_log 의 레거시 폴백 경로로 처리.
+    inventory_effect = Column(JSON, nullable=True)
     created_at = Column(
         DateTime,
         nullable=False,

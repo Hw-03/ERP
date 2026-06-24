@@ -80,6 +80,7 @@ export const queryKeys = {
   production: {
     all: ["production"] as const,
     capacity: () => ["production", "capacity"] as const,
+    pfPins: () => ["production", "pfPins"] as const,
     transactions: (params?: object) =>
       ["production", "transactions", params ?? {}] as const,
     transactionEdits: (logId: string) =>
@@ -88,5 +89,9 @@ export const queryKeys = {
   admin: {
     all: ["admin"] as const,
     auditCsvList: () => ["admin", "auditCsvList"] as const,
+  },
+  myItemOrder: {
+    all: ["myItemOrder"] as const,
+    byEmployee: (employeeId: string) => ["myItemOrder", employeeId] as const,
   },
 } as const;

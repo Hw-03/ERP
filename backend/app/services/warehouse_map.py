@@ -16,6 +16,7 @@ from app.models import (
     Department,
     Inventory,
     Item,
+    SystemSetting,
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
@@ -42,6 +43,90 @@ def department_for_item(item: Item) -> Optional[str]:
     if not code:
         return None
     return _PREFIX_TO_DEPT.get(code[0])
+
+
+# ──────────────────────────── 박스 추적 활성화 플래그 ────────────────────────────
+
+BOX_TRACKING_KEY = "warehouse_box_tracking_enabled"
+
+
+def is_box_tracking_enabled(db: Session) -> bool:
+    """창고 박스 자동 차감 기능 활성 여부. 기본 False(미설정 시 현행 동작 유지)."""
+    setting = (
+        db.query(SystemSetting)
+        .filter(SystemSetting.setting_key == BOX_TRACKING_KEY)
+        .first()
+    )
+    return bool(setting and setting.setting_value == "true")
+
+
+def set_box_tracking_enabled(db: Session, enabled: bool) -> None:
+    """박스 추적 플래그 설정. 호출 측에서 commit 책임."""
+    value = "true" if enabled else "false"
+    setting = (
+        db.query(SystemSetting)
+        .filter(SystemSetting.setting_key == BOX_TRACKING_KEY)
+        .first()
+    )
+    if setting:
+        setting.setting_value = value
+    else:
+        db.add(SystemSetting(setting_key=BOX_TRACKING_KEY, setting_value=value))
+    db.flush()
+
+
+# ──────────────────────────── 박스 수량 차감 (R1~R5) ────────────────────────────
+
+
+def boxes_total_for_item(db: Session, item_id) -> int:
+    """해당 품목이 배치된 박스 수량 합. R5 검증·미배치 판정 공용."""
+    total = (
+        db.query(func.coalesce(func.sum(WarehouseBoxItem.quantity), 0))
+        .filter(WarehouseBoxItem.item_id == item_id)
+        .scalar()
+    )
+    return int(total or 0)
+
+
+def deplete_boxes_by_order(db: Session, item_id, qty) -> None:
+    """창고 출고(warehouse_qty 감소)에 맞춰 박스 수량을 R1 순서로 차감.
+
+    정렬(R1): 층↓(layer_no DESC) → 줄↑(row_no ASC) → 자리↑(jari_index ASC)
+              → 스택↓(stack_order DESC, 위 박스 먼저).
+    첫 비어있지 않은 박스부터 깎고 0이 되면 다음으로(R2). 빈 박스는 건너뜀(R3).
+    박스 합 < qty 면 ValueError(R5 — 항상 차단). 호출 측 트랜잭션에서 롤백된다.
+    """
+    need = int(qty)
+    if need <= 0:
+        return
+
+    rows = (
+        db.query(WarehouseBoxItem)
+        .join(WarehouseBox, WarehouseBoxItem.box_id == WarehouseBox.box_id)
+        .filter(WarehouseBoxItem.item_id == item_id, WarehouseBoxItem.quantity > 0)
+        .order_by(
+            WarehouseBox.layer_no.desc(),
+            WarehouseBox.row_no.asc(),
+            WarehouseBox.jari_index.asc(),
+            WarehouseBox.stack_order.desc(),
+        )
+        .all()
+    )
+
+    available = sum(int(r.quantity) for r in rows)
+    if available < need:
+        raise ValueError(
+            f"박스 배치 수량 부족 — 창고 지도에서 먼저 배치하세요. (배치 {available}, 필요 {need})"
+        )
+
+    remaining = need
+    for r in rows:
+        if remaining <= 0:
+            break
+        take = min(remaining, int(r.quantity))
+        r.quantity = int(r.quantity) - take
+        remaining -= take
+    db.flush()
 
 
 def _dept_color_map(db: Session) -> dict[str, Optional[str]]:

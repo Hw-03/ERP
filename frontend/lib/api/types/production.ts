@@ -16,17 +16,27 @@ export interface TransactionLog {
   quantity_change: number;
   quantity_before: number | null;
   quantity_after: number | null;
+  warehouse_qty_before: number | null;
+  warehouse_qty_after: number | null;
   transfer_qty: number | null;
   reference_no: string | null;
   produced_by: string | null;
   requester_name: string | null;
   /** 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자. */
   approver_name: string | null;
+  /** 요청 시각: 배치 submitted_at ?? created_at, 없으면 log.created_at. */
+  requested_at?: string | null;
+  /** 승인 시각: 별도 결재 시 StockRequest.approved_at, 아니면 log.created_at. */
+  approved_at?: string | null;
+  department: string | null;
   notes: string | null;
   operation_batch_id: string | null;
   created_at: string;
-  /** 3차: 수정 이력 개수 (서버 응답에 포함). */
   edit_count?: number;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
 }
 
 /** 거래 수정 이력 (3차 메타 수정 + 4차 수량 보정 공통). */
@@ -81,6 +91,71 @@ export interface ProductionCapacityItem {
   limiting_item?: string | null;
 }
 
+/** AF(조립 완제품) 기준 상태. legacy status + "incomplete"(일부 BOM 미등록). */
+export type ProductionCapacityAfStatus =
+  | "no_target"
+  | "bom_not_registered"
+  | "incomplete"
+  | "not_producible"
+  | "producible";
+
+/** PF 기준 요약 3수량. PF 변형별 독립 계산의 합계(공유 자재 시 동시 보장 아님). */
+export interface ProductionCapacityAfSummary {
+  /** 출하 대기 — 창고에 있는 완성 PF 재고. */
+  ship_ready: number;
+  /** 빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 (포장 구간 포함). */
+  fast_production: number;
+  /** 총생산 — PF 루트로 BOM 전체 재귀 이론 최대. */
+  total_production: number;
+}
+
+/** AF 1종의 생산 가능 수량 + 병목 + BOM 상태 근거. 수치는 연결된 PF 변형 best 값. */
+export interface ProductionCapacityAfItem {
+  af_item_id: string;
+  af_code: string | null;
+  af_name: string;
+  model_symbol?: string | null;
+  ship_ready: number;
+  fast_production: number;
+  total_production: number;
+  ship_ready_limiting_item?: string | null;
+  fast_production_limiting_item?: string | null;
+  total_production_limiting_item?: string | null;
+  bom_status: "complete" | "incomplete";
+  has_direct_children: boolean;
+  /** 역방향 BOM 상 출하 경로(PF)가 1개 이상 존재. false 면 모든 수치 0. */
+  has_pf_path: boolean;
+  /** bom_completed_at 기록 여부(표시 신호 — 계산 게이팅 아님). */
+  marked_complete: boolean;
+}
+
+/** AF 에 연결된 PF 변형 — PF 1종 기준 3수량. */
+export interface ProductionCapacityPfVariant {
+  pf_item_id: string;
+  pf_code: string | null;
+  pf_name: string;
+  model_symbol?: string | null;
+  af_item_id: string | null;
+  /** 출하 대기 — 이 PF 완성 재고. */
+  ship_ready: number;
+  /** 빠른 생산 — AF재고 + 1단계 부품 → 이 PF로 환산. */
+  fast_production: number;
+  /** 총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대. */
+  total_production: number;
+  fast_production_limiting_item?: string | null;
+  total_production_limiting_item?: string | null;
+  bom_status: "complete" | "incomplete";
+}
+
+/** AF(조립 완제품) 기준 신규 생산 가능 수량 블록. */
+export interface ProductionCapacityAfBlock {
+  basis: "AF";
+  status: ProductionCapacityAfStatus;
+  summary: ProductionCapacityAfSummary;
+  items: ProductionCapacityAfItem[];
+  pf_variants: ProductionCapacityPfVariant[];
+}
+
 export interface ProductionCapacity {
   immediate: number;
   maximum: number;
@@ -90,6 +165,8 @@ export interface ProductionCapacity {
   top_items: ProductionCapacityItem[];
   /** 모델별 대표 PF 만 골라낸 리스트. 패널/모달 상단 표시용. */
   representative_items?: ProductionCapacityItem[];
+  /** AF 기준 신규 블록. 있으면 패널·모달이 이걸 우선 표시. 없으면 legacy(immediate/maximum) fallback. */
+  af?: ProductionCapacityAfBlock | null;
 }
 
 export interface BackflushDetail {

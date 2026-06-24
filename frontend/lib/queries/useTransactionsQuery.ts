@@ -22,12 +22,16 @@ import { queryKeys } from "./keys";
 type TransactionParams = Parameters<typeof productionApi.getTransactions>[0];
 type SummaryParams = Parameters<typeof productionApi.getTransactionsSummary>[0];
 
-export function useTransactionsQuery(params?: TransactionParams) {
+export function useTransactionsQuery(
+  params?: TransactionParams,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: queryKeys.transactions.list(params),
     queryFn: () => productionApi.getTransactions(params),
     // 입출고 내역은 신규 트랜잭션이 자주 추가됨 → 짧게 (R2-1).
     staleTime: STALE_TIME.VOLATILE,
+    enabled: options?.enabled ?? true,
   });
 }
 

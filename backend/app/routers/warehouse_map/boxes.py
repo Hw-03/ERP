@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
+from app.dependencies.warehouse_manager import require_warehouse_manager
 from app.models import (
     BoxSizeEnum,
+    Employee,
     Item,
     WarehouseAngle,
     WarehouseBox,
@@ -17,8 +19,12 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
+    BoxTrackingResponse,
+    BoxTrackingUpdate,
+    JariRestackPayload,
     WarehouseBoxCreate,
     WarehouseBoxItemPayload,
+    WarehouseBoxMove,
     WarehouseBoxResponse,
     WarehouseBoxUpdate,
 )
@@ -26,6 +32,21 @@ from app.services import warehouse_map as wm_service
 from app.services.warehouse_map import JARI_CAPACITY, SIZE_UNIT
 
 router = APIRouter()
+
+
+@router.put("/box-tracking", response_model=BoxTrackingResponse)
+def set_box_tracking(
+    payload: BoxTrackingUpdate,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
+    """창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).
+
+    켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.
+    """
+    wm_service.set_box_tracking_enabled(db, payload.enabled)
+    db.commit()
+    return BoxTrackingResponse(enabled=wm_service.is_box_tracking_enabled(db))
 
 
 def _validate_coords(db: Session, angle_id: int, row_no: int, layer_no: int, jari_index: int) -> WarehouseAngle:
@@ -71,7 +92,7 @@ def _box_response(db: Session, box_id) -> WarehouseBoxResponse:
 @router.post("/boxes", response_model=WarehouseBoxResponse, status_code=status.HTTP_201_CREATED)
 def create_box(
     payload: WarehouseBoxCreate,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
@@ -115,7 +136,7 @@ def create_box(
 def update_box(
     box_id: str,
     payload: WarehouseBoxUpdate,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
@@ -141,10 +162,97 @@ def update_box(
     return _box_response(db, box.box_id)
 
 
+@router.patch("/boxes/{box_id}/move", response_model=WarehouseBoxResponse)
+def move_box(
+    box_id: str,
+    payload: WarehouseBoxMove,
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
+    db: Session = Depends(get_db),
+):
+    """박스를 다른 자리로 이동(드래그). 같은 자리면 맨 위로 올림(스택 순서 변경).
+
+    대상 자리 용량 초과 시 422 차단. 어느 경우든 박스는 대상 자리의 맨 위로 간다
+    (stack_order 최대+1) — 차감 시 위 박스부터 빠지는 R1 순서와 일치.
+    """
+    box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
+    if not box:
+        raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
+
+    same_jari = (box.angle_id, box.row_no, box.layer_no, box.jari_index) == (
+        payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index
+    )
+
+    # 다른 자리로 옮길 때만 좌표·용량 검증 (같은 자리는 이미 들어가 있으므로 생략).
+    if not same_jari:
+        _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+        used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+        box_unit = SIZE_UNIT[box.size.value if hasattr(box.size, "value") else box.size]
+        if used + box_unit > JARI_CAPACITY:
+            raise http_error(
+                422, ErrorCode.VALIDATION_ERROR,
+                f"자리 용량 초과 — 남은 높이 {JARI_CAPACITY - used}, 박스 높이 {box_unit}.",
+            )
+        box.angle_id = payload.angle_id
+        box.row_no = payload.row_no
+        box.layer_no = payload.layer_no
+        box.jari_index = payload.jari_index
+
+    max_order = (
+        db.query(func.max(WarehouseBox.stack_order))
+        .filter(
+            WarehouseBox.angle_id == payload.angle_id,
+            WarehouseBox.row_no == payload.row_no,
+            WarehouseBox.layer_no == payload.layer_no,
+            WarehouseBox.jari_index == payload.jari_index,
+        )
+        .scalar()
+    )
+    box.stack_order = (max_order or 0) + 1
+    db.commit()
+    return _box_response(db, box.box_id)
+
+
+@router.patch("/boxes/restack", response_model=List[WarehouseBoxResponse])
+def restack_jari(
+    payload: JariRestackPayload,
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
+    db: Session = Depends(get_db),
+):
+    """한 자리의 스택 순서를 통째로 재배치(중간 삽입 포함). box_ids = 아래→위 최종 순서.
+
+    다른 자리에서 끌어온 박스도 이 자리로 이동된다. 합계 높이 초과 시 422.
+    """
+    _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+    box_ids = [str(b) for b in payload.box_ids]
+    boxes = db.query(WarehouseBox).filter(WarehouseBox.box_id.in_(box_ids)).all()
+    if len(boxes) != len(set(box_ids)):
+        raise http_error(404, ErrorCode.NOT_FOUND, "일부 박스를 찾을 수 없습니다.")
+
+    total = sum(SIZE_UNIT[b.size.value if hasattr(b.size, "value") else b.size] for b in boxes)
+    if total > JARI_CAPACITY:
+        raise http_error(
+            422, ErrorCode.VALIDATION_ERROR,
+            f"자리 용량 초과 — 합계 높이 {total}, 최대 {JARI_CAPACITY}.",
+        )
+
+    by_id = {str(b.box_id): b for b in boxes}
+    for idx, bid in enumerate(box_ids):
+        b = by_id[bid]
+        b.angle_id = payload.angle_id
+        b.row_no = payload.row_no
+        b.layer_no = payload.layer_no
+        b.jari_index = payload.jari_index
+        b.stack_order = idx
+    db.commit()
+
+    full = wm_service.build_map_payload(db)
+    return [b for b in full["boxes"] if str(b["box_id"]) in set(box_ids)]
+
+
 @router.delete("/boxes/{box_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_box(
     box_id: str,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()

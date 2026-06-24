@@ -45,6 +45,8 @@ export function useMyStockRequestsQuery(employeeId: string) {
     enabled: !!employeeId,
     // 내 요청 상태가 승인 흐름 따라 자주 바뀜 → 짧게 (R2-1).
     staleTime: STALE_TIME.VOLATILE,
+    // MyRequestsPanel 의 수동 setInterval(30s) 폴링 대체.
+    refetchInterval: 30_000,
   });
 }
 
@@ -80,6 +82,38 @@ export function useRejectStockRequestMutation() {
   });
 }
 
+/** 부서 승인 */
+export function useApproveStockRequestDepartmentMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      payload,
+    }: {
+      requestId: string;
+      payload: StockRequestActionPayload;
+    }) => stockRequestsApi.approveStockRequestDepartment(requestId, payload),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+  });
+}
+
+/** 부서 반려 */
+export function useRejectStockRequestDepartmentMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      payload,
+    }: {
+      requestId: string;
+      payload: StockRequestActionPayload;
+    }) => stockRequestsApi.rejectStockRequestDepartment(requestId, payload),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+  });
+}
+
 /** 요청 취소 */
 export function useCancelStockRequestMutation() {
   const qc = useQueryClient();
@@ -93,6 +127,24 @@ export function useCancelStockRequestMutation() {
     }) => stockRequestsApi.cancelStockRequest(requestId, payload),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+  });
+}
+
+/** 요청을 draft로 복원 (수정 후 재제출용) */
+export function useRevertToDraftMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      payload,
+    }: {
+      requestId: string;
+      payload: StockRequestActionPayload;
+    }) => stockRequestsApi.revertToDraft(requestId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all });
+      qc.invalidateQueries({ queryKey: ["io-drafts"] });
+    },
   });
 }
 

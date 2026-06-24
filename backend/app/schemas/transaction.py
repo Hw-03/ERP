@@ -62,17 +62,25 @@ class TransactionLogResponse(BaseModel):
     quantity_change: int
     quantity_before: Optional[int]
     quantity_after: Optional[int]
+    warehouse_qty_before: Optional[int] = None
+    warehouse_qty_after: Optional[int] = None
     transfer_qty: Optional[int] = None
+    department: Optional[str] = None
     reference_no: Optional[str]
     produced_by: Optional[str]
     producer_employee_id: Optional[uuid.UUID] = None
     requester_name: Optional[str] = None
-    # 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자.
     approver_name: Optional[str] = None
+    requested_at: Optional[UtcDatetime] = None
+    approved_at: Optional[UtcDatetime] = None
     notes: Optional[str]
     operation_batch_id: Optional[uuid.UUID] = None
     created_at: UtcDatetime
-    edit_count: int = 0  # 3차: 수정 이력 개수
+    edit_count: int = 0
+    cancelled: bool = False
+    cancel_reason: Optional[str] = None
+    cancelled_by: Optional[uuid.UUID] = None
+    cancelled_at: Optional[UtcDatetime] = None
 
 
 class TransactionQuantityCorrectionResponse(BaseModel):

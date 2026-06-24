@@ -77,6 +77,9 @@ export const stockRequestsApi = {
   cancelStockRequest: (requestId: string, payload: StockRequestActionPayload) =>
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/cancel`), payload),
 
+  revertToDraft: (requestId: string, payload: StockRequestActionPayload) =>
+    postJson<void>(toApiUrl(`/api/stock-requests/${requestId}/revert-to-draft`), payload),
+
   getItemReservations: (itemId: string) =>
     fetcher<StockRequestReservationLine[]>(
       toApiUrl(`/api/stock-requests/reservations?item_id=${encodeURIComponent(itemId)}`),

@@ -9,8 +9,13 @@
  *   import { api } from "@/lib/api";  // ...itemsApi 포함됨 (호환)
  */
 
-import { fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
 import type { Item } from "./types";
+
+export interface ItemOrderEntry {
+  item_id: string;
+  display_order: number;
+}
 
 export const itemsApi = {
   getItems: (
@@ -47,6 +52,7 @@ export const itemsApi = {
     min_stock?: number;
     initial_quantity?: number;
     model_slots?: number[];
+    initial_locations?: { department: string; quantity: number }[];
   }) => postJson<Item>(toApiUrl("/api/items"), payload),
 
   updateItem: async (
@@ -78,4 +84,16 @@ export const itemsApi = {
     items: { item_id: string; display_order: number }[];
     pin: string;
   }) => patchJson<{ ok: boolean }>(toApiUrl("/api/items/reorder"), payload),
+
+  /** 직원별 개인 품목 순서 조회. 행 없으면 []. 직원 없으면 404(ApiError). */
+  getMyItemOrder: (employeeId: string) =>
+    fetcher<ItemOrderEntry[]>(toApiUrl(`/api/items/my-order?employee_id=${encodeURIComponent(employeeId)}`)),
+
+  /** 직원별 개인 품목 순서 전체 교체 (PUT). */
+  putMyItemOrder: (payload: { employee_id: string; items: ItemOrderEntry[] }) =>
+    putJson<{ ok: boolean }>(toApiUrl("/api/items/my-order"), payload),
+
+  /** 직원별 개인 품목 순서 초기화 — 행 전부 삭제. */
+  resetMyItemOrder: (employeeId: string) =>
+    deleteJson<{ ok: boolean }>(toApiUrl(`/api/items/my-order?employee_id=${encodeURIComponent(employeeId)}`)),
 };
