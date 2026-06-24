@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -58,6 +58,42 @@ def unread_count(
         .count()
     )
     return {"count": int(n)}
+
+
+@router.delete("/read")
+def delete_read_notifications(
+    recipient_employee_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+) -> Response:
+    """읽은 알림 전체 하드 삭제."""
+    db.query(Notification).filter(
+        Notification.recipient_employee_id == recipient_employee_id,
+        Notification.is_read.is_(True),
+    ).delete()
+    commit_only(db)
+    return Response(status_code=204)
+
+
+@router.delete("/{notification_id}")
+def delete_notification(
+    notification_id: uuid.UUID,
+    recipient_employee_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+) -> Response:
+    """알림 개별 하드 삭제. 본인 소유 확인."""
+    row = (
+        db.query(Notification)
+        .filter(
+            Notification.notification_id == notification_id,
+            Notification.recipient_employee_id == recipient_employee_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    db.delete(row)
+    commit_only(db)
+    return Response(status_code=204)
 
 
 @router.post("/mark-read", response_model=NotificationListResponse)
