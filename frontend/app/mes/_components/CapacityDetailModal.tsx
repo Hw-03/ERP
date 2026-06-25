@@ -52,9 +52,9 @@ export function CapacityDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── 헤더 ───────────────────────────────────────── */}
-        <div className="border-b px-4 pb-5 pt-5 sm:px-7 sm:pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="border-b px-4 pb-3 pt-4 sm:px-7 sm:pb-5 sm:pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex items-start justify-between">
-            <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>
+            <div className="text-lg font-black sm:text-2xl" style={{ color: LEGACY_COLORS.text }}>
               생산 가능수량
             </div>
             <button
@@ -66,37 +66,37 @@ export function CapacityDetailModal({
               ✕
             </button>
           </div>
-          <div className="mt-0.5 text-base font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mt-0.5 text-xs font-semibold sm:text-base" style={{ color: LEGACY_COLORS.muted2 }}>
             조립 완제품(AF) 기준
           </div>
-          <div className="mt-3 space-y-1.5">
-            <div className="flex items-start gap-2 text-base leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mt-2 space-y-1 sm:mt-3 sm:space-y-1.5">
+            <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
               <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 창고에 이미 완성된 PF(출하 완제품) 재고예요. 부품 확인 없이 지금 당장 고객에게 보낼 수 있어요.</span>
             </div>
-            <div className="flex items-start gap-2 text-base leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
               <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span> — AF 재고 + AF 직계 1단계 부품으로 만들 수 있는 AF를 PF로 환산한 수량이에요. 포장 구간 부품도 함께 확인해요.</span>
             </div>
-            <div className="flex items-start gap-2 text-base leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.purple }} />
               <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — PF를 기준으로 BOM 전체를 끝까지 펼쳐서 이론적으로 만들 수 있는 최대 수량이에요. 부품 공유로 인한 중복은 제거해요.</span>
             </div>
           </div>
           <div
-            className="mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-base font-semibold"
+            className="mt-2 flex items-start gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold sm:mt-3 sm:inline-flex sm:items-center sm:rounded-full sm:py-1 sm:text-base"
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`,
               color: LEGACY_COLORS.yellow,
             }}
           >
-            <AlertTriangle className="h-3 w-3" />
+            <AlertTriangle className="h-3 w-3 mt-[2px] shrink-0 sm:mt-0" />
             {SHARED_HINT}
           </div>
         </div>
 
         {/* ── 본문 (스크롤) ───────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-4 py-8 sm:px-7">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-7 sm:py-8">
           {af ? (
             <AfCapacityView af={af} />
           ) : (

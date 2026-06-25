@@ -118,7 +118,7 @@ export function MyRequestRow({
           <button
             type="button"
             onClick={() => setLinesExpanded((v) => !v)}
-            className="pt-1.5 text-left text-xs underline-offset-2 hover:underline"
+            className="no-btn-inset pt-1.5 text-left text-xs underline-offset-2 hover:underline"
             style={{ color: LEGACY_COLORS.cyan }}
           >
             {linesExpanded ? "접기" : `외 ${req.lines.length - 5}건 더보기`}

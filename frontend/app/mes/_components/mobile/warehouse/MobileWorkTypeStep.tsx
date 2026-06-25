@@ -221,7 +221,7 @@ export function MobileSubTypeStep({
               >
                 <span className="text-xl font-black leading-tight">{row.label}</span>
                 <span
-                  className="text-sm font-semibold leading-tight"
+                  className="text-xs font-semibold leading-tight tracking-tight whitespace-nowrap"
                   style={{ color: LEGACY_COLORS.muted2 }}
                 >
                   {row.description}

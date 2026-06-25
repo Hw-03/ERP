@@ -212,10 +212,9 @@ export function MobileDefectCartFlow({
         <div className="shrink-0 pb-3">{header}</div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* 항목 7-6 — 출처 토글과 격리 부서 버튼 크기를 맞추며(부서 버튼 축소), 남는 세로 여백은
-              콘텐츠를 중앙 정렬해 위아래로 분산(화면 비율 유지). */}
-          <div className="flex min-h-full flex-col justify-center gap-4 pb-3">
-            <div className="flex flex-col gap-2">
+          {/* 항목 8-2 — 입출고 Step2 처럼 출처·부서가 가용 높이를 균등 분할(justify-center 제거). */}
+          <div className="flex min-h-full flex-col gap-4 pb-3">
+            <div className="flex flex-1 flex-col gap-2">
               <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
                 출처
               </span>
@@ -227,6 +226,7 @@ export function MobileDefectCartFlow({
                 active={source}
                 onChange={(s) => setSource(s as SourceKind)}
                 size="lg"
+                className="flex-1"
               />
               <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted }}>
                 {source === "warehouse"
@@ -250,13 +250,12 @@ export function MobileDefectCartFlow({
                 </div>
               </SectionCard>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-1 flex-col gap-2">
                 <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
                   {mode === "add" ? "출처·격리 부서" : "출처 부서"}
                 </span>
-                {/* 항목 7-6 — 세로 스트레치(flex-1) 제거 → 버튼이 콘텐츠 높이로. 출처 토글과 크기를
-                    맞추려 버튼 높이를 고정값으로 축소(기존 늘어난 ~140px → ~64px). */}
-                <div className="grid auto-rows-fr grid-cols-3 gap-2">
+                {/* 항목 8-2 — flex-1 복원 → 부서 그리드가 남은 높이를 채움. */}
+                <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
                   {PRODUCTION_LINES.map((d) => {
                     const active = dept === d;
                     const c = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2;
@@ -286,7 +285,7 @@ export function MobileDefectCartFlow({
           </div>
         </div>
 
-        <StickyFooter flat>
+        <StickyFooter flat compact>
           <PrimaryActionButton label="다음 →" intent="primary" onClick={() => setStep(2)} />
         </StickyFooter>
       </div>
@@ -389,7 +388,7 @@ export function MobileDefectCartFlow({
         </div>
       </div>
 
-      <StickyFooter flat>
+      <StickyFooter flat compact>
         {failures.length > 0 && (
           <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.red }}>
             {failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.
