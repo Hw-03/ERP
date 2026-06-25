@@ -8,7 +8,7 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
 ## Agent Skills
 
 - Repo-local skills live in `.agents/skills/` and should be treated as the shared Claude/Codex workflow layer for this MES project.
-- Before starting a task, check whether a relevant skill applies. If a skill applies, read its `SKILL.md` and follow it before taking task actions.
+- Before starting a task, check whether a relevant skill applies. If a skill applies, **read the `SKILL.md` file directly** (e.g. `.agents/skills/brainstorming/SKILL.md`) and follow it before taking task actions.
 - Prefer these workflow skills when relevant:
   - `using-superpowers`: skill discovery and activation discipline.
   - `brainstorming`: feature/design/change shaping before implementation.
@@ -72,7 +72,7 @@ For Codex plans, also include the recommended execution shape when useful: solo 
     - Mixed: `2026-05-26 fix(items): X` (date is OK but `type(scope)` in area is forbidden)
   - Merge commits (`Merge ...`) keep git's auto-generated message as-is; do not edit.
   - The body is free-form. The above rules apply to the subject line only.
-  - **Multi-line message safety:** Do not use the PowerShell here-string `@'...'@` when running `git commit` through Bash. For multi-line messages use `git commit -F <file>` or multiple `-m` flags. Reserve `@'...'@` for PowerShell only. **After every commit, verify the subject with `git log -1 --format=%s`.**
+  - **Multi-line message safety:** Do not use the PowerShell here-string `@'...'@` when running `git commit` from a bash/sh shell — it corrupts the subject line. For multi-line messages use `git commit -F <file>` or multiple `-m` flags. In PowerShell, `@'...'@` is fine. **After every commit, verify the subject with `git log -1 --format=%s`.**
   - A local hook `.git/hooks/commit-msg` (not version-controlled; shared across sessions on this clone) enforces the `YYYY-MM-DD area: summary` format and rejects `@`-corrupted subjects. If it goes missing, recreate it.
 
 ## DB / Run / Verify
@@ -109,6 +109,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ## Session Handoff
 
 At the start of a new session, check the most recent file in `_attic/handoff/` first (newest date in filename).
+
+> **Note:** Claude Code maintains a private auto-memory at `~/.claude/projects/.../memory/` that is not accessible to Codex. For cross-session and cross-agent context, rely solely on `_attic/handoff/`.
 
 ## Resource Locations
 
