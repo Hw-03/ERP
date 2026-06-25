@@ -10,8 +10,7 @@ import { createElement, type ReactNode } from "react";
 import {
   useAuditCsvFilesQuery,
   useVerifyAdminPinMutation,
-  useUpdateAdminPinMutation,
-  useResetDatabaseMutation,
+  useUpdateAdminPinMutation,
   useTriggerAuditCsvBackfillMutation,
 } from "./useAdminQuery";
 
@@ -58,15 +57,6 @@ describe("useVerifyAdminPinMutation", () => {
 describe("useUpdateAdminPinMutation", () => {
   it("PIN 변경 mutation이 존재한다", () => {
     const { result } = renderHook(() => useUpdateAdminPinMutation(), {
-      wrapper: makeWrapper(),
-    });
-    expect(typeof result.current.mutate).toBe("function");
-  });
-});
-
-describe("useResetDatabaseMutation", () => {
-  it("DB 초기화 mutation이 존재한다", () => {
-    const { result } = renderHook(() => useResetDatabaseMutation(), {
       wrapper: makeWrapper(),
     });
     expect(typeof result.current.mutate).toBe("function");

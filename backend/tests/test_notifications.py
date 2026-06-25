@@ -76,9 +76,14 @@ def _w2d_request(client, requester, item, to_dept: str = "조립") -> dict:
     return res.json()
 
 
+def _actor_headers(emp) -> dict[str, str]:
+    return {"X-Actor-Employee-Id": str(emp.employee_id)}
+
+
 def _unread(client, emp) -> int:
     return client.get(
-        f"/api/notifications?recipient_employee_id={emp.employee_id}"
+        f"/api/notifications?recipient_employee_id={emp.employee_id}",
+        headers=_actor_headers(emp),
     ).json()["unread_count"]
 
 
@@ -157,7 +162,8 @@ def test_approve_notifies_requester(client, db_session, make_item):
     assert approve.json()["status"] == "completed"
 
     items = client.get(
-        f"/api/notifications?recipient_employee_id={requester.employee_id}"
+        f"/api/notifications?recipient_employee_id={requester.employee_id}",
+        headers=_actor_headers(requester),
     ).json()["items"]
     assert any(n["type"] == "approval_approved" for n in items)
 
@@ -178,7 +184,8 @@ def test_reject_notifies_requester(client, db_session, make_item):
     assert reject.status_code == 200, reject.json()
 
     items = client.get(
-        f"/api/notifications?recipient_employee_id={requester.employee_id}"
+        f"/api/notifications?recipient_employee_id={requester.employee_id}",
+        headers=_actor_headers(requester),
     ).json()["items"]
     assert any(n["type"] == "approval_rejected" for n in items)
 
@@ -201,6 +208,7 @@ def test_mark_read_only_affects_owner(client, db_session, make_item):
 
     res = client.post(
         "/api/notifications/mark-read",
+        headers=_actor_headers(wh_primary),
         json={"recipient_employee_id": str(wh_primary.employee_id)},
     )
     assert res.status_code == 200, res.json()
@@ -210,6 +218,67 @@ def test_mark_read_only_affects_owner(client, db_session, make_item):
     assert _unread(client, wh_primary) == 0
     assert _unread(client, wh_deputy) == 1
 
+
+
+def test_notification_query_requires_matching_actor_header(client, db_session, make_item):
+    item = make_item(name="W006", warehouse_qty=Decimal("10"))
+    requester = _make_employee(db_session, code="REQ6", name="Requester6")
+    wh_primary = _make_employee(db_session, code="WHP6", name="Warehouse6", warehouse_role="primary")
+    wh_deputy = _make_employee(db_session, code="WHD6", name="Deputy6", warehouse_role="deputy")
+    db_session.commit()
+
+    _w2d_request(client, requester, item)
+
+    missing = client.get(f"/api/notifications?recipient_employee_id={wh_deputy.employee_id}")
+    assert missing.status_code == 400
+
+    mismatch = client.get(
+        f"/api/notifications?recipient_employee_id={wh_deputy.employee_id}",
+        headers=_actor_headers(wh_primary),
+    )
+    assert mismatch.status_code == 403
+
+    own = client.get(
+        f"/api/notifications?recipient_employee_id={wh_deputy.employee_id}",
+        headers=_actor_headers(wh_deputy),
+    )
+    assert own.status_code == 200
+    assert own.json()["unread_count"] == 1
+
+
+def test_notification_mutations_require_matching_actor_header(client, db_session, make_item):
+    item = make_item(name="W007", warehouse_qty=Decimal("10"))
+    requester = _make_employee(db_session, code="REQ7", name="Requester7")
+    wh_primary = _make_employee(db_session, code="WHP7", name="Warehouse7", warehouse_role="primary")
+    wh_deputy = _make_employee(db_session, code="WHD7", name="Deputy7", warehouse_role="deputy")
+    db_session.commit()
+
+    _w2d_request(client, requester, item)
+    note = (
+        db_session.query(Notification)
+        .filter(Notification.recipient_employee_id == wh_deputy.employee_id)
+        .first()
+    )
+    assert note is not None
+
+    mark = client.post(
+        "/api/notifications/mark-read",
+        headers=_actor_headers(wh_primary),
+        json={"recipient_employee_id": str(wh_deputy.employee_id)},
+    )
+    assert mark.status_code == 403
+
+    delete_read = client.delete(
+        f"/api/notifications/read?recipient_employee_id={wh_deputy.employee_id}",
+        headers=_actor_headers(wh_primary),
+    )
+    assert delete_read.status_code == 403
+
+    delete_one = client.delete(
+        f"/api/notifications/{note.notification_id}?recipient_employee_id={wh_deputy.employee_id}",
+        headers=_actor_headers(wh_primary),
+    )
+    assert delete_one.status_code == 403
 
 def test_arrived_notification_rolls_back_with_request(client, db_session, make_item):
     """요청 트랜잭션이 실패하면 알림도 함께 롤백(유령 알림 없음)."""

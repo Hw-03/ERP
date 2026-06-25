@@ -1,21 +1,11 @@
-"""Inventory API smoke tests for core warehouse and department flows."""
+"""Legacy direct inventory write route removal tests."""
 
 from __future__ import annotations
 
 from decimal import Decimal
 
-from app.models import (
-    DepartmentEnum,
-    Inventory,
-    InventoryLocation,
-    LocationStatusEnum,
-    TransactionLog,
-)
+from app.models import DepartmentEnum, Inventory, InventoryLocation, LocationStatusEnum
 from app.services import integrity as integrity_svc
-
-
-def _dec(value) -> Decimal:
-    return Decimal(str(value))
 
 
 def _location_qty(db_session, item_id, department: DepartmentEnum) -> Decimal:
@@ -31,71 +21,53 @@ def _location_qty(db_session, item_id, department: DepartmentEnum) -> Decimal:
     return loc.quantity if loc else Decimal("0")
 
 
-def test_inventory_receive_transfer_smoke(client, db_session, make_item):
-    item = make_item(name="스모크 재고", warehouse_qty=Decimal("0"))
+def test_legacy_direct_inventory_write_routes_are_removed(client, db_session, make_item):
+    item = make_item(name="legacy-route-removed", warehouse_qty=Decimal("5"))
     db_session.commit()
 
-    receive = client.post(
-        "/api/inventory/receive",
-        json={
-            "item_id": str(item.item_id),
-            "quantity": "20",
-            "reference_no": "SMOKE-RCV",
-            "produced_by": "smoke",
-        },
-    )
-    assert receive.status_code == 201, receive.text
-    assert _dec(receive.json()["quantity"]) == Decimal("20")
-    assert _dec(receive.json()["warehouse_qty"]) == Decimal("20")
+    cases = [
+        ("/api/inventory/receive", {"item_id": str(item.item_id), "quantity": "1"}),
+        ("/api/inventory/adjust", {"item_id": str(item.item_id), "quantity": "1", "reason": "legacy"}),
+        (
+            "/api/inventory/transfer-to-production",
+            {"item_id": str(item.item_id), "quantity": "1", "department": DepartmentEnum.ASSEMBLY.value},
+        ),
+        (
+            "/api/inventory/transfer-to-warehouse",
+            {"item_id": str(item.item_id), "quantity": "1", "department": DepartmentEnum.ASSEMBLY.value},
+        ),
+        (
+            "/api/inventory/transfer-between-depts",
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_department": DepartmentEnum.SHIPPING.value,
+            },
+        ),
+        (
+            "/api/inventory/mark-defective",
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "source": "warehouse",
+                "target_department": DepartmentEnum.ASSEMBLY.value,
+            },
+        ),
+        (
+            "/api/inventory/return-to-supplier",
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+            },
+        ),
+    ]
 
-    to_assembly = client.post(
-        "/api/inventory/transfer-to-production",
-        json={
-            "item_id": str(item.item_id),
-            "quantity": "8",
-            "department": DepartmentEnum.ASSEMBLY.value,
-            "notes": "smoke warehouse to assembly",
-            "reference_no": "SMOKE-ASM",
-        },
-    )
-    assert to_assembly.status_code == 200, to_assembly.text
-    assert _dec(to_assembly.json()["quantity"]) == Decimal("20")
-    assert _dec(to_assembly.json()["warehouse_qty"]) == Decimal("12")
+    for path, payload in cases:
+        res = client.post(path, json=payload)
+        assert res.status_code == 404, path
 
-    to_shipping = client.post(
-        "/api/inventory/transfer-between-depts",
-        json={
-            "item_id": str(item.item_id),
-            "quantity": "5",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
-            "to_department": DepartmentEnum.SHIPPING.value,
-            "notes": "smoke assembly to shipping",
-            "reference_no": "SMOKE-SHIP-LOC",
-        },
-    )
-    assert to_shipping.status_code == 200, to_shipping.text
-    assert _dec(to_shipping.json()["quantity"]) == Decimal("20")
-    assert _location_qty(db_session, item.item_id, DepartmentEnum.ASSEMBLY) == Decimal("3")
-    assert _location_qty(db_session, item.item_id, DepartmentEnum.SHIPPING) == Decimal("5")
-
-    assert db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).count() == 3
-    assert integrity_svc.check_inventory_consistency(db_session) == []
-
-
-def test_inventory_shortage_rolls_back_transfer(client, db_session, make_item):
-    item = make_item(name="스모크 부족", warehouse_qty=Decimal("5"))
-    db_session.commit()
-
-    too_much_transfer = client.post(
-        "/api/inventory/transfer-to-production",
-        json={
-            "item_id": str(item.item_id),
-            "quantity": "8",
-            "department": DepartmentEnum.ASSEMBLY.value,
-            "notes": "shortage should rollback",
-        },
-    )
-    assert too_much_transfer.status_code == 422
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("5")
     assert _location_qty(db_session, item.item_id, DepartmentEnum.ASSEMBLY) == Decimal("0")

@@ -64,6 +64,30 @@ def _cancel(client, log_id, *, code="KW01", pin="0000", reason="취소 테스트
     )
 
 
+def _receive_v2(client, item, requester: Employee, quantity: int):
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [{"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": str(quantity)}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.text
+    return res
+
+
 # ---------------------------------------------------------------------------
 # 불량 격리(새 불량) 취소 — 사용자가 막혔던 바로 그 케이스
 # ---------------------------------------------------------------------------
@@ -122,16 +146,7 @@ def test_cancel_receive_restores_warehouse(client, db_session, make_item):
     item = make_item(name="입고품", warehouse_qty=Decimal("0"))
     actor = _make_employee(db_session, code="RC01")
     db_session.commit()
-
-    res = client.post(
-        "/api/inventory/receive",
-        json={
-            "item_id": str(item.item_id),
-            "quantity": 50,
-            "producer_employee_code": "RC01",
-        },
-    )
-    assert res.status_code == 201, res.text
+    res = _receive_v2(client, item, actor, 50)
     wh, _, _ = _cells(db_session, item.item_id)
     assert wh == 50
 
@@ -234,11 +249,7 @@ def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
     db_session.commit()
 
     # 입고 50 → 창고 50
-    res = client.post(
-        "/api/inventory/receive",
-        json={"item_id": str(item.item_id), "quantity": 50, "producer_employee_code": "NG01"},
-    )
-    assert res.status_code == 201
+    res = _receive_v2(client, item, actor, 50)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
@@ -262,14 +273,11 @@ def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
 
 
 def test_cancel_idempotent_double(client, db_session, make_item):
-    item = make_item(name="중복품", warehouse_qty=Decimal("0"))
-    _make_employee(db_session, code="DUP1")
+    item = make_item(name="cancel-duplicate", warehouse_qty=Decimal("0"))
+    actor = _make_employee(db_session, code="DUP1")
     db_session.commit()
 
-    client.post(
-        "/api/inventory/receive",
-        json={"item_id": str(item.item_id), "quantity": 10, "producer_employee_code": "DUP1"},
-    )
+    _receive_v2(client, item, actor, 10)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
@@ -332,13 +340,10 @@ def test_cancel_approver_can_cancel_others(client, db_session, make_item):
 
 
 def test_cancel_wrong_pin_forbidden(client, db_session, make_item):
-    item = make_item(name="핀품", warehouse_qty=Decimal("0"))
-    _make_employee(db_session, code="PIN1")
+    item = make_item(name="cancel-wrong-pin", warehouse_qty=Decimal("0"))
+    actor = _make_employee(db_session, code="PIN1")
     db_session.commit()
-    client.post(
-        "/api/inventory/receive",
-        json={"item_id": str(item.item_id), "quantity": 5, "producer_employee_code": "PIN1"},
-    )
+    _receive_v2(client, item, actor, 5)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()

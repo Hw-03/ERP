@@ -10,8 +10,7 @@ import { createElement, type ReactNode } from "react";
 import {
   useAuditCsvListQuery,
   useVerifyPinMutation,
-  useUpdatePinMutation,
-  useResetDatabaseMutation,
+  useUpdatePinMutation,
 } from "./useSettingsQuery";
 
 function makeWrapper() {
@@ -69,15 +68,5 @@ describe("useUpdatePinMutation", () => {
     });
     result.current.mutate({ current_pin: "9999", new_pin: "1234" });
     await waitFor(() => expect(result.current.isError).toBe(true));
-  });
-});
-
-describe("useResetDatabaseMutation", () => {
-  it("올바른 PIN으로 DB 초기화 성공", async () => {
-    const { result } = renderHook(() => useResetDatabaseMutation(), {
-      wrapper: makeWrapper(),
-    });
-    result.current.mutate("0000");
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 });

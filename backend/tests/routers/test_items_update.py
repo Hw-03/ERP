@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
 
 def test_update_item_changes_process_type_code(client, make_item):
     # 모든 품목은 모델을 가진다(불변식) — 공정 변경 시 422 가드를 통과하려면 모델 필요.
@@ -22,7 +24,8 @@ def test_update_item_changes_process_type_code(client, make_item):
     # PUT 으로 process_type_code 만 변경
     res = client.put(
         f"/api/items/{item.item_id}",
-        json={"process_type_code": "HF"},
+        headers=ADMIN_HEADERS,
+json={"process_type_code": "HF"},
     )
     assert res.status_code == 200, res.text
     assert res.json()["process_type_code"] == "HF"
@@ -39,7 +42,8 @@ def test_update_item_does_not_clear_process_type_code_when_omitted(client, make_
 
     res = client.put(
         f"/api/items/{item.item_id}",
-        json={"item_name": "이름만 변경"},
+        headers=ADMIN_HEADERS,
+json={"item_name": "이름만 변경"},
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -53,7 +57,8 @@ def test_update_item_legacy_fields(client, make_item):
 
     res = client.put(
         f"/api/items/{item.item_id}",
-        json={
+        headers=ADMIN_HEADERS,
+json={
             "legacy_part": "PART_B",
             "legacy_item_type": "ITEM_C",
         },
@@ -72,7 +77,8 @@ def test_update_item_supplier(client, make_item):
 
     res = client.put(
         f"/api/items/{item.item_id}",
-        json={"supplier": "신규공급사 ABC"},
+        headers=ADMIN_HEADERS,
+json={"supplier": "신규공급사 ABC"},
     )
     assert res.status_code == 200, res.text
     assert res.json()["supplier"] == "신규공급사 ABC"
@@ -85,14 +91,16 @@ def test_update_item_min_stock_integer_only(client, make_item):
     # 소수는 거부
     res = client.put(
         f"/api/items/{item.item_id}",
-        json={"min_stock": "12.5"},
+        headers=ADMIN_HEADERS,
+json={"min_stock": "12.5"},
     )
     assert res.status_code == 422, res.text
 
     # 정수는 허용 + 정수(JSON number)로 직렬화
     res = client.put(
         f"/api/items/{item.item_id}",
-        json={"min_stock": 12},
+        headers=ADMIN_HEADERS,
+json={"min_stock": 12},
     )
     assert res.status_code == 200, res.text
     assert res.json()["min_stock"] == 12
@@ -104,7 +112,8 @@ def test_update_item_empty_payload_no_change(client, make_item):
 
     res = client.put(
         f"/api/items/{item.item_id}",
-        json={},
+        headers=ADMIN_HEADERS,
+json={},
     )
     assert res.status_code == 200, res.text
     body = res.json()

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
 
 def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
     parent = make_item(name="스모크 상위", process_type_code="AF")
@@ -9,6 +11,7 @@ def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
 
     created = client.post(
         "/api/bom",
+        headers=ADMIN_HEADERS,
         json={
             "parent_item_id": str(parent.item_id),
             "child_item_id": str(child.item_id),
@@ -54,14 +57,15 @@ def test_bom_duplicate_and_circular_references_are_blocked(client, make_item):
         "quantity": "1",
         "unit": "EA",
     }
-    first = client.post("/api/bom", json=payload)
+    first = client.post("/api/bom", headers=ADMIN_HEADERS, json=payload)
     assert first.status_code == 201, first.text
 
-    duplicate = client.post("/api/bom", json=payload)
+    duplicate = client.post("/api/bom", headers=ADMIN_HEADERS, json=payload)
     assert duplicate.status_code == 409
 
     circular = client.post(
         "/api/bom",
+        headers=ADMIN_HEADERS,
         json={
             "parent_item_id": str(child.item_id),
             "child_item_id": str(parent.item_id),
@@ -79,6 +83,7 @@ def test_bom_rejects_fractional_quantity(client, make_item):
 
     res = client.post(
         "/api/bom",
+        headers=ADMIN_HEADERS,
         json={
             "parent_item_id": str(parent.item_id),
             "child_item_id": str(child.item_id),

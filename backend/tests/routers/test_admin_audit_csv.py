@@ -11,6 +11,8 @@ import pytest
 
 from app.models import TransactionLog, TransactionTypeEnum
 
+ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
 
 @pytest.fixture()
 def csv_env(tmp_path, monkeypatch):
@@ -36,7 +38,7 @@ def _add_log(db_session, item_id, *, tx, qty, when):
 
 
 def test_files_endpoint_empty(client, csv_env):
-    res = client.get("/api/admin/audit-csv/files")
+    res = client.get("/api/admin/audit-csv/files", headers=ADMIN_HEADERS)
     assert res.status_code == 200
     assert res.json() == []
 
@@ -49,25 +51,25 @@ def test_backfill_then_list_and_download(client, db_session, make_item, csv_env)
              when=datetime(2026, 5, 11, 10, 0))
     db_session.commit()
 
-    backfill = client.post("/api/admin/audit-csv/backfill")
+    backfill = client.post("/api/admin/audit-csv/backfill", headers=ADMIN_HEADERS)
     assert backfill.status_code == 200, backfill.text
     body = backfill.json()
     assert body["total_rows"] == 2
     assert body["months"] == ["2026-05"]
 
-    listing = client.get("/api/admin/audit-csv/files").json()
+    listing = client.get("/api/admin/audit-csv/files", headers=ADMIN_HEADERS).json()
     assert len(listing) == 1
     assert listing[0]["month"] == "2026-05"
     assert listing[0]["row_count"] == 2
 
-    csv_resp = client.get("/api/admin/audit-csv/2026-05.csv")
+    csv_resp = client.get("/api/admin/audit-csv/2026-05.csv", headers=ADMIN_HEADERS)
     assert csv_resp.status_code == 200
     text = csv_resp.content.decode("utf-8-sig")
     rows = list(_csv.reader(text.splitlines()))
     assert rows[0][0] == "일시"
     assert len(rows) == 3  # header + 2
 
-    xlsx_resp = client.get("/api/admin/audit-csv/2026-05.xlsx")
+    xlsx_resp = client.get("/api/admin/audit-csv/2026-05.xlsx", headers=ADMIN_HEADERS)
     assert xlsx_resp.status_code == 200
     assert xlsx_resp.headers["content-type"].startswith(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -76,10 +78,10 @@ def test_backfill_then_list_and_download(client, db_session, make_item, csv_env)
 
 
 def test_invalid_month_format_rejected(client, csv_env):
-    res = client.get("/api/admin/audit-csv/2026-5.csv")
+    res = client.get("/api/admin/audit-csv/2026-5.csv", headers=ADMIN_HEADERS)
     assert res.status_code == 400
 
 
 def test_missing_month_returns_404(client, csv_env):
-    res = client.get("/api/admin/audit-csv/2099-12.csv")
+    res = client.get("/api/admin/audit-csv/2099-12.csv", headers=ADMIN_HEADERS)
     assert res.status_code == 404

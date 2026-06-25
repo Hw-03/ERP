@@ -3,9 +3,9 @@
 /**
  * Settings / Admin 도메인 React Query hook — W7-7.
  *
- * adminApi 기반. verifyPin / updatePin / resetDatabase / auditCsv 묶음.
+ * adminApi 기반. verifyPin / updatePin / auditCsv 묶음.
  * 인터페이스 ≤ 6: useAuditCsvListQuery + useVerifyPinMutation +
- *   useUpdatePinMutation + useResetDatabaseMutation + useTriggerAuditBackfillMutation
+ *   useUpdatePinMutation + useTriggerAuditBackfillMutation
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -36,12 +36,6 @@ export function useUpdatePinMutation() {
 }
 
 /** DB 초기화 */
-export function useResetDatabaseMutation() {
-  return useMutation({
-    mutationFn: (pin: string) => adminApi.resetDatabase(pin),
-  });
-}
-
 /** 감사 CSV 백필 트리거 */
 export function useTriggerAuditBackfillMutation() {
   const qc = useQueryClient();

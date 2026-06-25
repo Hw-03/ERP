@@ -17,6 +17,8 @@ from sqlalchemy import text
 
 from app.models import Department, Employee, EmployeeLevelEnum
 
+ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
 
 def _emp_payload(**overrides):
     base = {
@@ -38,7 +40,7 @@ def _emp_payload(**overrides):
 
 def test_create_employee_defaults_io_enabled_true(db_session, client):
     """신규 직원 생성 시 io_enabled 가 기본값 True 로 설정된다."""
-    resp = client.post("/api/employees", json=_emp_payload(name="기본권한"))
+    resp = client.post("/api/employees", headers=ADMIN_HEADERS, json=_emp_payload(name="기본권한"))
     assert resp.status_code == 201, resp.text
     data = resp.json()
     assert data["io_enabled"] is True
@@ -48,6 +50,7 @@ def test_create_employee_explicit_io_enabled_false(db_session, client):
     """io_enabled=False 를 명시적으로 전달하면 False 로 생성된다."""
     resp = client.post(
         "/api/employees",
+        headers=ADMIN_HEADERS,
         json=_emp_payload(name="차단직원", io_enabled=False),
     )
     assert resp.status_code == 201, resp.text
@@ -60,13 +63,14 @@ def test_create_employee_explicit_io_enabled_false(db_session, client):
 
 def test_update_employee_io_enabled_false(db_session, client):
     """PUT 으로 io_enabled=False 설정 시 응답·재조회 모두 False."""
-    create_resp = client.post("/api/employees", json=_emp_payload(name="업데이트직원"))
+    create_resp = client.post("/api/employees", headers=ADMIN_HEADERS, json=_emp_payload(name="업데이트직원"))
     assert create_resp.status_code == 201
     emp_id = create_resp.json()["employee_id"]
     assert create_resp.json()["io_enabled"] is True
 
     update_resp = client.put(
         f"/api/employees/{emp_id}",
+        headers=ADMIN_HEADERS,
         json={"io_enabled": False},
     )
     assert update_resp.status_code == 200, update_resp.text
@@ -84,6 +88,7 @@ def test_update_employee_io_enabled_toggle_back_to_true(db_session, client):
     """False 로 생성 → True 로 토글."""
     create_resp = client.post(
         "/api/employees",
+        headers=ADMIN_HEADERS,
         json=_emp_payload(name="토글직원", io_enabled=False),
     )
     assert create_resp.status_code == 201
@@ -92,6 +97,7 @@ def test_update_employee_io_enabled_toggle_back_to_true(db_session, client):
 
     update_resp = client.put(
         f"/api/employees/{emp_id}",
+        headers=ADMIN_HEADERS,
         json={"io_enabled": True},
     )
     assert update_resp.status_code == 200
@@ -103,9 +109,10 @@ def test_update_employee_io_enabled_toggle_back_to_true(db_session, client):
 
 def test_list_employees_returns_io_enabled(db_session, client):
     """GET /api/employees 응답에 io_enabled 필드가 포함된다."""
-    client.post("/api/employees", json=_emp_payload(name="목록직원1"))
+    client.post("/api/employees", headers=ADMIN_HEADERS, json=_emp_payload(name="목록직원1"))
     client.post(
         "/api/employees",
+        headers=ADMIN_HEADERS,
         json=_emp_payload(name="목록직원2", io_enabled=False),
     )
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import clsx from "clsx";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -11,8 +11,7 @@ export interface SegmentedTab<T extends string = string> {
 }
 
 /**
- * 모바일 세그먼트 컨트롤 — `s2 + border + p-1` 트레이, 활성은 `s1 + shadow`.
- * ItemDetailSheet · IoHubScreen · HistoryScreen · HistoryDetailSheet 공통.
+ * Mobile segmented tab control shared by active mobile screens.
  */
 export function SegmentedControl<T extends string>({
   tabs,
@@ -25,7 +24,7 @@ export function SegmentedControl<T extends string>({
   active: T;
   onChange: (next: T) => void;
   className?: string;
-  /** 항목 5-1 — opt-in 확대. 기본 md(현행), lg는 호출처에서만 키움(타 화면 무영향). */
+  /** ??ぉ 5-1 ??opt-in ?뺣?. 湲곕낯 md(?꾪뻾), lg???몄텧泥섏뿉?쒕쭔 ?ㅼ?(? ?붾㈃ 臾댁쁺??. */
   size?: "md" | "lg";
 }) {
   return (
@@ -45,7 +44,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(tab.id)}
             className={clsx(
               "flex flex-1 items-center justify-center gap-1.5 rounded-[10px] font-bold transition-[background-color]",
-              // 항목 7-6 — lg 는 불량 격리 Step1 출처 토글 단일 사용처. 격리 부서 버튼 높이와 맞추려 py 확대.
+              // ??ぉ 7-6 ??lg ??遺덈웾 寃⑸━ Step1 異쒖쿂 ?좉? ?⑥씪 ?ъ슜泥? 寃⑸━ 遺??踰꾪듉 ?믪씠? 留욎텛??py ?뺣?.
               size === "lg" ? "px-3 py-4" : "px-2 py-[7px]",
               size === "lg" ? TYPO.title : TYPO.caption,
             )}
@@ -79,3 +78,6 @@ export function SegmentedControl<T extends string>({
     </div>
   );
 }
+
+
+

@@ -61,7 +61,11 @@ def reorder_models(
     status_code=status.HTTP_201_CREATED,
     summary="제품 모델 신규 등록 (slot 자동 배정)",
 )
-def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
+def create_model(
+    payload: ProductModelCreate,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """새 제품 모델 추가 — 예약(reserved) 슬롯 1개를 승격(promote)한다.
 
     슬롯 행은 시드에서 1~100 전부 미리 생성됨(예약분 symbol/model_name=NULL,

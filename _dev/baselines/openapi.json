@@ -1690,85 +1690,6 @@
         "title": "DeptAdjSubmitRequest",
         "type": "object"
       },
-      "DeptTransferRequest": {
-        "description": "부서간 이동.",
-        "properties": {
-          "from_department": {
-            "title": "From Department",
-            "type": "string"
-          },
-          "item_id": {
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
-          },
-          "produced_by": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Produced By"
-          },
-          "producer_employee_code": {
-            "anyOf": [
-              {
-                "maxLength": 30,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
-            "title": "Producer Employee Code"
-          },
-          "quantity": {
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "type": "integer"
-          },
-          "reference_no": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference No"
-          },
-          "to_department": {
-            "title": "To Department",
-            "type": "string"
-          }
-        },
-        "required": [
-          "item_id",
-          "quantity",
-          "from_department",
-          "to_department"
-        ],
-        "title": "DeptTransferRequest",
-        "type": "object"
-      },
       "EmployeeCreate": {
         "properties": {
           "assigned_model_slots": {
@@ -2866,87 +2787,6 @@
         "title": "IntegrityRepairResponse",
         "type": "object"
       },
-      "InventoryAdjust": {
-        "properties": {
-          "item_id": {
-            "description": "재고 조정 대상 품목 ID",
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "location": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "보관 위치",
-            "title": "Location"
-          },
-          "produced_by": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "처리자",
-            "title": "Produced By"
-          },
-          "producer_employee_code": {
-            "anyOf": [
-              {
-                "maxLength": 30,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
-            "title": "Producer Employee Code"
-          },
-          "quantity": {
-            "description": "조정 후 최종 수량",
-            "minimum": 0.0,
-            "title": "Quantity",
-            "type": "integer"
-          },
-          "reason": {
-            "description": "조정 사유",
-            "minLength": 1,
-            "title": "Reason",
-            "type": "string"
-          },
-          "reference_no": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "참조 번호",
-            "title": "Reference No"
-          }
-        },
-        "required": [
-          "item_id",
-          "quantity",
-          "reason"
-        ],
-        "title": "InventoryAdjust",
-        "type": "object"
-      },
       "InventoryLocationResponse": {
         "description": "부서×상태(생산/불량) 단위 재고 분포.",
         "properties": {
@@ -2968,92 +2808,6 @@
           "quantity"
         ],
         "title": "InventoryLocationResponse",
-        "type": "object"
-      },
-      "InventoryReceive": {
-        "properties": {
-          "item_id": {
-            "description": "입고 대상 품목 ID",
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "location": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "보관 위치",
-            "title": "Location"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "비고",
-            "title": "Notes"
-          },
-          "produced_by": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "처리자",
-            "title": "Produced By"
-          },
-          "producer_employee_code": {
-            "anyOf": [
-              {
-                "maxLength": 30,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
-            "title": "Producer Employee Code"
-          },
-          "quantity": {
-            "description": "입고 수량",
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "type": "integer"
-          },
-          "reference_no": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "참조 번호",
-            "title": "Reference No"
-          }
-        },
-        "required": [
-          "item_id",
-          "quantity"
-        ],
-        "title": "InventoryReceive",
         "type": "object"
       },
       "InventoryResponse": {
@@ -4610,86 +4364,6 @@
         "title": "LocationStatusEnum",
         "type": "string"
       },
-      "MarkDefectiveRequest": {
-        "description": "불량 등록.\n\nsource: 'warehouse' 또는 'production'\nsource=production 일 때 source_department 필수 (어느 부서에서 발견됐는지)\ntarget_department: 격리될 부서",
-        "properties": {
-          "item_id": {
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "operator": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Operator"
-          },
-          "producer_employee_code": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "작업자 사번 (audit)",
-            "title": "Producer Employee Code"
-          },
-          "quantity": {
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "type": "integer"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "불량 사유",
-            "title": "Reason"
-          },
-          "source": {
-            "description": "warehouse | production",
-            "title": "Source",
-            "type": "string"
-          },
-          "source_department": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Department"
-          },
-          "target_department": {
-            "title": "Target Department",
-            "type": "string"
-          }
-        },
-        "required": [
-          "item_id",
-          "quantity",
-          "source",
-          "target_department"
-        ],
-        "title": "MarkDefectiveRequest",
-        "type": "object"
-      },
       "MesCodeGenerateRequest": {
         "properties": {
           "process_type": {
@@ -5729,22 +5403,6 @@
         "title": "ReservationLineResponse",
         "type": "object"
       },
-      "ResetRequest": {
-        "properties": {
-          "pin": {
-            "description": "현재 관리자 PIN",
-            "maxLength": 32,
-            "minLength": 4,
-            "title": "Pin",
-            "type": "string"
-          }
-        },
-        "required": [
-          "pin"
-        ],
-        "title": "ResetRequest",
-        "type": "object"
-      },
       "StockRequestActionRequest": {
         "description": "승인/반려/취소 공통 페이로드 — pin 필수.",
         "properties": {
@@ -6410,80 +6068,6 @@
         "title": "StockRequestTypeEnum",
         "type": "string"
       },
-      "SupplierReturnRequest": {
-        "description": "공급업체 반품: 부서별 DEFECTIVE 차감.",
-        "properties": {
-          "from_department": {
-            "title": "From Department",
-            "type": "string"
-          },
-          "item_id": {
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
-          },
-          "operator": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Operator"
-          },
-          "producer_employee_code": {
-            "anyOf": [
-              {
-                "maxLength": 30,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 operator(produced_by) 자동 설정",
-            "title": "Producer Employee Code"
-          },
-          "quantity": {
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "type": "integer"
-          },
-          "reference_no": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference No"
-          }
-        },
-        "required": [
-          "item_id",
-          "quantity",
-          "from_department"
-        ],
-        "title": "SupplierReturnRequest",
-        "type": "object"
-      },
       "TransactionCancelRequest": {
         "properties": {
           "employee_code": {
@@ -7032,81 +6616,6 @@
         ],
         "title": "TransactionTypeEnum",
         "type": "string"
-      },
-      "TransferRequest": {
-        "description": "창고↔부서 이동 (transfer-to-production / transfer-to-warehouse 공용).",
-        "properties": {
-          "department": {
-            "title": "Department",
-            "type": "string"
-          },
-          "item_id": {
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "비고",
-            "title": "Notes"
-          },
-          "produced_by": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Produced By"
-          },
-          "producer_employee_code": {
-            "anyOf": [
-              {
-                "maxLength": 30,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
-            "title": "Producer Employee Code"
-          },
-          "quantity": {
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "type": "integer"
-          },
-          "reference_no": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference No"
-          }
-        },
-        "required": [
-          "item_id",
-          "quantity",
-          "department"
-        ],
-        "title": "TransferRequest",
-        "type": "object"
       },
       "UnquarantineRequest": {
         "properties": {
@@ -8092,6 +7601,38 @@
               "title": "Overwrite",
               "type": "boolean"
             }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
           }
         ],
         "responses": {
@@ -8125,6 +7666,40 @@
     "/api/admin/audit-csv/files": {
       "get": {
         "operationId": "list_files_api_admin_audit_csv_files_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -8139,6 +7714,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "List Files",
@@ -8158,6 +7743,38 @@
             "schema": {
               "title": "Month",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -8198,6 +7815,38 @@
             "schema": {
               "title": "Month",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -8296,6 +7945,38 @@
               "description": "이 시각 이후만 (UTC)",
               "title": "Since"
             }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
           }
         ],
         "responses": {
@@ -8377,6 +8058,40 @@
       "post": {
         "description": "Create a BOM row for a parent and child item.",
         "operationId": "create_bom_api_bom_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -8477,6 +8192,38 @@
               "title": "Bom Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
           }
         ],
         "responses": {
@@ -8511,6 +8258,38 @@
               "format": "uuid",
               "title": "Bom Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -9580,6 +9359,40 @@
       },
       "post": {
         "operationId": "create_employee_api_employees_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -9631,6 +9444,38 @@
               "title": "Employee Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
           }
         ],
         "responses": {
@@ -9669,6 +9514,38 @@
               "format": "uuid",
               "title": "Employee Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -10525,48 +10402,6 @@
         ]
       }
     },
-    "/api/inventory/adjust": {
-      "post": {
-        "description": "재고 조정: warehouse_qty 를 직접 설정.\n\npayload.quantity 는 조정 후 창고 수량. production / defective 는 건드리지 않음.",
-        "operationId": "adjust_inventory_api_inventory_adjust_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InventoryAdjust"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Adjust Inventory",
-        "tags": [
-          "Inventory"
-        ]
-      }
-    },
     "/api/inventory/locations/{item_id}": {
       "get": {
         "description": "품목의 부서×상태 분포 조회 (수량 0 인 행 포함, 모든 분포 노출).",
@@ -10610,129 +10445,6 @@
           }
         },
         "summary": "Get Item Locations",
-        "tags": [
-          "Inventory"
-        ]
-      }
-    },
-    "/api/inventory/mark-defective": {
-      "post": {
-        "operationId": "mark_defective_api_inventory_mark_defective_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MarkDefectiveRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Mark Defective",
-        "tags": [
-          "Inventory"
-        ]
-      }
-    },
-    "/api/inventory/receive": {
-      "post": {
-        "operationId": "receive_inventory_api_inventory_receive_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InventoryReceive"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Receive Inventory",
-        "tags": [
-          "Inventory"
-        ]
-      }
-    },
-    "/api/inventory/return-to-supplier": {
-      "post": {
-        "operationId": "return_to_supplier_api_inventory_return_to_supplier_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SupplierReturnRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Return To Supplier",
         "tags": [
           "Inventory"
         ]
@@ -11638,129 +11350,6 @@
         ]
       }
     },
-    "/api/inventory/transfer-between-depts": {
-      "post": {
-        "operationId": "transfer_between_depts_api_inventory_transfer_between_depts_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeptTransferRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Transfer Between Depts",
-        "tags": [
-          "Inventory"
-        ]
-      }
-    },
-    "/api/inventory/transfer-to-production": {
-      "post": {
-        "operationId": "transfer_to_production_api_inventory_transfer_to_production_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransferRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Transfer To Production",
-        "tags": [
-          "Inventory"
-        ]
-      }
-    },
-    "/api/inventory/transfer-to-warehouse": {
-      "post": {
-        "operationId": "transfer_to_warehouse_api_inventory_transfer_to_warehouse_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransferRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Transfer To Warehouse",
-        "tags": [
-          "Inventory"
-        ]
-      }
-    },
     "/api/inventory/weekly-report": {
       "get": {
         "operationId": "get_weekly_report_api_inventory_weekly_report_get",
@@ -12365,6 +11954,40 @@
       },
       "post": {
         "operationId": "create_item_api_items_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -12745,6 +12368,38 @@
               "title": "Item Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
           }
         ],
         "requestBody": {
@@ -12798,6 +12453,38 @@
               "format": "uuid",
               "title": "Item Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -12853,6 +12540,38 @@
               "title": "Item Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
           }
         ],
         "responses": {
@@ -12896,6 +12615,38 @@
               "format": "uuid",
               "title": "Item Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -12955,6 +12706,40 @@
       "post": {
         "description": "새 제품 모델 추가 — 예약(reserved) 슬롯 1개를 승격(promote)한다.\n\n슬롯 행은 시드에서 1~100 전부 미리 생성됨(예약분 symbol/model_name=NULL,\nis_reserved=True). 신규 등록 = 가장 낮은 예약 슬롯을 골라 symbol/model_name 채우고\nis_reserved=False 로 전환. (구버전은 '행이 없는 빈 slot 번호'를 찾으려다\n시드가 1~100 을 모두 채워 항상 None → 400 버그였음.)",
         "operationId": "create_model_api_models_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -13248,6 +13033,23 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "X-Actor-Employee-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Employee-Id"
+            }
           }
         ],
         "responses": {
@@ -13280,8 +13082,26 @@
     },
     "/api/notifications/mark-read": {
       "post": {
-        "description": "본인의 안 읽은 알림을 읽음 처리. notification_ids 가 없으면 전체.",
         "operationId": "mark_read_api_notifications_mark_read_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Actor-Employee-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Employee-Id"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -13322,7 +13142,6 @@
     },
     "/api/notifications/read": {
       "delete": {
-        "description": "읽은 알림 전체 하드 삭제.",
         "operationId": "delete_read_notifications_api_notifications_read_delete",
         "parameters": [
           {
@@ -13333,6 +13152,23 @@
               "format": "uuid",
               "title": "Recipient Employee Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Actor-Employee-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Employee-Id"
             }
           }
         ],
@@ -13375,6 +13211,23 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "X-Actor-Employee-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Employee-Id"
+            }
           }
         ],
         "responses": {
@@ -13409,7 +13262,6 @@
     },
     "/api/notifications/{notification_id}": {
       "delete": {
-        "description": "알림 개별 하드 삭제. 본인 소유 확인.",
         "operationId": "delete_notification_api_notifications__notification_id__delete",
         "parameters": [
           {
@@ -13430,6 +13282,23 @@
               "format": "uuid",
               "title": "Recipient Employee Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Actor-Employee-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Employee-Id"
             }
           }
         ],
@@ -13912,48 +13781,6 @@
           }
         },
         "summary": "Repair Inventory Integrity",
-        "tags": [
-          "Settings"
-        ]
-      }
-    },
-    "/api/settings/reset": {
-      "post": {
-        "description": "PIN 검증 후 시드 데이터 재적재 (안전 초기화). 관리자 도구.",
-        "operationId": "reset_database_api_settings_reset_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResetRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Reset Database",
         "tags": [
           "Settings"
         ]

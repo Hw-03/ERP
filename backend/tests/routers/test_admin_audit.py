@@ -4,18 +4,20 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
 
 def test_audit_logs_empty_returns_empty_list(client):
-    res = client.get("/api/admin/audit-logs")
+    res = client.get("/api/admin/audit-logs", headers=ADMIN_HEADERS)
     assert res.status_code == 200
     assert res.json() == []
 
 
 def test_audit_logs_limit_bound(client):
     """A-1 통일: limit le=2000 허용."""
-    res = client.get("/api/admin/audit-logs", params={"limit": 2000})
+    res = client.get("/api/admin/audit-logs", headers=ADMIN_HEADERS, params={"limit": 2000})
     assert res.status_code == 200
-    res2 = client.get("/api/admin/audit-logs", params={"limit": 2001})
+    res2 = client.get("/api/admin/audit-logs", headers=ADMIN_HEADERS, params={"limit": 2001})
     assert res2.status_code == 422
 
 
@@ -30,7 +32,7 @@ def test_audit_logs_action_prefix_filter(client, db_session):
     ])
     db_session.commit()
 
-    res = client.get("/api/admin/audit-logs", params={"action": "bom."})
+    res = client.get("/api/admin/audit-logs", headers=ADMIN_HEADERS, params={"action": "bom."})
     assert res.status_code == 200
     actions = [row["action"] for row in res.json()]
     assert sorted(actions) == ["bom.create", "bom.update"]
@@ -45,7 +47,7 @@ def test_audit_logs_target_type_filter(client, db_session):
     ])
     db_session.commit()
 
-    res = client.get("/api/admin/audit-logs", params={"target_type": "bom"})
+    res = client.get("/api/admin/audit-logs", headers=ADMIN_HEADERS, params={"target_type": "bom"})
     assert res.status_code == 200
     rows = res.json()
     assert len(rows) == 1
@@ -64,7 +66,7 @@ def test_audit_logs_since_filter(client, db_session):
         actor_pin_role="admin", action="item.create", target_type="item", created_at=new))
     db_session.commit()
 
-    res = client.get("/api/admin/audit-logs", params={"since": "2025-01-01T00:00:00"})
+    res = client.get("/api/admin/audit-logs", headers=ADMIN_HEADERS, params={"since": "2025-01-01T00:00:00"})
     assert res.status_code == 200
     rows = res.json()
     assert len(rows) == 1
@@ -82,7 +84,7 @@ def test_audit_logs_response_schema_fields(client, db_session):
     ))
     db_session.commit()
 
-    res = client.get("/api/admin/audit-logs")
+    res = client.get("/api/admin/audit-logs", headers=ADMIN_HEADERS)
     rows = res.json()
     assert len(rows) == 1
     row = rows[0]

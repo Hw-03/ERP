@@ -20,14 +20,7 @@ export const settingsHandlers = [
     if (body.current_pin !== "0000")
       return HttpResponse.json({ detail: "현재 PIN 불일치" }, { status: 403 });
     return HttpResponse.json({ message: "PIN 변경 완료" });
-  }),
-
-  http.post("*/api/settings/reset", async ({ request }) => {
-    const body = (await request.json()) as { pin: string };
-    if (body.pin !== "0000")
-      return HttpResponse.json({ detail: "PIN 불일치" }, { status: 403 });
-    return HttpResponse.json({ message: "DB 초기화 완료" });
-  }),
+  }),
 
   http.get("*/api/admin/audit-csv/files", () =>
     HttpResponse.json(sampleAuditFiles),
