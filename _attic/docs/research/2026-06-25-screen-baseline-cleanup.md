@@ -2740,3 +2740,127 @@ F3 알림 라벨 책임 설명 정리:
 검증:
 - `python -m pytest backend\\tests\\test_transaction_cancel.py backend\\tests\\routers\\test_transactions_operational_audit.py backend\\tests\\ops\\test_ops_backup_integrity.py backend\\tests\\ops\\test_operational_readiness.py -q` 통과.
 - `scripts\\ops\\operational_readiness.bat` 통과.
+## 2026-06-25 운영 안전장치 진행 로그 - 수량 보정 ADJUST 감사 추적 보강
+
+목표: 수량 보정으로 생성되는 신규 ADJUST 거래가 운영 점검 WARN을 새로 만들지 않고, 나중에 누가 어떤 재고 효과를 만들었는지 추적/취소할 수 있게 한다.
+
+변경:
+- `backend/app/routers/inventory/transactions.py`: 수량 보정 직전 재고 셀 스냅샷을 캡처하고, 보정 ADJUST 로그에 `inventory_effect`를 기록한다.
+- 같은 보정 ADJUST 로그에 `producer_employee_id=editor.employee_id`를 기록해 이름 문자열 fallback 없이 처리자를 식별할 수 있게 했다.
+- `backend/tests/routers/test_transaction_edit.py`: 보정 ADJUST 로그가 직원 ID, warehouse delta, 취소 후 창고 수량 원복까지 만족하는지 검증한다.
+
+검증:
+- `python -m pytest backend\tests\routers\test_transaction_edit.py::test_quantity_correct_adjust_log_records_effect_and_editor_id -q` 통과.
+- `python -m pytest backend\tests\routers\test_transaction_edit.py backend\tests\test_transaction_cancel.py backend\tests\ops\test_ops_backup_integrity.py backend\tests\routers\test_transactions_operational_audit.py -q` 통과.
+- `scripts\ops\operational_readiness.bat` 통과. 기존 DB의 과거 로그 때문에 `WARN missing transaction effects: 349`는 남지만 readiness 자체는 PASS.
+
+판단:
+- 이 변경 이후 수량 보정 경로는 신규 stock-affecting 로그를 만들 때 재고 효과와 처리자 ID를 남긴다.
+- 기존 과거 로그 WARN은 별도 데이터 정리 대상이며, 새 보정 작업이 같은 문제를 추가로 만들지 않는 것이 이번 조치의 범위다.
+## 2026-06-25 운영 안전장치 진행 로그 - 불량 분해 처리자 ID 보강
+
+목표: 불량 분해로 생성되는 DISASSEMBLE/RECEIVE/MARK_DEFECTIVE 묶음 거래가 이름 문자열만 남기지 않고, 승인/처리 직원 ID로 감사 추적되게 한다.
+
+변경:
+- `backend/app/services/dept_adjustment.py`: `submit_defective_disassemble`에 선택 인자 `actor_employee_id`를 추가하고, 부모 DISASSEMBLE 로그와 자식 RECEIVE/MARK_DEFECTIVE 로그에 `producer_employee_id`를 기록한다.
+- `backend/app/services/sr_execution.py`: 불량 분해 승인 실행 시 `approver.employee_id`를 분해 서비스로 전달한다.
+- `backend/tests/test_defect_flow.py`: 분해 처리로 생성된 부모/자식 거래 로그가 모두 동일한 처리자 직원 ID를 남기는지 검증한다.
+
+검증:
+- `python -m pytest backend\tests\test_defect_flow.py::test_defective_disassemble_keep_scrap -q` 통과.
+- `python -m pytest backend\tests\test_defect_flow.py backend\tests\services\test_sr_execution.py backend\tests\services\test_dept_adjustment.py backend\tests\routers\test_dept_adjustment.py -q` 통과.
+
+판단:
+- 이 변경 이후 불량 분해 승인 경로에서 새로 생기는 stock-affecting 로그는 `inventory_effect`와 `producer_employee_id`를 함께 가진다.
+## 2026-06-25 운영 안전장치 진행 로그 - 부서 조정 API 처리자 사번 필수화
+
+목표: 부서 조정 submit API가 처리자 없이 재고를 변경하고 `producer_employee_id`가 빈 거래 로그를 남기는 경로를 차단한다.
+
+변경:
+- `backend/app/routers/dept_adjustment.py`: `/api/dept-adjustment/submit` 요청의 `operator_employee_code`를 필수 필드로 변경했다.
+- `frontend/lib/api/types/dept-adjustment.ts`: `DeptAdjSubmitPayload.operator_employee_code`를 필수 타입으로 맞췄다.
+- `_dev/baselines/openapi.json`: 의도한 API 계약 변경을 반영해 baseline을 갱신했다.
+- `backend/tests/routers/test_dept_adjustment.py`: 사번 없는 submit은 422로 거부되고 재고가 변하지 않음을 검증한다. 기존 성공/부족재고 테스트는 실제 직원 사번을 넘기도록 조정했다.
+
+검증:
+- `python -m pytest backend\tests\routers\test_dept_adjustment.py -q` 통과.
+- `python -m pytest backend\tests\routers\test_dept_adjustment.py backend\tests\services\test_dept_adjustment.py backend\tests\test_defect_flow.py backend\tests\services\test_sr_execution.py backend\tests\routers\test_transaction_edit.py backend\tests\test_transaction_cancel.py -q` 통과.
+- `cd frontend && npx tsc --noEmit` 통과.
+- `cd frontend && npm run lint:strict` 통과.
+- `cd frontend && npm test -- lib/__tests__/api-core.test.ts` 통과(샌드박스 EPERM 때문에 정상 권한으로 재실행).
+
+판단:
+- 이 변경 이후 부서 조정 API는 처리자 사번 없이 신규 stock-affecting 거래를 만들 수 없다.
+## 2026-06-25 운영 안전장치 진행 로그 - 거래 취소 이름 fallback 제거
+
+목표: 거래 취소 권한이 `produced_by` 이름 문자열에 기대지 않도록 한다. 동명이인, 이름 변경, 수기 문자열 차이 때문에 이름은 감사 표시용 스냅샷일 뿐 권한 근거가 될 수 없다.
+
+변경:
+- `backend/app/routers/inventory/transactions.py`: 취소 권한 판정에서 `producer_employee_id` 또는 `operation_batch_id -> IoBatch.requester_employee_id`만 본인 판정 근거로 사용한다. `produced_by` 이름 fallback은 제거했다.
+- `backend/tests/test_transaction_cancel.py`: `producer_employee_id`가 없는 로그는 `produced_by` 이름이 같은 직원이라도 본인 취소로 인정하지 않는 테스트를 추가했다.
+- 기존 `inventory_effect` 비정상 차단 테스트는 권한 단계에 막히지 않도록 `producer_employee_id`를 명시해 목적을 분리했다.
+
+검증:
+- `python -m pytest backend\tests\test_transaction_cancel.py -q` 통과.
+- `python -m pytest backend\tests\test_transaction_cancel.py backend\tests\routers\test_transaction_edit.py backend\tests\ops\test_ops_backup_integrity.py backend\tests\routers\test_transactions_operational_audit.py backend\tests\test_defect_flow.py backend\tests\services\test_sr_execution.py backend\tests\routers\test_dept_adjustment.py -q` 통과.
+- `scripts\ops\operational_readiness.bat` 통과.
+
+판단:
+- 신규 거래는 처리자/요청자 ID를 남기도록 보강했고, 취소 권한은 이제 그 ID만 신뢰한다.
+- ID 없는 과거 로그는 결재권자가 검토해 취소하거나, 자동 취소가 불가능한 경우 별도 보정 거래로 처리해야 한다.
+## 2026-06-25 운영 안전장치 진행 로그 - missing transaction effects 샘플 진단 강화
+
+목표: 운영 점검에서 `WARN missing transaction effects`가 나왔을 때 단순 건수만 보고 끝나지 않고, 어떤 과거 거래 유형과 품목부터 확인해야 하는지 바로 추적할 수 있게 한다.
+
+변경:
+- `scripts/ops/check_inventory_integrity.py`: `inventory_effect`가 비어 있는 재고 영향 거래를 거래 유형별로 집계하면서 `sample_log_id`, `sample_mes_code`를 함께 출력하도록 보강했다.
+- `backend/tests/ops/test_ops_backup_integrity.py`: missing effect 경고에 거래 유형, 건수, 샘플 로그 ID, 샘플 품목 코드가 포함되는지 검증을 추가했다.
+- 운영 문서: `operational_readiness.bat`는 요약 경고만 보여주고, 샘플 확인은 `python scripts\ops\check_inventory_integrity.py`로 직접 실행한다는 기준을 기록했다.
+
+검증:
+- `python -m pytest backend\tests\ops\test_ops_backup_integrity.py::test_check_inventory_integrity_warns_for_transaction_without_inventory_effect -q` 통과.
+- `python -m pytest backend\tests\ops\test_ops_backup_integrity.py backend\tests\ops\test_operational_readiness.py -q` 통과.
+- `scripts\ops\operational_readiness.bat` 통과. 현재 실제 DB는 과거 로그 때문에 `WARN missing transaction effects: 349`를 유지하지만 readiness 자체는 PASS.
+- `python scripts\ops\check_inventory_integrity.py` 직접 실행 시 거래 유형별 `count`, `sample_log_id`, `sample_mes_code`가 출력됨을 확인했다.
+## 2026-06-25 운영 안전장치 진행 로그 - 핵심 재고 업무 시나리오 회귀 테스트 추가
+
+목표: 입고, 창고에서 부서 이동, 부서 간 이동, 불량 격리, 불량 반품, 거래 취소를 한 흐름으로 실행했을 때 재고 총량과 위치별 수량, 히스토리 추적 근거가 기대대로 유지되는지 자동 검증한다.
+
+변경:
+- `backend/tests/routers/test_inventory_operational_scenarios.py`를 추가했다.
+- 테스트는 한 품목을 기준으로 `raw_receive -> warehouse_to_dept -> dept_internal -> defects/quarantine -> defect_return -> transaction cancel` 흐름을 통과시킨다.
+- 각 단계에서 `Inventory.quantity`, `warehouse_qty`, `pending_quantity`, 부서별 `InventoryLocation`, 불량 버킷 수량을 검증한다.
+- 재고에 영향을 주는 신규 로그가 `producer_employee_id`와 `inventory_effect`를 남기는지 확인한다. 결재 요청 기반 로그는 `reference_no`까지 요구하고, 즉시 불량 격리 로그는 작업자 ID/사유/재고 효과를 감사 근거로 본다.
+
+검증:
+- `python -m pytest backend\tests\routers\test_inventory_operational_scenarios.py -q` 통과.
+## 2026-06-25 운영 안전장치 진행 로그 - 제품 기호 마스터 수정 관리자 PIN 잠금
+
+목표: 품목 코드 체계에 영향을 주는 제품 기호 슬롯 수정이 관리자 PIN 없이 호출되는 경로를 차단한다.
+
+문제:
+- `PUT /api/codes/symbols/{slot}`은 `codes.symbol_update` 감사로그는 남겼지만 `require_admin_pin` dependency가 없어 PIN 없이 200으로 통과했다.
+- 제품 기호는 품목 코드와 모델 구분의 기준이므로 일반 작업자가 수정할 수 있으면 마스터 데이터 신뢰성이 깨질 수 있다.
+
+변경:
+- `backend/app/routers/codes.py`: 제품 기호 슬롯 수정 엔드포인트에 `require_admin_pin` dependency를 적용했다.
+- `backend/tests/routers/test_admin_pin_guards.py`: PIN 누락 시 400으로 차단되는 테스트와 올바른 `X-Admin-Pin` 헤더로 정상 수정되는 테스트를 추가했다.
+- `_dev/baselines/openapi.json`: 관리자 PIN dependency 추가에 따른 OpenAPI baseline을 갱신했다.
+
+검증:
+- `python -m pytest backend\tests\routers\test_admin_pin_guards.py -q` 통과.
+- `python -m pytest backend\tests\routers\test_models.py backend\tests\routers\test_items_create.py backend\tests\test_model_symbol_sync.py -q` 통과.
+
+## 2026-06-26 Inventory Cutover Preparation
+
+목표: 엑셀 운영을 중단하기 전에 과거 업무 이력과 창고 지도 수량을 비우고, 기준 재고 파일로 DEXCOWIN MES 재고를 새로 적재할 수 있는 안전한 전환 절차를 만든다.
+
+변경:
+- `scripts/ops/inventory_cutover.py` 추가. 기본 dry-run, 실제 적용은 `--apply --confirm START-OVER` 필요.
+- 전환 적용 시 품목/BOM/직원/부서 마스터는 유지하고, transaction/request/io 업무 이력과 warehouse_box_items를 비운 뒤 입력 파일 기준으로 Inventory/InventoryLocation을 덮어쓴다.
+- 입력은 `mes_code,bucket,department,quantity,location` 형식의 CSV/XLSX를 지원한다. unknown/duplicate/missing code는 적용 전 차단한다.
+- `_attic/docs/operations/INVENTORY_CUTOVER_RUNBOOK.md` 추가.
+- 일일 운영 체크리스트와 운영 문서에 cutover 절차 링크를 추가했다.
+
+검증:
+- `python -m pytest backend\tests\ops\test_inventory_cutover.py -q` PASS.

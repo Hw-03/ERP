@@ -305,6 +305,7 @@ def submit_defective_disassemble(
     reason_category: str,
     reason_memo: str,
     actor: str,
+    actor_employee_id: Optional[uuid.UUID] = None,
 ) -> dict:
     """격리(DEFECTIVE) 품목 분해 처리 — 재귀 트리 + 수량 분할 지원.
 
@@ -358,6 +359,7 @@ def submit_defective_disassemble(
         quantity_before=qty_before_parent,
         quantity_after=parent_inv.quantity,
         produced_by=actor,
+        producer_employee_id=actor_employee_id,
         notes=None,
         reason_category=reason_category,
         reason_memo=reason_memo,
@@ -416,6 +418,7 @@ def submit_defective_disassemble(
                 quantity_before=qty_before_child,
                 quantity_after=child_inv.quantity,
                 produced_by=actor,
+                producer_employee_id=actor_employee_id,
                 notes=None,
                 reason_category=reason_category,
                 reason_memo=child_note or None,
@@ -451,6 +454,7 @@ def submit_defective_disassemble(
                 quantity_before=qty_before_q,
                 quantity_after=q_inv.quantity,
                 produced_by=actor,
+                producer_employee_id=actor_employee_id,
                 notes=None,
                 reason_category=reason_category,
                 reason_memo=child_note or None,

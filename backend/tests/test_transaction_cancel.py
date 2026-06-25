@@ -282,6 +282,7 @@ def test_cancel_blocks_empty_inventory_effect_without_mutating_stock(client, db_
         quantity_before=Decimal("0"),
         quantity_after=Decimal("50"),
         produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
         inventory_effect=[],
     )
     db_session.add(log)
@@ -308,6 +309,7 @@ def test_cancel_blocks_zero_delta_inventory_effect_without_mutating_stock(client
         quantity_before=Decimal("0"),
         quantity_after=Decimal("50"),
         produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
         inventory_effect=[{"scope": "warehouse", "delta": 0}],
     )
     db_session.add(log)
@@ -366,6 +368,33 @@ def test_cancel_non_self_non_approver_forbidden(client, db_session, make_item):
     assert res.status_code == 403, res.text
 
 
+
+
+def test_cancel_without_employee_id_does_not_trust_same_name(client, db_session, make_item):
+    item = make_item(name="same-name-cancel", warehouse_qty=Decimal("80"))
+    original = _make_employee(db_session, code="SN01", name="Same Name")
+    other_same_name = _make_employee(db_session, code="SN02", name="Same Name")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("20"),
+        quantity_before=Decimal("60"),
+        quantity_after=Decimal("80"),
+        produced_by=original.name,
+        producer_employee_id=None,
+        inventory_effect=[{"scope": "warehouse", "delta": 20}],
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    res = _cancel(client, log.log_id, code=other_same_name.employee_code)
+
+    assert res.status_code == 403, res.text
+    wh, total, _ = _cells(db_session, item.item_id)
+    assert wh == 80
+    assert total == 80
+    db_session.refresh(log)
+    assert log.cancelled is False
 def test_cancel_approver_can_cancel_others(client, db_session, make_item):
     item = make_item(name="결재취소품", warehouse_qty=Decimal("100"))
     requester = _make_employee(db_session, code="OWN2", name="요청자2")

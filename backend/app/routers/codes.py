@@ -1,11 +1,12 @@
 """Code master router: 제품기호 / 공정 / 흐름 + 3-파트 코드 파싱·생성."""
 
-from typing import List
+from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.admin import require_admin_pin
 from app.models import ProcessType, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
@@ -32,7 +33,13 @@ def list_symbols(db: Session = Depends(get_db)):
 
 
 @router.put("/symbols/{slot}", response_model=ProductSymbolResponse, summary="제품기호 슬롯 수정")
-def update_symbol(slot: int, payload: ProductSymbolUpdate, request: Request, db: Session = Depends(get_db)):
+def update_symbol(
+    slot: int,
+    payload: ProductSymbolUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: Annotated[None, Depends(require_admin_pin)] = None,
+):
     row = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).one_or_none()
     if row is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "해당 슬롯이 없습니다.")

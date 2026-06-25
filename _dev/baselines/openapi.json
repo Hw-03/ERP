@@ -1639,16 +1639,10 @@
             "title": "Notes"
           },
           "operator_employee_code": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Operator Employee Code"
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Operator Employee Code",
+            "type": "string"
           },
           "operator_name": {
             "anyOf": [
@@ -1685,7 +1679,8 @@
         },
         "required": [
           "sub_type",
-          "lines"
+          "lines",
+          "operator_employee_code"
         ],
         "title": "DeptAdjSubmitRequest",
         "type": "object"
@@ -8581,6 +8576,38 @@
             "schema": {
               "title": "Slot",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],

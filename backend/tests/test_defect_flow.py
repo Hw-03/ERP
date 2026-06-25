@@ -263,6 +263,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
 
     from app.services.dept_adjustment import submit_defective_disassemble
 
+    actor = _make_employee(db_session, code="DASM1", name="disassemble actor")
     result = submit_defective_disassemble(
         db_session,
         parent.item_id,
@@ -275,6 +276,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
         ],
         reason_category="기능불량",
         reason_memo="분해 처리",
+        actor_employee_id=actor.employee_id,
         actor="테스터",
     )
     db_session.commit()
@@ -298,6 +300,8 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
         TransactionLog.transaction_type == TransactionTypeEnum.DISASSEMBLE,
     ).first()
     assert disassemble_log is not None
+    assert disassemble_log.producer_employee_id == actor.employee_id
+
 
     # keep 자식 → PRODUCTION 입고 확인
     for child in [child1, child3]:
@@ -313,6 +317,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
             TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE,
         ).first()
         assert recv_log is not None
+        assert recv_log.producer_employee_id == actor.employee_id
 
     # 회수 외 자식 → 격리(DEFECTIVE) 적재 + MARK_DEFECTIVE 로그 (폐기 아님, 소실 아님)
     quarantine_loc = db_session.query(InventoryLocation).filter(
@@ -329,6 +334,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
     ).first()
     assert mark_log is not None
     assert mark_log.quantity_change == Decimal("2")
+    assert mark_log.producer_employee_id == actor.employee_id
 
     # 분해 단계에서 폐기(DEFECT_SCRAP) 로그는 생성되지 않는다.
     scrap_log = db_session.query(TransactionLog).filter(

@@ -73,7 +73,7 @@ class DeptAdjSubmitRequest(BaseModel):
     sub_type: Literal["production", "disassembly", "correction"]
     lines: List[AdjLineInput] = Field(..., min_length=1)
     operator_name: Optional[str] = None
-    operator_employee_code: Optional[str] = Field(None, max_length=50)
+    operator_employee_code: str = Field(..., min_length=1, max_length=50)
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
 

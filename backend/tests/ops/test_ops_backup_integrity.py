@@ -210,6 +210,10 @@ def test_check_inventory_integrity_warns_for_transaction_without_inventory_effec
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "WARN missing transaction effects" in result.stdout
+    assert "transaction_type=RECEIVE" in result.stdout
+    assert "count=1" in result.stdout
+    assert "sample_log_id=tx-2" in result.stdout
+    assert "sample_mes_code=AA-0001" in result.stdout
 
 
 def test_check_inventory_integrity_warns_for_zero_delta_inventory_effect(tmp_path: Path) -> None:

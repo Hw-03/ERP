@@ -219,3 +219,40 @@ schtasks /Create /TN "MES Cleanup Monthly" /TR "%USERPROFILE%\Documents\GitHub\E
 - Alembic 마이그레이션 활성화
 
 자세한 배경은 `docs/BACKEND_REFACTOR_PLAN.md` 참고.
+## 운영 안전장치: missing transaction effects 추적
+
+`operational_readiness.bat`에서 `WARN missing transaction effects: N`이 나오면 신규 입출고를 막는 FAIL은 아니다. 다만 과거 거래 중 자동 취소와 감사 추적에 필요한 `inventory_effect`가 비어 있는 로그가 있다는 뜻이므로, 해당 과거 거래는 자동 취소하지 말고 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.
+
+상세 확인은 다음 명령으로 한다.
+
+```bat
+python scripts\ops\check_inventory_integrity.py
+```
+
+직접 실행하면 거래 유형별 `count`, `sample_log_id`, `sample_mes_code`가 함께 출력된다. 운영자는 `sample_log_id`를 기준으로 히스토리/DB 로그를 확인하고, 같은 유형의 과거 로그가 현재 재고에 영향을 줄 수 있는지 판단한다. `operational_readiness.bat`는 아침 점검용 요약만 보여주므로 샘플 ID가 필요하면 직접 진단 스크립트를 실행한다.
+
+## Inventory Cutover
+
+엑셀 운영을 중단하고 DEXCOWIN MES 기준 재고로 전환할 때는 전용 런북을 따른다.
+
+- Runbook: `_attic/docs/operations/INVENTORY_CUTOVER_RUNBOOK.md`
+- Script: `scripts/ops/inventory_cutover.py`
+
+기본 실행은 dry-run이며 DB를 바꾸지 않는다.
+
+```bat
+python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv
+```
+
+실제 적용은 다음처럼 확인 문구를 함께 넣어야 한다. SQLite 적용 전에는 스크립트가 백업을 먼저 만든다.
+
+```bat
+python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv --apply --confirm START-OVER
+```
+
+적용 후에는 반드시 아래 두 검사를 통과해야 한다.
+
+```bat
+python scripts\ops\check_inventory_integrity.py
+scripts\ops\operational_readiness.bat
+```

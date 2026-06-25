@@ -132,3 +132,45 @@
 | 동시 운영 | [CONCURRENT_LOCAL_OPERATION.md](CONCURRENT_LOCAL_OPERATION.md) |
 | 30명 부하 테스트 | [scripts/ops/load_test_30_users.py](../../scripts/ops/load_test_30_users.py) |
 | 무결성 점검 | [scripts/ops/check_inventory_integrity.py](../../scripts/ops/check_inventory_integrity.py) |
+## WARN missing transaction effects 처리 기준
+
+`operational_readiness.bat`가 `WARN missing transaction effects: N`을 보여도 마지막 줄이 `PASS operational readiness`이면 당일 신규 입출고 시작을 막는 조건은 아니다. 이 경고는 과거 거래 로그에 자동 취소 근거가 부족하다는 뜻이다.
+
+샘플 확인이 필요하면 아래 명령을 직접 실행한다.
+
+```bat
+python scripts\ops\check_inventory_integrity.py
+```
+
+직접 실행 결과에는 `transaction_type`, `count`, `sample_log_id`, `sample_mes_code`가 표시된다. 해당 과거 거래를 취소 버튼으로 되돌리려 하지 말고, 히스토리와 현재 재고를 대조한 뒤 필요한 경우 별도 보정 거래로 처리한다.
+
+---
+
+## Inventory Cutover Day
+
+엑셀 운영을 중단하고 DEXCOWIN MES 기준 재고로 전환하는 날에는 일반 일일 체크리스트보다 먼저 아래 절차를 수행한다.
+
+```
+[ ] 업무 사용 중지
+[ ] 기준 재고 입력 파일 준비
+[ ] dry-run 실행
+    python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv
+
+[ ] dry-run 요약 확인
+    - items updated 예상 수량 확인
+    - unknown/duplicate/missing mes_code 없음 확인
+    - 삭제 예정 history/map 수량 확인
+
+[ ] 실제 적용
+    python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv --apply --confirm START-OVER
+
+[ ] 재고 무결성 확인
+    python scripts\ops\check_inventory_integrity.py
+
+[ ] 운영 준비 확인
+    scripts\ops\operational_readiness.bat
+
+[ ] PASS operational readiness 확인 후 업무 시작
+```
+
+상세 절차는 `_attic/docs/operations/INVENTORY_CUTOVER_RUNBOOK.md`를 따른다.

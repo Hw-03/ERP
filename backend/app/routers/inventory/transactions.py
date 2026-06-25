@@ -33,7 +33,7 @@ from app.schemas import (
     TransactionQuantityCorrectionRequest,
     TransactionQuantityCorrectionResponse,
 )
-from app.services import audit, inventory as inventory_svc
+from app.services import audit, inv_effect, inventory as inventory_svc
 from app.services._tx import commit_only
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
@@ -743,6 +743,7 @@ def quantity_correct_transaction(
         )
 
     before = _log_snapshot(log)
+    cells_before = inv_effect.snapshot_cells(db, log.item_id)
 
     # adjust_warehouse 서비스 호출로 재고 절대값 설정
     adjusted_inv, qty_before, _applied_delta = inventory_svc.adjust_warehouse(
@@ -759,6 +760,8 @@ def quantity_correct_transaction(
         notes=f"보정: {payload.reason}",
         reference_no=str(log.log_id),
         produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=inv_effect.capture_effect(db, log.item_id, cells_before),
     )
     db.add(correction_log)
     db.flush()  # correction_log.log_id 채움
@@ -877,9 +880,9 @@ def cancel_transaction(
 
     # 권한 체크: 본인(요청자) 또는 결재 권한자
     # 요청자 식별 — 히스토리 화면의 '요청자' 표기와 동일한 우선순위로 판정한다:
-    #   1) producer_employee_id (입고/이동/생산 등 레거시 경로)
-    #   2) operation_batch_id → IoBatch.requester_employee_id (IO v2 배치 경로)
-    #   3) produced_by(요청자 이름) — 배치 없는 IO 로그(새 불량 등)의 유일한 단서
+    #   1) producer_employee_id
+    #   2) operation_batch_id -> IoBatch.requester_employee_id
+    # produced_by is only a display snapshot and is not trusted for authorization.
     requester_eid: Optional[str] = None
     if log.producer_employee_id is not None:
         requester_eid = str(log.producer_employee_id)
@@ -891,11 +894,7 @@ def cancel_transaction(
         )
         if batch is not None and batch.requester_employee_id is not None:
             requester_eid = str(batch.requester_employee_id)
-    if requester_eid is not None:
-        is_self = requester_eid == str(canceller.employee_id)
-    else:
-        # employee_id 단서가 없는 로그 — 기록된 요청자 이름으로 대조(화면 표기와 일치).
-        is_self = bool(log.produced_by) and log.produced_by == canceller.name
+    is_self = requester_eid == str(canceller.employee_id) if requester_eid is not None else False
     is_approver = (
         (getattr(canceller, "warehouse_role", None) or "none").lower() != "none"
         or (getattr(canceller, "department_role", None) or "none").lower() != "none"

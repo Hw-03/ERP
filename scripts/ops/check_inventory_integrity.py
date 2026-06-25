@@ -250,14 +250,22 @@ def check_missing_transaction_effects(db: Any) -> list[dict[str, Any]]:
     rows = _rows(
         db,
         """
-        SELECT transaction_type, COUNT(*) AS count
-        FROM transaction_logs
-        WHERE transaction_type IN (
-            'RECEIVE', 'SHIP', 'TRANSFER_TO_PROD', 'TRANSFER_TO_WH', 'TRANSFER_DEPT',
-            'ADJUST', 'PRODUCE', 'BACKFLUSH', 'MARK_DEFECTIVE', 'UNMARK_DEFECTIVE',
-            'DEFECT_SCRAP', 'SUPPLIER_RETURN', 'DISASSEMBLE'
+        WITH missing AS (
+            SELECT tl.log_id, tl.item_id, tl.transaction_type, it.mes_code
+            FROM transaction_logs tl
+            LEFT JOIN items it ON it.item_id = tl.item_id
+            WHERE tl.transaction_type IN (
+                'RECEIVE', 'SHIP', 'TRANSFER_TO_PROD', 'TRANSFER_TO_WH', 'TRANSFER_DEPT',
+                'ADJUST', 'PRODUCE', 'BACKFLUSH', 'MARK_DEFECTIVE', 'UNMARK_DEFECTIVE',
+                'DEFECT_SCRAP', 'SUPPLIER_RETURN', 'DISASSEMBLE'
+            )
+            AND COALESCE(TRIM(CAST(tl.inventory_effect AS TEXT)), '') IN ('', '[]', 'null')
         )
-        AND COALESCE(TRIM(CAST(inventory_effect AS TEXT)), '') IN ('', '[]', 'null')
+        SELECT transaction_type,
+               COUNT(*) AS count,
+               MIN(log_id) AS sample_log_id,
+               MIN(mes_code) AS sample_mes_code
+        FROM missing
         GROUP BY transaction_type
         ORDER BY transaction_type
         """,
@@ -266,6 +274,8 @@ def check_missing_transaction_effects(db: Any) -> list[dict[str, Any]]:
         {
             "transaction_type": row[0],
             "count": row[1],
+            "sample_log_id": str(row[2]) if row[2] is not None else None,
+            "sample_mes_code": row[3],
         }
         for row in rows
     ]
@@ -375,7 +385,7 @@ def main() -> int:
                     print(f"PASS {label}: 0")
 
             warnings = [
-                ("missing transaction effects", check_missing_transaction_effects(db), ("transaction_type", "count")),
+                ("missing transaction effects", check_missing_transaction_effects(db), ("transaction_type", "count", "sample_log_id", "sample_mes_code")),
                 ("ineffective transaction effects", check_ineffective_transaction_effects(db), ("log_id", "transaction_type")),
             ]
             for label, rows, keys in warnings:

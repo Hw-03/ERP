@@ -4,10 +4,27 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from app.models import DepartmentEnum, LocationStatusEnum
+from app.models import DepartmentEnum, Employee, EmployeeLevelEnum, LocationStatusEnum
+from app.services.pin_auth import DEFAULT_PIN_HASH
 
 D = Decimal
 ASSEMBLY = DepartmentEnum.ASSEMBLY
+
+
+def _make_operator(db_session, *, code: str = "DA01") -> Employee:
+    emp = Employee(
+        employee_code=code,
+        name="부서조정담당",
+        role=f"{ASSEMBLY.value}/staff",
+        department=ASSEMBLY,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active="true",
+        pin_hash=DEFAULT_PIN_HASH,
+    )
+    db_session.add(emp)
+    db_session.flush()
+    return emp
 
 
 def _prod_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
@@ -126,6 +143,7 @@ def test_submit_production_api(client, db_session, make_item, make_location):
     comp = make_item(name="AR")
     result = make_item(name="AF")
     make_location(comp.item_id, department=ASSEMBLY, quantity=D("5"))
+    operator = _make_operator(db_session, code="DAP1")
     db_session.commit()
 
     resp = client.post(
@@ -133,6 +151,7 @@ def test_submit_production_api(client, db_session, make_item, make_location):
         json={
             "sub_type": "production",
             "operator_name": "작업자1",
+            "operator_employee_code": operator.employee_code,
             "lines": [
                 {"item_id": str(comp.item_id),   "direction": "out", "quantity": 2, "department": "조립"},
                 {"item_id": str(result.item_id),  "direction": "in",  "quantity": 1, "department": "조립"},
@@ -152,12 +171,14 @@ def test_submit_production_api(client, db_session, make_item, make_location):
 def test_submit_correction_api(client, db_session, make_item, make_location):
     item = make_item(name="X")
     make_location(item.item_id, department=ASSEMBLY, quantity=D("10"))
+    operator = _make_operator(db_session, code="DAC1")
     db_session.commit()
 
     resp = client.post(
         "/api/dept-adjustment/submit",
         json={
             "sub_type": "correction",
+            "operator_employee_code": operator.employee_code,
             "lines": [
                 {"item_id": str(item.item_id), "direction": "out", "quantity": 3,
                  "department": "조립", "reason": "실사 차이"},
@@ -169,15 +190,36 @@ def test_submit_correction_api(client, db_session, make_item, make_location):
     assert _prod_qty(db_session, item.item_id) == D("7")
 
 
-def test_submit_stock_shortage_422(client, db_session, make_item, make_location):
-    item = make_item(name="Y")
-    make_location(item.item_id, department=ASSEMBLY, quantity=D("1"))
+
+
+def test_submit_requires_operator_employee_code(client, db_session, make_item, make_location):
+    item = make_item(name="NOOP")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("10"))
     db_session.commit()
 
     resp = client.post(
         "/api/dept-adjustment/submit",
         json={
             "sub_type": "correction",
+            "lines": [
+                {"item_id": str(item.item_id), "direction": "out", "quantity": 1, "department": ASSEMBLY.value},
+            ],
+        },
+    )
+
+    assert resp.status_code == 422
+    assert _prod_qty(db_session, item.item_id) == D("10")
+def test_submit_stock_shortage_422(client, db_session, make_item, make_location):
+    item = make_item(name="Y")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("1"))
+    operator = _make_operator(db_session, code="DAS1")
+    db_session.commit()
+
+    resp = client.post(
+        "/api/dept-adjustment/submit",
+        json={
+            "sub_type": "correction",
+            "operator_employee_code": operator.employee_code,
             "lines": [{"item_id": str(item.item_id), "direction": "out", "quantity": 99, "department": "조립"}],
         },
     )

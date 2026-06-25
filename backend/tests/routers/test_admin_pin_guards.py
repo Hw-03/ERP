@@ -47,6 +47,26 @@ def test_model_create_requires_admin_pin(client, db_session):
     assert res.status_code == 400
 
 
+def test_product_symbol_update_requires_admin_pin(client, db_session):
+    _seed_symbol(db_session)
+    res = client.put("/api/codes/symbols/2", json={"symbol": "8", "model_name": "NEW"})
+    assert res.status_code == 400
+
+
+def test_product_symbol_update_allows_admin_pin(client, db_session):
+    _seed_symbol(db_session)
+    res = client.put(
+        "/api/codes/symbols/2",
+        headers=ADMIN_HEADERS,
+        json={"symbol": "8", "model_name": "NEW"},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["slot"] == 2
+    assert body["symbol"] == "8"
+    assert body["model_name"] == "NEW"
+
+
 def test_item_write_endpoints_require_admin_pin(client, db_session, make_item):
     _seed_symbol(db_session)
     create_res = client.post(
