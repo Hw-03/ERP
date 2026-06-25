@@ -64,7 +64,8 @@ For Codex plans, also include the recommended execution shape when useful: solo 
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
 - **Required commit message format: `YYYY-MM-DD area: summary`**
   - **Always check the real date immediately before committing** using `date +%Y-%m-%d` (Bash) or `Get-Date -Format yyyy-MM-dd` (PowerShell). Do not reuse the date baked into session context; sessions can span midnight.
-  - Examples: `2026-05-26 backend: fix serial assignment`, `2026-05-26 vault: update Obsidian config`
+  - Commit subjects and bodies must be written in Korean, except for technical identifiers, paths, branch names, and commands.
+  - Examples: `2026-05-26 backend: 시리얼 배정 오류 수정`, `2026-05-26 vault: Obsidian 설정 갱신`
   - `area` is free-form: `frontend`, `backend`, `desktop`, `mobile`, `admin`, `docs`, `data`, `fix`, `refactor`, `chore`, `vault`, `defect`, `items`, `ux`, `weekly`, `history`, `capacity`, etc.
   - **Forbidden patterns** (never use):
     - Conventional Commits: `type(scope): X` (e.g. `fix(items): X`, `docs(vault): X`)
