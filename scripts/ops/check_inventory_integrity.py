@@ -14,6 +14,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -270,6 +271,35 @@ def check_missing_transaction_effects(db: Any) -> list[dict[str, Any]]:
     ]
 
 
+def check_ineffective_transaction_effects(db: Any) -> list[dict[str, Any]]:
+    rows = _rows(
+        db,
+        """
+        SELECT log_id, transaction_type, inventory_effect
+        FROM transaction_logs
+        WHERE transaction_type IN (
+            'RECEIVE', 'SHIP', 'TRANSFER_TO_PROD', 'TRANSFER_TO_WH', 'TRANSFER_DEPT',
+            'ADJUST', 'PRODUCE', 'BACKFLUSH', 'MARK_DEFECTIVE', 'UNMARK_DEFECTIVE',
+            'DEFECT_SCRAP', 'SUPPLIER_RETURN', 'DISASSEMBLE'
+        )
+        AND COALESCE(TRIM(CAST(inventory_effect AS TEXT)), '') NOT IN ('', '[]', 'null')
+        """,
+    )
+    ineffective: list[dict[str, Any]] = []
+    for row in rows:
+        raw_effect = row[2]
+        try:
+            effect = json.loads(raw_effect) if isinstance(raw_effect, str) else raw_effect
+            has_nonzero_delta = isinstance(effect, list) and any(
+                isinstance(cell, dict) and int(cell.get("delta", 0)) != 0
+                for cell in effect
+            )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            has_nonzero_delta = False
+        if not has_nonzero_delta:
+            ineffective.append({"log_id": str(row[0]), "transaction_type": row[1]})
+    return ineffective
+
 def check_stale_reserved(db: Any, url: str) -> list[dict[str, Any]]:
     if url.startswith("sqlite"):
         sql = """
@@ -346,6 +376,7 @@ def main() -> int:
 
             warnings = [
                 ("missing transaction effects", check_missing_transaction_effects(db), ("transaction_type", "count")),
+                ("ineffective transaction effects", check_ineffective_transaction_effects(db), ("log_id", "transaction_type")),
             ]
             for label, rows, keys in warnings:
                 if rows:

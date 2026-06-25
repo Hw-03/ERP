@@ -1,4 +1,4 @@
-﻿# DEXCOWIN MES Screen Baseline Cleanup Log
+# DEXCOWIN MES Screen Baseline Cleanup Log
 
 작성일: 2026-06-25
 
@@ -919,7 +919,7 @@
   - 묶음 작업은 `operation_batch_id` 또는 `defect-disassemble:` reference_no 단위로 함께 취소한다: `transactions.py` 1014-1037
   - 취소 후 `cancelled`, `cancel_reason`, `cancelled_by`, `cancelled_at`을 남긴다: `transactions.py` 1050-1053
 - 위험/확인 요소:
-  - `inventory_effect`가 없는 과거 로그는 `_cancel_one_log`의 레거시 폴백으로 처리되며, 정보 부족 유형은 취소가 거부된다: `transactions.py` 815-829, 944-948
+  - `inventory_effect`가 없는 과거 로그는 자동 취소가 거부된다. 운영 자동 취소는 `inventory_effect`의 실제 재고 셀 증감만 신뢰한다.
   - 취소 권한은 요청자 본인 또는 창고/부서 결재 권한자로 판단한다: `transactions.py` 984-1010
   - 요청자 식별이 `producer_employee_id`, `IoBatch.requester_employee_id`, `produced_by 이름` 순으로 fallback된다: `transactions.py` 984-1004
   - 이름 fallback은 과거 데이터 호환에는 필요하지만 동명이인/이름 변경에는 약하다. 운영 신뢰성 강화 단계에서 `producer_employee_id` 기록 누락 경로를 줄이는 것이 좋다.
@@ -2711,3 +2711,32 @@ F3 알림 라벨 책임 설명 정리:
 - powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1: PASS. Backend pytest, frontend strict lint, type check, Vitest coverage, production build, bundle size, OpenAPI drift all passed after regenerating _dev/baselines/openapi.json for the intentional API removals/guard changes.
 - Playwright smoke (C:/tmp/mes-smoke-operational.js, removed after run): PASS. Desktop dashboard/warehouse/defect/history/warehouseMap/weekly/admin and mobile dashboard/warehouse/defect/history/more/weekly/warehouseMap rendered. Admin PIN entry and audit CSV section navigation were included.
 - Temporary work directories/files created by this session were removed.
+
+## 2026-06-25 운영 안전장치 진행 로그 - 거래 취소 효과 검증
+
+목표: 엑셀 없이 DEXCOWIN MES 히스토리와 취소 기능을 신뢰할 수 있도록, 재고 역재생 근거가 없는 거래가 취소 완료로 표시되는 경로를 차단한다.
+
+변경:
+- `backend/app/routers/inventory/transactions.py`: `inventory_effect`가 빈 배열이거나 non-zero delta가 없는 경우 자동 취소를 거부한다. 재고를 실제로 되돌리지 못하는 거래가 `cancelled=true`로 남는 상황을 막는다.
+- `backend/tests/test_transaction_cancel.py`: 빈 효과 배열과 zero-delta 효과 배열 모두 재고 불변 + 취소 거부를 검증한다.
+- `scripts/ops/check_inventory_integrity.py`: non-zero delta가 없는 효과 기록을 `WARN ineffective transaction effects`로 표시한다.
+- `backend/tests/ops/test_ops_backup_integrity.py`: zero-delta 효과 기록 WARN 회귀 테스트를 추가한다.
+
+검증:
+- `python -m pytest backend\\tests\\test_transaction_cancel.py backend\\tests\\routers\\test_transactions_operational_audit.py backend\\tests\\ops\\test_ops_backup_integrity.py backend\\tests\\ops\\test_operational_readiness.py -q` 통과.
+- `scripts\\ops\\operational_readiness.bat` 통과. 현재 실제 DB는 `WARN missing transaction effects: 349`만 표시되고 readiness 자체는 PASS.
+
+남은 판단:
+- 과거 `inventory_effect=None` 거래의 레거시 fallback은 제거했다. 자동 취소는 `inventory_effect`가 있고 non-zero delta가 있는 거래만 허용한다.
+## 2026-06-25 운영 안전장치 진행 로그 - 레거시 자동 취소 차단
+
+목표: 과거 로그 필드 조합으로 재고를 추론해 자동 취소하던 경로를 제거해, 근거 없는 역재생이 실제 재고를 바꾸는 일을 막는다.
+
+변경:
+- `backend/app/routers/inventory/transactions.py`: `inventory_effect=None`이면 거래 유형과 보조 필드가 있어도 자동 취소를 거부한다. 기존 레거시 fallback 블록을 제거했다.
+- `backend/tests/test_transaction_cancel.py`: 수량 추론이 가능해 보이는 레거시 MARK_DEFECTIVE 로그도 자동 취소되지 않고 재고/로그가 불변임을 검증한다.
+- 운영 문서: `WARN missing transaction effects`는 신규 작업 차단은 아니지만, 해당 과거 거래 자동 취소가 거부되고 별도 보정 거래로 처리해야 함을 명시했다.
+
+검증:
+- `python -m pytest backend\\tests\\test_transaction_cancel.py backend\\tests\\routers\\test_transactions_operational_audit.py backend\\tests\\ops\\test_ops_backup_integrity.py backend\\tests\\ops\\test_operational_readiness.py -q` 통과.
+- `scripts\\ops\\operational_readiness.bat` 통과.

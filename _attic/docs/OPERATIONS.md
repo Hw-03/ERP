@@ -25,7 +25,7 @@ scripts\ops\operational_readiness.bat
 
 마지막 줄이 `PASS operational readiness`이면 입출고 작업을 시작할 수 있다. `FAIL latest backup`이 나오면 먼저 `backup_db.bat`를 실행하고 readiness를 다시 돌린다. 그 외 `FAIL`은 입출고를 시작하지 말고 백업/복구 또는 정합성 점검 절차를 먼저 따른다.
 
-WARN missing transaction effects: N이 함께 나오면 재고 합계는 정상이나, 과거 거래 로그 일부에 자동 역취소용 재고 영향 기록이 없다는 뜻이다. 신규 입출고를 막는 조건은 아니지만, 해당 과거 거래를 취소해야 할 때는 히스토리와 현재 재고를 대조한 뒤 처리한다.
+WARN missing transaction effects: N이 함께 나오면 재고 합계는 정상이나, 과거 거래 로그 일부에 자동 역취소용 재고 영향 기록이 없다는 뜻이다. 신규 입출고를 막는 조건은 아니지만, 해당 과거 거래의 자동 취소는 거부된다. 필요하면 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.
 
 서버가 켜진 뒤에는 다음 중 하나로 화면/서버 상태를 확인한다.
 
@@ -125,7 +125,7 @@ taskkill /PID <PID> /F
 | 결과 모달이 닫히지 않음 | submit 진행 중 (의도된 잠금) | "처리 중..." 표시가 사라질 때까지 대기 |
 | `/health/detailed` 가 `inventory_mismatch_count > 0` | Inventory 합계와 위치별 합계 불일치 | DB 백업 후 운영 담당에게 보고 (수정은 별도 절차) |
 | `operational_readiness.bat` 가 `FAIL` | 백업 없음/오래됨/DB보다 오래됨, 백업 검증 실패, 재고 정합성 실패 | 입출고 시작 금지. `backup_db.bat`, `verify_backup.bat`, `check_inventory_integrity.py` 결과를 확인 |
-| WARN missing transaction effects 표시 | 과거 거래 로그에 자동 역취소용 재고 영향 기록 없음 | 신규 작업은 가능. 과거 거래 취소 시 히스토리/현재 재고 대조 후 처리 |
+| WARN missing transaction effects 표시 | 과거 거래 로그에 자동 역취소용 재고 영향 기록 없음 | 신규 작업은 가능. 해당 과거 거래 자동 취소는 거부되며, 히스토리/현재 재고 대조 후 별도 보정 거래로 처리 |
 | 다른 PC에서 접속 안 됨 | LAN IP 변경 / 방화벽 | start.bat 콘솔에 표시된 새 IP 확인, Windows 방화벽에서 8011·3001 (dev) 또는 8010·3000 (prod) 인바운드 허용 |
 
 ## 데이터 정합성 점검(수동)

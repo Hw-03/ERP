@@ -272,6 +272,57 @@ def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
     assert log.cancelled is False
 
 
+def test_cancel_blocks_empty_inventory_effect_without_mutating_stock(client, db_session, make_item):
+    item = make_item(name="empty-effect", warehouse_qty=Decimal("50"))
+    actor = _make_employee(db_session, code="EMP0")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("50"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("50"),
+        produced_by=actor.name,
+        inventory_effect=[],
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    res = _cancel(client, log.log_id, code="EMP0")
+
+    assert res.status_code == 422, res.text
+    assert "재고 효과" in res.json()["detail"]["message"]
+    wh, total, _ = _cells(db_session, item.item_id)
+    assert wh == 50
+    assert total == 50
+    db_session.refresh(log)
+    assert log.cancelled is False
+
+
+def test_cancel_blocks_zero_delta_inventory_effect_without_mutating_stock(client, db_session, make_item):
+    item = make_item(name="zero-effect", warehouse_qty=Decimal("50"))
+    actor = _make_employee(db_session, code="EMPZ")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("50"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("50"),
+        produced_by=actor.name,
+        inventory_effect=[{"scope": "warehouse", "delta": 0}],
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    res = _cancel(client, log.log_id, code="EMPZ")
+
+    assert res.status_code == 422, res.text
+    assert "재고 효과" in res.json()["detail"]["message"]
+    wh, total, _ = _cells(db_session, item.item_id)
+    assert wh == 50
+    assert total == 50
+    db_session.refresh(log)
+    assert log.cancelled is False
+
 def test_cancel_idempotent_double(client, db_session, make_item):
     item = make_item(name="cancel-duplicate", warehouse_qty=Decimal("0"))
     actor = _make_employee(db_session, code="DUP1")
@@ -376,11 +427,11 @@ def test_cancel_legacy_defect_without_effect_returns_message(client, db_session,
 
     res = _cancel(client, log.log_id, code="WH2")
     assert res.status_code == 422, res.text
-    assert "이전 버전" in res.json()["detail"]["message"]
+    assert "재고 효과" in res.json()["detail"]["message"]
 
 
-def test_cancel_legacy_mark_defective_restores_warehouse_and_defective(client, db_session, make_item):
-    """레거시 MARK_DEFECTIVE(inventory_effect=None)를 warehouse_qty_before/after 로 수량 추론해 취소."""
+def test_cancel_legacy_mark_defective_with_inferred_quantity_is_blocked(client, db_session, make_item):
+    """수량 추론이 가능해 보여도 inventory_effect=None이면 자동 취소하지 않는다."""
     item = make_item(name="레거시불량복구", warehouse_qty=Decimal("70"))
     approver = _make_employee(db_session, code="WH3", name="창고장3", warehouse_role="primary")
     # 격리된 상태 재현: 부서 DEFECTIVE 위치에 30개
@@ -408,9 +459,11 @@ def test_cancel_legacy_mark_defective_restores_warehouse_and_defective(client, d
     db_session.commit()
 
     res = _cancel(client, log.log_id, code="WH3")
-    assert res.status_code == 200, res.text
-    assert res.json()["cancelled"] is True
+    assert res.status_code == 422, res.text
+    assert "재고 효과" in res.json()["detail"]["message"]
 
     wh, _, locs = _cells(db_session, item.item_id)
-    assert wh == 100  # 창고 복구: 70 + 30
-    assert locs.get((DepartmentEnum.ASSEMBLY.value, "DEFECTIVE"), 0) == 0
+    assert wh == 70
+    assert locs.get((DepartmentEnum.ASSEMBLY.value, "DEFECTIVE"), 0) == 30
+    db_session.refresh(log)
+    assert log.cancelled is False

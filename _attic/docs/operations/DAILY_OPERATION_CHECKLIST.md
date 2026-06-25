@@ -26,7 +26,7 @@
 
 **판정 기준:**
 - `operational_readiness.bat` 마지막 줄이 `PASS operational readiness` → 운영 시작 가능
-- WARN missing transaction effects는 과거 거래의 자동 역취소 근거 부족 경고이며, FAIL이 아니면 신규 입출고 시작 차단 조건은 아님
+- WARN missing transaction effects는 과거 거래의 자동 역취소 근거 부족 경고이며, FAIL이 아니면 신규 입출고 시작 차단 조건은 아님. 해당 과거 거래 자동 취소는 거부되므로 필요 시 히스토리/현재 재고 대조 후 별도 보정 거래로 처리
 - `FAIL latest backup` → `backup_db.bat` 실행 후 readiness 재실행
 - 그 외 readiness 또는 healthcheck FAIL 1건 이상 → 입출고 시작 금지, 장애 대응 절차 참조: docs/operations/INCIDENT_RESPONSE.md
 

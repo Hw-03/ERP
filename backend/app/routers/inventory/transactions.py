@@ -20,9 +20,7 @@ from app.models import (
     Employee,
     IoBatch,
     Inventory,
-    InventoryLocation,
     Item,
-    LocationStatusEnum,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -818,140 +816,30 @@ class TransactionCancelRequest(BaseModel):
     pin: str = Field(..., min_length=1, max_length=20)
 
 
-def _cancel_one_log(db: Session, log: TransactionLog, inv: Inventory) -> None:
-    """단일 TransactionLog 의 재고 효과를 역방향 적용. 범위 외/데이터 부족 시 ValueError.
+def _cancel_one_log(db: Session, log: TransactionLog) -> None:
+    """단일 TransactionLog 의 재고 효과를 역방향 적용한다.
 
-    1순위: inventory_effect(거래가 건드린 셀 증감 기록)가 있으면 부호 반전해 일반적으로 역재생.
-    레거시(효과 기록 이전 로그)는 유형별 필드 재구성으로 폴백하되, 정보가 부족한 유형은 거부.
+    운영 자동 취소는 inventory_effect 에 기록된 실제 재고 셀 증감만 신뢰한다.
+    효과 기록이 없는 과거 로그는 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.
     """
-    from decimal import Decimal as _D
+    if log.inventory_effect is None:
+        raise ValueError("재고 효과 기록이 없어 자동 취소할 수 없습니다.")
 
-    # 1순위 — 효과 기록 기반 일반 역재생(유형 무관, 불량·이동·생산·분해 모두 정확).
-    if log.inventory_effect is not None:
-        from app.services.inv_effect import apply_effect_reverse
-        apply_effect_reverse(db, log.item_id, log.inventory_effect)
-        return
-
-    # 레거시 폴백 — 효과 기록 이전에 생성된 로그.
-    tx = log.transaction_type
-    qty = _D(str(log.transfer_qty or abs(log.quantity_change or 0)))
-
-    WAREHOUSE_ONLY = {
-        TransactionTypeEnum.RECEIVE,
-        TransactionTypeEnum.SHIP,
-        TransactionTypeEnum.ADJUST,
-    }
-    DEPT_ONLY = {
-        TransactionTypeEnum.PRODUCE,
-        TransactionTypeEnum.BACKFLUSH,
-        TransactionTypeEnum.SUPPLIER_RETURN,
-    }
-    TRANSFER_TYPES = {
-        TransactionTypeEnum.TRANSFER_TO_PROD,
-        TransactionTypeEnum.TRANSFER_TO_WH,
-        TransactionTypeEnum.TRANSFER_DEPT,
-    }
-
-    if tx in WAREHOUSE_ONLY:
-        # quantity_change: RECEIVE=+, SHIP=-, ADJUST=±
-        delta = _D(str(log.quantity_change or 0))
-        new_wh = (inv.warehouse_qty or _D("0")) - delta
-        if new_wh < 0:
-            raise ValueError(f"취소 후 창고 재고가 음수({new_wh})가 됩니다.")
-        inv.warehouse_qty = new_wh
-
-    elif tx in DEPT_ONLY:
-        dept_name = log.department
-        if not dept_name:
-            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == log.item_id,
-                InventoryLocation.department == dept_name,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
+    effect = log.inventory_effect
+    if not isinstance(effect, list) or not effect:
+        raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
+    try:
+        has_nonzero_delta = any(
+            isinstance(cell, dict) and int(cell.get("delta", 0)) != 0
+            for cell in effect
         )
-        if loc is None:
-            raise ValueError(f"{dept_name} 부서 재고 위치를 찾을 수 없습니다.")
-        # PRODUCE: quantity_change=+qty (입고), 역: -qty
-        # BACKFLUSH/SUPPLIER_RETURN: quantity_change=-qty (출고), 역: +qty
-        delta = _D(str(log.quantity_change or 0))
-        new_loc_qty = (loc.quantity or _D("0")) - delta
-        if new_loc_qty < 0:
-            raise ValueError(f"취소 후 {dept_name} 부서 재고가 음수({new_loc_qty})가 됩니다.")
-        loc.quantity = new_loc_qty
+    except (TypeError, ValueError):
+        has_nonzero_delta = False
+    if not has_nonzero_delta:
+        raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
 
-    elif tx in TRANSFER_TYPES:
-        dept_name = log.department
-        if not dept_name:
-            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == log.item_id,
-                InventoryLocation.department == dept_name,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
-        )
-        if loc is None:
-            raise ValueError(f"{dept_name} 부서 재고 위치를 찾을 수 없습니다.")
-
-        if tx == TransactionTypeEnum.TRANSFER_TO_PROD:
-            # 창고↓, 부서↑ → 역: 창고↑, 부서↓
-            new_wh = (inv.warehouse_qty or _D("0")) + qty
-            new_loc = (loc.quantity or _D("0")) - qty
-            if new_loc < 0:
-                raise ValueError(f"취소 후 {dept_name} 부서 재고가 음수({new_loc})가 됩니다.")
-            inv.warehouse_qty = new_wh
-            loc.quantity = new_loc
-        elif tx == TransactionTypeEnum.TRANSFER_TO_WH:
-            # 부서↓, 창고↑ → 역: 부서↑, 창고↓
-            new_wh = (inv.warehouse_qty or _D("0")) - qty
-            new_loc = (loc.quantity or _D("0")) + qty
-            if new_wh < 0:
-                raise ValueError(f"취소 후 창고 재고가 음수({new_wh})가 됩니다.")
-            inv.warehouse_qty = new_wh
-            loc.quantity = new_loc
-        else:  # TRANSFER_DEPT: from_dept↓, to_dept↑ (to_dept 정보가 로그에 없어 복원 불가)
-            raise ValueError(
-                "이전 버전 거래라 자동 취소할 수 없습니다. 반대 방향 이동으로 직접 처리해 주세요."
-            )
-    elif tx == TransactionTypeEnum.MARK_DEFECTIVE:
-        dept_name = log.department
-        if not dept_name:
-            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
-        if log.transfer_qty:
-            q_qty = _D(str(log.transfer_qty))
-        elif log.warehouse_qty_before is not None and log.warehouse_qty_after is not None:
-            q_qty = _D(str(log.warehouse_qty_before)) - _D(str(log.warehouse_qty_after))
-        else:
-            raise ValueError("이전 버전 거래라 격리 수량을 추론할 수 없습니다.")
-        if q_qty <= 0:
-            raise ValueError("이전 버전 거래라 격리 수량을 추론할 수 없습니다.")
-        inv.warehouse_qty = (inv.warehouse_qty or _D("0")) + q_qty
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == log.item_id,
-                InventoryLocation.department == dept_name,
-                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
-            )
-            .first()
-        )
-        if loc is None:
-            raise ValueError(f"{dept_name} 부서 불량 재고 위치를 찾을 수 없습니다.")
-        new_qty = (loc.quantity or _D("0")) - q_qty
-        if new_qty < 0:
-            raise ValueError(f"취소 후 {dept_name} 부서 불량 재고가 음수({new_qty})가 됩니다.")
-        loc.quantity = new_qty
-    else:
-        # 레거시 UNMARK_DEFECTIVE·분해(DISASSEMBLE) 등 — 수량/방향 정보 부족.
-        raise ValueError(
-            "이전 버전 거래라 자동 취소할 수 없습니다. 불량 해제 등 기존 기능을 사용해 주세요."
-        )
+    from app.services.inv_effect import apply_effect_reverse
+    apply_effect_reverse(db, log.item_id, effect)
 
 
 @router.post("/transactions/{log_id}/cancel", response_model=TransactionLogResponse)
@@ -1048,7 +936,7 @@ def cancel_transaction(
         if not bl_inv:
             raise http_error(404, ErrorCode.NOT_FOUND, f"재고 레코드를 찾을 수 없습니다 (item={bl.item_id}).")
         try:
-            _cancel_one_log(db, bl, bl_inv)
+            _cancel_one_log(db, bl)
         except ValueError as exc:
             raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
         from app.services.inv_calc import _sync_total

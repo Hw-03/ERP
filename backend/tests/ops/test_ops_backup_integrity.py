@@ -212,6 +212,23 @@ def test_check_inventory_integrity_warns_for_transaction_without_inventory_effec
     assert "WARN missing transaction effects" in result.stdout
 
 
+def test_check_inventory_integrity_warns_for_zero_delta_inventory_effect(tmp_path: Path) -> None:
+    db_path = tmp_path / "zero-effect.db"
+    _create_ops_schema_db(db_path)
+    con = sqlite3.connect(db_path)
+    try:
+        con.execute(
+            "INSERT INTO transaction_logs VALUES ('tx-3', 'item-1', 'RECEIVE', '[{\"scope\":\"warehouse\",\"delta\":0}]')"
+        )
+        con.commit()
+    finally:
+        con.close()
+
+    result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "WARN ineffective transaction effects" in result.stdout
+
 
 def test_backup_db_py_creates_verified_backup_in_backend_backup(tmp_path: Path) -> None:
     src = tmp_path / "source.db"
