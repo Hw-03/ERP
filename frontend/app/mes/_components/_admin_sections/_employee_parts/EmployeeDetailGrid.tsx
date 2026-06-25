@@ -46,6 +46,18 @@ export function EmployeeDetailGrid({
       {/* 카드 1: 기본 정보 */}
       <DetailCardSlot title="기본 정보">
         <div className="grid grid-cols-2 gap-3">
+          <FieldRow label="사번">
+            <div
+              className="w-full rounded-[10px] border px-3 py-2 text-[13px] font-bold"
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+              }}
+            >
+              {employee.employee_code}
+            </div>
+          </FieldRow>
           <FieldRow label="이름" htmlFor="emp-edit-name">
             <TextInput
               id="emp-edit-name"
