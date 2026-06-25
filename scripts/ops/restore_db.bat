@@ -1,46 +1,41 @@
 @echo off
 rem ============================================================
-rem  MES DB restore (operator must stop the backend first!)
+rem  DEXCOWIN MES DB restore (operator must stop the backend first)
 rem  Usage: restore_db.bat <backup-filename>
 rem      filename is relative to backend\_backup\
-rem  Steps:
-rem    1) snapshot the current mes.db as mes_PRE-RESTORE_TS.db
-rem    2) integrity_check on the source backup
-rem    3) replace mes.db + remove stale wal/shm
 rem ============================================================
 setlocal
 
 set "ROOT=%~dp0..\.."
 set "DB=%ROOT%\backend\mes.db"
+set "BACKUP_DIR=%ROOT%\backend\_backup"
+set "VERIFY=%~dp0_verify_backup.py"
 
 if "%~1"=="" (
     echo Usage: restore_db.bat ^<backup-filename^>
     echo Available backups:
-    dir /B "%ROOT%\backend\_backup\mes_*.db" 2>nul
+    dir /B "%BACKUP_DIR%\mes_*.db" 2>nul
     exit /b 2
 )
 
-set "SRC=%ROOT%\backend\_backup\%~1"
+set "SRC=%BACKUP_DIR%\%~1"
 if not exist "%SRC%" (
     echo [RESTORE] not found: %SRC%
     exit /b 1
 )
 
-rem 1) safety snapshot before overwrite
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"`) do set "TS=%%i"
-if exist "%DB%" (
-    copy /Y "%DB%" "%ROOT%\backend\_backup\mes_PRE-RESTORE_%TS%.db" >nul
-    echo [RESTORE] snapshot: mes_PRE-RESTORE_%TS%.db
-)
-
-rem 2) integrity check
-python -c "import sqlite3,sys; c=sqlite3.connect(r'%SRC%'); r=c.execute('PRAGMA integrity_check').fetchone()[0]; sys.exit(0 if r=='ok' else 3)"
-if errorlevel 3 (
-    echo [RESTORE] integrity check failed on %SRC%
+python "%VERIFY%" "%SRC%"
+if errorlevel 1 (
+    echo [RESTORE] source backup verification failed: %SRC%
     exit /b 3
 )
 
-rem 3) replace + remove stale wal/shm
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"`) do set "TS=%%i"
+if exist "%DB%" (
+    copy /Y "%DB%" "%BACKUP_DIR%\mes_PRE-RESTORE_%TS%.db" >nul
+    echo [RESTORE] snapshot: mes_PRE-RESTORE_%TS%.db
+)
+
 copy /Y "%SRC%" "%DB%" >nul
 if errorlevel 1 (
     echo [RESTORE] copy failed
@@ -50,8 +45,8 @@ del "%DB%-wal" "%DB%-shm" 2>nul
 
 echo [RESTORE] OK
 echo   restored: %SRC%
-echo   to     : %DB%
-echo Now start the backend manually (start.bat or uvicorn).
+echo   to      : %DB%
+echo Now start the backend manually.
 
 endlocal
 exit /b 0

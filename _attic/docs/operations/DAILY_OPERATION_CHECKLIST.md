@@ -18,7 +18,7 @@
     - 50건 초과 시 창고 담당자에게 알림
 
 [ ] DB 백업 실행
-    python scripts/ops/backup_db.py
+    scripts\ops\backup_db.bat
 ```
 
 **판정 기준:**
@@ -74,7 +74,7 @@
 
 ```
 [ ] DB 최종 백업
-    python scripts/ops/backup_db.py
+    scripts\ops\backup_db.bat
 
 [ ] 오늘 처리 건수 확인
     - GET /health/detailed → transaction_logs 카운트 확인
@@ -97,7 +97,7 @@
 
 ```
 [ ] 백업 파일 보관 확인
-    - outputs/backups/ 에 주간 백업 파일 최소 5개 보관 여부
+    - backend/_backup/ 에 주간 백업 파일 최소 5개 보관 여부
     - 오래된 백업(30일 초과) 정리
 
 [ ] 성능 추이 확인 (부하 테스트)
@@ -121,7 +121,7 @@
 | 상황 | 문서 |
 |------|------|
 | 장애 발생 | [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) |
-| DB 백업/복구 | [scripts/ops/backup_db.py](../../scripts/ops/backup_db.py), [restore_db.py](../../scripts/ops/restore_db.py) |
+| DB 백업/복구 | [scripts/ops/backup_db.bat](../../scripts/ops/backup_db.bat), [verify_backup.bat](../../scripts/ops/verify_backup.bat), [restore_db.bat](../../scripts/ops/restore_db.bat) |
 | PostgreSQL 전환 | [POSTGRES_LOCAL_SERVER_RUNBOOK.md](POSTGRES_LOCAL_SERVER_RUNBOOK.md) |
 | 동시 운영 | [CONCURRENT_LOCAL_OPERATION.md](CONCURRENT_LOCAL_OPERATION.md) |
 | 30명 부하 테스트 | [scripts/ops/load_test_30_users.py](../../scripts/ops/load_test_30_users.py) |

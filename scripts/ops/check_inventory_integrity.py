@@ -1,193 +1,230 @@
 #!/usr/bin/env python3
-"""재고 무결성 직접 점검 (서버 없이 DB 직접 접속).
+"""Check DEXCOWIN MES inventory integrity without starting the server.
 
-사용법:
-    # SQLite (기본)
+Usage:
     python scripts/ops/check_inventory_integrity.py
-
-    # 환경변수로 DB URL 지정
-    DATABASE_URL=postgresql://mes_user:mes_pass@localhost:5432/mes_db \
-        python scripts/ops/check_inventory_integrity.py
-
-    # --db-url 인수로 직접 지정
+    python scripts/ops/check_inventory_integrity.py --db-url sqlite:///C:/ERP/backend/mes.db
     python scripts/ops/check_inventory_integrity.py --db-url postgresql://...
 
-종료 코드:
-    0 = 전체 PASS
-    1 = 위반 항목 있음
+Exit codes:
+    0 = PASS
+    1 = integrity violation or DB/schema error
 """
+
+from __future__ import annotations
 
 import argparse
 import os
 import sys
-from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
-# backend를 sys.path에 추가
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 from dotenv import load_dotenv
-load_dotenv(BACKEND_DIR / ".env")
-
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
-# --db-url 인수 파싱 (main() 이전에 수행해야 DATABASE_URL 오버라이드가 가능)
-_parser = argparse.ArgumentParser(add_help=False)
-_parser.add_argument("--db-url", dest="db_url", default=None)
-_args, _ = _parser.parse_known_args()
-
-DATABASE_URL = (
-    _args.db_url
-    or os.getenv("DATABASE_URL")
-    or f"sqlite:///{(BACKEND_DIR / 'mes.db').as_posix()}"
-)
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-)
-Session = sessionmaker(bind=engine)
+load_dotenv(BACKEND_DIR / ".env")
 
 
-def _f(val) -> Decimal:
-    return Decimal(str(val)) if val is not None else Decimal("0")
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Check DEXCOWIN MES inventory integrity")
+    parser.add_argument("--db-url", default=None, help="SQLAlchemy database URL")
+    return parser.parse_args()
 
 
-def check_negative_inventory(db) -> list[dict]:
-    rows = db.execute(text(
-        "SELECT i.item_id, it.mes_code, it.name, i.warehouse_qty, i.quantity "
-        "FROM inventory i LEFT JOIN item it ON it.item_id = i.item_id "
-        "WHERE i.warehouse_qty < 0 OR i.quantity < 0"
-    )).fetchall()
-    return [{"item_id": str(r[0]), "mes_code": r[1], "name": r[2],
-             "warehouse_qty": r[3], "quantity": r[4]} for r in rows]
+def database_url(args: argparse.Namespace) -> str:
+    return args.db_url or os.getenv("DATABASE_URL") or f"sqlite:///{(BACKEND_DIR / 'mes.db').as_posix()}"
 
 
-def check_negative_locations(db) -> list[dict]:
-    rows = db.execute(text(
-        "SELECT il.item_id, it.mes_code, il.department, il.status, il.quantity "
-        "FROM inventory_location il LEFT JOIN item it ON it.item_id = il.item_id "
-        "WHERE il.quantity < 0"
-    )).fetchall()
-    return [{"item_id": str(r[0]), "mes_code": r[1], "department": r[2],
-             "status": r[3], "quantity": r[4]} for r in rows]
+def make_session(url: str):
+    engine = create_engine(
+        url,
+        connect_args={"check_same_thread": False} if url.startswith("sqlite") else {},
+    )
+    return sessionmaker(bind=engine)
 
 
-def check_pending_exceeds_warehouse(db) -> list[dict]:
-    rows = db.execute(text(
-        "SELECT i.item_id, it.mes_code, i.pending_quantity, i.warehouse_qty "
-        "FROM inventory i LEFT JOIN item it ON it.item_id = i.item_id "
-        "WHERE i.pending_quantity > i.warehouse_qty AND i.pending_quantity > 0"
-    )).fetchall()
-    return [{"item_id": str(r[0]), "mes_code": r[1],
-             "pending_quantity": r[2], "warehouse_qty": r[3]} for r in rows]
+def _rows(db: Any, sql: str) -> list[Any]:
+    return list(db.execute(text(sql)).fetchall())
 
 
-def check_total_mismatch(db) -> list[dict]:
-    """Inventory.quantity != warehouse_qty + Σ location.quantity"""
-    rows = db.execute(text("""
+def require_tables(db: Any) -> list[str]:
+    existing = {row[0] for row in _rows(db, "SELECT name FROM sqlite_master WHERE type='table'")}
+    required = {"items", "inventory", "inventory_locations", "stock_requests"}
+    return sorted(required - existing)
+
+
+def check_negative_inventory(db: Any) -> list[dict[str, Any]]:
+    rows = _rows(
+        db,
+        """
+        SELECT i.item_id, it.mes_code, it.item_name, i.warehouse_qty, i.quantity, i.pending_quantity
+        FROM inventory i
+        LEFT JOIN items it ON it.item_id = i.item_id
+        WHERE i.warehouse_qty < 0 OR i.quantity < 0 OR i.pending_quantity < 0
+        """,
+    )
+    return [
+        {
+            "item_id": str(row[0]),
+            "mes_code": row[1],
+            "item_name": row[2],
+            "warehouse_qty": row[3],
+            "quantity": row[4],
+            "pending_quantity": row[5],
+        }
+        for row in rows
+    ]
+
+
+def check_negative_locations(db: Any) -> list[dict[str, Any]]:
+    rows = _rows(
+        db,
+        """
+        SELECT il.item_id, it.mes_code, il.department, il.status, il.quantity
+        FROM inventory_locations il
+        LEFT JOIN items it ON it.item_id = il.item_id
+        WHERE il.quantity < 0
+        """,
+    )
+    return [
+        {
+            "item_id": str(row[0]),
+            "mes_code": row[1],
+            "department": row[2],
+            "status": row[3],
+            "quantity": row[4],
+        }
+        for row in rows
+    ]
+
+
+def check_pending_exceeds_warehouse(db: Any) -> list[dict[str, Any]]:
+    rows = _rows(
+        db,
+        """
+        SELECT i.item_id, it.mes_code, i.pending_quantity, i.warehouse_qty
+        FROM inventory i
+        LEFT JOIN items it ON it.item_id = i.item_id
+        WHERE i.pending_quantity > i.warehouse_qty AND i.pending_quantity > 0
+        """,
+    )
+    return [
+        {
+            "item_id": str(row[0]),
+            "mes_code": row[1],
+            "pending_quantity": row[2],
+            "warehouse_qty": row[3],
+        }
+        for row in rows
+    ]
+
+
+def check_total_mismatch(db: Any) -> list[dict[str, Any]]:
+    rows = _rows(
+        db,
+        """
         SELECT i.item_id, it.mes_code,
                i.quantity AS stored_total,
                i.warehouse_qty + COALESCE(loc_sum.total, 0) AS computed_total
         FROM inventory i
-        LEFT JOIN item it ON it.item_id = i.item_id
+        LEFT JOIN items it ON it.item_id = i.item_id
         LEFT JOIN (
             SELECT item_id, SUM(quantity) AS total
-            FROM inventory_location
+            FROM inventory_locations
             GROUP BY item_id
         ) loc_sum ON loc_sum.item_id = i.item_id
         WHERE ABS(i.quantity - (i.warehouse_qty + COALESCE(loc_sum.total, 0))) > 0.001
-    """)).fetchall()
-    return [{"item_id": str(r[0]), "mes_code": r[1],
-             "stored_total": r[2], "computed_total": r[3]} for r in rows]
+        """,
+    )
+    return [
+        {
+            "item_id": str(row[0]),
+            "mes_code": row[1],
+            "stored_total": row[2],
+            "computed_total": row[3],
+        }
+        for row in rows
+    ]
 
 
-def check_stale_reserved(db) -> list[dict]:
-    rows = db.execute(text(
-        "SELECT request_id, request_code, created_at "
-        "FROM stock_request "
-        "WHERE status = 'reserved' "
-        "AND created_at < datetime('now', '-7 days')"
-        if DATABASE_URL.startswith("sqlite") else
-        "SELECT request_id, request_code, created_at "
-        "FROM stock_request "
-        "WHERE status = 'reserved' "
-        "AND created_at < NOW() - INTERVAL '7 days'"
-    )).fetchall()
-    return [{"request_id": str(r[0]), "request_code": r[1], "created_at": str(r[2])}
-            for r in rows]
+def check_stale_reserved(db: Any, url: str) -> list[dict[str, Any]]:
+    if url.startswith("sqlite"):
+        sql = """
+            SELECT request_id, request_code, created_at
+            FROM stock_requests
+            WHERE status = 'reserved'
+            AND created_at < datetime('now', '-7 days')
+        """
+    else:
+        sql = """
+            SELECT request_id, request_code, created_at
+            FROM stock_requests
+            WHERE status = 'reserved'
+            AND created_at < NOW() - INTERVAL '7 days'
+        """
+    rows = _rows(db, sql)
+    return [
+        {"request_id": str(row[0]), "request_code": row[1], "created_at": str(row[2])}
+        for row in rows
+    ]
 
 
-def main():
+def print_sample(label: str, rows: list[dict[str, Any]], *keys: str) -> None:
+    print(f"FAIL {label}: {len(rows)}")
+    for row in rows[:5]:
+        details = " ".join(f"{key}={row.get(key)}" for key in keys)
+        print(f"  {details}")
+
+
+def main() -> int:
+    args = parse_args()
+    url = database_url(args)
+    Session = make_session(url)
+
     print("=" * 56)
-    print("  재고 무결성 점검")
-    print(f"  DB: {DATABASE_URL[:60]}...")
+    print("  DEXCOWIN MES inventory integrity check")
+    print(f"  DB: {url[:80]}...")
     print("=" * 56)
 
     violations = 0
+    try:
+        with Session() as db:
+            if url.startswith("sqlite"):
+                missing = require_tables(db)
+                if missing:
+                    print(f"FAIL schema missing required table(s): {', '.join(missing)}")
+                    return 1
 
-    with Session() as db:
-        # 1. 음수 재고
-        neg_inv = check_negative_inventory(db)
-        if neg_inv:
-            print(f"❌ 음수 창고/총재고: {len(neg_inv)}개 품목")
-            for v in neg_inv[:5]:
-                print(f"   {v['mes_code']} wh={v['warehouse_qty']} total={v['quantity']}")
-            violations += len(neg_inv)
-        else:
-            print("✅ 음수 창고/총재고: 없음")
+            checks = [
+                ("negative inventory", check_negative_inventory(db), ("mes_code", "warehouse_qty", "quantity", "pending_quantity")),
+                ("negative locations", check_negative_locations(db), ("mes_code", "department", "status", "quantity")),
+                ("pending > warehouse", check_pending_exceeds_warehouse(db), ("mes_code", "pending_quantity", "warehouse_qty")),
+                ("total mismatch", check_total_mismatch(db), ("mes_code", "stored_total", "computed_total")),
+                ("stale reserved requests", check_stale_reserved(db, url), ("request_code", "created_at")),
+            ]
 
-        # 2. 음수 위치 재고
-        neg_loc = check_negative_locations(db)
-        if neg_loc:
-            print(f"❌ 음수 위치 재고: {len(neg_loc)}개 행")
-            for v in neg_loc[:5]:
-                print(f"   {v['mes_code']} {v['department']}/{v['status']} qty={v['quantity']}")
-            violations += len(neg_loc)
-        else:
-            print("✅ 음수 위치 재고: 없음")
+            for label, rows, keys in checks:
+                if rows:
+                    print_sample(label, rows, *keys)
+                    violations += len(rows)
+                else:
+                    print(f"PASS {label}: 0")
+    except SQLAlchemyError as exc:
+        print(f"FAIL database check error: {exc}")
+        return 1
 
-        # 3. pending > warehouse
-        pend = check_pending_exceeds_warehouse(db)
-        if pend:
-            print(f"❌ pending > warehouse: {len(pend)}개 품목")
-            for v in pend[:5]:
-                print(f"   {v['mes_code']} pending={v['pending_quantity']} wh={v['warehouse_qty']}")
-            violations += len(pend)
-        else:
-            print("✅ pending ≤ warehouse: 모두 만족")
-
-        # 4. 총량 불일치
-        mismatch = check_total_mismatch(db)
-        if mismatch:
-            print(f"❌ 총량 불일치: {len(mismatch)}개 품목")
-            for v in mismatch[:5]:
-                print(f"   {v['mes_code']} stored={v['stored_total']} computed={v['computed_total']}")
-            violations += len(mismatch)
-        else:
-            print("✅ 총량 일치: 모두 정상")
-
-        # 5. Stale reserved 요청
-        try:
-            stale = check_stale_reserved(db)
-            if stale:
-                print(f"⚠️  7일 이상 RESERVED: {len(stale)}건")
-            else:
-                print("✅ 장기 RESERVED 없음")
-        except Exception:
-            print("⚠️  stale 요청 검사 실패 (stock_request 테이블 없음?)")
-
-    print()
     print("-" * 56)
-    if violations > 0:
-        print(f"  ❌ 위반 항목: {violations}건 — 즉시 확인 필요")
-        sys.exit(1)
-    else:
-        print("  ✅ 전체 PASS — 재고 무결성 정상")
-        sys.exit(0)
+    if violations:
+        print(f"FAIL inventory integrity violations: {violations}")
+        return 1
+    print("PASS inventory integrity normal")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

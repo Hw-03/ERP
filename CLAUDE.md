@@ -115,7 +115,7 @@ Only files automatically referenced by tools remain at the root and in each fold
 - One-off backend scripts (seed, sync, archive, backup): `_attic/backend-scripts/`
   - Run: `cd backend && python ../_attic/backend-scripts/<script>.py`
   - `sys.path` is patched to auto-include `backend/`
-- DB backups: `_attic/data/db_backups/` (local only, matched by `.gitignore` — not tracked)
+- DB backups: `backend/_backup/` (local only, matched by `.gitignore`; not tracked)
 - New member guide: `_attic/ONBOARDING.md`
 - Active DB: `backend/mes.db` (single — `app.db`, `erp.db` traces removed)
 

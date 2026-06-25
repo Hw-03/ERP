@@ -49,7 +49,7 @@ scripts\ops\verify_backup.bat
 
 가장 최근 정식 백업(`mes_PRE-RESTORE_*` 제외) 1건에 대해:
 - `PRAGMA integrity_check` 결과 (`ok` 면 정상)
-- `items / inventory / transaction_logs / bom / admin_audit_logs` 행 수
+- `items / inventory / inventory_locations / transaction_logs / bom / admin_audit_logs` 행 수
 
 운영 PC 에서 주 1회 정도 수행 권장.
 

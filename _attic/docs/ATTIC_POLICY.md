@@ -14,7 +14,7 @@
 |---|---|
 | `_attic/docs/` | 도메인 사전·가이드 (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS/ITEM_CODE_RULES/ATTIC_POLICY), 끝난 plan, 발표·연구 자료, feedback 메모 |
 | `_attic/backend-scripts/` | 1회성 backend 스크립트 (seed/sync/archive/backup) — `cd backend && python ../_attic/backend-scripts/<f>.py` |
-| `_attic/data/db_backups/` | mes.db 스냅샷 (`backup_db.py` 자동 저장, `.gitignore` 매칭 — 추적 X) |
+| `backend/_backup/` | DEXCOWIN MES SQLite backups from `scripts/ops/backup_db.bat` / `backup_db.py`, local only |
 | `_attic/ONBOARDING.md` | 신규 합류자 가이드 |
 | `_attic/ai/` | AI 협업자 인수인계 자료 |
 | `_attic/_archive/`, `_attic/frontend/`, `_attic/backend/`, `_attic/outputs/` | 옛 코드·자산 (참고용) |
@@ -29,8 +29,8 @@
 
 ## DB 백업 (특별 규정)
 
-- 자동 생성 위치: `_attic/data/db_backups/`
-- `.gitignore` 매칭 (`*.db.bak*`, `_attic/data/db_backups/`) — repo 추적 X, 로컬만.
+- ?? ?? ??: `backend/_backup/`
+- `.gitignore` 매칭 (`backend/_backup/`, `*.db.bak*`) — repo 추적 X, 로컬만.
 - 누적 시 외부 NAS/스토리지로 이관 후 로컬 삭제.
 
 ## 삭제 (Delete from repo)
