@@ -21,6 +21,7 @@ import {
 } from "./historyBatchInterpreter";
 import { FlowBadge, MovementSummaryCell } from "./historyTableHelpers";
 import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
+import { toInventoryEffectRows, type InventoryEffectCell } from "./historyInventoryEffect";
 
 type Props = {
   selected: TransactionLog | null;
@@ -151,6 +152,8 @@ export function HistoryDetailPanel({
       )}
 
       <HistoryDetailMemo notes={selected.notes} />
+
+      <HistoryInventoryEffectPanel effect={selected.inventory_effect} />
 
       <HistoryDetailMetaStrip
         log={selected}
@@ -448,6 +451,48 @@ export function HistoryDetailMemo({ notes }: { notes: string | null | undefined 
         {userMemo}
       </div>
     </div>
+  );
+}
+
+function HistoryInventoryEffectPanel({
+  effect,
+}: {
+  effect: InventoryEffectCell[] | null | undefined;
+}) {
+  const rows = toInventoryEffectRows(effect);
+  if (rows.length === 0) return null;
+
+  return (
+    <Collapsible
+      icon={<Activity className="h-3.5 w-3.5" />}
+      title="재고 영향"
+      count={rows.length}
+      defaultOpen
+    >
+      <div className="grid gap-2 sm:grid-cols-2">
+        {rows.map((row) => {
+          const isIncrease = row.delta > 0;
+          const color = isIncrease ? LEGACY_COLORS.green : LEGACY_COLORS.red;
+          return (
+            <div
+              key={row.key}
+              className="flex items-center justify-between rounded-[12px] border px-3 py-2 text-xs"
+              style={{
+                background: `color-mix(in srgb, ${color} 7%, ${LEGACY_COLORS.s1})`,
+                borderColor: `color-mix(in srgb, ${color} 24%, ${LEGACY_COLORS.border})`,
+              }}
+            >
+              <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
+                {row.label}
+              </span>
+              <span className="font-black" style={{ color }}>
+                {row.deltaLabel}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Collapsible>
   );
 }
 

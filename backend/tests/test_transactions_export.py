@@ -106,6 +106,45 @@ def test_export_csv_search_matches_requester_name(client, db_session):
     assert "ExportItem" in resp.text  # requester_name 검색으로 매칭됨
 
 
+def test_export_csv_includes_requester_and_approver_from_stock_request_reference(client, db_session):
+    requester = _emp(db_session, "EXP_DREQ", "DirectRequester")
+    approver = _emp(db_session, "EXP_DAPP", "DirectApprover")
+    item = Item(item_name="DirectExportItem", process_type_code="TR")
+    db_session.add(item)
+    db_session.flush()
+
+    sr = StockRequest(
+        request_code="SR-DIRECT-EXPORT",
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=DepartmentEnum.ASSEMBLY.value,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        status=StockRequestStatusEnum.COMPLETED,
+        approved_by_name=approver.name,
+        approved_by_employee_id=approver.employee_id,
+        approved_at=datetime.utcnow(),
+        submitted_at=datetime.utcnow(),
+    )
+    db_session.add(sr)
+    db_session.flush()
+
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.TRANSFER_TO_PROD,
+            quantity_change=Decimal("0"),
+            reference_no=sr.request_code,
+            created_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/transactions/export.csv?{_range()}")
+    assert resp.status_code == 200, resp.text
+    assert "DirectRequester" in resp.text
+    assert "DirectApprover" in resp.text
+
+
 def test_export_xlsx_ok(client, db_session):
     _seed_batch_transaction(db_session)
     resp = client.get(f"/api/inventory/transactions/export.xlsx?{_range()}")

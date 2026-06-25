@@ -6248,6 +6248,21 @@
             "title": "Edit Count",
             "type": "integer"
           },
+          "inventory_effect": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Effect"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",

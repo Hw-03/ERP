@@ -349,6 +349,50 @@ def _batch_name_map(
     return batch_map
 
 
+def _stock_request_info_map(
+    db: Session, reference_nos: set[str]
+) -> dict[str, _BatchInfo]:
+    if not reference_nos:
+        return {}
+    rows = (
+        db.query(
+            StockRequest.request_code,
+            StockRequest.requester_name,
+            StockRequest.requester_employee_id,
+            StockRequest.approved_by_name,
+            StockRequest.approved_by_employee_id,
+            StockRequest.approved_at,
+            StockRequest.department_approved_by_name,
+            StockRequest.department_approved_by_employee_id,
+            StockRequest.department_approved_at,
+            StockRequest.submitted_at,
+            StockRequest.created_at,
+        )
+        .filter(StockRequest.request_code.in_(reference_nos))
+        .all()
+    )
+    out: dict[str, _BatchInfo] = {}
+    for row in rows:
+        approver_name = None
+        approved_at = None
+        if row.approved_by_employee_id and row.approved_by_employee_id != row.requester_employee_id:
+            approver_name = row.approved_by_name
+            approved_at = row.approved_at
+        elif (
+            row.department_approved_by_employee_id
+            and row.department_approved_by_employee_id != row.requester_employee_id
+        ):
+            approver_name = row.department_approved_by_name
+            approved_at = row.department_approved_at
+        out[row.request_code] = _BatchInfo(
+            row.requester_name,
+            approver_name,
+            row.submitted_at or row.created_at,
+            approved_at,
+        )
+    return out
+
+
 def _to_log_response(
     log: TransactionLog,
     item: Item,
@@ -388,4 +432,5 @@ def _to_log_response(
         cancel_reason=log.cancel_reason,
         cancelled_by=log.cancelled_by,
         cancelled_at=log.cancelled_at,
+        inventory_effect=log.inventory_effect,
     )

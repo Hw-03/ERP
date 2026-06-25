@@ -51,6 +51,7 @@ from app.routers.inventory._tx_filters import (
     _operation_filter,
     _apply_common_filters,
     _batch_name_map,
+    _stock_request_info_map,
     _to_log_response,
 )
 from app.repositories import item_repository, inventory_repository
@@ -214,9 +215,7 @@ def list_transactions(
         .scalar_subquery()
     )
 
-    # IoBatch outerjoin — search 에서 IoBatch.requester_name 까지 매칭하기 위함.
-    # operation_batch_id 가 NULL 인 row 도 보존하기 위해 outerjoin.
-    # IoBatch.batch_id 가 PK 라 1:1 join → row 중복 없음, 정렬/페이지네이션 영향 없음.
+    # Keep logs without an IoBatch while allowing requester-name search.
     query = (
         db.query(TransactionLog, Item, edit_count_sq.label("edit_count"))
         .join(Item, TransactionLog.item_id == Item.item_id)
@@ -226,15 +225,12 @@ def list_transactions(
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
 
-    # 단수 transaction_type: 타 화면 호환용 — 원시 IN 필터 유지
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
 
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
 
-    # 복수 transaction_types / 부서 / 공정 / 모델 / 기간 / 아카이브 / 검색:
-    # summary 와 동일한 공통 필터 빌더로 위임.
     query = _apply_common_filters(
         query,
         db,
@@ -248,10 +244,6 @@ def list_transactions(
         include_archived=include_archived,
     )
 
-    # 김현우·허동현 피드백: 입출고 내역은 '요청일시'(요청자가 작성한 시각) 순으로 정렬한다.
-    # 승인 필요 건은 승인 시점에 TransactionLog(created_at)가 생기므로 created_at 정렬은 '승인 순'이 된다.
-    # 화면의 요청일시 = COALESCE(IoBatch.submitted_at, IoBatch.created_at, log.created_at)(_batch_name_map/
-    # _to_log_response 와 동일 기준)로 정렬하고, 같은 요청(배치 내 복수 행)·동시각은 created_at·log_id 로 안정 정렬.
     requested_at_order = func.coalesce(
         IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at
     )
@@ -266,13 +258,17 @@ def list_transactions(
         .all()
     )
 
-    # operation_batch_id 기준 requester_name + approver_name 매핑(export 와 공유 헬퍼).
+    # Fill requester/approver names from IoBatch or StockRequest reference_no.
     batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
     batch_map = _batch_name_map(db, batch_ids)
+    reference_nos = {log.reference_no for log, _, _ in rows if log.reference_no}
+    sr_map = _stock_request_info_map(db, reference_nos)
 
     result = []
     for log, item, edit_count in rows:
         info = batch_map.get(log.operation_batch_id)
+        if info is None and log.reference_no:
+            info = sr_map.get(log.reference_no)
         result.append(
             _to_log_response(
                 log,
@@ -406,6 +402,9 @@ def export_transactions_csv(
     batch_map = _batch_name_map(
         db, {log.operation_batch_id for log, _ in rows if log.operation_batch_id}
     )
+    sr_map = _stock_request_info_map(
+        db, {log.reference_no for log, _ in rows if log.reference_no}
+    )
 
     buffer = StringIO()
     writer = csv.writer(buffer)
@@ -428,6 +427,8 @@ def export_transactions_csv(
     )
     for log, item in rows:
         info = batch_map.get(log.operation_batch_id)
+        if info is None and log.reference_no:
+            info = sr_map.get(log.reference_no)
         requester = info.requester_name if info else None
         approver = info.approver_name if info else None
         writer.writerow(
@@ -496,6 +497,9 @@ def export_transactions_xlsx(
     batch_map = _batch_name_map(
         db, {log.operation_batch_id for log, _ in rows if log.operation_batch_id}
     )
+    sr_map = _stock_request_info_map(
+        db, {log.reference_no for log, _ in rows if log.reference_no}
+    )
 
     wb = Workbook()
     ws = wb.active
@@ -521,6 +525,8 @@ def export_transactions_xlsx(
     for log, item in rows:
         tx_val = log.transaction_type.value
         info = batch_map.get(log.operation_batch_id)
+        if info is None and log.reference_no:
+            info = sr_map.get(log.reference_no)
         requester = info.requester_name if info else None
         approver = info.approver_name if info else None
         row_data = [
