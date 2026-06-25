@@ -9,6 +9,7 @@
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
 
 export type BoxSize = "LARGE" | "MEDIUM" | "SMALL";
+export type WarehouseSpecialZoneType = "aisle" | "pallet";
 
 export interface WarehouseAngle {
   id: number;
@@ -44,9 +45,36 @@ export interface WarehouseBox {
   items: WarehouseBoxItem[];
 }
 
+
+export interface WarehouseSpecialZone {
+  id: number;
+  label: string;
+  zone_type: WarehouseSpecialZoneType;
+  pos_x: number;
+  pos_y: number;
+  width: number;
+  height: number;
+  display_order: number;
+  is_active: boolean;
+  items: WarehouseBoxItem[];
+}
+
+export interface WarehouseSpecialZonePayload {
+  label?: string;
+  zone_type?: WarehouseSpecialZoneType;
+  pos_x?: number;
+  pos_y?: number;
+  width?: number;
+  height?: number;
+  display_order?: number;
+  is_active?: boolean;
+  items?: BoxItemPayload[];
+}
+
 export interface WarehouseMap {
   angles: WarehouseAngle[];
   boxes: WarehouseBox[];
+  special_zones: WarehouseSpecialZone[];
 }
 
 export interface ReconcileRow {
@@ -115,4 +143,13 @@ export const warehouseMapApi = {
   }) => patchJson<WarehouseBox[]>(toApiUrl("/api/warehouse-map/boxes/restack"), payload),
   deleteBox: (boxId: string) =>
     deleteJson<void>(toApiUrl(`/api/warehouse-map/boxes/${boxId}`)),
+
+  createZone: (payload: WarehouseSpecialZonePayload & { label: string; zone_type: WarehouseSpecialZoneType }) =>
+    postJson<WarehouseSpecialZone>(toApiUrl("/api/warehouse-map/zones"), payload),
+  updateZone: (id: number, payload: WarehouseSpecialZonePayload) =>
+    putJson<WarehouseSpecialZone>(toApiUrl(`/api/warehouse-map/zones/${id}`), payload),
+  replaceZoneItems: (id: number, items: BoxItemPayload[]) =>
+    putJson<WarehouseSpecialZone>(toApiUrl(`/api/warehouse-map/zones/${id}/items`), { items }),
+  deleteZone: (id: number) =>
+    deleteJson<void>(toApiUrl(`/api/warehouse-map/zones/${id}`)),
 };

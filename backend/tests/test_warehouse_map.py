@@ -59,6 +59,23 @@ def _put_box(client, angle_id, *, row=1, layer=1, jari=0, size="SMALL", items=No
         headers=MGR,
     )
 
+def _make_zone(client, *, label="PL-1", zone_type="pallet", items=None):
+    resp = client.post(
+        f"{BASE}/zones",
+        json={
+            "label": label,
+            "zone_type": zone_type,
+            "pos_x": 12,
+            "pos_y": 34,
+            "width": 80,
+            "height": 40,
+            "items": items or [],
+        },
+        headers=MGR,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
 
 # ──────────────────────────── 앵글 CRUD ────────────────────────────
 
@@ -197,6 +214,60 @@ def test_reconcile_ok_when_match(client, make_item):
              items=[{"item_id": str(item.item_id), "quantity": 4}])
     data = client.get(f"{BASE}/reconcile").json()
     assert data["mismatch_count"] == 0
+    assert data["rows"][0]["status"] == "ok"
+
+
+def test_create_special_zone_requires_warehouse_manager(client):
+    resp = client.post(
+        f"{BASE}/zones",
+        json={
+            "label": "AISLE-1",
+            "zone_type": "aisle",
+            "pos_x": 1,
+            "pos_y": 2,
+            "width": 30,
+            "height": 20,
+            "items": [],
+        },
+    )
+    assert resp.status_code == 403
+
+
+def test_create_special_zone_and_map_includes_items(client, make_item):
+    item = make_item(name="Pallet Item", process_type_code="TR", warehouse_qty=D("3"))
+    zone = _make_zone(
+        client,
+        label="PL-1",
+        zone_type="pallet",
+        items=[{"item_id": str(item.item_id), "quantity": 3}],
+    )
+
+    assert zone["label"] == "PL-1"
+    assert zone["zone_type"] == "pallet"
+    assert zone["items"][0]["item_name"] == "Pallet Item"
+
+    data = client.get(f"{BASE}/map").json()
+    assert len(data["special_zones"]) == 1
+    mapped = data["special_zones"][0]
+    assert mapped["label"] == "PL-1"
+    assert mapped["items"][0]["quantity"] == 3
+
+
+def test_reconcile_counts_boxes_and_special_zones(client, make_item):
+    angle = _make_angle(client)
+    item = make_item(warehouse_qty=D("10"))
+    _put_box(client, angle["id"],
+             items=[{"item_id": str(item.item_id), "quantity": 7}])
+    _make_zone(
+        client,
+        label="AISLE-1",
+        zone_type="aisle",
+        items=[{"item_id": str(item.item_id), "quantity": 3}],
+    )
+
+    data = client.get(f"{BASE}/reconcile").json()
+    assert data["mismatch_count"] == 0
+    assert data["rows"][0]["placed_total"] == 10
     assert data["rows"][0]["status"] == "ok"
 
 

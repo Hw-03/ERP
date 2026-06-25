@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, MapPin, Search, X } from "lucide-react";
+import { ChevronLeft, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SlidePanel } from "./common/SlidePanel";
@@ -13,6 +13,8 @@ import {
   type WarehouseBox,
   type WarehouseBoxItem,
   type WarehouseMap,
+  type WarehouseSpecialZone,
+  type WarehouseSpecialZonePayload,
 } from "@/lib/api/warehouse-map";
 import { buildCellIndex, cellColor, cellKey, rowLabel } from "./_warehouse_map_sections/helpers";
 import { FloorStage, FrontStage, RowStage } from "./_warehouse_map_sections/WarehouseStages";
@@ -49,10 +51,12 @@ export function DesktopWarehouseMapView({
   const [curAngle, setCurAngle] = useState<WarehouseAngle | null>(null);
   const [curRow, setCurRow] = useState(1);
   const [panel, setPanel] = useState<PanelCell | null>(null);
+  const [zonePanel, setZonePanel] = useState<WarehouseSpecialZone | null>(null);
   const [matchQuery, setMatchQuery] = useState("");
   // 편집 모드: 박스 넣기/편집 오버레이(좌측 지도 카드를 AddBoxScreen으로 덮음). null이면 지도 표시.
   const [addBox, setAddBox] = useState<{ jariIndex: number; remaining: number; editBox?: WarehouseBox } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [zoneBusy, setZoneBusy] = useState(false);
 
   const [query, setQuery] = useState("");
   // 품목 단위 후보(드롭다운). 선택 전에는 여기에 후보들이, 선택 후에는 null.
@@ -100,6 +104,8 @@ export function DesktopWarehouseMapView({
   async function reloadMap() {
     const data = await warehouseMapApi.getMap();
     setMap(data);
+    setZonePanel((prev) => (prev ? data.special_zones.find((zone) => zone.id === prev.id) ?? prev : prev));
+    return data;
   }
 
   // 편집 모드: 칸 패널 "박스 넣기"/"박스 편집" → AddBoxScreen 제출.
@@ -138,6 +144,76 @@ export function DesktopWarehouseMapView({
   }
 
   // 편집 모드: 칸 패널 "박스 빼기"(휴지통).
+  async function handleCreateZone(zoneType: "aisle" | "pallet") {
+    const count = map?.special_zones.filter((zone) => zone.zone_type === zoneType).length ?? 0;
+    const isPallet = zoneType === "pallet";
+    setZoneBusy(true);
+    try {
+      const created = await warehouseMapApi.createZone({
+        label: isPallet ? `PL-${count + 1}` : `통로 ${count + 1}`,
+        zone_type: zoneType,
+        pos_x: isPallet ? 560 + count * 18 : 120,
+        pos_y: isPallet ? 190 : 128 + count * 18,
+        width: isPallet ? 76 : 240,
+        height: isPallet ? 48 : 32,
+        items: [],
+      });
+      await reloadMap();
+      setPanel(null);
+      setZonePanel(created);
+      onMapMutated?.();
+      onStatusChange?.(isPallet ? "PL 구역을 추가했습니다." : "통로 구역을 추가했습니다.");
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : "구역 추가 실패");
+    } finally {
+      setZoneBusy(false);
+    }
+  }
+
+  async function handleSaveZone(zoneId: number, patch: WarehouseSpecialZonePayload) {
+    setZoneBusy(true);
+    try {
+      const saved = await warehouseMapApi.updateZone(zoneId, patch);
+      await reloadMap();
+      setZonePanel(saved);
+      onMapMutated?.();
+      onStatusChange?.("구역 정보를 저장했습니다.");
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : "구역 저장 실패");
+    } finally {
+      setZoneBusy(false);
+    }
+  }
+
+  async function handleSaveZoneItems(zoneId: number, lines: { item_id: string; quantity: number }[]) {
+    setZoneBusy(true);
+    try {
+      const saved = await warehouseMapApi.replaceZoneItems(zoneId, lines);
+      await reloadMap();
+      setZonePanel(saved);
+      onMapMutated?.();
+      onStatusChange?.("구역 적재 품목을 저장했습니다.");
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : "구역 품목 저장 실패");
+    } finally {
+      setZoneBusy(false);
+    }
+  }
+
+  async function handleDeleteZone(zoneId: number) {
+    setZoneBusy(true);
+    try {
+      await warehouseMapApi.deleteZone(zoneId);
+      setZonePanel(null);
+      await reloadMap();
+      onMapMutated?.();
+      onStatusChange?.("구역을 삭제했습니다.");
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : "구역 삭제 실패");
+    } finally {
+      setZoneBusy(false);
+    }
+  }
   async function handleDeleteBox(boxId: string) {
     setBusy(true);
     try {
@@ -313,6 +389,7 @@ export function DesktopWarehouseMapView({
 
   // ── Navigation ──
   function openAngle(a: WarehouseAngle) {
+    setZonePanel(null);
     setCurAngle(a);
     setStage("front");
     setPanel(null);
@@ -320,6 +397,7 @@ export function DesktopWarehouseMapView({
     window.history.pushState({ wm: { stage: "front", angleId: a.id }, wmDepth: wmDepthRef.current }, "");
   }
   function openCell(row: number, layer: number) {
+    setZonePanel(null);
     if (!curAngle) return;
     setCurRow(row);
     setStage("row");
@@ -328,6 +406,7 @@ export function DesktopWarehouseMapView({
     window.history.pushState({ wm: { stage: "row", angleId: curAngle.id, row }, wmDepth: wmDepthRef.current }, "");
   }
   function openLayer(layer: number) {
+    setZonePanel(null);
     if (!curAngle) return;
     setPanel({ angle: curAngle, row: curRow, layer });
   }
@@ -574,6 +653,56 @@ export function DesktopWarehouseMapView({
             ))}
           </div>
 
+
+          {editable && stage === "floor" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => void handleCreateZone("aisle")}
+                disabled={zoneBusy}
+                style={{
+                  height: 32,
+                  padding: "0 10px",
+                  borderRadius: 12,
+                  background: LEGACY_COLORS.s2,
+                  border: `1px solid ${LEGACY_COLORS.border}`,
+                  color: LEGACY_COLORS.text,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  cursor: zoneBusy ? "not-allowed" : "pointer",
+                  opacity: zoneBusy ? 0.5 : 1,
+                }}
+              >
+                <Plus size={14} /> 통로
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCreateZone("pallet")}
+                disabled={zoneBusy}
+                style={{
+                  height: 32,
+                  padding: "0 10px",
+                  borderRadius: 12,
+                  background: LEGACY_COLORS.s2,
+                  border: `1px solid ${LEGACY_COLORS.border}`,
+                  color: LEGACY_COLORS.text,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  cursor: zoneBusy ? "not-allowed" : "pointer",
+                  opacity: zoneBusy ? 0.5 : 1,
+                }}
+              >
+                <Plus size={14} /> PL
+              </button>
+            </div>
+          )}
+
           {/* Search — 헤더 중앙에 절대 고정 (stage 전환 시 위치 불변) */}
           <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", flexShrink: 0, zIndex: 5 }}>
             <div
@@ -804,7 +933,14 @@ export function DesktopWarehouseMapView({
           ) : (
             <div key={stage} className={styles.stageEnter} style={{ flex: 1, minWidth: 0, display: "flex", minHeight: 0 }}>
               {stage === "floor" && (
-                <FloorStage angles={angles} hitAngles={hitAngles ?? undefined} pulseAngleId={pulse?.angleId} onAngleClick={openAngle} />
+                <FloorStage
+                  angles={angles}
+                  specialZones={map?.special_zones ?? []}
+                  hitAngles={hitAngles ?? undefined}
+                  pulseAngleId={pulse?.angleId}
+                  onAngleClick={openAngle}
+                  onZoneClick={(zone) => { setPanel(null); setZonePanel(zone); }}
+                />
               )}
               {stage === "front" && curAngle && (
                 <FrontStage angle={curAngle} cellIndex={cellIndex} pulseCellKey={pulse?.cellKey} showSlotLabels onCellClick={openCell} />
@@ -854,6 +990,389 @@ export function DesktopWarehouseMapView({
           />
         )}
       </SlidePanel>
+      <SlidePanel open={!!zonePanel} onClose={() => setZonePanel(null)}>
+        {zonePanel && (
+          <WarehouseZonePanel
+            zone={zonePanel}
+            items={items ?? []}
+            editable={editable}
+            busy={zoneBusy}
+            onSaveZone={handleSaveZone}
+            onSaveItems={handleSaveZoneItems}
+            onDeleteZone={handleDeleteZone}
+          />
+        )}
+      </SlidePanel>
+    </div>
+  );
+}
+
+type ZoneLine = { item_id: string; quantity: number };
+
+function WarehouseZonePanel({
+  zone,
+  items,
+  editable = false,
+  busy = false,
+  onSaveZone,
+  onSaveItems,
+  onDeleteZone,
+}: {
+  zone: WarehouseSpecialZone;
+  items: Item[];
+  editable?: boolean;
+  busy?: boolean;
+  onSaveZone: (zoneId: number, patch: WarehouseSpecialZonePayload) => Promise<void>;
+  onSaveItems: (zoneId: number, lines: ZoneLine[]) => Promise<void>;
+  onDeleteZone: (zoneId: number) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState({
+    label: zone.label,
+    zone_type: zone.zone_type,
+    pos_x: String(zone.pos_x),
+    pos_y: String(zone.pos_y),
+    width: String(zone.width),
+    height: String(zone.height),
+  });
+  const [lines, setLines] = useState<ZoneLine[]>(() =>
+    zone.items.map((item) => ({ item_id: item.item_id, quantity: item.quantity })),
+  );
+  const [selectedItemId, setSelectedItemId] = useState("");
+
+  useEffect(() => {
+    setDraft({
+      label: zone.label,
+      zone_type: zone.zone_type,
+      pos_x: String(zone.pos_x),
+      pos_y: String(zone.pos_y),
+      width: String(zone.width),
+      height: String(zone.height),
+    });
+    setLines(zone.items.map((item) => ({ item_id: item.item_id, quantity: item.quantity })));
+  }, [zone.id, zone.label, zone.zone_type, zone.pos_x, zone.pos_y, zone.width, zone.height, zone.items]);
+
+  useEffect(() => {
+    setSelectedItemId((prev) => prev || items[0]?.item_id || "");
+  }, [items]);
+
+  const itemById = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
+  const zoneItemById = useMemo(() => new Map(zone.items.map((item) => [item.item_id, item])), [zone.items]);
+  const totalQty = lines.reduce((sum, line) => sum + line.quantity, 0);
+  const isPallet = zone.zone_type === "pallet";
+
+  const inputStyle = {
+    background: LEGACY_COLORS.s2,
+    border: `1px solid ${LEGACY_COLORS.border}`,
+    borderRadius: 10,
+    padding: "7px 10px",
+    fontSize: 13,
+    color: LEGACY_COLORS.text,
+    width: "100%",
+  } as const;
+
+  function updateLine(itemId: string, quantity: number) {
+    setLines((prev) =>
+      prev.map((line) =>
+        line.item_id === itemId ? { ...line, quantity: Math.max(0, Math.floor(quantity || 0)) } : line,
+      ),
+    );
+  }
+
+  function removeLine(itemId: string) {
+    setLines((prev) => prev.filter((line) => line.item_id !== itemId));
+  }
+
+  function addSelectedItem() {
+    if (!selectedItemId) return;
+    setLines((prev) => {
+      const existing = prev.find((line) => line.item_id === selectedItemId);
+      if (existing) {
+        return prev.map((line) =>
+          line.item_id === selectedItemId ? { ...line, quantity: line.quantity + 1 } : line,
+        );
+      }
+      return [...prev, { item_id: selectedItemId, quantity: 1 }];
+    });
+  }
+
+  function itemName(itemId: string) {
+    return itemById.get(itemId)?.item_name ?? zoneItemById.get(itemId)?.item_name ?? itemId;
+  }
+
+  function itemCode(itemId: string) {
+    return itemById.get(itemId)?.mes_code ?? zoneItemById.get(itemId)?.mes_code ?? null;
+  }
+
+  async function saveZone() {
+    await onSaveZone(zone.id, {
+      label: draft.label.trim() || zone.label,
+      zone_type: draft.zone_type,
+      pos_x: Math.max(0, Math.floor(Number(draft.pos_x) || 0)),
+      pos_y: Math.max(0, Math.floor(Number(draft.pos_y) || 0)),
+      width: Math.max(20, Math.floor(Number(draft.width) || zone.width)),
+      height: Math.max(20, Math.floor(Number(draft.height) || zone.height)),
+    });
+  }
+
+  async function saveItems() {
+    await onSaveItems(
+      zone.id,
+      lines
+        .filter((line) => line.quantity > 0)
+        .map((line) => ({ item_id: line.item_id, quantity: Math.floor(line.quantity) })),
+    );
+  }
+
+  return (
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        borderRadius: 24,
+        background: LEGACY_COLORS.s1,
+        border: `1px solid ${LEGACY_COLORS.border}`,
+        boxShadow: "var(--c-card-shadow)",
+        backgroundImage: "var(--c-panel-glow)",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${LEGACY_COLORS.border}`, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: LEGACY_COLORS.text, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {zone.label}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, fontWeight: 800, color: isPallet ? LEGACY_COLORS.green : LEGACY_COLORS.yellow }}>
+              {isPallet ? "PL 적재" : "통로 적재"} · {zone.items.length}품목 · {totalQty}
+            </div>
+          </div>
+          {editable && (
+            <button
+              type="button"
+              onClick={() => void onDeleteZone(zone.id)}
+              disabled={busy}
+              aria-label="구역 삭제"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 10,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: LEGACY_COLORS.red,
+                background: LEGACY_COLORS.s2,
+                border: `1px solid ${LEGACY_COLORS.border}`,
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.45 : 1,
+              }}
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+        {editable && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 104px", gap: 8 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 800, color: LEGACY_COLORS.muted2 }}>
+                이름
+                <input style={inputStyle} value={draft.label} onChange={(e) => setDraft((prev) => ({ ...prev, label: e.target.value }))} />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 800, color: LEGACY_COLORS.muted2 }}>
+                유형
+                <select
+                  style={inputStyle}
+                  value={draft.zone_type}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, zone_type: e.target.value as "aisle" | "pallet" }))}
+                >
+                  <option value="aisle">통로</option>
+                  <option value="pallet">PL</option>
+                </select>
+              </label>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+              {[
+                ["X", "pos_x"],
+                ["Y", "pos_y"],
+                ["W", "width"],
+                ["H", "height"],
+              ].map(([label, key]) => (
+                <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 800, color: LEGACY_COLORS.muted2 }}>
+                  {label}
+                  <input
+                    type="number"
+                    min={key === "width" || key === "height" ? 20 : 0}
+                    style={inputStyle}
+                    value={draft[key as "pos_x" | "pos_y" | "width" | "height"]}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, [key]: e.target.value }))}
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => void saveZone()}
+              disabled={busy}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                height: 36,
+                borderRadius: 12,
+                background: LEGACY_COLORS.blue,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.5 : 1,
+              }}
+            >
+              <Save size={14} /> 위치 저장
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: LEGACY_COLORS.text }}>적재 품목</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: LEGACY_COLORS.muted2 }}>합계 {totalQty}</div>
+          </div>
+
+          {lines.length === 0 ? (
+            <div style={{ padding: "24px 0", textAlign: "center", color: LEGACY_COLORS.muted, fontSize: 13 }}>
+              적재 품목이 없습니다
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {lines.map((line) => (
+                <div
+                  key={line.item_id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: editable ? "minmax(0, 1fr) 68px 28px" : "minmax(0, 1fr) 48px",
+                    gap: 8,
+                    alignItems: "center",
+                    padding: "9px 10px",
+                    borderRadius: 12,
+                    background: LEGACY_COLORS.s2,
+                    border: `1px solid ${LEGACY_COLORS.border}`,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, fontWeight: 700, color: LEGACY_COLORS.text }}>
+                      {itemName(line.item_id)}
+                    </div>
+                    {itemCode(line.item_id) && (
+                      <div style={{ marginTop: 1, fontSize: 11, color: LEGACY_COLORS.muted2 }}>{itemCode(line.item_id)}</div>
+                    )}
+                  </div>
+                  {editable ? (
+                    <>
+                      <input
+                        type="number"
+                        min={0}
+                        value={line.quantity}
+                        onChange={(e) => updateLine(line.item_id, Number(e.target.value))}
+                        style={{ ...inputStyle, textAlign: "center", padding: "6px 4px" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeLine(line.item_id)}
+                        disabled={busy}
+                        aria-label="품목 제거"
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: LEGACY_COLORS.muted2,
+                          cursor: busy ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "right", fontSize: 13, fontWeight: 800, color: LEGACY_COLORS.muted2 }}>×{line.quantity}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {editable && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 40px", gap: 8 }}>
+              <select
+                value={selectedItemId}
+                onChange={(e) => setSelectedItemId(e.target.value)}
+                style={inputStyle}
+                disabled={items.length === 0}
+              >
+                {items.length === 0 ? (
+                  <option value="">품목 없음</option>
+                ) : (
+                  items.map((item) => (
+                    <option key={item.item_id} value={item.item_id}>
+                      {item.mes_code ? `${item.mes_code} · ` : ""}{item.item_name}
+                    </option>
+                  ))
+                )}
+              </select>
+              <button
+                type="button"
+                onClick={addSelectedItem}
+                disabled={busy || !selectedItemId}
+                aria-label="품목 추가"
+                style={{
+                  height: 36,
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  background: LEGACY_COLORS.blue,
+                  cursor: busy || !selectedItemId ? "not-allowed" : "pointer",
+                  opacity: busy || !selectedItemId ? 0.5 : 1,
+                }}
+              >
+                <Plus size={15} />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => void saveItems()}
+              disabled={busy}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                height: 38,
+                borderRadius: 12,
+                background: LEGACY_COLORS.s2,
+                border: `1px solid ${LEGACY_COLORS.border}`,
+                color: LEGACY_COLORS.text,
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.5 : 1,
+              }}
+            >
+              <Save size={14} /> 적재 품목 저장
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

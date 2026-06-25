@@ -62,6 +62,9 @@ from app.models.warehouse import (
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
+    WarehouseSpecialZoneAudit,
 )
 from app.models.employee_item_order import EmployeeItemOrder
 
@@ -114,6 +117,9 @@ __all__ = [
     "WarehouseAngle",
     "WarehouseBox",
     "WarehouseBoxItem",
+    "WarehouseSpecialZone",
+    "WarehouseSpecialZoneItem",
+    "WarehouseSpecialZoneAudit",
     "BoxSizeEnum",
     # employee item order
     "EmployeeItemOrder",

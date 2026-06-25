@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # 창고 지도 (Warehouse Map)
 # ---------------------------------------------------------------------------
 BoxSizeLiteral = Literal["LARGE", "MEDIUM", "SMALL"]
+WarehouseSpecialZoneTypeLiteral = Literal["aisle", "pallet"]
 
 
 class WarehouseAngleResponse(BaseModel):
@@ -101,9 +102,51 @@ class WarehouseBoxResponse(BaseModel):
     items: List[WarehouseBoxItemResponse]
 
 
+
+
+class WarehouseSpecialZoneCreate(BaseModel):
+    label: str = Field(..., max_length=50)
+    zone_type: WarehouseSpecialZoneTypeLiteral
+    pos_x: int = Field(0)
+    pos_y: int = Field(0)
+    width: int = Field(80, ge=1)
+    height: int = Field(40, ge=1)
+    display_order: Optional[int] = None
+    items: List[WarehouseBoxItemPayload] = Field(default_factory=list)
+
+
+class WarehouseSpecialZoneUpdate(BaseModel):
+    label: Optional[str] = Field(None, max_length=50)
+    zone_type: Optional[WarehouseSpecialZoneTypeLiteral] = None
+    pos_x: Optional[int] = None
+    pos_y: Optional[int] = None
+    width: Optional[int] = Field(None, ge=1)
+    height: Optional[int] = Field(None, ge=1)
+    display_order: Optional[int] = None
+    is_active: Optional[bool] = None
+    items: Optional[List[WarehouseBoxItemPayload]] = None
+
+
+class WarehouseSpecialZoneItemsUpdate(BaseModel):
+    items: List[WarehouseBoxItemPayload] = Field(default_factory=list)
+
+
+class WarehouseSpecialZoneResponse(BaseModel):
+    id: int
+    label: str
+    zone_type: WarehouseSpecialZoneTypeLiteral
+    pos_x: int
+    pos_y: int
+    width: int
+    height: int
+    display_order: int
+    is_active: bool
+    items: List[WarehouseBoxItemResponse]
+
 class WarehouseMapResponse(BaseModel):
     angles: List[WarehouseAngleResponse]
     boxes: List[WarehouseBoxResponse]
+    special_zones: List[WarehouseSpecialZoneResponse]
 
 
 class WarehouseBoxMove(BaseModel):

@@ -305,6 +305,44 @@ _MIGRATION_DDL: list[str] = [
     )""",
     "CREATE INDEX IF NOT EXISTS ix_handover_lines_handover ON handover_lines(handover_id)",
     "CREATE INDEX IF NOT EXISTS ix_handover_lines_item ON handover_lines(item_id)",
+    # 2026-06-25: warehouse map aisle/pallet special zones.
+    """CREATE TABLE IF NOT EXISTS warehouse_special_zones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        label VARCHAR(50) NOT NULL,
+        zone_type VARCHAR(20) NOT NULL,
+        pos_x INTEGER NOT NULL DEFAULT 0,
+        pos_y INTEGER NOT NULL DEFAULT 0,
+        width INTEGER NOT NULL DEFAULT 80,
+        height INTEGER NOT NULL DEFAULT 40,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        is_active BOOLEAN NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT ck_wh_zone_type CHECK (zone_type IN ('aisle', 'pallet')),
+        CONSTRAINT ck_wh_zone_size_pos CHECK (width >= 1 AND height >= 1)
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_wh_zone_order ON warehouse_special_zones(display_order, id)",
+    """CREATE TABLE IF NOT EXISTS warehouse_special_zone_items (
+        id CHAR(36) PRIMARY KEY,
+        zone_id INTEGER NOT NULL REFERENCES warehouse_special_zones(id) ON DELETE CASCADE,
+        item_id CHAR(36) NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        CONSTRAINT ck_wh_zoneitem_qty_nonneg CHECK (quantity >= 0)
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_items_zone_id ON warehouse_special_zone_items(zone_id)",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_items_item_id ON warehouse_special_zone_items(item_id)",
+    "CREATE INDEX IF NOT EXISTS ix_wh_zoneitem_item ON warehouse_special_zone_items(item_id)",
+    """CREATE TABLE IF NOT EXISTS warehouse_special_zone_audits (
+        id CHAR(36) PRIMARY KEY,
+        zone_id INTEGER REFERENCES warehouse_special_zones(id) ON DELETE SET NULL,
+        action VARCHAR(32) NOT NULL,
+        actor_employee_id CHAR(36) REFERENCES employees(employee_id) ON DELETE SET NULL,
+        actor_employee_code VARCHAR(30),
+        actor_name VARCHAR(100),
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_audits_zone_id ON warehouse_special_zone_audits(zone_id)",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_audits_actor_employee_id ON warehouse_special_zone_audits(actor_employee_id)",
     # 2026-06-22: 모델별 기준 PF 지정 — 대시보드 칩 기준 수치 고정
     """CREATE TABLE IF NOT EXISTS model_pf_pins (
         model_symbol TEXT PRIMARY KEY,

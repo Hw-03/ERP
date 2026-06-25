@@ -20,6 +20,8 @@ from app.models import (
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
 )
 
 # process_type_code prefix → 부서명 (bootstrap/seed.py _PROCESS_TYPES 와 일치)
@@ -134,6 +136,69 @@ def _dept_color_map(db: Session) -> dict[str, Optional[str]]:
     return {d.name: d.color_hex for d in db.query(Department).all()}
 
 
+
+
+def _content_item_payload(content, color_map: dict[str, Optional[str]]) -> Optional[dict]:
+    item = content.item
+    if item is None or item.deleted_at is not None:
+        return None
+    dept = department_for_item(item)
+    return {
+        "item_id": item.item_id,
+        "mes_code": item.mes_code,
+        "item_name": item.item_name,
+        "quantity": content.quantity,
+        "department": dept,
+        "color_hex": color_map.get(dept) if dept else None,
+    }
+
+
+def _special_zone_payloads(
+    db: Session,
+    color_map: dict[str, Optional[str]],
+    *,
+    include_inactive: bool = False,
+) -> list[dict]:
+    q = db.query(WarehouseSpecialZone)
+    if not include_inactive:
+        q = q.filter(WarehouseSpecialZone.is_active.is_(True))
+    zones = q.order_by(
+        WarehouseSpecialZone.display_order.asc(),
+        WarehouseSpecialZone.id.asc(),
+    ).all()
+
+    payloads = []
+    for zone in zones:
+        items_out = []
+        for content in zone.contents:
+            item_out = _content_item_payload(content, color_map)
+            if item_out is not None:
+                items_out.append(item_out)
+        payloads.append(
+            {
+                "id": zone.id,
+                "label": zone.label,
+                "zone_type": zone.zone_type,
+                "pos_x": zone.pos_x,
+                "pos_y": zone.pos_y,
+                "width": zone.width,
+                "height": zone.height,
+                "display_order": zone.display_order,
+                "is_active": zone.is_active,
+                "items": items_out,
+            }
+        )
+    return payloads
+
+
+def build_special_zone_payloads(db: Session, *, include_inactive: bool = False) -> list[dict]:
+    return _special_zone_payloads(
+        db,
+        _dept_color_map(db),
+        include_inactive=include_inactive,
+    )
+
+
 def build_map_payload(db: Session) -> dict:
     """지도 통합 데이터: angles + boxes(품목/부서색 평탄화)."""
     angles = (
@@ -189,7 +254,9 @@ def build_map_payload(db: Session) -> dict:
             }
         )
 
-    return {"angles": angles, "boxes": box_payloads}
+    special_zone_payloads = _special_zone_payloads(db, color_map)
+
+    return {"angles": angles, "boxes": box_payloads, "special_zones": special_zone_payloads}
 
 
 def reconcile_inventory(db: Session, item_id=None) -> dict:
@@ -207,6 +274,20 @@ def reconcile_inventory(db: Session, item_id=None) -> dict:
     if item_id is not None:
         placed_q = placed_q.filter(WarehouseBoxItem.item_id == item_id)
     placed_rows = {r.item_id: int(r.placed_total) for r in placed_q.all()}
+
+    zone_placed_q = (
+        db.query(
+            WarehouseSpecialZoneItem.item_id.label("item_id"),
+            func.coalesce(func.sum(WarehouseSpecialZoneItem.quantity), 0).label("placed_total"),
+        )
+        .join(WarehouseSpecialZone, WarehouseSpecialZoneItem.zone_id == WarehouseSpecialZone.id)
+        .filter(WarehouseSpecialZone.is_active.is_(True))
+        .group_by(WarehouseSpecialZoneItem.item_id)
+    )
+    if item_id is not None:
+        zone_placed_q = zone_placed_q.filter(WarehouseSpecialZoneItem.item_id == item_id)
+    for row in zone_placed_q.all():
+        placed_rows[row.item_id] = placed_rows.get(row.item_id, 0) + int(row.placed_total)
 
     target_ids = set(placed_rows.keys())
     if item_id is not None:

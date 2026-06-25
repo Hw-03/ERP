@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { WarehouseAngle, WarehouseBox } from "@/lib/api/warehouse-map";
+import type { WarehouseAngle, WarehouseBox, WarehouseSpecialZone } from "@/lib/api/warehouse-map";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { JariColumn } from "./JariColumn";
 import { cellColor, cellKey, cellOccupied, jariStacks, rowLabel } from "./helpers";
@@ -14,14 +14,18 @@ type CellIndex = Map<string, WarehouseBox[]>;
 // ═══════════════════════════════════════════════════════
 export function FloorStage({
   angles,
+  specialZones,
   hitAngles,
   pulseAngleId,
   onAngleClick,
+  onZoneClick,
 }: {
   angles: WarehouseAngle[];
+  specialZones?: WarehouseSpecialZone[];
   hitAngles?: Map<number, number>;
   pulseAngleId?: number | null;
   onAngleClick: (a: WarehouseAngle) => void;
+  onZoneClick?: (zone: WarehouseSpecialZone) => void;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -78,6 +82,55 @@ export function FloorStage({
               backgroundSize: "40px 40px",
             }}
           />
+          {specialZones?.map((zone) => {
+            const totalQty = zone.items.reduce((sum, item) => sum + item.quantity, 0);
+            const isPallet = zone.zone_type === "pallet";
+            const accent = isPallet ? LEGACY_COLORS.green : LEGACY_COLORS.yellow;
+            return (
+              <button
+                key={zone.id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onZoneClick?.(zone);
+                }}
+                style={{
+                  position: "absolute",
+                  left: zone.pos_x,
+                  top: zone.pos_y,
+                  width: zone.width,
+                  height: zone.height,
+                  zIndex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  background: isPallet
+                    ? `color-mix(in srgb, ${accent} 16%, ${LEGACY_COLORS.s1})`
+                    : `repeating-linear-gradient(45deg, color-mix(in srgb, ${accent} 18%, ${LEGACY_COLORS.s1}) 0 8px, color-mix(in srgb, ${accent} 8%, ${LEGACY_COLORS.s1}) 8px 16px)`,
+                  border: `1px solid color-mix(in srgb, ${accent} 58%, ${LEGACY_COLORS.border})`,
+                  borderRadius: isPallet ? 10 : 6,
+                  color: LEGACY_COLORS.text,
+                  cursor: onZoneClick ? "pointer" : "default",
+                  boxShadow: "0 1px 3px rgba(45,70,106,0.08)",
+                  overflow: "hidden",
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 800, color: accent, lineHeight: 1 }}>
+                  {isPallet ? "PL" : "통로"}
+                </span>
+                <span style={{ maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, fontWeight: 800 }}>
+                  {zone.label}
+                </span>
+                {totalQty > 0 && (
+                  <span style={{ fontSize: 9, fontWeight: 800, color: LEGACY_COLORS.muted2 }}>
+                    {zone.items.length}품목 · {totalQty}
+                  </span>
+                )}
+              </button>
+            );
+          })}
           {angles.map((a) => {
             const count = hitAngles?.get(a.id);
             const pulse = pulseAngleId === a.id;
@@ -102,6 +155,7 @@ export function FloorStage({
                   borderRadius: 16,
                   boxShadow: "0 1px 3px rgba(45,70,106,0.10)",
                   cursor: "pointer",
+                  zIndex: 2,
                 }}
               >
                 <span style={{ fontSize: 11, fontWeight: 700, color: LEGACY_COLORS.text }}>

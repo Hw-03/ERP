@@ -10,7 +10,7 @@
 
 from fastapi import APIRouter
 
-from . import angles, boxes, query
+from . import angles, boxes, query, zones
 
 router = APIRouter()
 
@@ -18,5 +18,6 @@ router = APIRouter()
 router.include_router(query.router)
 router.include_router(angles.router)
 router.include_router(boxes.router)
+router.include_router(zones.router)
 
 __all__ = ["router"]

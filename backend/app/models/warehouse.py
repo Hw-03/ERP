@@ -152,3 +152,90 @@ class WarehouseBoxItem(Base):
         CheckConstraint("quantity >= 0", name="ck_wh_boxitem_qty_nonneg"),
         Index("ix_wh_boxitem_item", "item_id"),  # 검색·재고대조 핵심
     )
+
+class WarehouseSpecialZone(Base):
+    """Free-form warehouse map zone for aisle and pallet storage."""
+    __tablename__ = "warehouse_special_zones"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    label = Column(String(50), nullable=False)
+    zone_type = Column(String(20), nullable=False)
+    pos_x = Column(Integer, nullable=False, default=0)
+    pos_y = Column(Integer, nullable=False, default=0)
+    width = Column(Integer, nullable=False, default=80)
+    height = Column(Integer, nullable=False, default=40)
+    display_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
+    )
+
+    contents = relationship(
+        "WarehouseSpecialZoneItem", back_populates="zone", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        CheckConstraint("zone_type IN ('aisle', 'pallet')", name="ck_wh_zone_type"),
+        CheckConstraint("width >= 1 AND height >= 1", name="ck_wh_zone_size_pos"),
+        Index("ix_wh_zone_order", "display_order", "id"),
+    )
+
+
+class WarehouseSpecialZoneItem(Base):
+    """Item quantities placed in an aisle or pallet zone."""
+    __tablename__ = "warehouse_special_zone_items"
+
+    id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    zone_id = Column(
+        Integer,
+        ForeignKey("warehouse_special_zones.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_id = Column(
+        UUIDString,
+        ForeignKey("items.item_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    quantity = Column(IntQuantity, nullable=False, default=0)
+
+    zone = relationship("WarehouseSpecialZone", back_populates="contents")
+    item = relationship("Item")
+
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_wh_zoneitem_qty_nonneg"),
+        Index("ix_wh_zoneitem_item", "item_id"),
+    )
+
+
+class WarehouseSpecialZoneAudit(Base):
+    """Minimal audit trail for warehouse special zone edits."""
+    __tablename__ = "warehouse_special_zone_audits"
+
+    id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    zone_id = Column(
+        Integer,
+        ForeignKey("warehouse_special_zones.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    action = Column(String(32), nullable=False)
+    actor_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    actor_employee_code = Column(String(30), nullable=True)
+    actor_name = Column(String(100), nullable=True)
+    created_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, server_default=func.now()
+    )
