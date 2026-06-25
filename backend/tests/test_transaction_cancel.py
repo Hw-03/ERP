@@ -64,6 +64,30 @@ def _cancel(client, log_id, *, code="KW01", pin="0000", reason="취소 테스트
     )
 
 
+def _receive_v2(client, item, requester: Employee, quantity: int):
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [{"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": str(quantity)}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.text
+    return res
+
+
 # ---------------------------------------------------------------------------
 # 불량 격리(새 불량) 취소 — 사용자가 막혔던 바로 그 케이스
 # ---------------------------------------------------------------------------
@@ -122,16 +146,7 @@ def test_cancel_receive_restores_warehouse(client, db_session, make_item):
     item = make_item(name="입고품", warehouse_qty=Decimal("0"))
     actor = _make_employee(db_session, code="RC01")
     db_session.commit()
-
-    res = client.post(
-        "/api/inventory/receive",
-        json={
-            "item_id": str(item.item_id),
-            "quantity": 50,
-            "producer_employee_code": "RC01",
-        },
-    )
-    assert res.status_code == 201, res.text
+    res = _receive_v2(client, item, actor, 50)
     wh, _, _ = _cells(db_session, item.item_id)
     assert wh == 50
 
@@ -234,11 +249,7 @@ def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
     db_session.commit()
 
     # 입고 50 → 창고 50
-    res = client.post(
-        "/api/inventory/receive",
-        json={"item_id": str(item.item_id), "quantity": 50, "producer_employee_code": "NG01"},
-    )
-    assert res.status_code == 201
+    res = _receive_v2(client, item, actor, 50)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
@@ -261,15 +272,65 @@ def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
     assert log.cancelled is False
 
 
-def test_cancel_idempotent_double(client, db_session, make_item):
-    item = make_item(name="중복품", warehouse_qty=Decimal("0"))
-    _make_employee(db_session, code="DUP1")
+def test_cancel_blocks_empty_inventory_effect_without_mutating_stock(client, db_session, make_item):
+    item = make_item(name="empty-effect", warehouse_qty=Decimal("50"))
+    actor = _make_employee(db_session, code="EMP0")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("50"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("50"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        inventory_effect=[],
+    )
+    db_session.add(log)
     db_session.commit()
 
-    client.post(
-        "/api/inventory/receive",
-        json={"item_id": str(item.item_id), "quantity": 10, "producer_employee_code": "DUP1"},
+    res = _cancel(client, log.log_id, code="EMP0")
+
+    assert res.status_code == 422, res.text
+    assert "재고 효과" in res.json()["detail"]["message"]
+    wh, total, _ = _cells(db_session, item.item_id)
+    assert wh == 50
+    assert total == 50
+    db_session.refresh(log)
+    assert log.cancelled is False
+
+
+def test_cancel_blocks_zero_delta_inventory_effect_without_mutating_stock(client, db_session, make_item):
+    item = make_item(name="zero-effect", warehouse_qty=Decimal("50"))
+    actor = _make_employee(db_session, code="EMPZ")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("50"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("50"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        inventory_effect=[{"scope": "warehouse", "delta": 0}],
     )
+    db_session.add(log)
+    db_session.commit()
+
+    res = _cancel(client, log.log_id, code="EMPZ")
+
+    assert res.status_code == 422, res.text
+    assert "재고 효과" in res.json()["detail"]["message"]
+    wh, total, _ = _cells(db_session, item.item_id)
+    assert wh == 50
+    assert total == 50
+    db_session.refresh(log)
+    assert log.cancelled is False
+
+def test_cancel_idempotent_double(client, db_session, make_item):
+    item = make_item(name="cancel-duplicate", warehouse_qty=Decimal("0"))
+    actor = _make_employee(db_session, code="DUP1")
+    db_session.commit()
+
+    _receive_v2(client, item, actor, 10)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
@@ -307,6 +368,33 @@ def test_cancel_non_self_non_approver_forbidden(client, db_session, make_item):
     assert res.status_code == 403, res.text
 
 
+
+
+def test_cancel_without_employee_id_does_not_trust_same_name(client, db_session, make_item):
+    item = make_item(name="same-name-cancel", warehouse_qty=Decimal("80"))
+    original = _make_employee(db_session, code="SN01", name="Same Name")
+    other_same_name = _make_employee(db_session, code="SN02", name="Same Name")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("20"),
+        quantity_before=Decimal("60"),
+        quantity_after=Decimal("80"),
+        produced_by=original.name,
+        producer_employee_id=None,
+        inventory_effect=[{"scope": "warehouse", "delta": 20}],
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    res = _cancel(client, log.log_id, code=other_same_name.employee_code)
+
+    assert res.status_code == 403, res.text
+    wh, total, _ = _cells(db_session, item.item_id)
+    assert wh == 80
+    assert total == 80
+    db_session.refresh(log)
+    assert log.cancelled is False
 def test_cancel_approver_can_cancel_others(client, db_session, make_item):
     item = make_item(name="결재취소품", warehouse_qty=Decimal("100"))
     requester = _make_employee(db_session, code="OWN2", name="요청자2")
@@ -332,13 +420,10 @@ def test_cancel_approver_can_cancel_others(client, db_session, make_item):
 
 
 def test_cancel_wrong_pin_forbidden(client, db_session, make_item):
-    item = make_item(name="핀품", warehouse_qty=Decimal("0"))
-    _make_employee(db_session, code="PIN1")
+    item = make_item(name="cancel-wrong-pin", warehouse_qty=Decimal("0"))
+    actor = _make_employee(db_session, code="PIN1")
     db_session.commit()
-    client.post(
-        "/api/inventory/receive",
-        json={"item_id": str(item.item_id), "quantity": 5, "producer_employee_code": "PIN1"},
-    )
+    _receive_v2(client, item, actor, 5)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
@@ -371,11 +456,11 @@ def test_cancel_legacy_defect_without_effect_returns_message(client, db_session,
 
     res = _cancel(client, log.log_id, code="WH2")
     assert res.status_code == 422, res.text
-    assert "이전 버전" in res.json()["detail"]["message"]
+    assert "재고 효과" in res.json()["detail"]["message"]
 
 
-def test_cancel_legacy_mark_defective_restores_warehouse_and_defective(client, db_session, make_item):
-    """레거시 MARK_DEFECTIVE(inventory_effect=None)를 warehouse_qty_before/after 로 수량 추론해 취소."""
+def test_cancel_legacy_mark_defective_with_inferred_quantity_is_blocked(client, db_session, make_item):
+    """수량 추론이 가능해 보여도 inventory_effect=None이면 자동 취소하지 않는다."""
     item = make_item(name="레거시불량복구", warehouse_qty=Decimal("70"))
     approver = _make_employee(db_session, code="WH3", name="창고장3", warehouse_role="primary")
     # 격리된 상태 재현: 부서 DEFECTIVE 위치에 30개
@@ -403,9 +488,11 @@ def test_cancel_legacy_mark_defective_restores_warehouse_and_defective(client, d
     db_session.commit()
 
     res = _cancel(client, log.log_id, code="WH3")
-    assert res.status_code == 200, res.text
-    assert res.json()["cancelled"] is True
+    assert res.status_code == 422, res.text
+    assert "재고 효과" in res.json()["detail"]["message"]
 
     wh, _, locs = _cells(db_session, item.item_id)
-    assert wh == 100  # 창고 복구: 70 + 30
-    assert locs.get((DepartmentEnum.ASSEMBLY.value, "DEFECTIVE"), 0) == 0
+    assert wh == 70
+    assert locs.get((DepartmentEnum.ASSEMBLY.value, "DEFECTIVE"), 0) == 30
+    db_session.refresh(log)
+    assert log.cancelled is False

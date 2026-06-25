@@ -1,42 +1,62 @@
 /**
- * 결재 알림 도메인 API — `@/lib/api/notifications`.
+ * 결재 알림 도메인 API - `@/lib/api/notifications`.
  */
 
-import { deleteJson, fetcher, postJson, toApiUrl } from "../api-core";
+import { ApiError, parseError, toApiUrl } from "../api-core";
 import type { NotificationListResponse, NotificationMarkReadPayload } from "./types";
+
+
+async function requestWithActor<T>(
+  url: string,
+  employeeId: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set("X-Actor-Employee-Id", employeeId);
+  if (init.body !== undefined && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const res = await fetch(url, { ...init, headers });
+  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
 
 export const notificationsApi = {
   listNotifications: (employeeId: string) =>
-    fetcher<NotificationListResponse>(
+    requestWithActor<NotificationListResponse>(
       toApiUrl(
-        `/api/notifications?recipient_employee_id=${encodeURIComponent(employeeId)}`,
+        "/api/notifications?recipient_employee_id=" + encodeURIComponent(employeeId),
       ),
-    ),
-
-  unreadNotificationCount: (employeeId: string) =>
-    fetcher<{ count: number }>(
-      toApiUrl(
-        `/api/notifications/unread-count?recipient_employee_id=${encodeURIComponent(employeeId)}`,
-      ),
+      employeeId,
     ),
 
   markNotificationsRead: (payload: NotificationMarkReadPayload) =>
-    postJson<NotificationListResponse>(
+    requestWithActor<NotificationListResponse>(
       toApiUrl("/api/notifications/mark-read"),
-      payload,
+      payload.recipient_employee_id,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
     ),
 
   deleteNotification: (notificationId: string, employeeId: string) =>
-    deleteJson<void>(
+    requestWithActor<void>(
       toApiUrl(
-        `/api/notifications/${notificationId}?recipient_employee_id=${encodeURIComponent(employeeId)}`,
+        "/api/notifications/" + encodeURIComponent(notificationId) +
+          "?recipient_employee_id=" + encodeURIComponent(employeeId),
       ),
+      employeeId,
+      { method: "DELETE" },
     ),
 
   deleteReadNotifications: (employeeId: string) =>
-    deleteJson<void>(
+    requestWithActor<void>(
       toApiUrl(
-        `/api/notifications/read?recipient_employee_id=${encodeURIComponent(employeeId)}`,
+        "/api/notifications/read?recipient_employee_id=" + encodeURIComponent(employeeId),
       ),
+      employeeId,
+      { method: "DELETE" },
     ),
 };

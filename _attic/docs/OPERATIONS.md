@@ -15,10 +15,22 @@ start.bat
 
 LAN IP는 자동 감지된다. 같은 사설망의 다른 PC에서도 `http://<LAN IP>:3001` 으로 접근 가능 (dev 기준 — prod 는 3000).
 
-## 매일 정상 동작 확인 (1분)
+## 매일 운영 시작 전 확인 (1분)
+
+운영 시작 전 먼저 `scripts\ops\backup_db.bat`로 현재 DB 백업을 만든 뒤, 운영자 PC에서 read-only 게이트를 실행한다. 이 게이트는 DB 파일, 현재 DB보다 뒤처지지 않은 최신 검증 백업, 재고 무결성을 한 번에 확인하며 DB를 변경하지 않는다.
+
+```bat
+scripts\ops\operational_readiness.bat
+```
+
+마지막 줄이 `PASS operational readiness`이면 입출고 작업을 시작할 수 있다. `FAIL latest backup`이 나오면 먼저 `backup_db.bat`를 실행하고 readiness를 다시 돌린다. 그 외 `FAIL`은 입출고를 시작하지 말고 백업/복구 또는 정합성 점검 절차를 먼저 따른다.
+
+WARN missing transaction effects: N이 함께 나오면 재고 합계는 정상이나, 과거 거래 로그 일부에 자동 역취소용 재고 영향 기록이 없다는 뜻이다. 신규 입출고를 막는 조건은 아니지만, 해당 과거 거래의 자동 취소는 거부된다. 필요하면 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.
+
+서버가 켜진 뒤에는 다음 중 하나로 화면/서버 상태를 확인한다.
 
 1. 우측 상단 **새로고침** 버튼 → 데이터가 갱신되고 pill이 정상 메시지로 바뀌면 OK.
-2. 또는 운영자 PC에서 `scripts/ops/healthcheck.bat` 실행:
+2. 운영자 PC에서 `scripts/ops/healthcheck.bat` 실행:
 
 ```bat
 scripts\ops\healthcheck.bat
@@ -49,7 +61,7 @@ scripts\ops\verify_backup.bat
 
 가장 최근 정식 백업(`mes_PRE-RESTORE_*` 제외) 1건에 대해:
 - `PRAGMA integrity_check` 결과 (`ok` 면 정상)
-- `items / inventory / transaction_logs / bom / admin_audit_logs` 행 수
+- `items / inventory / inventory_locations / transaction_logs / bom / admin_audit_logs` 행 수
 
 운영 PC 에서 주 1회 정도 수행 권장.
 
@@ -76,7 +88,8 @@ scripts\ops\cleanup_backups.bat 60     rem 60일로 변경
    - 복구 대상 파일에 `PRAGMA integrity_check` (실패 시 중단)
    - `mes.db` 교체 + 잔여 `mes.db-wal / .db-shm` 제거
 3. **백엔드 재기동** — `start.bat`
-4. `scripts\ops\healthcheck.bat` 로 정상성 확인
+4. `scripts\ops\operational_readiness.bat` 로 DB/백업/재고 무결성 확인
+5. `scripts\ops\healthcheck.bat` 로 서버 정상성 확인
 
 복구 후에도 안전하게 PRE-RESTORE 스냅샷이 `_backup/` 에 남아있어 되돌릴 수 있다.
 
@@ -111,6 +124,8 @@ taskkill /PID <PID> /F
 | 입출고 일부만 처리됨 | 단건 처리 중 일부 실패 (재고 부족, 음수 등) | 결과 모달에서 "실패 항목만 다시 시도" |
 | 결과 모달이 닫히지 않음 | submit 진행 중 (의도된 잠금) | "처리 중..." 표시가 사라질 때까지 대기 |
 | `/health/detailed` 가 `inventory_mismatch_count > 0` | Inventory 합계와 위치별 합계 불일치 | DB 백업 후 운영 담당에게 보고 (수정은 별도 절차) |
+| `operational_readiness.bat` 가 `FAIL` | 백업 없음/오래됨/DB보다 오래됨, 백업 검증 실패, 재고 정합성 실패 | 입출고 시작 금지. `backup_db.bat`, `verify_backup.bat`, `check_inventory_integrity.py` 결과를 확인 |
+| WARN missing transaction effects 표시 | 과거 거래 로그에 자동 역취소용 재고 영향 기록 없음 | 신규 작업은 가능. 해당 과거 거래 자동 취소는 거부되며, 히스토리/현재 재고 대조 후 별도 보정 거래로 처리 |
 | 다른 PC에서 접속 안 됨 | LAN IP 변경 / 방화벽 | start.bat 콘솔에 표시된 새 IP 확인, Windows 방화벽에서 8011·3001 (dev) 또는 8010·3000 (prod) 인바운드 허용 |
 
 ## 데이터 정합성 점검(수동)
@@ -204,3 +219,40 @@ schtasks /Create /TN "MES Cleanup Monthly" /TR "%USERPROFILE%\Documents\GitHub\E
 - Alembic 마이그레이션 활성화
 
 자세한 배경은 `docs/BACKEND_REFACTOR_PLAN.md` 참고.
+## 운영 안전장치: missing transaction effects 추적
+
+`operational_readiness.bat`에서 `WARN missing transaction effects: N`이 나오면 신규 입출고를 막는 FAIL은 아니다. 다만 과거 거래 중 자동 취소와 감사 추적에 필요한 `inventory_effect`가 비어 있는 로그가 있다는 뜻이므로, 해당 과거 거래는 자동 취소하지 말고 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.
+
+상세 확인은 다음 명령으로 한다.
+
+```bat
+python scripts\ops\check_inventory_integrity.py
+```
+
+직접 실행하면 거래 유형별 `count`, `sample_log_id`, `sample_mes_code`가 함께 출력된다. 운영자는 `sample_log_id`를 기준으로 히스토리/DB 로그를 확인하고, 같은 유형의 과거 로그가 현재 재고에 영향을 줄 수 있는지 판단한다. `operational_readiness.bat`는 아침 점검용 요약만 보여주므로 샘플 ID가 필요하면 직접 진단 스크립트를 실행한다.
+
+## Inventory Cutover
+
+엑셀 운영을 중단하고 DEXCOWIN MES 기준 재고로 전환할 때는 전용 런북을 따른다.
+
+- Runbook: `_attic/docs/operations/INVENTORY_CUTOVER_RUNBOOK.md`
+- Script: `scripts/ops/inventory_cutover.py`
+
+기본 실행은 dry-run이며 DB를 바꾸지 않는다.
+
+```bat
+python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv
+```
+
+실제 적용은 다음처럼 확인 문구를 함께 넣어야 한다. SQLite 적용 전에는 스크립트가 백업을 먼저 만든다.
+
+```bat
+python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv --apply --confirm START-OVER
+```
+
+적용 후에는 반드시 아래 두 검사를 통과해야 한다.
+
+```bat
+python scripts\ops\check_inventory_integrity.py
+scripts\ops\operational_readiness.bat
+```

@@ -33,12 +33,5 @@ describe("adminApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/settings/admin-pin");
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("PUT");
-  });
-
-  it("resetDatabase POST /api/settings/reset", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ message: "reset" })));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await adminApi.resetDatabase("0000");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/settings/reset");
-  });
+  });
 });

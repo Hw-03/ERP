@@ -20,13 +20,13 @@
 # Ctrl+C 또는 프로세스 종료
 
 # 2. 백업 생성
-python scripts/ops/backup_db.py
+scripts\ops\backup_db.bat
 
 # 3. 무결성 상세 점검
 python scripts/ops/check_inventory_integrity.py
 
 # 4. 음수 품목 조회 (SQLite)
-sqlite3 backend/mes.db "SELECT i.item_id, it.item_code, i.warehouse_qty, i.quantity FROM inventory i JOIN item it ON it.item_id = i.item_id WHERE i.warehouse_qty < 0 OR i.quantity < 0;"
+sqlite3 backend/mes.db "SELECT i.item_id, it.mes_code, i.warehouse_qty, i.quantity FROM inventory i JOIN items it ON it.item_id = i.item_id WHERE i.warehouse_qty < 0 OR i.quantity < 0;"
 ```
 
 ### 복구
@@ -35,7 +35,7 @@ sqlite3 backend/mes.db "SELECT i.item_id, it.item_code, i.warehouse_qty, i.quant
 -- 음수 warehouse_qty 0으로 정정 (원인 파악 후 적용)
 UPDATE inventory SET warehouse_qty = 0 WHERE warehouse_qty < 0;
 UPDATE inventory SET quantity = warehouse_qty + (
-    SELECT COALESCE(SUM(quantity), 0) FROM inventory_location WHERE item_id = inventory.item_id
+    SELECT COALESCE(SUM(quantity), 0) FROM inventory_locations WHERE item_id = inventory.item_id
 ) WHERE item_id = '<문제 item_id>';
 ```
 
@@ -113,17 +113,14 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 
 ## 4. 데이터 손상 의심 / 백업 복구
 
-### SQLite 복구 (권장: restore_db.py 사용)
+### SQLite 복구 (권장: restore_db.bat 사용)
 
 ```bash
 # 최신 백업 확인
-ls -lt outputs/backups/mes_*.db | head -5
+dir /O-D backend\_backup\mes_*.db
 
 # 복구 (현재 DB를 .pre-restore로 자동 백업 후 복구)
-python scripts/ops/restore_db.py \
-    --sqlite outputs/backups/mes_YYYYMMDD_HHMMSS.db \
-    --target backend/mes.db \
-    --check
+scripts\ops\restore_db.bat mes_YYYYMMDD_HHMMSS.db
 
 # 무결성 자동 확인됨 (--check 플래그)
 ```
@@ -132,18 +129,18 @@ python scripts/ops/restore_db.py \
 
 ```bash
 # 최신 백업 확인
-ls -lt outputs/backups/mes_*.sql | head -5
+ls -lt backend/_backup/mes_*.sql | head -5
 
 # Docker 컨테이너 기준 복구
 CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
 python scripts/ops/restore_db.py \
-    --postgres outputs/backups/mes_YYYYMMDD_HHMMSS.sql \
+    --postgres backend/_backup/mes_YYYYMMDD_HHMMSS.sql \
     --container $CONTAINER \
     --check
 
 # 직접 호스트 기준
 python scripts/ops/restore_db.py \
-    --postgres outputs/backups/mes_YYYYMMDD_HHMMSS.sql \
+    --postgres backend/_backup/mes_YYYYMMDD_HHMMSS.sql \
     --host localhost --port 5432 --user mes_user --dbname mes_db \
     --check
 ```
@@ -162,20 +159,16 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 
 ```bash
 # 1. 현재 상태 백업
-python scripts/ops/backup_db.py
+scripts\ops\backup_db.bat
 
 # 2. 임시 경로에 복구 테스트 (운영 DB 미변경)
-python scripts/ops/restore_db.py \
-    --sqlite outputs/backups/mes_LATEST.db \
-    --target /tmp/mes_rehearsal_test.db \
-    --check
+python scripts/ops/restore_db.py --sqlite backend/_backup/mes_LATEST.db --target C:/tmp/mes_rehearsal_test.db --check
 
 # 3. 임시 DB 무결성 직접 확인
-DATABASE_URL=sqlite:////tmp/mes_rehearsal_test.db \
-    python scripts/ops/check_inventory_integrity.py
+python scripts/ops/check_inventory_integrity.py --db-url sqlite:///C:/tmp/mes_rehearsal_test.db
 
 # 4. 정상 확인 후 임시 파일 삭제
-rm /tmp/mes_rehearsal_test.db
+del C:\tmp\mes_rehearsal_test.db
 echo "복구 리허설 완료"
 ```
 
@@ -223,7 +216,7 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 
 주 1회:
 ```bash
-python scripts/ops/backup_db.py
+scripts\ops\backup_db.bat
 python scripts/ops/check_inventory_integrity.py
 ```
 

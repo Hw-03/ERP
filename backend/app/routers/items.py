@@ -119,7 +119,12 @@ def _to_item_with_inventory(
 
 
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
-def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get_db)):
+def create_item(
+    payload: ItemCreate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
@@ -466,7 +471,13 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.put("/{item_id}", response_model=ItemWithInventory)
-def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: Session = Depends(get_db)):
+def update_item(
+    item_id: uuid.UUID,
+    payload: ItemUpdate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
@@ -560,6 +571,7 @@ def update_bom_completion(
     item_id: uuid.UUID,
     payload: BomCompletionUpdate,
     request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
     """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
@@ -584,7 +596,12 @@ def update_bom_completion(
 
 
 @router.patch("/{item_id}/soft-delete", response_model=ItemResponse)
-def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+def soft_delete_item(
+    item_id: uuid.UUID,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
     item = item_repository.get(db, item_id)
     if not item:
@@ -619,7 +636,12 @@ def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends
 
 
 @router.patch("/{item_id}/restore", response_model=ItemResponse)
-def restore_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+def restore_item(
+    item_id: uuid.UUID,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """삭제된 품목 복구 — deleted_at 초기화."""
     item = item_repository.get(db, item_id)
     if not item:

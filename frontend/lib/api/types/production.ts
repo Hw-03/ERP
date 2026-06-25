@@ -5,6 +5,14 @@
 
 import type { TransactionType } from "./shared";
 
+export interface InventoryEffectCell {
+  scope: string;
+  delta: number | string;
+  department?: string | null;
+  status?: string | null;
+  box_id?: string | null;
+}
+
 export interface TransactionLog {
   log_id: string;
   item_id: string;
@@ -37,6 +45,7 @@ export interface TransactionLog {
   cancel_reason: string | null;
   cancelled_by: string | null;
   cancelled_at: string | null;
+  inventory_effect?: InventoryEffectCell[] | null;
 }
 
 /** 거래 수정 이력 (3차 메타 수정 + 4차 수량 보정 공통). */

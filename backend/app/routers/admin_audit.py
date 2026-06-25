@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.admin import require_admin_pin
 from app.models import AdminAuditLog
 
 
@@ -34,7 +35,7 @@ class AdminAuditLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-@router.get("/audit-logs", response_model=List[AdminAuditLogResponse])
+@router.get("/audit-logs", response_model=List[AdminAuditLogResponse], dependencies=[Depends(require_admin_pin)])
 def list_audit_logs(
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=2000),

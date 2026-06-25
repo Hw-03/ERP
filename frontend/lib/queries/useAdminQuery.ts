@@ -7,7 +7,7 @@
  * settings 도메인(W7-7)과 같은 API를 사용하되 admin-gate 진입 전용 hook.
  * 인터페이스 ≤ 6:
  *   useAuditCsvFilesQuery / useVerifyAdminPinMutation /
- *   useUpdateAdminPinMutation / useResetDatabaseMutation /
+ *   useUpdateAdminPinMutation /
  *   useTriggerAuditCsvBackfillMutation
  */
 
@@ -39,12 +39,6 @@ export function useUpdateAdminPinMutation() {
 }
 
 /** DB 초기화 */
-export function useResetDatabaseMutation() {
-  return useMutation({
-    mutationFn: (pin: string) => adminApi.resetDatabase(pin),
-  });
-}
-
 /** 감사 CSV 백필 트리거 */
 export function useTriggerAuditCsvBackfillMutation() {
   const qc = useQueryClient();

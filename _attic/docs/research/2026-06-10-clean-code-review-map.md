@@ -48,7 +48,7 @@
 
 - `backend/app/routers/inventory/transactions.py` 취소·역산
   - 진짜 역산 로직(`apply_effect_reverse`)은 이미 `services/inv_effect.py`로 분리·단위테스트(`test_effect_helper_roundtrip`)됨.
-  - 라우터에 남은 `_cancel_one_log`(799-932)은 `inventory_effect`가 없는 **레거시 로그용 폴백**뿐. 신규 거래는 모두 effect를 남기므로 점점 죽어가는 경로다.
+  - [STALE: 2026-06-25] 당시에는 라우터에 남은 `_cancel_one_log`가 `inventory_effect` 없는 레거시 로그용 폴백을 포함했다. 현재는 운영 자동 취소가 `inventory_effect`가 있는 거래만 허용하고 레거시 폴백은 제거됐다.
   - 따라서 "서비스로 빼자"는 추출 가치가 낮다(얇은 pass-through만 추가). 음수 가드·`_sync_total` 순서가 얽힌 destructive 경로라 위험 대비 실익이 적다.
 
 ### 완료 (2026-06-19 구현·검증·머지)

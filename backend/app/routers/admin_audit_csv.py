@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.admin import require_admin_pin
 from app.routers._errors import ErrorCode, http_error
 from app.services import audit_csv as svc
 from app.services.export_helpers import csv_streaming_response
@@ -46,12 +47,12 @@ class BackfillResult(BaseModel):
     months: List[str]
 
 
-@router.get("/audit-csv/files", response_model=List[AuditCsvFile])
+@router.get("/audit-csv/files", response_model=List[AuditCsvFile], dependencies=[Depends(require_admin_pin)])
 def list_files() -> List[AuditCsvFile]:
     return [AuditCsvFile(**item) for item in svc.list_available_months()]
 
 
-@router.get("/audit-csv/{month}.csv")
+@router.get("/audit-csv/{month}.csv", dependencies=[Depends(require_admin_pin)])
 def download_csv(month: str):
     _validate_month(month)
     path = svc.get_csv_dir() / f"inout_{month}.csv"
@@ -64,7 +65,7 @@ def download_csv(month: str):
     return csv_streaming_response(buf, f"inout_{month}.csv")
 
 
-@router.get("/audit-csv/{month}.xlsx")
+@router.get("/audit-csv/{month}.xlsx", dependencies=[Depends(require_admin_pin)])
 def download_xlsx(month: str):
     _validate_month(month)
     path = svc.get_csv_dir() / f"inout_{month}.csv"
@@ -93,7 +94,7 @@ def download_xlsx(month: str):
     return make_xlsx_response(wb, f"inout_{month}.xlsx")
 
 
-@router.post("/audit-csv/backfill", response_model=BackfillResult)
+@router.post("/audit-csv/backfill", response_model=BackfillResult, dependencies=[Depends(require_admin_pin)])
 def trigger_backfill(
     overwrite: bool = True,
     db: Session = Depends(get_db),

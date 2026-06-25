@@ -258,11 +258,11 @@ async def check_backup_exists() -> None:
     """11. 최근 백업 파일 존재"""
     backup_dir = Path(__file__).resolve().parents[2] / "outputs" / "backups"
     if not backup_dir.exists():
-        record("백업 존재", "WARN", "outputs/backups/ 없음 — python scripts/ops/backup_db.py 실행 필요")
+        record("백업 존재", "WARN", "backend/_backup/ 없음 — scripts\ops\backup_db.bat 실행 필요")
         return
     files = sorted(backup_dir.glob("*.db")) + sorted(backup_dir.glob("*.sql"))
     if not files:
-        record("백업 존재", "WARN", "백업 파일 없음 — python scripts/ops/backup_db.py 실행 필요")
+        record("백업 존재", "WARN", "백업 파일 없음 — scripts\ops\backup_db.bat 실행 필요")
         return
     latest = max(f.stat().st_mtime for f in files)
     age_days = (datetime.now(timezone.utc).timestamp() - latest) / 86400

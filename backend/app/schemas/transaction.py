@@ -1,6 +1,6 @@
 """거래 로그·메타수정·수량보정 schema."""
 
-from typing import Optional
+from typing import Any, Optional
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -81,6 +81,7 @@ class TransactionLogResponse(BaseModel):
     cancel_reason: Optional[str] = None
     cancelled_by: Optional[uuid.UUID] = None
     cancelled_at: Optional[UtcDatetime] = None
+    inventory_effect: Optional[list[dict[str, Any]]] = None
 
 
 class TransactionQuantityCorrectionResponse(BaseModel):

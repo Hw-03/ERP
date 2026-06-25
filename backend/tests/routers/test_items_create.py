@@ -7,6 +7,9 @@ import pytest
 from app.models import ProductSymbol
 
 
+ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
+
 @pytest.fixture()
 def seed_symbol(db_session):
     """slot=1, symbol="9" ProductSymbol 시드. POST /api/items에 model_slots=[1] 사용 가능하게 함."""
@@ -29,7 +32,7 @@ def _create_item(client, *, name="테스트품목", process_type_code="HR",
         payload["initial_quantity"] = initial_quantity
     if initial_locations is not None:
         payload["initial_locations"] = initial_locations
-    return client.post("/api/items", json=payload)
+    return client.post("/api/items", headers=ADMIN_HEADERS, json=payload)
 
 
 def _get_item(client, item_id):

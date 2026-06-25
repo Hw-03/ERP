@@ -27,7 +27,7 @@ function formatMonthLabel(month: string): string {
   return `${y}년 ${Number(m)}월`;
 }
 
-export function AdminAuditLogSection() {
+export function AdminAuditCsvSection() {
   const { data: files = [], isLoading: loading, error: qError, refetch: refetchFiles } = useAuditCsvListQuery();
   const backfillMutation = useTriggerAuditBackfillMutation();
   const busy = backfillMutation.isPending;

@@ -20,9 +20,7 @@ from app.models import (
     Employee,
     IoBatch,
     Inventory,
-    InventoryLocation,
     Item,
-    LocationStatusEnum,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -35,7 +33,7 @@ from app.schemas import (
     TransactionQuantityCorrectionRequest,
     TransactionQuantityCorrectionResponse,
 )
-from app.services import audit, inventory as inventory_svc
+from app.services import audit, inv_effect, inventory as inventory_svc
 from app.services._tx import commit_only
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
@@ -51,6 +49,7 @@ from app.routers.inventory._tx_filters import (
     _operation_filter,
     _apply_common_filters,
     _batch_name_map,
+    _stock_request_info_map,
     _to_log_response,
 )
 from app.repositories import item_repository, inventory_repository
@@ -214,9 +213,7 @@ def list_transactions(
         .scalar_subquery()
     )
 
-    # IoBatch outerjoin — search 에서 IoBatch.requester_name 까지 매칭하기 위함.
-    # operation_batch_id 가 NULL 인 row 도 보존하기 위해 outerjoin.
-    # IoBatch.batch_id 가 PK 라 1:1 join → row 중복 없음, 정렬/페이지네이션 영향 없음.
+    # Keep logs without an IoBatch while allowing requester-name search.
     query = (
         db.query(TransactionLog, Item, edit_count_sq.label("edit_count"))
         .join(Item, TransactionLog.item_id == Item.item_id)
@@ -226,15 +223,12 @@ def list_transactions(
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
 
-    # 단수 transaction_type: 타 화면 호환용 — 원시 IN 필터 유지
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
 
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
 
-    # 복수 transaction_types / 부서 / 공정 / 모델 / 기간 / 아카이브 / 검색:
-    # summary 와 동일한 공통 필터 빌더로 위임.
     query = _apply_common_filters(
         query,
         db,
@@ -248,10 +242,6 @@ def list_transactions(
         include_archived=include_archived,
     )
 
-    # 김현우·허동현 피드백: 입출고 내역은 '요청일시'(요청자가 작성한 시각) 순으로 정렬한다.
-    # 승인 필요 건은 승인 시점에 TransactionLog(created_at)가 생기므로 created_at 정렬은 '승인 순'이 된다.
-    # 화면의 요청일시 = COALESCE(IoBatch.submitted_at, IoBatch.created_at, log.created_at)(_batch_name_map/
-    # _to_log_response 와 동일 기준)로 정렬하고, 같은 요청(배치 내 복수 행)·동시각은 created_at·log_id 로 안정 정렬.
     requested_at_order = func.coalesce(
         IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at
     )
@@ -266,13 +256,17 @@ def list_transactions(
         .all()
     )
 
-    # operation_batch_id 기준 requester_name + approver_name 매핑(export 와 공유 헬퍼).
+    # Fill requester/approver names from IoBatch or StockRequest reference_no.
     batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
     batch_map = _batch_name_map(db, batch_ids)
+    reference_nos = {log.reference_no for log, _, _ in rows if log.reference_no}
+    sr_map = _stock_request_info_map(db, reference_nos)
 
     result = []
     for log, item, edit_count in rows:
         info = batch_map.get(log.operation_batch_id)
+        if info is None and log.reference_no:
+            info = sr_map.get(log.reference_no)
         result.append(
             _to_log_response(
                 log,
@@ -406,6 +400,9 @@ def export_transactions_csv(
     batch_map = _batch_name_map(
         db, {log.operation_batch_id for log, _ in rows if log.operation_batch_id}
     )
+    sr_map = _stock_request_info_map(
+        db, {log.reference_no for log, _ in rows if log.reference_no}
+    )
 
     buffer = StringIO()
     writer = csv.writer(buffer)
@@ -428,6 +425,8 @@ def export_transactions_csv(
     )
     for log, item in rows:
         info = batch_map.get(log.operation_batch_id)
+        if info is None and log.reference_no:
+            info = sr_map.get(log.reference_no)
         requester = info.requester_name if info else None
         approver = info.approver_name if info else None
         writer.writerow(
@@ -496,6 +495,9 @@ def export_transactions_xlsx(
     batch_map = _batch_name_map(
         db, {log.operation_batch_id for log, _ in rows if log.operation_batch_id}
     )
+    sr_map = _stock_request_info_map(
+        db, {log.reference_no for log, _ in rows if log.reference_no}
+    )
 
     wb = Workbook()
     ws = wb.active
@@ -521,6 +523,8 @@ def export_transactions_xlsx(
     for log, item in rows:
         tx_val = log.transaction_type.value
         info = batch_map.get(log.operation_batch_id)
+        if info is None and log.reference_no:
+            info = sr_map.get(log.reference_no)
         requester = info.requester_name if info else None
         approver = info.approver_name if info else None
         row_data = [
@@ -739,6 +743,7 @@ def quantity_correct_transaction(
         )
 
     before = _log_snapshot(log)
+    cells_before = inv_effect.snapshot_cells(db, log.item_id)
 
     # adjust_warehouse 서비스 호출로 재고 절대값 설정
     adjusted_inv, qty_before, _applied_delta = inventory_svc.adjust_warehouse(
@@ -755,6 +760,8 @@ def quantity_correct_transaction(
         notes=f"보정: {payload.reason}",
         reference_no=str(log.log_id),
         produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=inv_effect.capture_effect(db, log.item_id, cells_before),
     )
     db.add(correction_log)
     db.flush()  # correction_log.log_id 채움
@@ -812,140 +819,30 @@ class TransactionCancelRequest(BaseModel):
     pin: str = Field(..., min_length=1, max_length=20)
 
 
-def _cancel_one_log(db: Session, log: TransactionLog, inv: Inventory) -> None:
-    """단일 TransactionLog 의 재고 효과를 역방향 적용. 범위 외/데이터 부족 시 ValueError.
+def _cancel_one_log(db: Session, log: TransactionLog) -> None:
+    """단일 TransactionLog 의 재고 효과를 역방향 적용한다.
 
-    1순위: inventory_effect(거래가 건드린 셀 증감 기록)가 있으면 부호 반전해 일반적으로 역재생.
-    레거시(효과 기록 이전 로그)는 유형별 필드 재구성으로 폴백하되, 정보가 부족한 유형은 거부.
+    운영 자동 취소는 inventory_effect 에 기록된 실제 재고 셀 증감만 신뢰한다.
+    효과 기록이 없는 과거 로그는 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.
     """
-    from decimal import Decimal as _D
+    if log.inventory_effect is None:
+        raise ValueError("재고 효과 기록이 없어 자동 취소할 수 없습니다.")
 
-    # 1순위 — 효과 기록 기반 일반 역재생(유형 무관, 불량·이동·생산·분해 모두 정확).
-    if log.inventory_effect is not None:
-        from app.services.inv_effect import apply_effect_reverse
-        apply_effect_reverse(db, log.item_id, log.inventory_effect)
-        return
-
-    # 레거시 폴백 — 효과 기록 이전에 생성된 로그.
-    tx = log.transaction_type
-    qty = _D(str(log.transfer_qty or abs(log.quantity_change or 0)))
-
-    WAREHOUSE_ONLY = {
-        TransactionTypeEnum.RECEIVE,
-        TransactionTypeEnum.SHIP,
-        TransactionTypeEnum.ADJUST,
-    }
-    DEPT_ONLY = {
-        TransactionTypeEnum.PRODUCE,
-        TransactionTypeEnum.BACKFLUSH,
-        TransactionTypeEnum.SUPPLIER_RETURN,
-    }
-    TRANSFER_TYPES = {
-        TransactionTypeEnum.TRANSFER_TO_PROD,
-        TransactionTypeEnum.TRANSFER_TO_WH,
-        TransactionTypeEnum.TRANSFER_DEPT,
-    }
-
-    if tx in WAREHOUSE_ONLY:
-        # quantity_change: RECEIVE=+, SHIP=-, ADJUST=±
-        delta = _D(str(log.quantity_change or 0))
-        new_wh = (inv.warehouse_qty or _D("0")) - delta
-        if new_wh < 0:
-            raise ValueError(f"취소 후 창고 재고가 음수({new_wh})가 됩니다.")
-        inv.warehouse_qty = new_wh
-
-    elif tx in DEPT_ONLY:
-        dept_name = log.department
-        if not dept_name:
-            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == log.item_id,
-                InventoryLocation.department == dept_name,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
+    effect = log.inventory_effect
+    if not isinstance(effect, list) or not effect:
+        raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
+    try:
+        has_nonzero_delta = any(
+            isinstance(cell, dict) and int(cell.get("delta", 0)) != 0
+            for cell in effect
         )
-        if loc is None:
-            raise ValueError(f"{dept_name} 부서 재고 위치를 찾을 수 없습니다.")
-        # PRODUCE: quantity_change=+qty (입고), 역: -qty
-        # BACKFLUSH/SUPPLIER_RETURN: quantity_change=-qty (출고), 역: +qty
-        delta = _D(str(log.quantity_change or 0))
-        new_loc_qty = (loc.quantity or _D("0")) - delta
-        if new_loc_qty < 0:
-            raise ValueError(f"취소 후 {dept_name} 부서 재고가 음수({new_loc_qty})가 됩니다.")
-        loc.quantity = new_loc_qty
+    except (TypeError, ValueError):
+        has_nonzero_delta = False
+    if not has_nonzero_delta:
+        raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
 
-    elif tx in TRANSFER_TYPES:
-        dept_name = log.department
-        if not dept_name:
-            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == log.item_id,
-                InventoryLocation.department == dept_name,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
-        )
-        if loc is None:
-            raise ValueError(f"{dept_name} 부서 재고 위치를 찾을 수 없습니다.")
-
-        if tx == TransactionTypeEnum.TRANSFER_TO_PROD:
-            # 창고↓, 부서↑ → 역: 창고↑, 부서↓
-            new_wh = (inv.warehouse_qty or _D("0")) + qty
-            new_loc = (loc.quantity or _D("0")) - qty
-            if new_loc < 0:
-                raise ValueError(f"취소 후 {dept_name} 부서 재고가 음수({new_loc})가 됩니다.")
-            inv.warehouse_qty = new_wh
-            loc.quantity = new_loc
-        elif tx == TransactionTypeEnum.TRANSFER_TO_WH:
-            # 부서↓, 창고↑ → 역: 부서↑, 창고↓
-            new_wh = (inv.warehouse_qty or _D("0")) - qty
-            new_loc = (loc.quantity or _D("0")) + qty
-            if new_wh < 0:
-                raise ValueError(f"취소 후 창고 재고가 음수({new_wh})가 됩니다.")
-            inv.warehouse_qty = new_wh
-            loc.quantity = new_loc
-        else:  # TRANSFER_DEPT: from_dept↓, to_dept↑ (to_dept 정보가 로그에 없어 복원 불가)
-            raise ValueError(
-                "이전 버전 거래라 자동 취소할 수 없습니다. 반대 방향 이동으로 직접 처리해 주세요."
-            )
-    elif tx == TransactionTypeEnum.MARK_DEFECTIVE:
-        dept_name = log.department
-        if not dept_name:
-            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
-        if log.transfer_qty:
-            q_qty = _D(str(log.transfer_qty))
-        elif log.warehouse_qty_before is not None and log.warehouse_qty_after is not None:
-            q_qty = _D(str(log.warehouse_qty_before)) - _D(str(log.warehouse_qty_after))
-        else:
-            raise ValueError("이전 버전 거래라 격리 수량을 추론할 수 없습니다.")
-        if q_qty <= 0:
-            raise ValueError("이전 버전 거래라 격리 수량을 추론할 수 없습니다.")
-        inv.warehouse_qty = (inv.warehouse_qty or _D("0")) + q_qty
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == log.item_id,
-                InventoryLocation.department == dept_name,
-                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
-            )
-            .first()
-        )
-        if loc is None:
-            raise ValueError(f"{dept_name} 부서 불량 재고 위치를 찾을 수 없습니다.")
-        new_qty = (loc.quantity or _D("0")) - q_qty
-        if new_qty < 0:
-            raise ValueError(f"취소 후 {dept_name} 부서 불량 재고가 음수({new_qty})가 됩니다.")
-        loc.quantity = new_qty
-    else:
-        # 레거시 UNMARK_DEFECTIVE·분해(DISASSEMBLE) 등 — 수량/방향 정보 부족.
-        raise ValueError(
-            "이전 버전 거래라 자동 취소할 수 없습니다. 불량 해제 등 기존 기능을 사용해 주세요."
-        )
+    from app.services.inv_effect import apply_effect_reverse
+    apply_effect_reverse(db, log.item_id, effect)
 
 
 @router.post("/transactions/{log_id}/cancel", response_model=TransactionLogResponse)
@@ -983,9 +880,9 @@ def cancel_transaction(
 
     # 권한 체크: 본인(요청자) 또는 결재 권한자
     # 요청자 식별 — 히스토리 화면의 '요청자' 표기와 동일한 우선순위로 판정한다:
-    #   1) producer_employee_id (입고/이동/생산 등 레거시 경로)
-    #   2) operation_batch_id → IoBatch.requester_employee_id (IO v2 배치 경로)
-    #   3) produced_by(요청자 이름) — 배치 없는 IO 로그(새 불량 등)의 유일한 단서
+    #   1) producer_employee_id
+    #   2) operation_batch_id -> IoBatch.requester_employee_id
+    # produced_by is only a display snapshot and is not trusted for authorization.
     requester_eid: Optional[str] = None
     if log.producer_employee_id is not None:
         requester_eid = str(log.producer_employee_id)
@@ -997,11 +894,7 @@ def cancel_transaction(
         )
         if batch is not None and batch.requester_employee_id is not None:
             requester_eid = str(batch.requester_employee_id)
-    if requester_eid is not None:
-        is_self = requester_eid == str(canceller.employee_id)
-    else:
-        # employee_id 단서가 없는 로그 — 기록된 요청자 이름으로 대조(화면 표기와 일치).
-        is_self = bool(log.produced_by) and log.produced_by == canceller.name
+    is_self = requester_eid == str(canceller.employee_id) if requester_eid is not None else False
     is_approver = (
         (getattr(canceller, "warehouse_role", None) or "none").lower() != "none"
         or (getattr(canceller, "department_role", None) or "none").lower() != "none"
@@ -1042,7 +935,7 @@ def cancel_transaction(
         if not bl_inv:
             raise http_error(404, ErrorCode.NOT_FOUND, f"재고 레코드를 찾을 수 없습니다 (item={bl.item_id}).")
         try:
-            _cancel_one_log(db, bl, bl_inv)
+            _cancel_one_log(db, bl)
         except ValueError as exc:
             raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
         from app.services.inv_calc import _sync_total

@@ -7,8 +7,14 @@
 ## 1. 아침 시작 점검 (오전 8시 전)
 
 ```
+[ ] DB 백업 실행
+    scripts\ops\backup_db.bat
+
+[ ] 운영 readiness 게이트
+    scripts\ops\operational_readiness.bat
+
 [ ] 서버 상태 확인
-    python scripts/ops/preflight_30_users.py --url http://localhost:8000
+    scripts\ops\healthcheck.bat
 
 [ ] 재고 무결성 점검 (서버 없이 직접 DB)
     python scripts/ops/check_inventory_integrity.py
@@ -16,14 +22,13 @@
 [ ] 미처리 요청 확인 (전일 잔여 RESERVED 요청)
     - GET /api/stock-requests?status=reserved
     - 50건 초과 시 창고 담당자에게 알림
-
-[ ] DB 백업 실행
-    python scripts/ops/backup_db.py
 ```
 
 **판정 기준:**
-- preflight 전 항목 PASS → 운영 가능
-- FAIL 1건 이상 → 장애 대응 절차 참조: docs/operations/INCIDENT_RESPONSE.md
+- `operational_readiness.bat` 마지막 줄이 `PASS operational readiness` → 운영 시작 가능
+- WARN missing transaction effects는 과거 거래의 자동 역취소 근거 부족 경고이며, FAIL이 아니면 신규 입출고 시작 차단 조건은 아님. 해당 과거 거래 자동 취소는 거부되므로 필요 시 히스토리/현재 재고 대조 후 별도 보정 거래로 처리
+- `FAIL latest backup` → `backup_db.bat` 실행 후 readiness 재실행
+- 그 외 readiness 또는 healthcheck FAIL 1건 이상 → 입출고 시작 금지, 장애 대응 절차 참조: docs/operations/INCIDENT_RESPONSE.md
 
 ---
 
@@ -74,7 +79,7 @@
 
 ```
 [ ] DB 최종 백업
-    python scripts/ops/backup_db.py
+    scripts\ops\backup_db.bat
 
 [ ] 오늘 처리 건수 확인
     - GET /health/detailed → transaction_logs 카운트 확인
@@ -97,11 +102,11 @@
 
 ```
 [ ] 백업 파일 보관 확인
-    - outputs/backups/ 에 주간 백업 파일 최소 5개 보관 여부
+    - backend/_backup/ 에 주간 백업 파일 최소 5개 보관 여부
     - 오래된 백업(30일 초과) 정리
 
 [ ] 성능 추이 확인 (부하 테스트)
-    python scripts/ops/load_test_30_users.py --url http://localhost:8000 --confirm
+    python scripts/ops/load_test_30_users.py --url http://localhost:8011 --confirm
     결과: outputs/load_test/ 폴더 확인
 
 [ ] 동시성 테스트 실행 (개발 환경)
@@ -121,8 +126,51 @@
 | 상황 | 문서 |
 |------|------|
 | 장애 발생 | [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) |
-| DB 백업/복구 | [scripts/ops/backup_db.py](../../scripts/ops/backup_db.py), [restore_db.py](../../scripts/ops/restore_db.py) |
+| 운영 시작 게이트 | [scripts/ops/operational_readiness.bat](../../scripts/ops/operational_readiness.bat) |
+| DB 백업/복구 | [scripts/ops/backup_db.bat](../../scripts/ops/backup_db.bat), [verify_backup.bat](../../scripts/ops/verify_backup.bat), [restore_db.bat](../../scripts/ops/restore_db.bat) |
 | PostgreSQL 전환 | [POSTGRES_LOCAL_SERVER_RUNBOOK.md](POSTGRES_LOCAL_SERVER_RUNBOOK.md) |
 | 동시 운영 | [CONCURRENT_LOCAL_OPERATION.md](CONCURRENT_LOCAL_OPERATION.md) |
 | 30명 부하 테스트 | [scripts/ops/load_test_30_users.py](../../scripts/ops/load_test_30_users.py) |
 | 무결성 점검 | [scripts/ops/check_inventory_integrity.py](../../scripts/ops/check_inventory_integrity.py) |
+## WARN missing transaction effects 처리 기준
+
+`operational_readiness.bat`가 `WARN missing transaction effects: N`을 보여도 마지막 줄이 `PASS operational readiness`이면 당일 신규 입출고 시작을 막는 조건은 아니다. 이 경고는 과거 거래 로그에 자동 취소 근거가 부족하다는 뜻이다.
+
+샘플 확인이 필요하면 아래 명령을 직접 실행한다.
+
+```bat
+python scripts\ops\check_inventory_integrity.py
+```
+
+직접 실행 결과에는 `transaction_type`, `count`, `sample_log_id`, `sample_mes_code`가 표시된다. 해당 과거 거래를 취소 버튼으로 되돌리려 하지 말고, 히스토리와 현재 재고를 대조한 뒤 필요한 경우 별도 보정 거래로 처리한다.
+
+---
+
+## Inventory Cutover Day
+
+엑셀 운영을 중단하고 DEXCOWIN MES 기준 재고로 전환하는 날에는 일반 일일 체크리스트보다 먼저 아래 절차를 수행한다.
+
+```
+[ ] 업무 사용 중지
+[ ] 기준 재고 입력 파일 준비
+[ ] dry-run 실행
+    python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv
+
+[ ] dry-run 요약 확인
+    - items updated 예상 수량 확인
+    - unknown/duplicate/missing mes_code 없음 확인
+    - 삭제 예정 history/map 수량 확인
+
+[ ] 실제 적용
+    python scripts\ops\inventory_cutover.py C:\path\real_inventory.csv --apply --confirm START-OVER
+
+[ ] 재고 무결성 확인
+    python scripts\ops\check_inventory_integrity.py
+
+[ ] 운영 준비 확인
+    scripts\ops\operational_readiness.bat
+
+[ ] PASS operational readiness 확인 후 업무 시작
+```
+
+상세 절차는 `_attic/docs/operations/INVENTORY_CUTOVER_RUNBOOK.md`를 따른다.

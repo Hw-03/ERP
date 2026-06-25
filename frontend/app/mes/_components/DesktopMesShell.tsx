@@ -222,7 +222,6 @@ function DesktopMesShellInner() {
         <DesktopSidebar
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          alertCount={{ dashboard: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
         />
 
         <div className="min-w-0 flex-1 flex flex-col">

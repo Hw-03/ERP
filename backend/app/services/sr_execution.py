@@ -188,6 +188,7 @@ def _handle_scrap_normal(db, request, line, approver, qty, item_id) -> Decimal:
             category=request.reason_category or _DEFAULT_REASON_CATEGORY,
             memo=request.reason_memo or (request.notes or ""),
             actor=approver.name,
+            actor_employee_id=approver.employee_id,
         ),
     )
     return -qty

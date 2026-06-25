@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
  * 관리자 설정 페이지 (PIN 변경) 상태 + 액션 훅.
  *
  * Round-9 (R9-5) 추출. DesktopAdminView 의 상태·함수 분리.
- * PR-2.2-6: resetDatabase/resetPin 제거.
+ * Admin settings state is limited to PIN change UI.
  */
 export interface UseAdminSettingsOptions {
   onStatusChange: (status: string) => void;

@@ -126,7 +126,12 @@ def _auto_employee_code(db: Session) -> str:
 
 
 @router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
-def create_employee(payload: EmployeeCreate, request: Request, db: Session = Depends(get_db)):
+def create_employee(
+    payload: EmployeeCreate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     code = payload.employee_code.strip() if payload.employee_code else _auto_employee_code(db)
     existing = db.query(Employee).filter(Employee.employee_code == code).first()
     if existing:
@@ -181,7 +186,13 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
 
 
 @router.put("/{employee_id}", response_model=EmployeeResponse)
-def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Request, db: Session = Depends(get_db)):
+def update_employee(
+    employee_id: uuid.UUID,
+    payload: EmployeeUpdate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
@@ -254,7 +265,12 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
 
 
 @router.delete("/{employee_id}")
-def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+def delete_employee(
+    employee_id: uuid.UUID,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")

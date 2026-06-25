@@ -5,10 +5,6 @@ Phase 4 에서 단일 파일(routers/inventory.py 807줄)을 책임 단위로 �
 
 서브 모듈:
 - query        — /summary, /locations/{item_id}
-- receive      — /receive, /adjust
-- transfer     — /transfer-to-production, /transfer-to-warehouse, /transfer-between-depts
-- defective    — /mark-defective
-- supplier     — /return-to-supplier
 - transactions — /transactions, /transactions/export.csv|.xlsx, PUT /transactions/{log_id}
 
 GET "" (목록) 은 FastAPI include_router 가 빈 prefix + 빈 path 를 거부하므로
@@ -25,12 +21,8 @@ from app.models import Inventory, Item
 from app.schemas import InventoryResponse
 
 from . import (
-    defective,
     query,
-    receive,
-    supplier,
     transactions,
-    transfer,
     weekly_report,
 )
 from ._shared import to_response_bulk
@@ -42,10 +34,6 @@ router = APIRouter()
 router.include_router(transactions.router)
 router.include_router(query.router)
 router.include_router(weekly_report.router)
-router.include_router(receive.router)
-router.include_router(transfer.router)
-router.include_router(defective.router)
-router.include_router(supplier.router)
 
 
 @router.get("", response_model=List[InventoryResponse])

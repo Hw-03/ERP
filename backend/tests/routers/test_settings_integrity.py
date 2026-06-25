@@ -35,3 +35,9 @@ def test_integrity_inventory_get_compatibility_is_kept(client, make_item):
     body = resp.json()
     assert body["checked"] == 1
     assert body["mismatched_count"] == 0
+
+
+
+def test_settings_reset_endpoint_is_removed(client):
+    resp = client.post("/api/settings/reset", json={"pin": "0000"})
+    assert resp.status_code == 404

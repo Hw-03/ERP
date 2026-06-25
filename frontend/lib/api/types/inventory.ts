@@ -11,10 +11,3 @@ export interface InventorySummary {
   total_quantity: number;
 }
 
-export interface InventoryMutationResponse {
-  inventory_id: string;
-  item_id: string;
-  quantity: number;
-  location: string | null;
-  updated_at: string;
-}

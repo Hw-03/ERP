@@ -11,7 +11,7 @@ import { AdminEmployeesProvider } from "./AdminEmployeesContext";
 import { AdminModelsProvider } from "./AdminModelsContext";
 import { AdminModelsSection } from "./AdminModelsSection";
 import { AdminExportSection } from "./AdminExportSection";
-import { AdminAuditLogSection } from "./AdminAuditLogSection";
+import { AdminAuditCsvSection } from "./AdminAuditCsvSection";
 import { AdminDangerZone } from "./AdminDangerZone";
 import { AdminDepartmentsProvider } from "./AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
@@ -149,7 +149,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     );
   }
   if (section === "audit") {
-    return <AdminAuditLogSection />;
+    return <AdminAuditCsvSection />;
   }
   if (section === "settings") {
     return (

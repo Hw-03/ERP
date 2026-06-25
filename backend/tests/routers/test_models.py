@@ -6,6 +6,8 @@
 
 from app.models import ProductSymbol
 
+ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
 
 def _seed_symbols(db):
     # 배정 1종 + 예약 2종
@@ -17,7 +19,7 @@ def _seed_symbols(db):
 
 def test_create_model_promotes_lowest_reserved_slot(client, db_session):
     _seed_symbols(db_session)
-    res = client.post("/api/models", json={"model_name": "NEWMODEL", "symbol": "9"})
+    res = client.post("/api/models", headers=ADMIN_HEADERS, json={"model_name": "NEWMODEL", "symbol": "9"})
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["slot"] == 2  # 최저 예약 슬롯 승격
@@ -29,18 +31,18 @@ def test_create_model_promotes_lowest_reserved_slot(client, db_session):
 
 def test_create_model_duplicate_name_409(client, db_session):
     _seed_symbols(db_session)
-    res = client.post("/api/models", json={"model_name": "DX3000", "symbol": "Z"})
+    res = client.post("/api/models", headers=ADMIN_HEADERS, json={"model_name": "DX3000", "symbol": "Z"})
     assert res.status_code == 409, res.text
 
 
 def test_create_model_duplicate_symbol_409(client, db_session):
     _seed_symbols(db_session)
-    res = client.post("/api/models", json={"model_name": "OTHER", "symbol": "3"})
+    res = client.post("/api/models", headers=ADMIN_HEADERS, json={"model_name": "OTHER", "symbol": "3"})
     assert res.status_code == 409, res.text
 
 
 def test_create_model_no_reserved_slot_400(client, db_session):
     db_session.add(ProductSymbol(slot=1, symbol="3", model_name="DX3000", is_reserved=False))
     db_session.commit()
-    res = client.post("/api/models", json={"model_name": "NEW", "symbol": "9"})
+    res = client.post("/api/models", headers=ADMIN_HEADERS, json={"model_name": "NEW", "symbol": "9"})
     assert res.status_code == 400, res.text

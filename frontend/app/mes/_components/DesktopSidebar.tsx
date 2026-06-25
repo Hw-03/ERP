@@ -28,11 +28,9 @@ const BOTTOM_TABS: TabDef[] = [
 export function DesktopSidebar({
   activeTab,
   onTabChange,
-  alertCount,
 }: {
   activeTab: DesktopTabId;
   onTabChange: (tab: DesktopTabId) => void;
-  alertCount?: Partial<Record<DesktopTabId, number>>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<DesktopTabId | null>(null);

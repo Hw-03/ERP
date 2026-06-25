@@ -35,6 +35,7 @@ export interface DeptAdjSubmitPayload {
   sub_type: DeptAdjSubType;
   lines: AdjLineInput[];
   operator_name?: string | null;
+  operator_employee_code: string;
   reference_no?: string | null;
   notes?: string | null;
 }

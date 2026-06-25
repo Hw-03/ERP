@@ -213,6 +213,43 @@ def test_quantity_correct_receive_creates_adjust(client, db_session, receive_log
     assert log.quantity_change == Decimal("100")
 
 
+def test_quantity_correct_adjust_log_records_effect_and_editor_id(client, db_session, receive_log, editor):
+    """Correction ADJUST logs must be cancellable/auditable by exact inventory effect and employee id."""
+    log, _item = receive_log
+
+    resp = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "audit trail",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert resp.status_code == 200, resp.json()
+    correction_id = resp.json()["correction"]["log_id"]
+    correction = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.log_id == correction_id)
+        .one()
+    )
+    assert correction.producer_employee_id == editor.employee_id
+    assert correction.inventory_effect is not None
+    deltas = {
+        (cell["scope"], cell.get("department"), cell.get("status")): cell["delta"]
+        for cell in correction.inventory_effect
+    }
+    assert deltas[("warehouse", None, None)] == -20
+
+    cancel = client.post(
+        f"/api/inventory/transactions/{correction.log_id}/cancel",
+        json={"reason": "undo correction", "employee_code": "ED01", "pin": "0000"},
+    )
+    assert cancel.status_code == 200, cancel.text
+    inv = db_session.query(Inventory).filter(Inventory.item_id == log.item_id).one()
+    assert inv.warehouse_qty == Decimal("100")
+
 def test_quantity_correct_ship_must_be_negative(client, receive_log, editor):
     """SHIP 부호 검증은 수량 보정에서도 적용."""
     log, _ = receive_log  # 이건 RECEIVE라 RECEIVE 검증

@@ -2,12 +2,13 @@
 
 import uuid
 from decimal import Decimal
-from typing import List
+from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.admin import require_admin_pin
 from app.models import BOM, Inventory, Item
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
@@ -54,7 +55,12 @@ def get_all_bom(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=BOMResponse, status_code=status.HTTP_201_CREATED)
-def create_bom(payload: BOMCreate, request: Request, db: Session = Depends(get_db)):
+def create_bom(
+    payload: BOMCreate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """Create a BOM row for a parent and child item."""
 
     if payload.parent_item_id == payload.child_item_id:
@@ -126,7 +132,13 @@ def create_bom(payload: BOMCreate, request: Request, db: Session = Depends(get_d
 
 
 @router.patch("/{bom_id}", response_model=BOMResponse)
-def update_bom(bom_id: uuid.UUID, payload: BOMUpdate, request: Request, db: Session = Depends(get_db)):
+def update_bom(
+    bom_id: uuid.UUID,
+    payload: BOMUpdate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """Update quantity or unit of an existing BOM row."""
     bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
     if not bom_entry:
@@ -207,7 +219,12 @@ def get_bom_tree(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.delete("/{bom_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_bom(bom_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+def delete_bom(
+    bom_id: uuid.UUID,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """Delete a BOM row."""
 
     bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()

@@ -34,9 +34,6 @@ from app.services.pin_auth import hash_pin
 logger = logging.getLogger("mes")
 
 
-class ResetRequest(BaseModel):
-    pin: str = Field(..., min_length=4, max_length=32, description="현재 관리자 PIN")
-
 
 class IntegrityRepairRequest(BaseModel):
     pin: str = Field(..., min_length=4, max_length=32)
@@ -187,47 +184,3 @@ def repair_inventory_integrity(
         )
         commit_only(db)
     return report.to_dict()
-
-
-@router.post("/reset", response_model=MessageResponse)
-def reset_database(payload: ResetRequest, request: Request, db: Session = Depends(get_db)):
-    """PIN 검증 후 시드 데이터 재적재 (안전 초기화). 관리자 도구."""
-    setting = ensure_admin_pin(db)
-    if not _matches_admin_pin(db, setting, payload.pin):
-        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
-
-    # reset 직전에 audit 1건 기록 (reset 자체는 시드 재적재로 audit_logs 도 비울 수 있어 사후 기록은 무의미).
-    audit.record(
-        db,
-        request=request,
-        action="settings.reset_db",
-        target_type="settings",
-        target_id="database",
-        payload_summary="DB 초기화 + 시드 재적재 시작",
-    )
-    commit_only(db)
-
-    try:
-        from app.models import Inventory as _Inv, InventoryLocation as _Loc, Item as _Item
-        from app.services.seed_cleanup import run_cleanup_import
-        from app.services.sr_approval import cancel_open_stock_requests
-
-        # 미결 stock_request 정리 — 품목·재고 DELETE 전에 먼저 취소해야
-        # "요청은 있는데 재고 장부는 0"인 고아 상태를 막을 수 있다.
-        cancelled = cancel_open_stock_requests(db, reason="DB 초기화(settings/reset) 전 자동 취소")
-        db.flush()
-
-        # 품목·재고 데이터 초기화 (참조 데이터 — Employee/ProcessType 등은 유지)
-        db.query(_Loc).delete(synchronize_session=False)
-        db.query(_Inv).delete(synchronize_session=False)
-        db.query(_Item).delete(synchronize_session=False)
-        db.commit()
-        logger.info("DB 초기화: 미결 요청 %d건 자동 취소 후 품목·재고 삭제 완료", cancelled)
-
-        result = run_cleanup_import(db)
-        msg = f"데이터베이스를 초기화하고 722 정리본을 재적재했습니다. (rows={result['rows']}, total_qty={result['total_qty']})"
-        return MessageResponse(message=msg)
-    except Exception as exc:
-        # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
-        logger.exception("DB 초기화 중 예기치 못한 오류")
-        raise http_error(500, ErrorCode.INTERNAL, f"초기화 중 오류가 발생했습니다: {exc}")
