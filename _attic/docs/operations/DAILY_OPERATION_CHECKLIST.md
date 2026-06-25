@@ -7,8 +7,14 @@
 ## 1. 아침 시작 점검 (오전 8시 전)
 
 ```
+[ ] DB 백업 실행
+    scripts\ops\backup_db.bat
+
+[ ] 운영 readiness 게이트
+    scripts\ops\operational_readiness.bat
+
 [ ] 서버 상태 확인
-    python scripts/ops/preflight_30_users.py --url http://localhost:8000
+    scripts\ops\healthcheck.bat
 
 [ ] 재고 무결성 점검 (서버 없이 직접 DB)
     python scripts/ops/check_inventory_integrity.py
@@ -16,14 +22,13 @@
 [ ] 미처리 요청 확인 (전일 잔여 RESERVED 요청)
     - GET /api/stock-requests?status=reserved
     - 50건 초과 시 창고 담당자에게 알림
-
-[ ] DB 백업 실행
-    scripts\ops\backup_db.bat
 ```
 
 **판정 기준:**
-- preflight 전 항목 PASS → 운영 가능
-- FAIL 1건 이상 → 장애 대응 절차 참조: docs/operations/INCIDENT_RESPONSE.md
+- `operational_readiness.bat` 마지막 줄이 `PASS operational readiness` → 운영 시작 가능
+- WARN missing transaction effects는 과거 거래의 자동 역취소 근거 부족 경고이며, FAIL이 아니면 신규 입출고 시작 차단 조건은 아님
+- `FAIL latest backup` → `backup_db.bat` 실행 후 readiness 재실행
+- 그 외 readiness 또는 healthcheck FAIL 1건 이상 → 입출고 시작 금지, 장애 대응 절차 참조: docs/operations/INCIDENT_RESPONSE.md
 
 ---
 
@@ -101,7 +106,7 @@
     - 오래된 백업(30일 초과) 정리
 
 [ ] 성능 추이 확인 (부하 테스트)
-    python scripts/ops/load_test_30_users.py --url http://localhost:8000 --confirm
+    python scripts/ops/load_test_30_users.py --url http://localhost:8011 --confirm
     결과: outputs/load_test/ 폴더 확인
 
 [ ] 동시성 테스트 실행 (개발 환경)
@@ -121,6 +126,7 @@
 | 상황 | 문서 |
 |------|------|
 | 장애 발생 | [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) |
+| 운영 시작 게이트 | [scripts/ops/operational_readiness.bat](../../scripts/ops/operational_readiness.bat) |
 | DB 백업/복구 | [scripts/ops/backup_db.bat](../../scripts/ops/backup_db.bat), [verify_backup.bat](../../scripts/ops/verify_backup.bat), [restore_db.bat](../../scripts/ops/restore_db.bat) |
 | PostgreSQL 전환 | [POSTGRES_LOCAL_SERVER_RUNBOOK.md](POSTGRES_LOCAL_SERVER_RUNBOOK.md) |
 | 동시 운영 | [CONCURRENT_LOCAL_OPERATION.md](CONCURRENT_LOCAL_OPERATION.md) |

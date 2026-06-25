@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Read-only operational readiness gate for DEXCOWIN MES.
 
 Checks that the local SQLite DB exists, the latest backup is a verified DEXCOWIN
@@ -47,15 +47,21 @@ def check_database_file(db_path: Path) -> bool:
     return True
 
 
-def check_latest_backup(backup_dir: Path, max_age_hours: float) -> bool:
+def check_latest_backup(db_path: Path, backup_dir: Path, max_age_hours: float) -> bool:
     latest = _latest_backup(backup_dir)
     if latest is None:
         _print_result(False, "latest backup", f"no mes_*.db in {backup_dir}")
         return False
 
-    age_hours = (time.time() - latest.stat().st_mtime) / 3600
+    latest_stat = latest.stat()
+    age_hours = (time.time() - latest_stat.st_mtime) / 3600
     if age_hours > max_age_hours:
         _print_result(False, "latest backup", f"stale {age_hours:.1f}h old: {latest}")
+        return False
+
+    db_mtime = db_path.stat().st_mtime
+    if latest_stat.st_mtime + 1 < db_mtime:
+        _print_result(False, "latest backup", f"older than database: {latest.name}")
         return False
 
     result = _run_validator([sys.executable, str(VERIFY_BACKUP), str(latest)])
@@ -81,6 +87,9 @@ def check_inventory_integrity(db_path: Path) -> bool:
         if result.stderr.strip():
             print(result.stderr.strip(), file=sys.stderr)
         return False
+    for line in result.stdout.splitlines():
+        if line.startswith("WARN "):
+            print(line)
     _print_result(True, "inventory integrity")
     return True
 
@@ -100,7 +109,7 @@ def main() -> int:
 
     checks = [
         check_database_file(db_path),
-        check_latest_backup(backup_dir, args.max_backup_age_hours),
+        check_latest_backup(db_path, backup_dir, args.max_backup_age_hours),
         check_inventory_integrity(db_path),
     ]
     if all(checks):

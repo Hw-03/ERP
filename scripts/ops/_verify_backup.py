@@ -22,6 +22,7 @@ REQUIRED_TABLES = [
     "items",
     "inventory",
     "inventory_locations",
+    "stock_request_lines",
     "transaction_logs",
     "bom",
     "admin_audit_logs",
