@@ -89,6 +89,17 @@ export async function pickWorkType(page: Page, label: RegExp): Promise<void> {
   await page.getByRole("button", { name: label }).filter({ visible: true }).first().click();
 }
 
+/**
+ * Next app-router query-only step changes should wait on rendered UI, not load/navigation completion.
+ */
+export async function clickNextStep(page: Page): Promise<void> {
+  await page
+    .getByRole("button", { name: /다음 단계로/ })
+    .filter({ visible: true })
+    .first()
+    .click({ noWaitAfter: true });
+}
+
 /** globalSetup 이 저장한 시드(.e2e-seed.json) 를 읽어 테스트에서 품목/직원 식별자에 접근. */
 export function readSeed(): {
   rawItem: any;

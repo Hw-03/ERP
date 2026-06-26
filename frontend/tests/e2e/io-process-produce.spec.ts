@@ -8,7 +8,7 @@
  * 자식 자재는 부서(조립) PRODUCTION 재고에서 소비된다 — globalSetup 이 조립 부서에 시드.
  */
 import { expect, test } from "@playwright/test";
-import { gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("입출고 V2 — 부서 입출고(생산)", () => {
   test.beforeEach(async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
 
     // 2. 대상 부서(조립 기본 선택) + 방향: 생산 입고 → 다음 단계로
     await page.getByRole("button", { name: "생산 입고" }).first().click();
-    await page.getByRole("button", { name: /다음 단계로/ }).click();
+    await clickNextStep(page);
 
     // 3. BOM 부모(E2E조립튜브) 행의 "BOM" 으로 자동 전개
     await page
@@ -51,7 +51,7 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
     await gotoWarehouseCompose(page);
     await pickWorkType(page, /부서 입출고/);
     await page.getByRole("button", { name: "생산 입고" }).first().click();
-    await page.getByRole("button", { name: /다음 단계로/ }).click();
+    await clickNextStep(page);
     await page
       .getByRole("row", { name: /E2E조립튜브/ })
       .getByRole("button", { name: "BOM", exact: true })

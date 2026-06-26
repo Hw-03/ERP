@@ -6,7 +6,7 @@
  * 하므로 globalSetup 이 조립 부서에 시드한 원자재(E2E원자재튜브)를 사용.
  */
 import { expect, test } from "@playwright/test";
-import { gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("입출고 V2 — 부서 → 창고 회수", () => {
   test.beforeEach(async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe("입출고 V2 — 부서 → 창고 회수", () => {
     // 2. 세부 작업: 부서 → 창고 + 출발 부서(조립) → 다음 단계로
     await page.getByRole("button", { name: /부서 → 창고/ }).first().click();
     await page.getByRole("button", { name: "조립", exact: true }).click();
-    await page.getByRole("button", { name: /다음 단계로/ }).click();
+    await clickNextStep(page);
 
     // 3. 품목 선택 — 조립 부서에 재고 있는 원자재 낱개
     await page

@@ -8,7 +8,7 @@
  * 원자재 입고 work type 은 창고 정/부 직원에게만 노출 → 창고 역할로 로그인.
  */
 import { expect, test } from "@playwright/test";
-import { gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("입출고 V2 — 원자재 입고", () => {
   test.beforeEach(async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe("입출고 V2 — 원자재 입고", () => {
     await pickWorkType(page, /원자재 입고/);
 
     // 2. 세부 작업(원자재 입고 단일) → 다음 단계로
-    await page.getByRole("button", { name: /다음 단계로/ }).click();
+    await clickNextStep(page);
 
     // 3. 입고 품목 선택 — 시드 원자재 행의 "선택"
     await page

@@ -124,3 +124,16 @@ def test_admin_audit_endpoints_require_admin_pin(client, csv_env):
     assert client.post("/api/admin/audit-csv/backfill").status_code == 400
     assert client.get("/api/admin/audit-csv/2026-05.csv").status_code == 400
     assert client.get("/api/admin/audit-csv/2026-05.xlsx").status_code == 400
+
+
+def test_warehouse_box_tracking_requires_admin_pin(client):
+    res = client.put("/api/warehouse-map/box-tracking", json={"enabled": True})
+    assert res.status_code == 400
+
+    allowed = client.put(
+        "/api/warehouse-map/box-tracking",
+        headers=ADMIN_HEADERS,
+        json={"enabled": True},
+    )
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["enabled"] is True
