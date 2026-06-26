@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ---------------------------------------------------------------------------
 BoxSizeLiteral = Literal["LARGE", "MEDIUM", "SMALL"]
 WarehouseSpecialZoneTypeLiteral = Literal["aisle", "pallet"]
+WarehouseAngleTypeLiteral = Literal["angle", "aisle", "pallet"]
 
 
 class WarehouseAngleResponse(BaseModel):
@@ -18,6 +19,7 @@ class WarehouseAngleResponse(BaseModel):
 
     id: int
     label: str
+    angle_type: WarehouseAngleTypeLiteral = "angle"
     rows: int
     layers: int
     jaris_per_cell: int
@@ -31,6 +33,7 @@ class WarehouseAngleResponse(BaseModel):
 
 class WarehouseAngleCreate(BaseModel):
     label: str = Field(..., max_length=50)
+    angle_type: WarehouseAngleTypeLiteral = "angle"
     rows: int = Field(1, ge=1)
     layers: int = Field(1, ge=1)
     jaris_per_cell: int = Field(3, ge=1)
@@ -43,6 +46,7 @@ class WarehouseAngleCreate(BaseModel):
 
 class WarehouseAngleUpdate(BaseModel):
     label: Optional[str] = Field(None, max_length=50)
+    angle_type: Optional[WarehouseAngleTypeLiteral] = None
     rows: Optional[int] = Field(None, ge=1)
     layers: Optional[int] = Field(None, ge=1)
     jaris_per_cell: Optional[int] = Field(None, ge=1)

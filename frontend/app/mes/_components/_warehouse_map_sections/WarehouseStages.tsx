@@ -134,6 +134,9 @@ export function FloorStage({
           {angles.map((a) => {
             const count = hitAngles?.get(a.id);
             const pulse = pulseAngleId === a.id;
+            const isPallet = a.angle_type === "pallet";
+            const isAisle = a.angle_type === "aisle";
+            const accent = isPallet ? LEGACY_COLORS.green : isAisle ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue;
             return (
               <button
                 key={a.id}
@@ -150,9 +153,13 @@ export function FloorStage({
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 2,
-                  background: LEGACY_COLORS.s1,
-                  border: `1px solid ${LEGACY_COLORS.border}`,
-                  borderRadius: 16,
+                  background: isPallet
+                    ? `color-mix(in srgb, ${accent} 16%, ${LEGACY_COLORS.s1})`
+                    : isAisle
+                      ? `repeating-linear-gradient(45deg, color-mix(in srgb, ${accent} 16%, ${LEGACY_COLORS.s1}) 0 8px, color-mix(in srgb, ${accent} 7%, ${LEGACY_COLORS.s1}) 8px 16px)`
+                      : LEGACY_COLORS.s1,
+                  border: `1px solid ${isPallet || isAisle ? `color-mix(in srgb, ${accent} 58%, ${LEGACY_COLORS.border})` : LEGACY_COLORS.border}`,
+                  borderRadius: isPallet ? 10 : isAisle ? 6 : 16,
                   boxShadow: "0 1px 3px rgba(45,70,106,0.10)",
                   cursor: "pointer",
                   zIndex: 2,
@@ -162,8 +169,7 @@ export function FloorStage({
                   {a.label}
                 </span>
                 <span style={{ fontSize: 9, color: LEGACY_COLORS.muted2 }}>
-                  {a.rows}열·{a.layers}층
-                </span>
+                  {a.angle_type === "angle" ? `${a.rows} x ${a.layers}` : isPallet ? "PL" : "\uD1B5\uB85C"}</span>
                 {count ? (
                   <span
                     style={{

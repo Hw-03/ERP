@@ -213,10 +213,8 @@ _MIGRATION_DDL: list[str] = [
     # 2026-05-24 (W11-A): 부서별 입출고 권한 토글 — io_enabled 컬럼.
     # 기본값 1(TRUE). 기존 부서는 모두 TRUE 로 추가됨.
     "ALTER TABLE departments ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
-    # backfill: PROD_DEPTS 외 부서는 FALSE (프론트 hardcode 동작 보존).
-    # WHERE io_enabled = 1 조건으로 이미 0 으로 설정된 행은 건드리지 않음.
-    "UPDATE departments SET io_enabled = 0 "
-    "WHERE name NOT IN ('튜브', '고압', '진공', '튜닝', '조립', '출하') AND io_enabled = 1",
+    # Preserve saved department permission settings on repeated bootstrap runs.
+    "UPDATE departments SET io_enabled = io_enabled WHERE 0 = 1",
     # 2026-05-26: 품목 소프트 삭제 — deleted_at NULL=활성, 값있으면 삭제됨
     "ALTER TABLE items ADD COLUMN deleted_at DATETIME",
     # 2026-05-24 (W12-#7): 직원별 입출고 권한 토글 — employees.io_enabled.
@@ -224,12 +222,8 @@ _MIGRATION_DDL: list[str] = [
     # 기본값 1(TRUE). 기존 직원은 모두 TRUE 로 추가된 뒤, 본인 부서의 io_enabled 값으로 백필.
     # → 부서가 차단(FALSE) 상태였던 직원은 마이그레이션 후에도 동일하게 차단 유지.
     "ALTER TABLE employees ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
-    # 백필: 직원.io_enabled = (부서.io_enabled). 부서 이름이 일치하는 부서가 없으면 그대로 1 유지.
-    "UPDATE employees SET io_enabled = ("
-    "SELECT departments.io_enabled FROM departments WHERE departments.name = employees.department"
-    ") WHERE EXISTS ("
-    "SELECT 1 FROM departments WHERE departments.name = employees.department"
-    ")",
+    # Preserve saved employee permission settings on repeated bootstrap runs.
+    "UPDATE employees SET io_enabled = io_enabled WHERE 0 = 1",
     # 2026-05-27: 불량·수량조정 부서 필터 수정 — 직접 생성된 TransactionLog 에 부서 기록.
     # IoBatch 없이 생성되는 MARK_DEFECTIVE/UNMARK_DEFECTIVE/DEFECT_SCRAP/SUPPLIER_RETURN 트랜잭션의
     # 부서 라벨을 _department_label_expr() 에서 이 컬럼으로 폴백.
@@ -305,6 +299,8 @@ _MIGRATION_DDL: list[str] = [
     )""",
     "CREATE INDEX IF NOT EXISTS ix_handover_lines_handover ON handover_lines(handover_id)",
     "CREATE INDEX IF NOT EXISTS ix_handover_lines_item ON handover_lines(item_id)",
+    # 2026-06-26: warehouse map structures can be angle/aisle/pallet.
+    "ALTER TABLE warehouse_angles ADD COLUMN angle_type VARCHAR(20) NOT NULL DEFAULT 'angle'",
     # 2026-06-25: warehouse map aisle/pallet special zones.
     """CREATE TABLE IF NOT EXISTS warehouse_special_zones (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

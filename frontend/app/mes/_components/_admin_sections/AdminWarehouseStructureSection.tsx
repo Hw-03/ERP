@@ -5,7 +5,7 @@ import { Plus, Save, Trash2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { AdminPageHeader } from "./_admin_primitives";
-import { warehouseMapApi, type WarehouseAngle } from "@/lib/api/warehouse-map";
+import { warehouseMapApi, type WarehouseAngle, type WarehouseAngleType } from "@/lib/api/warehouse-map";
 
 interface Props {
   onStatusChange: (s: string) => void;
@@ -27,6 +27,38 @@ type DragSession = {
 const GRID = 40;
 const SNAP = 10;
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
+
+const STRUCTURE_LABEL: Record<WarehouseAngleType, string> = {
+  angle: "\uC575\uAE00",
+  aisle: "\uD1B5\uB85C",
+  pallet: "PL",
+};
+
+const ADD_LABEL = "\uCD94\uAC00";
+const EDIT_LABEL = "\uD3B8\uC9D1";
+const DELETE_STRUCTURE_LABEL = "\uAD6C\uC870 \uC0AD\uC81C";
+const STRUCTURE_HEADER_TITLE = "\uAD6C\uC870 \uD3B8\uC9D1";
+const STRUCTURE_HEADER_DESCRIPTION = "\uC575\uAE00\u00B7\uD1B5\uB85C\u00B7PL\uC744 \uB4DC\uB798\uADF8\uD574 \uC704\uCE58\uB97C \uC62E\uAE30\uACE0, \uC624\uB978\uCABD \uBAA8\uC11C\uB9AC\uB85C \uD06C\uAE30\uB97C \uC870\uC808\uD558\uC138\uC694. \uC190\uC744 \uB5BC\uBA74 10px \uB2E8\uC704\uB85C \uC790\uB3D9 \uC800\uC7A5\uB429\uB2C8\uB2E4.";
+
+function structureKind(angle: WarehouseAngle): WarehouseAngleType {
+  return angle.angle_type ?? "angle";
+}
+
+function structureVisual(kind: WarehouseAngleType) {
+  const isPallet = kind === "pallet";
+  const isAisle = kind === "aisle";
+  const accent = isPallet ? LEGACY_COLORS.green : isAisle ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue;
+  return {
+    accent,
+    background: isPallet
+      ? `color-mix(in srgb, ${accent} 16%, ${LEGACY_COLORS.s1})`
+      : isAisle
+        ? `repeating-linear-gradient(45deg, color-mix(in srgb, ${accent} 16%, ${LEGACY_COLORS.s1}) 0 8px, color-mix(in srgb, ${accent} 7%, ${LEGACY_COLORS.s1}) 8px 16px)`
+        : LEGACY_COLORS.s1,
+    radius: isPallet ? 10 : isAisle ? 6 : 14,
+  };
+}
+
 
 export function AdminWarehouseStructureSection({ onStatusChange, onError }: Props) {
   const [angles, setAngles] = useState<WarehouseAngle[]>([]);
@@ -140,22 +172,28 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
     }
   }
 
-  async function addAngle() {
+  async function addStructure(kind: WarehouseAngleType) {
+    const count = angles.filter((angle) => structureKind(angle) === kind).length;
+    const isAngle = kind === "angle";
+    const isPallet = kind === "pallet";
+    const label = isAngle ? `\uC575\uAE00 ${count + 1}` : isPallet ? `PL-${count + 1}` : `\uD1B5\uB85C ${count + 1}`;
     try {
       const created = await warehouseMapApi.createAngle({
-        label: `앵글 ${angles.length + 1}`,
-        rows: 4,
-        layers: 6,
-        pos_x: 40,
-        pos_y: 40,
-        width: 80,
-        height: 120,
+        label,
+        angle_type: kind,
+        rows: isAngle ? 4 : 1,
+        layers: isAngle ? 6 : 1,
+        jaris_per_cell: isAngle ? 3 : 1,
+        pos_x: isPallet ? 560 + count * 18 : isAngle ? 40 : 120,
+        pos_y: isPallet ? 190 : isAngle ? 40 : 128 + count * 18,
+        width: isPallet ? 76 : isAngle ? 80 : 240,
+        height: isPallet ? 48 : isAngle ? 120 : 32,
       });
       await load();
       setSelectedId(created.id);
-      onStatusChange("앵글을 추가했습니다.");
+      onStatusChange(`${label} \uCD94\uAC00\uD588\uC2B5\uB2C8\uB2E4.`);
     } catch (e) {
-      onError(e instanceof Error ? e.message : "추가 실패");
+      onError(e instanceof Error ? e.message : "\uCD94\uAC00 \uC2E4\uD328");
     }
   }
 
@@ -188,12 +226,20 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
       <AdminPageHeader
         icon={Warehouse}
-        title="앵글 편집"
-        description="앵글을 드래그해 위치를 옮기고, 우하단 모서리로 크기를 조절하세요. 손을 떼는 순간 자동 저장됩니다."
+        title={STRUCTURE_HEADER_TITLE}
+        description={STRUCTURE_HEADER_DESCRIPTION}
         actions={
-          <Button variant="secondary" onClick={addAngle}>
-            <Plus size={14} /> 앵글 추가
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={() => void addStructure("angle")}>
+              <Plus size={14} /> {STRUCTURE_LABEL.angle} {ADD_LABEL}
+            </Button>
+            <Button variant="secondary" onClick={() => void addStructure("aisle")}>
+              <Plus size={14} /> {STRUCTURE_LABEL.aisle}
+            </Button>
+            <Button variant="secondary" onClick={() => void addStructure("pallet")}>
+              <Plus size={14} /> PL
+            </Button>
+          </div>
         }
       />
 
@@ -245,6 +291,8 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
                 />
                 {angles.map((a) => {
               const sel = a.id === selectedId;
+              const kind = structureKind(a);
+              const visual = structureVisual(kind);
               return (
                 <div
                   key={a.id}
@@ -259,9 +307,9 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
                     top: a.pos_y,
                     width: a.width,
                     height: a.height,
-                    background: LEGACY_COLORS.s1,
-                    border: `${sel ? 2 : 1}px solid ${sel ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
-                    borderRadius: 14,
+                    background: visual.background,
+                    border: `${sel ? 2 : 1}px solid ${sel ? visual.accent : LEGACY_COLORS.border}`,
+                    borderRadius: visual.radius,
                     boxShadow: "0 1px 3px rgba(45,70,106,0.10)",
                     cursor: "move",
                     display: "flex",
@@ -276,7 +324,7 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
                     {a.label}
                   </span>
                   <span style={{ fontSize: 9, color: LEGACY_COLORS.muted2, pointerEvents: "none" }}>
-                    {a.rows}열·{a.layers}층
+                    {kind === "angle" ? `${a.rows} x ${a.layers}` : STRUCTURE_LABEL[kind]}
                   </span>
                   <div
                     data-handle="1"
@@ -304,7 +352,7 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
           </div>
         </div>
 
-        {/* 선택 앵글 편집 */}
+        {/* 선택 구조 편집 */}
         <div
           className="flex w-[280px] shrink-0 flex-col gap-3 rounded-[18px] border p-4"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}

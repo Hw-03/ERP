@@ -365,3 +365,41 @@ def test_restack_jari_requires_manager(client):
               "box_ids": [box["box_id"]]},
     )
     assert resp.status_code == 403
+
+
+def test_create_pallet_structure_accepts_box_list_storage(client, make_item):
+    """PL/pallet structures are map structures that can hold warehouse boxes."""
+    item = make_item(name="Pallet Box Item", process_type_code="TR", warehouse_qty=D("4"))
+    resp = client.post(
+        f"{BASE}/angles",
+        json={
+            "label": "PL-1",
+            "angle_type": "pallet",
+            "pos_x": 100,
+            "pos_y": 180,
+            "width": 120,
+            "height": 60,
+        },
+        headers=MGR,
+    )
+    assert resp.status_code == 201, resp.text
+    pallet = resp.json()
+    assert pallet["angle_type"] == "pallet"
+
+    box_resp = _put_box(
+        client,
+        pallet["id"],
+        row=1,
+        layer=1,
+        jari=0,
+        size="LARGE",
+        items=[{"item_id": str(item.item_id), "quantity": 4}],
+    )
+    assert box_resp.status_code == 201, box_resp.text
+
+    data = client.get(f"{BASE}/map").json()
+    mapped = next(a for a in data["angles"] if a["id"] == pallet["id"])
+    assert mapped["angle_type"] == "pallet"
+    boxes = [b for b in data["boxes"] if b["angle_id"] == pallet["id"]]
+    assert len(boxes) == 1
+    assert boxes[0]["items"][0]["item_name"] == "Pallet Box Item"

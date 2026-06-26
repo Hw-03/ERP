@@ -33,6 +33,7 @@ def create_angle(
         order = (max_order or 0) + 1
     angle = WarehouseAngle(
         label=payload.label,
+        angle_type=payload.angle_type,
         rows=payload.rows,
         layers=payload.layers,
         jaris_per_cell=payload.jaris_per_cell,

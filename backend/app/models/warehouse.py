@@ -51,6 +51,7 @@ class WarehouseAngle(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     label = Column(String(50), nullable=False)
+    angle_type = Column(String(20), nullable=False, default="angle", server_default="angle")
     rows = Column(Integer, nullable=False, default=1)            # 줄 수(가로 칸)
     layers = Column(Integer, nullable=False, default=1)          # 층 수(세로 칸)
     jaris_per_cell = Column(Integer, nullable=False, default=3)  # 칸당 자리 수(현 UI 고정 3)
@@ -77,6 +78,7 @@ class WarehouseAngle(Base):
     )
 
     __table_args__ = (
+        CheckConstraint("angle_type IN ('angle', 'aisle', 'pallet')", name="ck_wh_angle_type"),
         CheckConstraint("rows >= 1 AND layers >= 1", name="ck_wh_angle_dims_pos"),
         CheckConstraint("jaris_per_cell >= 1", name="ck_wh_angle_jaris_pos"),
     )

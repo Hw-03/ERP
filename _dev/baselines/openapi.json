@@ -6722,6 +6722,16 @@
       },
       "WarehouseAngleCreate": {
         "properties": {
+          "angle_type": {
+            "default": "angle",
+            "enum": [
+              "angle",
+              "aisle",
+              "pallet"
+            ],
+            "title": "Angle Type",
+            "type": "string"
+          },
           "display_order": {
             "anyOf": [
               {
@@ -6821,6 +6831,16 @@
       },
       "WarehouseAngleResponse": {
         "properties": {
+          "angle_type": {
+            "default": "angle",
+            "enum": [
+              "angle",
+              "aisle",
+              "pallet"
+            ],
+            "title": "Angle Type",
+            "type": "string"
+          },
           "display_order": {
             "title": "Display Order",
             "type": "integer"
@@ -6884,6 +6904,22 @@
       },
       "WarehouseAngleUpdate": {
         "properties": {
+          "angle_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "angle",
+                  "aisle",
+                  "pallet"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Angle Type"
+          },
           "display_order": {
             "anyOf": [
               {

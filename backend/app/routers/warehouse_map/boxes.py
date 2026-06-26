@@ -49,14 +49,26 @@ def set_box_tracking(
     return BoxTrackingResponse(enabled=wm_service.is_box_tracking_enabled(db))
 
 
+def _is_plain_angle(angle: WarehouseAngle) -> bool:
+    return (getattr(angle, "angle_type", "angle") or "angle") == "angle"
+
+
 def _validate_coords(db: Session, angle_id: int, row_no: int, layer_no: int, jari_index: int) -> WarehouseAngle:
     angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == angle_id).first()
     if not angle:
-        raise http_error(404, ErrorCode.NOT_FOUND, "앵글을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "Angle not found.")
+    if not _is_plain_angle(angle):
+        if (row_no, layer_no, jari_index) != (1, 1, 0):
+            raise http_error(
+                422,
+                ErrorCode.VALIDATION_ERROR,
+                "PL/aisle boxes can only use list coordinates (row=1, layer=1, jari_index=0).",
+            )
+        return angle
     if row_no > angle.rows or layer_no > angle.layers or jari_index >= angle.jaris_per_cell:
         raise http_error(
             422, ErrorCode.VALIDATION_ERROR,
-            f"좌표가 앵글 범위를 벗어납니다 (줄 1~{angle.rows}, 층 1~{angle.layers}, 자리 0~{angle.jaris_per_cell - 1}).",
+            f"Coordinates are outside angle bounds (row 1~{angle.rows}, layer 1~{angle.layers}, jari 0~{angle.jaris_per_cell - 1}).",
         )
     return angle
 
@@ -95,12 +107,12 @@ def create_box(
     _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
-    _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+    angle = _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
     _validate_items(db, payload.items)
 
     used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
     new_unit = SIZE_UNIT[payload.size]
-    if used + new_unit > JARI_CAPACITY:
+    if _is_plain_angle(angle) and used + new_unit > JARI_CAPACITY:
         raise http_error(
             422, ErrorCode.VALIDATION_ERROR,
             f"자리 용량 초과 — 남은 높이 {JARI_CAPACITY - used}, 박스 높이 {new_unit}.",
@@ -144,8 +156,9 @@ def update_box(
         raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
 
     if payload.size is not None and payload.size != (box.size.value if hasattr(box.size, "value") else box.size):
+        angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == box.angle_id).first()
         used = _jari_used_units(db, box.angle_id, box.row_no, box.layer_no, box.jari_index, exclude_box_id=box.box_id)
-        if used + SIZE_UNIT[payload.size] > JARI_CAPACITY:
+        if (angle is None or _is_plain_angle(angle)) and used + SIZE_UNIT[payload.size] > JARI_CAPACITY:
             raise http_error(
                 422, ErrorCode.VALIDATION_ERROR,
                 f"자리 용량 초과 — 남은 높이 {JARI_CAPACITY - used}, 박스 높이 {SIZE_UNIT[payload.size]}.",
@@ -184,10 +197,10 @@ def move_box(
 
     # 다른 자리로 옮길 때만 좌표·용량 검증 (같은 자리는 이미 들어가 있으므로 생략).
     if not same_jari:
-        _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+        target_angle = _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
         used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
         box_unit = SIZE_UNIT[box.size.value if hasattr(box.size, "value") else box.size]
-        if used + box_unit > JARI_CAPACITY:
+        if _is_plain_angle(target_angle) and used + box_unit > JARI_CAPACITY:
             raise http_error(
                 422, ErrorCode.VALIDATION_ERROR,
                 f"자리 용량 초과 — 남은 높이 {JARI_CAPACITY - used}, 박스 높이 {box_unit}.",
@@ -222,14 +235,14 @@ def restack_jari(
 
     다른 자리에서 끌어온 박스도 이 자리로 이동된다. 합계 높이 초과 시 422.
     """
-    _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+    target_angle = _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
     box_ids = [str(b) for b in payload.box_ids]
     boxes = db.query(WarehouseBox).filter(WarehouseBox.box_id.in_(box_ids)).all()
     if len(boxes) != len(set(box_ids)):
         raise http_error(404, ErrorCode.NOT_FOUND, "일부 박스를 찾을 수 없습니다.")
 
     total = sum(SIZE_UNIT[b.size.value if hasattr(b.size, "value") else b.size] for b in boxes)
-    if total > JARI_CAPACITY:
+    if _is_plain_angle(target_angle) and total > JARI_CAPACITY:
         raise http_error(
             422, ErrorCode.VALIDATION_ERROR,
             f"자리 용량 초과 — 합계 높이 {total}, 최대 {JARI_CAPACITY}.",

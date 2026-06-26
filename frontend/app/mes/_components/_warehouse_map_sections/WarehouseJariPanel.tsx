@@ -34,6 +34,7 @@ export function WarehouseJariPanel({
   onRequestEditBox,
   onDeleteBox,
 }: Props) {
+  const isPlainAngle = angle.angle_type === "angle";
   const stacks = jariStacks(cellIndex.get(cellKey(angle.id, row, layer)), angle.jaris_per_cell);
   const anyContent = stacks.some((s) => s.length > 0);
   const lq = (matchQuery || "").toLowerCase();
@@ -69,7 +70,7 @@ export function WarehouseJariPanel({
           </div>
         ) : (
           stacks.map((boxes, ji) => {
-            const remaining = JARI_CAPACITY - stackUnits(boxes);
+            const remaining = isPlainAngle ? JARI_CAPACITY - stackUnits(boxes) : 999;
             return (
               <div
                 key={`${row}-${layer}-${ji}`}
@@ -97,7 +98,7 @@ export function WarehouseJariPanel({
                   </span>
                   {editable && (
                     <span style={{ fontSize: 11, fontWeight: 600, color: remaining > 0 ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}>
-                      남은 {remaining}칸
+                      {isPlainAngle ? `\uC794\uC5EC ${remaining}\uCE78` : "\uBC15\uC2A4 \uB9AC\uC2A4\uD2B8"}
                     </span>
                   )}
                 </div>

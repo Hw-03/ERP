@@ -1,7 +1,7 @@
 /**
  * 창고 지도 도메인 API — `@/lib/api/warehouse-map`.
  *
- * 보기(GET)는 공개. 박스·앵글 편집은 창고 정/부 관리자(warehouse_role) 인증
+ * 보기(GET)는 공개. 박스·구조 편집은 창고 정/부 관리자(warehouse_role) 인증
  * — api-core 가 X-Employee-Code + X-Operator-Pin 자동 주입(편집 모드 진입 시 등록).
  * box-tracking 토글만 admin PIN.
  */
@@ -10,10 +10,12 @@ import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../
 
 export type BoxSize = "LARGE" | "MEDIUM" | "SMALL";
 export type WarehouseSpecialZoneType = "aisle" | "pallet";
+export type WarehouseAngleType = "angle" | "aisle" | "pallet";
 
 export interface WarehouseAngle {
   id: number;
   label: string;
+  angle_type: WarehouseAngleType;
   rows: number;
   layers: number;
   jaris_per_cell: number;

@@ -60,13 +60,20 @@ export function HistoryDetailPanel({
       setEditsLoaded(false);
       return;
     }
+    setEdits([]);
     setEditsLoaded(false);
+    let cancelled = false;
     api.getTransactionEdits(selected.log_id)
       .then((data) => {
+        if (cancelled) return;
         setEdits(data);
         setEditsLoaded(true);
       })
-      .catch(() => setEditsLoaded(true));
+      .catch(() => {
+        if (cancelled) return;
+        setEditsLoaded(true);
+      });
+    return () => { cancelled = true; };
     // selected 객체 전체가 아니라 log_id 만 deps — 같은 로그를 가리키는 새 객체로
     // 교체돼도(목록 갱신 등) 수정이력을 불필요하게 재조회하지 않도록 의도적 최소화.
   }, [selected?.log_id]); // eslint-disable-line react-hooks/exhaustive-deps

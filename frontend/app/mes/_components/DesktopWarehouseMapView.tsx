@@ -104,7 +104,6 @@ export function DesktopWarehouseMapView({
   async function reloadMap() {
     const data = await warehouseMapApi.getMap();
     setMap(data);
-    setZonePanel((prev) => (prev ? data.special_zones.find((zone) => zone.id === prev.id) ?? prev : prev));
     return data;
   }
 
@@ -144,32 +143,6 @@ export function DesktopWarehouseMapView({
   }
 
   // 편집 모드: 칸 패널 "박스 빼기"(휴지통).
-  async function handleCreateZone(zoneType: "aisle" | "pallet") {
-    const count = map?.special_zones.filter((zone) => zone.zone_type === zoneType).length ?? 0;
-    const isPallet = zoneType === "pallet";
-    setZoneBusy(true);
-    try {
-      const created = await warehouseMapApi.createZone({
-        label: isPallet ? `PL-${count + 1}` : `통로 ${count + 1}`,
-        zone_type: zoneType,
-        pos_x: isPallet ? 560 + count * 18 : 120,
-        pos_y: isPallet ? 190 : 128 + count * 18,
-        width: isPallet ? 76 : 240,
-        height: isPallet ? 48 : 32,
-        items: [],
-      });
-      await reloadMap();
-      setPanel(null);
-      setZonePanel(created);
-      onMapMutated?.();
-      onStatusChange?.(isPallet ? "PL 구역을 추가했습니다." : "통로 구역을 추가했습니다.");
-    } catch (e) {
-      onStatusChange?.(e instanceof Error ? e.message : "구역 추가 실패");
-    } finally {
-      setZoneBusy(false);
-    }
-  }
-
   async function handleSaveZone(zoneId: number, patch: WarehouseSpecialZonePayload) {
     setZoneBusy(true);
     try {
@@ -391,6 +364,10 @@ export function DesktopWarehouseMapView({
   function openAngle(a: WarehouseAngle) {
     setZonePanel(null);
     setCurAngle(a);
+    if (a.angle_type !== "angle") {
+      setPanel({ angle: a, row: 1, layer: 1 });
+      return;
+    }
     setStage("front");
     setPanel(null);
     wmDepthRef.current += 1;
@@ -654,55 +631,6 @@ export function DesktopWarehouseMapView({
           </div>
 
 
-          {editable && stage === "floor" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => void handleCreateZone("aisle")}
-                disabled={zoneBusy}
-                style={{
-                  height: 32,
-                  padding: "0 10px",
-                  borderRadius: 12,
-                  background: LEGACY_COLORS.s2,
-                  border: `1px solid ${LEGACY_COLORS.border}`,
-                  color: LEGACY_COLORS.text,
-                  fontSize: 12,
-                  fontWeight: 800,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  cursor: zoneBusy ? "not-allowed" : "pointer",
-                  opacity: zoneBusy ? 0.5 : 1,
-                }}
-              >
-                <Plus size={14} /> 통로
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCreateZone("pallet")}
-                disabled={zoneBusy}
-                style={{
-                  height: 32,
-                  padding: "0 10px",
-                  borderRadius: 12,
-                  background: LEGACY_COLORS.s2,
-                  border: `1px solid ${LEGACY_COLORS.border}`,
-                  color: LEGACY_COLORS.text,
-                  fontSize: 12,
-                  fontWeight: 800,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  cursor: zoneBusy ? "not-allowed" : "pointer",
-                  opacity: zoneBusy ? 0.5 : 1,
-                }}
-              >
-                <Plus size={14} /> PL
-              </button>
-            </div>
-          )}
-
           {/* Search — 헤더 중앙에 절대 고정 (stage 전환 시 위치 불변) */}
           <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", flexShrink: 0, zIndex: 5 }}>
             <div
@@ -935,11 +863,9 @@ export function DesktopWarehouseMapView({
               {stage === "floor" && (
                 <FloorStage
                   angles={angles}
-                  specialZones={map?.special_zones ?? []}
                   hitAngles={hitAngles ?? undefined}
                   pulseAngleId={pulse?.angleId}
                   onAngleClick={openAngle}
-                  onZoneClick={(zone) => { setPanel(null); setZonePanel(zone); }}
                 />
               )}
               {stage === "front" && curAngle && (
