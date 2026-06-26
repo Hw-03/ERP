@@ -65,6 +65,7 @@ export function DesktopHistoryRightPanel({
           onClose={onClose}
         >
           <HistoryDetailPanel
+            key={displaySelection.log.log_id}
             selected={displaySelection.log}
             onSelectLog={onSelectLog}
             onLogUpdated={onLogUpdated}
@@ -92,6 +93,7 @@ export function DesktopHistoryRightPanel({
             onClose={onClose}
           >
             <HistoryBatchDetailPanel
+              key={displaySelection.batchId}
               batchId={displaySelection.batchId}
               logs={displaySelection.logs}
               batchCache={batchCache}

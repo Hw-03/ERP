@@ -87,6 +87,15 @@ describe("productionApi", () => {
     await productionApi.getTransactionEdits("log-1");
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/inventory/transactions/log-1/edits");
   });
+  it("getTransactionEdits forwards AbortSignal to fetcher", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const ctrl = new AbortController();
+
+    await productionApi.getTransactionEdits("log-1", { signal: ctrl.signal });
+
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBe(ctrl.signal);
+  });
 
   it("quantityCorrectTransaction POST /transactions/{id}/quantity-correction", async () => {
     const fetchSpy = vi.fn(() =>

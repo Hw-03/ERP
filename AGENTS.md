@@ -44,19 +44,26 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
 - **Renames and moves must be complete in the same change.** After renaming or moving a file/symbol/route, grep the old name across BOTH code and docs (`_attic/docs/`, READMEs) and update every hit, or explicitly note the ones intentionally kept (e.g. the `legacy_part` / `legacy_item_type` data fields). The same applies to facts inside docs: if you change behavior, fix or mark `[STALE]` the doc sentence that now lies about it.
 - **Verify a claim about the code before reporting it.** Any judgment ("this is duplicated", "untestable", "not extracted into a service", "a bug", "needs refactoring") must be confirmed against the actual file and cited as `file:line`, not inferred from a name or a partial read. Separate what you verified by reading from what you only inferred.
 
-## Plan Mode - Model Recommendation
+## Plan Mode - Codex Model Recommendation
 
-After completing a plan, always place the recommended model at the very top of the plan shown to the user:
+After completing a plan, always place the recommended Codex model and reasoning level at the very top of the plan shown to the user. The model must be one of the Codex UI model choices, and the reasoning level must be written in Korean exactly as shown in the UI:
 
-> **Recommended model: Sonnet** - [one-line reason]
+> **추천 모델: GPT-5.5** - [한 줄 이유]
+> **추천 추론 수준: 높음** - [한 줄 이유]
 
-Criteria:
-- **Haiku**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
-- **Sonnet**: General development tasks. e.g. bug fix, add a router, API integration, moderate refactor.
-- **Opus**: High-complexity judgment tasks. e.g. redesigning the stock request state machine, security-related auth changes, structural changes spanning many files.
+Available model choices:
+- **GPT-5.5**: Default for most DEXCOWIN MES development plans, especially when quality and broad context matter.
+- **GPT-5.4**: Use for normal development plans where speed matters more than maximum judgment.
+- **GPT-5.4-Mini**: Use for narrow, repetitive, or low-risk edits such as renames, search tasks, and minor text changes.
+- **GPT-5.3-Codex-Spark**: Use for very quick lightweight coding tasks or first-pass exploration when cost/speed matters most.
 
-For Codex plans, also include the recommended execution shape when useful: solo vs. subagents, and any relevant effort/reasoning level supported by the current Codex surface.
+Reasoning level choices:
+- **낮음**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
+- **중간**: General development tasks. e.g. bug fix, add a router, API integration, moderate refactor.
+- **높음**: Complex development tasks with multiple files, state transitions, data flow, or meaningful regression risk.
+- **매우 높음**: High-complexity judgment tasks. e.g. redesigning the stock request state machine, security-related auth changes, structural changes spanning many files.
 
+For Codex plans, also include the recommended execution shape when useful: solo vs. subagents.
 ## Commit / Push
 
 - Never auto-commit or auto-push.

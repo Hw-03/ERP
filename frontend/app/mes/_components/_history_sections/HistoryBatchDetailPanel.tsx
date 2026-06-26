@@ -87,7 +87,8 @@ export function HistoryBatchDetailPanel({
     }
     setState({ status: "loading" });
     let cancelled = false;
-    void ioApi.getBatch(batchId)
+    const controller = new AbortController();
+    void ioApi.getBatch(batchId, { signal: controller.signal })
       .then((b) => {
         if (cancelled) return;
         setBatchCache((prev) => {
@@ -98,11 +99,14 @@ export function HistoryBatchDetailPanel({
         });
         setState({ status: "available", batch: b });
       })
-      .catch(() => {
-        if (cancelled) return;
+      .catch((err: unknown) => {
+        if (cancelled || (err as Error)?.name === "AbortError") return;
         setState({ status: "unavailable" });
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isBatchCancelled = logs.every((l) => l.cancelled);

@@ -226,6 +226,15 @@ describe("ioApi.getBatch", () => {
     const url = String(fetchSpy.mock.calls[0][0]);
     expect(url).toContain("/api/io/b-1");
   });
+  it("forwards AbortSignal to fetcher", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ batch_id: "b-1" })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const ctrl = new AbortController();
+
+    await ioApi.getBatch("b-1", { signal: ctrl.signal });
+
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBe(ctrl.signal);
+  });
 
   it("throws on non-2xx (404 not found)", async () => {
     globalThis.fetch = vi.fn(() =>
