@@ -22,6 +22,8 @@ export type EmployeeEditForm = {
   department_role: DepartmentRole;
   /** W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합. */
   io_enabled: boolean;
+  /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. */
+  hidden_sidebar_tabs: string[];
   /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위, 0=1순위). */
   assigned_model_slots: number[];
 };
@@ -35,6 +37,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   warehouse_role: "none",
   department_role: "none",
   io_enabled: true,
+  hidden_sidebar_tabs: [],
   assigned_model_slots: [],
 };
 
@@ -48,6 +51,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     department_role: (emp.department_role ?? "none") as DepartmentRole,
     io_enabled: emp.io_enabled ?? true,
+    hidden_sidebar_tabs: emp.hidden_sidebar_tabs ?? [],
     assigned_model_slots: emp.assigned_model_slots ?? [],
   };
 }
@@ -94,6 +98,12 @@ export function useAdminEmployeesForm(employees: Employee[]) {
     if (orig.warehouse_role !== editForm.warehouse_role) return true;
     if (orig.department_role !== editForm.department_role) return true;
     if (orig.io_enabled !== editForm.io_enabled) return true;
+    const hiddenA = orig.hidden_sidebar_tabs;
+    const hiddenB = editForm.hidden_sidebar_tabs;
+    if (hiddenA.length !== hiddenB.length) return true;
+    for (let i = 0; i < hiddenA.length; i += 1) {
+      if (hiddenA[i] !== hiddenB[i]) return true;
+    }
     const a = orig.assigned_model_slots;
     const b = editForm.assigned_model_slots;
     if (a.length !== b.length) return true;

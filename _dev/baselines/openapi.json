@@ -1728,6 +1728,13 @@
             ],
             "title": "Employee Code"
           },
+          "hidden_sidebar_tabs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hidden Sidebar Tabs",
+            "type": "array"
+          },
           "io_enabled": {
             "anyOf": [
               {
@@ -1867,6 +1874,13 @@
             "format": "uuid",
             "title": "Employee Id",
             "type": "string"
+          },
+          "hidden_sidebar_tabs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hidden Sidebar Tabs",
+            "type": "array"
           },
           "io_enabled": {
             "default": true,
@@ -2021,6 +2035,20 @@
               }
             ],
             "title": "Display Order"
+          },
+          "hidden_sidebar_tabs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden Sidebar Tabs"
           },
           "io_enabled": {
             "anyOf": [
@@ -5396,6 +5424,1004 @@
           "created_at"
         ],
         "title": "ReservationLineResponse",
+        "type": "object"
+      },
+      "ShippingBomLineInput": {
+        "properties": {
+          "child_item_id": {
+            "format": "uuid",
+            "title": "Child Item Id",
+            "type": "string"
+          },
+          "included": {
+            "default": true,
+            "title": "Included",
+            "type": "boolean"
+          },
+          "origin": {
+            "default": "CUSTOM",
+            "pattern": "^(DEFAULT|CUSTOM)$",
+            "title": "Origin",
+            "type": "string"
+          },
+          "parent_stage": {
+            "default": "PA",
+            "pattern": "^(PA|PF)$",
+            "title": "Parent Stage",
+            "type": "string"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit": {
+            "default": "EA",
+            "maxLength": 20,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "child_item_id",
+          "quantity"
+        ],
+        "title": "ShippingBomLineInput",
+        "type": "object"
+      },
+      "ShippingBomLineResponse": {
+        "properties": {
+          "child_item_id": {
+            "format": "uuid",
+            "title": "Child Item Id",
+            "type": "string"
+          },
+          "included": {
+            "default": true,
+            "title": "Included",
+            "type": "boolean"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "origin": {
+            "default": "CUSTOM",
+            "title": "Origin",
+            "type": "string"
+          },
+          "parent_stage": {
+            "title": "Parent Stage",
+            "type": "string"
+          },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "parent_stage",
+          "child_item_id",
+          "item_name",
+          "quantity",
+          "unit"
+        ],
+        "title": "ShippingBomLineResponse",
+        "type": "object"
+      },
+      "ShippingBomMatchRequest": {
+        "properties": {
+          "base_pf_item_id": {
+            "format": "uuid",
+            "title": "Base Pf Item Id",
+            "type": "string"
+          },
+          "bom_lines": {
+            "items": {
+              "$ref": "#/components/schemas/ShippingBomLineInput"
+            },
+            "title": "Bom Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_pf_item_id",
+          "bom_lines"
+        ],
+        "title": "ShippingBomMatchRequest",
+        "type": "object"
+      },
+      "ShippingBomMatchResponse": {
+        "properties": {
+          "matched_pa_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Pa Item Id"
+          },
+          "matched_pa_item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Pa Item Name"
+          },
+          "matched_pf_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Pf Item Id"
+          },
+          "matched_pf_item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Pf Item Name"
+          },
+          "requires_pa_name": {
+            "default": false,
+            "title": "Requires Pa Name",
+            "type": "boolean"
+          },
+          "requires_pf_name": {
+            "default": false,
+            "title": "Requires Pf Name",
+            "type": "boolean"
+          }
+        },
+        "title": "ShippingBomMatchResponse",
+        "type": "object"
+      },
+      "ShippingChecklistLineResponse": {
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "boolean"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line_id",
+          "item_id",
+          "item_name",
+          "quantity",
+          "checked"
+        ],
+        "title": "ShippingChecklistLineResponse",
+        "type": "object"
+      },
+      "ShippingChecklistUpdate": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ShippingChecklistUpdateLine"
+            },
+            "title": "Checks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "checks"
+        ],
+        "title": "ShippingChecklistUpdate",
+        "type": "object"
+      },
+      "ShippingChecklistUpdateLine": {
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "boolean"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "checked"
+        ],
+        "title": "ShippingChecklistUpdateLine",
+        "type": "object"
+      },
+      "ShippingCompanionLineInput": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit": {
+            "default": "EA",
+            "maxLength": 20,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "quantity"
+        ],
+        "title": "ShippingCompanionLineInput",
+        "type": "object"
+      },
+      "ShippingCompanionLineResponse": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "item_id",
+          "item_name",
+          "quantity",
+          "unit"
+        ],
+        "title": "ShippingCompanionLineResponse",
+        "type": "object"
+      },
+      "ShippingEventResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "created_at"
+        ],
+        "title": "ShippingEventResponse",
+        "type": "object"
+      },
+      "ShippingPrepareCancelRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "ShippingPrepareCancelRequest",
+        "type": "object"
+      },
+      "ShippingPrepareCompleteRequest": {
+        "properties": {
+          "companion_lines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingCompanionLineInput"
+            },
+            "title": "Companion Lines",
+            "type": "array"
+          }
+        },
+        "title": "ShippingPrepareCompleteRequest",
+        "type": "object"
+      },
+      "ShippingRequestCreate": {
+        "properties": {
+          "base_pf_item_id": {
+            "format": "uuid",
+            "title": "Base Pf Item Id",
+            "type": "string"
+          },
+          "bom_lines": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ShippingBomLineInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Lines"
+          },
+          "custom_pa_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Pa Name"
+          },
+          "custom_pf_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Pf Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "requested_by_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Name"
+          }
+        },
+        "required": [
+          "base_pf_item_id"
+        ],
+        "title": "ShippingRequestCreate",
+        "type": "object"
+      },
+      "ShippingRequestResponse": {
+        "properties": {
+          "base_pf_item_id": {
+            "format": "uuid",
+            "title": "Base Pf Item Id",
+            "type": "string"
+          },
+          "base_pf_item_name": {
+            "title": "Base Pf Item Name",
+            "type": "string"
+          },
+          "base_pf_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Pf Mes Code"
+          },
+          "bom_lines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingBomLineResponse"
+            },
+            "title": "Bom Lines",
+            "type": "array"
+          },
+          "checklist_lines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingChecklistLineResponse"
+            },
+            "title": "Checklist Lines",
+            "type": "array"
+          },
+          "companion_lines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingCompanionLineResponse"
+            },
+            "title": "Companion Lines",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "custom_pa_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Pa Name"
+          },
+          "custom_pf_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Pf Name"
+          },
+          "events": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingEventResponse"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "final_pa_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Pa Item Id"
+          },
+          "final_pa_item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Pa Item Name"
+          },
+          "final_pf_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Pf Item Id"
+          },
+          "final_pf_item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Pf Item Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "picked_up_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picked Up At"
+          },
+          "prepared_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prepared At"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "requested_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+          },
+          "transaction_count": {
+            "default": 0,
+            "title": "Transaction Count",
+            "type": "integer"
+          },
+          "transactions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingTransactionLogResponse"
+            },
+            "title": "Transactions",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "status",
+          "base_pf_item_id",
+          "base_pf_item_name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ShippingRequestResponse",
+        "type": "object"
+      },
+      "ShippingRequestStatusEnum": {
+        "enum": [
+          "REQUESTED",
+          "PREPARING",
+          "PREPARED",
+          "PICKED_UP"
+        ],
+        "title": "ShippingRequestStatusEnum",
+        "type": "string"
+      },
+      "ShippingRequestUpdate": {
+        "properties": {
+          "bom_lines": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ShippingBomLineInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Lines"
+          },
+          "custom_pa_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Pa Name"
+          },
+          "custom_pf_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Pf Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "requested_by_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Name"
+          }
+        },
+        "title": "ShippingRequestUpdate",
+        "type": "object"
+      },
+      "ShippingTransactionLogResponse": {
+        "properties": {
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "cancelled": {
+            "default": false,
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "inventory_effect": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Effect"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "item_process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Process Type Code"
+          },
+          "log_id": {
+            "format": "uuid",
+            "title": "Log Id",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "produced_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Produced By"
+          },
+          "quantity_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity After"
+          },
+          "quantity_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Before"
+          },
+          "quantity_change": {
+            "title": "Quantity Change",
+            "type": "integer"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "shipping_phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Phase"
+          },
+          "transaction_type": {
+            "$ref": "#/components/schemas/TransactionTypeEnum"
+          },
+          "warehouse_qty_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty After"
+          },
+          "warehouse_qty_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty Before"
+          }
+        },
+        "required": [
+          "log_id",
+          "item_id",
+          "item_name",
+          "transaction_type",
+          "quantity_change",
+          "created_at"
+        ],
+        "title": "ShippingTransactionLogResponse",
         "type": "object"
       },
       "StockRequestActionRequest": {
@@ -14166,6 +15192,505 @@
         "summary": "Verify Admin Pin",
         "tags": [
           "Settings"
+        ]
+      }
+    },
+    "/api/shipping/bom-match": {
+      "post": {
+        "operationId": "bom_match_api_shipping_bom_match_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingBomMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingBomMatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bom Match",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/history": {
+      "get": {
+        "operationId": "history_api_shipping_history_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShippingRequestResponse"
+                  },
+                  "title": "Response History Api Shipping History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests": {
+      "get": {
+        "operationId": "list_requests_api_shipping_requests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShippingRequestResponse"
+                  },
+                  "title": "Response List Requests Api Shipping Requests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Requests",
+        "tags": [
+          "Shipping"
+        ]
+      },
+      "post": {
+        "operationId": "create_request_api_shipping_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Request",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}": {
+      "patch": {
+        "operationId": "update_request_api_shipping_requests__request_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingRequestUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Request",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/checklist": {
+      "patch": {
+        "operationId": "update_checklist_api_shipping_requests__request_id__checklist_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingChecklistUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Checklist",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/checklist/clear": {
+      "post": {
+        "operationId": "clear_checklist_api_shipping_requests__request_id__checklist_clear_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clear Checklist",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/pickup-complete": {
+      "post": {
+        "operationId": "pickup_complete_api_shipping_requests__request_id__pickup_complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pickup Complete",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/prepare-cancel": {
+      "post": {
+        "operationId": "prepare_cancel_api_shipping_requests__request_id__prepare_cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingPrepareCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prepare Cancel",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/prepare-complete": {
+      "post": {
+        "operationId": "prepare_complete_api_shipping_requests__request_id__prepare_complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingPrepareCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prepare Complete",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/send-to-prep": {
+      "post": {
+        "operationId": "send_to_prep_api_shipping_requests__request_id__send_to_prep_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send To Prep",
+        "tags": [
+          "Shipping"
         ]
       }
     },

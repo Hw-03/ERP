@@ -79,6 +79,13 @@ class TransactionLog(Base):
         nullable=True,
         index=True,
     )
+    shipping_request_id = Column(
+        UUIDString,
+        ForeignKey("shipping_requests.request_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    shipping_phase = Column(String(20), nullable=True, index=True)
     department = Column(String(50), nullable=True, index=True)
     cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     cancel_reason = Column(Text, nullable=True)
@@ -110,6 +117,7 @@ class TransactionLog(Base):
         Index("ix_tx_type_created", "transaction_type", "created_at"),
         # operation_batch_id 기반 배치 그룹 조회 가속.
         Index("ix_tx_batch_created", "operation_batch_id", "created_at"),
+        Index("ix_tx_shipping_request", "shipping_request_id", "created_at"),
     )
 
 

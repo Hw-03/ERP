@@ -30,6 +30,93 @@ from app._actor import set_actor
 
 router = APIRouter()
 
+SIDEBAR_TAB_IDS: tuple[str, ...] = (
+    "dashboard",
+    "warehouse",
+    "shipping",
+    "warehouseMap",
+    "defect",
+    "history",
+    "weekly",
+    "admin",
+)
+SIDEBAR_TAB_ID_SET = set(SIDEBAR_TAB_IDS)
+
+
+def _parse_hidden_sidebar_tabs(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    tabs: List[str] = []
+    for part in raw.split(","):
+        tab = part.strip()
+        if tab and tab in SIDEBAR_TAB_ID_SET and tab not in tabs:
+            tabs.append(tab)
+    return tabs
+
+
+def _validate_hidden_sidebar_tabs(tabs: Optional[List[str]]) -> List[str]:
+    if not tabs:
+        return []
+    normalized: List[str] = []
+    invalid: List[str] = []
+    for value in tabs:
+        tab = str(value).strip()
+        if tab not in SIDEBAR_TAB_ID_SET:
+            invalid.append(tab)
+            continue
+        if tab not in normalized:
+            normalized.append(tab)
+    if invalid:
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "알 수 없는 사이드바 탭 권한 값입니다.",
+        )
+    if len(normalized) == len(SIDEBAR_TAB_IDS):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "직원에게 최소 1개 이상의 탭이 표시되어야 합니다.",
+        )
+    return normalized
+
+
+def _serialize_hidden_sidebar_tabs(tabs: List[str]) -> str:
+    return ",".join(tabs)
+
+
+def _is_active_value(value: object) -> bool:
+    if isinstance(value, str):
+        return value.lower() == "true"
+    return bool(value)
+
+
+def _ensure_admin_tab_access_remains(
+    db: Session,
+    *,
+    employee_id: Optional[uuid.UUID],
+    hidden_sidebar_tabs: List[str],
+    is_active: bool,
+) -> None:
+    if is_active and "admin" not in hidden_sidebar_tabs:
+        return
+
+    for other in db.query(Employee).all():
+        if employee_id is not None and other.employee_id == employee_id:
+            continue
+        if not _is_active_value(other.is_active):
+            continue
+        other_hidden = _parse_hidden_sidebar_tabs(
+            getattr(other, "hidden_sidebar_tabs", "")
+        )
+        if "admin" not in other_hidden:
+            return
+
+    raise http_error(
+        422,
+        ErrorCode.UNPROCESSABLE,
+        "관리자 탭에 접근 가능한 활성 직원이 최소 1명 필요합니다.",
+    )
 
 def _assigned_slots_for(db: Session, employee_id: uuid.UUID) -> List[int]:
     """단일 직원의 담당 모델 slot 목록 (priority asc)."""
@@ -153,6 +240,13 @@ def create_employee(
             "department_role 은 none/primary/deputy 중 하나여야 합니다.",
         )
 
+    hidden_tabs = _validate_hidden_sidebar_tabs(payload.hidden_sidebar_tabs)
+    _ensure_admin_tab_access_remains(
+        db,
+        employee_id=None,
+        hidden_sidebar_tabs=hidden_tabs,
+        is_active=bool(payload.is_active),
+    )
     employee = Employee(
         employee_code=code,
         name=payload.name,
@@ -163,6 +257,7 @@ def create_employee(
         warehouse_role=role_value,
         department_role=dept_role_value,
         io_enabled=payload.io_enabled if payload.io_enabled is not None else True,
+        hidden_sidebar_tabs=_serialize_hidden_sidebar_tabs(hidden_tabs),
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
@@ -196,7 +291,24 @@ def update_employee(
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-
+    candidate_hidden_tabs = _parse_hidden_sidebar_tabs(
+        getattr(employee, "hidden_sidebar_tabs", "")
+    )
+    if payload.hidden_sidebar_tabs is not None:
+        candidate_hidden_tabs = _validate_hidden_sidebar_tabs(
+            payload.hidden_sidebar_tabs
+        )
+    candidate_is_active = (
+        bool(payload.is_active)
+        if payload.is_active is not None
+        else _is_active_value(employee.is_active)
+    )
+    _ensure_admin_tab_access_remains(
+        db,
+        employee_id=employee.employee_id,
+        hidden_sidebar_tabs=candidate_hidden_tabs,
+        is_active=candidate_is_active,
+    )
     changed: list[str] = []
     if payload.name is not None and employee.name != payload.name:
         employee.name = payload.name; changed.append("name")
@@ -239,7 +351,11 @@ def update_employee(
         if bool(employee.io_enabled) != bool(payload.io_enabled):
             employee.io_enabled = bool(payload.io_enabled)
             changed.append("io_enabled")
-
+    if payload.hidden_sidebar_tabs is not None:
+        hidden_raw = _serialize_hidden_sidebar_tabs(candidate_hidden_tabs)
+        if (getattr(employee, "hidden_sidebar_tabs", "") or "") != hidden_raw:
+            employee.hidden_sidebar_tabs = hidden_raw
+            changed.append("hidden_sidebar_tabs")
     if payload.assigned_model_slots is not None:
         current = _assigned_slots_for(db, employee.employee_id)
         if current != payload.assigned_model_slots:
@@ -450,4 +566,7 @@ def _to_response(
         pin_is_default=pin_is_default,
         theme=getattr(employee, "theme", None),
         assigned_model_slots=assigned_model_slots or [],
+        hidden_sidebar_tabs=_parse_hidden_sidebar_tabs(
+            getattr(employee, "hidden_sidebar_tabs", "")
+        ),
     )

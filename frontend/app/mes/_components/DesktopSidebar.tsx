@@ -3,11 +3,11 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ThemeToggle } from "./ThemeToggle";
-
-export type DesktopTabId = "dashboard" | "warehouse" | "warehouseMap" | "defect" | "history" | "weekly" | "admin";
+import type { DesktopTabId } from "./tabAccess";
+export type { DesktopTabId } from "./tabAccess";
 
 type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: ElementType; color: string };
 
@@ -15,6 +15,7 @@ type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: Element
 const MAIN_TABS: TabDef[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: LEGACY_COLORS.blue },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: LEGACY_COLORS.green },
+  { id: "shipping", label: "출하", subtitle: "요청·준비·픽업 완료", icon: Truck, color: LEGACY_COLORS.cyan },
   { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle, color: LEGACY_COLORS.red },
   { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History, color: LEGACY_COLORS.purple },
   { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned, color: LEGACY_COLORS.cyan },
@@ -28,9 +29,11 @@ const BOTTOM_TABS: TabDef[] = [
 export function DesktopSidebar({
   activeTab,
   onTabChange,
+  visibleTabs,
 }: {
   activeTab: DesktopTabId;
   onTabChange: (tab: DesktopTabId) => void;
+  visibleTabs: DesktopTabId[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<DesktopTabId | null>(null);
@@ -102,7 +105,7 @@ export function DesktopSidebar({
 
         {/* 탭 내비게이션 */}
         <nav className="mt-5 space-y-1.5">
-          {MAIN_TABS.map((tab) => (
+          {MAIN_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
             <TabButton
               key={tab.id}
               tab={tab}
@@ -117,7 +120,7 @@ export function DesktopSidebar({
 
         {/* 하단 고정: 관리 + 테마 */}
         <div className="mt-auto space-y-1.5 pt-1.5">
-          {BOTTOM_TABS.map((tab) => (
+          {BOTTOM_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
             <TabButton
               key={tab.id}
               tab={tab}

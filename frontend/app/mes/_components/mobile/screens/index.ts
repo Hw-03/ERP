@@ -5,3 +5,4 @@ export { MobileHistoryScreen } from "./MobileHistoryScreen";
 export { MobileWeeklyScreen } from "./MobileWeeklyScreen";
 export { MobileWarehouseMapScreen } from "./MobileWarehouseMapScreen";
 export { MobileMoreScreen } from "./MobileMoreScreen";
+export { MobileShippingScreen } from "./MobileShippingScreen";
