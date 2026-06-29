@@ -213,10 +213,8 @@ _MIGRATION_DDL: list[str] = [
     # 2026-05-24 (W11-A): 부서별 입출고 권한 토글 — io_enabled 컬럼.
     # 기본값 1(TRUE). 기존 부서는 모두 TRUE 로 추가됨.
     "ALTER TABLE departments ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
-    # backfill: PROD_DEPTS 외 부서는 FALSE (프론트 hardcode 동작 보존).
-    # WHERE io_enabled = 1 조건으로 이미 0 으로 설정된 행은 건드리지 않음.
-    "UPDATE departments SET io_enabled = 0 "
-    "WHERE name NOT IN ('튜브', '고압', '진공', '튜닝', '조립', '출하') AND io_enabled = 1",
+    # Preserve saved department permission settings on repeated bootstrap runs.
+    "UPDATE departments SET io_enabled = io_enabled WHERE 0 = 1",
     # 2026-05-26: 품목 소프트 삭제 — deleted_at NULL=활성, 값있으면 삭제됨
     "ALTER TABLE items ADD COLUMN deleted_at DATETIME",
     # 2026-05-24 (W12-#7): 직원별 입출고 권한 토글 — employees.io_enabled.
@@ -224,12 +222,8 @@ _MIGRATION_DDL: list[str] = [
     # 기본값 1(TRUE). 기존 직원은 모두 TRUE 로 추가된 뒤, 본인 부서의 io_enabled 값으로 백필.
     # → 부서가 차단(FALSE) 상태였던 직원은 마이그레이션 후에도 동일하게 차단 유지.
     "ALTER TABLE employees ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
-    # 백필: 직원.io_enabled = (부서.io_enabled). 부서 이름이 일치하는 부서가 없으면 그대로 1 유지.
-    "UPDATE employees SET io_enabled = ("
-    "SELECT departments.io_enabled FROM departments WHERE departments.name = employees.department"
-    ") WHERE EXISTS ("
-    "SELECT 1 FROM departments WHERE departments.name = employees.department"
-    ")",
+    # Preserve saved employee permission settings on repeated bootstrap runs.
+    "UPDATE employees SET io_enabled = io_enabled WHERE 0 = 1",
     # 2026-05-27: 불량·수량조정 부서 필터 수정 — 직접 생성된 TransactionLog 에 부서 기록.
     # IoBatch 없이 생성되는 MARK_DEFECTIVE/UNMARK_DEFECTIVE/DEFECT_SCRAP/SUPPLIER_RETURN 트랜잭션의
     # 부서 라벨을 _department_label_expr() 에서 이 컬럼으로 폴백.
@@ -305,6 +299,46 @@ _MIGRATION_DDL: list[str] = [
     )""",
     "CREATE INDEX IF NOT EXISTS ix_handover_lines_handover ON handover_lines(handover_id)",
     "CREATE INDEX IF NOT EXISTS ix_handover_lines_item ON handover_lines(item_id)",
+    # 2026-06-26: warehouse map structures can be angle/aisle/pallet.
+    "ALTER TABLE warehouse_angles ADD COLUMN angle_type VARCHAR(20) NOT NULL DEFAULT 'angle'",
+    # 2026-06-25: warehouse map aisle/pallet special zones.
+    """CREATE TABLE IF NOT EXISTS warehouse_special_zones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        label VARCHAR(50) NOT NULL,
+        zone_type VARCHAR(20) NOT NULL,
+        pos_x INTEGER NOT NULL DEFAULT 0,
+        pos_y INTEGER NOT NULL DEFAULT 0,
+        width INTEGER NOT NULL DEFAULT 80,
+        height INTEGER NOT NULL DEFAULT 40,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        is_active BOOLEAN NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT ck_wh_zone_type CHECK (zone_type IN ('aisle', 'pallet')),
+        CONSTRAINT ck_wh_zone_size_pos CHECK (width >= 1 AND height >= 1)
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_wh_zone_order ON warehouse_special_zones(display_order, id)",
+    """CREATE TABLE IF NOT EXISTS warehouse_special_zone_items (
+        id CHAR(36) PRIMARY KEY,
+        zone_id INTEGER NOT NULL REFERENCES warehouse_special_zones(id) ON DELETE CASCADE,
+        item_id CHAR(36) NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        CONSTRAINT ck_wh_zoneitem_qty_nonneg CHECK (quantity >= 0)
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_items_zone_id ON warehouse_special_zone_items(zone_id)",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_items_item_id ON warehouse_special_zone_items(item_id)",
+    "CREATE INDEX IF NOT EXISTS ix_wh_zoneitem_item ON warehouse_special_zone_items(item_id)",
+    """CREATE TABLE IF NOT EXISTS warehouse_special_zone_audits (
+        id CHAR(36) PRIMARY KEY,
+        zone_id INTEGER REFERENCES warehouse_special_zones(id) ON DELETE SET NULL,
+        action VARCHAR(32) NOT NULL,
+        actor_employee_id CHAR(36) REFERENCES employees(employee_id) ON DELETE SET NULL,
+        actor_employee_code VARCHAR(30),
+        actor_name VARCHAR(100),
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_audits_zone_id ON warehouse_special_zone_audits(zone_id)",
+    "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_audits_actor_employee_id ON warehouse_special_zone_audits(actor_employee_id)",
     # 2026-06-22: 모델별 기준 PF 지정 — 대시보드 칩 기준 수치 고정
     """CREATE TABLE IF NOT EXISTS model_pf_pins (
         model_symbol TEXT PRIMARY KEY,

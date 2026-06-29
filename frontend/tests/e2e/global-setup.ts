@@ -64,9 +64,14 @@ async function getJson(url: string): Promise<any> {
 }
 
 async function sendJson(method: string, url: string, body: unknown): Promise<any> {
+  // bc5ad563 이후 /api/employees POST·PUT·DELETE 등이 X-Admin-Pin 가드를 요구한다.
+  // setup 은 admin 권한으로 직원 역할을 부여하므로 기본 PIN 을 항상 동봉한다.
   const r = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Pin": process.env.E2E_ADMIN_PIN ?? "0000",
+    },
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`${method} ${url} → ${r.status} ${await r.text()}`);

@@ -351,7 +351,8 @@ export function DefectCartFlow({
               <DefectItemPicker
                 items={items}
                 productModels={productModels}
-                targetDepartment={dept}
+                targetDepartment={source === "warehouse" ? "\ucc3d\uace0" : dept}
+                lockedDepartment={source === "warehouse" ? "\ucc3d\uace0" : dept}
                 selectedIds={selectedIds}
                 onAdd={addItem}
                 onRemove={removeItemById}

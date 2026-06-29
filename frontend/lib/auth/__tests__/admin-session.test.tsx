@@ -3,7 +3,7 @@ import { act, render, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 import { AdminSessionProvider, useAdminSession } from "../admin-session";
-import { postJson, fetcher } from "@/lib/api-core";
+import { deleteJson, fetcher, patchJson, postJson, putJson } from "@/lib/api-core";
 
 // Helper: 표준 Response mock --------------------------------------
 
@@ -92,6 +92,26 @@ describe("AdminSessionProvider × api-core PIN injection", () => {
     expect(secondHeaders["Content-Type"]).toBe("application/json");
   });
 
+  it("injects X-Admin-Pin header into every write helper after setPin", async () => {
+    const { result } = renderHook(() => useAdminSession(), { wrapper });
+    act(() => {
+      result.current.setPin("2468");
+    });
+
+    await putJson("/api/a", { a: 1 });
+    await patchJson("/api/b", { b: 2 });
+    await deleteJson("/api/c", { c: 3 });
+
+    const fetchSpy = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const calls = fetchSpy.mock.calls as [string, RequestInit][];
+    expect(calls).toHaveLength(3);
+    expect(calls.map(([, init]) => init.method)).toEqual(["PUT", "PATCH", "DELETE"]);
+    for (const [, init] of calls) {
+      const headers = (init.headers ?? {}) as Record<string, string>;
+      expect(headers["X-Admin-Pin"]).toBe("2468");
+      expect(headers["Content-Type"]).toBe("application/json");
+    }
+  });
   it("injects X-Admin-Pin header into fetcher (GET) after setPin", async () => {
     const { result } = renderHook(() => useAdminSession(), { wrapper });
     act(() => {

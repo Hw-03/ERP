@@ -38,6 +38,7 @@ interface Props {
   productModels: ProductModel[];
   /** 정렬 우선순위 기준 대상 부서. */
   targetDepartment?: string | null;
+  lockedDepartment?: string | null;
   /** 이미 장바구니에 담긴 item_id 집합 — "담김" 표시·중복 추가 방지. */
   selectedIds: Set<string>;
   onAdd: (item: Item) => void;
@@ -53,12 +54,13 @@ export function DefectItemPicker({
   items,
   productModels,
   targetDepartment,
+  lockedDepartment,
   selectedIds,
   onAdd,
   onRemove,
 }: Props) {
   const [dept, setDept] = useState("ALL");
-  const [model, setModel] = useState("전체");
+  const [model, setModel] = useState("\uc804\uccb4");
   const [stage, setStage] = useState("ALL");
   const [search, setSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT);
@@ -71,6 +73,7 @@ export function DefectItemPicker({
   const resetMyOrder = useResetMyItemOrderMutation();
 
   const keyword = search.trim().toLowerCase();
+  const effectiveDept = lockedDepartment ?? dept;
 
   const deptPriorityByLetter = useMemo(
     () => buildDeptPriorityByLetter(targetDepartment),
@@ -87,18 +90,18 @@ export function DefectItemPicker({
 
   const filteredItems = useMemo(() => {
     const selectedModelSlot =
-      model === "전체" ? undefined :
-      model === "공용" ? null :
+      model === "\uc804\uccb4" ? undefined :
+      model === "\uacf5\uc6a9" ? null :
       (productModels.find((m) => m.model_name === model)?.slot ?? undefined);
     const filtered = items.filter(
       (item) =>
-        matchesDept(item, dept) &&
+        matchesDept(item, effectiveDept) &&
         matchesModel(item, selectedModelSlot) &&
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
     return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
-  }, [items, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
+  }, [items, effectiveDept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
 
   const allItemsSorted = useMemo(() => {
     return sortItemsForPicker(items, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
@@ -133,31 +136,51 @@ export function DefectItemPicker({
     setEditItems([]);
   }
 
-  const hasActiveFilter = dept !== "ALL" || model !== "전체" || stage !== "ALL" || keyword.length > 0;
+  const hasActiveFilter = (!lockedDepartment && dept !== "ALL") || model !== "\uc804\uccb4" || stage !== "ALL" || keyword.length > 0;
 
   function clearFilters() {
     setDept("ALL");
-    setModel("전체");
+    setModel("\uc804\uccb4");
     setStage("ALL");
     setSearch("");
   }
 
-  const modelOptions = ["전체", "공용", ...productModels.map((m) => m.model_name ?? "")].map((v) => ({
+  const modelOptions = ["\uc804\uccb4", "\uacf5\uc6a9", ...productModels.map((m) => m.model_name ?? "")].map((v) => ({
     value: v,
     label: v,
   }));
+
+  const filterGridClass = lockedDepartment
+    ? "grid flex-1 grid-cols-2 gap-2 lg:grid-cols-[1fr_1fr_2fr]"
+    : "grid flex-1 grid-cols-3 gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]";
+  const searchFieldClass = lockedDepartment
+    ? "col-span-2 flex flex-col gap-0.5 lg:col-span-1"
+    : "col-span-3 flex flex-col gap-0.5 lg:col-span-1";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
+        {lockedDepartment && (
+          <div
+            data-testid="defect-locked-dept"
+            className="inline-flex w-fit items-center gap-1.5 rounded-[10px] border px-2.5 py-1 text-xs font-black"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, ${LEGACY_COLORS.s2})`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 28%, ${LEGACY_COLORS.border})`,
+              color: LEGACY_COLORS.blue,
+            }}
+          >
+            {"\uc9c4\uc785 \ubd80\uc11c: "}{lockedDepartment}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2">
-          <div className="grid flex-1 grid-cols-3 gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]" style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
-            <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />
+          <div className={filterGridClass} style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
+            {!lockedDepartment && <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />}
             <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
             <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
             {/* 모바일: 검색을 아래 전체폭 줄로(드롭다운 폭 확보). 데스크톱(lg): 기존 4열 인라인. */}
-            <label className="col-span-3 flex flex-col gap-0.5 lg:col-span-1">
+            <label className={searchFieldClass}>
               <span
                 className="text-[10px] font-bold uppercase tracking-[1.5px]"
                 style={{ color: LEGACY_COLORS.muted2 }}

@@ -6722,6 +6722,16 @@
       },
       "WarehouseAngleCreate": {
         "properties": {
+          "angle_type": {
+            "default": "angle",
+            "enum": [
+              "angle",
+              "aisle",
+              "pallet"
+            ],
+            "title": "Angle Type",
+            "type": "string"
+          },
           "display_order": {
             "anyOf": [
               {
@@ -6821,6 +6831,16 @@
       },
       "WarehouseAngleResponse": {
         "properties": {
+          "angle_type": {
+            "default": "angle",
+            "enum": [
+              "angle",
+              "aisle",
+              "pallet"
+            ],
+            "title": "Angle Type",
+            "type": "string"
+          },
           "display_order": {
             "title": "Display Order",
             "type": "integer"
@@ -6884,6 +6904,22 @@
       },
       "WarehouseAngleUpdate": {
         "properties": {
+          "angle_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "angle",
+                  "aisle",
+                  "pallet"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Angle Type"
+          },
           "display_order": {
             "anyOf": [
               {
@@ -7269,13 +7305,277 @@
             },
             "title": "Boxes",
             "type": "array"
+          },
+          "special_zones": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseSpecialZoneResponse"
+            },
+            "title": "Special Zones",
+            "type": "array"
           }
         },
         "required": [
           "angles",
-          "boxes"
+          "boxes",
+          "special_zones"
         ],
         "title": "WarehouseMapResponse",
+        "type": "object"
+      },
+      "WarehouseSpecialZoneCreate": {
+        "properties": {
+          "display_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Order"
+          },
+          "height": {
+            "default": 40,
+            "minimum": 1.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBoxItemPayload"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "label": {
+            "maxLength": 50,
+            "title": "Label",
+            "type": "string"
+          },
+          "pos_x": {
+            "default": 0,
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "default": 0,
+            "title": "Pos Y",
+            "type": "integer"
+          },
+          "width": {
+            "default": 80,
+            "minimum": 1.0,
+            "title": "Width",
+            "type": "integer"
+          },
+          "zone_type": {
+            "enum": [
+              "aisle",
+              "pallet"
+            ],
+            "title": "Zone Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "zone_type"
+        ],
+        "title": "WarehouseSpecialZoneCreate",
+        "type": "object"
+      },
+      "WarehouseSpecialZoneItemsUpdate": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBoxItemPayload"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "title": "WarehouseSpecialZoneItemsUpdate",
+        "type": "object"
+      },
+      "WarehouseSpecialZoneResponse": {
+        "properties": {
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBoxItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "pos_x": {
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "title": "Pos Y",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          },
+          "zone_type": {
+            "enum": [
+              "aisle",
+              "pallet"
+            ],
+            "title": "Zone Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "zone_type",
+          "pos_x",
+          "pos_y",
+          "width",
+          "height",
+          "display_order",
+          "is_active",
+          "items"
+        ],
+        "title": "WarehouseSpecialZoneResponse",
+        "type": "object"
+      },
+      "WarehouseSpecialZoneUpdate": {
+        "properties": {
+          "display_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Order"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WarehouseBoxItemPayload"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "pos_x": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos X"
+          },
+          "pos_y": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Y"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "zone_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aisle",
+                  "pallet"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Type"
+          }
+        },
+        "title": "WarehouseSpecialZoneUpdate",
         "type": "object"
       },
       "WeeklyGroupReport": {
@@ -15780,6 +16080,314 @@
           }
         },
         "summary": "Get Structure",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/zones": {
+      "post": {
+        "operationId": "create_zone_api_warehouse_map_zones_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseSpecialZoneCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseSpecialZoneResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Zone",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/zones/{zone_id}": {
+      "delete": {
+        "operationId": "delete_zone_api_warehouse_map_zones__zone_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "title": "Zone Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Zone",
+        "tags": [
+          "Warehouse Map"
+        ]
+      },
+      "put": {
+        "operationId": "update_zone_api_warehouse_map_zones__zone_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "title": "Zone Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseSpecialZoneUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseSpecialZoneResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Zone",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/zones/{zone_id}/items": {
+      "put": {
+        "operationId": "replace_zone_items_api_warehouse_map_zones__zone_id__items_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "title": "Zone Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseSpecialZoneItemsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseSpecialZoneResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Zone Items",
         "tags": [
           "Warehouse Map"
         ]

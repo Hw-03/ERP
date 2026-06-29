@@ -95,7 +95,16 @@ uri = f"file:{db_path.as_posix()}?mode=ro"
 con = sqlite3.connect(uri, uri=True)
 cur = con.cursor()
 
-tables = ["items", "employees", "inventory", "transaction_logs", "queue_batches"]
+tables = [
+    "items",
+    "employees",
+    "inventory",
+    "inventory_locations",
+    "transaction_logs",
+    "stock_requests",
+    "io_batches",
+    "warehouse_box_items",
+]
 rows = {table: cur.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in tables}
 
 mismatch_count = cur.execute("""
@@ -110,16 +119,12 @@ LEFT JOIN loc ON loc.item_id = i.item_id
 WHERE COALESCE(i.quantity, 0) != COALESCE(i.warehouse_qty, 0) + COALESCE(loc.location_sum, 0)
 """).fetchone()[0]
 
-open_queue_batches = cur.execute(
-    "SELECT COUNT(*) FROM queue_batches WHERE status = 'OPEN'"
-).fetchone()[0]
 last_transaction_at = cur.execute("SELECT MAX(created_at) FROM transaction_logs").fetchone()[0]
 
 report = {
     "db": str(db_path),
     "rows": rows,
     "inventory_mismatch_count": mismatch_count,
-    "open_queue_batches": open_queue_batches,
     "last_transaction_at": last_transaction_at,
 }
 print(json.dumps(report, ensure_ascii=False, indent=2))

@@ -151,8 +151,14 @@ export const productionApi = {
     ),
 
   /** 특정 거래의 수정 이력 (최신순). */
-  getTransactionEdits: (logId: string): Promise<TransactionEditLog[]> =>
-    fetcher<TransactionEditLog[]>(toApiUrl(`/api/inventory/transactions/${logId}/edits`)),
+  getTransactionEdits: (
+    logId: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<TransactionEditLog[]> =>
+    fetcher<TransactionEditLog[]>(
+      toApiUrl(`/api/inventory/transactions/${logId}/edits`),
+      opts?.signal,
+    ),
 
   /** RECEIVE/SHIP 수량 보정. SHIP은 quantity_change가 음수여야 함. */
   quantityCorrectTransaction: (

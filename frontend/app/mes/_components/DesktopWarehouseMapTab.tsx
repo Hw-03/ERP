@@ -5,11 +5,11 @@
  *
  * 일반 직원: 읽기 전용 지도(DesktopWarehouseMapView)만.
  * 창고 정/부 관리자(warehouse_role primary/deputy): "편집 모드" 토글 → 본인 PIN 확인 →
- *   박스 관리(이동·넣기·빼기·편집) / 앵글 편집 노출. 편집 쓰기는 X-Employee-Code + X-Operator-Pin 으로
+ *   박스 관리(이동·넣기·빼기·편집) / 구조 편집 노출. 편집 쓰기는 X-Employee-Code + X-Operator-Pin 으로
  *   백엔드 require_warehouse_manager 가 검증(api-core operator 자격증명 주입).
  *
  * "박스 관리"는 DesktopWarehouseMapView(editable)에서 드래그 이동 + 칸 패널 박스 넣기/빼기를
- *   한 화면에 통합한다. "앵글 편집"(AdminWarehouseStructureSection)은 골조 단위라 분리 유지.
+ *   한 화면에 통합한다. "구조 편집"(AdminWarehouseStructureSection)은 앵글·통로·PL 구조물 단위라 분리 유지.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -26,7 +26,7 @@ import { AdminWarehouseStructureSection } from "./_admin_sections/AdminWarehouse
 
 const EDITOR_TABS = [
   { id: "map" as const, label: "박스 관리" },
-  { id: "structure" as const, label: "앵글 편집" },
+  { id: "structure" as const, label: "구조 편집" },
 ];
 
 export function DesktopWarehouseMapTab({

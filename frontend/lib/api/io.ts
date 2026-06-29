@@ -47,6 +47,9 @@ export const ioApi = {
       {},
     ),
 
-  getBatch: (batchId: string) =>
-    fetcher<IoBatch>(toApiUrl(`/api/io/${encodeURIComponent(batchId)}`)),
+  getBatch: (batchId: string, opts?: { signal?: AbortSignal }) =>
+    fetcher<IoBatch>(
+      toApiUrl(`/api/io/${encodeURIComponent(batchId)}`),
+      opts?.signal,
+    ),
 };

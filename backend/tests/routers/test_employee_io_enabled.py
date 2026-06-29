@@ -173,3 +173,30 @@ def test_backfill_employee_io_enabled_copies_department(db_session, client):
     db_session.refresh(emp_closed)
     assert bool(emp_open.io_enabled) is True, "개방부서 직원은 io_enabled True 유지"
     assert bool(emp_closed.io_enabled) is False, "폐쇄부서 직원은 io_enabled False 로 복사"
+
+
+def test_repeated_migration_does_not_overwrite_saved_employee_io_enabled(db_session, monkeypatch):
+    """Existing employees.io_enabled values must survive repeated migrations."""
+    from bootstrap import migrate
+
+    dept = Department(name="NO_IO_DEPT", display_order=10, is_active=True, io_enabled=False)
+    emp = Employee(
+        employee_code="KEEP_IO",
+        name="keep io",
+        role="r",
+        department="NO_IO_DEPT",
+        level=EmployeeLevelEnum.STAFF,
+        display_order=10,
+        is_active="true",
+        io_enabled=True,
+    )
+    db_session.add_all([dept, emp])
+    db_session.commit()
+
+    monkeypatch.setattr(migrate, "engine", db_session.bind)
+    result = migrate.run_migrations()
+    assert result["errors"] == []
+
+    db_session.expire_all()
+    saved = db_session.query(Employee).filter(Employee.employee_code == "KEEP_IO").one()
+    assert bool(saved.io_enabled) is True

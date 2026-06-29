@@ -60,13 +60,24 @@ export function HistoryDetailPanel({
       setEditsLoaded(false);
       return;
     }
+    setEdits([]);
     setEditsLoaded(false);
-    api.getTransactionEdits(selected.log_id)
+    let cancelled = false;
+    const controller = new AbortController();
+    api.getTransactionEdits(selected.log_id, { signal: controller.signal })
       .then((data) => {
+        if (cancelled) return;
         setEdits(data);
         setEditsLoaded(true);
       })
-      .catch(() => setEditsLoaded(true));
+      .catch((err: unknown) => {
+        if (cancelled || (err as Error)?.name === "AbortError") return;
+        setEditsLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
     // selected 객체 전체가 아니라 log_id 만 deps — 같은 로그를 가리키는 새 객체로
     // 교체돼도(목록 갱신 등) 수정이력을 불필요하게 재조회하지 않도록 의도적 최소화.
   }, [selected?.log_id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,16 +93,20 @@ export function HistoryDetailPanel({
     }
     setFlow({ status: "loading" });
     let cancelled = false;
-    void ioApi.getBatch(selected.operation_batch_id)
+    const controller = new AbortController();
+    void ioApi.getBatch(selected.operation_batch_id, { signal: controller.signal })
       .then((b) => {
         if (cancelled) return;
         setFlow({ status: "available", batch: b });
       })
-      .catch(() => {
-        if (cancelled) return;
+      .catch((err: unknown) => {
+        if (cancelled || (err as Error)?.name === "AbortError") return;
         setFlow({ status: "unavailable" });
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
     // log_id / operation_batch_id 필드만 deps — selected 객체 identity 가 바뀌어도
     // 두 ID 가 같으면 배치 흐름을 재요청하지 않도록 의도적 최소화.
   }, [selected?.log_id, selected?.operation_batch_id]); // eslint-disable-line react-hooks/exhaustive-deps

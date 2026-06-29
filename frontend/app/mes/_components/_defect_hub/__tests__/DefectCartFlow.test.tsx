@@ -150,6 +150,25 @@ describe("DefectCartFlow", () => {
     });
   });
 
+  it("locks the Step 2 department picker to the Step 1 department", () => {
+    render(
+      <DefectCartFlow
+        mode="add"
+        items={[rItem, fItem]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const buttons = screen.getAllByRole("button");
+    fireEvent.click(buttons[buttons.length - 1]);
+
+    expect(screen.getByTestId("defect-locked-dept")).toHaveTextContent(employee.department);
+    expect(screen.getAllByRole("combobox")).toHaveLength(2);
+  });
+
   it("scrap 제출(확인 후) 시 scrap_normal 요청을 보낸다", async () => {
     render(
       <DefectCartFlow

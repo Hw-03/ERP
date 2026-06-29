@@ -59,6 +59,23 @@ def _put_box(client, angle_id, *, row=1, layer=1, jari=0, size="SMALL", items=No
         headers=MGR,
     )
 
+def _make_zone(client, *, label="PL-1", zone_type="pallet", items=None):
+    resp = client.post(
+        f"{BASE}/zones",
+        json={
+            "label": label,
+            "zone_type": zone_type,
+            "pos_x": 12,
+            "pos_y": 34,
+            "width": 80,
+            "height": 40,
+            "items": items or [],
+        },
+        headers=MGR,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
 
 # ──────────────────────────── 앵글 CRUD ────────────────────────────
 
@@ -200,6 +217,60 @@ def test_reconcile_ok_when_match(client, make_item):
     assert data["rows"][0]["status"] == "ok"
 
 
+def test_create_special_zone_requires_warehouse_manager(client):
+    resp = client.post(
+        f"{BASE}/zones",
+        json={
+            "label": "AISLE-1",
+            "zone_type": "aisle",
+            "pos_x": 1,
+            "pos_y": 2,
+            "width": 30,
+            "height": 20,
+            "items": [],
+        },
+    )
+    assert resp.status_code == 403
+
+
+def test_create_special_zone_and_map_includes_items(client, make_item):
+    item = make_item(name="Pallet Item", process_type_code="TR", warehouse_qty=D("3"))
+    zone = _make_zone(
+        client,
+        label="PL-1",
+        zone_type="pallet",
+        items=[{"item_id": str(item.item_id), "quantity": 3}],
+    )
+
+    assert zone["label"] == "PL-1"
+    assert zone["zone_type"] == "pallet"
+    assert zone["items"][0]["item_name"] == "Pallet Item"
+
+    data = client.get(f"{BASE}/map").json()
+    assert len(data["special_zones"]) == 1
+    mapped = data["special_zones"][0]
+    assert mapped["label"] == "PL-1"
+    assert mapped["items"][0]["quantity"] == 3
+
+
+def test_reconcile_counts_boxes_and_special_zones(client, make_item):
+    angle = _make_angle(client)
+    item = make_item(warehouse_qty=D("10"))
+    _put_box(client, angle["id"],
+             items=[{"item_id": str(item.item_id), "quantity": 7}])
+    _make_zone(
+        client,
+        label="AISLE-1",
+        zone_type="aisle",
+        items=[{"item_id": str(item.item_id), "quantity": 3}],
+    )
+
+    data = client.get(f"{BASE}/reconcile").json()
+    assert data["mismatch_count"] == 0
+    assert data["rows"][0]["placed_total"] == 10
+    assert data["rows"][0]["status"] == "ok"
+
+
 def test_jari_returns_stack(client, make_item):
     angle = _make_angle(client)
     item = make_item(warehouse_qty=D("2"))
@@ -294,3 +365,41 @@ def test_restack_jari_requires_manager(client):
               "box_ids": [box["box_id"]]},
     )
     assert resp.status_code == 403
+
+
+def test_create_pallet_structure_accepts_box_list_storage(client, make_item):
+    """PL/pallet structures are map structures that can hold warehouse boxes."""
+    item = make_item(name="Pallet Box Item", process_type_code="TR", warehouse_qty=D("4"))
+    resp = client.post(
+        f"{BASE}/angles",
+        json={
+            "label": "PL-1",
+            "angle_type": "pallet",
+            "pos_x": 100,
+            "pos_y": 180,
+            "width": 120,
+            "height": 60,
+        },
+        headers=MGR,
+    )
+    assert resp.status_code == 201, resp.text
+    pallet = resp.json()
+    assert pallet["angle_type"] == "pallet"
+
+    box_resp = _put_box(
+        client,
+        pallet["id"],
+        row=1,
+        layer=1,
+        jari=0,
+        size="LARGE",
+        items=[{"item_id": str(item.item_id), "quantity": 4}],
+    )
+    assert box_resp.status_code == 201, box_resp.text
+
+    data = client.get(f"{BASE}/map").json()
+    mapped = next(a for a in data["angles"] if a["id"] == pallet["id"])
+    assert mapped["angle_type"] == "pallet"
+    boxes = [b for b in data["boxes"] if b["angle_id"] == pallet["id"]]
+    assert len(boxes) == 1
+    assert boxes[0]["items"][0]["item_name"] == "Pallet Box Item"
