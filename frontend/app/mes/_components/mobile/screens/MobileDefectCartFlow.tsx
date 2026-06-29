@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
@@ -117,6 +117,10 @@ export function MobileDefectCartFlow({
   const reworkLineReady = Boolean(
     selectedReworkLine && Number.isFinite(selectedReworkLine.qty) && selectedReworkLine.qty > 0 && selectedReworkLine.category.trim() !== "",
   );
+  useEffect(() => {
+    if (isRework && source !== "production") setSource("production");
+  }, [isRework, source]);
+
   const lockedMetaLabel = source === "warehouse" ? "진입 위치" : "진입 부서";
   const lockedMetaValue = source === "warehouse" ? "창고" : dept;
 
@@ -287,7 +291,10 @@ export function MobileDefectCartFlow({
               title="재작업"
               desc="BOM 있는 품목 한 개를 하위 품목 정상·격리·폐기로 나눠 처리합니다."
               tone={LEGACY_COLORS.yellow}
-              onClick={() => setDirectAction("rework")}
+              onClick={() => {
+                setSource("production");
+                setDirectAction("rework");
+              }}
             />
           </div>
         </div>
@@ -348,10 +355,12 @@ export function MobileDefectCartFlow({
                 출처
               </span>
               <SegmentedControl
-                tabs={[
-                  { id: "production", label: "부서 재고" },
-                  { id: "warehouse", label: "창고 재고" },
-                ]}
+                tabs={isRework
+                  ? [{ id: "production", label: "부서 재고" }]
+                  : [
+                    { id: "production", label: "부서 재고" },
+                    { id: "warehouse", label: "창고 재고" },
+                  ]}
                 active={source}
                 onChange={(s) => setSource(s as SourceKind)}
                 size="lg"

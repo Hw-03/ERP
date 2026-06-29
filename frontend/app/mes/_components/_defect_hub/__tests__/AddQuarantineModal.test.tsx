@@ -70,6 +70,15 @@ const defaultProps = {
   onSubmitted: vi.fn(),
 };
 
+function selectReasonCategory(label: string) {
+  const categoryCombobox = screen.getAllByRole("combobox").find((el) =>
+    el.textContent?.includes("카테고리 선택") || el.textContent?.includes(label),
+  );
+  expect(categoryCombobox).toBeTruthy();
+  fireEvent.click(categoryCombobox as HTMLElement);
+  fireEvent.mouseDown(screen.getByRole("option", { name: label }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(defectsApi.quarantine).mockResolvedValue(undefined);
@@ -123,12 +132,7 @@ describe("AddQuarantineModal", () => {
     });
     fireEvent.click(await screen.findByText("전극(70kV)"));
 
-    // 사유 카테고리
-    const categorySelect = screen.getAllByRole("combobox").find((el) =>
-      el.querySelector('option[value="외관 불량"]'),
-    );
-    expect(categorySelect).toBeTruthy();
-    fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "외관 불량" } });
+    selectReasonCategory("외관 불량");
 
     // 수량
     const qtyInput = screen.getByPlaceholderText("예: 3");
@@ -146,10 +150,7 @@ describe("AddQuarantineModal", () => {
     });
     fireEvent.click(await screen.findByText("전극(70kV)"));
 
-    const categorySelect = screen.getAllByRole("combobox").find((el) =>
-      el.querySelector('option[value="기능 불량"]'),
-    );
-    fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "기능 불량" } });
+    selectReasonCategory("기능 불량");
 
     fireEvent.change(screen.getByPlaceholderText("예: 3"), { target: { value: "5" } });
 
@@ -182,10 +183,7 @@ describe("AddQuarantineModal", () => {
     // 부서 재고 라디오
     fireEvent.click(screen.getByDisplayValue("production"));
 
-    const categorySelect = screen.getAllByRole("combobox").find((el) =>
-      el.querySelector('option[value="치수 불량"]'),
-    );
-    fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "치수 불량" } });
+    selectReasonCategory("치수 불량");
 
     fireEvent.change(screen.getByPlaceholderText("예: 3"), { target: { value: "2" } });
 
@@ -212,10 +210,7 @@ describe("AddQuarantineModal", () => {
     });
     fireEvent.click(await screen.findByText("전극(70kV)"));
 
-    const categorySelect = screen.getAllByRole("combobox").find((el) =>
-      el.querySelector('option[value="기타"]'),
-    );
-    fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "기타" } });
+    selectReasonCategory("기타");
     fireEvent.change(screen.getByPlaceholderText("예: 3"), { target: { value: "1" } });
 
     fireEvent.click(screen.getByText(/격리하기/));

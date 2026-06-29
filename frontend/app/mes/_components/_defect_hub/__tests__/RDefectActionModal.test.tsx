@@ -43,6 +43,12 @@ const defaultProps = {
   onSubmitted: vi.fn(),
 };
 
+function selectReasonCategory(label: string) {
+  const combobox = screen.getByRole("combobox");
+  fireEvent.click(combobox);
+  fireEvent.mouseDown(screen.getByRole("option", { name: label }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(defectsApi.unquarantine).mockResolvedValue(undefined);
@@ -87,8 +93,7 @@ describe("RDefectActionModal", () => {
     render(<RDefectActionModal {...defaultProps} />);
 
     // 카테고리 선택
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: "검사 통과" } });
+    selectReasonCategory("검사 통과");
 
     // 정상복귀는 기본 선택 상태
     const confirmBtn = screen.getByText("확인 →");
@@ -114,8 +119,7 @@ describe("RDefectActionModal", () => {
 
     fireEvent.click(screen.getByDisplayValue("scrap"));
 
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: "외관 불량" } });
+    selectReasonCategory("외관 불량");
 
     fireEvent.click(screen.getByText("확인 →"));
 
@@ -151,8 +155,7 @@ describe("RDefectActionModal", () => {
       />,
     );
 
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: "기타" } });
+    selectReasonCategory("기타");
     fireEvent.click(screen.getByText("확인 →"));
 
     await waitFor(() => {

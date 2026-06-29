@@ -105,6 +105,10 @@ export function DefectCartFlow({
   const isDirect = mode === "scrap";
   const isRework = isDirect && directAction === "rework";
   const isScrap = isDirect && directAction === "scrap";
+  useEffect(() => {
+    if (isRework && source !== "production") setSource("production");
+  }, [isRework, source]);
+
   const title = mode === "add" ? "불량 격리" : directAction === "rework" ? "바로 재작업" : directAction === "scrap" ? "바로 폐기" : "바로 처리";
   const submitLabel = mode === "add" ? "격리하기" : isRework ? "즉시 재작업" : "즉시 폐기";
   const pickerItems = isRework ? items.filter(isReworkCandidate) : items;
@@ -269,7 +273,10 @@ export function DefectCartFlow({
             title="재작업"
             desc="BOM 있는 품목을 한 개 선택해 하위 품목을 정상·격리·폐기로 나눕니다."
             tone={LEGACY_COLORS.yellow}
-            onClick={() => setDirectAction("rework")}
+            onClick={() => {
+              setSource("production");
+              setDirectAction("rework");
+            }}
           />
         </div>
       </div>
@@ -323,8 +330,8 @@ export function DefectCartFlow({
           <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
             <div className="flex min-h-0 flex-col gap-2">
               <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>출처</div>
-              <div className="grid min-h-0 flex-1 grid-rows-2 gap-3">
-                {(["production", "warehouse"] as SourceKind[]).map((s) => {
+              <div className={`grid min-h-0 flex-1 gap-3 ${isRework ? "grid-rows-1" : "grid-rows-2"}`}>
+                {(isRework ? (["production"] as SourceKind[]) : (["production", "warehouse"] as SourceKind[])).map((s) => {
                   const active = source === s;
                   const Icon = s === "warehouse" ? Warehouse : Building2;
                   const label = s === "warehouse" ? "창고 재고" : "부서 재고";

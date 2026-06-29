@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -60,6 +60,14 @@ const fItem = makeItem({ item_id: "f-1", mes_code: "3-AF-0002", item_name: "완�
 const assemblyWithoutBom = makeItem({ item_id: "aa-no-bom", mes_code: "6-AA-0038", item_name: "BOM 없는 조립품" });
 const productModels: ProductModel[] = [];
 const employee = { employee_id: "emp-1", name: "테스터", department: "조립" };
+function selectReasonCategory(label = "기타") {
+  const categoryCombobox = screen.getAllByRole("combobox").find((el) =>
+    el.textContent?.includes("카테고리 선택") || el.textContent?.includes(label),
+  );
+  expect(categoryCombobox).toBeTruthy();
+  fireEvent.click(categoryCombobox as HTMLElement);
+  fireEvent.mouseDown(screen.getByRole("option", { name: label }));
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -128,10 +136,7 @@ describe("DefectCartFlow", () => {
     fireEvent.click(screen.getByRole("button", { name: /다음/ }));
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
     fireEvent.change(screen.getByPlaceholderText(/예: 3/), { target: { value: "2" } });
-    const categorySelect = screen.getAllByRole("combobox").find((el) =>
-      el.querySelector('option[value="기타"]'),
-    );
-    fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "기타" } });
+    selectReasonCategory();
 
     fireEvent.click(screen.getByRole("button", { name: /즉시 폐기/ }));
 
@@ -195,10 +200,7 @@ describe("DefectCartFlow", () => {
 
     expect(screen.queryByText("원자재")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
-    const categorySelect = screen.getAllByRole("combobox").find((el) =>
-      el.querySelector('option[value="기타"]'),
-    );
-    fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "기타" } });
+    selectReasonCategory();
 
     fireEvent.click(screen.getByRole("button", { name: /BOM 확인/ }));
     expect(await screen.findByText("④ BOM 확인")).toBeInTheDocument();

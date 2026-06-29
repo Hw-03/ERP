@@ -1,6 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { AppSelect } from "../common/AppSelect";
 import { REASON_CATEGORIES } from "./reasonCategories";
 
 export interface ReasonFormFieldsProps {
@@ -38,23 +39,16 @@ export function ReasonFormFields({
             : <span className="ml-1 font-bold" style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
           }
         </label>
-        <select
+        <AppSelect
           value={category}
-          onChange={(e) => onCategoryChange(e.target.value)}
-          className="w-full rounded-[10px] border px-3 py-2 text-sm font-bold outline-none transition-colors"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: categoryMissing ? LEGACY_COLORS.red : LEGACY_COLORS.border,
-            color: category ? LEGACY_COLORS.text : LEGACY_COLORS.muted,
+          onChange={onCategoryChange}
+          placeholder="카테고리 선택"
+          options={REASON_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+          size="md"
+          triggerStyle={{
+            borderColor: categoryMissing ? LEGACY_COLORS.red : undefined,
           }}
-        >
-          <option value="">카테고리 선택</option>
-          {REASON_CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
+        />
         {categoryMissing && (
           <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
             카테고리를 선택하세요.

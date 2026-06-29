@@ -105,7 +105,9 @@ export function AppSelect({
     const el = listRef.current.querySelector<HTMLLIElement>(
       `[data-idx="${activeIndex}"]`,
     );
-    el?.scrollIntoView({ block: "nearest" });
+    if (typeof el?.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest" });
+    }
   }, [activeIndex, open]);
 
   const commit = useCallback(
