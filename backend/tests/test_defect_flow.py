@@ -303,11 +303,11 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
     assert disassemble_log.producer_employee_id == actor.employee_id
 
 
-    # keep 자식 → PRODUCTION 입고 확인
+    # keep 자식 → 품목코드 기준 부서(PRODUCTION) 입고 확인
     for child in [child1, child3]:
         prod_loc = db_session.query(InventoryLocation).filter(
             InventoryLocation.item_id == child.item_id,
-            InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+            InventoryLocation.department == DepartmentEnum.TUBE.value,
             InventoryLocation.status == LocationStatusEnum.PRODUCTION,
         ).first()
         assert prod_loc is not None and prod_loc.quantity == Decimal("2"), f"{child.item_name} 입고 실패"
@@ -319,10 +319,10 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
         assert recv_log is not None
         assert recv_log.producer_employee_id == actor.employee_id
 
-    # 회수 외 자식 → 격리(DEFECTIVE) 적재 + MARK_DEFECTIVE 로그 (폐기 아님, 소실 아님)
+    # 회수 외 자식 → 품목코드 기준 부서 격리(DEFECTIVE) 적재 + MARK_DEFECTIVE 로그 (폐기 아님, 소실 아님)
     quarantine_loc = db_session.query(InventoryLocation).filter(
         InventoryLocation.item_id == child2.item_id,
-        InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+        InventoryLocation.department == DepartmentEnum.TUBE.value,
         InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
     ).first()
     assert quarantine_loc is not None and quarantine_loc.quantity == Decimal("2")

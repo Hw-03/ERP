@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { DefectLocation } from "@/lib/api/types/defects";
 
@@ -157,11 +157,12 @@ beforeEach(() => {
 });
 
 describe("PaPfDefectWizard", () => {
-  it("open=true 시 모달이 렌더링된다", () => {
+  it("open=true 시 모달이 렌더링된다", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/전극 어셈블리/)).toBeInTheDocument();
     expect(screen.getByText(/7-TR-0001/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("필라멘트")).toBeInTheDocument());
   });
 
   it("'정상 복귀' 선택 시 DisassembleTree 미표시, 버튼 텍스트 변경", async () => {
@@ -171,7 +172,7 @@ describe("PaPfDefectWizard", () => {
     fireEvent.click(screen.getByLabelText(/정상 복귀/));
 
     // BOM 트리 영역이 없어야 함 (로딩 텍스트도 없어야 함)
-    expect(screen.queryByText("BOM 자식 목록 로딩 중...")).not.toBeInTheDocument();
+    expect(screen.queryByText("BOM 하위 품목 로딩 중...")).not.toBeInTheDocument();
 
     // 사유 선택
     fireEvent.change(screen.getByTestId("category-select"), {
@@ -187,7 +188,7 @@ describe("PaPfDefectWizard", () => {
 
     fireEvent.click(screen.getByLabelText(/전부 폐기/));
 
-    expect(screen.queryByText("BOM 자식 목록 로딩 중...")).not.toBeInTheDocument();
+    expect(screen.queryByText("BOM 하위 품목 로딩 중...")).not.toBeInTheDocument();
 
     // 사유 필수 — 카테고리 선택
     fireEvent.change(screen.getByTestId("category-select"), {
@@ -217,7 +218,7 @@ describe("PaPfDefectWizard", () => {
     });
   });
 
-  it("'분해' 선택 → DisassembleTree 렌더 → getBomTemplate 호출 → 자식 행 표시", async () => {
+  it("'재작업' 선택 → DisassembleTree 렌더 → getBomTemplate 호출 → 자식 행 표시", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
     // 분해는 기본 선택이므로 BOM 로드
@@ -233,7 +234,7 @@ describe("PaPfDefectWizard", () => {
     );
   });
 
-  it("분해 + 정상/폐기 수량 분할 → 결재 요청 → createStockRequest(DEFECT_DISASSEMBLE, notes JSON 검증)", async () => {
+  it("재작업 + 정상/격리/폐기 수량 분할 → 결재 요청 → createStockRequest(DEFECT_DISASSEMBLE, notes JSON 검증)", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
     // BOM 로드 대기
@@ -246,13 +247,13 @@ describe("PaPfDefectWizard", () => {
       target: { value: "기능 불량" },
     });
 
-    // 게터 행의 정상 수량 input 을 0 으로 변경 (= 전부 폐기)
-    const keepInput = screen.getByLabelText("게터 정상 수량");
-    fireEvent.change(keepInput, { target: { value: "0" } });
+    // 게터 행의 폐기 수량을 5로 변경하면 정상 수량이 0으로 자동 보정된다.
+    fireEvent.change(screen.getByLabelText("게터 폐기 수량"), { target: { value: "5" } });
+    expect(screen.getByLabelText("게터 정상 수량")).toHaveValue(0);
 
     // 즉시 처리 → 확인 팝업 → 확인 버튼
     fireEvent.click(screen.getByText("즉시 처리 →"));
-    await waitFor(() => expect(screen.getByText("재작업(분해) 확인")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("재작업 확인")).toBeInTheDocument());
     fireEvent.click(screen.getByText("즉시 처리"));
 
     await waitFor(() => {
@@ -273,18 +274,21 @@ describe("PaPfDefectWizard", () => {
 
     const call = vi.mocked(stockRequestsApi.createStockRequest).mock.calls[0][0];
     const parsedNotes = JSON.parse(call.notes as string) as {
-      child_decisions: { item_id: string; keep_qty?: number; qty: number }[];
+      child_decisions: { item_id: string; normal_qty?: number; defective_qty?: number; scrap_qty?: number; qty: number }[];
     };
     expect(parsedNotes.child_decisions).toHaveLength(2);
     expect(parsedNotes.child_decisions[1]).toMatchObject({
       item_id: "child-002",
-      keep_qty: 0,
+      normal_qty: 0,
+      defective_qty: 0,
+      scrap_qty: 5,
     });
   });
 
-  it("카테고리 미선택 시 즉시 처리 버튼 비활성", () => {
+  it("카테고리 미선택 시 즉시 처리 버튼 비활성", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
+    await waitFor(() => expect(screen.getByText("필라멘트")).toBeInTheDocument());
     const submitBtn = screen.getByText("즉시 처리 →");
     expect(submitBtn).toBeDisabled();
   });

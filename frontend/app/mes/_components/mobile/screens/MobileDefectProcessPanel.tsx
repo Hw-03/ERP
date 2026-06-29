@@ -14,6 +14,7 @@ import type { Department } from "@/lib/api/types/shared";
 import {
   DisassembleTree,
   toServerDecision,
+  validateDecisionTree,
   type ChildDecision,
 } from "../../_defect_hub/DisassembleTree";
 import { InlineErrorNote } from "../../_defect_hub/InlineErrorNote";
@@ -27,7 +28,7 @@ type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
  * 불량 통합 처리 — 모바일 전용.
  *
  * 데스크톱 DefectProcessPanel 의 동작/옵션(정상복귀·재작업·전체폐기·반품, 사유 선택,
- * has_bom 일 때만 재작업, 창고 부서만 반품, 재작업 시 BOM 분해 step2)을 그대로 옮기되,
+ * has_bom 일 때만 재작업, 창고 부서만 반품, 재작업 시 BOM 재작업 step2)을 그대로 옮기되,
  * 393px 레이아웃(세로 액션 카드·Stepper·인라인 하단 버튼)으로 재구성한다.
  * 데스크톱 컴포넌트는 건드리지 않는다(동명 분리 정책).
  */
@@ -71,8 +72,10 @@ export function MobileDefectProcessPanel({
     if (action !== "disassemble") setDecisions([]);
   }, [action]);
 
+  const reworkReady = decisions.length > 0 && validateDecisionTree(decisions);
+
   async function handleSubmit() {
-    if (busy) return;
+    if (busy || (action === "disassemble" && !reworkReady)) return;
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -137,7 +140,7 @@ export function MobileDefectProcessPanel({
   };
   const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
 
-  // ── Step 2: BOM 분해(재작업) ──────────────────────────────────────────
+  // ── Step 2: BOM 재작업 ──────────────────────────────────────────
   if (step === 2) {
     return (
       <div className="flex h-full min-h-0 flex-col">
@@ -168,7 +171,7 @@ export function MobileDefectProcessPanel({
 
         <div className="flex flex-col gap-2">
           <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-            BOM 자식 트리
+            BOM 재작업 트리
           </span>
           <DisassembleTree
             parentItemId={location.item_id}
@@ -187,7 +190,7 @@ export function MobileDefectProcessPanel({
         <StickyFooter>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !reworkReady}
             onClick={() => setConfirmOpen(true)}
             className={clsx(
               "w-full rounded-[16px] px-4 py-[14px] font-black text-white transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
@@ -201,7 +204,7 @@ export function MobileDefectProcessPanel({
 
         <ConfirmModal
           open={confirmOpen}
-          title="재작업(분해) 확인"
+          title="재작업 확인"
           tone="danger"
           cautionMessage="이 작업은 즉시 반영됩니다."
           confirmLabel="즉시 처리"
@@ -213,7 +216,7 @@ export function MobileDefectProcessPanel({
           }}
         >
           <span style={{ color: LEGACY_COLORS.text }}>
-            {location.item_name} × {processQty}개를 분해·재작업합니다.
+            {location.item_name} × {processQty}개를 재작업합니다.
           </span>
         </ConfirmModal>
       </div>
@@ -291,7 +294,7 @@ export function MobileDefectProcessPanel({
         {location.has_bom && (
           <ActionRow
             label="재작업"
-            desc="BOM 분해 후 처리"
+            desc="BOM 재작업 후 처리"
             color={LEGACY_COLORS.yellow}
             selected={action === "disassemble"}
             onClick={() => setAction("disassemble")}

@@ -37,7 +37,7 @@ export function WarehouseSectionTabs({
 }: Props) {
   const tabs: TabDef[] = [
     { id: "compose", label: "요청 작성", tone: LEGACY_COLORS.blue },
-    { id: "cart", label: "작업 중", tone: LEGACY_COLORS.green },
+    { id: "cart", label: "작성 중", tone: LEGACY_COLORS.green },
     { id: "mine", label: "내 요청", tone: LEGACY_COLORS.purple },
   ];
   if (showQueue) tabs.push({ id: "queue", label: "창고 승인함", tone: LEGACY_COLORS.yellow });

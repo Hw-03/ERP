@@ -114,6 +114,7 @@ export const REQUEST_TYPE_LABEL: Record<string, string> = {
   defect_disassemble: "불량 분해",
   // R 정상 재고 바로 처리 (격리 미경유)
   scrap_normal: "정상 폐기",
+  rework_normal: "정상 재작업",
   return_normal: "정상 반품",
 };
 

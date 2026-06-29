@@ -9,7 +9,7 @@ import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
-import { DisassembleTree, toServerDecision, type ChildDecision } from "./DisassembleTree";
+import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDecision } from "./DisassembleTree";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { REASON_CATEGORIES } from "./reasonCategories";
@@ -52,8 +52,10 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
     if (action !== "disassemble") setDecisions([]);
   }, [action]);
 
+  const reworkReady = decisions.length > 0 && validateDecisionTree(decisions);
+
   async function handleSubmit() {
-    if (busy) return;
+    if (busy || (action === "disassemble" && !reworkReady)) return;
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -172,6 +174,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
                   onChange={(e) => {
                     const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
                     setProcessQty(v);
+                    setDecisions([]);
                   }}
                   className="w-24 rounded-[10px] border px-3 py-2 text-center text-base font-black"
                   style={{ borderColor: tint(LEGACY_COLORS.blue, 35), background: LEGACY_COLORS.s1, color: LEGACY_COLORS.blue }}
@@ -197,7 +200,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
 
           {/* BOM 트리 */}
           <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <span className="text-sm font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>BOM 자식 트리</span>
+            <span className="text-sm font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>BOM 재작업 트리</span>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <DisassembleTree
                 parentItemId={location.item_id}
@@ -216,10 +219,10 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
 
         {/* 하단 */}
         <div className="flex shrink-0 items-center justify-between gap-2 pt-4">
-          <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>BOM 수량 확인 후 최종 처리하세요.</span>
+          <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>정상·격리·폐기 합계가 처리 수량과 같아야 합니다.</span>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !reworkReady}
             onClick={() => setConfirmOpen(true)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: LEGACY_COLORS.yellow }}
@@ -230,7 +233,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
 
         <ConfirmModal
           open={confirmOpen}
-          title="재작업(분해) 확인"
+          title="재작업 확인"
           tone="danger"
           cautionMessage="이 작업은 즉시 반영됩니다."
           confirmLabel="즉시 처리"
@@ -238,7 +241,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
         >
-          <span style={{ color: LEGACY_COLORS.text }}>{location.item_name} × {processQty}개를 분해·재작업합니다.</span>
+          <span style={{ color: LEGACY_COLORS.text }}>{location.item_name} × {processQty}개를 재작업합니다.</span>
         </ConfirmModal>
       </div>
     );
@@ -307,6 +310,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             onChange={(e) => {
               const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
               setProcessQty(v);
+                    setDecisions([]);
             }}
             className="w-28 rounded-[10px] border px-3 py-2.5 text-center text-base font-black"
             style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
@@ -328,7 +332,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             {location.has_bom && (
               <ActionCard
                 label="재작업"
-                desc="BOM 분해 후 처리"
+                desc="BOM 재작업 후 처리"
                 color={LEGACY_COLORS.yellow}
                 selected={action === "disassemble"}
                 onClick={() => setAction("disassemble")}

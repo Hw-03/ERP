@@ -59,6 +59,7 @@ class ItemResponse(BaseModel):
     process_type_code: Optional[str] = None
     serial_no: Optional[int] = None
     bom_completed_at: Optional[UtcDatetime] = None
+    has_bom: bool = False
     deleted_at: Optional[UtcDatetime] = None
     created_at: UtcDatetime
     updated_at: UtcDatetime

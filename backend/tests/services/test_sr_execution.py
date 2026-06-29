@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -384,6 +385,180 @@ def test_execute_line_mark_defective_prod(db_session, make_item, make_location):
     assert len(logs) == 1
     assert logs[0].transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
 
+
+
+def test_execute_line_scrap_normal_from_production(db_session, make_item, make_location):
+    """SCRAP_NORMAL: 부서 PRODUCTION 차감, 총량 감소, DEFECT_SCRAP 로그 생성."""
+    item = make_item(name="SNP", warehouse_qty=D("0"))
+    make_location(item.item_id, department=ASSEMBLY,
+                  status=LocationStatusEnum.PRODUCTION, quantity=D("5"))
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inv.quantity = D("5")
+    db_session.flush()
+
+    emp = _make_employee(db_session)
+    req = _make_request(
+        db_session, emp, request_type=StockRequestTypeEnum.SCRAP_NORMAL,
+        requires_warehouse_approval=False,
+        reason_category="기타",
+        reason_memo="즉시 폐기",
+    )
+    line = _add_line(
+        db_session, req, item, quantity=D("2"),
+        from_bucket=RequestBucketEnum.PRODUCTION, to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+
+    svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
+    db_session.flush()
+
+    assert _prod_qty(db_session, item.item_id, ASSEMBLY) == D("3")
+    assert _total_qty(db_session, item.item_id) == D("3")
+    logs = _logs(db_session, item.item_id)
+    assert len(logs) == 1
+    assert logs[0].transaction_type == TransactionTypeEnum.DEFECT_SCRAP
+    assert logs[0].quantity_change == D("-2")
+
+
+def test_execute_line_rework_normal_splits_children_by_item_department(
+    db_session, make_item, make_location
+):
+    """REWORK_NORMAL: 정상 부모 차감 후 하위 정상/격리/폐기를 품목코드 부서 기준으로 처리."""
+    parent = make_item(name="RN-PARENT", process_type_code="PF", warehouse_qty=D("0"))
+    normal_child = make_item(name="TUBE-CHILD", process_type_code="TR", warehouse_qty=D("0"))
+    defective_child = make_item(name="HV-CHILD", process_type_code="HR", warehouse_qty=D("0"))
+    scrap_child = make_item(name="ASSY-CHILD", process_type_code="AR", warehouse_qty=D("0"))
+    make_location(parent.item_id, department=ASSEMBLY,
+                  status=LocationStatusEnum.PRODUCTION, quantity=D("2"))
+    inv = db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).first()
+    inv.quantity = D("2")
+    db_session.flush()
+
+    emp = _make_employee(db_session)
+    req = _make_request(
+        db_session,
+        emp,
+        request_type=StockRequestTypeEnum.REWORK_NORMAL,
+        requires_warehouse_approval=False,
+        reason_category="기타",
+        reason_memo="바로 재작업",
+        notes=json.dumps({
+            "child_decisions": [
+                {
+                    "item_id": str(normal_child.item_id),
+                    "qty": "2",
+                    "normal_qty": "2",
+                    "defective_qty": "0",
+                    "scrap_qty": "0",
+                },
+                {
+                    "item_id": str(defective_child.item_id),
+                    "qty": "2",
+                    "normal_qty": "0",
+                    "defective_qty": "1",
+                    "scrap_qty": "1",
+                    "reason_memo": "재검 필요",
+                },
+                {
+                    "item_id": str(scrap_child.item_id),
+                    "qty": "2",
+                    "normal_qty": "0",
+                    "defective_qty": "0",
+                    "scrap_qty": "2",
+                },
+            ]
+        }),
+    )
+    line = _add_line(
+        db_session, req, parent, quantity=D("2"),
+        from_bucket=RequestBucketEnum.PRODUCTION, to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+
+    svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
+    db_session.flush()
+
+    assert _prod_qty(db_session, parent.item_id, ASSEMBLY) == D("0")
+    assert _total_qty(db_session, parent.item_id) == D("0")
+    assert _prod_qty(db_session, normal_child.item_id, DepartmentEnum.TUBE) == D("2")
+    assert _defective_qty(db_session, defective_child.item_id, DepartmentEnum.HIGH_VOLTAGE) == D("1")
+    assert _total_qty(db_session, defective_child.item_id) == D("1")
+    assert _total_qty(db_session, scrap_child.item_id) == D("0")
+
+    parent_logs = _logs(db_session, parent.item_id)
+    assert [log.transaction_type for log in parent_logs] == [TransactionTypeEnum.DISASSEMBLE]
+    assert parent_logs[0].quantity_change == D("-2")
+
+    normal_log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == normal_child.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE,
+    ).one()
+    defective_log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == defective_child.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
+    ).one()
+    defective_scrap_log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == defective_child.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP,
+    ).one()
+    scrap_log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == scrap_child.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP,
+    ).one()
+    assert normal_log.department == DepartmentEnum.TUBE.value
+    assert defective_log.department == DepartmentEnum.HIGH_VOLTAGE.value
+    assert defective_scrap_log.department == DepartmentEnum.HIGH_VOLTAGE.value
+    assert scrap_log.department == DepartmentEnum.ASSEMBLY.value
+
+
+def test_execute_line_defect_disassemble_uses_three_way_child_split(
+    db_session, make_item, make_location
+):
+    """DEFECT_DISASSEMBLE: 격리 부모도 같은 정상/격리/폐기 3분할 모델을 사용한다."""
+    parent = make_item(name="QD-PARENT", process_type_code="PF", warehouse_qty=D("0"))
+    child = make_item(name="VAC-CHILD", process_type_code="VR", warehouse_qty=D("0"))
+    make_location(parent.item_id, department=ASSEMBLY,
+                  status=LocationStatusEnum.DEFECTIVE, quantity=D("3"))
+    inv = db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).first()
+    inv.quantity = D("3")
+    db_session.flush()
+
+    emp = _make_employee(db_session)
+    req = _make_request(
+        db_session,
+        emp,
+        request_type=StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+        requires_warehouse_approval=False,
+        notes=json.dumps({
+            "child_decisions": [{
+                "item_id": str(child.item_id),
+                "qty": "3",
+                "normal_qty": "1",
+                "defective_qty": "1",
+                "scrap_qty": "1",
+            }]
+        }),
+    )
+    line = _add_line(
+        db_session, req, parent, quantity=D("3"),
+        from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+
+    svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
+    db_session.flush()
+
+    assert _defective_qty(db_session, parent.item_id, ASSEMBLY) == D("0")
+    assert _prod_qty(db_session, child.item_id, DepartmentEnum.VACUUM) == D("1")
+    assert _defective_qty(db_session, child.item_id, DepartmentEnum.VACUUM) == D("1")
+    assert _total_qty(db_session, child.item_id) == D("2")
+
+    child_logs = _logs(db_session, child.item_id)
+    assert [log.transaction_type for log in child_logs] == [
+        TransactionTypeEnum.RECEIVE,
+        TransactionTypeEnum.MARK_DEFECTIVE,
+        TransactionTypeEnum.DEFECT_SCRAP,
+    ]
 
 def test_execute_line_raw_ship_insufficient_raises(db_session, make_item):
     """RAW_SHIP 창고 재고 부족 → ValueError."""

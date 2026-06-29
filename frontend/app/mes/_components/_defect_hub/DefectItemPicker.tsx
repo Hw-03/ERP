@@ -161,19 +161,6 @@ export function DefectItemPicker({
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
-        {lockedDepartment && (
-          <div
-            data-testid="defect-locked-dept"
-            className="inline-flex w-fit items-center gap-1.5 rounded-[10px] border px-2.5 py-1 text-xs font-black"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, ${LEGACY_COLORS.s2})`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 28%, ${LEGACY_COLORS.border})`,
-              color: LEGACY_COLORS.blue,
-            }}
-          >
-            {"\uc9c4\uc785 \ubd80\uc11c: "}{lockedDepartment}
-          </div>
-        )}
         <div className="flex items-center justify-between gap-2">
           <div className={filterGridClass} style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
             {!lockedDepartment && <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />}

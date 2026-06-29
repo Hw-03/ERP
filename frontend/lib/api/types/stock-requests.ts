@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Stock requests 도메인 타입 — `@/lib/api/types/stock-requests`.
  * (작업자 결재 요청 흐름)
  * Round-10A (#2) 본문 이전.
@@ -31,7 +31,8 @@ export type StockRequestType =
   // R 정상 재고 바로 폐기/반품 — 격리를 거치지 않고 정상(창고/부서) 재고에서 즉시 처리.
   // 백엔드 StockRequestTypeEnum 의 SCRAP_NORMAL/RETURN_NORMAL 값과 정확히 일치.
   | "scrap_normal"
-  | "return_normal";
+  | "return_normal"
+  | "rework_normal";
 
 export type RequestBucket = "warehouse" | "production" | "defective" | "none";
 

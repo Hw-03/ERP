@@ -1,4 +1,4 @@
-"""부서 재고 조정 서비스 — 생산/조립·분해/회수·수량 보정.
+﻿"""부서 재고 조정 서비스 — 생산/조립·분해/회수·수량 보정.
 
 처리 정책:
 - 부서 PRODUCTION 재고끼리만 움직임 (즉시 처리, 창고 승인 불필요).
@@ -295,63 +295,99 @@ def submit_adjustment(
 # ---------------------------------------------------------------------------
 
 
-def submit_defective_disassemble(
+def _rework_dept_for_item(db: Session, item_id: uuid.UUID, fallback: DepartmentEnum) -> DepartmentEnum:
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    code = (item.process_type_code or "").strip().upper() if item else ""
+    prefix_map = {
+        "T": DepartmentEnum.TUBE,
+        "H": DepartmentEnum.HIGH_VOLTAGE,
+        "V": DepartmentEnum.VACUUM,
+        "N": DepartmentEnum.TUNING,
+        "A": DepartmentEnum.ASSEMBLY,
+        "P": DepartmentEnum.SHIPPING,
+    }
+    return prefix_map.get(code[:1], fallback)
+
+
+def _split_rework_quantities(decision: dict, qty: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+    has_three_way = any(k in decision for k in ("normal_qty", "defective_qty", "scrap_qty"))
+    if has_three_way:
+        normal_qty = Decimal(str(decision.get("normal_qty", "0") or "0"))
+        defective_qty = Decimal(str(decision.get("defective_qty", "0") or "0"))
+        scrap_qty = Decimal(str(decision.get("scrap_qty", "0") or "0"))
+    elif "keep_qty" in decision:
+        normal_qty = Decimal(str(decision["keep_qty"] or "0"))
+        defective_qty = qty - normal_qty
+        scrap_qty = Decimal("0")
+    elif decision.get("action") == "keep":
+        normal_qty = qty
+        defective_qty = Decimal("0")
+        scrap_qty = Decimal("0")
+    elif decision.get("action") == "scrap":
+        normal_qty = Decimal("0")
+        defective_qty = qty
+        scrap_qty = Decimal("0")
+    else:
+        raise ValueError(f"자식 결정에 normal_qty/defective_qty/scrap_qty 또는 keep_qty/action 이 필요합니다: {decision}")
+
+    if normal_qty < 0 or defective_qty < 0 or scrap_qty < 0:
+        raise ValueError(f"재작업 수량은 음수일 수 없습니다: {decision}")
+    if normal_qty + defective_qty + scrap_qty != qty:
+        raise ValueError(
+            f"재작업 수량 합계({normal_qty + defective_qty + scrap_qty})가 총 수량({qty})과 다릅니다: {decision}"
+        )
+    return normal_qty, defective_qty, scrap_qty
+
+
+def _submit_rework_disassemble(
     db: Session,
     parent_item_id: uuid.UUID,
     parent_qty: Decimal,
     parent_dept: DepartmentEnum,
     child_decisions: list[dict],
     *,
+    parent_source: str,
+    normal_source_kind: str | None = None,
     reason_category: str,
     reason_memo: str,
     actor: str,
     actor_employee_id: Optional[uuid.UUID] = None,
 ) -> dict:
-    """격리(DEFECTIVE) 품목 분해 처리 — 재귀 트리 + 수량 분할 지원.
-
-    child_decisions 형식 (재귀):
-        leaf:    {"item_id": uuid, "qty": Decimal, "keep_qty": Decimal, "reason_memo": str|None}
-        nested:  {"item_id": uuid, "qty": Decimal, "children": [<재귀>]}
-        호환(legacy 1-depth): {"item_id": uuid, "action": "keep"|"scrap", "qty": Decimal, ...}
-
-    의미:
-    - leaf 노드: keep_qty 만큼 부서 PRODUCTION 입고 (RECEIVE), 나머지 (qty - keep_qty) 폐기 (DEFECT_SCRAP)
-    - children 있는 노드: 자기 자체 정상/폐기 처리 안 함(분해됨), 자식들 재귀 처리
-
-    처리 결과:
-        - 부모: DEFECTIVE 차감 (DISASSEMBLE 트랜잭션)
-        - 각 leaf 의 keep_qty>0 → RECEIVE 로그 + 재고 입고
-        - 각 leaf 의 scrap_qty>0 → DEFECT_SCRAP 로그 (재고 변동 없음 — 부모에 내재)
-        - 중간 노드(children 보유) → 트랜잭션 로그 없음, 자식만 처리
-
-    모든 TransactionLog 에 동일 batch_ref 공유.
-    """
     if parent_qty <= 0:
-        raise ValueError("분해 수량은 0보다 커야 합니다.")
+        raise ValueError("재작업 수량은 0보다 커야 합니다.")
     if not child_decisions:
         raise ValueError("자식 결정이 비어 있습니다.")
 
     batch_id = uuid.uuid4()
-    # TransactionLog.operation_batch_id 는 io_batches FK — 직접 사용 불가.
-    # 대신 reference_no 에 batch_id 를 기록해 그룹 식별자로 활용한다.
     batch_ref = f"defect-disassemble:{batch_id}"
-
-    # TransactionLog.department(String) 에는 enum repr("DepartmentEnum.X")이 아니라
-    # 한국어 값("조립")이 들어가야 한다. str(enum) 금지 — .value 사용.
     parent_dept_value = getattr(parent_dept, "value", parent_dept)
-
-    # 1) 부모 DEFECTIVE 차감
-    parent_cells_before = inv_effect.snapshot_cells(db, parent_item_id)
-    parent_inv = inventory_svc.scrap_defective(
-        db, parent_item_id, parent_qty, parent_dept,
-        inventory_svc.ReasonContext(
-            category=reason_category,
-            memo=reason_memo,
-            actor=actor,
-        ),
+    reason = inventory_svc.ReasonContext(
+        category=reason_category,
+        memo=reason_memo,
+        actor=actor,
     )
-    qty_before_parent = (parent_inv.quantity or Decimal("0")) + parent_qty
 
+    parent_cells_before = inv_effect.snapshot_cells(db, parent_item_id)
+    if parent_source == "defective":
+        parent_inv = inventory_svc.scrap_defective(
+            db, parent_item_id, parent_qty, parent_dept, reason
+        )
+    elif parent_source == "normal":
+        source_kind = normal_source_kind or "production"
+        parent_inv = inventory_svc.scrap_normal(
+            db,
+            parent_item_id,
+            parent_qty,
+            inventory_svc.NormalSource(kind=source_kind, dept_or_warehouse=parent_dept),
+            reason,
+        )
+    else:
+        raise ValueError(f"알 수 없는 재작업 부모 출처: {parent_source}")
+
+    qty_before_parent = (parent_inv.quantity or Decimal("0")) + parent_qty
+    parent_note = "[rework:normal]" if parent_source == "normal" else "[rework:defective]"
+    if reason_memo:
+        parent_note += f" {reason_memo}"
     parent_log = TransactionLog(
         item_id=parent_item_id,
         transaction_type=TransactionTypeEnum.DISASSEMBLE,
@@ -360,7 +396,7 @@ def submit_defective_disassemble(
         quantity_after=parent_inv.quantity,
         produced_by=actor,
         producer_employee_id=actor_employee_id,
-        notes=None,
+        notes=parent_note,
         reason_category=reason_category,
         reason_memo=reason_memo,
         reference_no=batch_ref,
@@ -371,7 +407,7 @@ def submit_defective_disassemble(
     db.flush()
 
     child_log_ids: list[uuid.UUID] = []
-    _MAX_DEPTH = 10  # explode_bom 과 동일
+    _MAX_DEPTH = 10
 
     def process(decision: dict, depth: int) -> None:
         if depth > _MAX_DEPTH:
@@ -380,87 +416,92 @@ def submit_defective_disassemble(
         qty = Decimal(str(decision.get("qty", parent_qty)))
         children = decision.get("children")
         if children:
-            # 중간 노드 — 자기 자체 처리 skip, 자식 재귀
             for child in children:
                 process(child, depth + 1)
             return
 
-        # leaf — keep_qty / scrap_qty 분리 처리. legacy action 호환.
-        if "keep_qty" in decision:
-            keep_qty = Decimal(str(decision["keep_qty"]))
-        elif decision.get("action") == "keep":
-            keep_qty = qty
-        elif decision.get("action") == "scrap":
-            keep_qty = Decimal("0")
-        else:
-            raise ValueError(
-                f"자식 결정에 keep_qty 또는 action 이 필요합니다: {decision}"
-            )
-        if keep_qty < 0 or keep_qty > qty:
-            raise ValueError(
-                f"keep_qty({keep_qty}) 가 범위(0..{qty}) 를 벗어났습니다: item_id={item_id}"
-            )
-        scrap_qty = qty - keep_qty
+        normal_qty, defective_qty, scrap_qty = _split_rework_quantities(decision, qty)
+        child_dept = _rework_dept_for_item(db, item_id, parent_dept)
+        child_dept_value = getattr(child_dept, "value", child_dept)
         child_note = decision.get("reason_memo") or reason_memo or ""
 
-        if keep_qty > 0:
-            keep_cells_before = inv_effect.snapshot_cells(db, item_id)
+        if normal_qty > 0:
+            cells_before = inv_effect.snapshot_cells(db, item_id)
             child_inv = inventory_svc.receive_confirmed(
-                db, item_id, keep_qty,
+                db, item_id, normal_qty,
                 bucket="production",
-                dept=parent_dept,
+                dept=child_dept,
             )
-            qty_before_child = (child_inv.quantity or Decimal("0")) - keep_qty
+            qty_before_child = (child_inv.quantity or Decimal("0")) - normal_qty
             log = TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.RECEIVE,
-                quantity_change=keep_qty,
+                quantity_change=normal_qty,
                 quantity_before=qty_before_child,
                 quantity_after=child_inv.quantity,
                 produced_by=actor,
                 producer_employee_id=actor_employee_id,
-                notes=None,
+                notes="[rework:normal_child]",
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
-                department=parent_dept_value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, keep_cells_before),
+                department=child_dept_value,
+                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
             )
             db.add(log)
             db.flush()
             child_log_ids.append(log.log_id)
 
-        if scrap_qty > 0:
-            # 회수하지 않은 잔량은 폐기로 소실시키지 않고 분해 부서의 격리(DEFECTIVE)로
-            # 적재한다. keep_qty(PRODUCTION 입고)와 대칭으로 신규 적재 → 총량 증가.
-            # 이후 폐기 여부는 불량 허브의 격리→폐기(결재) 흐름에서 결정한다.
-            scrap_cells_before = inv_effect.snapshot_cells(db, item_id)
-            q_inv = inventory_svc.receive_defective(
+        if defective_qty > 0:
+            cells_before = inv_effect.snapshot_cells(db, item_id)
+            child_inv = inventory_svc.receive_defective(
                 db,
                 item_id,
-                scrap_qty,
-                parent_dept,
+                defective_qty,
+                child_dept,
                 inventory_svc.ReasonContext(
                     category=reason_category,
                     memo=child_note or reason_memo,
                     actor=actor,
                 ),
             )
-            qty_before_q = (q_inv.quantity or Decimal("0")) - scrap_qty
+            qty_before_child = (child_inv.quantity or Decimal("0")) - defective_qty
             log = TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
-                quantity_change=scrap_qty,
-                quantity_before=qty_before_q,
-                quantity_after=q_inv.quantity,
+                quantity_change=defective_qty,
+                quantity_before=qty_before_child,
+                quantity_after=child_inv.quantity,
                 produced_by=actor,
                 producer_employee_id=actor_employee_id,
-                notes=None,
+                notes="[rework:defective_child]",
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
-                department=parent_dept_value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, scrap_cells_before),
+                department=child_dept_value,
+                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+            )
+            db.add(log)
+            db.flush()
+            child_log_ids.append(log.log_id)
+
+        if scrap_qty > 0:
+            cells_before = inv_effect.snapshot_cells(db, item_id)
+            child_inv = inventory_svc.get_or_create_inventory(db, item_id)
+            log = TransactionLog(
+                item_id=item_id,
+                transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
+                quantity_change=-scrap_qty,
+                quantity_before=(child_inv.quantity or Decimal("0")) + scrap_qty,
+                quantity_after=child_inv.quantity,
+                produced_by=actor,
+                producer_employee_id=actor_employee_id,
+                notes="[rework:scrap_child]",
+                reason_category=reason_category,
+                reason_memo=child_note or None,
+                reference_no=batch_ref,
+                department=child_dept_value,
+                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
             )
             db.add(log)
             db.flush()
@@ -475,3 +516,59 @@ def submit_defective_disassemble(
         "parent_log_id": parent_log.log_id,
         "child_log_ids": child_log_ids,
     }
+
+
+def submit_defective_disassemble(
+    db: Session,
+    parent_item_id: uuid.UUID,
+    parent_qty: Decimal,
+    parent_dept: DepartmentEnum,
+    child_decisions: list[dict],
+    *,
+    reason_category: str,
+    reason_memo: str,
+    actor: str,
+    actor_employee_id: Optional[uuid.UUID] = None,
+) -> dict:
+    """격리 품목 재작업: 부모 DEFECTIVE 차감 후 하위 정상/격리/폐기 3분할."""
+    return _submit_rework_disassemble(
+        db,
+        parent_item_id,
+        parent_qty,
+        parent_dept,
+        child_decisions,
+        parent_source="defective",
+        reason_category=reason_category,
+        reason_memo=reason_memo,
+        actor=actor,
+        actor_employee_id=actor_employee_id,
+    )
+
+
+def submit_normal_disassemble(
+    db: Session,
+    parent_item_id: uuid.UUID,
+    parent_qty: Decimal,
+    source_kind: str,
+    source_dept: DepartmentEnum,
+    child_decisions: list[dict],
+    *,
+    reason_category: str,
+    reason_memo: str,
+    actor: str,
+    actor_employee_id: Optional[uuid.UUID] = None,
+) -> dict:
+    """정상 품목 바로 재작업: 부모 정상 재고 차감 후 하위 정상/격리/폐기 3분할."""
+    return _submit_rework_disassemble(
+        db,
+        parent_item_id,
+        parent_qty,
+        source_dept,
+        child_decisions,
+        parent_source="normal",
+        normal_source_kind=source_kind,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
+        actor=actor,
+        actor_employee_id=actor_employee_id,
+    )

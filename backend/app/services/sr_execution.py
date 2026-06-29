@@ -188,7 +188,6 @@ def _handle_scrap_normal(db, request, line, approver, qty, item_id) -> Decimal:
             category=request.reason_category or _DEFAULT_REASON_CATEGORY,
             memo=request.reason_memo or (request.notes or ""),
             actor=approver.name,
-            actor_employee_id=approver.employee_id,
         ),
     )
     return -qty
@@ -211,47 +210,70 @@ def _handle_return_normal(db, request, line, approver, qty, item_id) -> Decimal:
     return -qty
 
 
-def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Decimal:
-    # 분해 처리 — notes 에서 child_decisions JSON 추출 후 submit_defective_disassemble 호출.
-    # 분해 시 부모 1라인만 있고 자식 결정은 request.notes 에 JSON 직렬화되어 있다.
+def _child_decisions_from_notes(request, qty: Decimal) -> list[dict]:
     import json
-    from app.services.dept_adjustment import submit_defective_disassemble
-    if line.from_department is None:
-        raise ValueError("분해 처리는 from_department 가 필요합니다.")
-    reason_cat = request.reason_category or ""
-    reason_memo_val = request.reason_memo or ""
-    # child_decisions 는 request.notes 에 JSON으로 저장됨
+
     try:
         raw = json.loads(request.notes or "{}") if request.notes else {}
         child_decisions = raw.get("child_decisions", [])
     except (json.JSONDecodeError, TypeError):
         child_decisions = []
-    # child qty default → qty (부모와 동일 비율)
     for cd in child_decisions:
-        if "qty" not in cd:
-            cd["qty"] = str(qty)
-        else:
-            cd["qty"] = str(cd["qty"])
+        cd["qty"] = str(cd.get("qty", qty))
+    return child_decisions
+
+
+def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Decimal:
+    from app.services.dept_adjustment import submit_defective_disassemble
+
+    if line.from_department is None:
+        raise ValueError("재작업 처리에는 from_department 가 필요합니다.")
+    reason_cat = request.reason_category or _DEFAULT_REASON_CATEGORY
+    reason_memo_val = request.reason_memo or ""
+    child_decisions = _child_decisions_from_notes(request, qty)
     if child_decisions:
         submit_defective_disassemble(
             db, item_id, qty, line.from_department,
             child_decisions,
-            reason_category=reason_cat or _DEFAULT_REASON_CATEGORY,
+            reason_category=reason_cat,
             reason_memo=reason_memo_val,
             actor=approver.name,
+            actor_employee_id=approver.employee_id,
         )
     else:
-        # child_decisions 없으면 단순 scrap_defective (전부 폐기)
         inventory_svc.scrap_defective(
             db, item_id, qty, line.from_department,
             inventory_svc.ReasonContext(
-                category=reason_cat or _DEFAULT_REASON_CATEGORY,
+                category=reason_cat,
                 memo=reason_memo_val,
                 actor=approver.name,
             ),
         )
-    # 분해는 서비스 함수가 자체 로그 생성 — 추가 TransactionLog 불필요
-    # (아래 TransactionLog 생성 구문은 _TX_TYPE_BY_REQUEST 로 DISASSEMBLE 로 기록됨)
+    return -qty
+
+
+def _handle_rework_normal(db, request, line, approver, qty, item_id) -> Decimal:
+    from app.services.dept_adjustment import submit_normal_disassemble
+
+    source = _source_from_bucket(line)
+    if source == "production" and line.from_department is None:
+        raise ValueError("정상 재고 바로 재작업에는 from_department 가 필요합니다.")
+    source_dept = line.from_department or approver.department
+    child_decisions = _child_decisions_from_notes(request, qty)
+    if not child_decisions:
+        raise ValueError("재작업 자식 결정이 비어 있습니다.")
+    submit_normal_disassemble(
+        db,
+        item_id,
+        qty,
+        source,
+        source_dept,
+        child_decisions,
+        reason_category=request.reason_category or _DEFAULT_REASON_CATEGORY,
+        reason_memo=request.reason_memo or "",
+        actor=approver.name,
+        actor_employee_id=approver.employee_id,
+    )
     return -qty
 
 
@@ -270,6 +292,7 @@ _LINE_HANDLERS = {
     StockRequestTypeEnum.DEFECT_RETURN: _handle_defect_return,
     StockRequestTypeEnum.SCRAP_NORMAL: _handle_scrap_normal,
     StockRequestTypeEnum.RETURN_NORMAL: _handle_return_normal,
+    StockRequestTypeEnum.REWORK_NORMAL: _handle_rework_normal,
     StockRequestTypeEnum.DEFECT_DISASSEMBLE: _handle_defect_disassemble,
 }
 
@@ -317,12 +340,12 @@ def _execute_line(
         f"{from_label} → {to_label} / {qty}개 / "
         f"요청자 {request.requester_name}"
     )
-    if request.notes and rt != StockRequestTypeEnum.DEFECT_DISASSEMBLE:
+    if request.notes and rt not in (StockRequestTypeEnum.DEFECT_DISASSEMBLE, StockRequestTypeEnum.REWORK_NORMAL):
         note += f" / 비고: {request.notes}"
 
-    # DEFECT_DISASSEMBLE: submit_defective_disassemble 이 이미 부모 DISASSEMBLE 로그를 생성함.
+    # DEFECT_DISASSEMBLE/REWORK_NORMAL: 재작업 서비스가 이미 부모 DISASSEMBLE 로그를 생성함.
     # 여기서 중복 생성하면 "분해|출고" 행이 별도로 나타남 — 건너뜀.
-    if rt == StockRequestTypeEnum.DEFECT_DISASSEMBLE:
+    if rt in (StockRequestTypeEnum.DEFECT_DISASSEMBLE, StockRequestTypeEnum.REWORK_NORMAL):
         return
 
     db.add(

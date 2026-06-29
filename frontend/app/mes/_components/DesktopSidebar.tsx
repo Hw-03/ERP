@@ -11,7 +11,7 @@ export type { DesktopTabId } from "./tabAccess";
 
 type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: ElementType; color: string };
 
-// 항목 3-6 — 사이드바 아이콘에 탭별 고유색(비활성 시 표시). 활성은 기존 blue 박스+white 아이콘 유지.
+// ??ぉ 3-6 ???ъ씠?쒕컮 ?꾩씠肄섏뿉 ??퀎 怨좎쑀??鍮꾪솢?????쒖떆). ?쒖꽦? 湲곗〈 blue 諛뺤뒪+white ?꾩씠肄??좎?.
 const MAIN_TABS: TabDef[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: LEGACY_COLORS.blue },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: LEGACY_COLORS.green },
@@ -56,12 +56,12 @@ export function DesktopSidebar({
           boxShadow: "var(--c-card-shadow)",
         }}
       >
-        {/* 로고 */}
+        {/* 濡쒓퀬 */}
         <div
           className="flex items-center justify-center"
           style={{ height: expanded ? 68 : 44, transition: "height 180ms ease", flexShrink: 0 }}
         >
-          {/* 축소 상태: 전체 폭 로고 */}
+          {/* 異뺤냼 ?곹깭: ?꾩껜 ??濡쒓퀬 */}
           <div
             className="flex w-full items-center justify-center"
             style={{
@@ -81,7 +81,7 @@ export function DesktopSidebar({
               priority
             />
           </div>
-          {/* 확장 상태: 큰 로고 */}
+          {/* ?뺤옣 ?곹깭: ??濡쒓퀬 */}
           <div
             style={{
               opacity: expanded ? 1 : 0,
@@ -103,7 +103,7 @@ export function DesktopSidebar({
           </div>
         </div>
 
-        {/* 탭 내비게이션 */}
+        {/* ???대퉬寃뚯씠??*/}
         <nav className="mt-5 space-y-1.5">
           {MAIN_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
             <TabButton
@@ -118,7 +118,7 @@ export function DesktopSidebar({
           ))}
         </nav>
 
-        {/* 하단 고정: 관리 + 테마 */}
+        {/* ?섎떒 怨좎젙: 愿由?+ ?뚮쭏 */}
         <div className="mt-auto space-y-1.5 pt-1.5">
           {BOTTOM_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
             <TabButton
@@ -154,6 +154,7 @@ function TabButton({
   onHover: (id: DesktopTabId | null) => void;
 }) {
   const Icon = tab.icon;
+  const iconSizeClass = tab.id === "shipping" ? "h-[22px] w-[22px]" : "h-5 w-5";
   return (
     <button
       onClick={() => onTabChange(tab.id)}
@@ -183,7 +184,7 @@ function TabButton({
             color: active ? LEGACY_COLORS.white : tab.color,
           }}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className={iconSizeClass} />
         </div>
       </div>
       <div

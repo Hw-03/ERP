@@ -17,7 +17,7 @@ vi.mock("../../mobile/screens/MobileDefectProcessPanel", () => ({
     <div data-testid="process-panel">{location.mes_code}</div>
   ),
 }));
-// 격리 추가·바로 폐기 다품목 카트 모킹 — DOM 렌더만 검증
+// 격리 추가·바로 처리 다품목 카트 모킹 — DOM 렌더만 검증
 vi.mock("../../mobile/screens/MobileDefectCartFlow", () => ({
   MobileDefectCartFlow: ({ mode }: { mode: string }) => (
     <div data-testid="cart-flow">{mode}</div>
@@ -169,9 +169,9 @@ describe("DefectHubPanel", () => {
     expect(cart).toHaveTextContent("add");
   });
 
-  it("'바로 폐기' 카드 클릭 시 다품목 카트(scrap)로 전환된다", async () => {
+  it("'바로 처리' 카드 클릭 시 다품목 카트(scrap)로 전환된다", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
-    fireEvent.click(screen.getByText("바로 폐기"));
+    fireEvent.click(screen.getByText("바로 처리"));
     const cart = await screen.findByTestId("cart-flow");
     expect(cart).toHaveTextContent("scrap");
   });

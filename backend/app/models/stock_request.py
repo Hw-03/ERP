@@ -1,4 +1,4 @@
-"""입출고 결재 요청 (StockRequest / StockRequestLine)."""
+﻿"""입출고 결재 요청 (StockRequest / StockRequestLine)."""
 
 import enum
 import uuid
@@ -59,6 +59,7 @@ class StockRequestTypeEnum(str, enum.Enum):
     # R 정상 재고 바로 처리 — 격리 미경유, 정상(창고/부서) 재고에서 곧장 처리
     SCRAP_NORMAL = "scrap_normal"           # 정상 재고 바로 폐기
     RETURN_NORMAL = "return_normal"         # 정상 재고 바로 공급처 반품
+    REWORK_NORMAL = "rework_normal"         # 정상 재고 바로 재작업
 
 
 class RequestBucketEnum(str, enum.Enum):

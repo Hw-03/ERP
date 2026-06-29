@@ -66,6 +66,7 @@ _REQUEST_TYPE_LABEL: dict[str, str] = {
     "defect_return": "원자재 반품",
     "defect_disassemble": "불량 분해",
     "scrap_normal": "정상 폐기",
+    "rework_normal": "정상 재작업",
     "return_normal": "정상 반품",
 }
 

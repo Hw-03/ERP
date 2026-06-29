@@ -57,6 +57,7 @@ def _to_item_with_inventory(
     figures: Optional[stock_math.StockFigures] = None,
     locations: Optional[list[InventoryLocationResponse]] = None,
     model_slots: Optional[list[int]] = None,
+    has_bom: Optional[bool] = None,
 ) -> ItemWithInventory:
     """ItemWithInventory DTO 조립.
 
@@ -83,6 +84,9 @@ def _to_item_with_inventory(
             for row in loc_rows
         ]
 
+    if has_bom is None:
+        has_bom = db.query(BOM.bom_id).filter(BOM.parent_item_id == item.item_id).first() is not None
+
     if model_slots is None:
         # 회사 규약: mes_code prefix(첫 '-' 앞 글자열) 가 모델을 결정.
         # 예: "8-AR-0307" → SOLO(slot 3), "78-PR-0042" → COCOON+SOLO(slot 2,3).
@@ -103,6 +107,7 @@ def _to_item_with_inventory(
         process_type_code=item.process_type_code,
         serial_no=item.serial_no,
         bom_completed_at=item.bom_completed_at,
+        has_bom=bool(has_bom),
         deleted_at=item.deleted_at,
         created_at=item.created_at,
         updated_at=item.updated_at,
@@ -288,6 +293,8 @@ def list_items(
 
     from decimal import Decimal as _D
 
+    bom_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).filter(BOM.parent_item_id.in_(item_ids)).distinct().all()}
+
     loc_rows = (
         db.query(InventoryLocation)
         .filter(InventoryLocation.item_id.in_(item_ids), InventoryLocation.quantity > 0)
@@ -311,6 +318,7 @@ def list_items(
             figures=figures_map.get(item.item_id),
             locations=locations_by_item.get(item.item_id, []),
             model_slots=mes_code_to_model_slots(item.mes_code),
+            has_bom=item.item_id in bom_parent_ids,
         )
         for item, inv in rows
     ]

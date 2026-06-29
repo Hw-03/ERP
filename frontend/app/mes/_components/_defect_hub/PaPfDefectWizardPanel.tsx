@@ -7,7 +7,7 @@ import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
-import { DisassembleTree, toServerDecision, type ChildDecision } from "./DisassembleTree";
+import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDecision } from "./DisassembleTree";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -58,7 +58,10 @@ export function PaPfDefectWizardPanel({
     if (action !== "disassemble") setDecisions([]);
   }, [action]);
 
-  const canSubmit = category.trim() !== "" && !busy;
+  const canSubmit =
+    category.trim() !== "" &&
+    !busy &&
+    (action !== "disassemble" || (decisions.length > 0 && validateDecisionTree(decisions)));
 
   const submitLabel: Record<DisposalAction, string> = {
     unquarantine: "정상 복귀로 변경",
@@ -177,7 +180,7 @@ export function PaPfDefectWizardPanel({
               [
                 { value: "unquarantine", label: "정상 복귀 (잘못 격리)" },
                 { value: "scrap", label: "전부 폐기 (BOM 통째)" },
-                { value: "disassemble", label: "분해 + 자식 처리" },
+                { value: "disassemble", label: "재작업" },
               ] as { value: DisposalAction; label: string }[]
             ).map(({ value, label }) => (
               <label
@@ -206,11 +209,11 @@ export function PaPfDefectWizardPanel({
           </div>
         </div>
 
-        {/* BOM 분해 트리 — 분해 선택 시만 표시 */}
+        {/* BOM 재작업 트리 — 분해 선택 시만 표시 */}
         {action === "disassemble" && (
           <div className="flex flex-col gap-2">
             <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              BOM 자식 트리
+              BOM 재작업 트리
             </div>
             <DisassembleTree
               parentItemId={location.item_id}
@@ -276,7 +279,7 @@ export function PaPfDefectWizardPanel({
 
       <ConfirmModal
         open={confirmOpen}
-        title={action === "scrap" ? "폐기 확인" : "재작업(분해) 확인"}
+        title={action === "scrap" ? "폐기 확인" : "재작업 확인"}
         tone="danger"
         cautionMessage="이 작업은 즉시 반영됩니다."
         confirmLabel="즉시 처리"
@@ -287,7 +290,7 @@ export function PaPfDefectWizardPanel({
         <span style={{ color: LEGACY_COLORS.text }}>
           {action === "scrap"
             ? `${location.item_name} × ${processQty}개를 폐기합니다.`
-            : `${location.item_name} × ${processQty}개를 분해·재작업합니다.`}
+            : `${location.item_name} × ${processQty}개를 재작업합니다.`}
         </span>
       </ConfirmModal>
     </div>

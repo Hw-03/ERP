@@ -1,4 +1,4 @@
-"""StockRequest 서비스 — 작업자 결재 요청 흐름.
+﻿"""StockRequest 서비스 — 작업자 결재 요청 흐름.
 
 원칙:
 - 창고 재고가 움직이는 모든 작업(`from_bucket=='warehouse'` 또는 `to_bucket=='warehouse'`)은
@@ -206,6 +206,7 @@ def create_request(
         # R 정상 재고 바로 폐기/반품 — 기존 불량 처리와 동일하게 즉시 처리(결재 없음)로 통일.
         StockRequestTypeEnum.SCRAP_NORMAL,
         StockRequestTypeEnum.RETURN_NORMAL,
+        StockRequestTypeEnum.REWORK_NORMAL,
     }
     warehouse_override: Optional[bool] = None
     if request_type in _DEFECT_TYPES:

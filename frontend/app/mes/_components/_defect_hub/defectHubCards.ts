@@ -1,4 +1,4 @@
-// 불량 허브 3장 카드 메타 — DefectHubEntry·MobileDefectEntry가 공유 import
+﻿// 불량 허브 3장 카드 메타 — DefectHubEntry·MobileDefectEntry가 공유 import
 import { ShieldAlert, Trash2, ListChecks } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -24,8 +24,8 @@ export const DEFECT_HUB_CARDS: DefectHubCard[] = [
   },
   {
     id: "scrap",
-    label: "바로 폐기",
-    description: "격리 없이 즉시 폐기 (모든 품목)",
+    label: "바로 처리",
+    description: "격리 없이 폐기·재작업 즉시 처리",
     icon: Trash2,
     accentKey: "red",
   },
