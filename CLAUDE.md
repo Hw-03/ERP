@@ -99,14 +99,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 
 - If the backend shows 0 log lines, suspect a zombie — run stop then start.
 
-- Before commit/push, run verification proportional to the staged change:
-  - For docs/config/low-risk scoped changes, `git diff --cached --check` is sufficient unless the user asks for full verification.
-  - Reuse fresh relevant verification from the current session instead of rerunning the same checks.
-  - For high-risk backend/frontend behavior changes, run:
+- Before commit/push, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
+
+  기본 `-Mode auto` 는 워킹트리 변경 영역만 검증합니다 (docs 약 1초 / frontend 또는 backend 만 해당 게이트). 인프라 파일 또는 매핑되지 않은 경로가 섞이면 자동으로 풀 게이트로 승격. 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`. 같은 세션에서 이미 같은 영역을 통과시켰다면 다시 돌리지 마세요.
 
 ## Session Handoff
 
