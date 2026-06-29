@@ -31,11 +31,14 @@ test.describe("불량 — 격리 / 해제", () => {
       .click();
     // 장바구니: 수량 + 사유 카테고리
     await page.getByPlaceholder("예: 3").fill("5");
+    // 카테고리 셀렉트는 native <select> 가 아니라 커스텀 AppSelect(button + listbox).
+    // trigger 클릭 → 옵션 클릭으로 commit.
     await page
-      .locator("select")
-      .filter({ hasText: "외관 불량" })
+      .getByRole("combobox")
+      .filter({ hasText: "카테고리 선택" })
       .first()
-      .selectOption("외관 불량");
+      .click();
+    await page.getByRole("option", { name: "외관 불량" }).click();
     // 제출 → ConfirmModal → 확인
     await page.getByRole("button", { name: /격리하기 \(1건\)/ }).click();
     await page
@@ -56,11 +59,13 @@ test.describe("불량 — 격리 / 해제", () => {
     // ── 해제(정상 복귀) ───────────────────────────────────
     await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
+    // 같은 AppSelect 패턴.
     await page
-      .locator("select")
-      .filter({ hasText: "외관 불량" })
+      .getByRole("combobox")
+      .filter({ hasText: "카테고리 선택" })
       .first()
-      .selectOption("외관 불량");
+      .click();
+    await page.getByRole("option", { name: "외관 불량" }).click();
     // 정상 복귀는 ConfirmModal 없이 직접 제출.
     // 재설계 후 "정상 복귀" ActionCard 와 제출 버튼이 공존 → 화살표 포함 제출 버튼만 정확히 겨냥.
     await page.getByRole("button", { name: "정상 복귀 →" }).click();
