@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from decimal import Decimal
 
@@ -191,4 +191,36 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
     assert match.json()["requires_pf_name"] is True
 
 
+def test_requested_shipping_request_can_be_deleted_but_preparing_cannot(client, db_session, make_item, make_bom):
+    af = make_item(name="AF 본체", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    pa = make_item(name="기본 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    pf = make_item(name="기본 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
 
+    create = client.post(
+        "/api/shipping/requests",
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "출하담당"},
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+
+    delete_requested = client.delete(f"/api/shipping/requests/{request_id}")
+    assert delete_requested.status_code == 204, delete_requested.text
+
+    rows = client.get("/api/shipping/requests")
+    assert rows.status_code == 200, rows.text
+    assert all(row["request_id"] != request_id for row in rows.json())
+
+    create_again = client.post(
+        "/api/shipping/requests",
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "출하담당"},
+    )
+    assert create_again.status_code == 201, create_again.text
+    preparing_id = create_again.json()["request_id"]
+    prep = client.post(f"/api/shipping/requests/{preparing_id}/send-to-prep")
+    assert prep.status_code == 200, prep.text
+
+    delete_preparing = client.delete(f"/api/shipping/requests/{preparing_id}")
+    assert delete_preparing.status_code == 422, delete_preparing.text

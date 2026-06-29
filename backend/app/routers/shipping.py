@@ -1,4 +1,4 @@
-﻿"""Shipping request router."""
+"""Shipping request router."""
 
 from __future__ import annotations
 
@@ -145,7 +145,8 @@ def _commit_or_422(db: Session, func, *args, **kwargs):
     try:
         obj = func(db, *args, **kwargs)
         db.commit()
-        db.refresh(obj)
+        if obj is not None:
+            db.refresh(obj)
         return obj
     except ShippingError as exc:
         db.rollback()
@@ -192,6 +193,11 @@ def update_request(request_id: uuid.UUID, payload: ShippingRequestUpdate, db: Se
     req = _commit_or_422(db, shipping_svc.update_request, request_id, update)
     return _to_response(db, req)
 
+
+@router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
+    _commit_or_422(db, shipping_svc.delete_request, request_id)
+    return None
 
 @router.post("/requests/{request_id}/send-to-prep", response_model=ShippingRequestResponse)
 def send_to_prep(request_id: uuid.UUID, db: Session = Depends(get_db)):
@@ -257,5 +263,3 @@ def bom_match(payload: ShippingBomMatchRequest, db: Session = Depends(get_db)):
     except ShippingError as exc:
         db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
-
-

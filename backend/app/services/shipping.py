@@ -1,4 +1,4 @@
-﻿"""Shipping request workflow service."""
+"""Shipping request workflow service."""
 
 from __future__ import annotations
 
@@ -275,6 +275,14 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
     db.flush()
     return req
 
+
+
+def delete_request(db: Session, request_id: uuid.UUID) -> None:
+    req = _get_request(db, request_id)
+    if req.status != ShippingRequestStatusEnum.REQUESTED:
+        raise ShippingError("요청 상태에서만 출하 요청을 취소할 수 있습니다.")
+    db.delete(req)
+    db.flush()
 
 def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
@@ -705,6 +713,3 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     _record_event(db, req, "PICKED_UP", "배송업체 픽업 완료")
     db.flush()
     return req
-
-
-

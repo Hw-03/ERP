@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingRequest } from "@/lib/api";
@@ -12,6 +12,7 @@ vi.mock("@/lib/api", () => ({
     createShippingRequest: vi.fn(),
     updateShippingRequest: vi.fn(),
     sendShippingToPrep: vi.fn(),
+    deleteShippingRequest: vi.fn(),
     updateShippingChecklist: vi.fn(),
     clearShippingChecklist: vi.fn(),
     prepareShippingComplete: vi.fn(),
@@ -155,6 +156,40 @@ beforeEach(() => {
     request({ request_id: "requested-1", status: "REQUESTED" }),
     request(),
     request({ request_id: "prepared-1", status: "PREPARED", prepared_at: "2026-06-26T01:00:00Z" }),
+    request({
+      request_id: "hist-1",
+      status: "PICKED_UP",
+      final_pa_item_id: "pa-1",
+      final_pa_item_name: "Standard PA",
+      final_pf_item_id: "pf-1",
+      final_pf_item_name: "Standard PF",
+      picked_up_at: "2026-06-26T01:00:00Z",
+      transactions: [
+        {
+          log_id: "tx-1",
+          item_id: "pf-1",
+          item_name: "Standard PF",
+          mes_code: "PF-001",
+          item_process_type_code: "PF",
+          transaction_type: "SHIP",
+          quantity_change: -1,
+          quantity_before: 1,
+          quantity_after: 0,
+          warehouse_qty_before: 1,
+          warehouse_qty_after: 0,
+          reference_no: "SHIP-req",
+          produced_by: "shipping",
+          notes: "final PF shipped",
+          shipping_phase: "PICKUP",
+          created_at: "2026-06-26T01:00:00Z",
+          cancelled: false,
+          cancel_reason: null,
+          cancelled_at: null,
+          inventory_effect: [{ scope: "warehouse", delta: -1 }],
+        },
+      ],
+      transaction_count: 1,
+    }),
   ]);
   vi.mocked(api.getShippingHistory).mockResolvedValue([
     request({
@@ -215,7 +250,8 @@ beforeEach(() => {
   vi.mocked(api.clearShippingChecklist).mockResolvedValue(request());
   vi.mocked(api.createShippingRequest).mockResolvedValue(request({ request_id: "new-1", status: "REQUESTED" }));
   vi.mocked(api.updateShippingRequest).mockResolvedValue(request({ request_id: "requested-1", status: "REQUESTED" }));
-  vi.mocked(api.sendShippingToPrep).mockResolvedValue(request({ status: "PREPARING" }));
+  vi.mocked(api.sendShippingToPrep).mockResolvedValue(request({ request_id: "requested-1", status: "PREPARING" }));
+  vi.mocked(api.deleteShippingRequest).mockResolvedValue(undefined);
   vi.mocked(api.prepareShippingComplete).mockResolvedValue(request({ status: "PREPARED" }));
   vi.mocked(api.cancelShippingPrepare).mockResolvedValue(request({ status: "PREPARING" }));
   vi.mocked(api.completeShippingPickup).mockResolvedValue(request({ request_id: "req-1", status: "PICKED_UP" }));
@@ -234,12 +270,26 @@ describe("DesktopShippingView", () => {
     fireEvent.click(button as HTMLElement);
   }
 
+  function openRequestById(container: HTMLElement, requestId: string) {
+    const button = container.querySelector(`[data-shipping-request-id="${requestId}"]`);
+    expect(button).toBeTruthy();
+    fireEvent.click(button as HTMLElement);
+  }
+
   function nextStep(container: HTMLElement) {
     const button = container.querySelector('[data-testid="shipping-wizard-next"]');
     expect(button).toBeTruthy();
     fireEvent.click(button as HTMLElement);
   }
 
+  it("loads the shipping hub without waiting for items or history", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    expect(api.getShippingRequests).toHaveBeenCalledTimes(1);
+    expect(api.getItems).not.toHaveBeenCalled();
+    expect(api.getShippingHistory).not.toHaveBeenCalled();
+  });
   it("renders full-height hub cards", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -248,6 +298,8 @@ describe("DesktopShippingView", () => {
     expect(requestCard.className).toContain("h-full");
     expect(requestCard.className).toContain("min-h-0");
     expect(requestCard.className).not.toContain("min-h-[360px]");
+    expect(screen.queryByText("작업 선택")).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="shipping-hub-accent"]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy();
     expect(container.querySelector('[data-shipping-hub-card="history"]')).toBeTruthy();
   });
@@ -261,6 +313,7 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
     expect(container.querySelectorAll('[data-primary-action="new-shipping-request"]')).toHaveLength(1);
+    expect(screen.getAllByText("요청 목록")).toHaveLength(1);
     expect(screen.queryByTestId("shipping-request-empty-action")).not.toBeInTheDocument();
   });
 
@@ -314,7 +367,7 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     openHubCard(container, "request");
-    fireEvent.click(await screen.findByRole("button", { name: /requested-1/ }));
+    openRequestById(container, "requested-1");
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("shipping-edit-request"));
@@ -326,7 +379,7 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     openHubCard(container, "request");
-    fireEvent.click(await screen.findByRole("button", { name: /requested-1/ }));
+    openRequestById(container, "requested-1");
     fireEvent.click(await screen.findByTestId("shipping-edit-request"));
 
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
@@ -392,12 +445,54 @@ describe("DesktopShippingView", () => {
     expect(screen.getAllByText("SHIP-req").length).toBeGreaterThan(0);
   });
 
+  it("does not expose request ids in request list or detail text", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
+    expect(screen.queryByText(/requested-1/)).not.toBeInTheDocument();
+
+    openRequestById(container, "requested-1");
+    expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    expect(screen.queryByText(/requested-1/)).not.toBeInTheDocument();
+  });
+
+  it("can send an existing requested detail to prep", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openRequestById(container, "requested-1");
+
+    fireEvent.click(await screen.findByTestId("shipping-detail-send-to-prep"));
+
+    await waitFor(() => {
+      expect(api.sendShippingToPrep).toHaveBeenCalledWith("requested-1");
+    });
+  });
+
+  it("can delete an existing requested detail after confirmation", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openRequestById(container, "requested-1");
+
+    fireEvent.click(await screen.findByTestId("shipping-delete-request"));
+    fireEvent.click(await screen.findByTestId("shipping-confirm-action"));
+
+    await waitFor(() => {
+      expect(api.deleteShippingRequest).toHaveBeenCalledWith("requested-1");
+      expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument();
+    });
+  });
   it("locks prepared requests in detail view", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     openHubCard(container, "request");
-    fireEvent.click(await screen.findByRole("button", { name: /prepared-1/ }));
+    openRequestById(container, "prepared-1");
 
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-edit-request")).not.toBeInTheDocument();

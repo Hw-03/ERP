@@ -1,4 +1,4 @@
-import { fetcher, patchJson, postJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, patchJson, postJson, toApiUrl } from "../api-core";
 import type {
   ShippingBomLineInput,
   ShippingBomMatchResponse,
@@ -27,6 +27,9 @@ export const shippingApi = {
 
   updateShippingRequest: (requestId: string, payload: ShippingRequestUpdatePayload) =>
     patchJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}`), payload),
+
+  deleteShippingRequest: (requestId: string) =>
+    deleteJson(toApiUrl(`/api/shipping/requests/${requestId}`)),
 
   sendShippingToPrep: (requestId: string) =>
     postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/send-to-prep`), {}),

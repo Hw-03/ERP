@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -38,11 +38,13 @@ type PendingAction =
   | "prepare"
   | "cancel"
   | "pickup"
+  | "delete"
   | null;
 
 type ConfirmAction =
   | { kind: "prepare"; request: ShippingRequest; companionLines: ShippingCompanionLineInput[] }
   | { kind: "cancel"; request: ShippingRequest }
+  | { kind: "delete"; request: ShippingRequest }
   | { kind: "pickup"; request: ShippingRequest };
 const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
   REQUESTED: "요청",
@@ -133,9 +135,9 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
   const [view, setView] = useState<ViewMode>("hub");
   const [items, setItems] = useState<Item[]>([]);
   const [requests, setRequests] = useState<ShippingRequest[]>([]);
-  const [history, setHistory] = useState<ShippingRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [itemsLoading, setItemsLoading] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
   const [requestWizardStep, setRequestWizardStep] = useState<RequestWizardStep>(1);
 
@@ -161,6 +163,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     () => requests.filter((req) => req.status === "PREPARING" || req.status === "PREPARED"),
     [requests],
   );
+  const history = useMemo(() => requests.filter((req) => req.status === "PICKED_UP"), [requests]);
   const selectedRequest = useMemo(
     () => (editingId ? requests.find((req) => req.request_id === editingId) ?? null : null),
     [editingId, requests],
@@ -180,9 +183,6 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       const rest = prev.filter((row) => row.request_id !== next.request_id);
       return [next, ...rest];
     });
-    if (next.status === "PICKED_UP") {
-      setHistory((prev) => [next, ...prev.filter((row) => row.request_id !== next.request_id)]);
-    }
   }, []);
 
   const loadData = useCallback(async () => {
@@ -190,16 +190,10 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     setError(null);
     setPending("load");
     try {
-      const [nextItems, nextRequests, nextHistory] = await Promise.all([
-        api.getItems({ limit: 2000 }),
-        api.getShippingRequests(),
-        api.getShippingHistory(),
-      ]);
-      setItems(nextItems);
+      const nextRequests = await api.getShippingRequests();
       setRequests(nextRequests);
-      setHistory(nextHistory);
       setSelectedPrepId((current) => current ?? nextRequests.find((req) => req.status === "PREPARING" || req.status === "PREPARED")?.request_id ?? null);
-      setSelectedHistoryId((current) => current ?? nextHistory[0]?.request_id ?? null);
+      setSelectedHistoryId((current) => current ?? nextRequests.find((req) => req.status === "PICKED_UP")?.request_id ?? null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "출하 데이터를 불러오지 못했습니다.";
       setError(msg);
@@ -209,6 +203,25 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       setLoading(false);
     }
   }, [onStatusChange]);
+
+  const ensureItemsLoaded = useCallback(async () => {
+    if (items.length > 0 || itemsLoading) return true;
+    setItemsLoading(true);
+    setPending("load");
+    setError(null);
+    try {
+      setItems(await api.getItems({ limit: 2000 }));
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "품목 목록을 불러오지 못했습니다.";
+      setError(msg);
+      onStatusChange(msg);
+      return false;
+    } finally {
+      setItemsLoading(false);
+      setPending(null);
+    }
+  }, [items.length, itemsLoading, onStatusChange]);
 
   useEffect(() => {
     void loadData();
@@ -225,6 +238,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     setNotes("");
     setDraftLines([]);
     setMatchResult(null);
+    void ensureItemsLoaded();
   }
 
   function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork") {
@@ -238,6 +252,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     setMatchResult(null);
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
     setView(nextView);
+    if (nextView === "requestWork") void ensureItemsLoaded();
   }
 
   async function loadDefaultBom(nextBasePfId: string) {
@@ -396,6 +411,32 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       setPending(null);
     }
   }
+
+  async function sendExistingToPrep(req: ShippingRequest) {
+    if (req.status !== "REQUESTED") {
+      onStatusChange("요청 상태에서만 준비 중으로 보낼 수 있습니다.");
+      return;
+    }
+    setPending("send");
+    setError(null);
+    try {
+      const next = await api.sendShippingToPrep(req.request_id);
+      upsertRequest(next);
+      setSelectedPrepId(next.request_id);
+      setView("prepWork");
+      onStatusChange("출하 요청을 준비 중으로 넘겼습니다.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "준비 중 전환에 실패했습니다.";
+      setError(msg);
+      onStatusChange(msg);
+    } finally {
+      setPending(null);
+    }
+  }
+
+  function deleteRequest(req: ShippingRequest) {
+    setConfirmAction({ kind: "delete", request: req });
+  }
   async function matchBom() {
     if (!basePfId) {
       onStatusChange("기준 PF를 먼저 선택하세요.");
@@ -465,7 +506,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
   async function executeConfirmedAction() {
     if (!confirmAction) return;
     const action = confirmAction;
-    setPending(action.kind === "prepare" ? "prepare" : action.kind === "cancel" ? "cancel" : "pickup");
+    setPending(action.kind === "prepare" ? "prepare" : action.kind === "cancel" ? "cancel" : action.kind === "delete" ? "delete" : "pickup");
     setError(null);
     try {
       if (action.kind === "prepare") {
@@ -480,6 +521,12 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
         upsertRequest(next);
         setSelectedPrepId(next.request_id);
         onStatusChange("준비 완료를 취소했습니다. 요청과 BOM을 다시 수정할 수 있습니다.");
+      } else if (action.kind === "delete") {
+        await api.deleteShippingRequest(action.request.request_id);
+        setRequests((prev) => prev.filter((row) => row.request_id !== action.request.request_id));
+        setEditingId(null);
+        setView("requestList");
+        onStatusChange("출하 요청을 취소했습니다.");
       } else {
         const next = await api.completeShippingPickup(action.request.request_id);
         upsertRequest(next);
@@ -489,7 +536,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       }
       setConfirmAction(null);
     } catch (err) {
-      const fallback = action.kind === "prepare" ? "준비 완료 처리에 실패했습니다." : action.kind === "cancel" ? "준비 완료 취소에 실패했습니다." : "픽업 완료 처리에 실패했습니다.";
+      const fallback = action.kind === "prepare" ? "준비 완료 처리에 실패했습니다." : action.kind === "cancel" ? "준비 완료 취소에 실패했습니다." : action.kind === "delete" ? "요청 취소에 실패했습니다." : "픽업 완료 처리에 실패했습니다.";
       const msg = err instanceof Error ? err.message : fallback;
       setError(msg);
       onStatusChange(msg);
@@ -567,6 +614,9 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
           request={selectedRequest}
           onBack={() => setView("requestList")}
           onEdit={(req) => loadRequestIntoDraft(req, "requestWork")}
+          onSendToPrep={(req) => void sendExistingToPrep(req)}
+          onDelete={deleteRequest}
+          pending={pending}
         />
       );
     }
@@ -706,7 +756,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
         <ShippingActionConfirmModal
           action={confirmAction}
           itemById={itemById}
-          pending={pending === "prepare" || pending === "cancel" || pending === "pickup"}
+          pending={pending === "prepare" || pending === "cancel" || pending === "pickup" || pending === "delete"}
           onClose={() => setConfirmAction(null)}
           onConfirm={() => void executeConfirmedAction()}
         />
@@ -737,15 +787,13 @@ function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
   );
 }
 
+
 function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void }) {
   return (
-    <div className="grid h-full min-h-[calc(100vh-210px)] grid-rows-[auto_minmax(0,1fr)] gap-5">
-      <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>작업 선택</div>
-      <div className="grid h-full min-h-0 gap-3 xl:grid-cols-3">
-        <HubCard id="request" icon={ClipboardList} title="출하 요청" body="요청 목록, 상세, BOM 편집" count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
-        <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" body="준비 체크, 준비 완료, 픽업" count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
-        <HubCard id="history" icon={History} title="출하 이력" body="완료 요청, 재고 로그, 이벤트" count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
-      </div>
+    <div className="grid h-full min-h-[calc(100vh-170px)] gap-3 xl:grid-cols-3">
+      <HubCard id="request" icon={ClipboardList} title="출하 요청" body="요청 목록, 상세, BOM 편집" count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
+      <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" body="준비 체크, 준비 완료, 픽업" count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
+      <HubCard id="history" icon={History} title="출하 이력" body="완료 요청, 재고 로그, 이벤트" count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
     </div>
   );
 }
@@ -756,7 +804,7 @@ function HubCard({ id, icon: Icon, title, body, count, tone, onClick }: { id: Se
       type="button"
       data-shipping-hub-card={id}
       onClick={onClick}
-      className="flex h-full min-h-0 flex-col items-start justify-between rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99]"
+      className="flex h-full min-h-0 flex-col items-start justify-between rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99] xl:p-12"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
     >
       <div className="flex w-full items-start justify-between gap-5">
@@ -769,10 +817,11 @@ function HubCard({ id, icon: Icon, title, body, count, tone, onClick }: { id: Se
         </div>
         <span className="rounded-full px-3 py-1.5 text-sm font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>
       </div>
-      <div className="h-1.5 w-24 rounded-full" style={{ background: tone }} />
+      <div className="mt-auto text-sm font-black" style={{ color: tone }}>바로 열기</div>
     </button>
   );
 }
+
 
 function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onNew: () => void; onOpen: (request: ShippingRequest) => void }) {
   const groups: Array<{ status: ShippingRequestStatus; label: string }> = [
@@ -782,25 +831,29 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
   ];
   const total = requests.length;
   return (
-    <div className="grid gap-3">
-      <ViewHeader title="요청 목록" subtitle="요청됨, 준비 중, 준비 완료 상태를 나눠 확인합니다." onBack={onBack} />
-      <Panel dataTestId="shipping-request-list-panel">
+    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+      <Panel dataTestId="shipping-request-list-panel" className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>출하 요청 {total}건</div>
-            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>새 요청을 만들거나 기존 요청의 상태를 확인합니다.</div>
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="min-w-0">
+              <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>요청 목록</div>
+              <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>출하 요청 {total}건 · 새 요청을 만들거나 기존 요청의 상태를 확인합니다.</div>
+            </div>
           </div>
           <PrimaryActionButton icon={Plus} label="새 요청 만들기" tone={LEGACY_COLORS.blue} onClick={onNew} dataAction="new-shipping-request" />
         </div>
 
-        <div className="mt-4 min-h-[340px] rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="mt-4 flex min-h-0 flex-1 rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {total === 0 ? (
-            <div className="flex min-h-[300px] flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-6 py-10 text-center">
               <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 요청 없음</div>
               <div className="mt-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기준 PF를 선택해 새 요청을 만들 수 있습니다.</div>
             </div>
           ) : (
-            <div className="grid gap-3 xl:grid-cols-3">
+            <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
               {groups.map((group) => {
                 const rows = requests.filter((request) => request.status === group.status);
                 return (
@@ -821,22 +874,37 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
   );
 }
 
-function RequestDetailEntry({ request, onBack, onEdit }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void }) {
+
+function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
-      <div className="grid gap-3">
-        <ViewHeader title="요청 상세" onBack={onBack} />
-        <EmptyState title="선택된 요청 없음" body="목록에서 출하 요청을 선택하세요." />
+      <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+        <Panel className="flex min-h-0 flex-1 flex-col">
+          <div className="flex items-center gap-3">
+            <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <PanelTitle icon={PackageCheck} title="요청 상세" subtitle="목록에서 출하 요청을 선택하세요." />
+          </div>
+          <div className="mt-4 flex min-h-0 flex-1 items-center justify-center">
+            <EmptyState title="선택된 요청 없음" body="목록에서 출하 요청을 선택하세요." />
+          </div>
+        </Panel>
       </div>
     );
   }
   const editable = request.status === "REQUESTED" || request.status === "PREPARING";
+  const canSend = request.status === "REQUESTED";
   return (
-    <div className="grid gap-3">
-      <ViewHeader title="요청 상세" subtitle={`${request.request_id} · ${request.base_pf_item_name}`} onBack={onBack} />
-      <Panel dataTestId="shipping-request-detail">
+    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+      <Panel dataTestId="shipping-request-detail" className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <PanelTitle icon={PackageCheck} title={request.base_pf_item_name} subtitle={`요청자 ${request.requested_by_name ?? "-"} · 생성 ${formatDate(request.created_at)}`} />
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <PanelTitle icon={PackageCheck} title="요청 상세" subtitle={`${request.base_pf_item_name} · 생성 ${formatDate(request.created_at)}`} />
+          </div>
           <StatusBadge status={request.status} />
         </div>
         {request.notes && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
@@ -846,31 +914,35 @@ function RequestDetailEntry({ request, onBack, onEdit }: { request: ShippingRequ
           <Metric label="최종 PA" value={request.final_pa_item_name ?? "준비 전"} />
           <Metric label="최종 PF" value={request.final_pf_item_name ?? "준비 전"} />
         </div>
-        <div className="mt-4"><LineSummary request={request} /></div>
-        <div className="mt-4 flex justify-end gap-2">
-          {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} dataTestId="shipping-edit-request" />}
+        <div className="mt-4 min-h-0 flex-1"><LineSummary request={request} /></div>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {canSend && <ActionButton icon={Send} label={pending === "send" ? "전환 중" : "준비 중으로 보내기"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
+          {canSend && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
+          {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
         </div>
       </Panel>
     </div>
   );
 }
 
+
 function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onOpen: (request: ShippingRequest) => void }) {
   return (
-    <div className="grid gap-3">
-      <ViewHeader title="준비 중 목록" subtitle="준비 중이거나 준비 완료된 요청을 선택합니다." onBack={onBack} />
-      <Panel dataTestId="shipping-prep-list">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>준비 대상 {requests.length}건</div>
-            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>체크리스트 작업과 준비 완료, 픽업 처리를 이어갑니다.</div>
-          </div>
+    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+      <Panel dataTestId="shipping-prep-list" className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <PanelTitle icon={ClipboardCheck} title="준비 중 목록" subtitle={`준비 대상 ${requests.length}건 · 체크리스트 작업과 준비 완료, 픽업 처리를 이어갑니다.`} />
         </div>
-        <div className="mt-4 rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="mt-4 flex min-h-0 flex-1 rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {requests.length === 0 ? (
-            <EmptyState title="준비 중 요청 없음" body="출하 요청을 준비 중으로 보내면 여기에 표시됩니다." />
+            <div className="flex flex-1 items-center justify-center">
+              <EmptyState title="준비 중 요청 없음" body="출하 요청을 준비 중으로 보내면 여기에 표시됩니다." />
+            </div>
           ) : (
-            <div className="grid gap-2">
+            <div className="grid flex-1 content-start gap-2 overflow-y-auto pr-1">
               {requests.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)}
             </div>
           )}
@@ -880,22 +952,24 @@ function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest
   );
 }
 
+
 function HistoryListEntry({ rows, onBack, onOpen }: { rows: ShippingRequest[]; onBack: () => void; onOpen: (request: ShippingRequest) => void }) {
   return (
-    <div className="grid gap-3">
-      <ViewHeader title="출하 완료 목록" subtitle="픽업 완료된 출하 요청입니다." onBack={onBack} />
-      <Panel dataTestId="shipping-history-list">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>완료 이력 {rows.length}건</div>
-            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>최종 PF, 동반 출하품, 연결 입출고 로그를 확인합니다.</div>
-          </div>
+    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+      <Panel dataTestId="shipping-history-list" className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <PanelTitle icon={History} title="출하 완료 목록" subtitle={`완료 이력 ${rows.length}건 · 최종 PF, 동반 출하품, 연결 입출고 로그를 확인합니다.`} />
         </div>
-        <div className="mt-4 rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="mt-4 flex min-h-0 flex-1 rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {rows.length === 0 ? (
-            <EmptyState title="출하 이력 없음" body="픽업 완료 처리된 요청이 아직 없습니다." />
+            <div className="flex flex-1 items-center justify-center">
+              <EmptyState title="출하 이력 없음" body="픽업 완료 처리된 요청이 아직 없습니다." />
+            </div>
           ) : (
-            <div className="grid gap-2">
+            <div className="grid flex-1 content-start gap-2 overflow-y-auto pr-1">
               {rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)}
             </div>
           )}
@@ -1533,13 +1607,15 @@ function ShippingActionConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const title = action.kind === "prepare" ? "준비 완료 확인" : action.kind === "cancel" ? "준비 완료 취소 확인" : "픽업 완료 확인";
-  const tone = action.kind === "prepare" ? LEGACY_COLORS.green : action.kind === "cancel" ? LEGACY_COLORS.yellow : LEGACY_COLORS.purple;
+  const title = action.kind === "prepare" ? "준비 완료 확인" : action.kind === "cancel" ? "준비 완료 취소 확인" : action.kind === "delete" ? "요청 취소 확인" : "픽업 완료 확인";
+  const tone = action.kind === "prepare" ? LEGACY_COLORS.green : action.kind === "cancel" ? LEGACY_COLORS.yellow : action.kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
   const description = action.kind === "prepare"
     ? "AF와 하위 자재를 차감하고 최종 PA/PF 생산 로그를 남깁니다. 준비 완료 취소로 원복할 수 있습니다."
     : action.kind === "cancel"
       ? "준비 완료 때 생성된 입출고 로그를 역재생해 재고를 원복합니다."
-      : "최종 PF 1개와 카톤·동반 출하품을 출하 차감합니다. v1에서는 픽업 완료 후 취소 기능이 없습니다.";
+      : action.kind === "delete"
+        ? "요청됨 상태의 출하 요청을 목록에서 삭제합니다. 준비 중으로 넘어간 요청은 삭제할 수 없습니다."
+        : "최종 PF 1개와 카톤·동반 출하품을 출하 차감합니다. v1에서는 픽업 완료 후 취소 기능이 없습니다.";
   const lines = action.kind === "prepare"
     ? [
         ...action.request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} x ${line.quantity}`),
@@ -1547,7 +1623,9 @@ function ShippingActionConfirmModal({
       ]
     : action.kind === "cancel"
       ? action.request.transactions.filter((log) => log.shipping_phase === "PREPARE" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
-      : [
+      : action.kind === "delete"
+        ? [`기준 PF · ${action.request.base_pf_item_name}`]
+        : [
           `최종 PF · ${action.request.final_pf_item_name ?? action.request.base_pf_item_name} x 1`,
           ...action.request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}`),
         ];
@@ -1575,7 +1653,7 @@ function ShippingActionConfirmModal({
           <button type="button" onClick={onClose} disabled={pending} className="rounded-[11px] border px-3 py-2 text-sm font-black disabled:opacity-45" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
             닫기
           </button>
-          <ActionButton icon={CheckCircle2} label={pending ? "처리 중" : "확인 후 실행"} tone={tone} onClick={onConfirm} disabled={pending} />
+          <ActionButton icon={CheckCircle2} label={pending ? "처리 중" : "확인 후 실행"} tone={tone} onClick={onConfirm} disabled={pending} dataTestId="shipping-confirm-action" />
         </div>
       </div>
     </div>
@@ -1676,6 +1754,7 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
     <button
       type="button"
       onClick={onClick}
+      data-shipping-request-id={request.request_id}
       className="min-h-[74px] rounded-[14px] border px-3 py-2 text-left transition-colors"
       style={{
         background: active ? tint(STATUS_TONE[request.status], 16) : LEGACY_COLORS.s2,
@@ -1693,15 +1772,15 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
         <StatusBadge status={request.status} compact />
       </div>
       <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        {request.request_id} · 생성 {formatDate(request.created_at)} {request.final_pf_item_name ? `· 최종 ${request.final_pf_item_name}` : ""}
+        생성 {formatDate(request.created_at)} {request.final_pf_item_name ? `· 최종 ${request.final_pf_item_name}` : ""}
       </div>
     </button>
   );
 }
 
-function Panel({ children, dataTestId }: { children: ReactNode; dataTestId?: string }) {
+function Panel({ children, dataTestId, className }: { children: ReactNode; dataTestId?: string; className?: string }) {
   return (
-    <div data-testid={dataTestId} className="min-w-0 rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+    <div data-testid={dataTestId} className={`min-w-0 rounded-[24px] border p-4 ${className ?? ""}`} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
       {children}
     </div>
   );
@@ -1858,26 +1937,3 @@ function ActionButton({
     </button>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
