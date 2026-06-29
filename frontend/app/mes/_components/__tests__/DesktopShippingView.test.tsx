@@ -222,87 +222,126 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
-  it("출하 첫 화면은 큰 카드 3개로 진입하고 기존 설명 문구를 숨긴다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
+  function openHubCard(container: HTMLElement, id: "request" | "prep" | "history") {
+    const button = container.querySelector(`[data-shipping-hub-card="${id}"]`);
+    expect(button).toBeTruthy();
+    fireEvent.click(button as HTMLElement);
+  }
 
-    expect(await screen.findByRole("button", { name: /출하 요청/ })).toHaveAttribute("data-shipping-hub-card", "request");
-    expect(screen.getByRole("button", { name: /출하 준비 중/ })).toHaveAttribute("data-shipping-hub-card", "prep");
-    expect(screen.getByRole("button", { name: /출하 이력/ })).toHaveAttribute("data-shipping-hub-card", "history");
-    expect(screen.queryByText(/요청 생성부터 준비 체크/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "새로고침" })).not.toBeInTheDocument();
+  function openNewRequest(container: HTMLElement) {
+    const button = container.querySelector('[data-primary-action="new-shipping-request"]');
+    expect(button).toBeTruthy();
+    fireEvent.click(button as HTMLElement);
+  }
+
+  function nextStep(container: HTMLElement) {
+    const button = container.querySelector('[data-testid="shipping-wizard-next"]');
+    expect(button).toBeTruthy();
+    fireEvent.click(button as HTMLElement);
+  }
+
+  it("renders full-height hub cards", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    const requestCard = container.querySelector('[data-shipping-hub-card="request"]') as HTMLElement;
+    expect(requestCard.className).toContain("h-full");
+    expect(requestCard.className).toContain("min-h-0");
+    expect(requestCard.className).not.toContain("min-h-[360px]");
+    expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy();
+    expect(container.querySelector('[data-shipping-hub-card="history"]')).toBeTruthy();
   });
 
-  it("요청 목록은 새 요청을 주 액션으로 노출하고 작성 화면은 목록 패널 없이 전폭으로 열린다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
+  it("keeps a single primary new-request action in the empty request list", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([]);
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /출하 요청/ }));
-    const newRequestButton = await screen.findByRole("button", { name: "새 요청 만들기" });
-    expect(newRequestButton).toHaveAttribute("data-primary-action", "new-shipping-request");
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
 
-    fireEvent.click(newRequestButton);
-
-    expect(await screen.findByText("출하 요청 작성")).toBeInTheDocument();
-    expect(screen.getByText("1. 기준 PF 선택")).toBeInTheDocument();
-    expect(screen.getByText("2. 요청 정보")).toBeInTheDocument();
-    expect(screen.getByText("3. BOM 구성 조정")).toBeInTheDocument();
-    expect(screen.getByText("4. 저장 및 전환")).toBeInTheDocument();
-    expect(screen.queryByText("준비로 넘어간 요청도 여기서 상태를 확인합니다.")).not.toBeInTheDocument();
-    expect(screen.getByText("기준 PF를 먼저 선택하세요")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
+    expect(container.querySelectorAll('[data-primary-action="new-shipping-request"]')).toHaveLength(1);
+    expect(screen.queryByTestId("shipping-request-empty-action")).not.toBeInTheDocument();
   });
 
-  it("출하 요청은 목록에서 상세로 들어가고 수정 버튼 후 편집 화면으로 들어간다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
+  it("opens a full-width wizard that shows one request task at a time", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /출하 요청/ }));
-    expect(await screen.findByText("요청 목록")).toBeInTheDocument();
-    expect(screen.getByText("요청됨")).toBeInTheDocument();
-    expect(screen.getAllByText("준비 중").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("준비 완료").length).toBeGreaterThan(0);
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Standard PF/ })[0]);
-    expect(await screen.findByText("요청 상세")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "수정" }));
-    await waitFor(() => expect(screen.getAllByText("출하 요청 수정").length).toBeGreaterThan(0));
+    expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-wizard-step-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-wizard-step-4")).not.toBeInTheDocument();
   });
 
-  it("PF 선택 후 PF/PA 전체 구성을 보여주고 제외/추가와 자동 매칭을 처리한다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
+  it("moves through PF, BOM, match, request info, and final send steps", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /출하 요청/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "새 요청 만들기" }));
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
     fireEvent.change(await screen.findByLabelText("기준 PF"), { target: { value: "pf-1" } });
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-bom-editor-pa")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-request-info-fields")).not.toBeInTheDocument();
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
+    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalled());
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-request-info-fields")).toBeInTheDocument();
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-5")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
 
     await waitFor(() => {
-      expect(api.getBOM).toHaveBeenCalledWith("pf-1");
-      expect(api.getBOM).toHaveBeenCalledWith("pa-1");
+      expect(api.createShippingRequest).toHaveBeenCalledWith(expect.objectContaining({ custom_pf_name: "Custom PF" }));
+      expect(api.sendShippingToPrep).toHaveBeenCalledWith("new-1");
     });
-    expect(await screen.findByText("PF 구성품")).toBeInTheDocument();
-    expect(screen.getAllByText("PA 구성품").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Cable Set/).length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: /Cable Set 제외/ }));
-    expect(await screen.findByText("제외됨")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /PA 구성품 추가/ }));
-    expect(await screen.findByText("추가됨")).toBeInTheDocument();
-
-    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalled());
-    expect(await screen.findByText(/기존 PA 재사용/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("새 PA 이름")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("새 PF 이름")).toBeInTheDocument();
   });
 
+  it("opens existing request edits directly on the BOM step", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-  it("기존 요청 수정 후 준비 중 전환은 현재 draft를 먼저 저장한다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /출하 요청/ }));
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
     fireEvent.click(await screen.findByRole("button", { name: /requested-1/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "수정" }));
+    expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Cable Set 제외/ }));
-    fireEvent.change(await screen.findByLabelText("새 PF 이름"), { target: { value: "Custom PF" } });
-    fireEvent.click(screen.getByRole("button", { name: "준비 중으로 보내기" }));
+    fireEvent.click(screen.getByTestId("shipping-edit-request"));
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+  });
+
+  it("shows PF and PA BOM groups, then carries excluded lines into send-to-prep save", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    fireEvent.click(await screen.findByRole("button", { name: /requested-1/ }));
+    fireEvent.click(await screen.findByTestId("shipping-edit-request"));
+
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-bom-editor-pf")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-bom-editor-pa")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /Cable Set/ }));
+    expect(container.querySelector('[data-bom-line-child="acc-1"][data-bom-line-included="false"]')).toBeTruthy();
+    fireEvent.click(screen.getByTestId("shipping-add-pa-line"));
+    expect(container.querySelector('[data-bom-line-origin="CUSTOM"]')).toBeTruthy();
+
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    nextStep(container);
+    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
 
     await waitFor(() => {
       expect(api.updateShippingRequest).toHaveBeenCalledWith(
@@ -316,17 +355,18 @@ describe("DesktopShippingView", () => {
       );
       expect(api.sendShippingToPrep).toHaveBeenCalledWith("requested-1");
     });
-  });  it("출하 준비 중은 목록에서 체크 상세로 들어가고 PF/PA 묶음과 전체 해제가 동작한다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
+  });
 
-    fireEvent.click(await screen.findByRole("button", { name: /출하 준비 중/ }));
-    expect(await screen.findByText("준비 중 목록")).toBeInTheDocument();
+  it("opens prep detail and supports checklist updates", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy());
+    openHubCard(container, "prep");
+    expect(await screen.findByTestId("shipping-prep-list")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: /Standard PF/ })[0]);
 
-    expect(await screen.findByText("준비 체크")).toBeInTheDocument();
-    expect(screen.getAllByText("PF 구성품").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("PA 구성품").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByLabelText("Cable Set 체크"));
+    expect(await screen.findByTestId("shipping-prep-detail")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("shipping-check-acc-1"));
 
     await waitFor(() => {
       expect(api.updateShippingChecklist).toHaveBeenCalledWith("req-1", {
@@ -334,38 +374,32 @@ describe("DesktopShippingView", () => {
       });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /전체 해제/ }));
+    fireEvent.click(screen.getByTestId("shipping-clear-checklist"));
     await waitFor(() => {
       expect(api.clearShippingChecklist).toHaveBeenCalledWith("req-1");
     });
   });
 
-  it("출하 이력은 완료 목록에서 상세 이력과 연결 입출고 로그로 들어간다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
+  it("opens shipping history details with linked transaction logs", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /출하 이력/ }));
-    expect(await screen.findByText("출하 완료 목록")).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="history"]')).toBeTruthy());
+    openHubCard(container, "history");
+    expect(await screen.findByTestId("shipping-history-list")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Standard PF/ }));
 
-    expect(await screen.findByText("출하 상세 이력")).toBeInTheDocument();
-    expect(screen.getByText("연결 입출고 로그")).toBeInTheDocument();
+    expect(await screen.findByTestId("shipping-history-detail")).toBeInTheDocument();
     expect(screen.getAllByText("SHIP-req").length).toBeGreaterThan(0);
   });
 
-  it("준비 완료 요청은 상세에서 수정이 잠기고 취소 안내를 보여준다", async () => {
-    render(<DesktopShippingView onStatusChange={() => {}} />);
+  it("locks prepared requests in detail view", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /출하 요청/ }));
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
     fireEvent.click(await screen.findByRole("button", { name: /prepared-1/ }));
 
-    expect(await screen.findByText("요청 상세")).toBeInTheDocument();
-    expect(screen.getByText(/준비 완료 취소 후 수정 가능/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
+    expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-edit-request")).not.toBeInTheDocument();
   });
 });
-
-
-
-
-
-

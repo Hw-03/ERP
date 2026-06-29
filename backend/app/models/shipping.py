@@ -128,8 +128,6 @@ class ShippingRequestCompanionLine(Base):
     item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="RESTRICT"), nullable=False, index=True)
     quantity = Column(IntQuantity, nullable=False)
     unit = Column(String(20), nullable=False, default="EA")
-    included = Column(Boolean, nullable=False, default=True, server_default="1")
-    origin = Column(String(20), nullable=False, default="CUSTOM", server_default="CUSTOM")
     sort_order = Column(IntQuantity, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
 

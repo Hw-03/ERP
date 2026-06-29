@@ -367,21 +367,40 @@ def _pf_lines_with_final_pa(req: ShippingRequest, final_pa: Item) -> list[tuple[
     return out
 
 
+def _stage_signature_from_lines(lines: list[dict], stage: str) -> tuple[tuple[str, int], ...]:
+    return _signature(
+        (line["child_item_id"], line["quantity"])
+        for line in lines
+        if line["parent_stage"] == stage and bool(line.get("included", True))
+    )
+
+
+def _pf_lines_with_final_pa_from_lines(db: Session, lines: list[dict], final_pa: Item) -> list[tuple[uuid.UUID, int, str]]:
+    out: list[tuple[uuid.UUID, int, str]] = []
+    replaced_pa = False
+    for line in lines:
+        if line["parent_stage"] != "PF" or not bool(line.get("included", True)):
+            continue
+        item = _get_item(db, line["child_item_id"])
+        if item.process_type_code == "PA" and not replaced_pa:
+            out.append((final_pa.item_id, int(line.get("quantity") or 1), line.get("unit") or "EA"))
+            replaced_pa = True
+        else:
+            out.append((line["child_item_id"], int(line["quantity"]), line.get("unit") or "EA"))
+    if not replaced_pa:
+        out.insert(0, (final_pa.item_id, 1, "EA"))
+    return out
+
+
 def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) -> dict:
     base_pf = _get_item(db, base_pf_item_id)
-    req = ShippingRequest(base_pf_item_id=base_pf.item_id)
-    db.add(req)
-    db.flush()
-    _replace_bom_lines(db, req, _normalize_bom_lines(db, base_pf, bom_lines))
-    db.refresh(req)
-    pa_sig = _request_stage_signature(req, "PA")
+    normalized = _normalize_bom_lines(db, base_pf, bom_lines)
+    pa_sig = _stage_signature_from_lines(normalized, "PA")
     pa = _find_item_by_signature(db, process_type_code="PA", signature=pa_sig)
     pf = None
     if pa is not None:
-        pf_sig = _signature((child_id, qty) for child_id, qty, _ in _pf_lines_with_final_pa(req, pa))
+        pf_sig = _signature((child_id, qty) for child_id, qty, _ in _pf_lines_with_final_pa_from_lines(db, normalized, pa))
         pf = _find_item_by_signature(db, process_type_code="PF", signature=pf_sig)
-    db.delete(req)
-    db.flush()
     return {
         "matched_pa_item_id": pa.item_id if pa else None,
         "matched_pf_item_id": pf.item_id if pf else None,

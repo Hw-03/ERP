@@ -3,8 +3,9 @@
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import event
 
-from app.models import BOM, Inventory, TransactionLog, TransactionTypeEnum
+from app.models import BOM, Inventory, ShippingRequestCompanionLine, TransactionLog, TransactionTypeEnum
 from app.services import shipping as shipping_svc
 
 
@@ -31,6 +32,56 @@ def _bom_line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
         "included": included,
         "origin": origin,
     }
+
+
+def test_companion_lines_do_not_map_bom_inclusion_flags():
+    column_names = set(ShippingRequestCompanionLine.__table__.columns.keys())
+
+    assert "included" not in column_names
+    assert "origin" not in column_names
+
+
+def test_match_bom_does_not_write_temporary_shipping_rows(db_session, make_item, make_bom):
+    af = make_item(name="AF body", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    pa = make_item(name="Reusable PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    pf = make_item(name="Reusable PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    write_statements: list[str] = []
+
+    def capture_shipping_writes(conn, cursor, statement, parameters, context, executemany):
+        sql = " ".join(statement.lower().split())
+        touches_shipping_request = any(
+            table in sql
+            for table in (
+                "shipping_requests",
+                "shipping_request_bom_lines",
+                "shipping_request_checklist_lines",
+                "shipping_request_events",
+            )
+        )
+        if touches_shipping_request and sql.startswith(("insert", "update", "delete")):
+            write_statements.append(sql)
+
+    bind = db_session.get_bind()
+    event.listen(bind, "before_cursor_execute", capture_shipping_writes)
+    try:
+        match = shipping_svc.match_bom(
+            db_session,
+            bom_lines=[
+                _bom_line(pa, stage="PF", origin="DEFAULT"),
+                _bom_line(af, stage="PA", origin="DEFAULT"),
+            ],
+            base_pf_item_id=pf.item_id,
+        )
+    finally:
+        event.remove(bind, "before_cursor_execute", capture_shipping_writes)
+
+    assert match["matched_pa_item_id"] == pa.item_id
+    assert match["matched_pf_item_id"] == pf.item_id
+    assert write_statements == []
 
 
 def test_prepare_complete_creates_custom_pa_pf_and_pickup_ships_companions(
