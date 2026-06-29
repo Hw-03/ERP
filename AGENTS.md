@@ -67,6 +67,7 @@ For Codex plans, also include the recommended execution shape when useful: solo 
 ## Commit / Push
 
 - Never auto-commit or auto-push.
+- Never create or switch branches unless the user explicitly asks.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
 - **Required commit message format: `YYYY-MM-DD area: summary`**
