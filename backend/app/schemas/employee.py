@@ -41,6 +41,8 @@ class EmployeeCreate(BaseModel):
     io_enabled: Optional[bool] = True
     # 조립 부서 직원의 담당 모델 slot 목록. 리스트 순서 = priority (앞=상위).
     assigned_model_slots: Optional[List[int]] = None
+    # 직원별 좌측 사이드바/모바일 탭 숨김 목록. 빈 목록이면 모든 탭 표시.
+    hidden_sidebar_tabs: List[str] = Field(default_factory=list)
 
 
 class EmployeeUpdate(BaseModel):
@@ -57,6 +59,8 @@ class EmployeeUpdate(BaseModel):
     io_enabled: Optional[bool] = None
     # 조립 부서 직원의 담당 모델 slot 목록. None=변경 없음, []=전부 제거.
     assigned_model_slots: Optional[List[int]] = None
+    # None=변경 없음, []=모든 탭 표시.
+    hidden_sidebar_tabs: Optional[List[str]] = None
 
 
 class EmployeeResponse(BaseModel):
@@ -82,6 +86,8 @@ class EmployeeResponse(BaseModel):
     theme: Optional[str] = None
     # 담당 모델 slot 목록 (priority 순서대로 정렬되어 반환됨)
     assigned_model_slots: List[int] = Field(default_factory=list)
+    # 직원별 좌측 사이드바/모바일 탭 숨김 목록.
+    hidden_sidebar_tabs: List[str] = Field(default_factory=list)
 
 
 class EmployeeThemeUpdate(BaseModel):

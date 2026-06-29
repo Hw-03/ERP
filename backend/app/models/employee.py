@@ -67,6 +67,7 @@ class Employee(Base):
     # 2026-05-24 (W12-#7): 직원별 입출고 권한 토글. 부서 io_enabled 와 AND 결합.
     # 기본값 True — 신규 직원은 부서 권한만 만족하면 입출고 가능.
     io_enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+    hidden_sidebar_tabs = Column(Text, nullable=False, default="", server_default="")
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(BoolAsString, nullable=False, default=True)
     # 작업자 식별용 PIN 해시 — 실제 보안 인증이 아님. None이면 기본 PIN 0000 적용

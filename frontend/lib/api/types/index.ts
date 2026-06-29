@@ -20,3 +20,4 @@ export type * from "./dept-adjustment";
 export type * from "./io";
 export type * from "./notifications";
 export type * from "./handover";
+export type * from "./shipping";

@@ -5,8 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
-import { canEnterIO, isWarehouseStaff, isDepartmentApprover } from "./_warehouse_steps";
-import { WarehouseAccessDenied } from "./_warehouse_sections/WarehouseAccessDenied";
+import { isWarehouseStaff, isDepartmentApprover } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import type { Operator } from "./login/useCurrentOperator";
 import { DefectKpiCards, type DefectKpiKind } from "./_defect_hub/DefectKpiCards";
@@ -46,9 +45,6 @@ interface Props {
  * 전환(새 불량 추가 / R 바로 폐기·반품 / 일괄 처리 / PA·PF 분해).
  */
 export function DesktopDefectView({ operator, defectDeptFilter, onStatusChange }: Props) {
-  if (operator && !canEnterIO(operator)) {
-    return <WarehouseAccessDenied department={operator.department ?? ""} />;
-  }
   if (!operator) {
     return (
       <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">

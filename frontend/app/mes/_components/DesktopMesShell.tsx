@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
 import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
+import { DesktopShippingView } from "./DesktopShippingView";
 import { DesktopWarehouseMapTab } from "./DesktopWarehouseMapTab";
 import { DesktopDefectView } from "./DesktopDefectView";
 import { DesktopAdminView } from "./DesktopAdminView";
@@ -26,13 +27,18 @@ import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
+import {
+  filterVisibleSidebarTabs,
+  SIDEBAR_TAB_IDS,
+} from "./tabAccess";
 
-const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "warehouseMap", "defect", "history", "weekly", "admin"]);
+const VALID_TABS = new Set<DesktopTabId>(SIDEBAR_TAB_IDS);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
 
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   dashboard: { title: "대시보드", icon: Boxes },
   warehouse: { title: "입출고", icon: Warehouse },
+  shipping: { title: "출하", icon: Truck },
   warehouseMap: { title: "창고 지도", icon: MapPinned },
   defect: { title: "불량", icon: AlertTriangle },
   history: { title: "입출고 내역", icon: History },
@@ -53,6 +59,15 @@ function DesktopMesShellInner() {
   const router = useRouter();
   const confirmAdminNavigation = useConfirmNavigation();
   const operator = useCurrentOperator();
+  const visibleTabs = useMemo(
+    () => filterVisibleSidebarTabs(SIDEBAR_TAB_IDS, operator),
+    [operator],
+  );
+  const fallbackTab = visibleTabs[0] ?? "dashboard";
+  const canOpenTab = useCallback(
+    (tab: DesktopTabId) => visibleTabs.includes(tab),
+    [visibleTabs],
+  );
 
   const initialTab = (() => {
     const t = searchParams.get("tab") as DesktopTabId | null;
@@ -80,6 +95,13 @@ function DesktopMesShellInner() {
   }, []);
 
   function handleTabChange(tab: DesktopTabId) {
+    if (!canOpenTab(tab)) {
+      if (fallbackTab !== activeTab) {
+        setActiveTab(fallbackTab);
+        router.push(`?tab=${fallbackTab}`, { scroll: false });
+      }
+      return;
+    }
     if (tab === activeTab) {
       // admin 은 key 가 고정이라 리마운트되지 않음 — 의도적 제외 (내부 폼 입력 보호)
       if (tab !== "admin") {
@@ -99,7 +121,7 @@ function DesktopMesShellInner() {
 
   // 알림 클릭 딥링크 — 해당 탭(+섹션)으로 이동. section 은 입출고 섹션(queue/dept-queue/mine).
   function handleNotificationNavigate(tab: string, section: string | null) {
-    if (!VALID_TABS.has(tab as DesktopTabId)) return;
+    if (!VALID_TABS.has(tab as DesktopTabId) || !canOpenTab(tab as DesktopTabId)) return;
     const target = tab as DesktopTabId;
     confirmAdminNavigation(() => {
       router.push(
@@ -121,14 +143,19 @@ function DesktopMesShellInner() {
   useEffect(() => {
     const t = searchParams.get("tab") as DesktopTabId | null;
     const dept = searchParams.get("defect_dept");
-    if (t && VALID_TABS.has(t) && t !== activeTab) {
-      setActiveTab(t);
-    } else if (!t && dept && activeTab !== "defect") {
-      setActiveTab("defect");
+    const targetFromUrl = t && VALID_TABS.has(t) ? t : !t && dept ? "defect" : null;
+
+    if (targetFromUrl) {
+      const target = canOpenTab(targetFromUrl) ? targetFromUrl : fallbackTab;
+      if (target !== activeTab) setActiveTab(target);
+      if (target !== targetFromUrl) router.replace(`?tab=${target}`, { scroll: false });
+    } else if (!canOpenTab(activeTab)) {
+      setActiveTab(fallbackTab);
+      router.replace(`?tab=${fallbackTab}`, { scroll: false });
     }
-    setDefectDeptFilter(dept);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+
+    setDefectDeptFilter(canOpenTab("defect") ? dept : null);
+  }, [searchParams, activeTab, canOpenTab, fallbackTab, router]);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
 
@@ -144,15 +171,16 @@ function DesktopMesShellInner() {
 
   const activeMeta = TAB_META[activeTab];
 
-  const canReceive = canSeeWorkType("receive", operator);
+  const canReceive = canSeeWorkType("receive", operator) && canOpenTab("warehouse");
 
   const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
+    if (!canOpenTab("warehouse")) return;
     setWarehousePreselected(item);
     setWarehouseIntent(intent ?? null);
     setActiveTab("warehouse");
     // tab 만 전환 — step 은 위저드(useIoUrlSync)가 tab=warehouse 와 함께 기록한다.
     router.push("?tab=warehouse", { scroll: false });
-  }, [router]);
+  }, [router, canOpenTab]);
 
   const content = useMemo(() => {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
@@ -182,6 +210,9 @@ function DesktopMesShellInner() {
           onSubmitSuccess={() => { void refetchCapacity(); }}
         />
       );
+    }
+    if (activeTab === "shipping") {
+      return <DesktopShippingView key={key} onStatusChange={handleStatusChange} />;
     }
     if (activeTab === "warehouseMap") {
       return <DesktopWarehouseMapTab key={key} onStatusChange={handleStatusChange} />;
@@ -218,34 +249,35 @@ function DesktopMesShellInner() {
         />
       )}
       <div className="hidden h-screen overflow-hidden lg:flex">
-      <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
-        <DesktopSidebar
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-        />
-
-        <div className="min-w-0 flex-1 flex flex-col">
-          <DesktopTopbar
-            title={activeMeta.title}
-            icon={activeMeta.icon}
-            onRefresh={() => {
-              setRefreshNonce((current) => current + 1);
-              void refetchCapacity();
-            }}
-            status={status}
-            statusNonce={statusNonce}
-            titleAddon={
-              activeTab === "weekly" ? (
-                <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
-              ) : undefined
-            }
-            onNavigate={handleNotificationNavigate}
+        <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
+          <DesktopSidebar
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            visibleTabs={visibleTabs}
           />
 
-          <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>
+          <div className="min-w-0 flex-1 flex flex-col">
+            <DesktopTopbar
+              title={activeMeta.title}
+              icon={activeMeta.icon}
+              onRefresh={() => {
+                setRefreshNonce((current) => current + 1);
+                void refetchCapacity();
+              }}
+              status={status}
+              statusNonce={statusNonce}
+              titleAddon={
+                activeTab === "weekly" ? (
+                  <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
+                ) : undefined
+              }
+              onNavigate={handleNotificationNavigate}
+            />
+
+            <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>
+          </div>
         </div>
       </div>
-    </div>
     </>
   );
 }

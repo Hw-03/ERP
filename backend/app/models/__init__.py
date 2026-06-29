@@ -44,6 +44,14 @@ from app.models.item import (
     BOM,
     Item,
 )
+from app.models.shipping import (
+    ShippingRequest,
+    ShippingRequestBomLine,
+    ShippingRequestChecklistLine,
+    ShippingRequestCompanionLine,
+    ShippingRequestEvent,
+    ShippingRequestStatusEnum,
+)
 from app.models.stock_request import (
     RequestBucketEnum,
     StockRequest,
@@ -93,6 +101,13 @@ __all__ = [
     "TransactionLog",
     "TransactionEditLog",
     "TransactionTypeEnum",
+    # shipping
+    "ShippingRequest",
+    "ShippingRequestBomLine",
+    "ShippingRequestChecklistLine",
+    "ShippingRequestCompanionLine",
+    "ShippingRequestEvent",
+    "ShippingRequestStatusEnum",
     # stock requests
     "StockRequest",
     "StockRequestLine",

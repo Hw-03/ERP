@@ -30,6 +30,129 @@ from app._actor import set_actor
 
 router = APIRouter()
 
+SIDEBAR_TAB_IDS: tuple[str, ...] = (
+    "dashboard",
+    "warehouse",
+    "shipping",
+    "warehouseMap",
+    "defect",
+    "history",
+    "weekly",
+    "admin",
+)
+SIDEBAR_TAB_ID_SET = set(SIDEBAR_TAB_IDS)
+IO_RELATED_TAB_IDS: tuple[str, str] = ("warehouse", "defect")
+
+
+def _normalize_io_related_hidden_tabs(tabs: List[str]) -> List[str]:
+    if not any(tab in IO_RELATED_TAB_IDS for tab in tabs):
+        return tabs
+    normalized: List[str] = []
+    inserted = False
+    for tab in tabs:
+        if tab in IO_RELATED_TAB_IDS:
+            if not inserted:
+                normalized.extend(IO_RELATED_TAB_IDS)
+                inserted = True
+            continue
+        normalized.append(tab)
+    return normalized
+
+
+def _hide_io_related_tabs(tabs: List[str]) -> List[str]:
+    return _normalize_io_related_hidden_tabs([*tabs, *IO_RELATED_TAB_IDS])
+
+
+def _show_io_related_tabs(tabs: List[str]) -> List[str]:
+    return [tab for tab in tabs if tab not in IO_RELATED_TAB_IDS]
+
+
+def _io_enabled_from_hidden_tabs(tabs: List[str]) -> bool:
+    return not any(tab in IO_RELATED_TAB_IDS for tab in tabs)
+
+
+def _payload_has_field(payload: object, field: str) -> bool:
+    fields = getattr(payload, "model_fields_set", None)
+    if fields is None:
+        fields = getattr(payload, "__fields_set__", set())
+    return field in fields
+
+
+def _parse_hidden_sidebar_tabs(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    tabs: List[str] = []
+    for part in raw.split(","):
+        tab = part.strip()
+        if tab and tab in SIDEBAR_TAB_ID_SET and tab not in tabs:
+            tabs.append(tab)
+    return tabs
+
+
+def _validate_hidden_sidebar_tabs(tabs: Optional[List[str]]) -> List[str]:
+    if not tabs:
+        return []
+    normalized: List[str] = []
+    invalid: List[str] = []
+    for value in tabs:
+        tab = str(value).strip()
+        if tab not in SIDEBAR_TAB_ID_SET:
+            invalid.append(tab)
+            continue
+        if tab not in normalized:
+            normalized.append(tab)
+    if invalid:
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "알 수 없는 사이드바 탭 권한 값입니다.",
+        )
+    normalized = _normalize_io_related_hidden_tabs(normalized)
+    if len(normalized) == len(SIDEBAR_TAB_IDS):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "직원에게 최소 1개 이상의 탭이 표시되어야 합니다.",
+        )
+    return normalized
+
+
+def _serialize_hidden_sidebar_tabs(tabs: List[str]) -> str:
+    return ",".join(tabs)
+
+
+def _is_active_value(value: object) -> bool:
+    if isinstance(value, str):
+        return value.lower() == "true"
+    return bool(value)
+
+
+def _ensure_admin_tab_access_remains(
+    db: Session,
+    *,
+    employee_id: Optional[uuid.UUID],
+    hidden_sidebar_tabs: List[str],
+    is_active: bool,
+) -> None:
+    if is_active and "admin" not in hidden_sidebar_tabs:
+        return
+
+    for other in db.query(Employee).all():
+        if employee_id is not None and other.employee_id == employee_id:
+            continue
+        if not _is_active_value(other.is_active):
+            continue
+        other_hidden = _parse_hidden_sidebar_tabs(
+            getattr(other, "hidden_sidebar_tabs", "")
+        )
+        if "admin" not in other_hidden:
+            return
+
+    raise http_error(
+        422,
+        ErrorCode.UNPROCESSABLE,
+        "관리자 탭에 접근 가능한 활성 직원이 최소 1명 필요합니다.",
+    )
 
 def _assigned_slots_for(db: Session, employee_id: uuid.UUID) -> List[int]:
     """단일 직원의 담당 모델 slot 목록 (priority asc)."""
@@ -153,6 +276,19 @@ def create_employee(
             "department_role 은 none/primary/deputy 중 하나여야 합니다.",
         )
 
+    hidden_tabs = _validate_hidden_sidebar_tabs(payload.hidden_sidebar_tabs)
+    hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
+    io_enabled = payload.io_enabled if payload.io_enabled is not None else True
+    if hidden_tabs_provided:
+        io_enabled = _io_enabled_from_hidden_tabs(hidden_tabs)
+    elif not io_enabled:
+        hidden_tabs = _hide_io_related_tabs(hidden_tabs)
+    _ensure_admin_tab_access_remains(
+        db,
+        employee_id=None,
+        hidden_sidebar_tabs=hidden_tabs,
+        is_active=bool(payload.is_active),
+    )
     employee = Employee(
         employee_code=code,
         name=payload.name,
@@ -162,7 +298,8 @@ def create_employee(
         level=payload.level,
         warehouse_role=role_value,
         department_role=dept_role_value,
-        io_enabled=payload.io_enabled if payload.io_enabled is not None else True,
+        io_enabled=io_enabled,
+        hidden_sidebar_tabs=_serialize_hidden_sidebar_tabs(hidden_tabs),
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
@@ -196,7 +333,34 @@ def update_employee(
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-
+    candidate_hidden_tabs = _parse_hidden_sidebar_tabs(
+        getattr(employee, "hidden_sidebar_tabs", "")
+    )
+    candidate_io_enabled = bool(getattr(employee, "io_enabled", True))
+    hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
+    if hidden_tabs_provided:
+        candidate_hidden_tabs = _validate_hidden_sidebar_tabs(
+            payload.hidden_sidebar_tabs
+        )
+        candidate_io_enabled = _io_enabled_from_hidden_tabs(candidate_hidden_tabs)
+    elif payload.io_enabled is not None:
+        candidate_io_enabled = bool(payload.io_enabled)
+        candidate_hidden_tabs = (
+            _show_io_related_tabs(candidate_hidden_tabs)
+            if candidate_io_enabled
+            else _hide_io_related_tabs(candidate_hidden_tabs)
+        )
+    candidate_is_active = (
+        bool(payload.is_active)
+        if payload.is_active is not None
+        else _is_active_value(employee.is_active)
+    )
+    _ensure_admin_tab_access_remains(
+        db,
+        employee_id=employee.employee_id,
+        hidden_sidebar_tabs=candidate_hidden_tabs,
+        is_active=candidate_is_active,
+    )
     changed: list[str] = []
     if payload.name is not None and employee.name != payload.name:
         employee.name = payload.name; changed.append("name")
@@ -235,11 +399,14 @@ def update_employee(
     if payload.is_active is not None:
         if employee.is_active != payload.is_active:
             employee.is_active = payload.is_active; changed.append("is_active")
-    if payload.io_enabled is not None:
-        if bool(employee.io_enabled) != bool(payload.io_enabled):
-            employee.io_enabled = bool(payload.io_enabled)
-            changed.append("io_enabled")
-
+    if bool(employee.io_enabled) != candidate_io_enabled:
+        employee.io_enabled = candidate_io_enabled
+        changed.append("io_enabled")
+    if hidden_tabs_provided or payload.io_enabled is not None:
+        hidden_raw = _serialize_hidden_sidebar_tabs(candidate_hidden_tabs)
+        if (getattr(employee, "hidden_sidebar_tabs", "") or "") != hidden_raw:
+            employee.hidden_sidebar_tabs = hidden_raw
+            changed.append("hidden_sidebar_tabs")
     if payload.assigned_model_slots is not None:
         current = _assigned_slots_for(db, employee.employee_id)
         if current != payload.assigned_model_slots:
@@ -426,6 +593,13 @@ def update_employee_theme(
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
+
+def _effective_hidden_sidebar_tabs(employee: Employee) -> List[str]:
+    tabs = _parse_hidden_sidebar_tabs(getattr(employee, "hidden_sidebar_tabs", ""))
+    if not tabs and not bool(getattr(employee, "io_enabled", True)):
+        return _hide_io_related_tabs(tabs)
+    return tabs
+
 def _to_response(
     employee: Employee, assigned_model_slots: Optional[List[int]] = None
 ) -> EmployeeResponse:
@@ -450,4 +624,5 @@ def _to_response(
         pin_is_default=pin_is_default,
         theme=getattr(employee, "theme", None),
         assigned_model_slots=assigned_model_slots or [],
+        hidden_sidebar_tabs=_effective_hidden_sidebar_tabs(employee),
     )

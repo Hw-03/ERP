@@ -8,6 +8,7 @@ import {
   History as HistoryIcon,
   MapPinned,
   MoreHorizontal,
+  PackageCheck,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   MobileWeeklyScreen,
   MobileWarehouseMapScreen,
   MobileMoreScreen,
+  MobileShippingScreen,
 } from "./screens";
 import { WeeklyWeekPicker, getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
@@ -28,11 +30,16 @@ import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { StatusPill, inferToneFromStatus } from "../common";
-import { canEnterIO } from "../_warehouse_steps";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 import { MobileDirtyLeaveSheet } from "./warehouse/MobileDirtyLeaveSheet";
+import type { MobileMoreEntryId } from "./screens/MobileMoreScreen";
+import {
+  MOBILE_MORE_ENTRY_TAB_IDS,
+  isSidebarTabVisible,
+  mobileMoreHasVisibleEntries,
+} from "../tabAccess";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
 export type MobileTabId =
@@ -42,7 +49,8 @@ export type MobileTabId =
   | "history"
   | "more"
   | "weekly"
-  | "warehouseMap";
+  | "warehouseMap"
+  | "shipping";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
@@ -50,11 +58,12 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   defect: { label: "불량", icon: AlertTriangle },
   history: { label: "내역", icon: HistoryIcon },
   more: { label: "더보기", icon: MoreHorizontal },
+  shipping: { label: "출하", icon: PackageCheck },
   weekly: { label: "주간보고", icon: BarChart2 },
   warehouseMap: { label: "창고지도", icon: MapPinned },
 };
 
-// 하단 탭바에 노출되는 5탭. 더보기는 전폭 화면(주간보고·창고지도·계정)으로 진입한다.
+// 하단 탭바에 노출되는 5탭. 더보기는 전폭 화면(출하·주간보고·창고지도)으로 진입한다.
 const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "more"];
 
 // 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합. 알 수 없는 값(예: admin)이
@@ -67,6 +76,7 @@ const VALID_TAB_IDS: MobileTabId[] = [
   "more",
   "weekly",
   "warehouseMap",
+  "shipping",
 ];
 
 // 항목 3-1 — 데스크톱 상단바와 동일한 기본 브랜드 상태 텍스트.
@@ -167,26 +177,53 @@ export function MobileShell() {
     }
   }, []);
 
+  const canOpenMobileTab = useCallback((tab: MobileTabId) => {
+    if (!operator) return true;
+    if (tab === "more") return mobileMoreHasVisibleEntries(operator);
+    return isSidebarTabVisible(tab, operator);
+  }, [operator]);
+
+  const visibleTabs = useMemo(
+    () => TAB_BAR_IDS.filter((tab) => canOpenMobileTab(tab)),
+    [canOpenMobileTab],
+  );
+  const fallbackTab = visibleTabs[0] ?? "dashboard";
+  const visibleMoreEntries = useMemo(
+    () => MOBILE_MORE_ENTRY_TAB_IDS.filter((tab) => isSidebarTabVisible(tab, operator)) as MobileMoreEntryId[],
+    [operator],
+  );
+
+  useEffect(() => {
+    if (!operator) return;
+    if (!canOpenMobileTab(activeTab)) {
+      setActiveTab(fallbackTab);
+      if (activeTab === "defect") setDefectDeptFilter(null);
+    }
+  }, [activeTab, canOpenMobileTab, fallbackTab, operator]);
+
   const handleTabChange = useCallback((tab: MobileTabId) => {
-    if (tab === activeTab) {
+    const target = canOpenMobileTab(tab) ? tab : fallbackTab;
+    if (!canOpenMobileTab(target)) return;
+    if (target === activeTab) {
       setRefreshNonce((n) => n + 1);
       return;
     }
     // 항목 16 — 입출고 작성 중 다른 탭으로 이탈 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
     if (activeTab === "warehouse" && warehouseDirty) {
-      setPendingNavTab(tab);
+      setPendingNavTab(target);
       return;
     }
-    setActiveTab(tab);
-  }, [activeTab, warehouseDirty]);
+    setActiveTab(target);
+  }, [activeTab, canOpenMobileTab, fallbackTab, warehouseDirty]);
 
-  const canReceive = canSeeWorkType("receive", operator);
+  const canReceive = canSeeWorkType("receive", operator) && canOpenMobileTab("warehouse");
 
   const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
+    if (!canOpenMobileTab("warehouse")) return;
     setWarehousePreselected(item);
     setWarehouseIntent(intent ?? null);
     setActiveTab("warehouse");
-  }, []);
+  }, [canOpenMobileTab]);
 
   const loadCapacity = useCallback(() => {
     void api.getProductionCapacity().then(setCapacityData).catch(() => {});
@@ -204,19 +241,12 @@ export function MobileShell() {
     return () => window.removeEventListener("focus", handleFocus);
   }, [loadCapacity]);
 
-  const visibleTabs = useMemo(() => {
-    if (!operator) return TAB_BAR_IDS;
-    return TAB_BAR_IDS.filter((tab) => {
-      if (tab === "warehouse" || tab === "defect") return canEnterIO(operator);
-      return true;
-    });
-  }, [operator]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
   // 항목 2-9 — weekly/warehouseMap 은 '더보기' 탭으로 진입한 하위 화면이라 TAB_BAR_IDS 에 없다.
   // 하단 네비에선 '더보기' 슬롯을 활성으로 매핑해 pill·강조가 더보기에 붙도록 한다.
-  const isMoreSubScreen = activeTab === "weekly" || activeTab === "warehouseMap";
+  const isMoreSubScreen = activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping";
   const effectiveNavTab: MobileTabId = isMoreSubScreen ? "more" : activeTab;
   const activeIndex = visibleTabs.indexOf(effectiveNavTab);
 
@@ -235,6 +265,7 @@ export function MobileShell() {
 
   const content = useMemo(() => {
     const key = `${activeTab}-${refreshNonce}`;
+    if (!canOpenMobileTab(activeTab)) return null;
     if (activeTab === "dashboard") {
       return (
         <MobileDashboardScreen
@@ -275,9 +306,14 @@ export function MobileShell() {
         <MobileMoreScreen
           key={key}
           onWeekly={() => handleTabChange("weekly")}
+          onShipping={() => handleTabChange("shipping")}
           onWarehouseMap={() => handleTabChange("warehouseMap")}
+          visibleEntries={visibleMoreEntries}
         />
       );
+    }
+    if (activeTab === "shipping") {
+      return <MobileShippingScreen key={key} />;
     }
     if (activeTab === "weekly") {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} />;
@@ -299,12 +335,14 @@ export function MobileShell() {
     warehouseIntent,
     handleGoToWarehouse,
     handleStatusChange,
+    canOpenMobileTab,
     canReceive,
     capacityData,
     weekMon,
     handleTabChange,
     loadCapacity,
     defectDeptFilter,
+    visibleMoreEntries,
   ]);
 
   return (
@@ -359,10 +397,10 @@ export function MobileShell() {
             <div className="ml-2 shrink-0">
               <NotificationBell
                 onNavigate={(tab) => {
-                  // 알림이 가리키는 탭이 유효할 때만 전환(숨김탭 weekly/warehouseMap/admin
-                  // 도 화면은 정상 렌더). 알 수 없는 값이면 무시해 오작동 방지.
+                  // 알림이 가리키는 탭이 유효하고 현재 직원에게 보일 때만 전환한다.
                   if ((VALID_TAB_IDS as string[]).includes(tab)) {
-                    handleTabChange(tab as MobileTabId);
+                    const target = tab as MobileTabId;
+                    if (canOpenMobileTab(target)) handleTabChange(target);
                   }
                 }}
               />
@@ -451,14 +489,14 @@ export function MobileShell() {
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
-          if (next) setActiveTab(next);
+          if (next) setActiveTab(canOpenMobileTab(next) ? next : fallbackTab);
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
-          if (next) setActiveTab(next);
+          if (next) setActiveTab(canOpenMobileTab(next) ? next : fallbackTab);
         }}
       />
 

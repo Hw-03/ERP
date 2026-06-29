@@ -50,6 +50,7 @@ from app.routers import (
     notifications,
     production,
     settings,
+    shipping,
     stock_requests,
     warehouse_map,
 )
@@ -274,6 +275,7 @@ app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(shipping.router, prefix="/api/shipping", tags=["Shipping"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])

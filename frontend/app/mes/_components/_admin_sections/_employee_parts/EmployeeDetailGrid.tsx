@@ -17,7 +17,19 @@ import {
   WAREHOUSE_ROLE_LABEL,
 } from "./employeeRoleLabels";
 import { DetailCardSlot, FieldRow, SelectInput, TextInput } from "./employeeDetailPrimitives";
+import { SIDEBAR_TAB_IDS, setSidebarTabVisible, type SidebarTabId } from "../../tabAccess";
 
+
+const SIDEBAR_TAB_LABELS: Record<SidebarTabId, string> = {
+  dashboard: "대시보드",
+  warehouse: "입출고",
+  shipping: "출하",
+  warehouseMap: "창고 지도",
+  defect: "불량",
+  history: "입출고 내역",
+  weekly: "주간보고",
+  admin: "관리자",
+};
 interface EmployeeDetailGridProps {
   employee: Employee;
   form: ReturnType<typeof useAdminEmployeesContext>["editForm"];
@@ -41,6 +53,13 @@ export function EmployeeDetailGrid({
 }: EmployeeDetailGridProps) {
   const whMeta = WAREHOUSE_ROLE_LABEL[form.warehouse_role];
   const deptMeta = DEPARTMENT_ROLE_LABEL[form.department_role];
+  const hiddenTabs = new Set(form.hidden_sidebar_tabs);
+  const toggleSidebarTab = (tab: SidebarTabId, checked: boolean) => {
+    setForm((f) => ({
+      ...f,
+      hidden_sidebar_tabs: setSidebarTabVisible(f.hidden_sidebar_tabs, tab, checked),
+    }));
+  };
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {/* 카드 1: 기본 정보 */}
@@ -126,29 +145,28 @@ export function EmployeeDetailGrid({
               {deptMeta.hint}
             </div>
           </FieldRow>
-          <FieldRow label="입출고 권한">
-            <label className="inline-flex cursor-pointer items-center gap-3 py-1">
-              <input
-                type="checkbox"
-                checked={form.io_enabled}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, io_enabled: e.target.checked }))
-                }
-                className="h-4 w-4 cursor-pointer rounded border"
-                style={{
-                  accentColor: LEGACY_COLORS.blue,
-                  borderColor: LEGACY_COLORS.border,
-                }}
-              />
-              <span
-                className="text-[13px]"
-                style={{ color: LEGACY_COLORS.text }}
-              >
-                입출고 화면 접근 허용
-              </span>
-            </label>
+          <FieldRow label="표시 탭">
+            <div className="grid grid-cols-2 gap-2">
+              {SIDEBAR_TAB_IDS.map((tab) => (
+                <label key={tab} className="inline-flex cursor-pointer items-center gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    checked={!hiddenTabs.has(tab)}
+                    onChange={(e) => toggleSidebarTab(tab, e.target.checked)}
+                    className="h-4 w-4 cursor-pointer rounded border"
+                    style={{
+                      accentColor: LEGACY_COLORS.blue,
+                      borderColor: LEGACY_COLORS.border,
+                    }}
+                  />
+                  <span className="text-[13px]" style={{ color: LEGACY_COLORS.text }}>
+                    {SIDEBAR_TAB_LABELS[tab]}
+                  </span>
+                </label>
+              ))}
+            </div>
             <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              직원 개별 권한. 체크 해제 시 입출고 화면 접근 차단.
+              체크 해제한 탭은 해당 직원의 PC 사이드바와 모바일 메뉴에서 숨겨집니다.
             </div>
           </FieldRow>
         </div>

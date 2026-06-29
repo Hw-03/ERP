@@ -222,6 +222,8 @@ _MIGRATION_DDL: list[str] = [
     # 기본값 1(TRUE). 기존 직원은 모두 TRUE 로 추가된 뒤, 본인 부서의 io_enabled 값으로 백필.
     # → 부서가 차단(FALSE) 상태였던 직원은 마이그레이션 후에도 동일하게 차단 유지.
     "ALTER TABLE employees ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
+    # 2026-06-29: 직원별 사이드바/모바일 탭 숨김 목록. 빈 문자열이면 모든 탭 표시.
+    "ALTER TABLE employees ADD COLUMN hidden_sidebar_tabs TEXT NOT NULL DEFAULT ''",
     # Preserve saved employee permission settings on repeated bootstrap runs.
     "UPDATE employees SET io_enabled = io_enabled WHERE 0 = 1",
     # 2026-05-27: 불량·수량조정 부서 필터 수정 — 직접 생성된 TransactionLog 에 부서 기록.
@@ -247,6 +249,68 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE transaction_logs ADD COLUMN cancelled_at DATETIME",
     # 2026-06-15: 취소 재구현 — 거래가 건드린 재고 셀 증감 기록(JSON). 취소 시 부호 반전해 역재생.
     "ALTER TABLE transaction_logs ADD COLUMN inventory_effect TEXT",
+    # 2026-06-26: 출하 요청 워크플로우
+    """CREATE TABLE IF NOT EXISTS shipping_requests (
+        request_id CHAR(36) PRIMARY KEY,
+        status VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
+        base_pf_item_id CHAR(36) NOT NULL REFERENCES items(item_id),
+        final_pa_item_id CHAR(36) REFERENCES items(item_id),
+        final_pf_item_id CHAR(36) REFERENCES items(item_id),
+        requested_by_name VARCHAR(100),
+        custom_pa_name VARCHAR(255),
+        custom_pf_name VARCHAR(255),
+        notes TEXT,
+        prepared_at DATETIME,
+        picked_up_at DATETIME,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_requests_status ON shipping_requests(status)",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_requests_created ON shipping_requests(created_at)",
+    """CREATE TABLE IF NOT EXISTS shipping_request_bom_lines (
+        line_id CHAR(36) PRIMARY KEY,
+        request_id CHAR(36) NOT NULL REFERENCES shipping_requests(request_id) ON DELETE CASCADE,
+        parent_stage VARCHAR(2) NOT NULL,
+        child_item_id CHAR(36) NOT NULL REFERENCES items(item_id),
+        quantity INTEGER NOT NULL,
+        unit VARCHAR(20) NOT NULL DEFAULT 'EA',
+        included BOOLEAN NOT NULL DEFAULT 1,
+        origin VARCHAR(20) NOT NULL DEFAULT 'CUSTOM',
+        sort_order INTEGER NOT NULL DEFAULT 0
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_bom_request_stage ON shipping_request_bom_lines(request_id, parent_stage, sort_order)",
+    "ALTER TABLE shipping_request_bom_lines ADD COLUMN included BOOLEAN NOT NULL DEFAULT 1",
+    "ALTER TABLE shipping_request_bom_lines ADD COLUMN origin VARCHAR(20) NOT NULL DEFAULT 'CUSTOM'",
+    """CREATE TABLE IF NOT EXISTS shipping_request_companion_lines (
+        line_id CHAR(36) PRIMARY KEY,
+        request_id CHAR(36) NOT NULL REFERENCES shipping_requests(request_id) ON DELETE CASCADE,
+        item_id CHAR(36) NOT NULL REFERENCES items(item_id),
+        quantity INTEGER NOT NULL,
+        unit VARCHAR(20) NOT NULL DEFAULT 'EA',
+        sort_order INTEGER NOT NULL DEFAULT 0
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_companion_request ON shipping_request_companion_lines(request_id, sort_order)",
+    """CREATE TABLE IF NOT EXISTS shipping_request_checklist_lines (
+        line_id CHAR(36) PRIMARY KEY,
+        request_id CHAR(36) NOT NULL REFERENCES shipping_requests(request_id) ON DELETE CASCADE,
+        item_id CHAR(36) NOT NULL REFERENCES items(item_id),
+        label_snapshot VARCHAR(255),
+        quantity INTEGER NOT NULL DEFAULT 1,
+        checked BOOLEAN NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_checklist_request ON shipping_request_checklist_lines(request_id, sort_order)",
+    """CREATE TABLE IF NOT EXISTS shipping_request_events (
+        event_id CHAR(36) PRIMARY KEY,
+        request_id CHAR(36) NOT NULL REFERENCES shipping_requests(request_id) ON DELETE CASCADE,
+        event_type VARCHAR(50) NOT NULL,
+        message TEXT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_events_request ON shipping_request_events(request_id, created_at)",
+    "ALTER TABLE transaction_logs ADD COLUMN shipping_request_id CHAR(36)",
+    "ALTER TABLE transaction_logs ADD COLUMN shipping_phase VARCHAR(20)",
+    "CREATE INDEX IF NOT EXISTS ix_tx_shipping_request ON transaction_logs(shipping_request_id, created_at)",
     # 2026-06-04: 결재 알림 — 요청 도착(승인자)/승인·반려(요청자) 알림 영속 테이블.
     """CREATE TABLE IF NOT EXISTS notifications (
         notification_id CHAR(36) PRIMARY KEY,

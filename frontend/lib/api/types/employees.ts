@@ -33,4 +33,6 @@ export interface Employee {
   theme?: string | null;
   /** 조립 부서 직원의 담당 모델 slot 목록. 배열 순서 = 우선순위 (앞=상위). */
   assigned_model_slots?: number[];
+  /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. 누락 시 []로 간주. */
+  hidden_sidebar_tabs?: string[];
 }

@@ -34,6 +34,8 @@ export const employeesApi = {
     io_enabled?: boolean;
     /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위). */
     assigned_model_slots?: number[];
+    /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. */
+    hidden_sidebar_tabs?: string[];
   }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
 
   updateEmployee: (
@@ -52,6 +54,8 @@ export const employeesApi = {
       io_enabled?: boolean;
       /** 담당 모델 slot 목록. null=변경 없음, []=전부 제거. */
       assigned_model_slots?: number[];
+      /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. */
+      hidden_sidebar_tabs?: string[];
     },
   ) => putJson<Employee>(toApiUrl(`/api/employees/${employeeId}`), payload),
 

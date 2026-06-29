@@ -37,6 +37,7 @@ import { ioApi } from "./api/io";
 import { notificationsApi } from "./api/notifications";
 // 인수인계서 도메인.
 import { handoverApi } from "./api/handover";
+import { shippingApi } from "./api/shipping";
 
 // 외부 import 호환을 위해 동일 이름 그대로 re-export.
 // parseError 는 도메인 API (직접 fetch 사용처) 가 본 파일 내부에서 사용 — 이번 PR 에선 그대로.
@@ -106,6 +107,21 @@ import type {
   IoDraftPayload,
   IoBatch,
   IoSubmitResponse,
+  ShippingRequestStatus,
+  ShippingBomParentStage,
+  ShippingBomLineInput,
+  ShippingCompanionLineInput,
+  ShippingRequestCreatePayload,
+  ShippingRequestUpdatePayload,
+  ShippingChecklistUpdatePayload,
+  ShippingPrepareCompletePayload,
+  ShippingPrepareCancelPayload,
+  ShippingBomLine,
+  ShippingCompanionLine,
+  ShippingChecklistLine,
+  ShippingEvent,
+  ShippingRequest,
+  ShippingBomMatchResponse,
 } from "./api/types";
 
 export type {
@@ -163,6 +179,21 @@ export type {
   IoDraftPayload,
   IoBatch,
   IoSubmitResponse,
+  ShippingRequestStatus,
+  ShippingBomParentStage,
+  ShippingBomLineInput,
+  ShippingCompanionLineInput,
+  ShippingRequestCreatePayload,
+  ShippingRequestUpdatePayload,
+  ShippingChecklistUpdatePayload,
+  ShippingPrepareCompletePayload,
+  ShippingPrepareCancelPayload,
+  ShippingBomLine,
+  ShippingCompanionLine,
+  ShippingChecklistLine,
+  ShippingEvent,
+  ShippingRequest,
+  ShippingBomMatchResponse,
 };
 
 export const api = {
@@ -192,4 +223,5 @@ export const api = {
   ...notificationsApi,
   // 인수인계서.
   ...handoverApi,
+  ...shippingApi,
 };

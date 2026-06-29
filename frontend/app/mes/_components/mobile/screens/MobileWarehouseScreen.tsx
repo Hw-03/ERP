@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
-import { canEnterIO, isDepartmentApprover } from "../../_warehouse_steps";
+import { isDepartmentApprover } from "../../_warehouse_steps";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
 import { WarehouseHeader } from "../../_warehouse_sections/WarehouseHeader";
 import {
   WarehouseSectionTabs,
   type WarehouseSectionTab,
 } from "../../_warehouse_sections/WarehouseSectionTabs";
-import { WarehouseAccessDenied } from "../../_warehouse_sections/WarehouseAccessDenied";
 import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraftPanelTabs";
 import { readCurrentOperator } from "../../login/useCurrentOperator";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
@@ -145,9 +144,6 @@ export function MobileWarehouseScreen({
       .catch(() => {});
   }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce]);
 
-  if (operator && !canEnterIO(operator)) {
-    return <WarehouseAccessDenied department={operator.department ?? ""} />;
-  }
 
   function handleLegacyDraftContinue(_draft: StockRequest) {
     setSectionTab("compose");
