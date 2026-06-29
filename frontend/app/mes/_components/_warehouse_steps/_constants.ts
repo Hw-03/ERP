@@ -25,8 +25,6 @@ type OperatorLike =
       department_role?: DepartmentRole;
       level?: EmployeeLevel;
       department: Department;
-      /** W12-#7: 직원별 입출고 권한. 미정의(undefined)=true 로 간주. */
-      io_enabled?: boolean;
     }
   | null
   | undefined;
@@ -103,11 +101,6 @@ export function isDepartmentApprover(op: OperatorLike): boolean {
   return op.department_role === "primary" || op.department_role === "deputy";
 }
 
-/** 입출고 화면 진입 가드. 직원별 io_enabled 만 확인. */
-export function canEnterIO(op: OperatorLike): boolean {
-  if (!op) return false;
-  return op.io_enabled !== false;
-}
 
 export function workTypesForOperator(op: OperatorLike): WorkType[] {
   if (!op) return [];

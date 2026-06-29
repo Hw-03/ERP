@@ -30,7 +30,6 @@ import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { StatusPill, inferToneFromStatus } from "../common";
-import { canEnterIO } from "../_warehouse_steps";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
@@ -181,7 +180,6 @@ export function MobileShell() {
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
     if (tab === "more") return mobileMoreHasVisibleEntries(operator);
-    if ((tab === "warehouse" || tab === "defect") && !canEnterIO(operator)) return false;
     return isSidebarTabVisible(tab, operator);
   }, [operator]);
 

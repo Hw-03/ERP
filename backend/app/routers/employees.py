@@ -41,6 +41,41 @@ SIDEBAR_TAB_IDS: tuple[str, ...] = (
     "admin",
 )
 SIDEBAR_TAB_ID_SET = set(SIDEBAR_TAB_IDS)
+IO_RELATED_TAB_IDS: tuple[str, str] = ("warehouse", "defect")
+
+
+def _normalize_io_related_hidden_tabs(tabs: List[str]) -> List[str]:
+    if not any(tab in IO_RELATED_TAB_IDS for tab in tabs):
+        return tabs
+    normalized: List[str] = []
+    inserted = False
+    for tab in tabs:
+        if tab in IO_RELATED_TAB_IDS:
+            if not inserted:
+                normalized.extend(IO_RELATED_TAB_IDS)
+                inserted = True
+            continue
+        normalized.append(tab)
+    return normalized
+
+
+def _hide_io_related_tabs(tabs: List[str]) -> List[str]:
+    return _normalize_io_related_hidden_tabs([*tabs, *IO_RELATED_TAB_IDS])
+
+
+def _show_io_related_tabs(tabs: List[str]) -> List[str]:
+    return [tab for tab in tabs if tab not in IO_RELATED_TAB_IDS]
+
+
+def _io_enabled_from_hidden_tabs(tabs: List[str]) -> bool:
+    return not any(tab in IO_RELATED_TAB_IDS for tab in tabs)
+
+
+def _payload_has_field(payload: object, field: str) -> bool:
+    fields = getattr(payload, "model_fields_set", None)
+    if fields is None:
+        fields = getattr(payload, "__fields_set__", set())
+    return field in fields
 
 
 def _parse_hidden_sidebar_tabs(raw: Optional[str]) -> List[str]:
@@ -72,6 +107,7 @@ def _validate_hidden_sidebar_tabs(tabs: Optional[List[str]]) -> List[str]:
             ErrorCode.UNPROCESSABLE,
             "알 수 없는 사이드바 탭 권한 값입니다.",
         )
+    normalized = _normalize_io_related_hidden_tabs(normalized)
     if len(normalized) == len(SIDEBAR_TAB_IDS):
         raise http_error(
             422,
@@ -241,6 +277,12 @@ def create_employee(
         )
 
     hidden_tabs = _validate_hidden_sidebar_tabs(payload.hidden_sidebar_tabs)
+    hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
+    io_enabled = payload.io_enabled if payload.io_enabled is not None else True
+    if hidden_tabs_provided:
+        io_enabled = _io_enabled_from_hidden_tabs(hidden_tabs)
+    elif not io_enabled:
+        hidden_tabs = _hide_io_related_tabs(hidden_tabs)
     _ensure_admin_tab_access_remains(
         db,
         employee_id=None,
@@ -256,7 +298,7 @@ def create_employee(
         level=payload.level,
         warehouse_role=role_value,
         department_role=dept_role_value,
-        io_enabled=payload.io_enabled if payload.io_enabled is not None else True,
+        io_enabled=io_enabled,
         hidden_sidebar_tabs=_serialize_hidden_sidebar_tabs(hidden_tabs),
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
@@ -294,9 +336,19 @@ def update_employee(
     candidate_hidden_tabs = _parse_hidden_sidebar_tabs(
         getattr(employee, "hidden_sidebar_tabs", "")
     )
-    if payload.hidden_sidebar_tabs is not None:
+    candidate_io_enabled = bool(getattr(employee, "io_enabled", True))
+    hidden_tabs_provided = _payload_has_field(payload, "hidden_sidebar_tabs")
+    if hidden_tabs_provided:
         candidate_hidden_tabs = _validate_hidden_sidebar_tabs(
             payload.hidden_sidebar_tabs
+        )
+        candidate_io_enabled = _io_enabled_from_hidden_tabs(candidate_hidden_tabs)
+    elif payload.io_enabled is not None:
+        candidate_io_enabled = bool(payload.io_enabled)
+        candidate_hidden_tabs = (
+            _show_io_related_tabs(candidate_hidden_tabs)
+            if candidate_io_enabled
+            else _hide_io_related_tabs(candidate_hidden_tabs)
         )
     candidate_is_active = (
         bool(payload.is_active)
@@ -347,11 +399,10 @@ def update_employee(
     if payload.is_active is not None:
         if employee.is_active != payload.is_active:
             employee.is_active = payload.is_active; changed.append("is_active")
-    if payload.io_enabled is not None:
-        if bool(employee.io_enabled) != bool(payload.io_enabled):
-            employee.io_enabled = bool(payload.io_enabled)
-            changed.append("io_enabled")
-    if payload.hidden_sidebar_tabs is not None:
+    if bool(employee.io_enabled) != candidate_io_enabled:
+        employee.io_enabled = candidate_io_enabled
+        changed.append("io_enabled")
+    if hidden_tabs_provided or payload.io_enabled is not None:
         hidden_raw = _serialize_hidden_sidebar_tabs(candidate_hidden_tabs)
         if (getattr(employee, "hidden_sidebar_tabs", "") or "") != hidden_raw:
             employee.hidden_sidebar_tabs = hidden_raw
@@ -542,6 +593,13 @@ def update_employee_theme(
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
+
+def _effective_hidden_sidebar_tabs(employee: Employee) -> List[str]:
+    tabs = _parse_hidden_sidebar_tabs(getattr(employee, "hidden_sidebar_tabs", ""))
+    if not tabs and not bool(getattr(employee, "io_enabled", True)):
+        return _hide_io_related_tabs(tabs)
+    return tabs
+
 def _to_response(
     employee: Employee, assigned_model_slots: Optional[List[int]] = None
 ) -> EmployeeResponse:
@@ -566,7 +624,5 @@ def _to_response(
         pin_is_default=pin_is_default,
         theme=getattr(employee, "theme", None),
         assigned_model_slots=assigned_model_slots or [],
-        hidden_sidebar_tabs=_parse_hidden_sidebar_tabs(
-            getattr(employee, "hidden_sidebar_tabs", "")
-        ),
+        hidden_sidebar_tabs=_effective_hidden_sidebar_tabs(employee),
     )

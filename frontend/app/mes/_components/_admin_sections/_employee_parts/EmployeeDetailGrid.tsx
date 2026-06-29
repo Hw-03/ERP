@@ -17,7 +17,7 @@ import {
   WAREHOUSE_ROLE_LABEL,
 } from "./employeeRoleLabels";
 import { DetailCardSlot, FieldRow, SelectInput, TextInput } from "./employeeDetailPrimitives";
-import { SIDEBAR_TAB_IDS, type SidebarTabId } from "../../tabAccess";
+import { SIDEBAR_TAB_IDS, setSidebarTabVisible, type SidebarTabId } from "../../tabAccess";
 
 
 const SIDEBAR_TAB_LABELS: Record<SidebarTabId, string> = {
@@ -55,12 +55,10 @@ export function EmployeeDetailGrid({
   const deptMeta = DEPARTMENT_ROLE_LABEL[form.department_role];
   const hiddenTabs = new Set(form.hidden_sidebar_tabs);
   const toggleSidebarTab = (tab: SidebarTabId, checked: boolean) => {
-    setForm((f) => {
-      const nextHidden = new Set(f.hidden_sidebar_tabs);
-      if (checked) nextHidden.delete(tab);
-      else nextHidden.add(tab);
-      return { ...f, hidden_sidebar_tabs: SIDEBAR_TAB_IDS.filter((id) => nextHidden.has(id)) };
-    });
+    setForm((f) => ({
+      ...f,
+      hidden_sidebar_tabs: setSidebarTabVisible(f.hidden_sidebar_tabs, tab, checked),
+    }));
   };
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -133,31 +131,6 @@ export function EmployeeDetailGrid({
               style={{ color: deptMeta.tone }}
             >
               {deptMeta.hint}
-            </div>
-          </FieldRow>
-          <FieldRow label="입출고 권한">
-            <label className="inline-flex cursor-pointer items-center gap-3 py-1">
-              <input
-                type="checkbox"
-                checked={form.io_enabled}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, io_enabled: e.target.checked }))
-                }
-                className="h-4 w-4 cursor-pointer rounded border"
-                style={{
-                  accentColor: LEGACY_COLORS.blue,
-                  borderColor: LEGACY_COLORS.border,
-                }}
-              />
-              <span
-                className="text-[13px]"
-                style={{ color: LEGACY_COLORS.text }}
-              >
-                입출고 화면 접근 허용
-              </span>
-            </label>
-            <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              직원 개별 권한. 체크 해제 시 입출고 화면 접근 차단.
             </div>
           </FieldRow>
           <FieldRow label="표시 탭">

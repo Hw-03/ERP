@@ -4,6 +4,7 @@ import {
   filterVisibleSidebarTabs,
   mobileMoreHasVisibleEntries,
   normalizeHiddenSidebarTabs,
+  setSidebarTabVisible,
 } from "../tabAccess";
 
 const op = (hidden_sidebar_tabs?: string[] | null) => ({ hidden_sidebar_tabs });
@@ -23,6 +24,11 @@ describe("tabAccess", () => {
     expect(normalizeHiddenSidebarTabs(["weekly", "unknown", "weekly"])).toEqual(["weekly"]);
   });
 
+
+  it("toggles warehouse and defect as one visible-tab group", () => {
+    expect(setSidebarTabVisible([], "warehouse", false)).toEqual(["warehouse", "defect"]);
+    expect(setSidebarTabVisible(["warehouse", "defect", "weekly"], "defect", true)).toEqual(["weekly"]);
+  });
   it("hides the mobile More slot when every More entry is hidden", () => {
     expect(mobileMoreHasVisibleEntries(op(["shipping", "weekly", "warehouseMap"]))).toBe(false);
     expect(mobileMoreHasVisibleEntries(op(["shipping", "weekly"]))).toBe(true);

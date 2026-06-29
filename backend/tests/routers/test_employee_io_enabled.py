@@ -237,6 +237,61 @@ def test_update_employee_hidden_sidebar_tabs_round_trips(db_session, client):
     assert emp["hidden_sidebar_tabs"] == ["weekly", "history"]
 
 
+
+def test_create_employee_io_enabled_false_hides_io_related_tabs(db_session, client):
+    """Legacy io_enabled=false is absorbed into warehouse+defect hidden tabs."""
+    resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="Legacy IO hidden", io_enabled=False),
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["io_enabled"] is False
+    assert resp.json()["hidden_sidebar_tabs"] == ["warehouse", "defect"]
+
+
+def test_hidden_sidebar_tabs_couple_warehouse_and_defect(db_session, client):
+    """Warehouse and defect tab visibility always move as one permission group."""
+    create_resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="Coupled IO tabs"),
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    emp_id = create_resp.json()["employee_id"]
+
+    update_resp = client.put(
+        f"/api/employees/{emp_id}",
+        headers=ADMIN_HEADERS,
+        json={"hidden_sidebar_tabs": ["defect"]},
+    )
+    assert update_resp.status_code == 200, update_resp.text
+    assert update_resp.json()["hidden_sidebar_tabs"] == ["warehouse", "defect"]
+
+
+def test_update_io_enabled_true_clears_legacy_io_hidden_tabs(db_session, client):
+    """Legacy io_enabled=true re-opens the coupled warehouse+defect tabs."""
+    create_resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(
+            name="Legacy IO reopen",
+            io_enabled=False,
+            hidden_sidebar_tabs=["warehouse", "defect"],
+        ),
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    emp_id = create_resp.json()["employee_id"]
+
+    update_resp = client.put(
+        f"/api/employees/{emp_id}",
+        headers=ADMIN_HEADERS,
+        json={"io_enabled": True},
+    )
+    assert update_resp.status_code == 200, update_resp.text
+    assert update_resp.json()["io_enabled"] is True
+    assert update_resp.json()["hidden_sidebar_tabs"] == []
+
 def test_employee_hidden_sidebar_tabs_reject_unknown_tab(db_session, client):
     """Unknown sidebar tab ids are rejected instead of being silently stored."""
     resp = client.post(

@@ -32,6 +32,7 @@ describe("useAdminEmployeesForm", () => {
     });
 
     expect(result.current.editForm.hidden_sidebar_tabs).toEqual(["weekly", "admin"]);
+    expect("io_enabled" in result.current.editForm).toBe(false);
     expect(result.current.dirty).toBe(false);
 
     await act(async () => {

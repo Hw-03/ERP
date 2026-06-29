@@ -1,8 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { canEnterIO, isWarehouseStaff, isDepartmentApprover } from "../../_warehouse_steps";
-import { WarehouseAccessDenied } from "../../_warehouse_sections/WarehouseAccessDenied";
+import { isWarehouseStaff, isDepartmentApprover } from "../../_warehouse_steps";
 import { readCurrentOperator, type Operator } from "../../login/useCurrentOperator";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
 import { DefectHubPanel } from "../../_defect_hub/DefectHubPanel";
@@ -13,7 +12,7 @@ const NOOP = () => {};
  * 불량 모바일 화면.
  *
  * 좁은 화면엔 세로형 허브가 맞아 기존 DefectHubPanel(세로 스택)을 그대로 마운트한다.
- * 권한·가시성은 입출고와 동일(canEnterIO). 격리 추가·바로 폐기(다품목 카트)·처리 패널은
+ * 격리 추가·바로 폐기(다품목 카트)·처리 패널은
  * 데스크톱과 동일한 흐름을 모바일 전용으로 재구성해 DefectHubPanel 안에서 렌더한다.
  */
 export function MobileDefectScreen({
@@ -23,9 +22,6 @@ export function MobileDefectScreen({
 }) {
   const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
 
-  if (operator && !canEnterIO(operator)) {
-    return <WarehouseAccessDenied department={operator.department ?? ""} />;
-  }
   if (!operator) {
     return (
       <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
