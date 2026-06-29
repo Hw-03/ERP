@@ -59,13 +59,14 @@ test.describe("불량 — 격리 / 해제", () => {
     // ── 해제(정상 복귀) ───────────────────────────────────
     await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
-    // 같은 AppSelect 패턴.
-    await page
+    // RDefectActionModal 안의 AppSelect — dialog scope 로 좁힌다.
+    const reactionDialog = page.getByRole("dialog");
+    await reactionDialog
       .getByRole("combobox")
       .filter({ hasText: "카테고리 선택" })
       .first()
       .click();
-    await page.getByRole("option", { name: "외관 불량" }).click();
+    await reactionDialog.getByRole("option", { name: "외관 불량" }).click();
     // 정상 복귀는 ConfirmModal 없이 직접 제출.
     // 재설계 후 "정상 복귀" ActionCard 와 제출 버튼이 공존 → 화살표 포함 제출 버튼만 정확히 겨냥.
     await page.getByRole("button", { name: "정상 복귀 →" }).click();
