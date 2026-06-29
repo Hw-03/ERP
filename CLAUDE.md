@@ -99,7 +99,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 
 - If the backend shows 0 log lines, suspect a zombie — run stop then start.
 
-- Before commit/push, run:
+- Before commit/push, run verification proportional to the staged change:
+  - For docs/config/low-risk scoped changes, `git diff --cached --check` is sufficient unless the user asks for full verification.
+  - Reuse fresh relevant verification from the current session instead of rerunning the same checks.
+  - For high-risk backend/frontend behavior changes, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
