@@ -29,6 +29,7 @@ const DEPARTMENT_ROLE_LABEL: Record<string, string | null> = {
 export function DesktopTopbar({
   title,
   icon: Icon,
+  iconColor = LEGACY_COLORS.blue,
   onRefresh,
   actionSlot,
   status,
@@ -38,6 +39,7 @@ export function DesktopTopbar({
 }: {
   title: string;
   icon?: ElementType;
+  iconColor?: string;
   onRefresh: () => void;
   actionSlot?: ReactNode;
   status?: string;
@@ -80,8 +82,12 @@ export function DesktopTopbar({
           <div className="flex items-center gap-3">
             {Icon && (
               <div
+                data-testid="desktop-topbar-icon"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px]"
-                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}
+                style={{
+                  background: `color-mix(in srgb, ${iconColor} 12%, transparent)`,
+                  color: iconColor,
+                }}
               >
                 <Icon className="h-5 w-5" />
               </div>

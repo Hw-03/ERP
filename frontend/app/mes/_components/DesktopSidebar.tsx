@@ -11,19 +11,29 @@ export type { DesktopTabId } from "./tabAccess";
 
 type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: ElementType; color: string };
 
+export const DESKTOP_TAB_ICON_COLORS: Record<DesktopTabId, string> = {
+  dashboard: LEGACY_COLORS.blue,
+  warehouse: LEGACY_COLORS.green,
+  shipping: LEGACY_COLORS.cyan,
+  warehouseMap: LEGACY_COLORS.cyan,
+  defect: LEGACY_COLORS.red,
+  history: LEGACY_COLORS.purple,
+  weekly: LEGACY_COLORS.yellow,
+  admin: LEGACY_COLORS.muted2,
+};
 // ??ぉ 3-6 ???ъ씠?쒕컮 ?꾩씠肄섏뿉 ??퀎 怨좎쑀??鍮꾪솢?????쒖떆). ?쒖꽦? 湲곗〈 blue 諛뺤뒪+white ?꾩씠肄??좎?.
 const MAIN_TABS: TabDef[] = [
-  { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: LEGACY_COLORS.blue },
-  { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: LEGACY_COLORS.green },
-  { id: "shipping", label: "출하", subtitle: "요청·준비·픽업 완료", icon: Truck, color: LEGACY_COLORS.cyan },
-  { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle, color: LEGACY_COLORS.red },
-  { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History, color: LEGACY_COLORS.purple },
-  { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned, color: LEGACY_COLORS.cyan },
-  { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2, color: LEGACY_COLORS.yellow },
+  { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: DESKTOP_TAB_ICON_COLORS.dashboard },
+  { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: DESKTOP_TAB_ICON_COLORS.warehouse },
+  { id: "shipping", label: "출하", subtitle: "요청·준비·픽업 완료", icon: Truck, color: DESKTOP_TAB_ICON_COLORS.shipping },
+  { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle, color: DESKTOP_TAB_ICON_COLORS.defect },
+  { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History, color: DESKTOP_TAB_ICON_COLORS.history },
+  { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned, color: DESKTOP_TAB_ICON_COLORS.warehouseMap },
+  { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2, color: DESKTOP_TAB_ICON_COLORS.weekly },
 ];
 
 const BOTTOM_TABS: TabDef[] = [
-  { id: "admin", label: "관리", subtitle: "마스터와 운영 설정", icon: Settings2, color: LEGACY_COLORS.muted2 },
+  { id: "admin", label: "관리", subtitle: "마스터와 운영 설정", icon: Settings2, color: DESKTOP_TAB_ICON_COLORS.admin },
 ];
 
 export function DesktopSidebar({

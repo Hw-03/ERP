@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
-import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
+import { DESKTOP_TAB_ICON_COLORS, DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
@@ -260,6 +260,7 @@ function DesktopMesShellInner() {
             <DesktopTopbar
               title={activeMeta.title}
               icon={activeMeta.icon}
+              iconColor={DESKTOP_TAB_ICON_COLORS[activeTab]}
               onRefresh={() => {
                 setRefreshNonce((current) => current + 1);
                 void refetchCapacity();
