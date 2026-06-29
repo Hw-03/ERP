@@ -59,13 +59,10 @@ test.describe("불량 — 격리 / 해제", () => {
     // ── 해제(정상 복귀) ───────────────────────────────────
     await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
-    // RDefectActionModal 안의 AppSelect — dialog scope 로 좁힌다.
+    // RDefectActionModal 은 location.reason_category 를 prefill 하므로 trigger 텍스트는
+    // 이미 "외관 불량" 일 수 있어 placeholder 로 filter 하지 않는다. dialog 안 combobox 는 1개.
     const reactionDialog = page.getByRole("dialog");
-    await reactionDialog
-      .getByRole("combobox")
-      .filter({ hasText: "카테고리 선택" })
-      .first()
-      .click();
+    await reactionDialog.getByRole("combobox").first().click();
     await reactionDialog.getByRole("option", { name: "외관 불량" }).click();
     // 정상 복귀는 ConfirmModal 없이 직접 제출.
     // 재설계 후 "정상 복귀" ActionCard 와 제출 버튼이 공존 → 화살표 포함 제출 버튼만 정확히 겨냥.
