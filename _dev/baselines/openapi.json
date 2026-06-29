@@ -3862,6 +3862,11 @@
             ],
             "title": "Deleted At"
           },
+          "has_bom": {
+            "default": false,
+            "title": "Has Bom",
+            "type": "boolean"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -4154,6 +4159,11 @@
               }
             ],
             "title": "Department"
+          },
+          "has_bom": {
+            "default": false,
+            "title": "Has Bom",
+            "type": "boolean"
           },
           "item_id": {
             "format": "uuid",
@@ -7084,7 +7094,8 @@
           "defect_return",
           "defect_disassemble",
           "scrap_normal",
-          "return_normal"
+          "return_normal",
+          "rework_normal"
         ],
         "title": "StockRequestTypeEnum",
         "type": "string"
