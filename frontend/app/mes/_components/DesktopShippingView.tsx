@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -23,9 +24,15 @@ import {
 import { api, type Item, type ShippingBomLineInput, type ShippingBomMatchResponse, type ShippingCompanionLineInput, type ShippingRequest, type ShippingRequestStatus } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { AppSelect } from "./common/AppSelect";
+import type { Operator } from "./login/useCurrentOperator";
 
 type SectionTab = "request" | "prep" | "history";
 type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "historyList" | "historyWork";
+const VIEW_MODE_VALUES: ViewMode[] = ["hub", "requestList", "requestDetail", "requestWork", "prepList", "prepWork", "historyList", "historyWork"];
+function isShippingViewMode(value: string | null): value is ViewMode {
+  return Boolean(value && VIEW_MODE_VALUES.includes(value as ViewMode));
+}
 type RequestWizardStep = 1 | 2 | 3 | 4 | 5;
 type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM" };
 type PendingAction =
@@ -131,7 +138,10 @@ function requestBomLines(req: ShippingRequest): DraftLine[] {
   }));
 }
 
-export function DesktopShippingView({ onStatusChange }: { onStatusChange: (status: string) => void }) {
+export function DesktopShippingView({ onStatusChange, operator = null }: { onStatusChange: (status: string) => void; operator?: Operator | null }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const lastUrlSearchRef = useRef(searchParams.toString());
   const [view, setView] = useState<ViewMode>("hub");
   const [items, setItems] = useState<Item[]>([]);
   const [requests, setRequests] = useState<ShippingRequest[]>([]);
@@ -177,6 +187,24 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     [history, selectedHistoryId],
   );
   const canEditDraft = !selectedRequest || selectedRequest.status === "REQUESTED" || selectedRequest.status === "PREPARING";
+  function buildShippingUrl(nextView: ViewMode, requestId?: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "shipping");
+    if (nextView === "hub") {
+      params.delete("shippingView");
+      params.delete("shippingRequestId");
+    } else {
+      params.set("shippingView", nextView);
+      if (requestId) params.set("shippingRequestId", requestId);
+      else params.delete("shippingRequestId");
+    }
+    return `?${params.toString()}`;
+  }
+
+  function navigateView(nextView: ViewMode, requestId?: string | null) {
+    setView(nextView);
+    router.push(buildShippingUrl(nextView, requestId), { scroll: false });
+  }
 
   const upsertRequest = useCallback((next: ShippingRequest) => {
     setRequests((prev) => {
@@ -226,13 +254,78 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
   useEffect(() => {
     void loadData();
   }, [loadData]);
+  useEffect(() => {
+    if (searchParams.get("tab") !== "shipping") return;
+    const currentSearch = searchParams.toString();
+    const hasSubview = searchParams.has("shippingView");
+    if (!hasSubview && lastUrlSearchRef.current === currentSearch && view !== "hub") return;
+    lastUrlSearchRef.current = currentSearch;
+    const nextView = isShippingViewMode(searchParams.get("shippingView")) ? searchParams.get("shippingView") as ViewMode : "hub";
+    const requestId = searchParams.get("shippingRequestId");
+
+    if (nextView === "hub") {
+      setView("hub");
+      return;
+    }
+    if (nextView === "requestList" || nextView === "prepList" || nextView === "historyList") {
+      setView(nextView);
+      return;
+    }
+    if (nextView === "requestDetail") {
+      if (!requestId) {
+        setView("requestList");
+        return;
+      }
+      setEditingId(requestId);
+      setView("requestDetail");
+      return;
+    }
+    if (nextView === "prepWork") {
+      if (!requestId) {
+        setView("prepList");
+        return;
+      }
+      setSelectedPrepId(requestId);
+      setView("prepWork");
+      return;
+    }
+    if (nextView === "historyWork") {
+      if (!requestId) {
+        setView("historyList");
+        return;
+      }
+      setSelectedHistoryId(requestId);
+      setView("historyWork");
+      return;
+    }
+    if (requestId) {
+      const found = requests.find((req) => req.request_id === requestId);
+      if (found) {
+        setEditingId(found.request_id);
+        setBasePfId(found.base_pf_item_id);
+        setRequestedBy(found.requested_by_name ?? "");
+        setCustomPaName(found.custom_pa_name ?? "");
+        setCustomPfName(found.custom_pf_name ?? "");
+        setNotes(found.notes ?? "");
+        setDraftLines(requestBomLines(found));
+        setMatchResult(null);
+        setRequestWizardStep(2);
+        setView("requestWork");
+      } else if (!loading) setView("requestList");
+      return;
+    }
+    setEditingId(null);
+    setRequestWizardStep(1);
+    setView("requestWork");
+  // URL query drives browser back/forward for the shipping subview.
+  }, [searchParams, requests, loading, view]);
 
   function clearDraft() {
-    setView("requestWork");
+    navigateView("requestWork");
     setRequestWizardStep(1);
     setEditingId(null);
     setBasePfId("");
-    setRequestedBy("");
+    setRequestedBy(operator?.name ?? "");
     setCustomPaName("");
     setCustomPfName("");
     setNotes("");
@@ -241,7 +334,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     void ensureItemsLoaded();
   }
 
-  function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork") {
+  function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork", syncUrl = true) {
     setEditingId(req.request_id);
     setBasePfId(req.base_pf_item_id);
     setRequestedBy(req.requested_by_name ?? "");
@@ -251,7 +344,8 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     setDraftLines(requestBomLines(req));
     setMatchResult(null);
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
-    setView(nextView);
+    if (syncUrl) navigateView(nextView, req.request_id);
+    else setView(nextView);
     if (nextView === "requestWork") void ensureItemsLoaded();
   }
 
@@ -311,7 +405,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
 
   function draftPayload() {
     return {
-      requested_by_name: requestedBy.trim() || null,
+      requested_by_name: (editingId ? requestedBy.trim() : operator?.name?.trim() || requestedBy.trim()) || null,
       custom_pa_name: customPaName.trim() || null,
       custom_pf_name: customPfName.trim() || null,
       notes: notes.trim() || null,
@@ -401,7 +495,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       const next = await api.sendShippingToPrep(saved.request_id);
       upsertRequest(next);
       setSelectedPrepId(next.request_id);
-      setView("prepWork");
+      navigateView("prepWork", next.request_id);
       onStatusChange("출하 요청을 준비 중으로 넘겼습니다.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "준비 중 전환에 실패했습니다.";
@@ -423,7 +517,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       const next = await api.sendShippingToPrep(req.request_id);
       upsertRequest(next);
       setSelectedPrepId(next.request_id);
-      setView("prepWork");
+      navigateView("prepWork", next.request_id);
       onStatusChange("출하 요청을 준비 중으로 넘겼습니다.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "준비 중 전환에 실패했습니다.";
@@ -525,13 +619,13 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
         await api.deleteShippingRequest(action.request.request_id);
         setRequests((prev) => prev.filter((row) => row.request_id !== action.request.request_id));
         setEditingId(null);
-        setView("requestList");
+        navigateView("requestList");
         onStatusChange("출하 요청을 취소했습니다.");
       } else {
         const next = await api.completeShippingPickup(action.request.request_id);
         upsertRequest(next);
         setSelectedHistoryId(next.request_id);
-        setView("historyWork");
+        navigateView("historyWork", next.request_id);
         onStatusChange("픽업 완료 처리했습니다.");
       }
       setConfirmAction(null);
@@ -583,7 +677,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
   }, [basePfId, draftLines, itemById, view]);
 
   function openSection(next: SectionTab) {
-    setView(next === "request" ? "requestList" : next === "prep" ? "prepList" : "historyList");
+    navigateView(next === "request" ? "requestList" : next === "prep" ? "prepList" : "historyList");
   }
 
   function renderActiveView() {
@@ -601,7 +695,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       return (
         <RequestListEntry
           requests={activeRequests}
-          onBack={() => setView("hub")}
+          onBack={() => navigateView("hub")}
           onNew={clearDraft}
           onOpen={(req) => loadRequestIntoDraft(req, "requestDetail")}
         />
@@ -612,7 +706,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       return (
         <RequestDetailEntry
           request={selectedRequest}
-          onBack={() => setView("requestList")}
+          onBack={() => navigateView("requestList")}
           onEdit={(req) => loadRequestIntoDraft(req, "requestWork")}
           onSendToPrep={(req) => void sendExistingToPrep(req)}
           onDelete={deleteRequest}
@@ -623,14 +717,9 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
 
     if (view === "requestWork") {
       return (
-        <div className="grid gap-3">
-          <ViewHeader
-            title={editingId ? "출하 요청 수정" : "출하 요청 작성"}
-            subtitle="PF 선택 후 PF/PA 구성품을 조정합니다."
-            onBack={() => setView(selectedRequest ? "requestDetail" : "requestList")}
-          />
-          <RequestSection
+        <RequestSection
             showList={false}
+            onBack={() => navigateView(selectedRequest ? "requestDetail" : "requestList", selectedRequest?.request_id)}
             activeRequests={activeRequests}
             selectedRequest={selectedRequest}
             editingId={editingId}
@@ -638,7 +727,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
             itemById={itemById}
             itemOptions={lineItemOptions}
             basePfId={basePfId}
-            requestedBy={requestedBy}
+            requestedBy={editingId ? requestedBy : operator?.name ?? requestedBy}
             customPaName={customPaName}
             customPfName={customPfName}
             notes={notes}
@@ -663,7 +752,6 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
             onSave={() => void saveRequest()}
             onSend={() => void sendToPrep()}
           />
-        </div>
       );
     }
 
@@ -671,10 +759,10 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       return (
         <PrepListEntry
           requests={prepRequests}
-          onBack={() => setView("hub")}
+          onBack={() => navigateView("hub")}
           onOpen={(req) => {
             setSelectedPrepId(req.request_id);
-            setView("prepWork");
+            navigateView("prepWork", req.request_id);
           }}
         />
       );
@@ -683,7 +771,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
     if (view === "prepWork") {
       return (
         <div className="grid gap-3">
-          <ViewHeader title="준비 체크" subtitle="구성품 체크 후 준비 완료와 픽업을 처리합니다." onBack={() => setView("prepList")} />
+          <ViewHeader title="준비 체크" subtitle="구성품 체크 후 준비 완료와 픽업을 처리합니다." onBack={() => navigateView("prepList")} />
           <PrepSection
             showList={false}
             requests={prepRequests}
@@ -708,10 +796,10 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
       return (
         <HistoryListEntry
           rows={history}
-          onBack={() => setView("hub")}
+          onBack={() => navigateView("hub")}
           onOpen={(req) => {
             setSelectedHistoryId(req.request_id);
-            setView("historyWork");
+            navigateView("historyWork", req.request_id);
           }}
         />
       );
@@ -719,7 +807,7 @@ export function DesktopShippingView({ onStatusChange }: { onStatusChange: (statu
 
     return (
       <div className="grid gap-3">
-        <ViewHeader title="출하 상세 이력" subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다." onBack={() => setView("historyList")} />
+        <ViewHeader title="출하 상세 이력" subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다." onBack={() => navigateView("historyList")} />
         <HistorySection rows={history} selected={selectedHistory} onSelect={(req) => setSelectedHistoryId(req.request_id)} showList={false} />
       </div>
     );
@@ -817,7 +905,7 @@ function HubCard({ id, icon: Icon, title, body, count, tone, onClick }: { id: Se
         </div>
         <span className="rounded-full px-3 py-1.5 text-sm font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>
       </div>
-      <div className="mt-auto text-sm font-black" style={{ color: tone }}>바로 열기</div>
+      <div className="mt-auto inline-flex min-h-11 items-center rounded-[14px] border px-4 text-sm font-black" style={{ background: tint(tone, 10), borderColor: tint(tone, 36), color: tone }}>바로 열기</div>
     </button>
   );
 }
@@ -857,7 +945,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
               {groups.map((group) => {
                 const rows = requests.filter((request) => request.status === group.status);
                 return (
-                  <ListColumn key={group.status} icon={ClipboardList} title={group.label} subtitle={`${rows.length}건`}>
+                  <ListColumn key={group.status} icon={ClipboardList} title={group.label} subtitle={`${rows.length}건`} bodyDataTestId={`shipping-request-column-body-${group.status}`}>
                     {rows.length === 0 ? (
                       <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
                     ) : (
@@ -1013,6 +1101,7 @@ function RequestSection(props: {
   onMatch: () => void;
   onSave: () => void;
   onSend: () => void;
+  onBack: () => void;
 }) {
   const grouped = {
     PA: props.draftLines.filter((line) => line.parent_stage === "PA"),
@@ -1046,11 +1135,18 @@ function RequestSection(props: {
     <div className="grid min-h-[calc(100vh-275px)] gap-3">
       <Panel>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <PanelTitle
-            icon={PackageCheck}
-            title={props.editingId ? "출하 요청 수정" : "출하 요청 작성"}
-            subtitle="한 화면에 하나의 작업만 처리합니다."
-          />
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" aria-label="이전 화면" onClick={props.onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div data-testid="shipping-work-title">
+              <PanelTitle
+                icon={PackageCheck}
+                title={props.editingId ? "출하 요청 수정" : "출하 요청 작성"}
+                subtitle="한 화면에 하나의 작업만 처리합니다."
+              />
+            </div>
+          </div>
           {props.selectedRequest && <StatusBadge status={props.selectedRequest.status} />}
         </div>
 
@@ -1082,12 +1178,12 @@ function RequestSection(props: {
           })}
         </div>
 
-        <div className="mt-4 min-h-[430px] rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {props.wizardStep === 1 && (
+        <div className="mt-4 min-h-[430px] rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>          {props.wizardStep === 1 && (
             <WorkStep number={1} title="기준 PF 선택" body="출하할 최종 PF를 먼저 선택하면 기본 PF/PA 구성이 준비됩니다." dataTestId="shipping-wizard-step-1">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="grid gap-3">
                 <Field label="PF 검색">
                   <input
+                    data-testid="shipping-pf-search"
                     aria-label="PF 검색"
                     value={pfQuery}
                     disabled={locked || props.pending !== null}
@@ -1097,27 +1193,36 @@ function RequestSection(props: {
                     placeholder="PF 코드/품명 검색"
                   />
                 </Field>
-                <Field label="기준 PF">
-                  <select
-                    aria-label="기준 PF"
-                    value={props.basePfId}
-                    disabled={locked || props.pending !== null}
-                    onChange={(event) => props.onBasePfChange(event.target.value)}
-                    className="h-12 w-full min-w-0 rounded-[12px] border px-3 text-sm font-bold outline-none focus-visible:ring-2"
-                    style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                  >
-                    <option value="">PF 선택</option>
-                    {filteredPfItems.map((item) => (
-                      <option key={item.item_id} value={item.item_id}>{itemLabel(item)}</option>
-                    ))}
-                  </select>
-                </Field>
+                <div className="grid max-h-[360px] gap-2 overflow-y-auto rounded-[14px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  {filteredPfItems.length === 0 ? (
+                    <EmptyState title="선택 가능한 PF 없음" body="검색어를 바꾸거나 품목 목록을 확인하세요." />
+                  ) : (
+                    filteredPfItems.slice(0, 80).map((item) => {
+                      const selected = props.basePfId === item.item_id;
+                      return (
+                        <button
+                          key={item.item_id}
+                          type="button"
+                          data-testid={`shipping-pf-option-${item.item_id}`}
+                          onClick={() => props.onBasePfChange(item.item_id)}
+                          disabled={locked || props.pending !== null}
+                          className="flex min-h-12 items-center justify-between gap-3 rounded-[12px] border px-3 py-2 text-left transition-all hover:brightness-110 disabled:opacity-50"
+                          style={{ background: selected ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.blue, 45) : LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-black">{item.item_name}</span>
+                            <span className="block truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item.mes_code ?? item.process_type_code ?? "-"}</span>
+                          </span>
+                          {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
               {!props.basePfId && <div className="mt-4"><EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 다음 단계에서 PA 구성품과 PF 구성품을 나눠 조정합니다." /></div>}
             </WorkStep>
-          )}
-
-          {props.wizardStep === 2 && (
+          )}{props.wizardStep === 2 && (
             <WorkStep number={2} title="BOM 구성 조정" body="기본 구성은 제외로 남기고, 필요한 품목은 PA/PF 묶음에 추가합니다." dataTestId="shipping-wizard-step-2">
               {!props.basePfId ? (
                 <EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 PA 구성품과 PF 구성품을 나눠 보여줍니다." />
@@ -1160,7 +1265,7 @@ function RequestSection(props: {
             <WorkStep number={4} title="요청 정보" body="준비자가 마지막에 확인할 담당자와 변경 사항을 남깁니다." dataTestId="shipping-wizard-step-4">
               <div data-testid="shipping-request-info-fields" className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
                 <Field label="요청자">
-                  <input aria-label="요청자" value={props.requestedBy} disabled={locked} onChange={(event) => props.onRequestedBy(event.target.value)} className="h-12 w-full min-w-0 rounded-[12px] border px-3 text-sm font-bold outline-none focus-visible:ring-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="예: 출하 담당" />
+                  <div className="flex h-12 w-full min-w-0 items-center rounded-[12px] border px-3 text-sm font-black" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>{props.requestedBy || "로그인 사용자 없음"}</div>
                 </Field>
                 <Field label="요청 메모">
                   <textarea aria-label="요청 메모" value={props.notes} disabled={locked} onChange={(event) => props.onNotes(event.target.value)} className="min-h-[150px] w-full min-w-0 resize-none rounded-[12px] border px-3 py-2 text-sm font-bold outline-none focus-visible:ring-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="출하 준비자가 알아야 할 변경 사항" />
@@ -1475,21 +1580,24 @@ function BomEditor({
                 style={{ background: isExcluded ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.s1, borderColor: isExcluded ? tint(LEGACY_COLORS.red, 36) : LEGACY_COLORS.border }}
               >
                 <div className="grid min-w-0 gap-1">
-                  <select
+                                    <AppSelect
                     value={line.child_item_id}
                     disabled={disabled || isExcluded}
-                    onChange={(event) => {
-                      const nextItem = itemById.get(event.target.value);
-                      onUpdate(line.key, { child_item_id: event.target.value, unit: nextItem?.unit ?? "EA" });
+                    onChange={(value) => {
+                      const nextItem = itemById.get(value);
+                      onUpdate(line.key, { child_item_id: value, unit: nextItem?.unit ?? "EA" });
                     }}
-                    className="h-9 w-full min-w-0 rounded-[9px] border px-2 text-sm font-bold outline-none"
-                    style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                  >
-                    <option value="">품목 선택</option>
-                    {filteredItemOptions.map((option) => (
-                      <option key={option.item_id} value={option.item_id}>{itemLabel(option)}</option>
-                    ))}
-                  </select>
+                    options={[
+                      ...(line.child_item_id && !filteredItemOptions.some((option) => option.item_id === line.child_item_id)
+                        ? [{ value: line.child_item_id, label: itemLabel(item) }]
+                        : []),
+                      ...filteredItemOptions.map((option) => ({ value: option.item_id, label: itemLabel(option) })),
+                    ]}
+                    placeholder="품목 선택"
+                    size="sm"
+                    triggerAriaLabel={`${title} 품목 선택`}
+                    triggerStyle={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  />
                   <div className="flex items-center gap-1.5">
                     <span className="rounded-full px-2 py-0.5 text-[11px] font-black" style={{ background: tint(badgeTone, 18), color: badgeTone }}>{badgeLabel}</span>
                     <span className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "품목 미선택"}</span>
@@ -1700,20 +1808,23 @@ function PrepareCompleteModal({
           />
           {lines.map((line) => (
             <div key={line.key} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_90px_40px]">
-              <select
+                            <AppSelect
                 value={line.item_id}
-                onChange={(event) => {
-                  const item = itemById.get(event.target.value);
-                  onChange(lines.map((row) => (row.key === line.key ? { ...row, item_id: event.target.value, unit: item?.unit ?? "EA" } : row)));
+                onChange={(value) => {
+                  const item = itemById.get(value);
+                  onChange(lines.map((row) => (row.key === line.key ? { ...row, item_id: value, unit: item?.unit ?? "EA" } : row)));
                 }}
-                className="h-10 w-full min-w-0 rounded-[10px] border px-3 text-sm font-bold outline-none"
-                style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              >
-                <option value="">동반 출하품 선택</option>
-                {filteredItemOptions.map((item) => (
-                  <option key={item.item_id} value={item.item_id}>{itemLabel(item)}</option>
-                ))}
-              </select>
+                options={[
+                  ...(line.item_id && !filteredItemOptions.some((item) => item.item_id === line.item_id)
+                    ? [{ value: line.item_id, label: itemLabel(itemById.get(line.item_id)) }]
+                    : []),
+                  ...filteredItemOptions.map((item) => ({ value: item.item_id, label: itemLabel(item) })),
+                ]}
+                placeholder="동반 출하품 선택"
+                size="md"
+                triggerAriaLabel="동반 출하품 선택"
+                triggerStyle={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              />
               <input
                 type="number"
                 min={1}
@@ -1835,11 +1946,11 @@ function WorkStep({ number, title, body, children, dataTestId }: { number: numbe
   );
 }
 
-function ListColumn({ icon: Icon, title, subtitle, children }: { icon: typeof PackageCheck; title: string; subtitle: string; children: ReactNode }) {
+function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId }: { icon: typeof PackageCheck; title: string; subtitle: string; children: ReactNode; bodyDataTestId?: string }) {
   return (
     <section className="min-w-0 rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <PanelTitle icon={Icon} title={title} subtitle={subtitle} />
-      <div className="mt-3 grid gap-2">{children}</div>
+      <div data-testid={bodyDataTestId} className="mt-3 grid min-h-[360px] content-start gap-2">{children}</div>
     </section>
   );
 }

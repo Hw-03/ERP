@@ -212,7 +212,7 @@ function DesktopMesShellInner() {
       );
     }
     if (activeTab === "shipping") {
-      return <DesktopShippingView key={key} onStatusChange={handleStatusChange} />;
+      return <DesktopShippingView key={key} operator={operator} onStatusChange={handleStatusChange} />;
     }
     if (activeTab === "warehouseMap") {
       return <DesktopWarehouseMapTab key={key} onStatusChange={handleStatusChange} />;

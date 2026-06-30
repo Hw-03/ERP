@@ -3,6 +3,19 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingRequest } from "@/lib/api";
 
+const navigationMock = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  search: "tab=shipping",
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: navigationMock.push,
+    replace: navigationMock.replace,
+  }),
+  useSearchParams: () => new URLSearchParams(navigationMock.search),
+}));
 vi.mock("@/lib/api", () => ({
   api: {
     getItems: vi.fn(),
@@ -151,6 +164,7 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  navigationMock.search = "tab=shipping";
   vi.mocked(api.getItems).mockResolvedValue(items);
   vi.mocked(api.getShippingRequests).mockResolvedValue([
     request({ request_id: "requested-1", status: "REQUESTED" }),
@@ -282,6 +296,12 @@ describe("DesktopShippingView", () => {
     fireEvent.click(button as HTMLElement);
   }
 
+  async function selectBasePf() {
+    const input = await screen.findByTestId("shipping-pf-search");
+    fireEvent.change(input, { target: { value: "Standard" } });
+    fireEvent.click(await screen.findByTestId("shipping-pf-option-pf-1"));
+  }
+
   it("loads the shipping hub without waiting for items or history", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -335,7 +355,7 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     openHubCard(container, "request");
     openNewRequest(container);
-    fireEvent.change(await screen.findByLabelText("기준 PF"), { target: { value: "pf-1" } });
+    await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
 
     nextStep(container);
@@ -496,5 +516,75 @@ describe("DesktopShippingView", () => {
 
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-edit-request")).not.toBeInTheDocument();
+  });
+  it("syncs shipping subviews to URL history", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+
+    await waitFor(() => {
+      expect(navigationMock.push).toHaveBeenCalledWith(expect.stringContaining("shippingView=requestList"), expect.any(Object));
+    });
+
+    openRequestById(container, "requested-1");
+
+    await waitFor(() => {
+      expect(navigationMock.push).toHaveBeenCalledWith(expect.stringContaining("shippingView=requestDetail"), expect.any(Object));
+      expect(navigationMock.push).toHaveBeenCalledWith(expect.stringContaining("shippingRequestId=requested-1"), expect.any(Object));
+    });
+  });
+
+  it("opens shipping subviews from URL query", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=requested-1";
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    expect(screen.queryByText(/requested-1/)).not.toBeInTheDocument();
+  });
+
+  it("uses the logged-in operator as the requester for new requests", async () => {
+    const operator = { name: "김현우", department: "조립" } as any;
+    const { container } = render(<DesktopShippingView operator={operator} onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-request-info-fields")).toHaveTextContent("김현우");
+    nextStep(container);
+    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+
+    await waitFor(() => {
+      expect(api.createShippingRequest).toHaveBeenCalledWith(expect.objectContaining({ requested_by_name: "김현우" }));
+    });
+  });
+
+  it("uses app-style selectors and one work header in the request editor", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+
+    expect(await screen.findByTestId("shipping-work-title")).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-testid="shipping-work-title"]')).toHaveLength(1);
+    expect(container.querySelector("select")).not.toBeInTheDocument();
+  });
+
+  it("keeps request list column bodies on the same height rhythm", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+
+    expect(await screen.findByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("min-h-[360px]");
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("min-h-[360px]");
+    expect(screen.getByTestId("shipping-request-column-body-PREPARED")).toHaveClass("min-h-[360px]");
   });
 });
