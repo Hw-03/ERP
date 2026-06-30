@@ -27,7 +27,7 @@ test.describe("불량 — 격리 / 해제", () => {
     // Step 2: 시드 원자재 행 "추가".
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })
-      .getByRole("button", { name: "추가", exact: true })
+      .getByRole("button", { name: /장바구니에 추가/ })
       .click();
     // 장바구니: 수량 + 사유 카테고리
     await page.getByPlaceholder("예: 3").fill("5");
