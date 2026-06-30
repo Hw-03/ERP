@@ -587,4 +587,81 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("min-h-[360px]");
     expect(screen.getByTestId("shipping-request-column-body-PREPARED")).toHaveClass("min-h-[360px]");
   });
+  it("puts the new-request action inside the shipping request column", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+
+    const requestedBody = await screen.findByTestId("shipping-request-column-body-REQUESTED");
+    const requestedColumn = requestedBody.closest("section");
+    expect(requestedColumn).toHaveTextContent("출하 요청");
+    expect(requestedColumn).toHaveTextContent("새 요청 만들기");
+    expect(screen.queryByText("요청됨")).not.toBeInTheDocument();
+  });
+
+  it("shows delete for preparing details and prepare-cancel for prepared details", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    const { container, unmount } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-delete-request")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-detail-send-to-prep")).not.toBeInTheDocument();
+    unmount();
+
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-1";
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-prepare-cancel-from-detail")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-delete-request")).not.toBeInTheDocument();
+  });
+
+  it("uses compact request detail summary instead of large metric cards", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openRequestById(container, "req-1");
+
+    const summary = await screen.findByTestId("shipping-request-detail-summary");
+    expect(summary).toHaveTextContent("기준 PF");
+    expect(summary).toHaveTextContent("최종 PA");
+    expect(summary).toHaveTextContent("최종 PF");
+    expect(screen.getByTestId("shipping-detail-actions")).toBeInTheDocument();
+  });
+
+  it("keeps request wizard tabs in the same header row and removes manual BOM buttons", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+
+    const header = await screen.findByTestId("shipping-work-header");
+    expect(header).toContainElement(screen.getByTestId("shipping-step-tabs"));
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+
+    expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /동일 BOM 확인/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /기본 BOM 다시 불러오기/ })).not.toBeInTheDocument();
+  });
+
+  it("shows existing BOM rows as read-only and only new rows use a selector", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openRequestById(container, "requested-1");
+    fireEvent.click(await screen.findByTestId("shipping-edit-request"));
+
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    expect(screen.getAllByTestId("shipping-bom-readonly-item").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("combobox", { name: /품목 선택/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("shipping-add-pa-line"));
+    expect(screen.getByRole("combobox", { name: /PA 구성품 추가 품목 선택/ })).toBeInTheDocument();
+  });
 });

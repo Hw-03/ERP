@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -12,10 +12,8 @@ import {
   PackageCheck,
   Pencil,
   Plus,
-  RefreshCw,
   RotateCcw,
   Save,
-  Search,
   Send,
   Trash2,
   Truck,
@@ -710,6 +708,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
           onEdit={(req) => loadRequestIntoDraft(req, "requestWork")}
           onSendToPrep={(req) => void sendExistingToPrep(req)}
           onDelete={deleteRequest}
+          onPrepareCancel={cancelPrepare}
           pending={pending}
         />
       );
@@ -740,7 +739,6 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             onNew={clearDraft}
             onSelectRequest={(req) => loadRequestIntoDraft(req, "requestDetail")}
             onBasePfChange={(value) => void handleBasePfChange(value)}
-            onReloadDefault={() => void loadDefaultBom(basePfId)}
             onRequestedBy={setRequestedBy}
             onCustomPaName={setCustomPaName}
             onCustomPfName={setCustomPfName}
@@ -748,7 +746,6 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             onUpdateLine={updateDraftLine}
             onAddLine={addDraftLine}
             onRemoveLine={removeDraftLine}
-            onMatch={() => void matchBom()}
             onSave={() => void saveRequest()}
             onSend={() => void sendToPrep()}
           />
@@ -913,7 +910,7 @@ function HubCard({ id, icon: Icon, title, body, count, tone, onClick }: { id: Se
 
 function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onNew: () => void; onOpen: (request: ShippingRequest) => void }) {
   const groups: Array<{ status: ShippingRequestStatus; label: string }> = [
-    { status: "REQUESTED", label: "요청됨" },
+    { status: "REQUESTED", label: "출하 요청" },
     { status: "PREPARING", label: "준비 중" },
     { status: "PREPARED", label: "준비 완료" },
   ];
@@ -921,41 +918,38 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
   return (
     <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
       <Panel dataTestId="shipping-request-list-panel" className="flex min-h-0 flex-1 flex-col">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <div className="min-w-0">
-              <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>요청 목록</div>
-              <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>출하 요청 {total}건 · 새 요청을 만들거나 기존 요청의 상태를 확인합니다.</div>
-            </div>
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="min-w-0">
+            <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>요청 목록</div>
+            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>출하 요청 {total}건 · 새 요청을 만들거나 기존 요청의 상태를 확인합니다.</div>
           </div>
-          <PrimaryActionButton icon={Plus} label="새 요청 만들기" tone={LEGACY_COLORS.blue} onClick={onNew} dataAction="new-shipping-request" />
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {total === 0 ? (
-            <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-              <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 요청 없음</div>
-              <div className="mt-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기준 PF를 선택해 새 요청을 만들 수 있습니다.</div>
-            </div>
-          ) : (
-            <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
-              {groups.map((group) => {
-                const rows = requests.filter((request) => request.status === group.status);
-                return (
-                  <ListColumn key={group.status} icon={ClipboardList} title={group.label} subtitle={`${rows.length}건`} bodyDataTestId={`shipping-request-column-body-${group.status}`}>
-                    {rows.length === 0 ? (
-                      <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
-                    ) : (
-                      rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)
-                    )}
-                  </ListColumn>
-                );
-              })}
-            </div>
-          )}
+          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
+            {groups.map((group) => {
+              const rows = requests.filter((request) => request.status === group.status);
+              return (
+                <ListColumn
+                  key={group.status}
+                  icon={ClipboardList}
+                  title={group.label}
+                  subtitle={`${rows.length}건`}
+                  bodyDataTestId={`shipping-request-column-body-${group.status}`}
+                  action={group.status === "REQUESTED" ? <PrimaryActionButton icon={Plus} label="새 요청 만들기" tone={LEGACY_COLORS.blue} onClick={onNew} dataAction="new-shipping-request" /> : null}
+                >
+                  {rows.length === 0 ? (
+                    <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
+                  ) : (
+                    rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)
+                  )}
+                </ListColumn>
+              );
+            })}
+          </div>
         </div>
       </Panel>
     </div>
@@ -963,7 +957,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
 }
 
 
-function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; pending: PendingAction }) {
+function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareCancel, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
       <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
@@ -983,6 +977,8 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, p
   }
   const editable = request.status === "REQUESTED" || request.status === "PREPARING";
   const canSend = request.status === "REQUESTED";
+  const canDelete = request.status === "REQUESTED" || request.status === "PREPARING";
+  const canCancelPrepared = request.status === "PREPARED";
   return (
     <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
       <Panel dataTestId="shipping-request-detail" className="flex min-h-0 flex-1 flex-col">
@@ -995,18 +991,23 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, p
           </div>
           <StatusBadge status={request.status} />
         </div>
+
+        <div data-testid="shipping-request-detail-summary" className="mt-3 grid gap-2 rounded-[16px] border px-3 py-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          <CompactSummary label="기준 PF" value={request.base_pf_item_name} />
+          <CompactSummary label="최종 PA" value={request.final_pa_item_name ?? "준비 전"} />
+          <CompactSummary label="최종 PF" value={request.final_pf_item_name ?? "준비 전"} />
+        </div>
+
         {request.notes && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
         {request.status === "PREPARED" && <div className="mt-3"><Notice tone={LEGACY_COLORS.yellow} title="수정 잠김" body="준비 완료 취소 후 수정 가능합니다." /></div>}
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Metric label="기준 PF" value={request.base_pf_item_name} />
-          <Metric label="최종 PA" value={request.final_pa_item_name ?? "준비 전"} />
-          <Metric label="최종 PF" value={request.final_pf_item_name ?? "준비 전"} />
-        </div>
-        <div className="mt-4 min-h-0 flex-1"><LineSummary request={request} /></div>
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
+
+        <div className="mt-3 min-h-0 flex-1"><LineSummary request={request} /></div>
+
+        <div data-testid="shipping-detail-actions" className="mt-3 flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {canSend && <ActionButton icon={Send} label={pending === "send" ? "전환 중" : "준비 중으로 보내기"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
-          {canSend && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
           {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
+          {canDelete && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
+          {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
         </div>
       </Panel>
     </div>
@@ -1090,7 +1091,6 @@ function RequestSection(props: {
   onNew: () => void;
   onSelectRequest: (req: ShippingRequest) => void;
   onBasePfChange: (value: string) => void;
-  onReloadDefault: () => void;
   onRequestedBy: (value: string) => void;
   onCustomPaName: (value: string) => void;
   onCustomPfName: (value: string) => void;
@@ -1098,7 +1098,6 @@ function RequestSection(props: {
   onUpdateLine: (key: string, patch: Partial<DraftLine>) => void;
   onAddLine: (stage: "PA" | "PF") => void;
   onRemoveLine: (key: string) => void;
-  onMatch: () => void;
   onSave: () => void;
   onSend: () => void;
   onBack: () => void;
@@ -1120,7 +1119,7 @@ function RequestSection(props: {
         reusingExistingPa ? `기존 PA 재사용: ${props.matchResult.matched_pa_item_name ?? "-"}` : requiresPaName ? "새 PA 이름 필요" : null,
         reusingExistingPf ? `기존 PF 재사용: ${props.matchResult.matched_pf_item_name ?? "-"}` : requiresPfName ? "새 PF 이름 필요" : null,
       ].filter(Boolean).join(" / ")
-    : "BOM 변경 후 자동으로 동일 후보를 확인합니다.";
+    : "BOM 변경 시 자동으로 동일 후보를 확인합니다.";
   const sendDisabled = props.pending !== null || locked || !props.basePfId || missingNewBomNames || props.selectedRequest?.status === "PREPARING" || props.selectedRequest?.status === "PREPARED";
   const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "저장 및 전환"];
   const canGoNext = props.pending === null && !locked && (
@@ -1132,9 +1131,9 @@ function RequestSection(props: {
   const goNext = () => props.onWizardStep(Math.min(5, props.wizardStep + 1) as RequestWizardStep);
 
   return (
-    <div className="grid min-h-[calc(100vh-275px)] gap-3">
-      <Panel>
-        <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex h-[calc(100vh-210px)] min-h-0 flex-col">
+      <Panel className="flex min-h-0 flex-1 flex-col">
+        <div data-testid="shipping-work-header" className="grid min-w-0 gap-3 xl:grid-cols-[minmax(300px,420px)_minmax(0,1fr)_auto] xl:items-center">
           <div className="flex min-w-0 items-center gap-3">
             <button type="button" aria-label="이전 화면" onClick={props.onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
@@ -1147,40 +1146,40 @@ function RequestSection(props: {
               />
             </div>
           </div>
-          {props.selectedRequest && <StatusBadge status={props.selectedRequest.status} />}
+          <div data-testid="shipping-step-tabs" className="grid min-w-0 gap-2 md:grid-cols-5">
+            {stepTitles.map((title, index) => {
+              const step = (index + 1) as RequestWizardStep;
+              const active = props.wizardStep === step;
+              const complete = props.wizardStep > step;
+              const tone = active ? LEGACY_COLORS.blue : complete ? LEGACY_COLORS.green : LEGACY_COLORS.muted2;
+              return (
+                <button
+                  key={title}
+                  type="button"
+                  onClick={() => props.onWizardStep(step)}
+                  disabled={locked && step !== props.wizardStep}
+                  className="min-h-12 rounded-[14px] border px-3 py-2 text-left text-xs font-black transition-all disabled:opacity-45"
+                  style={{ background: active ? tint(tone, 16) : LEGACY_COLORS.s2, borderColor: active ? tone : LEGACY_COLORS.border, color: tone }}
+                >
+                  <span className="block text-xs">{step}</span>
+                  <span className="block truncate">{title}</span>
+                </button>
+              );
+            })}
+          </div>
+          {props.selectedRequest ? <StatusBadge status={props.selectedRequest.status} /> : <span />}
         </div>
 
         {locked && (
           <div className="mt-3">
-            <Notice tone={LEGACY_COLORS.yellow} title="수정 잠김" body="준비 완료 상태입니다. 준비 화면에서 준비 완료 취소 후 다시 수정할 수 있습니다." />
+            <Notice tone={LEGACY_COLORS.yellow} title="수정 잠금" body="준비 완료 상태입니다. 준비 화면에서 준비 완료 취소 후 다시 수정할 수 있습니다." />
           </div>
         )}
 
-        <div className="mt-4 grid gap-2 md:grid-cols-5">
-          {stepTitles.map((title, index) => {
-            const step = (index + 1) as RequestWizardStep;
-            const active = props.wizardStep === step;
-            const complete = props.wizardStep > step;
-            const tone = active ? LEGACY_COLORS.blue : complete ? LEGACY_COLORS.green : LEGACY_COLORS.muted2;
-            return (
-              <button
-                key={title}
-                type="button"
-                onClick={() => props.onWizardStep(step)}
-                disabled={locked && step !== props.wizardStep}
-                className="min-h-12 rounded-[14px] border px-3 py-2 text-left text-xs font-black transition-all disabled:opacity-45"
-                style={{ background: active ? tint(tone, 16) : LEGACY_COLORS.s2, borderColor: active ? tone : LEGACY_COLORS.border, color: tone }}
-              >
-                <span className="block text-xs">{step}</span>
-                <span className="block truncate">{title}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 min-h-[430px] rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>          {props.wizardStep === 1 && (
+        <div data-testid="shipping-work-area" className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          {props.wizardStep === 1 && (
             <WorkStep number={1} title="기준 PF 선택" body="출하할 최종 PF를 먼저 선택하면 기본 PF/PA 구성이 준비됩니다." dataTestId="shipping-wizard-step-1">
-              <div className="grid gap-3">
+              <div className="flex h-full min-h-0 flex-col gap-3">
                 <Field label="PF 검색">
                   <input
                     data-testid="shipping-pf-search"
@@ -1193,7 +1192,7 @@ function RequestSection(props: {
                     placeholder="PF 코드/품명 검색"
                   />
                 </Field>
-                <div className="grid max-h-[360px] gap-2 overflow-y-auto rounded-[14px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto rounded-[14px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   {filteredPfItems.length === 0 ? (
                     <EmptyState title="선택 가능한 PF 없음" body="검색어를 바꾸거나 품목 목록을 확인하세요." />
                   ) : (
@@ -1220,14 +1219,16 @@ function RequestSection(props: {
                   )}
                 </div>
               </div>
-              {!props.basePfId && <div className="mt-4"><EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 다음 단계에서 PA 구성품과 PF 구성품을 나눠 조정합니다." /></div>}
+              {!props.basePfId && <div className="mt-3"><EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 다음 단계에서 PA 구성품과 PF 구성품을 나눠 조정합니다." /></div>}
             </WorkStep>
-          )}{props.wizardStep === 2 && (
+          )}
+
+          {props.wizardStep === 2 && (
             <WorkStep number={2} title="BOM 구성 조정" body="기본 구성은 제외로 남기고, 필요한 품목은 PA/PF 묶음에 추가합니다." dataTestId="shipping-wizard-step-2">
               {!props.basePfId ? (
                 <EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 PA 구성품과 PF 구성품을 나눠 보여줍니다." />
               ) : (
-                <div className="grid max-h-[52vh] min-h-[360px] gap-3 overflow-y-auto pr-1 xl:grid-cols-2">
+                <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-2">
                   <BomEditor title="PA 구성품" stage="PA" lines={grouped.PA} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
                   <BomEditor title="PF 구성품" stage="PF" lines={grouped.PF} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
                 </div>
@@ -1237,7 +1238,7 @@ function RequestSection(props: {
 
           {props.wizardStep === 3 && (
             <WorkStep number={3} title="BOM 매칭" body="기존 PA/PF 재사용 여부를 확인하고, 필요한 새 이름만 입력합니다." dataTestId="shipping-wizard-step-3">
-              <div className="grid gap-3">
+              <div className="grid content-start gap-3">
                 <Notice tone={!props.matchResult ? LEGACY_COLORS.cyan : !requiresPaName && !requiresPfName ? LEGACY_COLORS.green : LEGACY_COLORS.yellow} title={!props.matchResult ? "BOM 매칭 대기" : !requiresPaName && !requiresPfName ? "동일 BOM 후보" : "BOM 매칭 결과"} body={matchNoticeBody} />
                 {(requiresPaName || requiresPfName) && (
                   <div className="grid gap-3 md:grid-cols-2">
@@ -1253,10 +1254,6 @@ function RequestSection(props: {
                     )}
                   </div>
                 )}
-                <div className="flex flex-wrap gap-2">
-                  <ActionButton icon={Search} label={props.pending === "match" ? "확인 중" : "동일 BOM 확인"} tone={LEGACY_COLORS.purple} onClick={props.onMatch} disabled={!props.basePfId || locked || props.pending !== null} />
-                  <ActionButton icon={RefreshCw} label="기본 BOM 다시 불러오기" tone={LEGACY_COLORS.cyan} onClick={props.onReloadDefault} disabled={!props.basePfId || locked || props.pending !== null} />
-                </div>
               </div>
             </WorkStep>
           )}
@@ -1276,7 +1273,7 @@ function RequestSection(props: {
 
           {props.wizardStep === 5 && (
             <WorkStep number={5} title="저장 및 전환" body="요청 내용을 저장하거나 바로 준비 중으로 보냅니다." dataTestId="shipping-wizard-step-5">
-              <div className="grid gap-3">
+              <div className="grid content-start gap-3">
                 <div className="grid gap-3 md:grid-cols-3">
                   <Metric label="기준 PF" value={props.pfItems.find((item) => item.item_id === props.basePfId)?.item_name ?? "미선택"} />
                   <Metric label="PA 구성" value={`${grouped.PA.filter((line) => line.included).length}개 포함`} />
@@ -1292,7 +1289,7 @@ function RequestSection(props: {
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           <button type="button" onClick={goPrev} disabled={props.wizardStep === 1 || props.pending !== null} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-4 py-2 text-sm font-black disabled:opacity-45" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>이전</button>
           {props.wizardStep < 5 ? (
             <button type="button" data-testid="shipping-wizard-next" onClick={goNext} disabled={!canGoNext} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-5 py-2 text-sm font-black transition-all hover:brightness-110 disabled:opacity-45" style={{ background: tint(LEGACY_COLORS.blue, 16), borderColor: tint(LEGACY_COLORS.blue, 48), color: LEGACY_COLORS.blue }}>다음</button>
@@ -1304,7 +1301,6 @@ function RequestSection(props: {
     </div>
   );
 }
-
 
 function PrepSection({
   showList = true,
@@ -1535,24 +1531,13 @@ function BomEditor({
   onAdd: (stage: "PA" | "PF") => void;
   onRemove: (key: string) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const filteredItemOptions = useMemo(() => filterItems(itemOptions, query), [itemOptions, query]);
   return (
     <div data-testid={`shipping-bom-editor-${stage.toLowerCase()}`} className="flex min-h-0 flex-col rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
         <ActionButton icon={Plus} label={`${title} 추가`} tone={stage === "PA" ? LEGACY_COLORS.green : LEGACY_COLORS.blue} onClick={() => onAdd(stage)} disabled={disabled} compact dataTestId={`shipping-add-${stage.toLowerCase()}-line`} />
       </div>
-      <input
-        aria-label={`${title} 품목 검색`}
-        value={query}
-        disabled={disabled}
-        onChange={(event) => setQuery(event.target.value)}
-        className="mb-2 h-9 w-full rounded-[9px] border px-2 text-sm font-bold outline-none"
-        style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        placeholder="코드/품명 검색"
-      />
-      <div className="grid min-h-0 gap-2 overflow-y-auto pr-1">
+      <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1">
         {lines.length === 0 ? (
           <div className="rounded-[10px] border px-3 py-4 text-center text-sm font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
             구성품이 없습니다.
@@ -1562,6 +1547,7 @@ function BomEditor({
             const item = itemById.get(line.child_item_id);
             const isCustom = line.origin === "CUSTOM";
             const isExcluded = !line.included;
+            const isSelectingNewItem = !line.child_item_id;
             const badgeTone = isExcluded ? LEGACY_COLORS.red : isCustom ? LEGACY_COLORS.cyan : LEGACY_COLORS.green;
             const badgeLabel = isExcluded ? "제외됨" : isCustom ? "추가됨" : "기본";
             const actionLabel = isCustom
@@ -1580,24 +1566,25 @@ function BomEditor({
                 style={{ background: isExcluded ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.s1, borderColor: isExcluded ? tint(LEGACY_COLORS.red, 36) : LEGACY_COLORS.border }}
               >
                 <div className="grid min-w-0 gap-1">
-                                    <AppSelect
-                    value={line.child_item_id}
-                    disabled={disabled || isExcluded}
-                    onChange={(value) => {
-                      const nextItem = itemById.get(value);
-                      onUpdate(line.key, { child_item_id: value, unit: nextItem?.unit ?? "EA" });
-                    }}
-                    options={[
-                      ...(line.child_item_id && !filteredItemOptions.some((option) => option.item_id === line.child_item_id)
-                        ? [{ value: line.child_item_id, label: itemLabel(item) }]
-                        : []),
-                      ...filteredItemOptions.map((option) => ({ value: option.item_id, label: itemLabel(option) })),
-                    ]}
-                    placeholder="품목 선택"
-                    size="sm"
-                    triggerAriaLabel={`${title} 품목 선택`}
-                    triggerStyle={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                  />
+                  {isSelectingNewItem ? (
+                    <AppSelect
+                      value=""
+                      disabled={disabled}
+                      onChange={(value) => {
+                        const nextItem = itemById.get(value);
+                        onUpdate(line.key, { child_item_id: value, unit: nextItem?.unit ?? "EA" });
+                      }}
+                      options={itemOptions.map((option) => ({ value: option.item_id, label: itemLabel(option) }))}
+                      placeholder="추가할 품목 선택"
+                      size="sm"
+                      triggerAriaLabel={`${title} 추가 품목 선택`}
+                      triggerStyle={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                    />
+                  ) : (
+                    <div data-testid="shipping-bom-readonly-item" className="min-h-9 rounded-[9px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: isExcluded ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}>
+                      <div className="truncate text-sm font-black">{item?.item_name ?? "품목 없음"}</div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5">
                     <span className="rounded-full px-2 py-0.5 text-[11px] font-black" style={{ background: tint(badgeTone, 18), color: badgeTone }}>{badgeLabel}</span>
                     <span className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "품목 미선택"}</span>
@@ -1607,7 +1594,7 @@ function BomEditor({
                   type="number"
                   min={1}
                   value={line.quantity}
-                  disabled={disabled || isExcluded}
+                  disabled={disabled || isExcluded || isSelectingNewItem}
                   onChange={(event) => onUpdate(line.key, { quantity: toNumber(event.target.value) })}
                   className="h-9 rounded-[9px] border px-2 text-right text-sm font-black outline-none"
                   style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
@@ -1677,19 +1664,19 @@ function LineSummary({ request }: { request: ShippingRequest }) {
   const pfLines = request.bom_lines.filter((line) => line.parent_stage === "PF");
   const formatLine = (line: ShippingRequest["bom_lines"][number]) => `${line.included ? "" : "제외됨 · "}${line.origin === "CUSTOM" ? "추가됨 · " : ""}${line.item_name} x ${line.quantity}`;
   return (
-    <div className="grid gap-3 xl:grid-cols-3">
+    <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
       <SummaryList title="PA 구성품" lines={paLines.map(formatLine)} />
       <SummaryList title="PF 구성품" lines={pfLines.map(formatLine)} />
-      <SummaryList title="카톤·동반 출하품" lines={request.companion_lines.map((line) => `${line.item_name} x ${line.quantity}`)} empty="픽업 전 입력 없음" />
+      <CompanionSummary lines={request.companion_lines.map((line) => `${line.item_name} x ${line.quantity}`)} />
     </div>
   );
 }
 
 function SummaryList({ title, lines, empty = "등록 없음" }: { title: string; lines: string[]; empty?: string }) {
   return (
-    <div className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <div className="flex min-h-0 flex-col rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
-      <div className="grid gap-1">
+      <div className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1">
         {lines.length === 0 ? (
           <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{empty}</div>
         ) : (
@@ -1700,6 +1687,18 @@ function SummaryList({ title, lines, empty = "등록 없음" }: { title: string;
       </div>
     </div>
   );
+}
+
+function CompanionSummary({ lines }: { lines: string[] }) {
+  if (lines.length === 0) {
+    return (
+      <div className="self-start rounded-[14px] border px-3 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>카톤·동반 출하품</div>
+        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>픽업 전 입력 없음</div>
+      </div>
+    );
+  }
+  return <SummaryList title="카톤·동반 출하품" lines={lines} />;
 }
 
 function ShippingActionConfirmModal({
@@ -1722,7 +1721,9 @@ function ShippingActionConfirmModal({
     : action.kind === "cancel"
       ? "준비 완료 때 생성된 입출고 로그를 역재생해 재고를 원복합니다."
       : action.kind === "delete"
-        ? "요청됨 상태의 출하 요청을 목록에서 삭제합니다. 준비 중으로 넘어간 요청은 삭제할 수 없습니다."
+        ? action.request.status === "PREPARING"
+          ? "재고 반영 전 요청이므로 요청과 준비 체크 내역이 삭제됩니다."
+          : "요청 상태의 출하 요청을 목록에서 삭제합니다. 이력은 남지 않습니다."
         : "최종 PF 1개와 카톤·동반 출하품을 출하 차감합니다. v1에서는 픽업 완료 후 취소 기능이 없습니다.";
   const lines = action.kind === "prepare"
     ? [
@@ -1866,7 +1867,7 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
       type="button"
       onClick={onClick}
       data-shipping-request-id={request.request_id}
-      className="min-h-[74px] rounded-[14px] border px-3 py-2 text-left transition-colors"
+      className="min-h-[112px] rounded-[14px] border px-3 py-3 text-left transition-colors"
       style={{
         background: active ? tint(STATUS_TONE[request.status], 16) : LEGACY_COLORS.s2,
         borderColor: active ? STATUS_TONE[request.status] : LEGACY_COLORS.border,
@@ -1931,7 +1932,7 @@ function Notice({ tone, title, body }: { tone: string; title: string; body: stri
 
 function WorkStep({ number, title, body, children, dataTestId }: { number: number; title: string; body: string; children: ReactNode; dataTestId?: string }) {
   return (
-    <section data-testid={dataTestId} className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+    <section data-testid={dataTestId} className="flex h-full min-h-0 flex-col rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-3 flex min-w-0 items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-sm font-black" style={{ background: tint(LEGACY_COLORS.blue, 16), color: LEGACY_COLORS.blue }}>
           {number}
@@ -1941,16 +1942,19 @@ function WorkStep({ number, title, body, children, dataTestId }: { number: numbe
           <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{body}</div>
         </div>
       </div>
-      {children}
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </section>
   );
 }
 
-function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId }: { icon: typeof PackageCheck; title: string; subtitle: string; children: ReactNode; bodyDataTestId?: string }) {
+function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, action }: { icon: typeof PackageCheck; title: string; subtitle: string; children: ReactNode; bodyDataTestId?: string; action?: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <PanelTitle icon={Icon} title={title} subtitle={subtitle} />
-      <div data-testid={bodyDataTestId} className="mt-3 grid min-h-[360px] content-start gap-2">{children}</div>
+    <section className="flex min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <PanelTitle icon={Icon} title={title} subtitle={subtitle} />
+        {action}
+      </div>
+      <div data-testid={bodyDataTestId} className="mt-3 grid min-h-[360px] content-start gap-2 overflow-y-auto pr-1">{children}</div>
     </section>
   );
 }
@@ -1976,6 +1980,14 @@ function StatusBadge({ status, compact = false }: { status: ShippingRequestStatu
   );
 }
 
+function CompactSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+      <div className="mt-0.5 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{value}</div>
+    </div>
+  );
+}
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[14px] border px-4 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

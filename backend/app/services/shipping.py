@@ -279,8 +279,8 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
 
 def delete_request(db: Session, request_id: uuid.UUID) -> None:
     req = _get_request(db, request_id)
-    if req.status != ShippingRequestStatusEnum.REQUESTED:
-        raise ShippingError("요청 상태에서만 출하 요청을 취소할 수 있습니다.")
+    if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
+        raise ShippingError("요청 또는 준비 중 상태에서만 출하 요청을 취소할 수 있습니다.")
     db.delete(req)
     db.flush()
 
