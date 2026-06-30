@@ -664,4 +664,102 @@ describe("DesktopShippingView", () => {
     fireEvent.click(screen.getByTestId("shipping-add-pa-line"));
     expect(screen.getByRole("combobox", { name: /PA 구성품 추가 품목 선택/ })).toBeInTheDocument();
   });
+
+  it("uses defect-style shipping hub cards without duplicate open buttons", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+
+    expect(screen.queryByText("바로 열기")).not.toBeInTheDocument();
+    const badge = screen.getByTestId("shipping-hub-count-request");
+    expect(badge).toHaveTextContent(/\d+/);
+    expect(badge.className).toContain("min-h-10");
+    expect(screen.getByText("요청 목록을 확인하고 BOM을 수정합니다.")).toBeInTheDocument();
+  });
+
+  it("keeps wizard step labels on one line and blocks invalid next navigation", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+
+    expect(await screen.findByText("1. 기준 PF 선택")).toBeInTheDocument();
+    expect(screen.getByText("5. 저장 및 전환")).toBeInTheDocument();
+    expect(screen.queryByText("출하할 최종 PF를 먼저 선택하면 기본 PF/PA 구성이 준비됩니다.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("shipping-pf-search")).toBeInTheDocument();
+
+    const next = screen.getByTestId("shipping-wizard-next") as HTMLButtonElement;
+    expect(next).toBeDisabled();
+    nextStep(container);
+    expect(screen.getByTestId("shipping-wizard-step-1")).toBeInTheDocument();
+
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    expect(screen.getByTestId("shipping-wizard-next")).not.toBeDisabled();
+  });
+
+  it("shows requester as read-only information and gives memo the main request-info space", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} operator={{ name: "김현우", role: "조립" }} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+
+    expect(await screen.findByTestId("shipping-request-info-fields")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-requester-summary")).toHaveTextContent("김현우");
+    expect(screen.queryByLabelText("요청자")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("요청 메모")).toHaveClass("min-h-[220px]");
+  });
+
+  it("summarizes new or reused PA/PF names and item codes on the final step", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    nextStep(container);
+
+    const finalSummary = await screen.findByTestId("shipping-final-summary");
+    expect(finalSummary).toHaveTextContent("PF-001");
+    expect(finalSummary).toHaveTextContent("Standard PF");
+    expect(finalSummary).toHaveTextContent("기존 PA 재사용");
+    expect(finalSummary).toHaveTextContent("Standard PA");
+    expect(finalSummary).toHaveTextContent("새 PF 생성 예정");
+    expect(finalSummary).toHaveTextContent("Custom PF");
+    expect(finalSummary).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
+  });
+
+  it("moves final save and send actions into the bottom action bar", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    nextStep(container);
+
+    expect(screen.queryByText("마지막 단계입니다.")).not.toBeInTheDocument();
+    const actionBar = screen.getByTestId("shipping-wizard-action-bar");
+    expect(actionBar).toContainElement(screen.getByText("요청 저장"));
+    expect(actionBar).toContainElement(screen.getByTestId("shipping-send-to-prep"));
+  });
+
 });
