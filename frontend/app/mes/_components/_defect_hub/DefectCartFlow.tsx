@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, Building2, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
+import { ArrowLeft, Building2, ChevronRight, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
 import { LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
@@ -283,25 +283,43 @@ export function DefectCartFlow({
     );
   }
 
+  const flowSteps = [
+    ...(isDirect ? [{ number: 1, label: "작업 선택", active: false }] : []),
+    { number: isDirect ? 2 : 1, label: "출처·부서 선택", active: step === 1 },
+    { number: isDirect ? 3 : 2, label: "품목 선택", active: step === 2 },
+    ...(isRework ? [{ number: 4, label: "BOM 확인", active: step === 3 }] : []),
+  ];
   const stepIndicator = (
-    <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-      {isDirect && <><span style={{ color: LEGACY_COLORS.muted2 }}>① 작업 선택</span><span style={{ color: LEGACY_COLORS.muted }}>→</span></>}
-      <span style={{ color: step === 1 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
-        {isDirect ? "②" : "①"} 출처·부서 선택
-      </span>
-      <span style={{ color: LEGACY_COLORS.muted }}>→</span>
-      <span style={{ color: step === 2 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
-        {isDirect ? "③" : "②"} 품목 선택
-      </span>
-      {isRework && <><span style={{ color: LEGACY_COLORS.muted }}>→</span><span style={{ color: step === 3 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>④ BOM 확인</span></>}
+    <div data-testid="defect-flow-stepper" className="flex flex-wrap items-center justify-end gap-4 text-base font-black">
+      {flowSteps.map((flowStep, idx) => {
+        const active = flowStep.active;
+        return (
+          <div key={flowStep.label} className="flex items-center gap-2 whitespace-nowrap">
+            {idx > 0 && <ChevronRight className="h-5 w-5" style={{ color: LEGACY_COLORS.muted }} />}
+            <span className="inline-flex items-center gap-2" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
+              <span
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full border text-sm font-black"
+                style={{
+                  background: active ? tint(LEGACY_COLORS.red, 12) : LEGACY_COLORS.s2,
+                  borderColor: active ? tint(LEGACY_COLORS.red, 42) : LEGACY_COLORS.border,
+                  color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+                }}
+              >
+                {flowStep.number}
+              </span>
+              {flowStep.label}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
   const lockedMetaLabel = source === "warehouse" ? "진입 위치" : "진입 부서";
   const lockedMetaValue = source === "warehouse" ? "창고" : dept;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex flex-wrap items-start gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={goBack}
@@ -312,16 +330,18 @@ export function DefectCartFlow({
           <ArrowLeft className="h-4 w-4" />
           {step === 1 && !(isDirect && directAction !== null) ? "취소" : "이전"}
         </button>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-8 gap-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{title}</h2>
             {step >= 2 && (
-              <span className="inline-flex cursor-default select-none items-center rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+              <span data-testid="defect-entry-meta" className="inline-flex cursor-default select-none items-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 {lockedMetaLabel} · {lockedMetaValue}
               </span>
             )}
           </div>
-          {stepIndicator}
+          <div className="min-w-[320px] flex-1">
+            {stepIndicator}
+          </div>
         </div>
       </div>
 
@@ -383,9 +403,9 @@ export function DefectCartFlow({
       )}
 
       {step === 2 && (
-        <div key="step2" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3">
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
-            <div className="min-h-0">
+        <div key="step2" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+          <div data-testid="defect-step2-grid" className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
+            <div data-testid="defect-picker-pane" className="h-full min-h-0">
               <DefectItemPicker
                 items={pickerItems}
                 productModels={productModels}
@@ -397,16 +417,17 @@ export function DefectCartFlow({
               />
             </div>
 
-            <div className="flex min-h-0 flex-col overflow-y-auto rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
-              <div className="sticky top-0 z-10 px-4 py-2 text-xs font-black uppercase tracking-[1.5px]" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+            <div data-testid="defect-cart-pane" className="flex h-full min-h-0 flex-col gap-3">
+              <div data-testid="defect-side-toolbar" className="flex h-[50px] shrink-0 items-center px-4 text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
                 {isRework ? "재작업 품목" : `장바구니 ${lines.length}건`}
               </div>
-              {lines.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-                  왼쪽에서 품목을 추가하세요.
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3 p-3">
+              <div data-testid="defect-cart-panel" className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+                {lines.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+                    왼쪽에서 품목을 추가하세요.
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 p-3">
                   {lines.map((line, idx) => {
                     const fail = failures.find((f) => f.key === line.key);
                     return (
@@ -444,8 +465,9 @@ export function DefectCartFlow({
                       </div>
                     );
                   })}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

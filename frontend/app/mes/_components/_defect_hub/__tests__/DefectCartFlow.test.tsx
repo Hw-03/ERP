@@ -115,11 +115,71 @@ describe("DefectCartFlow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /다음/ }));
 
-    expect(screen.getByText(`진입 부서 · ${employee.department}`)).toBeInTheDocument();
+    const entryMeta = screen.getByTestId("defect-entry-meta");
+    expect(entryMeta).toHaveTextContent(`진입 부서 · ${employee.department}`);
+    expect(entryMeta.tagName).toBe("SPAN");
     expect(screen.queryByTestId("defect-locked-dept")).not.toBeInTheDocument();
     expect(screen.getAllByRole("combobox")).toHaveLength(2);
   });
 
+  it("품목을 추가하면 Check 기반 담김 상태와 선택 행 강조를 보여준다", () => {
+    render(
+      <DefectCartFlow
+        mode="add"
+        items={[rItem, fItem]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /추가/ })[0]);
+
+    const addedButton = screen.getByRole("button", { name: /장바구니에서 제거/ });
+    expect(addedButton).toHaveTextContent("담김");
+    expect(screen.getByTestId("defect-picker-row-r-1")).toHaveAttribute("data-added", "true");
+    expect(screen.getByText("장바구니 1건")).toBeInTheDocument();
+
+    fireEvent.click(addedButton);
+
+    expect(screen.queryByRole("button", { name: /장바구니에서 제거/ })).not.toBeInTheDocument();
+    expect(screen.getByText("장바구니 0건")).toBeInTheDocument();
+  });
+
+  it("바로 재작업 Step 2에서 진행 표시와 좌우 툴바/카드 구조를 보여준다", () => {
+    render(
+      <DefectCartFlow
+        mode="scrap"
+        items={[{ ...fItem, has_bom: true }]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+
+    const stepper = screen.getByTestId("defect-flow-stepper");
+    const stepGrid = screen.getByTestId("defect-step2-grid");
+    const pickerPane = screen.getByTestId("defect-picker-pane");
+    const cartPane = screen.getByTestId("defect-cart-pane");
+    const pickerTable = screen.getByTestId("defect-picker-table");
+    const cartPanel = screen.getByTestId("defect-cart-panel");
+
+    expect(stepper).toBeInTheDocument();
+    expect(stepper).toHaveClass("text-base");
+    expect(stepGrid.className).not.toContain("items-start");
+    expect(pickerPane).toHaveClass("h-full", "min-h-0");
+    expect(cartPane).toHaveClass("h-full", "min-h-0");
+    expect(screen.getByTestId("defect-picker-toolbar")).toBeInTheDocument();
+    expect(screen.getByTestId("defect-side-toolbar")).toHaveTextContent("재작업 품목");
+    expect(pickerTable).toHaveClass("flex-1", "overflow-y-auto");
+    expect(cartPanel).toHaveClass("flex-1", "overflow-y-auto");
+  });
   it("scrap 제출 확인 후 scrap_normal 요청을 보낸다", async () => {
     render(
       <DefectCartFlow
@@ -203,7 +263,7 @@ describe("DefectCartFlow", () => {
     selectReasonCategory();
 
     fireEvent.click(screen.getByRole("button", { name: /BOM 확인/ }));
-    expect(await screen.findByText("④ BOM 확인")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("defect-flow-stepper")).toHaveTextContent("BOM 확인"));
     await screen.findByText("하위 품목");
 
     fireEvent.change(screen.getByLabelText("하위 품목 격리 수량"), { target: { value: "1" } });

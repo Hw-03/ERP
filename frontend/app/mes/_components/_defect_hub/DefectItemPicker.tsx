@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2, X } from "lucide-react";
+import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
@@ -151,8 +152,8 @@ export function DefectItemPicker({
   }));
 
   const filterGridClass = lockedDepartment
-    ? "grid flex-1 grid-cols-2 gap-2 lg:grid-cols-[1fr_1fr_2fr]"
-    : "grid flex-1 grid-cols-3 gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]";
+    ? "grid flex-1 grid-cols-2 items-end gap-2 lg:grid-cols-[1fr_1fr_2fr]"
+    : "grid flex-1 grid-cols-3 items-end gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]";
   const searchFieldClass = lockedDepartment
     ? "col-span-2 flex flex-col gap-0.5 lg:col-span-1"
     : "col-span-3 flex flex-col gap-0.5 lg:col-span-1";
@@ -161,7 +162,7 @@ export function DefectItemPicker({
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
+        <div data-testid="defect-picker-toolbar" className="flex h-[50px] items-end justify-between gap-2">
           <div className={filterGridClass} style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
             {!lockedDepartment && <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />}
             <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
@@ -191,7 +192,7 @@ export function DefectItemPicker({
           </div>
           {operator?.employee_id && (
             // 항목 4-10B — 순서 편집은 드래그 UX 라 모바일에서 숨김(PC 만 노출). 기능 코드는 보존.
-            <div className="hidden shrink-0 self-end pb-0.5 lg:block">
+            <div className="hidden h-[50px] shrink-0 items-center lg:flex">
               {editMode ? (
                 <button
                   type="button"
@@ -258,7 +259,7 @@ export function DefectItemPicker({
 
       {/* 결과 표 */}
       <div
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border"
+        data-testid="defect-picker-table" className="min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
@@ -319,7 +320,7 @@ export function DefectItemPicker({
               const wQty = Number(item.warehouse_qty) || 0;
               const added = selectedIds.has(item.item_id);
               return (
-                <tr key={item.item_id} className="transition-colors duration-150 hover:bg-[var(--c-s4)]">
+                <tr key={item.item_id} data-testid={`defect-picker-row-${item.item_id}`} data-added={added ? "true" : "false"} className="transition-colors duration-150 hover:bg-[var(--c-s4)]" style={{ background: added ? tint(LEGACY_COLORS.blue, 7) : undefined }}>
                   <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                     <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                       {item.item_name}
@@ -375,15 +376,16 @@ export function DefectItemPicker({
                     <button
                       type="button"
                       onClick={() => added ? onRemove(item) : onAdd(item)}
-                      className={`inline-flex items-center gap-1 rounded-[10px] border border-[var(--c-red)] px-2.5 py-1 text-[12px] font-black transition-colors hover:brightness-110 active:scale-[0.98] ${
+                      aria-label={added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
+                      className={`inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors hover:brightness-110 active:scale-[0.98] ${
                         added
-                          ? "bg-transparent text-[var(--c-red)] lg:bg-[var(--c-red)] lg:text-white"
-                          : "bg-[var(--c-red)] text-white"
+                          ? "border-[var(--c-blue)] bg-[color-mix(in_srgb,var(--c-blue)_12%,transparent)] text-[var(--c-blue)]"
+                          : "border-[var(--c-red)] bg-[var(--c-red)] text-white"
                       }`}
                     >
                       {added ? (
                         <>
-                          <X className="h-3 w-3" />
+                          <Check className="h-3 w-3" />
                           담김
                         </>
                       ) : (
