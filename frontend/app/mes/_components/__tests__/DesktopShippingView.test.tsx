@@ -310,6 +310,50 @@ describe("DesktopShippingView", () => {
     expect(api.getItems).not.toHaveBeenCalled();
     expect(api.getShippingHistory).not.toHaveBeenCalled();
   });
+  it("loads PF candidates separately and delays the full item list until PF selection", async () => {
+    vi.mocked(api.getItems).mockImplementation(async (params?: any) => {
+      if (params?.process_type_code === "PF") return [items[0]];
+      if (params?.limit === 2000) return items;
+      return items;
+    });
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+
+    expect(await screen.findByTestId("shipping-pf-option-pf-1")).toBeInTheDocument();
+    expect(api.getItems).toHaveBeenCalledWith({ process_type_code: "PF", limit: 2000 });
+    expect(api.getItems).not.toHaveBeenCalledWith({ limit: 2000 });
+
+    fireEvent.click(screen.getByTestId("shipping-pf-option-pf-1"));
+
+    await waitFor(() => expect(api.getItems).toHaveBeenCalledWith({ limit: 2000 }));
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+  });
+
+  it("shows a loading state while PF candidates are loading", async () => {
+    let resolvePfItems: (value: Item[]) => void = () => {};
+    const pfItemsPromise = new Promise<Item[]>((resolve) => {
+      resolvePfItems = resolve;
+    });
+    vi.mocked(api.getItems).mockImplementation((params?: any) => {
+      if (params?.process_type_code === "PF") return pfItemsPromise;
+      return Promise.resolve(items);
+    });
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+
+    expect(await screen.findByText("PF 후보를 불러오는 중입니다.")).toBeInTheDocument();
+
+    resolvePfItems([items[0]]);
+
+    expect(await screen.findByTestId("shipping-pf-option-pf-1")).toBeInTheDocument();
+  });
+
   it("renders full-height hub cards", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -345,6 +389,7 @@ describe("DesktopShippingView", () => {
     openNewRequest(container);
 
     expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-request-work-shell")).toHaveClass("flex-1");
     expect(screen.queryByTestId("shipping-wizard-step-2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("shipping-wizard-step-4")).not.toBeInTheDocument();
   });
@@ -583,9 +628,9 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     openHubCard(container, "request");
 
-    expect(await screen.findByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("min-h-[360px]");
-    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("min-h-[360px]");
-    expect(screen.getByTestId("shipping-request-column-body-PREPARED")).toHaveClass("min-h-[360px]");
+    expect(await screen.findByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("flex-1");
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("flex-1");
+    expect(screen.getByTestId("shipping-request-column-body-PREPARED")).toHaveClass("flex-1");
   });
   it("puts the new-request action inside the shipping request column", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
@@ -673,7 +718,7 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByText("바로 열기")).not.toBeInTheDocument();
     const badge = screen.getByTestId("shipping-hub-count-request");
     expect(badge).toHaveTextContent(/\d+/);
-    expect(badge.className).toContain("min-h-10");
+    expect(badge.className).toContain("min-h-12");
     expect(screen.getByText("요청 목록을 확인하고 BOM을 수정합니다.")).toBeInTheDocument();
   });
 

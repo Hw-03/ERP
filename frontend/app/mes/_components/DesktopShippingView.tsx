@@ -142,10 +142,14 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const lastUrlSearchRef = useRef(searchParams.toString());
   const [view, setView] = useState<ViewMode>("hub");
   const [items, setItems] = useState<Item[]>([]);
+  const [pfItems, setPfItems] = useState<Item[]>([]);
   const [requests, setRequests] = useState<ShippingRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [pfItemsLoading, setPfItemsLoading] = useState(false);
+  const [pfItemsLoaded, setPfItemsLoaded] = useState(false);
+  const [pfItemsError, setPfItemsError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [requestWizardStep, setRequestWizardStep] = useState<RequestWizardStep>(1);
 
@@ -163,8 +167,15 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [companionDraft, setCompanionDraft] = useState<Array<{ key: string; item_id: string; quantity: number; unit: string }>>([]);
 
-  const itemById = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
-  const pfItems = useMemo(() => items.filter((item) => item.process_type_code === "PF" && !item.deleted_at), [items]);
+  const displayItems = useMemo(() => {
+    const byId = new Map<string, Item>();
+    items.forEach((item) => byId.set(item.item_id, item));
+    pfItems.forEach((item) => {
+      if (!byId.has(item.item_id)) byId.set(item.item_id, item);
+    });
+    return Array.from(byId.values());
+  }, [items, pfItems]);
+  const itemById = useMemo(() => new Map(displayItems.map((item) => [item.item_id, item])), [displayItems]);
   const lineItemOptions = useMemo(() => items.filter((item) => !item.deleted_at), [items]);
   const activeRequests = useMemo(() => requests.filter((req) => req.status !== "PICKED_UP"), [requests]);
   const prepRequests = useMemo(
@@ -230,24 +241,46 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     }
   }, [onStatusChange]);
 
-  const ensureItemsLoaded = useCallback(async () => {
-    if (items.length > 0 || itemsLoading) return true;
+  const ensureItemsLoaded = useCallback(async (): Promise<Item[] | null> => {
+    if (items.length > 0) return items;
+    if (itemsLoading) return items.length > 0 ? items : null;
     setItemsLoading(true);
     setPending("load");
     setError(null);
     try {
-      setItems(await api.getItems({ limit: 2000 }));
-      return true;
+      const nextItems = await api.getItems({ limit: 2000 });
+      setItems(nextItems);
+      return nextItems;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "품목 목록을 불러오지 못했습니다.";
       setError(msg);
       onStatusChange(msg);
-      return false;
+      return null;
     } finally {
       setItemsLoading(false);
       setPending(null);
     }
-  }, [items.length, itemsLoading, onStatusChange]);
+  }, [items, itemsLoading, onStatusChange]);
+
+  const ensurePfItemsLoaded = useCallback(async () => {
+    if (pfItemsLoaded || pfItems.length > 0) return true;
+    if (pfItemsLoading) return true;
+    setPfItemsLoading(true);
+    setPfItemsError(null);
+    try {
+      const nextItems = await api.getItems({ process_type_code: "PF", limit: 2000 });
+      setPfItems(nextItems.filter((item) => item.process_type_code === "PF" && !item.deleted_at));
+      setPfItemsLoaded(true);
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "PF 후보를 불러오지 못했습니다.";
+      setPfItemsError(msg);
+      onStatusChange(msg);
+      return false;
+    } finally {
+      setPfItemsLoading(false);
+    }
+  }, [pfItems.length, pfItemsLoaded, pfItemsLoading, onStatusChange]);
 
   useEffect(() => {
     void loadData();
@@ -315,8 +348,9 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setEditingId(null);
     setRequestWizardStep(1);
     setView("requestWork");
+    void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
-  }, [searchParams, requests, loading, view]);
+  }, [searchParams, requests, loading, view, ensurePfItemsLoaded]);
 
   function clearDraft() {
     navigateView("requestWork");
@@ -329,7 +363,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setNotes("");
     setDraftLines([]);
     setMatchResult(null);
-    void ensureItemsLoaded();
+    void ensurePfItemsLoaded();
   }
 
   function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork", syncUrl = true) {
@@ -347,7 +381,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     if (nextView === "requestWork") void ensureItemsLoaded();
   }
 
-  async function loadDefaultBom(nextBasePfId: string) {
+  async function loadDefaultBom(nextBasePfId: string, sourceItems: Item[] = items) {
     if (!nextBasePfId) {
       setDraftLines([]);
       return;
@@ -355,6 +389,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setPending("load");
     setError(null);
     try {
+      const sourceItemById = new Map(sourceItems.map((item) => [item.item_id, item]));
       const pfRows = await api.getBOM(nextBasePfId);
       const lines: DraftLine[] = pfRows.map((row) => ({
         key: row.bom_id,
@@ -366,7 +401,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
         origin: "DEFAULT",
       }));
       const paChild = pfRows
-        .map((row) => itemById.get(row.child_item_id))
+        .map((row) => sourceItemById.get(row.child_item_id))
         .find((item) => item?.process_type_code === "PA");
       if (paChild) {
         const paRows = await api.getBOM(paChild.item_id);
@@ -398,7 +433,9 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setBasePfId(nextBasePfId);
     setEditingId(null);
     setRequestWizardStep(1);
-    await loadDefaultBom(nextBasePfId);
+    const loadedItems = await ensureItemsLoaded();
+    if (!loadedItems) return;
+    await loadDefaultBom(nextBasePfId, loadedItems);
   }
 
   function draftPayload() {
@@ -723,6 +760,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             selectedRequest={selectedRequest}
             editingId={editingId}
             pfItems={pfItems}
+            pfItemsLoading={pfItemsLoading}
+            pfItemsError={pfItemsError}
             itemById={itemById}
             itemOptions={lineItemOptions}
             basePfId={basePfId}
@@ -819,8 +858,16 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-y-auto lg:pr-4">
-      <div className="flex min-h-full w-full flex-col gap-3 px-3 pb-10 pt-4 lg:px-6">
+    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
+      <div
+        data-testid="shipping-root-panel"
+        className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-[28px] border px-4 py-4"
+        style={{
+          background: LEGACY_COLORS.s1,
+          borderColor: LEGACY_COLORS.border,
+          boxShadow: "0 18px 50px rgba(148, 163, 184, 0.18)",
+        }}
+      >
         {error && <Notice tone={LEGACY_COLORS.red} title="오류" body={error} />}
         {renderActiveView()}
       </div>
@@ -875,7 +922,7 @@ function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
 
 function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void }) {
   return (
-    <div className="grid h-full min-h-[calc(100vh-170px)] gap-3 xl:grid-cols-3">
+    <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-3">
       <HubCard id="request" icon={ClipboardList} title="출하 요청" body="요청 목록, 상세, BOM 편집" detail="요청 목록을 확인하고 BOM을 수정합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
       <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" body="준비 체크, 준비 완료, 픽업" detail="구성품 체크와 준비 완료를 처리합니다." count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
       <HubCard id="history" icon={History} title="출하 이력" body="완료 요청, 재고 로그, 이벤트" detail="픽업 완료와 재고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
@@ -900,7 +947,7 @@ function HubCard({ id, icon: Icon, title, body, detail, count, tone, onClick }: 
             <div className="mt-3 text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>{body}</div>
           </div>
         </div>
-        <span data-testid={"shipping-hub-count-" + id} className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-full px-3 text-base font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>
+        <span data-testid={"shipping-hub-count-" + id} className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>
       </div>
       <div className="mt-auto text-lg font-black leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>{detail}</div>
     </button>
@@ -915,7 +962,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
   ];
   const total = requests.length;
   return (
-    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Panel dataTestId="shipping-request-list-panel" className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -959,7 +1006,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
 function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareCancel, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
-      <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <Panel className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center gap-3">
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -979,7 +1026,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
   const canDelete = request.status === "REQUESTED" || request.status === "PREPARING";
   const canCancelPrepared = request.status === "PREPARED";
   return (
-    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Panel dataTestId="shipping-request-detail" className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -1016,7 +1063,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
 
 function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onOpen: (request: ShippingRequest) => void }) {
   return (
-    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Panel dataTestId="shipping-prep-list" className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -1043,7 +1090,7 @@ function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest
 
 function HistoryListEntry({ rows, onBack, onOpen }: { rows: ShippingRequest[]; onBack: () => void; onOpen: (request: ShippingRequest) => void }) {
   return (
-    <div className="flex h-full min-h-[calc(100vh-210px)] flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Panel dataTestId="shipping-history-list" className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -1074,6 +1121,8 @@ function RequestSection(props: {
   selectedRequest: ShippingRequest | null;
   editingId: string | null;
   pfItems: Item[];
+  pfItemsLoading: boolean;
+  pfItemsError: string | null;
   itemById: Map<string, Item>;
   itemOptions: Item[];
   basePfId: string;
@@ -1161,7 +1210,7 @@ function RequestSection(props: {
   };
 
   return (
-    <div className="flex h-[calc(100vh-210px)] min-h-0 flex-col">
+    <div data-testid="shipping-request-work-shell" className="flex min-h-0 flex-1 flex-col">
       <Panel className="flex min-h-0 flex-1 flex-col">
         <div data-testid="shipping-work-header" className="grid min-w-0 gap-3 xl:grid-cols-[minmax(300px,420px)_minmax(0,1fr)_auto] xl:items-center">
           <div className="flex min-w-0 items-center gap-3">
@@ -1224,7 +1273,11 @@ function RequestSection(props: {
                   />
                 </Field>
                 <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto rounded-[14px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  {filteredPfItems.length === 0 ? (
+                  {props.pfItemsLoading ? (
+                    <EmptyState title="PF 후보를 불러오는 중입니다." body="잠시만 기다려주세요." />
+                  ) : props.pfItemsError ? (
+                    <EmptyState title="PF 후보를 불러오지 못했습니다." body={props.pfItemsError} />
+                  ) : filteredPfItems.length === 0 ? (
                     <EmptyState title="선택 가능한 PF 없음" body="검색어를 바꾸거나 품목 목록을 확인하세요." />
                   ) : (
                     filteredPfItems.slice(0, 80).map((item) => {
@@ -1697,29 +1750,47 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
     </div>
   );
 }
+type SummaryDisplayLine = { key: string; title: string; meta: string; tone?: string };
+
 function LineSummary({ request }: { request: ShippingRequest }) {
   const paLines = request.bom_lines.filter((line) => line.parent_stage === "PA");
   const pfLines = request.bom_lines.filter((line) => line.parent_stage === "PF");
-  const formatLine = (line: ShippingRequest["bom_lines"][number]) => `${line.included ? "" : "제외됨 · "}${line.origin === "CUSTOM" ? "추가됨 · " : ""}${line.item_name} x ${line.quantity}`;
+  const formatLine = (line: ShippingRequest["bom_lines"][number]): SummaryDisplayLine => {
+    const flags = [!line.included ? "제외됨" : null, line.origin === "CUSTOM" ? "추가됨" : null].filter(Boolean).join(" · ");
+    return {
+      key: `${line.line_id ?? line.child_item_id}-${line.parent_stage}`,
+      title: line.item_name,
+      meta: `${flags ? flags + " · " : ""}${line.mes_code ?? "코드 없음"} · ${line.quantity}${line.unit ? " " + line.unit : ""}`,
+      tone: !line.included ? LEGACY_COLORS.red : line.origin === "CUSTOM" ? LEGACY_COLORS.cyan : undefined,
+    };
+  };
+  const companionLines = request.companion_lines.map((line) => ({
+    key: line.line_id ?? line.item_id,
+    title: line.item_name,
+    meta: `${line.mes_code ?? "코드 없음"} · ${line.quantity}${line.unit ? " " + line.unit : ""}`,
+  }));
   return (
-    <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
+    <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
       <SummaryList title="PA 구성품" lines={paLines.map(formatLine)} />
       <SummaryList title="PF 구성품" lines={pfLines.map(formatLine)} />
-      <CompanionSummary lines={request.companion_lines.map((line) => `${line.item_name} x ${line.quantity}`)} />
+      <CompanionSummary lines={companionLines} />
     </div>
   );
 }
 
-function SummaryList({ title, lines, empty = "등록 없음" }: { title: string; lines: string[]; empty?: string }) {
+function SummaryList({ title, lines, empty = "등록 없음" }: { title: string; lines: SummaryDisplayLine[]; empty?: string }) {
   return (
     <div className="flex min-h-0 flex-col rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
-      <div className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1">
+      <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
         {lines.length === 0 ? (
-          <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{empty}</div>
+          <div className="flex min-h-[88px] items-center justify-center rounded-[12px] border text-xs font-bold" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{empty}</div>
         ) : (
-          lines.map((line, index) => (
-            <div key={`${line}-${index}`} className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line}</div>
+          lines.map((line) => (
+            <div key={line.key} className="min-w-0 rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+              <div className="truncate text-sm font-black" style={{ color: line.tone ?? LEGACY_COLORS.text }}>{line.title}</div>
+              <div className="mt-0.5 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.meta}</div>
+            </div>
           ))
         )}
       </div>
@@ -1727,12 +1798,12 @@ function SummaryList({ title, lines, empty = "등록 없음" }: { title: string;
   );
 }
 
-function CompanionSummary({ lines }: { lines: string[] }) {
+function CompanionSummary({ lines }: { lines: SummaryDisplayLine[] }) {
   if (lines.length === 0) {
     return (
-      <div className="self-start rounded-[14px] border px-3 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="rounded-[14px] border px-3 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>카톤·동반 출하품</div>
-        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>픽업 전 입력 없음</div>
+        <div className="mt-2 flex min-h-[88px] items-center justify-center rounded-[12px] border text-xs font-bold" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>픽업 전 입력 없음</div>
       </div>
     );
   }
@@ -1905,7 +1976,7 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
       type="button"
       onClick={onClick}
       data-shipping-request-id={request.request_id}
-      className="min-h-[112px] rounded-[14px] border px-3 py-3 text-left transition-colors"
+      className="min-h-[136px] rounded-[14px] border px-4 py-3 text-left transition-colors"
       style={{
         background: active ? tint(STATUS_TONE[request.status], 16) : LEGACY_COLORS.s2,
         borderColor: active ? STATUS_TONE[request.status] : LEGACY_COLORS.border,
@@ -1999,12 +2070,12 @@ function FinalItemCard({ label, name, code, tone }: { label: string; name: strin
 
 function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, action }: { icon: typeof PackageCheck; title: string; subtitle: string; children: ReactNode; bodyDataTestId?: string; action?: ReactNode }) {
   return (
-    <section className="flex min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <section className="flex h-full min-h-0 min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="flex min-w-0 items-center justify-between gap-3">
         <PanelTitle icon={Icon} title={title} subtitle={subtitle} />
         {action}
       </div>
-      <div data-testid={bodyDataTestId} className="mt-3 grid min-h-[360px] content-start gap-2 overflow-y-auto pr-1">{children}</div>
+      <div data-testid={bodyDataTestId} className="mt-3 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">{children}</div>
     </section>
   );
 }
@@ -2012,7 +2083,7 @@ function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, act
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-[14px] border px-4 py-8 text-center" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <div className="flex min-h-[136px] flex-col items-center justify-center rounded-[14px] border px-4 py-6 text-center" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
       <div className="mt-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{body}</div>
     </div>
