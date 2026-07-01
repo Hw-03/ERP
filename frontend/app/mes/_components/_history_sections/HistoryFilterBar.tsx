@@ -47,7 +47,7 @@ export function HistoryFilterBar({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="품명 · 코드 · 담당자 · 참조번호 · 메모"
+            placeholder="품명 · 코드 · 담당자 · 메모"
             className="h-11 flex-1 bg-transparent text-sm outline-none lg:h-auto"
             style={{ color: LEGACY_COLORS.text }}
           />
@@ -111,6 +111,14 @@ export function HistoryFilterBar({
         >
           <Filter className="h-3.5 w-3.5" />
           필터
+          {activeFilterCount > 0 && (
+            <span
+              className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-black"
+              style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
+            >
+              {activeFilterCount}
+            </span>
+          )}
           <ChevronDown
             className="h-3.5 w-3.5 transition-transform"
             style={{ transform: filterPanelOpen ? "rotate(180deg)" : undefined }}

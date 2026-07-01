@@ -69,6 +69,7 @@ export function DesktopHistoryRightPanel({
             selected={displaySelection.log}
             onSelectLog={onSelectLog}
             onLogUpdated={onLogUpdated}
+            variant="desktop"
           />
         </DesktopRightPanel>
       )}
@@ -100,6 +101,7 @@ export function DesktopHistoryRightPanel({
               setBatchCache={setBatchCache}
               onSelectLog={onSelectLog}
               onBatchCancelled={onBatchCancelled}
+              variant="desktop"
             />
           </DesktopRightPanel>
         );

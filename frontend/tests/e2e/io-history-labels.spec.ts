@@ -9,7 +9,7 @@
  *  - "원자재 입고"(receive)는 창고 정/부 직원에게만 노출 → 창고 역할로 로그인.
  */
 import { expect, test } from "@playwright/test";
-import { loginAsOperator } from "./_helpers";
+import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 // "생산 | 입고" 처럼 정규식 메타문자(|)가 든 단어는 text=/.../ 가 alternation 으로
 // 오해석한다(=오매칭). 정확 일치는 getByText(word,{exact:true}) 로 검증한다.
@@ -62,9 +62,58 @@ test.describe("라벨 일관성 (glossary 단일 사전)", () => {
     await page.goto("/mes");
     await page.getByRole("navigation").getByRole("button", { name: /내역/ }).first().click();
 
-    const banned = ["재작업", "새 격리", "격리 해제", "폐기", "격리 폐기"];
+    const banned = ["새 격리", "격리 해제", "폐기", "격리 폐기"];
     for (const word of banned) {
       await expectLabelAbsent(page, word);
     }
+  });
+});
+
+test.describe("입출고 내역 PC 정보 위계", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loginAsOperator(page, { role: "warehouse" });
+  });
+
+  test("목록 테이블에 현장 판단 컬럼을 노출한다", async ({ browser }) => {
+    const submitContext = await browser.newContext();
+    const submitPage = await submitContext.newPage();
+    await loginAsOperator(submitPage, { code: "E01" });
+    await gotoWarehouseCompose(submitPage);
+    await pickWorkType(submitPage, /창고 입출고/);
+    await submitPage.getByRole("button", { name: /창고 → 부서/ }).first().click();
+    await submitPage.getByRole("button", { name: "조립", exact: true }).click();
+    await clickNextStep(submitPage);
+    await submitPage
+      .getByRole("row", { name: /E2E원자재튜브/ })
+      .getByRole("button", { name: "낱개", exact: true })
+      .click();
+    await submitPage.getByRole("button", { name: /제출확인/ }).click();
+    await submitPage.getByRole("button", { name: /창고 결재 요청/ }).click();
+    await submitPage.getByRole("button", { name: "결재 요청", exact: true }).click();
+    await expect(submitPage.getByRole("dialog", { name: /창고 결재 요청 완료/ })).toBeVisible();
+    await submitContext.close();
+
+    const approveContext = await browser.newContext();
+    const approvePage = await approveContext.newPage();
+    await loginAsOperator(approvePage, { code: "E22" });
+    await approvePage.goto("/mes?tab=warehouse");
+    await approvePage.getByRole("tab", { name: /창고 승인함/ }).click();
+    await approvePage.getByRole("button", { name: "승인", exact: true }).click();
+    await approvePage.getByRole("textbox", { name: "0000" }).fill("0000");
+    await approvePage.getByRole("button", { name: "승인 확정" }).click();
+    await expect(approvePage.getByText("승인 대기 중인 요청이 없습니다.")).toBeVisible();
+
+    await approvePage.goto("/mes?tab=history");
+
+    const table = approvePage.locator("table").filter({
+      has: approvePage.getByRole("columnheader", { name: "수량 · 재고" }),
+    });
+    await expect(table).toBeVisible();
+
+    for (const name of ["일시", "작업", "대상", "흐름", "수량 · 재고", "상태 · 처리"]) {
+      await expect(table.getByRole("columnheader", { name })).toBeVisible();
+    }
+    await approveContext.close();
   });
 });

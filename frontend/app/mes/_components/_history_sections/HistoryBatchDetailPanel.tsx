@@ -21,8 +21,16 @@ import {
   type LineSignTone,
 } from "./historyBatchInterpreter";
 import { formatHistoryDateTimeLong } from "./historyFormat";
-import { FlowBadge, MovementSummaryCell } from "./historyTableHelpers";
+import {
+  FlowBadge,
+  FlowSummaryCell,
+  MovementSummaryCell,
+  PeopleStatusCell,
+  QuantityStockCell,
+  TargetSummaryBlock,
+} from "./historyTableHelpers";
 import { HistoryDetailMemo } from "./HistoryDetailPanel";
+import { getHistoryRowPresentation } from "./historyPresentation";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,
@@ -44,6 +52,7 @@ type Props = {
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   onSelectLog: (log: TransactionLog) => void;
   onBatchCancelled: (batchId: string) => void;
+  variant?: "default" | "desktop";
 };
 
 type FetchState =
@@ -62,6 +71,7 @@ export function HistoryBatchDetailPanel({
   setBatchCache,
   onSelectLog,
   onBatchCancelled,
+  variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
   const [cancelState, setCancelState] = useState<CancelState>({ step: "idle" });
@@ -156,6 +166,9 @@ export function HistoryBatchDetailPanel({
         onCancelClick={() => setCancelState({ step: "confirm" })}
       />
 
+      {variant === "desktop" && batch && (
+        <HistoryBatchDecisionSummary first={first} batch={batch} />
+      )}
       {isBatchCancelled && (
         <div
           className="rounded-[16px] border px-4 py-3 text-sm font-bold"
@@ -247,6 +260,36 @@ export function HistoryBatchDetailPanel({
   );
 }
 
+function HistoryBatchDecisionSummary({
+  first,
+  batch,
+}: {
+  first: TransactionLog;
+  batch: IoBatch;
+}) {
+  const presentation = getHistoryRowPresentation(first, batch);
+  return (
+    <div className="grid gap-2 rounded-[20px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <TargetSummaryBlock
+        presentation={presentation}
+        icon={<GitBranch className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+      />
+      <div className="grid gap-2 xl:grid-cols-2">
+        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>흐름</div>
+          <FlowSummaryCell presentation={presentation} />
+        </div>
+        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>수량 · 재고</div>
+          <QuantityStockCell presentation={presentation} />
+        </div>
+      </div>
+      <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+        <PeopleStatusCell presentation={presentation} />
+      </div>
+    </div>
+  );
+}
 function HistoryBatchHero({
   first,
   logs,

@@ -16,6 +16,16 @@ describe("toInventoryEffectRows", () => {
     ]);
   });
 
+  it("formats box-tracking inventory effects with an operator-facing label", () => {
+    const rows = toInventoryEffectRows([
+      { scope: "warehouse_box", box_id: "box-1", delta: -2 },
+    ]);
+
+    expect(rows).toEqual([
+      { key: "warehouse_box::", label: "박스 재고", delta: -2, deltaLabel: "-2" },
+    ]);
+  });
+
   it("returns an empty list for null, empty, or zero-delta effects", () => {
     expect(toInventoryEffectRows(null)).toEqual([]);
     expect(toInventoryEffectRows([])).toEqual([]);

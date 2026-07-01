@@ -350,10 +350,22 @@ export function DesktopHistoryView() {
             dateFilter={dateFilter}
             setDateFilter={handleDateFilterChange}
             filterPanelOpen={filterPanelOpen}
-            onToggleFilterPanel={() => setFilterPanelOpen((o) => !o)}
+            onToggleFilterPanel={() => {
+              setFilterPanelOpen((open) => {
+                const next = !open;
+                if (next) setCalendarOpen(false);
+                return next;
+              });
+            }}
             activeFilterCount={activeFilterCount}
             calendarOpen={calendarOpen}
-            onToggleCalendar={() => setCalendarOpen((o) => !o)}
+            onToggleCalendar={() => {
+              setCalendarOpen((open) => {
+                const next = !open;
+                if (next) setFilterPanelOpen(false);
+                return next;
+              });
+            }}
             selectedDay={selectedDay}
             onClearSelectedDay={() => setSelectedDay(null)}
           />

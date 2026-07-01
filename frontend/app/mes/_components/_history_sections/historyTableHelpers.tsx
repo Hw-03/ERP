@@ -4,10 +4,11 @@ import { useState } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, ArrowRightLeft, ArrowUpFromLine,
   BookmarkMinus, BookmarkPlus, ChevronDown, ChevronRight, Hammer, Layers,
-  PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench,
+  Package, PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench,
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
+import type { HistoryPresentationTone, HistoryRowPresentation } from "./historyPresentation";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
@@ -21,6 +22,7 @@ import {
   type MovementTone,
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
+import { getHistoryRowPresentation, getReferenceBatchPresentation } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 
 const TX_ICON = {
@@ -108,6 +110,120 @@ export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
   );
 }
 
+const PRESENTATION_TONE_COLOR: Record<HistoryPresentationTone, string> = {
+  primary: LEGACY_COLORS.blue,
+  success: LEGACY_COLORS.green,
+  info: LEGACY_COLORS.cyan,
+  warning: LEGACY_COLORS.yellow,
+  danger: LEGACY_COLORS.red,
+  muted: LEGACY_COLORS.muted2,
+};
+
+export function StatusChipStrip({ presentation }: { presentation: HistoryRowPresentation }) {
+  if (presentation.statusChips.length === 0) {
+    return <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {presentation.statusChips.map((chip) => {
+        const color = PRESENTATION_TONE_COLOR[chip.tone];
+        return (
+          <span
+            key={`${chip.label}-${chip.title ?? ""}`}
+            title={chip.title}
+            className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
+            style={{
+              background: `color-mix(in srgb, ${color} 14%, transparent)`,
+              color: `color-mix(in srgb, ${color} 48%, ${LEGACY_COLORS.text})`,
+            }}
+          >
+            {chip.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+export function TargetSummaryBlock({
+  presentation,
+  icon,
+  titleOverride,
+  metaOverride,
+}: {
+  presentation: HistoryRowPresentation;
+  icon: React.ReactNode;
+  titleOverride?: string;
+  metaOverride?: string[];
+}) {
+  const meta = metaOverride ?? presentation.target.meta;
+  return (
+    <div className="min-w-0">
+      <div className="flex min-w-0 items-center gap-1.5">
+        {icon}
+        <span className="min-w-0 truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+          {titleOverride ?? presentation.target.title}
+        </span>
+      </div>
+      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        {presentation.target.code && <span className="font-semibold">{presentation.target.code}</span>}
+        {meta.map((part) => (
+          <span key={part} className="rounded-full px-1.5 py-0.5" style={{ background: tint(LEGACY_COLORS.muted2, 10) }}>
+            {part}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function FlowSummaryCell({ presentation }: { presentation: HistoryRowPresentation }) {
+  return (
+    <div className="flex flex-col items-center gap-1 text-xs">
+      <span className="rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+        {presentation.flow.label}
+      </span>
+      {presentation.flow.hint && (
+        <span className="max-w-[9rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
+          {presentation.flow.hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function QuantityStockCell({
+  presentation,
+  summary,
+}: {
+  presentation: HistoryRowPresentation;
+  summary?: MovementSummary;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <MovementSummaryCell summary={summary ?? presentation.movement} />
+      {presentation.stock && (
+        <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+          {presentation.stock.label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPresentation }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+        요청 {presentation.people.requester}
+      </div>
+      <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        승인 {presentation.people.approver}
+      </div>
+      <StatusChipStrip presentation={presentation} />
+    </div>
+  );
+}
 export type LogGroup =
   | { type: "solo"; log: TransactionLog }
   | { type: "batch"; refNo: string; logs: TransactionLog[] }
@@ -230,7 +346,7 @@ export function ChevronToggleBtn({
 
 /**
  * 레거시 reference_no 기반 묶음 헤더.
- * 같은 item_id 묶음일 때만 합산 수량 표시. 혼합이면 "하위 N건".
+ * 같은 item_id 묶음일 때만 품목명을 대표로 쓰고, 혼합이면 묶음 단위로 표시한다.
  * row click → onSelect (상세 열기), chevron click → onToggle (펼치기/접기).
  */
 export function BatchHeader({
@@ -251,15 +367,27 @@ export function BatchHeader({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
-  const homogeneous = isHomogeneousItemGroup(group.logs);
+  const referencePresentation = getReferenceBatchPresentation(group.logs);
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
-  const actor = getHistoryActor(first);
-  // 재작업(DISASSEMBLE) 묶음은 빨간색 강제. transactionColor 의 muted/회색 fallback 덮어씀.
   const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
-  const summary = getHistoryMovementSummary(first, null, group.logs.length);
+  const summary = referencePresentation.movement;
+  const basePresentation = getHistoryRowPresentation(first);
+  const presentation: HistoryRowPresentation = {
+    ...basePresentation,
+    operation: {
+      ...basePresentation.operation,
+      label: referencePresentation.operationLabel,
+    },
+    movement: summary,
+    target: {
+      ...basePresentation.target,
+      title: referencePresentation.targetTitle,
+      code: referencePresentation.targetCode,
+      meta: referencePresentation.targetMeta,
+    },
+  };
   const [hovered, setHovered] = useState(false);
 
-  // 평상시엔 채우기 없음. 호버 시에만 강조: 선택 줄은 더 진한 파랑, 그 외엔 유형색을 동색으로.
   const rowBackground = selected
     ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
     : hovered
@@ -294,33 +422,108 @@ export function BatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={getHistoryDisplayLabel(first)} color={flowColor} />
+        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex items-center gap-1.5">
-          <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <span className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-            {homogeneous ? first.item_name : `하위 ${group.logs.length}건 (혼합)`}
-          </span>
-        </div>
+        <TargetSummaryBlock
+          presentation={presentation}
+          icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+        />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-        <MovementSummaryCell summary={summary} />
+        <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <ActorCell name={actor} />
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} summary={summary} />
       </td>
-      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <MemoCell notes={first.notes} />
+      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
   );
 }
 
+export function ReferenceBatchDetail({
+  logs,
+  compact,
+}: {
+  logs: TransactionLog[];
+  compact?: boolean;
+}) {
+  const presentation = getReferenceBatchPresentation(logs);
+  const lineLabel = presentation.kind === "shipment"
+    ? "출하품"
+    : presentation.kind === "outbound"
+      ? "출고품"
+      : "구성품";
+  const color = presentation.kind === "batch" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red;
+
+  return (
+    <>
+      {logs.map((log) => (
+        <ReferenceBatchLineRow
+          key={log.log_id}
+          log={log}
+          label={lineLabel}
+          color={color}
+          compact={compact}
+        />
+      ))}
+    </>
+  );
+}
+
+function ReferenceBatchLineRow({
+  log,
+  label,
+  color,
+  compact,
+}: {
+  log: TransactionLog;
+  label: string;
+  color: string;
+  compact?: boolean;
+}) {
+  const padX = compact ? "px-2" : "px-4";
+  const presentation = getHistoryRowPresentation(log);
+
+  return (
+    <tr style={{ background: "color-mix(in srgb, var(--c-blue) 3%, transparent)" }}>
+      <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
+      <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
+        <FlowBadge type={log.transaction_type} label={label} color={color} />
+      </td>
+      <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="mt-0.5 shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
+          <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+              {log.item_name}
+            </div>
+            {log.mes_code && (
+              <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {log.mes_code}
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="whitespace-nowrap border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <FlowSummaryCell presentation={presentation} />
+      </td>
+      <td className="whitespace-nowrap border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} />
+      </td>
+      <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+        <PeopleStatusCell presentation={presentation} />
+      </td>
+    </tr>
+  );
+}
 /**
  * operation_batch_id 기반 묶음 헤더.
- * batch (IoBatch) 가 cache hit 이면 정확한 from→to/title/포함·제외 라인 수 표시.
- * 없으면 TransactionLog 기반 추론으로 fallback.
+ * batch cache 가 있으면 IoBatch 기준 대상/흐름/라인 상태를 한 행에서 설명한다.
  * row click → onSelect (우측 batch 상세 열기), chevron click → onToggle (펼치기/접기).
  */
 export function OpBatchHeader({
@@ -347,12 +550,9 @@ export function OpBatchHeader({
   const padX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
-  const actor = getHistoryActor(first);
-  const flow = describeBatchFlow(first, batch);
-  // 재작업(disassemble) 묶음은 빨간색 강제.
+  const basePresentation = getHistoryRowPresentation(first, batch ?? undefined);
   const flowColor = isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType);
 
-  // 품목명 영역
   let titleText: string;
   if (batch && batch.bundles.length > 0) {
     const head = batch.bundles[0].title;
@@ -361,11 +561,18 @@ export function OpBatchHeader({
     titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
   }
 
-  // 변동요약 — 작업 종류별 의미 라벨. 부족 라인 있으면 빨간 경고 인라인.
   const summary = getHistoryMovementSummary(first, batch, group.logs.length);
+  const presentation: HistoryRowPresentation = {
+    ...basePresentation,
+    movement: summary,
+    target: {
+      ...basePresentation.target,
+      title: titleText,
+      meta: batch ? basePresentation.target.meta : [`${group.logs.length}라인`],
+    },
+  };
   const [hovered, setHovered] = useState(false);
 
-  // 평상시엔 채우기 없음. 호버 시에만 강조: 선택 줄은 더 진한 파랑, 그 외엔 유형색을 동색으로.
   const rowBackground = selected
     ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
     : hovered
@@ -402,24 +609,22 @@ export function OpBatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={flow.primary} color={flowColor} />
+        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex items-center gap-1.5">
-          <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <span className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-            {titleText}
-          </span>
-        </div>
+        <TargetSummaryBlock
+          presentation={presentation}
+          icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+        />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-        <MovementSummaryCell summary={summary} />
+        <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <ActorCell name={actor} />
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} summary={summary} />
       </td>
-      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <MemoCell notes={first.notes} />
+      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
   );

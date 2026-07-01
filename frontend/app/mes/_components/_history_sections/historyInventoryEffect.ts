@@ -31,6 +31,7 @@ function statusLabel(status?: string | null): string {
 
 function cellLabel(cell: InventoryEffectCell): string {
   if (cell.scope === "warehouse") return "창고";
+  if (cell.scope === "warehouse_box") return "박스 재고";
   if (cell.scope === "box") return cell.box_id ? `박스 ${cell.box_id}` : "박스";
   if (cell.scope === "location") {
     const dept = cell.department ?? "부서";

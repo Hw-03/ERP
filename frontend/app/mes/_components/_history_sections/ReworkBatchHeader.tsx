@@ -1,13 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Layers, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { formatQty } from "@/lib/mes/format";
-import { getHistoryActor } from "./historyBatchInterpreter";
 import { formatHistoryDate } from "./historyFormat";
-import { ChevronToggleBtn, HISTORY_CELL_TRANSITION, type LogGroup } from "./historyTableHelpers";
+import {
+  ChevronToggleBtn,
+  FlowBadge,
+  FlowSummaryCell,
+  HISTORY_CELL_TRANSITION,
+  PeopleStatusCell,
+  QuantityStockCell,
+  TargetSummaryBlock,
+  type LogGroup,
+} from "./historyTableHelpers";
+import { getHistoryRowPresentation, type HistoryRowPresentation } from "./historyPresentation";
+
+const REWORK_LABEL = "재작업";
 
 type Props = {
   group: Extract<LogGroup, { type: "batch" }>;
@@ -23,10 +33,31 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
   const childCount = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE").length;
   const qty = Math.abs(parentLog.quantity_change);
-  const actor = getHistoryActor(parentLog);
+  const unit = parentLog.item_unit?.trim();
+  const basePresentation = getHistoryRowPresentation(parentLog);
+  const presentation: HistoryRowPresentation = {
+    ...basePresentation,
+    operation: {
+      ...basePresentation.operation,
+      label: REWORK_LABEL,
+    },
+    target: {
+      ...basePresentation.target,
+      title: `${parentLog.item_name} 재작업`,
+      code: parentLog.mes_code,
+      meta: [`${childCount}종 처리`],
+    },
+    movement: {
+      parts: [{ label: `${REWORK_LABEL} ${qty}${unit ? ` ${unit}` : ""}`, tone: "danger" }],
+    },
+    flow: {
+      ...basePresentation.flow,
+      label: "불량 처리",
+      hint: "회수 · 폐기 흐름",
+    },
+  };
   const [hovered, setHovered] = useState(false);
 
-  // 평상시엔 채우기 없음. 재작업은 빨강 정체성 유지 — 호버/선택 모두 빨강 동색 강조.
   const rowBackground = selected
     ? tint(LEGACY_COLORS.red, hovered ? 18 : 12)
     : hovered
@@ -51,7 +82,6 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
-      {/* 일시 */}
       <td
         className={`whitespace-nowrap border-b ${padX} py-3 text-xs`}
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}
@@ -61,60 +91,26 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
           {formatHistoryDate(parentLog.created_at)}
         </div>
       </td>
-      {/* 구분 */}
       <td
         className={`whitespace-nowrap border-b ${padX} py-3 text-center`}
         style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
       >
-        <span
-          className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
-            color: LEGACY_COLORS.red,
-          }}
-        >
-          <Wrench className="h-3.5 w-3.5" />
-          재작업
-        </span>
+        <FlowBadge type={parentLog.transaction_type} label={REWORK_LABEL} color={LEGACY_COLORS.red} />
       </td>
-      {/* 품목명 */}
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex items-center gap-1.5">
-          <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
-          <span className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-            {parentLog.item_name} 재작업 ({childCount}종 처리)
-          </span>
-        </div>
+        <TargetSummaryBlock
+          presentation={presentation}
+          icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
+        />
       </td>
-      {/* 변동요약 */}
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span
-          className="inline-flex min-w-[10.5rem] justify-center rounded-full px-3 py-1 text-xs font-bold tracking-wide"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`,
-            color: `color-mix(in srgb, ${LEGACY_COLORS.red} 42%, ${LEGACY_COLORS.text})`,
-          }}
-        >
-          재작업 {formatQty(qty)} {parentLog.item_unit}
-        </span>
+        <FlowSummaryCell presentation={presentation} />
       </td>
-      {/* 요청자 */}
-      <td
-        className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3"
-        style={{ borderColor: LEGACY_COLORS.border }}
-      >
-        {actor !== "-" ? (
-          <span className="block text-center text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>{actor}</span>
-        ) : (
-          <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-        )}
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} />
       </td>
-      {/* 메모 */}
-      <td
-        className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3"
-        style={{ borderColor: LEGACY_COLORS.border }}
-      >
-        <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
   );

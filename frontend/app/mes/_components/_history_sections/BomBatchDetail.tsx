@@ -130,29 +130,17 @@ function BundleRows({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const isBomParent = bundle.source_kind === "bom_parent";
-  // BOM 부모 라인은 헤더로 흡수 — 자식 목록에서 제외. helper 단일 진입.
   const parentLine = getHistoryBomParentLine(bundle);
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
-  // 단품(BOM 아님) + 단일 라인 → 번들 헤더가 곧 그 품목. 자동차감 자식 행을 노출하면
-  // 동일 정보(이름·코드·수량)가 중복되고 "자동차감" 라벨도 의미 없음(BOM 차감 아님).
-  // → 헤더 우측 슬롯에 바로 mes_code 노출하고 expand 비활성화.
   const isSingleLineDirect = !isBomParent && childLines.length === 1;
   const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
-  // 회귀 fix: source_kind 가 "bom_parent" 가 아니어도 lines 가 여럿이면 펼쳐서 표시.
-  // 백엔드 응답의 source_kind 변경 또는 origin 누락에도 견디게 한다.
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
 
-  // 헤더 우측 수량 — 부모 라인 있으면 sub_type 기반 부호+색.
-  // 단품(BOM 아님)은 bundle.quantity 가 라인 수(1)로 들어가는 경우가 있어 의미 없음 →
-  // bundle.lines 가 1개면 그 line 의 signed.label 사용(예: "+4 EA"). 그 외엔 bundle.quantity fallback.
   const headerSigned = parentLine
     ? getHistoryLineSignedQuantity(parentLine, batch, bundle)
     : bundle.lines.length === 1
       ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle)
       : null;
-  // BOM 상위 headerSigned 가 없는 경로(예: BOM warehouse_to_dept 의 부모 라인 없음)는
-  // bundle.quantity 만으로 단위가 빠져 자식 라인 "N EA" 와 정렬이 어색. 라인 unit 가 단일이면
-  // 그 unit 을 헤더에도 붙여 통일.
   const bundleUnit = (() => {
     const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
     return units.size === 1 ? Array.from(units)[0] : null;
@@ -163,18 +151,17 @@ function BundleRows({
       ? `${formatQty(bundle.quantity)} ${bundleUnit}`
       : `${formatQty(bundle.quantity)}`;
   const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
+  const shortageCount = childLines.filter((line) => line.included && line.shortage > 0).length;
+  const excludedCount = childLines.filter((line) => !line.included).length;
 
   return (
     <>
-      {/* 번들 헤더 — 5컬럼 정렬 */}
       <tr
         onClick={canExpand ? onToggle : undefined}
         className={canExpand ? "cursor-pointer hover:brightness-105" : undefined}
-        style={{ background: "rgba(101,169,255,.03)" }}
+        style={{ background: "color-mix(in srgb, var(--c-blue) 5%, transparent)" }}
       >
-        {/* 일시 — 부모 헤더 행은 비워둠(자동차감 라벨은 자식 행 구분 열로 이동) */}
         <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
-        {/* 구분 */}
         <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
           <span
             className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
@@ -189,45 +176,42 @@ function BundleRows({
             {isBomParent ? "BOM" : "단품"}
           </span>
         </td>
-        {/* 품목명 — chevron 들여쓰기 px-4 로 통일(parent Layers 아이콘과 같은 x),
-            우측 고정폭 슬롯에 mes_code 노출(BOM 상위 + 단품 헤더 동일 패턴). */}
         <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 items-start gap-1.5">
             {canExpand ? (
               expanded
-                ? <ChevronDown className="h-3 w-3 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-                : <ChevronRight className="h-3 w-3 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+                ? <ChevronDown className="mt-0.5 h-3 w-3 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+                : <ChevronRight className="mt-0.5 h-3 w-3 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
             ) : null}
-            <span className="min-w-0 flex-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
-              {bundle.title}
-            </span>
-            {canExpand && bundle.source_mes_code && (
-              <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {bundle.source_mes_code}
-              </span>
-            )}
-            {isSingleLineDirect && singleLineCode && (
-              <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {singleLineCode}
-              </span>
-            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+                {bundle.title}
+              </div>
+              {(bundle.source_mes_code || singleLineCode) && (
+                <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {bundle.source_mes_code ?? singleLineCode}
+                </div>
+              )}
+            </div>
           </div>
         </td>
-        {/* 수량변화 — 부모 라인 있으면 실제 입고 수량(파랑), 없으면 bundle.quantity */}
+        <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+          {isBomParent ? `하위 ${childLines.length}라인` : "단품 라인"}
+        </td>
         <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
           {headerQtyText}
         </td>
-        {/* 담당자 */}
-        <td className="hidden sm:table-cell border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-        </td>
-        {/* 메모 — 빈 셀(서식 유지) */}
-        <td className="hidden sm:table-cell border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+        <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="flex flex-wrap gap-1">
+            {shortageCount > 0 && <StatusBadge included shortage={shortageCount} />}
+            {excludedCount > 0 && <StatusBadge included={false} shortage={0} />}
+            {shortageCount === 0 && excludedCount === 0 && (
+              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+            )}
+          </div>
         </td>
       </tr>
 
-      {/* BOM 하위 라인 — 부모 자기 자신 제외, 6컬럼 정렬 */}
       {canExpand && expanded && childLines.map((line) => (
         <BomLineRow key={line.line_id} line={line} batch={batch} bundle={bundle} compact={compact} />
       ))}
@@ -243,55 +227,64 @@ function BomLineRow({ line, batch, bundle, compact }: { line: IoLine; batch: IoB
   return (
     <tr
       style={{
-        background: line.included ? "rgba(101,169,255,.02)" : "rgba(255,100,100,.03)",
-        opacity: dim ? 0.55 : 1,
+        background: line.included ? "color-mix(in srgb, var(--c-blue) 3%, transparent)" : "color-mix(in srgb, var(--c-red) 5%, transparent)",
+        opacity: dim ? 0.58 : 1,
       }}
     >
-      {/* 일시 */}
       <td className={`border-b ${padX} py-1.5`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
-      {/* 구분 — 자동차감 알약(BACKFLUSH 톤 통일) + 상태(부족/제외) 인라인 */}
       <td className={`whitespace-nowrap border-b ${padX} py-1.5 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <div className="inline-flex flex-col items-center gap-1">
-          <span
-            className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
-            style={{
-              background: "color-mix(in srgb, #fb923c 14%, transparent)",
-              color: "#fb923c",
-            }}
-          >
-            <Recycle className="h-3.5 w-3.5" />
-            자동차감
-          </span>
-          <StatusBadge included={line.included} shortage={line.shortage} />
-        </div>
+        <LineKindBadge line={line} />
       </td>
-      {/* 품목명 — └ 들여쓰기 px-4 로 통일(parent Layers/chevron 과 같은 x),
-          mes_code 는 우측 고정폭 슬롯에 좌측 정렬해서 행 간 코드 열 정렬 */}
       <td className="border-b px-4 py-1.5" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-            {line.item_name}
-          </span>
-          {line.mes_code && (
-            <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {line.mes_code}
-            </span>
-          )}
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+              {line.item_name}
+            </div>
+            {line.mes_code && (
+              <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {line.mes_code}
+              </div>
+            )}
+          </div>
         </div>
       </td>
-      {/* 수량변화 — sub_type + 부모/자식 역할 기반 부호 + 색 */}
+      <td className="whitespace-nowrap border-b px-4 py-1.5 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+        {getLineRoleLabel(line, batch)}
+      </td>
       <td className="whitespace-nowrap border-b px-4 py-1.5 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: qtyColor }}>
         {signed.label}
       </td>
-      {/* 담당자 */}
-      <td className="hidden sm:table-cell border-b px-4 py-1.5 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-      </td>
-      {/* 메모 — 빈 셀(서식 유지) */}
-      <td className="hidden sm:table-cell border-b px-4 py-1.5 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+      <td className="border-b px-4 py-1.5" style={{ borderColor: LEGACY_COLORS.border }}>
+        <StatusBadge included={line.included} shortage={line.shortage} />
       </td>
     </tr>
   );
+}
+
+function LineKindBadge({ line }: { line: IoLine }) {
+  const isAuto = line.origin === "bom_auto" || line.origin === "package_auto";
+  const color = isAuto ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2;
+  return (
+    <span
+      className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+      style={{
+        background: `color-mix(in srgb, ${color} 14%, transparent)`,
+        color: `color-mix(in srgb, ${color} 48%, ${LEGACY_COLORS.text})`,
+      }}
+    >
+      {isAuto ? <Recycle className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
+      {isAuto ? "자동차감" : "수동"}
+    </span>
+  );
+}
+
+function getLineRoleLabel(line: IoLine, batch: IoBatch): string {
+  if (line.origin === "bom_auto" || line.origin === "package_auto") {
+    return batch.sub_type === "disassemble" ? "하위 회수" : "하위 차감";
+  }
+  if (line.direction === "move") return "위치 이동";
+  if (line.direction === "adjust") return "수량 조정";
+  return line.included ? "적용" : "제외";
 }

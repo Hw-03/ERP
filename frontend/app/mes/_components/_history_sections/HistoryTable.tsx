@@ -10,7 +10,7 @@ import { EmptyState, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "./historyFormat";
 import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
-import { BatchHeader, OpBatchHeader, buildGroups, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
+import { BatchHeader, OpBatchHeader, ReferenceBatchDetail, buildGroups, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
 import { ReworkBatchHeader } from "./ReworkBatchHeader";
 import { ReworkBatchDetail } from "./ReworkBatchDetail";
@@ -33,24 +33,24 @@ type Props = {
 
 type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean; px?: string };
 
-// 평상시(우측 패널 닫힘) — 여유 간격
+// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 흐름 → 수량/재고 → 상태.
 const COLUMNS_DEFAULT: ColSpec[] = [
-  { label: "요청 일시", width: "140px", align: "center" },
-  { label: "구분", width: "130px", align: "center" },
-  { label: "품목명", minWidth: "180px" },
-  { label: "변동요약", width: "150px", align: "center" },
-  { label: "요청자", width: "130px", align: "center", hidden: true },
-  { label: "메모", width: "70px", align: "center", hidden: true },
+  { label: "일시", width: "124px", align: "center" },
+  { label: "작업", width: "132px", align: "center" },
+  { label: "대상", minWidth: "240px" },
+  { label: "흐름", width: "150px", align: "center" },
+  { label: "수량 · 재고", width: "190px", align: "center" },
+  { label: "상태 · 처리", width: "190px" },
 ];
 
-// 우측 패널 열림 — 가로 폭 좁아져 일시/구분 압축, 품목명 우선
+// 우측 패널 열림 — 대상/수량/상태가 남도록 일시·작업·흐름을 압축.
 const COLUMNS_COMPACT: ColSpec[] = [
-  { label: "요청 일시", width: "112px", align: "center", px: "px-2" },
-  { label: "구분", width: "104px", align: "center", px: "px-2" },
-  { label: "품목명", minWidth: "240px" },
-  { label: "변동요약", width: "150px", align: "center" },
-  { label: "요청자", width: "130px", align: "center", hidden: true },
-  { label: "메모", width: "70px", align: "center", hidden: true },
+  { label: "일시", width: "104px", align: "center", px: "px-2" },
+  { label: "작업", width: "116px", align: "center", px: "px-2" },
+  { label: "대상", minWidth: "220px" },
+  { label: "흐름", width: "132px", align: "center", px: "px-2" },
+  { label: "수량 · 재고", width: "172px", align: "center" },
+  { label: "상태 · 처리", width: "170px" },
 ];
 
 const VISIBLE_FETCH_CONCURRENCY = 4;
@@ -386,16 +386,12 @@ export function HistoryTable({
                       }}
                       compact={compact}
                     />
-                    {expanded &&
-                      group.logs.map((log) => (
-                        <HistoryLogRow
-                          key={log.log_id}
-                          log={log}
-                          selected={selectedLogId === log.log_id}
-                          onSelect={onSelectLog}
-                          compact={compact}
-                        />
-                      ))}
+                    {expanded && (
+                      <ReferenceBatchDetail
+                        logs={group.logs}
+                        compact={compact}
+                      />
+                    )}
                   </Fragment>
                 );
               })}

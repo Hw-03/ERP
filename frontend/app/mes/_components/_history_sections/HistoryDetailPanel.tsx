@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
+import { Activity, ArrowRight, ChevronDown, History, Package, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -19,14 +19,23 @@ import {
   getSingleLogMovement,
   parseTransactionNotes,
 } from "./historyBatchInterpreter";
-import { FlowBadge, MovementSummaryCell } from "./historyTableHelpers";
+import {
+  FlowBadge,
+  FlowSummaryCell,
+  MovementSummaryCell,
+  PeopleStatusCell,
+  QuantityStockCell,
+  TargetSummaryBlock,
+} from "./historyTableHelpers";
 import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
 import { toInventoryEffectRows, type InventoryEffectCell } from "./historyInventoryEffect";
+import { getHistoryRowPresentation } from "./historyPresentation";
 
 type Props = {
   selected: TransactionLog | null;
   onSelectLog: (log: TransactionLog) => void;
   onLogUpdated: (updated: TransactionLog) => void;
+  variant?: "default" | "desktop";
 };
 
 type FlowState =
@@ -45,6 +54,7 @@ export function HistoryDetailPanel({
   selected,
   onSelectLog,
   onLogUpdated,
+  variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
   const [cancelState, setCancelState] = useState<CancelState>({ step: "idle" });
@@ -152,6 +162,13 @@ export function HistoryDetailPanel({
     <div className="space-y-4">
       <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
 
+      {variant === "desktop" && (
+        <HistoryDetailDecisionSummary
+          log={selected}
+          batch={flow.status === "available" ? flow.batch : null}
+        />
+      )}
+
       {isCancelled && (
         <div
           className="rounded-[16px] border px-4 py-3 text-sm font-bold"
@@ -237,6 +254,36 @@ export function HistoryDetailPanel({
   );
 }
 
+function HistoryDetailDecisionSummary({
+  log,
+  batch,
+}: {
+  log: TransactionLog;
+  batch: IoBatch | null;
+}) {
+  const presentation = getHistoryRowPresentation(log, batch ?? undefined);
+  return (
+    <div className="grid gap-2 rounded-[20px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <TargetSummaryBlock
+        presentation={presentation}
+        icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+      />
+      <div className="grid gap-2 xl:grid-cols-2">
+        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>흐름</div>
+          <FlowSummaryCell presentation={presentation} />
+        </div>
+        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>수량 · 재고</div>
+          <QuantityStockCell presentation={presentation} />
+        </div>
+      </div>
+      <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+        <PeopleStatusCell presentation={presentation} />
+      </div>
+    </div>
+  );
+}
 function HistoryDetailHero({
   log,
   flow,
@@ -547,7 +594,7 @@ function Collapsible({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-3"
+        className="flex w-full items-center justify-between border-0 bg-transparent px-4 py-3 shadow-none outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
       >
         <span
           className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em]"
