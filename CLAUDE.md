@@ -187,4 +187,18 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
+## 5. Function-Level Craft (new & changed code)
+
+Each function should do one thing and do it well. When writing or changing code, prefer:
+
+1. **Pure where practical.** Take inputs as arguments, return results; don't mutate globals or shared state. Push side effects (DB, file, network) to the edges — a functional core with a thin I/O shell.
+2. **Type hints + intent docstrings.** Annotate every parameter and return. Docstrings explain *why* / the contract / the gotchas — not a restatement of the code (a stale docstring that lies is worse than none).
+3. **Business logic separated from I/O.** Keep pure validation/computation distinct from the code that reads Excel/DB/HTTP — but extract only when there's a real second consumer, not a speculative one.
+4. **Granular exceptions + no resource leaks.** Catch what you can meaningfully handle and let the rest propagate to one boundary; don't wrap everything in try/except (silent failure is worse than a crash). Always close connections/files with `with`/`finally`, or a framework construct that guarantees it (e.g. FastAPI `Depends(get_db)`).
+5. **Config/paths as top-level constants** (UPPERCASE) or externalized settings/env — not buried in function bodies. Don't hoist single-use local literals just to obey the letter of this.
+
+**Scope guardrail (overrides a naive reading of the five above):** apply these to code you are adding or changing. Do NOT retrofit them into already-clean code or one-off/dead scripts just to "improve" them — that violates #2 Simplicity First and #3 Surgical Changes. These are directions for writing well, not a checklist to force onto working code.
+
+---
+
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
