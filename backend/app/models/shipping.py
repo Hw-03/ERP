@@ -53,6 +53,7 @@ class ShippingRequest(Base):
     base_pf_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="RESTRICT"), nullable=False, index=True)
     final_pa_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="SET NULL"), nullable=True, index=True)
     final_pf_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="SET NULL"), nullable=True, index=True)
+    request_quantity = Column(IntQuantity, nullable=False, default=1, server_default="1")
     requested_by_name = Column(String(100), nullable=True)
     custom_pa_name = Column(String(200), nullable=True)
     custom_pf_name = Column(String(200), nullable=True)
@@ -165,4 +166,3 @@ class ShippingRequestEvent(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
 
     request = relationship("ShippingRequest", back_populates="events")
-

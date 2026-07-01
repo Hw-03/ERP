@@ -266,10 +266,11 @@ def _apply_common_filters(
     _md = _model_filter(db, model)
     if _md is not None:
         query = query.filter(_md)
+    request_date_expr = func.coalesce(IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at)
     if date_from:
-        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
+        query = query.filter(request_date_expr >= datetime.combine(date_from, time.min))
     if date_to:
-        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
+        query = query.filter(request_date_expr <= datetime.combine(date_to, time.max))
     if not include_archived:
         query = query.filter(TransactionLog.archived_at.is_(None))
     if search:

@@ -13,7 +13,6 @@ import {
   Pencil,
   Plus,
   RotateCcw,
-  Save,
   Send,
   Trash2,
   Truck,
@@ -33,6 +32,7 @@ function isShippingViewMode(value: string | null): value is ViewMode {
 }
 type RequestWizardStep = 1 | 2 | 3 | 4 | 5;
 type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM" };
+type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit: string };
 type PendingAction =
   | "load"
   | "save"
@@ -47,7 +47,7 @@ type PendingAction =
   | null;
 
 type ConfirmAction =
-  | { kind: "prepare"; request: ShippingRequest; companionLines: ShippingCompanionLineInput[] }
+  | { kind: "prepare"; request: ShippingRequest }
   | { kind: "cancel"; request: ShippingRequest }
   | { kind: "delete"; request: ShippingRequest }
   | { kind: "pickup"; request: ShippingRequest };
@@ -100,6 +100,16 @@ function toNumber(value: string | number) {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+function toPositiveInt(value: string | number) {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+function isValidPositiveInt(value: string | number) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1;
+}
+
 function formatDate(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleString("ko-KR", {
@@ -136,6 +146,25 @@ function requestBomLines(req: ShippingRequest): DraftLine[] {
   }));
 }
 
+function requestCompanionDraft(req: ShippingRequest): CompanionDraftLine[] {
+  return req.companion_lines.map((line) => ({
+    key: line.line_id ?? `companion-${line.item_id}`,
+    item_id: line.item_id,
+    quantity: line.quantity,
+    unit: line.unit,
+  }));
+}
+
+function companionPayload(lines: CompanionDraftLine[], itemById: Map<string, Item>): ShippingCompanionLineInput[] {
+  return lines
+    .filter((line) => line.item_id && Number(line.quantity) > 0)
+    .map((line) => ({
+      item_id: line.item_id,
+      quantity: toPositiveInt(line.quantity),
+      unit: line.unit || itemById.get(line.item_id)?.unit || "EA",
+    }));
+}
+
 export function DesktopShippingView({ onStatusChange, operator = null }: { onStatusChange: (status: string) => void; operator?: Operator | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -158,14 +187,14 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [basePfId, setBasePfId] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
+  const [requestQuantity, setRequestQuantity] = useState(1);
   const [customPaName, setCustomPaName] = useState("");
   const [customPfName, setCustomPfName] = useState("");
   const [notes, setNotes] = useState("");
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
   const [matchResult, setMatchResult] = useState<ShippingBomMatchResponse | null>(null);
-  const [prepareModalFor, setPrepareModalFor] = useState<ShippingRequest | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
-  const [companionDraft, setCompanionDraft] = useState<Array<{ key: string; item_id: string; quantity: number; unit: string }>>([]);
+  const [companionDraft, setCompanionDraft] = useState<CompanionDraftLine[]>([]);
 
   const displayItems = useMemo(() => {
     const byId = new Map<string, Item>();
@@ -338,6 +367,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
         setCustomPaName(found.custom_pa_name ?? "");
         setCustomPfName(found.custom_pf_name ?? "");
         setNotes(found.notes ?? "");
+        setRequestQuantity(found.request_quantity ?? 1);
+        setCompanionDraft(requestCompanionDraft(found));
         setDraftLines(requestBomLines(found));
         setMatchResult(null);
         setRequestWizardStep(2);
@@ -347,6 +378,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     }
     setEditingId(null);
     setRequestWizardStep(1);
+    setRequestQuantity(1);
+    setCompanionDraft([]);
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
@@ -358,6 +391,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setEditingId(null);
     setBasePfId("");
     setRequestedBy(operator?.name ?? "");
+    setRequestQuantity(1);
+    setCompanionDraft([]);
     setCustomPaName("");
     setCustomPfName("");
     setNotes("");
@@ -373,6 +408,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setCustomPaName(req.custom_pa_name ?? "");
     setCustomPfName(req.custom_pf_name ?? "");
     setNotes(req.notes ?? "");
+    setRequestQuantity(req.request_quantity ?? 1);
+    setCompanionDraft(requestCompanionDraft(req));
     setDraftLines(requestBomLines(req));
     setMatchResult(null);
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
@@ -440,10 +477,12 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
 
   function draftPayload() {
     return {
+      request_quantity: toPositiveInt(requestQuantity),
       requested_by_name: (editingId ? requestedBy.trim() : operator?.name?.trim() || requestedBy.trim()) || null,
       custom_pa_name: customPaName.trim() || null,
       custom_pf_name: customPfName.trim() || null,
       notes: notes.trim() || null,
+      companion_lines: companionPayload(companionDraft, itemById),
       bom_lines: draftLines
         .filter((line) => line.child_item_id && Number(line.quantity) > 0)
         .map((line) => ({
@@ -460,6 +499,10 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   async function saveRequest() {
     if (!basePfId) {
       onStatusChange("기준 PF를 먼저 선택하세요.");
+      return null;
+    }
+    if (!isValidPositiveInt(requestQuantity)) {
+      onStatusChange("출하 수량은 1 이상의 정수여야 합니다.");
       return null;
     }
     setPending("save");
@@ -486,6 +529,10 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   async function ensureReadyForPrep() {
     if (!basePfId) {
       onStatusChange("기준 PF를 먼저 선택하세요.");
+      return false;
+    }
+    if (!isValidPositiveInt(requestQuantity)) {
+      onStatusChange("출하 수량은 1 이상의 정수여야 합니다.");
       return false;
     }
     setPending("match");
@@ -589,40 +636,10 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     }
   }
 
-  async function updateChecklist(req: ShippingRequest, itemId: string, checked: boolean) {
-    setPending("checklist");
-    try {
-      const next = await api.updateShippingChecklist(req.request_id, { checks: [{ item_id: itemId, checked }] });
-      upsertRequest(next);
-      setSelectedPrepId(next.request_id);
-    } catch (err) {
-      onStatusChange(err instanceof Error ? err.message : "체크리스트 수정에 실패했습니다.");
-    } finally {
-      setPending(null);
-    }
+  function completePrepare(req: ShippingRequest) {
+    setConfirmAction({ kind: "prepare", request: req });
   }
 
-  async function clearChecklist(req: ShippingRequest) {
-    setPending("clear");
-    try {
-      const next = await api.clearShippingChecklist(req.request_id);
-      upsertRequest(next);
-      setSelectedPrepId(next.request_id);
-      onStatusChange("체크리스트를 전체 해제했습니다.");
-    } catch (err) {
-      onStatusChange(err instanceof Error ? err.message : "체크리스트 전체 해제에 실패했습니다.");
-    } finally {
-      setPending(null);
-    }
-  }
-
-  function completePrepare() {
-    if (!prepareModalFor) return;
-    const companionLines = companionDraft
-      .filter((line) => line.item_id && line.quantity > 0)
-      .map((line) => ({ item_id: line.item_id, quantity: line.quantity, unit: line.unit || itemById.get(line.item_id)?.unit || "EA" }));
-    setConfirmAction({ kind: "prepare", request: prepareModalFor, companionLines });
-  }
 
   function cancelPrepare(req: ShippingRequest) {
     setConfirmAction({ kind: "cancel", request: req });
@@ -639,11 +656,9 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setError(null);
     try {
       if (action.kind === "prepare") {
-        const next = await api.prepareShippingComplete(action.request.request_id, { companion_lines: action.companionLines });
+        const next = await api.prepareShippingComplete(action.request.request_id);
         upsertRequest(next);
         setSelectedPrepId(next.request_id);
-        setPrepareModalFor(null);
-        setCompanionDraft([]);
         onStatusChange("출하 준비 완료 처리했습니다.");
       } else if (action.kind === "cancel") {
         const next = await api.cancelShippingPrepare(action.request.request_id, { reason: "출하 준비 변경" });
@@ -766,6 +781,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             itemOptions={lineItemOptions}
             basePfId={basePfId}
             requestedBy={editingId ? requestedBy : operator?.name ?? requestedBy}
+            requestQuantity={requestQuantity}
+            companionDraft={companionDraft}
             customPaName={customPaName}
             customPfName={customPfName}
             notes={notes}
@@ -779,12 +796,26 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             onSelectRequest={(req) => loadRequestIntoDraft(req, "requestDetail")}
             onBasePfChange={(value) => void handleBasePfChange(value)}
             onRequestedBy={setRequestedBy}
+            onRequestQuantity={setRequestQuantity}
             onCustomPaName={setCustomPaName}
             onCustomPfName={setCustomPfName}
             onNotes={setNotes}
             onUpdateLine={updateDraftLine}
             onAddLine={addDraftLine}
             onRemoveLine={removeDraftLine}
+            onAddCompanion={(itemId) => {
+              const item = itemById.get(itemId);
+              if (!item) return;
+              setCompanionDraft((prev) => {
+                const existing = prev.find((line) => line.item_id === itemId);
+                if (existing) {
+                  return prev.map((line) => line.item_id === itemId ? { ...line, quantity: toPositiveInt(line.quantity) + 1 } : line);
+                }
+                return [...prev, { key: lineKey(), item_id: itemId, quantity: 1, unit: item.unit || "EA" }];
+              });
+            }}
+            onUpdateCompanion={(key, patch) => setCompanionDraft((prev) => prev.map((line) => line.key === key ? { ...line, ...patch } : line))}
+            onRemoveCompanion={(key) => setCompanionDraft((prev) => prev.filter((line) => line.key !== key))}
             onSave={() => void saveRequest()}
             onSend={() => void sendToPrep()}
           />
@@ -814,13 +845,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             selected={selectedPrep}
             pending={pending}
             onSelect={(req) => setSelectedPrepId(req.request_id)}
-            onEditRequest={(req) => loadRequestIntoDraft(req, "requestWork")}
-            onChecklist={(req, itemId, checked) => void updateChecklist(req, itemId, checked)}
-            onClear={(req) => void clearChecklist(req)}
-            onOpenPrepare={(req) => {
-              setPrepareModalFor(req);
-              setCompanionDraft([{ key: lineKey(), item_id: "", quantity: 1, unit: "EA" }]);
-            }}
+            onOpenPrepare={(req) => void completePrepare(req)}
             onCancel={(req) => void cancelPrepare(req)}
             onPickup={(req) => void completePickup(req)}
           />
@@ -872,22 +897,9 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
         {renderActiveView()}
       </div>
 
-      {prepareModalFor && (
-        <PrepareCompleteModal
-          request={prepareModalFor}
-          itemOptions={lineItemOptions}
-          itemById={itemById}
-          lines={companionDraft}
-          pending={pending === "prepare"}
-          onChange={setCompanionDraft}
-          onClose={() => setPrepareModalFor(null)}
-          onSubmit={() => void completePrepare()}
-        />
-      )}
       {confirmAction && (
         <ShippingActionConfirmModal
           action={confirmAction}
-          itemById={itemById}
           pending={pending === "prepare" || pending === "cancel" || pending === "pickup" || pending === "delete"}
           onClose={() => setConfirmAction(null)}
           onConfirm={() => void executeConfirmedAction()}
@@ -1050,7 +1062,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
         <div className="mt-3 min-h-0 flex-1"><LineSummary request={request} /></div>
 
         <div data-testid="shipping-detail-actions" className="mt-3 flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {canSend && <ActionButton icon={Send} label={pending === "send" ? "전환 중" : "준비 중으로 보내기"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
+          {canSend && <ActionButton icon={Send} label={pending === "send" ? "요청 중" : "출하 요청"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
           {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
           {canDelete && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
           {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
@@ -1127,6 +1139,8 @@ function RequestSection(props: {
   itemOptions: Item[];
   basePfId: string;
   requestedBy: string;
+  requestQuantity: number;
+  companionDraft: CompanionDraftLine[];
   customPaName: string;
   customPfName: string;
   notes: string;
@@ -1140,12 +1154,16 @@ function RequestSection(props: {
   onSelectRequest: (req: ShippingRequest) => void;
   onBasePfChange: (value: string) => void;
   onRequestedBy: (value: string) => void;
+  onRequestQuantity: (value: number) => void;
   onCustomPaName: (value: string) => void;
   onCustomPfName: (value: string) => void;
   onNotes: (value: string) => void;
   onUpdateLine: (key: string, patch: Partial<DraftLine>) => void;
   onAddLine: (stage: "PA" | "PF") => void;
   onRemoveLine: (key: string) => void;
+  onAddCompanion: (itemId: string) => void;
+  onUpdateCompanion: (key: string, patch: Partial<CompanionDraftLine>) => void;
+  onRemoveCompanion: (key: string) => void;
   onSave: () => void;
   onSend: () => void;
   onBack: () => void;
@@ -1168,7 +1186,9 @@ function RequestSection(props: {
         reusingExistingPf ? `기존 PF 재사용: ${props.matchResult.matched_pf_item_name ?? "-"}` : requiresPfName ? "새 PF 이름 필요" : null,
       ].filter(Boolean).join(" / ")
     : "BOM 변경 시 자동으로 동일 후보를 확인합니다.";
-  const sendDisabled = props.pending !== null || locked || !props.basePfId || missingNewBomNames || props.selectedRequest?.status === "PREPARING" || props.selectedRequest?.status === "PREPARED";
+  const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
+  const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
+  const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || props.selectedRequest?.status === "PREPARED";
   const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "저장 및 전환"];
   const basePfItem = props.pfItems.find((item) => item.item_id === props.basePfId) ?? props.itemById.get(props.basePfId);
   const matchedPaItem = props.matchResult?.matched_pa_item_id ? props.itemById.get(props.matchResult.matched_pa_item_id) : undefined;
@@ -1189,12 +1209,12 @@ function RequestSection(props: {
   const canOpenStep = (step: RequestWizardStep) => {
     if (locked && step !== props.wizardStep) return false;
     if (props.pending !== null && step !== props.wizardStep) return false;
-    if (step >= 2 && !props.basePfId) return false;
+    if (step >= 2 && (!props.basePfId || !validRequestQuantity)) return false;
     if (step >= 4 && missingNewBomNames) return false;
     return true;
   };
   const canGoNext = props.pending === null && !locked && (
-    props.wizardStep === 1 ? Boolean(props.basePfId) :
+    props.wizardStep === 1 ? Boolean(props.basePfId && validRequestQuantity) :
     props.wizardStep === 3 ? !missingNewBomNames :
     props.wizardStep < 5
   );
@@ -1258,20 +1278,36 @@ function RequestSection(props: {
 
         <div data-testid="shipping-work-area" className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {props.wizardStep === 1 && (
-            <WorkStep number={1} title="기준 PF 선택" body="출하할 최종 PF를 먼저 선택하면 기본 PF/PA 구성이 준비됩니다." dataTestId="shipping-wizard-step-1" showHeader={false}>
+            <WorkStep number={1} title="기준 PF 선택" body="출하할 최종 PF와 수량을 지정합니다." dataTestId="shipping-wizard-step-1" showHeader={false}>
               <div className="flex h-full min-h-0 flex-col gap-3">
-                <Field label="PF 검색">
-                  <input
-                    data-testid="shipping-pf-search"
-                    aria-label="PF 검색"
-                    value={pfQuery}
-                    disabled={locked || props.pending !== null}
-                    onChange={(event) => setPfQuery(event.target.value)}
-                    className="h-12 w-full min-w-0 rounded-[12px] border px-3 text-sm font-bold outline-none focus-visible:ring-2"
-                    style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                    placeholder="PF 코드/품명 검색"
-                  />
-                </Field>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
+                  <Field label="PF 검색">
+                    <input
+                      data-testid="shipping-pf-search"
+                      aria-label="PF 검색"
+                      value={pfQuery}
+                      disabled={locked || props.pending !== null}
+                      onChange={(event) => setPfQuery(event.target.value)}
+                      className="h-12 w-full min-w-0 rounded-[12px] border px-3 text-sm font-bold outline-none focus-visible:ring-2"
+                      style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                      placeholder="PF 코드/품명 검색"
+                    />
+                  </Field>
+                  <Field label="출하 수량">
+                    <input
+                      data-testid="shipping-request-quantity"
+                      aria-label="출하 수량"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={props.requestQuantity}
+                      disabled={locked || props.pending !== null}
+                      onChange={(event) => props.onRequestQuantity(Number(event.target.value))}
+                      className="h-12 w-full min-w-0 rounded-[12px] border px-3 text-right text-sm font-black outline-none focus-visible:ring-2"
+                      style={{ background: LEGACY_COLORS.bg, borderColor: validRequestQuantity ? LEGACY_COLORS.border : LEGACY_COLORS.red, color: LEGACY_COLORS.text }}
+                    />
+                  </Field>
+                </div>
                 <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto rounded-[14px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   {props.pfItemsLoading ? (
                     <EmptyState title="PF 후보를 불러오는 중입니다." body="잠시만 기다려주세요." />
@@ -1307,13 +1343,14 @@ function RequestSection(props: {
           )}
 
           {props.wizardStep === 2 && (
-            <WorkStep number={2} title="BOM 구성 조정" body="기본 구성은 제외로 남기고, 필요한 품목은 PA/PF 묶음에 추가합니다." dataTestId="shipping-wizard-step-2">
+            <WorkStep number={2} title="BOM 구성 조정" body="기본 구성은 제외하고, 필요한 품목과 동반 출하품은 검색해서 추가합니다." dataTestId="shipping-wizard-step-2">
               {!props.basePfId ? (
                 <EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 PA 구성품과 PF 구성품을 나눠 보여줍니다." />
               ) : (
-                <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-2">
+                <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_360px]">
                   <BomEditor title="PA 구성품" stage="PA" lines={grouped.PA} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
                   <BomEditor title="PF 구성품" stage="PF" lines={grouped.PF} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
+                  <CompanionEditor lines={props.companionDraft} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onAdd={props.onAddCompanion} onUpdate={props.onUpdateCompanion} onRemove={props.onRemoveCompanion} />
                 </div>
               )}
             </WorkStep>
@@ -1357,22 +1394,25 @@ function RequestSection(props: {
           )}
 
           {props.wizardStep === 5 && (
-            <WorkStep number={5} title="저장 및 전환" body="요청 내용을 저장하거나 바로 준비 중으로 보냅니다." dataTestId="shipping-wizard-step-5">
+            <WorkStep number={5} title="저장 및 전환" body="요청 내용을 확인한 뒤 출하 요청을 등록합니다." dataTestId="shipping-wizard-step-5">
               <div data-testid="shipping-final-summary" className="grid content-start gap-3">
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-4">
                   <Metric label="기준 PF" value={basePfItem ? itemCodeText(basePfItem) + " · " + basePfItem.item_name : "미선택"} />
+                  <Metric label="출하 수량" value={`${toPositiveInt(props.requestQuantity)}대`} />
                   <Metric label="PA 구성" value={grouped.PA.filter((line) => line.included).length + "개 포함"} />
-                  <Metric label="PF 구성" value={grouped.PF.filter((line) => line.included).length + "개 포함"} />
+                  <Metric label="PF/동반" value={`${grouped.PF.filter((line) => line.included).length}개 / ${props.companionDraft.length}개`} />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <FinalItemCard label={finalPaSummary.label} name={finalPaSummary.name} code={finalPaSummary.code} tone={reusingExistingPa ? LEGACY_COLORS.green : requiresPaName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
                   <FinalItemCard label={finalPfSummary.label} name={finalPfSummary.name} code={finalPfSummary.code} tone={reusingExistingPf ? LEGACY_COLORS.green : requiresPfName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
                 </div>
-                <Notice tone={LEGACY_COLORS.cyan} title="마지막 확인" body="저장하면 위 구성으로 요청 목록에 남고, 준비 중으로 보내면 저장 후 준비 체크 화면으로 이동합니다." />
+                <CompanionFinalSummary lines={props.companionDraft} itemById={props.itemById} />
+                <Notice tone={LEGACY_COLORS.cyan} title="마지막 확인" body={finalActionIsUpdateOnly ? "변경사항을 반영해 현재 준비 중 요청을 갱신합니다." : "출하 요청을 등록하면 바로 준비 중 화면으로 이동합니다."} />
               </div>
             </WorkStep>
           )}
         </div>
+
 
         <div data-testid="shipping-wizard-action-bar" className="mt-3 grid items-center gap-2 rounded-[14px] border p-3 md:grid-cols-[auto_minmax(0,1fr)_auto]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           <button type="button" onClick={goPrev} disabled={props.wizardStep === 1 || props.pending !== null} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-4 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>이전</button>
@@ -1381,10 +1421,14 @@ function RequestSection(props: {
             {props.wizardStep < 5 ? (
               <button type="button" data-testid="shipping-wizard-next" onClick={goNext} disabled={!canGoNext} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-5 py-2 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: tint(LEGACY_COLORS.blue, 16), borderColor: tint(LEGACY_COLORS.blue, 48), color: LEGACY_COLORS.blue }}>다음</button>
             ) : (
-              <>
-                <ActionButton icon={Save} label={props.pending === "save" ? "저장 중" : "요청 저장"} tone={LEGACY_COLORS.blue} onClick={props.onSave} disabled={!props.basePfId || locked || props.pending !== null} />
-                <PrimaryActionButton icon={Send} label={props.pending === "send" ? "전환 중" : "준비 중으로 보내기"} tone={LEGACY_COLORS.green} onClick={props.onSend} disabled={sendDisabled} dataTestId="shipping-send-to-prep" />
-              </>
+              <PrimaryActionButton
+                icon={finalActionIsUpdateOnly ? CheckCircle2 : Send}
+                label={finalActionIsUpdateOnly ? (props.pending === "save" ? "반영 중" : "변경사항 반영") : (props.pending === "send" ? "요청 중" : "출하 요청")}
+                tone={finalActionIsUpdateOnly ? LEGACY_COLORS.blue : LEGACY_COLORS.green}
+                onClick={finalActionIsUpdateOnly ? props.onSave : props.onSend}
+                disabled={finalActionDisabled}
+                dataTestId="shipping-send-to-prep"
+              />
             )}
           </div>
         </div>
@@ -1399,9 +1443,6 @@ function PrepSection({
   selected,
   pending,
   onSelect,
-  onEditRequest,
-  onChecklist,
-  onClear,
   onOpenPrepare,
   onCancel,
   onPickup,
@@ -1411,102 +1452,69 @@ function PrepSection({
   selected: ShippingRequest | null;
   pending: PendingAction;
   onSelect: (req: ShippingRequest) => void;
-  onEditRequest: (req: ShippingRequest) => void;
-  onChecklist: (req: ShippingRequest, itemId: string, checked: boolean) => void;
-  onClear: (req: ShippingRequest) => void;
   onOpenPrepare: (req: ShippingRequest) => void;
   onCancel: (req: ShippingRequest) => void;
   onPickup: (req: ShippingRequest) => void;
 }) {
-  const checklistGroups = useMemo(() => {
-    const groups: Record<"PF" | "PA", ShippingRequest["checklist_lines"]> = { PF: [], PA: [] };
-    if (!selected) return groups;
-    const stageByItem = new Map(selected.bom_lines.filter((line) => line.included).map((line) => [line.child_item_id, line.parent_stage]));
-    selected.checklist_lines.forEach((line) => {
-      const stage = stageByItem.get(line.item_id) ?? "PA";
-      groups[stage].push(line);
-    });
-    return groups;
-  }, [selected]);
+  const requestQty = selected?.request_quantity ?? 1;
+  const paLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PA") ?? [];
+  const pfLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PF") ?? [];
 
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[360px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
       {showList && (
-      <Panel>
-        <PanelTitle icon={ClipboardCheck} title="준비 작업" subtitle="준비할 제품을 선택해 체크리스트를 사용합니다." />
-        <div className="mt-3 flex flex-col gap-2">
-          {requests.length === 0 ? (
-            <EmptyState title="준비 중 요청 없음" body="출하 요청을 준비 중으로 보내면 여기에 표시됩니다." />
-          ) : (
-            requests.map((req) => (
-              <RequestRow key={req.request_id} request={req} active={selected?.request_id === req.request_id} onClick={() => onSelect(req)} />
-            ))
-          )}
-        </div>
-      </Panel>
+        <Panel>
+          <PanelTitle icon={ClipboardCheck} title="준비 작업" subtitle="PC에서는 출하 수량과 구성 요약을 확인합니다." />
+          <div className="mt-3 flex flex-col gap-2">
+            {requests.length === 0 ? (
+              <EmptyState title="준비 중 요청 없음" body="출하 요청을 만들면 여기에 표시됩니다." />
+            ) : (
+              requests.map((req) => (
+                <RequestRow key={req.request_id} request={req} active={selected?.request_id === req.request_id} onClick={() => onSelect(req)} />
+              ))
+            )}
+          </div>
+        </Panel>
       )}
 
-      <Panel dataTestId="shipping-prep-detail">
+      <Panel dataTestId="shipping-prep-detail" className="flex min-h-0 flex-col">
         {!selected ? (
-          <EmptyState title="선택된 준비 작업 없음" body="왼쪽 목록에서 준비 작업을 선택하세요." />
+          <EmptyState title="선택된 준비 작업 없음" body="준비 작업을 선택하세요." />
         ) : (
-          <div className="flex min-h-0 flex-col gap-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <PanelTitle icon={Truck} title={selected.base_pf_item_name} subtitle={`요청자 ${selected.requested_by_name ?? "-"} · ${formatDate(selected.created_at)}`} />
+              <PanelTitle icon={Truck} title={selected.base_pf_item_name} subtitle={`총 ${requestQty}대 출하 · 요청자 ${selected.requested_by_name ?? "-"} · ${formatDate(selected.created_at)}`} />
               <StatusBadge status={selected.status} />
             </div>
 
             {selected.notes && <Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={selected.notes} />}
-            {selected.status === "PREPARED" && <Notice tone={LEGACY_COLORS.yellow} title="체크리스트 잠김" body="준비 완료 상태입니다. 구성품 체크를 다시 바꾸려면 먼저 준비 완료 취소를 누르세요." />}
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>구성품 체크리스트</div>
-                  <ActionButton icon={RotateCcw} label="전체 해제" tone={LEGACY_COLORS.yellow} onClick={() => onClear(selected)} disabled={pending !== null || selected.status !== "PREPARING" || selected.checklist_lines.length === 0} dataTestId="shipping-clear-checklist" />
-                </div>
-                <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  체크는 준비 보조용입니다. 미체크 항목이 있어도 준비 완료 처리는 가능합니다.
-                </div>
-                <div className="grid gap-2">
-                  {selected.checklist_lines.length === 0 ? (
-                    <EmptyState title="체크할 구성품 없음" body="실제 포함 구성품이 없거나 AF만 포함된 요청입니다." />
-                  ) : (
-                    (["PF", "PA"] as const).map((stage) => (
-                      <div key={stage} className="grid gap-2 rounded-[12px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                        <div className="text-sm font-black" style={{ color: stage === "PF" ? LEGACY_COLORS.blue : LEGACY_COLORS.green }}>{stage} 구성품</div>
-                        {checklistGroups[stage].length === 0 ? (
-                          <div className="rounded-[10px] border px-3 py-3 text-xs font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            체크할 구성품이 없습니다.
-                          </div>
-                        ) : (
-                          checklistGroups[stage].map((line) => (
-                            <ChecklistLineRow key={line.line_id} line={line} request={selected} pending={pending} onChecklist={onChecklist} />
-                          ))
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <ActionButton icon={ClipboardList} label="요청/BOM 수정" tone={LEGACY_COLORS.blue} onClick={() => onEditRequest(selected)} disabled={selected.status !== "PREPARING" || pending !== null} />
-                {selected.status === "PREPARING" && (
-                  <ActionButton icon={PackageCheck} label="준비 완료" tone={LEGACY_COLORS.green} onClick={() => onOpenPrepare(selected)} disabled={pending !== null} />
-                )}
-                {selected.status === "PREPARED" && (
-                  <>
-                    <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onCancel(selected)} disabled={pending !== null} />
-                    <ActionButton icon={Truck} label={pending === "pickup" ? "처리 중" : "픽업 완료"} tone={LEGACY_COLORS.purple} onClick={() => onPickup(selected)} disabled={pending !== null} />
-                  </>
-                )}
-              </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <Metric label="출하 수량" value={`${requestQty}대`} />
+              <Metric label="PA 구성품" value={`${paLines.length}개 품목`} />
+              <Metric label="PF 구성품" value={`${pfLines.length}개 품목`} />
             </div>
 
-            <LineSummary request={selected} />
+            <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
+              <PrepRequirementList title="PA 구성품" lines={paLines} requestQuantity={requestQty} tone={LEGACY_COLORS.green} />
+              <PrepRequirementList title="PF 구성품" lines={pfLines} requestQuantity={requestQty} tone={LEGACY_COLORS.blue} />
+              <CompanionPrepList lines={selected.companion_lines} />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              {selected.status === "PREPARING" && (
+                <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onOpenPrepare(selected)} disabled={pending !== null} />
+              )}
+              {selected.status === "PREPARED" && (
+                <>
+                  <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onCancel(selected)} disabled={pending !== null} />
+                  <ActionButton icon={Truck} label={pending === "pickup" ? "처리 중" : "픽업 완료"} tone={LEGACY_COLORS.purple} onClick={() => onPickup(selected)} disabled={pending !== null} />
+                </>
+              )}
+            </div>
+
             {selected.status === "PREPARED" && (
-              <TransactionLogList title="재고 반영 내역" logs={selected.transactions.filter((log) => log.shipping_phase === "PREPARE")} />
+              <TransactionLogList title="재고 반영 이력" logs={selected.transactions.filter((log) => log.shipping_phase === "PREPARE")} />
             )}
           </div>
         )}
@@ -1515,39 +1523,50 @@ function PrepSection({
   );
 }
 
-function ChecklistLineRow({
-  line,
-  request,
-  pending,
-  onChecklist,
-}: {
-  line: ShippingRequest["checklist_lines"][number];
-  request: ShippingRequest;
-  pending: PendingAction;
-  onChecklist: (req: ShippingRequest, itemId: string, checked: boolean) => void;
-}) {
+function PrepRequirementList({ title, lines, requestQuantity, tone }: { title: string; lines: ShippingRequest["bom_lines"]; requestQuantity: number; tone: string }) {
   return (
-    <label
-      className="flex min-h-[54px] items-center gap-3 rounded-[12px] border px-3 py-2"
-      style={{ background: LEGACY_COLORS.s1, borderColor: line.checked ? LEGACY_COLORS.green : LEGACY_COLORS.border }}
-    >
-      <input
-        type="checkbox"
-        data-testid={`shipping-check-${line.item_id}`}
-        aria-label={`${line.item_name} 체크`}
-        checked={line.checked}
-        disabled={pending !== null || request.status !== "PREPARING"}
-        onChange={(event) => onChecklist(request, line.item_id, event.target.checked)}
-        className="h-5 w-5"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</span>
-        <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "-"} · {line.quantity}{line.quantity ? ` ${line.process_type_code ?? ""}` : ""}</span>
-      </span>
-      {line.checked ? <CheckCircle2 className="h-5 w-5" style={{ color: LEGACY_COLORS.green }} /> : <XCircle className="h-5 w-5" style={{ color: LEGACY_COLORS.muted2 }} />}
-    </label>
+    <div className="flex min-h-0 flex-col rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-2 text-sm font-black" style={{ color: tone }}>{title}</div>
+      <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
+        {lines.length === 0 ? (
+          <div className="flex min-h-[88px] items-center justify-center rounded-[12px] border text-xs font-bold" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>구성품 없음</div>
+        ) : (
+          lines.map((line) => (
+            <div key={line.line_id ?? `${line.parent_stage}-${line.child_item_id}`} className="rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <span>{line.mes_code ?? "코드 없음"}</span>
+                <span>1대 기준 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</span>
+                <span>총 필요 {line.quantity * requestQuantity}{line.unit ? ` ${line.unit}` : ""}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
+
+function CompanionPrepList({ lines }: { lines: ShippingRequest["companion_lines"] }) {
+  return (
+    <div className="flex min-h-0 flex-col rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.purple }}>카톤·동반 출하품</div>
+      <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
+        {lines.length === 0 ? (
+          <div className="flex min-h-[88px] items-center justify-center rounded-[12px] border text-xs font-bold" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>입력 없음</div>
+        ) : (
+          lines.map((line) => (
+            <div key={line.line_id ?? line.item_id} className="rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+              <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "코드 없음"} · 총 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HistorySection({ showList = true, rows, selected, onSelect }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; onSelect: (req: ShippingRequest) => void }) {
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[420px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
@@ -1597,6 +1616,118 @@ function HistorySection({ showList = true, rows, selected, onSelect }: { showLis
           </div>
         )}
       </Panel>
+    </div>
+  );
+}
+
+function CompanionEditor({
+  lines,
+  itemById,
+  itemOptions,
+  disabled,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  lines: CompanionDraftLine[];
+  itemById: Map<string, Item>;
+  itemOptions: Item[];
+  disabled: boolean;
+  onAdd: (itemId: string) => void;
+  onUpdate: (key: string, patch: Partial<CompanionDraftLine>) => void;
+  onRemove: (key: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => filterItems(itemOptions, query).slice(0, 30), [itemOptions, query]);
+  return (
+    <div data-testid="shipping-companion-editor" className="flex min-h-0 flex-col rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-2 text-base font-black" style={{ color: LEGACY_COLORS.text }}>카톤·동반 출하품</div>
+      <input
+        data-testid="shipping-companion-search"
+        aria-label="카톤·동반 출하품 검색"
+        value={query}
+        disabled={disabled}
+        onChange={(event) => setQuery(event.target.value)}
+        className="h-10 w-full min-w-0 rounded-[10px] border px-3 text-sm font-bold outline-none"
+        style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        placeholder="품목코드/품명 검색"
+      />
+      {query.trim() && (
+        <div className="mt-2 grid max-h-36 gap-1 overflow-y-auto rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+          {filtered.length === 0 ? (
+            <div className="px-3 py-3 text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>검색 결과 없음</div>
+          ) : (
+            filtered.map((item) => (
+              <button
+                key={item.item_id}
+                type="button"
+                onClick={() => { onAdd(item.item_id); setQuery(""); }}
+                disabled={disabled}
+                className="flex min-h-10 items-center justify-between gap-2 rounded-[10px] px-2 text-left text-xs font-bold hover:brightness-110 disabled:opacity-45"
+                style={{ background: LEGACY_COLORS.s1, color: LEGACY_COLORS.text }}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate">{item.item_name}</span>
+                  <span className="block truncate" style={{ color: LEGACY_COLORS.muted2 }}>{item.mes_code ?? item.process_type_code ?? "-"}</span>
+                </span>
+                <span className="shrink-0 rounded-full px-2 py-1 font-black" style={{ background: tint(LEGACY_COLORS.blue, 14), color: LEGACY_COLORS.blue }}>추가</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+      <div className="mt-2 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
+        {lines.length === 0 ? (
+          <div className="flex min-h-[88px] items-center justify-center rounded-[12px] border text-xs font-bold" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>추가된 동반 출하품 없음</div>
+        ) : (
+          lines.map((line) => {
+            const item = itemById.get(line.item_id);
+            return (
+              <div key={line.key} className="grid gap-2 rounded-[12px] border p-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
+                  <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "코드 없음"}</div>
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_42px] gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    value={line.quantity}
+                    disabled={disabled}
+                    aria-label={`${item?.item_name ?? "동반 출하품"} 수량`}
+                    onChange={(event) => onUpdate(line.key, { quantity: toPositiveInt(event.target.value), unit: item?.unit ?? line.unit ?? "EA" })}
+                    className="h-9 rounded-[9px] border px-2 text-right text-sm font-black outline-none"
+                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  />
+                  <button type="button" aria-label={`${item?.item_name ?? "동반 출하품"} 제거`} onClick={() => onRemove(line.key)} disabled={disabled} className="inline-flex h-9 items-center justify-center rounded-[9px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CompanionFinalSummary({ lines, itemById }: { lines: CompanionDraftLine[]; itemById: Map<string, Item> }) {
+  if (lines.length === 0) return <EmptyState title="동반 출하품 없음" body="카톤이나 추가 출하품이 필요하면 2단계에서 추가하세요." />;
+  return (
+    <div className="grid gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>카톤·동반 출하품</div>
+      <div className="grid gap-2 md:grid-cols-2">
+        {lines.map((line) => {
+          const item = itemById.get(line.item_id);
+          return (
+            <div key={line.key} className="rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
+              <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "코드 없음"} · 총 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1812,39 +1943,38 @@ function CompanionSummary({ lines }: { lines: SummaryDisplayLine[] }) {
 
 function ShippingActionConfirmModal({
   action,
-  itemById,
   pending,
   onClose,
   onConfirm,
 }: {
   action: ConfirmAction;
-  itemById: Map<string, Item>;
   pending: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const title = action.kind === "prepare" ? "준비 완료 확인" : action.kind === "cancel" ? "준비 완료 취소 확인" : action.kind === "delete" ? "요청 취소 확인" : "픽업 완료 확인";
   const tone = action.kind === "prepare" ? LEGACY_COLORS.green : action.kind === "cancel" ? LEGACY_COLORS.yellow : action.kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
+  const requestQty = action.request.request_quantity ?? 1;
   const description = action.kind === "prepare"
-    ? "AF와 하위 자재를 차감하고 최종 PA/PF 생산 로그를 남깁니다. 준비 완료 취소로 원복할 수 있습니다."
+    ? "요청 수량만큼 하위 자재를 반영하고 최종 PA/PF 생산 로그를 남깁니다. 동반 출하품은 요청에 저장된 항목을 사용합니다."
     : action.kind === "cancel"
       ? "준비 완료 때 생성된 입출고 로그를 역재생해 재고를 원복합니다."
       : action.kind === "delete"
         ? action.request.status === "PREPARING"
-          ? "재고 반영 전 요청이므로 요청과 준비 체크 내역이 삭제됩니다."
+          ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."
           : "요청 상태의 출하 요청을 목록에서 삭제합니다. 이력은 남지 않습니다."
-        : "최종 PF 1개와 카톤·동반 출하품을 출하 차감합니다. v1에서는 픽업 완료 후 취소 기능이 없습니다.";
+        : "최종 PF와 동반 출하품을 출하 처리합니다. v1에서는 픽업 완료 후 취소 기능이 없습니다.";
   const lines = action.kind === "prepare"
     ? [
-        ...action.request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} x ${line.quantity}`),
-        ...action.companionLines.map((line) => `동반 · ${itemById.get(line.item_id)?.item_name ?? "품목"} x ${line.quantity}`),
+        ...action.request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} · 1대 ${line.quantity}${line.unit ? ` ${line.unit}` : ""} / 총 ${line.quantity * requestQty}${line.unit ? ` ${line.unit}` : ""}`),
+        ...action.request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`),
       ]
     : action.kind === "cancel"
       ? action.request.transactions.filter((log) => log.shipping_phase === "PREPARE" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
       : action.kind === "delete"
         ? [`기준 PF · ${action.request.base_pf_item_name}`]
         : [
-          `최종 PF · ${action.request.final_pf_item_name ?? action.request.base_pf_item_name} x 1`,
+          `최종 PF · ${action.request.final_pf_item_name ?? action.request.base_pf_item_name} x ${requestQty}`,
           ...action.request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}`),
         ];
 
@@ -1860,7 +1990,7 @@ function ShippingActionConfirmModal({
         </div>
         <div className="mt-3 grid max-h-[260px] gap-1 overflow-y-auto rounded-[12px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {lines.length === 0 ? (
-            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>표시할 품목 내역이 없습니다.</div>
+            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>표시할 항목이 없습니다.</div>
           ) : (
             lines.map((line, index) => (
               <div key={`${line}-${index}`} className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line}</div>
@@ -1872,98 +2002,6 @@ function ShippingActionConfirmModal({
             닫기
           </button>
           <ActionButton icon={CheckCircle2} label={pending ? "처리 중" : "확인 후 실행"} tone={tone} onClick={onConfirm} disabled={pending} dataTestId="shipping-confirm-action" />
-        </div>
-      </div>
-    </div>
-  );
-}
-function PrepareCompleteModal({
-  request,
-  itemOptions,
-  itemById,
-  lines,
-  pending,
-  onChange,
-  onClose,
-  onSubmit,
-}: {
-  request: ShippingRequest;
-  itemOptions: Item[];
-  itemById: Map<string, Item>;
-  lines: Array<{ key: string; item_id: string; quantity: number; unit: string }>;
-  pending: boolean;
-  onChange: (lines: Array<{ key: string; item_id: string; quantity: number; unit: string }>) => void;
-  onClose: () => void;
-  onSubmit: () => void;
-}) {
-  const [query, setQuery] = useState("");
-  const filteredItemOptions = useMemo(() => filterItems(itemOptions, query), [itemOptions, query]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "color-mix(in srgb, var(--c-bg) 72%, transparent)" }}>
-      <div className="w-full max-w-2xl rounded-[22px] border p-5 shadow-xl" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-        <div className="flex items-start justify-between gap-3">
-          <PanelTitle icon={PackageCheck} title="준비 완료 처리" subtitle={`${request.base_pf_item_name} · 카톤과 동반 출하품을 입력합니다.`} />
-          <button type="button" onClick={onClose} className="rounded-[10px] border px-3 py-2 text-sm font-black" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-            닫기
-          </button>
-        </div>
-        <div className="mt-4 grid gap-2">
-          <input
-            aria-label="동반 출하품 검색"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="h-10 w-full min-w-0 rounded-[10px] border px-3 text-sm font-bold outline-none"
-            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            placeholder="카톤/동반 출하품 코드·품명 검색"
-          />
-          {lines.map((line) => (
-            <div key={line.key} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_90px_40px]">
-                            <AppSelect
-                value={line.item_id}
-                onChange={(value) => {
-                  const item = itemById.get(value);
-                  onChange(lines.map((row) => (row.key === line.key ? { ...row, item_id: value, unit: item?.unit ?? "EA" } : row)));
-                }}
-                options={[
-                  ...(line.item_id && !filteredItemOptions.some((item) => item.item_id === line.item_id)
-                    ? [{ value: line.item_id, label: itemLabel(itemById.get(line.item_id)) }]
-                    : []),
-                  ...filteredItemOptions.map((item) => ({ value: item.item_id, label: itemLabel(item) })),
-                ]}
-                placeholder="동반 출하품 선택"
-                size="md"
-                triggerAriaLabel="동반 출하품 선택"
-                triggerStyle={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              />
-              <input
-                type="number"
-                min={1}
-                value={line.quantity}
-                onChange={(event) => onChange(lines.map((row) => (row.key === line.key ? { ...row, quantity: toNumber(event.target.value) } : row)))}
-                className="h-10 rounded-[10px] border px-3 text-right text-sm font-black outline-none"
-                style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              />
-              <button
-                type="button"
-                aria-label="동반 출하품 삭제"
-                onClick={() => onChange(lines.filter((row) => row.key !== line.key))}
-                className="flex h-10 w-10 items-center justify-center rounded-[10px] border"
-                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap justify-between gap-2">
-          <ActionButton
-            icon={Plus}
-            label="동반 출하품 추가"
-            tone={LEGACY_COLORS.cyan}
-            onClick={() => onChange([...lines, { key: lineKey(), item_id: "", quantity: 1, unit: "EA" }])}
-            disabled={pending}
-          />
-          <ActionButton icon={CheckCircle2} label={pending ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={onSubmit} disabled={pending} />
         </div>
       </div>
     </div>

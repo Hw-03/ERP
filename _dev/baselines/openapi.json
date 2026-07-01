@@ -5899,6 +5899,20 @@
             ],
             "title": "Bom Lines"
           },
+          "companion_lines": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ShippingCompanionLineInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Companion Lines"
+          },
           "custom_pa_name": {
             "anyOf": [
               {
@@ -5933,6 +5947,12 @@
               }
             ],
             "title": "Notes"
+          },
+          "request_quantity": {
+            "default": 1,
+            "exclusiveMinimum": 0.0,
+            "title": "Request Quantity",
+            "type": "integer"
           },
           "requested_by_name": {
             "anyOf": [
@@ -6120,6 +6140,11 @@
             "title": "Request Id",
             "type": "string"
           },
+          "request_quantity": {
+            "default": 1,
+            "title": "Request Quantity",
+            "type": "integer"
+          },
           "requested_by_name": {
             "anyOf": [
               {
@@ -6190,6 +6215,20 @@
             ],
             "title": "Bom Lines"
           },
+          "companion_lines": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ShippingCompanionLineInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Companion Lines"
+          },
           "custom_pa_name": {
             "anyOf": [
               {
@@ -6224,6 +6263,18 @@
               }
             ],
             "title": "Notes"
+          },
+          "request_quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Quantity"
           },
           "requested_by_name": {
             "anyOf": [

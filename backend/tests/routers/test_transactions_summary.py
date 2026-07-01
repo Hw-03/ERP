@@ -7,6 +7,7 @@ list_transactions 와 동일한 필터를 받지만 row 가 아니라 카운트 
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from app.models import (
@@ -41,6 +42,9 @@ def _seed_batch_log(
     from_department: str | None = None,
     sub_type: str = "produce",
     transfer_qty: Decimal | None = None,
+    batch_created_at: datetime | None = None,
+    submitted_at: datetime | None = None,
+    log_created_at: datetime | None = None,
 ) -> None:
     """IoBatch 가 붙은 거래. 부서 라벨은 COALESCE(to, from).
 
@@ -64,6 +68,8 @@ def _seed_batch_log(
         requester_department=emp.department,
         to_department=to_department,
         from_department=from_department,
+        created_at=batch_created_at,
+        submitted_at=submitted_at,
     )
     db_session.add(batch)
     db_session.flush()
@@ -76,6 +82,7 @@ def _seed_batch_log(
             quantity_after=qty,
             operation_batch_id=batch.batch_id,
             transfer_qty=transfer_qty,
+            created_at=log_created_at,
         )
     )
 
@@ -219,6 +226,30 @@ def test_list_department_filter(client, db_session, make_item):
     assert len(rows) == 1
     assert rows[0]["transaction_type"] == "PRODUCE"
 
+
+
+def test_transactions_date_filter_uses_display_request_date(client, db_session, make_item):
+    """Date filters follow the request date shown in the history table."""
+    item = make_item(name="request-date-filter-item", warehouse_qty=Decimal("0"))
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.SHIP,
+        Decimal("-1"),
+        submitted_at=datetime(2026, 7, 1, 8, 14),
+        log_created_at=datetime(2026, 6, 30, 23, 14),
+    )
+    db_session.commit()
+
+    res = client.get("/api/inventory/transactions", params={"date_from": "2026-07-01"})
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert len(rows) == 1
+    assert rows[0]["requested_at"].startswith("2026-07-01T08:14")
+
+    res = client.get("/api/inventory/transactions/summary", params={"date_from": "2026-07-01"})
+    assert res.status_code == 200, res.text
+    assert res.json()["total"] == 1
 
 def test_summary_process_step_filter(client, db_session, make_item):
     """process_step = process_type_code 마지막 글자(R/A/F) IN 필터."""

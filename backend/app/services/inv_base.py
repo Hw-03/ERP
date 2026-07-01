@@ -24,16 +24,22 @@ from app.models import (
 # process_type_code → 부서 자동 매핑 (PRODUCE 결과물 적재용)
 # ---------------------------------------------------------------------------
 PROCESS_TYPE_TO_DEPT: dict[str, DepartmentEnum] = {
+    "TR": DepartmentEnum.TUBE,
     "TA": DepartmentEnum.TUBE,
     "TF": DepartmentEnum.TUBE,
+    "HR": DepartmentEnum.HIGH_VOLTAGE,
     "HA": DepartmentEnum.HIGH_VOLTAGE,
     "HF": DepartmentEnum.HIGH_VOLTAGE,
+    "VR": DepartmentEnum.VACUUM,
     "VA": DepartmentEnum.VACUUM,
     "VF": DepartmentEnum.VACUUM,
+    "NR": DepartmentEnum.TUNING,
     "NA": DepartmentEnum.TUNING,
     "NF": DepartmentEnum.TUNING,
+    "AR": DepartmentEnum.ASSEMBLY,
     "AA": DepartmentEnum.ASSEMBLY,
     "AF": DepartmentEnum.ASSEMBLY,
+    "PR": DepartmentEnum.SHIPPING,
     "PA": DepartmentEnum.SHIPPING,
     "PF": DepartmentEnum.SHIPPING,
 }

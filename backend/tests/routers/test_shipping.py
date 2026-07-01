@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from decimal import Decimal
 
-from app.models import ShippingRequestStatusEnum
+from app.models import DepartmentEnum, ShippingRequestStatusEnum
 
 
 def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
@@ -16,7 +16,7 @@ def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
     }
 
 
-def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, make_bom):
+def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, make_bom, make_location):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
     pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=2)
     carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("3"), model_symbol="4", serial_no=3)
@@ -24,6 +24,9 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     base_pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
     make_bom(base_pa.item_id, af.item_id, Decimal("1"))
     make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    make_location(pouch.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
+    make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     db_session.commit()
 
     create = client.post(
@@ -33,12 +36,17 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
             "requested_by_name": "shipping-user",
             "custom_pa_name": "Base PF with Pouch PA",
             "custom_pf_name": "Base PF with Pouch",
+            "request_quantity": 2,
+            "companion_lines": [{"item_id": str(carton.item_id), "quantity": 2, "unit": "EA"}],
             "bom_lines": [_line(af), _line(pouch)],
         },
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
     assert create.json()["status"] == ShippingRequestStatusEnum.REQUESTED.value
+    assert create.json()["request_quantity"] == 2
+    assert create.json()["companion_lines"][0]["item_name"] == "Carton"
+    assert create.json()["companion_lines"][0]["quantity"] == 2
     assert len(create.json()["bom_lines"]) == 3
 
     prep = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
@@ -57,7 +65,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     prepared = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
-        json={"companion_lines": [{"item_id": str(carton.item_id), "quantity": 1, "unit": "EA"}]},
+        json={},
     )
     assert prepared.status_code == 200, prepared.text
     assert prepared.json()["status"] == ShippingRequestStatusEnum.PREPARED.value
@@ -73,7 +81,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     prepared_again = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
-        json={"companion_lines": [{"item_id": str(carton.item_id), "quantity": 1, "unit": "EA"}]},
+        json={},
     )
     assert prepared_again.status_code == 200, prepared_again.text
 
@@ -230,12 +238,13 @@ def test_requested_and_preparing_shipping_requests_can_be_deleted(client, db_ses
     assert all(row["request_id"] != preparing_id for row in rows_after_preparing_delete.json())
 
 
-def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_session, make_item, make_bom):
+def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_session, make_item, make_bom, make_location):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=1)
     pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
     db_session.commit()
 
     create = client.post(
@@ -256,3 +265,30 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
 
     delete_picked_up = client.delete(f"/api/shipping/requests/{request_id}")
     assert delete_picked_up.status_code == 422, delete_picked_up.text
+
+
+def test_shipping_prepare_complete_requires_process_department_stock(client, db_session, make_item, make_bom):
+    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("5"), model_symbol="4", serial_no=1)
+    pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
+
+    prepared = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={"companion_lines": []})
+
+    assert prepared.status_code == 422, prepared.text
+    body = prepared.text
+    assert af.mes_code in body
+    assert "AF Main" in body
+    assert DepartmentEnum.ASSEMBLY.value in body
+    assert "0" in body
+    assert "1" in body

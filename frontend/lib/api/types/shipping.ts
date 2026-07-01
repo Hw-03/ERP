@@ -21,19 +21,23 @@ export interface ShippingCompanionLineInput {
 
 export interface ShippingRequestCreatePayload {
   base_pf_item_id: string;
+  request_quantity?: number;
   requested_by_name?: string | null;
   custom_pa_name?: string | null;
   custom_pf_name?: string | null;
   notes?: string | null;
   bom_lines?: ShippingBomLineInput[] | null;
+  companion_lines?: ShippingCompanionLineInput[] | null;
 }
 
 export interface ShippingRequestUpdatePayload {
+  request_quantity?: number;
   requested_by_name?: string | null;
   custom_pa_name?: string | null;
   custom_pf_name?: string | null;
   notes?: string | null;
   bom_lines?: ShippingBomLineInput[] | null;
+  companion_lines?: ShippingCompanionLineInput[] | null;
 }
 
 export interface ShippingChecklistUpdatePayload {
@@ -41,7 +45,7 @@ export interface ShippingChecklistUpdatePayload {
 }
 
 export interface ShippingPrepareCompletePayload {
-  companion_lines: ShippingCompanionLineInput[];
+  companion_lines?: ShippingCompanionLineInput[];
 }
 
 export interface ShippingPrepareCancelPayload {
@@ -116,6 +120,7 @@ export interface ShippingRequest {
   base_pf_item_id: string;
   base_pf_item_name: string;
   base_pf_mes_code: string | null;
+  request_quantity: number;
   final_pa_item_id: string | null;
   final_pa_item_name: string | null;
   final_pf_item_id: string | null;
@@ -144,5 +149,3 @@ export interface ShippingBomMatchResponse {
   requires_pa_name: boolean;
   requires_pf_name: boolean;
 }
-
-

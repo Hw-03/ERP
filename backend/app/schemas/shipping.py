@@ -28,19 +28,23 @@ class ShippingCompanionLineInput(BaseModel):
 
 class ShippingRequestCreate(BaseModel):
     base_pf_item_id: uuid.UUID
+    request_quantity: int = Field(1, gt=0)
     requested_by_name: Optional[str] = Field(None, max_length=100)
     custom_pa_name: Optional[str] = Field(None, max_length=200)
     custom_pf_name: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
     bom_lines: Optional[list[ShippingBomLineInput]] = None
+    companion_lines: Optional[list[ShippingCompanionLineInput]] = None
 
 
 class ShippingRequestUpdate(BaseModel):
+    request_quantity: Optional[int] = Field(None, gt=0)
     requested_by_name: Optional[str] = Field(None, max_length=100)
     custom_pa_name: Optional[str] = Field(None, max_length=200)
     custom_pf_name: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
     bom_lines: Optional[list[ShippingBomLineInput]] = None
+    companion_lines: Optional[list[ShippingCompanionLineInput]] = None
 
 
 class ShippingChecklistUpdateLine(BaseModel):
@@ -143,6 +147,7 @@ class ShippingRequestResponse(BaseModel):
     base_pf_item_id: uuid.UUID
     base_pf_item_name: str
     base_pf_mes_code: Optional[str] = None
+    request_quantity: int = 1
     final_pa_item_id: Optional[uuid.UUID] = None
     final_pa_item_name: Optional[str] = None
     final_pf_item_id: Optional[uuid.UUID] = None
@@ -161,4 +166,3 @@ class ShippingRequestResponse(BaseModel):
     events: list[ShippingEventResponse] = []
     transactions: list[ShippingTransactionLogResponse] = []
     transaction_count: int = 0
-

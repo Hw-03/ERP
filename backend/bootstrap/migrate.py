@@ -256,6 +256,7 @@ _MIGRATION_DDL: list[str] = [
         base_pf_item_id CHAR(36) NOT NULL REFERENCES items(item_id),
         final_pa_item_id CHAR(36) REFERENCES items(item_id),
         final_pf_item_id CHAR(36) REFERENCES items(item_id),
+        request_quantity INTEGER NOT NULL DEFAULT 1,
         requested_by_name VARCHAR(100),
         custom_pa_name VARCHAR(255),
         custom_pf_name VARCHAR(255),
@@ -267,6 +268,7 @@ _MIGRATION_DDL: list[str] = [
     )""",
     "CREATE INDEX IF NOT EXISTS ix_shipping_requests_status ON shipping_requests(status)",
     "CREATE INDEX IF NOT EXISTS ix_shipping_requests_created ON shipping_requests(created_at)",
+    "ALTER TABLE shipping_requests ADD COLUMN request_quantity INTEGER NOT NULL DEFAULT 1",
     """CREATE TABLE IF NOT EXISTS shipping_request_bom_lines (
         line_id CHAR(36) PRIMARY KEY,
         request_id CHAR(36) NOT NULL REFERENCES shipping_requests(request_id) ON DELETE CASCADE,
@@ -966,11 +968,14 @@ def _promote_model_9() -> None:
     NOT NULL 위반을 일으키지 않는다. 멱등 — 이미 승격/백필된 환경이면 UPDATE 0행.
     """
     with engine.connect() as conn:
-        conn.execute(text(
-            "UPDATE product_symbols "
-            "SET symbol='9', model_name='신제품', is_reserved=0 "
-            "WHERE slot=6 AND symbol IS NULL"
-        ))
+        conn.execute(
+            text(
+                "UPDATE product_symbols "
+                "SET symbol=:symbol, model_name=:model_name, is_reserved=0 "
+                "WHERE slot=6 AND symbol IS NULL"
+            ),
+            {"symbol": "9", "model_name": "신제품"},
+        )
         conn.execute(text(
             "UPDATE items SET model_symbol='9' "
             "WHERE model_symbol IS NULL AND mes_code LIKE '9-%'"

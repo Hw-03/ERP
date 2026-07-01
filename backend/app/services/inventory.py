@@ -58,6 +58,11 @@ from app.services.inv_transfer import (  # noqa: F401
     transfer_between_departments,
     consume_warehouse,
     consume_from_department,
+    department_for_item,
+    item_department_stock,
+    format_item_location_shortage,
+    consume_from_item_department,
+    receive_to_item_department,
 )
 from app.services.inv_defective import (  # noqa: F401
     DefectSource,

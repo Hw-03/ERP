@@ -1,4 +1,4 @@
-"""Shipping request router."""
+﻿"""Shipping request router."""
 
 from __future__ import annotations
 
@@ -43,8 +43,10 @@ def _line_payload(lines: list[ShippingBomLineInput] | None) -> list[dict] | None
     return [line.model_dump() for line in lines]
 
 
-def _companion_payload(payload: ShippingPrepareCompleteRequest) -> list[dict]:
-    return [line.model_dump() for line in payload.companion_lines]
+def _companion_payload(lines) -> list[dict] | None:
+    if lines is None:
+        return None
+    return [line.model_dump() for line in lines]
 
 
 def _to_response(db: Session, req: ShippingRequest) -> ShippingRequestResponse:
@@ -60,6 +62,7 @@ def _to_response(db: Session, req: ShippingRequest) -> ShippingRequestResponse:
         base_pf_item_id=req.base_pf_item_id,
         base_pf_item_name=req.base_pf_item.item_name,
         base_pf_mes_code=req.base_pf_item.mes_code,
+        request_quantity=int(req.request_quantity or 1),
         final_pa_item_id=req.final_pa_item_id,
         final_pa_item_name=req.final_pa_item.item_name if req.final_pa_item else None,
         final_pf_item_id=req.final_pf_item_id,
@@ -176,10 +179,12 @@ def create_request(payload: ShippingRequestCreate, db: Session = Depends(get_db)
         {
             "base_pf_item_id": payload.base_pf_item_id,
             "requested_by_name": payload.requested_by_name,
+            "request_quantity": payload.request_quantity,
             "custom_pa_name": payload.custom_pa_name,
             "custom_pf_name": payload.custom_pf_name,
             "notes": payload.notes,
             "bom_lines": _line_payload(payload.bom_lines),
+            "companion_lines": _companion_payload(payload.companion_lines),
         },
     )
     return _to_response(db, req)
@@ -190,6 +195,8 @@ def update_request(request_id: uuid.UUID, payload: ShippingRequestUpdate, db: Se
     update = payload.model_dump(exclude_unset=True)
     if "bom_lines" in update:
         update["bom_lines"] = _line_payload(payload.bom_lines)
+    if "companion_lines" in update:
+        update["companion_lines"] = _companion_payload(payload.companion_lines)
     req = _commit_or_422(db, shipping_svc.update_request, request_id, update)
     return _to_response(db, req)
 
@@ -220,12 +227,7 @@ def clear_checklist(request_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.post("/requests/{request_id}/prepare-complete", response_model=ShippingRequestResponse)
 def prepare_complete(request_id: uuid.UUID, payload: ShippingPrepareCompleteRequest, db: Session = Depends(get_db)):
-    req = _commit_or_422(
-        db,
-        shipping_svc.prepare_complete,
-        request_id,
-        companion_lines=_companion_payload(payload),
-    )
+    req = _commit_or_422(db, shipping_svc.prepare_complete, request_id)
     return _to_response(db, req)
 
 

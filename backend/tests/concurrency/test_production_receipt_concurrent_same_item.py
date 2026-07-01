@@ -7,14 +7,14 @@
     → services/integrity.check_inventory_consistency 재사용
   - 실패한 요청은 orphan TransactionLog 0건, 부분 배치 없음 (loser 의 쓰기 완전 롤백)
 
-production.py receipt 경로(_explode_bom → 사전 가용성 검사 → consume_warehouse
+production.py receipt 경로(_explode_bom → 사전 가용성 검사 → consume_from_item_department
 원자적 가드 → PRODUCE 적재)를 HTTP 계층으로 통과시킨다.
 
 두 가지 각도로 핀:
   1) test_..._real_race — 실제 2스레드 동시 HTTP 요청 (conftest 의 파일 기반
      SQLite + BEGIN IMMEDIATE 로 writer 직렬화). SQLite 자연 동작을 핀.
   2) test_..._loser_late_value_error — pre-check 를 둘 다 통과한 뒤 loser 의
-     consume_warehouse 가 원자적 가드에서 ValueError 를 늦게 던지는 정확한
+     consume_from_item_department 가 원자적 가드에서 ValueError 를 늦게 던지는 정확한
      시나리오를 결정적으로 재현. 라우터의 에러 매핑(audit 핵심)을 핀.
 
 fixture(concurrent_engine / make_session)는 같은 디렉터리 conftest.py
@@ -39,8 +39,11 @@ if str(BACKEND_DIR) not in sys.path:
 
 from app.models import (
     BOM,
+    DepartmentEnum,
     Inventory,
+    InventoryLocation,
     Item,
+    LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -68,8 +71,16 @@ def _setup(make_session, component_wh_qty: Decimal):
         Inventory(
             item_id=child.item_id,
             quantity=component_wh_qty,
-            warehouse_qty=component_wh_qty,
+            warehouse_qty=Decimal("0"),
             pending_quantity=Decimal("0"),
+        )
+    )
+    session.add(
+        InventoryLocation(
+            item_id=child.item_id,
+            department=DepartmentEnum.TUBE,
+            status=LocationStatusEnum.PRODUCTION,
+            quantity=component_wh_qty,
         )
     )
     # 완제품 P: 0 재고
@@ -226,11 +237,11 @@ def test_concurrent_production_receipt_loser_late_value_error(
 ):
     """audit 핵심 시나리오 결정적 재현:
 
-    pre-check 를 통과한 뒤 loser 의 consume_warehouse 가 원자적 가드에서
+    pre-check 를 통과한 뒤 loser 의 consume_from_item_department 가 원자적 가드에서
     ValueError 를 늦게 던진다(동시 경합 패배). 라우터가 이 늦은 ValueError 를
     깨끗한 422 STOCK_SHORTAGE 로 매핑해야 한다(500 아님).
 
-    consume_warehouse 를 1회 한정으로 실제 가드 메시지와 동일한 ValueError 를
+    consume_from_item_department 를 1회 한정으로 실제 가드 메시지와 동일한 ValueError 를
     던지도록 래핑 — 실제 동시 패배자가 받는 예외와 동일. 동작 변경 없음.
     """
     from app.database import get_db
@@ -254,24 +265,24 @@ def test_concurrent_production_receipt_loser_late_value_error(
 
     app.dependency_overrides[get_db] = _override_get_db
 
-    _real_consume = inventory_svc.consume_warehouse
+    _real_consume = inventory_svc.consume_from_item_department
     fail_once = {"done": False}
 
-    def _consume_loses_once(db, item_id, qty):
-        # 첫 호출(=loser)만 원자적 가드 패배를 시뮬레이트. consume_warehouse 가
+    def _consume_loses_once(db, item, qty):
+        # 첫 호출(=loser)만 원자적 가드 패배를 시뮬레이트. consume_from_item_department 가
         # rowcount==0 일 때 실제로 던지는 것과 동일한 ValueError.
         if not fail_once["done"]:
             fail_once["done"] = True
             inv_check = (
-                db.query(Inventory).filter(Inventory.item_id == item_id).first()
+                db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
             )
             wh = inv_check.warehouse_qty if inv_check else Decimal("0")
             raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
-        return _real_consume(db, item_id, qty)
+        return _real_consume(db, item, qty)
 
-    # consume_warehouse 호출은 production_receipt 서비스가 inventory_svc 를 통해
+    # consume_from_item_department 호출은 production_receipt 서비스가 inventory_svc 를 통해
     # 수행한다. 모듈 속성을 직접 패치하면 호출 위치(라우터/서비스)와 무관하게 적용된다.
-    inventory_svc.consume_warehouse = _consume_loses_once
+    inventory_svc.consume_from_item_department = _consume_loses_once
 
     statuses: list[int] = []
     bodies: list[dict] = []
@@ -294,7 +305,7 @@ def test_concurrent_production_receipt_loser_late_value_error(
         fire()
     finally:
         app.dependency_overrides.pop(get_db, None)
-        inventory_svc.consume_warehouse = _real_consume
+        inventory_svc.consume_from_item_department = _real_consume
 
     _assert_clean_one_winner(statuses, bodies)
     _assert_invariant_and_no_orphans(make_session, parent_id, child_id)

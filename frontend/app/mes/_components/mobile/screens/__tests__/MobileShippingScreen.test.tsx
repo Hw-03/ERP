@@ -18,6 +18,7 @@ function request(): ShippingRequest {
   return {
     request_id: "req-1",
     status: "PREPARING",
+    request_quantity: 3,
     base_pf_item_id: "pf-1",
     base_pf_item_name: "Standard PF",
     base_pf_mes_code: "PF-001",
@@ -66,6 +67,7 @@ describe("MobileShippingScreen", () => {
     render(<MobileShippingScreen />);
 
     expect(await screen.findByText("Standard PF")).toBeInTheDocument();
+    expect(screen.getByText("총 3대 출하")).toBeInTheDocument();
     expect(screen.getByText(/생성·수정·완료 처리는 PC/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /준비 완료/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /픽업 완료/ })).not.toBeInTheDocument();

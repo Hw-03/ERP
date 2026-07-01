@@ -16,6 +16,7 @@ from app.models import (
     DepartmentEnum,
     Inventory,
     InventoryLocation,
+    Item,
     LocationStatusEnum,
 )
 from app.services.inv_base import (
@@ -207,6 +208,60 @@ def transfer_between_departments(
     _sync_total(db, inv)
     return inv
 
+
+def department_for_item(item: Item) -> DepartmentEnum:
+    """Return the production department implied by an item's process type."""
+    from app.services.inv_base import dept_for_process_type
+
+    dept = dept_for_process_type(item.process_type_code)
+    if dept is None:
+        code = item.mes_code or str(item.item_id)
+        raise ValueError(f"품목코드로 부서를 찾을 수 없습니다: {code} / {item.item_name}")
+    return dept
+
+
+def item_department_stock(db: Session, item: Item) -> tuple[DepartmentEnum, Decimal]:
+    """Read the item's process-code department PRODUCTION quantity without warehouse fallback."""
+    dept = department_for_item(item)
+    loc = (
+        db.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == dept,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    return dept, loc.quantity if loc else Decimal("0")
+
+
+def format_item_location_shortage(item: Item, dept: DepartmentEnum, current: Decimal, required: Decimal) -> str:
+    """Human-readable shortage message for automatic production/shipping flows."""
+    code = item.mes_code or str(item.item_id)
+    return (
+        f"부서 위치 재고 부족: {code} / {item.item_name} / 부서 {dept.value} / "
+        f"현재 수량 {current} / 필요 수량 {required}"
+    )
+
+
+def consume_from_item_department(db: Session, item: Item, qty: Decimal) -> tuple[Inventory, Decimal, DepartmentEnum]:
+    """Consume from the item's process-code PRODUCTION location only."""
+    dept, current = item_department_stock(db, item)
+    if current < qty:
+        raise ValueError(format_item_location_shortage(item, dept, current, qty))
+    inv_before = get_or_create_inventory(db, item.item_id)
+    qty_before = inv_before.quantity or Decimal("0")
+    inv = consume_from_department(db, item.item_id, qty, dept)
+    return inv, qty_before, dept
+
+
+def receive_to_item_department(db: Session, item: Item, qty: Decimal) -> tuple[Inventory, Decimal, DepartmentEnum]:
+    """Receive into the item's process-code PRODUCTION location only."""
+    dept = department_for_item(item)
+    inv_before = get_or_create_inventory(db, item.item_id)
+    qty_before = inv_before.quantity or Decimal("0")
+    inv = receive_confirmed(db, item.item_id, qty, bucket="production", dept=dept)
+    return inv, qty_before, dept
 
 def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[Inventory, Decimal]:
     """창고에서 qty 만큼 차감 (BACKFLUSH / 비예약 창고 출고용). 원자적 조건부 UPDATE.

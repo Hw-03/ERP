@@ -163,6 +163,9 @@ function MobilePrepCard({
   return (
     <div className="rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <CardHeader request={request} />
+      <div className="mt-3 rounded-[14px] border px-3 py-2 text-xs font-black" style={{ background: tint(LEGACY_COLORS.green, 12), borderColor: tint(LEGACY_COLORS.green, 36), color: LEGACY_COLORS.green }}>
+        총 {request.request_quantity ?? 1}대 출하
+      </div>
       <div className="mt-3 grid gap-2">
         {request.checklist_lines.length === 0 ? (
           <InlineState title="체크 항목 없음" body="PC에서 BOM을 확인하세요." compact />

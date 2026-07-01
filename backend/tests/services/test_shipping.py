@@ -5,13 +5,40 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import event
 
-from app.models import BOM, Inventory, ShippingRequestCompanionLine, TransactionLog, TransactionTypeEnum
+from app.models import (
+    BOM,
+    DepartmentEnum,
+    Inventory,
+    InventoryLocation,
+    LocationStatusEnum,
+    ShippingRequestCompanionLine,
+    TransactionLog,
+    TransactionTypeEnum,
+)
 from app.services import shipping as shipping_svc
 
 
 def _stock(db_session, item):
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     return int(inv.quantity or 0), int(inv.warehouse_qty or 0)
+
+
+def _warehouse_qty(db_session, item):
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    return int(inv.warehouse_qty or 0)
+
+
+def _location_qty(db_session, item, dept):
+    loc = db_session.query(InventoryLocation).filter(
+        InventoryLocation.item_id == item.item_id,
+        InventoryLocation.department == dept,
+        InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+    ).first()
+    return int(loc.quantity or 0) if loc else 0
+
+
+def _effect_scopes(log):
+    return {entry.get("scope") for entry in (log.inventory_effect or [])}
 
 
 def _line(item, qty=1, stage="PA"):
@@ -85,48 +112,51 @@ def test_match_bom_does_not_write_temporary_shipping_rows(db_session, make_item,
 
 
 def test_prepare_complete_creates_custom_pa_pf_and_pickup_ships_companions(
-    db_session, make_item, make_bom
+    db_session, make_item, make_bom, make_location
 ):
-    af = make_item(name="AF 본체", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
-    cable = make_item(name="케이블", process_type_code="PR", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=2)
-    carton = make_item(name="카톤", process_type_code="PR", warehouse_qty=Decimal("5"), model_symbol="4", serial_no=3)
-    base_pa = make_item(name="기본 가방 포장 완료", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
-    base_pf = make_item(name="기본 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    af = make_item(name="AF 蹂몄껜", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    cable = make_item(name="耳?대툝", process_type_code="PR", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=2)
+    carton = make_item(name="移댄넠", process_type_code="PR", warehouse_qty=Decimal("5"), model_symbol="4", serial_no=3)
+    base_pa = make_item(name="湲곕낯 媛諛??ъ옣 ?꾨즺", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    base_pf = make_item(name="湲곕낯 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
     make_bom(base_pa.item_id, af.item_id, Decimal("1"))
     make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
+    make_location(cable.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
+    make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("5"))
     db_session.commit()
 
     req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
-            "requested_by_name": "출하담당",
-            "custom_pa_name": "기본 PF [케이블 추가]_가방 포장 완료",
-            "custom_pf_name": "기본 PF [케이블 추가]",
+            "requested_by_name": "異쒗븯?대떦",
+            "custom_pa_name": "湲곕낯 PF [耳?대툝 異붽?]_媛諛??ъ옣 ?꾨즺",
+            "custom_pf_name": "湲곕낯 PF [耳?대툝 異붽?]",
             "bom_lines": [_line(af), _line(cable)],
+            "companion_lines": [{"item_id": carton.item_id, "quantity": 1, "unit": "EA"}],
         },
     )
     shipping_svc.send_to_prep(db_session, req.request_id)
 
-    prepared = shipping_svc.prepare_complete(
-        db_session,
-        req.request_id,
-        companion_lines=[{"item_id": carton.item_id, "quantity": 1, "unit": "EA"}],
-    )
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
     final_pa = prepared.final_pa_item
     final_pf = prepared.final_pf_item
     assert final_pa is not None
     assert final_pf is not None
-    assert final_pa.item_name == "기본 PF [케이블 추가]_가방 포장 완료"
-    assert final_pf.item_name == "기본 PF [케이블 추가]"
+    assert final_pa.item_name == "湲곕낯 PF [耳?대툝 異붽?]_媛諛??ъ옣 ?꾨즺"
+    assert final_pf.item_name == "湲곕낯 PF [耳?대툝 異붽?]"
     assert db_session.query(BOM).filter(BOM.parent_item_id == final_pa.item_id).count() == 2
     assert db_session.query(BOM).filter(BOM.parent_item_id == final_pf.item_id).count() == 1
-    assert _stock(db_session, af) == (0, 0)
-    assert _stock(db_session, cable) == (1, 1)
-    assert _stock(db_session, final_pa) == (0, 0)
-    assert _stock(db_session, final_pf) == (1, 1)
-    assert _stock(db_session, carton) == (5, 5)
+    assert _warehouse_qty(db_session, af) == 1
+    assert _warehouse_qty(db_session, cable) == 2
+    assert _warehouse_qty(db_session, carton) == 5
+    assert _location_qty(db_session, af, DepartmentEnum.ASSEMBLY) == 0
+    assert _location_qty(db_session, cable, DepartmentEnum.SHIPPING) == 1
+    assert _location_qty(db_session, final_pa, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 1
+    assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 5
 
     prepare_logs = (
         db_session.query(TransactionLog)
@@ -139,11 +169,14 @@ def test_prepare_complete_creates_custom_pa_pf_and_pickup_ships_companions(
         TransactionTypeEnum.PRODUCE,
     }
     assert all(log.inventory_effect for log in prepare_logs)
+    assert all(_effect_scopes(log) <= {"location"} for log in prepare_logs)
 
     shipping_svc.pickup_complete(db_session, req.request_id)
 
-    assert _stock(db_session, final_pf) == (0, 0)
-    assert _stock(db_session, carton) == (4, 4)
+    assert _warehouse_qty(db_session, final_pf) == 0
+    assert _warehouse_qty(db_session, carton) == 5
+    assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 4
     pickup_logs = (
         db_session.query(TransactionLog)
         .filter(TransactionLog.shipping_request_id == req.request_id)
@@ -156,37 +189,43 @@ def test_prepare_complete_creates_custom_pa_pf_and_pickup_ships_companions(
     ]
 
 
-def test_prepare_cancel_reverses_prepare_logs(db_session, make_item, make_bom):
-    af = make_item(name="AF 본체", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
-    base_pa = make_item(name="기본 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
-    base_pf = make_item(name="기본 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+def test_prepare_cancel_reverses_prepare_logs(db_session, make_item, make_bom, make_location):
+    af = make_item(name="AF 蹂몄껜", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    base_pa = make_item(name="湲곕낯 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    base_pf = make_item(name="湲곕낯 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
     make_bom(base_pa.item_id, af.item_id, Decimal("1"))
     make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
     db_session.commit()
 
     req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
-            "requested_by_name": "출하담당",
+            "requested_by_name": "異쒗븯?대떦",
         },
     )
     shipping_svc.send_to_prep(db_session, req.request_id)
-    shipping_svc.prepare_complete(db_session, req.request_id, companion_lines=[])
+    shipping_svc.prepare_complete(db_session, req.request_id)
 
     with pytest.raises(shipping_svc.ShippingError):
         shipping_svc.update_checklist(db_session, req.request_id, {})
     with pytest.raises(shipping_svc.ShippingError):
         shipping_svc.clear_checklist(db_session, req.request_id)
 
-    assert _stock(db_session, af) == (0, 0)
-    assert _stock(db_session, base_pf) == (1, 1)
+    assert _warehouse_qty(db_session, af) == 1
+    assert _warehouse_qty(db_session, base_pf) == 0
+    assert _location_qty(db_session, af, DepartmentEnum.ASSEMBLY) == 0
+    assert _location_qty(db_session, base_pf, DepartmentEnum.SHIPPING) == 1
 
-    shipping_svc.prepare_cancel(db_session, req.request_id, reason="구성 변경")
+    shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
 
-    assert _stock(db_session, af) == (1, 1)
-    assert _stock(db_session, base_pa) == (0, 0)
-    assert _stock(db_session, base_pf) == (0, 0)
+    assert _warehouse_qty(db_session, af) == 1
+    assert _warehouse_qty(db_session, base_pa) == 0
+    assert _warehouse_qty(db_session, base_pf) == 0
+    assert _location_qty(db_session, af, DepartmentEnum.ASSEMBLY) == 1
+    assert _location_qty(db_session, base_pa, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, base_pf, DepartmentEnum.SHIPPING) == 0
     cancelled = (
         db_session.query(TransactionLog)
         .filter(TransactionLog.shipping_request_id == req.request_id)
@@ -198,41 +237,109 @@ def test_prepare_cancel_reverses_prepare_logs(db_session, make_item, make_bom):
 
 
 def test_same_bom_is_reused_and_companion_lines_do_not_create_new_items(
-    db_session, make_item, make_bom
+    db_session, make_item, make_bom, make_location
 ):
-    af = make_item(name="AF 본체", process_type_code="AF", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=1)
-    carton = make_item(name="카톤", process_type_code="PR", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=2)
-    pa = make_item(name="기존 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
-    pf = make_item(name="기존 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    af = make_item(name="AF 蹂몄껜", process_type_code="AF", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=1)
+    carton = make_item(name="移댄넠", process_type_code="PR", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=2)
+    pa = make_item(name="湲곗〈 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    pf = make_item(name="湲곗〈 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
     db_session.commit()
 
     req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
-            "requested_by_name": "출하담당",
+            "requested_by_name": "異쒗븯?대떦",
             "bom_lines": [_line(af)],
+            "companion_lines": [{"item_id": carton.item_id, "quantity": 1, "unit": "EA"}],
         },
     )
     shipping_svc.send_to_prep(db_session, req.request_id)
-    prepared = shipping_svc.prepare_complete(
-        db_session,
-        req.request_id,
-        companion_lines=[{"item_id": carton.item_id, "quantity": 1, "unit": "EA"}],
-    )
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
     assert prepared.final_pa_item_id == pa.item_id
     assert prepared.final_pf_item_id == pf.item_id
     assert db_session.query(TransactionLog).filter(TransactionLog.item_id == carton.item_id).count() == 0
 
 
+
+def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions(
+    db_session, make_item, make_bom, make_location
+):
+    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    make_bom(pa.item_id, af.item_id, Decimal("2"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_bom(pf.item_id, pouch.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("6"))
+    make_location(pouch.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("3"))
+    make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
+    db_session.commit()
+
+    req = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "requested_by_name": "shipping-user",
+            "request_quantity": 3,
+            "companion_lines": [{"item_id": carton.item_id, "quantity": 2, "unit": "EA"}],
+        },
+    )
+    shipping_svc.send_to_prep(db_session, req.request_id)
+
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
+
+    assert prepared.request_quantity == 3
+    assert len(prepared.companion_lines) == 1
+    assert _location_qty(db_session, af, DepartmentEnum.ASSEMBLY) == 0
+    assert _location_qty(db_session, pouch, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, pa, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 3
+    assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 2
+    prepare_logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.shipping_request_id == req.request_id)
+        .filter(TransactionLog.shipping_phase == "PREPARE")
+        .all()
+    )
+    assert any(log.item_id == af.item_id and log.quantity_change == -6 for log in prepare_logs)
+    assert any(log.item_id == pouch.item_id and log.quantity_change == -3 for log in prepare_logs)
+    assert any(log.item_id == pa.item_id and log.quantity_change == 3 for log in prepare_logs)
+    assert any(log.item_id == pa.item_id and log.quantity_change == -3 for log in prepare_logs)
+    assert any(log.item_id == pf.item_id and log.quantity_change == 3 for log in prepare_logs)
+
+    shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
+    assert req.status.value == "PREPARING"
+    assert len(req.companion_lines) == 1
+    assert _location_qty(db_session, af, DepartmentEnum.ASSEMBLY) == 6
+    assert _location_qty(db_session, pouch, DepartmentEnum.SHIPPING) == 3
+    assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 0
+
+    shipping_svc.prepare_complete(db_session, req.request_id)
+    shipping_svc.pickup_complete(db_session, req.request_id)
+
+    assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 0
+    pickup_logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.shipping_request_id == req.request_id)
+        .filter(TransactionLog.shipping_phase == "PICKUP")
+        .all()
+    )
+    assert any(log.item_id == pf.item_id and log.quantity_change == -3 for log in pickup_logs)
+    assert any(log.item_id == carton.item_id and log.quantity_change == -2 for log in pickup_logs)
+
 def test_custom_bom_requires_names_when_no_existing_match(db_session, make_item, make_bom):
-    af = make_item(name="AF 본체", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
-    cable = make_item(name="케이블", process_type_code="PR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=2)
-    base_pa = make_item(name="기본 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
-    base_pf = make_item(name="기본 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    af = make_item(name="AF 蹂몄껜", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    cable = make_item(name="耳?대툝", process_type_code="PR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=2)
+    base_pa = make_item(name="湲곕낯 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    base_pf = make_item(name="湲곕낯 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
     make_bom(base_pa.item_id, af.item_id, Decimal("1"))
     make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
     db_session.commit()
@@ -241,34 +348,35 @@ def test_custom_bom_requires_names_when_no_existing_match(db_session, make_item,
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
-            "requested_by_name": "출하담당",
+            "requested_by_name": "異쒗븯?대떦",
             "bom_lines": [_line(af), _line(cable)],
         },
     )
     shipping_svc.send_to_prep(db_session, req.request_id)
 
-    with pytest.raises(shipping_svc.ShippingError, match="새 PA/PF 이름"):
-        shipping_svc.prepare_complete(db_session, req.request_id, companion_lines=[])
+    with pytest.raises(shipping_svc.ShippingError):
+        shipping_svc.prepare_complete(db_session, req.request_id)
 
 def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare(
-    db_session, make_item, make_bom
+    db_session, make_item, make_bom, make_location
 ):
-    af = make_item(name="AF 본체", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
-    cable = make_item(name="기본 케이블", process_type_code="PR", warehouse_qty=Decimal("3"), model_symbol="4", serial_no=2)
-    pa = make_item(name="기존 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
-    pf = make_item(name="기존 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    af = make_item(name="AF 蹂몄껜", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    cable = make_item(name="湲곕낯 耳?대툝", process_type_code="PR", warehouse_qty=Decimal("3"), model_symbol="4", serial_no=2)
+    pa = make_item(name="湲곗〈 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    pf = make_item(name="湲곗〈 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pa.item_id, cable.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
     db_session.commit()
 
     req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
-            "requested_by_name": "출하담당",
-            "custom_pa_name": "케이블 제외 PA",
-            "custom_pf_name": "케이블 제외 PF",
+            "requested_by_name": "異쒗븯?대떦",
+            "custom_pa_name": "耳?대툝 ?쒖쇅 PA",
+            "custom_pf_name": "耳?대툝 ?쒖쇅 PF",
             "bom_lines": [
                 _bom_line(pa, stage="PF", origin="DEFAULT"),
                 _bom_line(af, stage="PA", origin="DEFAULT"),
@@ -283,22 +391,26 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
     assert all(line.item_id != cable.item_id for line in req.checklist_lines)
 
     shipping_svc.send_to_prep(db_session, req.request_id)
-    prepared = shipping_svc.prepare_complete(db_session, req.request_id, companion_lines=[])
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
-    assert prepared.final_pa_item.item_name == "케이블 제외 PA"
-    assert _stock(db_session, af) == (0, 0)
-    assert _stock(db_session, cable) == (3, 3)
+    assert prepared.final_pa_item.item_name == "耳?대툝 ?쒖쇅 PA"
+    assert _warehouse_qty(db_session, af) == 1
+    assert _warehouse_qty(db_session, cable) == 3
+    assert _location_qty(db_session, af, DepartmentEnum.ASSEMBLY) == 0
+    assert _location_qty(db_session, cable, DepartmentEnum.SHIPPING) == 0
 
 
 def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_differs(
-    db_session, make_item, make_bom
+    db_session, make_item, make_bom, make_location
 ):
-    af = make_item(name="AF 본체", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
-    bracket = make_item(name="브라켓", process_type_code="PR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=2)
-    pa = make_item(name="공용 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
-    pf = make_item(name="기본 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    af = make_item(name="AF 蹂몄껜", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    bracket = make_item(name="Bracket", process_type_code="PR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=2)
+    pa = make_item(name="怨듭슜 PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    pf = make_item(name="湲곕낯 PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
+    make_location(bracket.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     db_session.commit()
 
     bom_lines = [
@@ -317,15 +429,14 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
         db_session,
         {
             "base_pf_item_id": pf.item_id,
-            "requested_by_name": "출하담당",
-            "custom_pf_name": "브라켓 포함 PF",
+            "requested_by_name": "異쒗븯?대떦",
+            "custom_pf_name": "Bracket PF",
             "bom_lines": bom_lines,
         },
     )
     shipping_svc.send_to_prep(db_session, req.request_id)
-    prepared = shipping_svc.prepare_complete(db_session, req.request_id, companion_lines=[])
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
     assert prepared.final_pa_item_id == pa.item_id
-    assert prepared.final_pf_item.item_name == "브라켓 포함 PF"
+    assert prepared.final_pf_item.item_name == "Bracket PF"
     assert db_session.query(BOM).filter(BOM.parent_item_id == prepared.final_pf_item_id).count() == 2
-

@@ -81,6 +81,7 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
   return {
     request_id: "req-1",
     status: "PREPARING",
+    request_quantity: 1,
     base_pf_item_id: "pf-1",
     base_pf_item_name: "Standard PF",
     base_pf_mes_code: "PF-001",
@@ -475,7 +476,7 @@ describe("DesktopShippingView", () => {
     });
   });
 
-  it("opens prep detail and supports checklist updates", async () => {
+  it("opens prep detail as a desktop summary without checklist controls", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy());
@@ -483,21 +484,16 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-prep-list")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: /Standard PF/ })[0]);
 
-    expect(await screen.findByTestId("shipping-prep-detail")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("shipping-check-acc-1"));
-
-    await waitFor(() => {
-      expect(api.updateShippingChecklist).toHaveBeenCalledWith("req-1", {
-        checks: [{ item_id: "acc-1", checked: true }],
-      });
-    });
-
-    fireEvent.click(screen.getByTestId("shipping-clear-checklist"));
-    await waitFor(() => {
-      expect(api.clearShippingChecklist).toHaveBeenCalledWith("req-1");
-    });
+    const detail = await screen.findByTestId("shipping-prep-detail");
+    expect(detail).toHaveTextContent("출하 수량");
+    expect(detail).toHaveTextContent("총 1대 출하");
+    expect(detail).toHaveTextContent("1대 기준 2 EA");
+    expect(detail).toHaveTextContent("총 필요 2 EA");
+    expect(screen.queryByTestId("shipping-check-acc-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-clear-checklist")).not.toBeInTheDocument();
+    expect(api.updateShippingChecklist).not.toHaveBeenCalled();
+    expect(api.clearShippingChecklist).not.toHaveBeenCalled();
   });
-
   it("opens shipping history details with linked transaction logs", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -803,7 +799,9 @@ describe("DesktopShippingView", () => {
 
     expect(screen.queryByText("마지막 단계입니다.")).not.toBeInTheDocument();
     const actionBar = screen.getByTestId("shipping-wizard-action-bar");
-    expect(actionBar).toContainElement(screen.getByText("요청 저장"));
+    expect(screen.queryByText("요청 저장")).not.toBeInTheDocument();
+    expect(screen.queryByText("준비 중으로 보내기")).not.toBeInTheDocument();
+    expect(actionBar).toContainElement(screen.getByRole("button", { name: /출하 요청/ }));
     expect(actionBar).toContainElement(screen.getByTestId("shipping-send-to-prep"));
   });
 

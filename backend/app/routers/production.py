@@ -18,8 +18,8 @@ from app.schemas import (
     ProductionReceiptRequest,
     ProductionReceiptResponse,
 )
-from app.services import stock_math
 from app.services import production_receipt as production_receipt_svc
+from app.services import inventory as inventory_svc
 from app.services.production_receipt import (
     ProductionBadRequest,
     ProductionItemNotFound,
@@ -136,9 +136,7 @@ def check_production_feasibility(
     result = []
     all_ok = True
 
-    # bulk 로 전 품목 재고 수치 한 번에 확보 (N+1 제거)
     comp_ids = list(merged.keys())
-    figures_map = stock_math.bulk_compute(db, comp_ids)
     comps_map = {
         c.item_id: c
         for c in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()
@@ -148,21 +146,23 @@ def check_production_feasibility(
         comp_item = comps_map.get(comp_item_id)
         if comp_item is None:
             continue
-        fig = figures_map.get(comp_item_id) or stock_math.StockFigures()
-        # Backflush 는 창고만 소비하므로 feasibility 도 warehouse_available (wh - pending) 기준.
-        # 이렇게 해야 production_receipt 의 실제 검사식과 일치.
-        current_total = fig.total
-        current_pending = fig.pending
-        current_avail = fig.warehouse_available
+        try:
+            dept, current_avail = inventory_svc.item_department_stock(db, comp_item)
+        except ValueError:
+            dept = None
+            current_avail = Decimal("0")
         ok = current_avail >= required_qty
         if not ok:
             all_ok = False
+        current_total = current_avail
+        current_pending = Decimal("0")
         result.append(
             {
                 "mes_code": comp_item.mes_code,
                 "item_name": comp_item.item_name,
                 "process_type_code": comp_item.process_type_code,
                 "unit": comp_item.unit,
+                "department": dept.value if dept is not None else None,
                 "required": float(required_qty),
                 "current_stock": float(current_total),
                 "pending": float(current_pending),

@@ -6,7 +6,7 @@ routers/production.py 의 production_receipt 엔드포인트에서 추출했다.
 http_error 를 쓰지 않고 도메인 예외만 raise 한다(io_dispatch 패턴).
 
 동작 보존: 라우터에 인라인돼 있던 로직을 그대로 옮겼다. 재고 변경 primitive
-(consume_warehouse / receive_confirmed / lock_inventories)와 BOM 전개(explode_bom)는
+(consume_from_item_department / receive_to_item_department / lock_inventories)와 BOM 전개(explode_bom)는
 기존대로 하위 서비스에 위임한다.
 """
 
@@ -20,7 +20,6 @@ from app.models import Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
-from app.services import stock_math
 from app.services.bom import explode_bom, merge_requirements
 
 
@@ -81,21 +80,28 @@ def _preload_components(
 
 
 def _assert_no_shortage(
+    db: Session,
     merged: Dict[uuid.UUID, Decimal],
     items_map: Dict[uuid.UUID, Item],
     invs_map: Dict[uuid.UUID, Inventory],
 ) -> None:
-    """창고 가용분 기준 사전 재고 검사 — 부족 시 ProductionShortage."""
+    """Check process-code department PRODUCTION stock before backflush."""
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
-        inv = invs_map.get(comp_item_id)
-        # 생산 BACKFLUSH는 창고 가용분(warehouse - pending) 기준 사전 검사 — stock_math 단일 소스.
-        current_avail = stock_math.figures_from_inventory(inv).warehouse_available
+        comp_item = items_map.get(comp_item_id)
+        if comp_item is None:
+            shortage_errors.append(f"구성품 {comp_item_id} 을 찾을 수 없습니다.")
+            continue
+        try:
+            dept, current_avail = inventory_svc.item_department_stock(db, comp_item)
+        except ValueError as exc:
+            shortage_errors.append(str(exc))
+            continue
         if current_avail < required_qty:
-            comp_item = items_map.get(comp_item_id)
             shortage_errors.append(
-                f"[{comp_item.mes_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
-                f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
+                inventory_svc.format_item_location_shortage(
+                    comp_item, dept, current_avail, required_qty
+                )
             )
 
     if shortage_errors:
@@ -121,7 +127,7 @@ def _backflush_components(
 
         # 재고 변경은 서비스 레이어로 위임 (창고 차감 + _sync_total 은 내부 책임)
         comp_cells_before = inv_effect.snapshot_cells(db, comp_item_id)
-        inv, qty_before = inventory_svc.consume_warehouse(db, comp_item_id, required_qty)
+        inv, qty_before, dept = inventory_svc.consume_from_item_department(db, comp_item, required_qty)
 
         log = TransactionLog(
             item_id=comp_item_id,
@@ -132,6 +138,7 @@ def _backflush_components(
             reference_no=payload.reference_no,
             produced_by=producer_name or payload.produced_by,
             producer_employee_id=producer_id,
+            department=dept.value,
             notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
             inventory_effect=inv_effect.capture_effect(db, comp_item_id, comp_cells_before),
         )
@@ -160,21 +167,11 @@ def _record_production(
     producer_id,
     transaction_ids: List[uuid.UUID],
 ) -> None:
-    """생산 결과 적재 + PRODUCE 로그 기록.
-
-    process_type_code 기반 부서의 PRODUCTION 으로 적재 (R 시리즈/없음 → 창고 폴백).
-    """
-    target_dept = inventory_svc.dept_for_process_type(produced_item.process_type_code)
-    produced_inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    prod_qty_before = produced_inv.quantity or Decimal("0")
+    """Receive produced item into its process-code PRODUCTION location and log PRODUCE."""
     prod_cells_before = inv_effect.snapshot_cells(db, payload.item_id)
-    if target_dept is not None:
-        inventory_svc.receive_confirmed(
-            db, payload.item_id, payload.quantity,
-            bucket="production", dept=target_dept,
-        )
-    else:
-        inventory_svc.receive_confirmed(db, payload.item_id, payload.quantity)
+    produced_inv, prod_qty_before, dept = inventory_svc.receive_to_item_department(
+        db, produced_item, payload.quantity
+    )
 
     produce_log = TransactionLog(
         item_id=payload.item_id,
@@ -185,6 +182,7 @@ def _record_production(
         reference_no=payload.reference_no,
         produced_by=producer_name or payload.produced_by,
         producer_employee_id=producer_id,
+        department=dept.value,
         notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
         inventory_effect=inv_effect.capture_effect(db, payload.item_id, prod_cells_before),
     )
@@ -206,11 +204,11 @@ def execute_production_receipt(
       - ProductionBadRequest  : BOM 순환참조/빈 BOM (→ 400)
       - ProductionShortage    : 사전 재고 부족 (→ 422, shortages 보유)
       - ProductionItemNotFound: 부품 미존재 (→ 404)
-      - ValueError            : consume_warehouse 원자적 가드 늦은 패배 (→ 422)
+      - ValueError            : ?? ?? ?? ??? ?? ?? ?? (? 422)
     """
     merged = _load_and_merge_requirements(db, payload, produced_item)
     items_map, invs_map = _preload_components(db, merged)
-    _assert_no_shortage(merged, items_map, invs_map)
+    _assert_no_shortage(db, merged, items_map, invs_map)
 
     transaction_ids: List[uuid.UUID] = []
     backflushed: List[BackflushDetail] = []

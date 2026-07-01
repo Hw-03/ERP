@@ -1,4 +1,4 @@
-"""Shipping request workflow service."""
+﻿"""Shipping request workflow service."""
 
 from __future__ import annotations
 
@@ -41,19 +41,33 @@ class ShippingError(ValueError):
 def _get_request(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = db.query(ShippingRequest).filter(ShippingRequest.request_id == request_id).first()
     if req is None:
-        raise ShippingError("출하 요청을 찾을 수 없습니다.")
+        raise ShippingError("異쒗븯 ?붿껌??李얠쓣 ???놁뒿?덈떎.")
     return req
 
 
 def _get_item(db: Session, item_id: uuid.UUID) -> Item:
     item = item_repository.get(db, item_id)
     if item is None:
-        raise ShippingError("품목을 찾을 수 없습니다.")
+        raise ShippingError("?덈ぉ??李얠쓣 ???놁뒿?덈떎.")
     return item
 
 
 def _record_event(db: Session, req: ShippingRequest, event_type: str, message: str | None = None) -> None:
     db.add(ShippingRequestEvent(request_id=req.request_id, event_type=event_type, message=message))
+
+
+def _request_quantity(req: ShippingRequest) -> int:
+    qty = int(req.request_quantity or 1)
+    if qty <= 0:
+        raise ShippingError("출하 요청 수량은 1 이상이어야 합니다.")
+    return qty
+
+
+def _payload_request_quantity(payload: dict) -> int:
+    qty = int(payload.get("request_quantity") or 1)
+    if qty <= 0:
+        raise ShippingError("출하 요청 수량은 1 이상이어야 합니다.")
+    return qty
 
 
 def _direct_children(db: Session, parent_item_id: uuid.UUID) -> list[tuple[uuid.UUID, int, str]]:
@@ -152,10 +166,10 @@ def _normalize_bom_lines(db: Session, base_pf: Item, payload_lines: list[dict] |
     for idx, raw in enumerate(payload_lines):
         stage = str(raw.get("parent_stage") or "PA").upper()
         if stage not in {"PA", "PF"}:
-            raise ShippingError("BOM 라인의 parent_stage는 PA 또는 PF여야 합니다.")
+            raise ShippingError("BOM ?쇱씤??parent_stage??PA ?먮뒗 PF?ъ빞 ?⑸땲??")
         qty = int(raw.get("quantity") or 0)
         if qty <= 0:
-            raise ShippingError("BOM 수량은 1 이상이어야 합니다.")
+            raise ShippingError("BOM ?섎웾? 1 ?댁긽?댁뼱???⑸땲??")
         child_id = raw.get("child_item_id")
         _get_item(db, child_id)
         normalized.append(
@@ -183,7 +197,7 @@ def _replace_bom_lines(db: Session, req: ShippingRequest, lines: list[dict]) -> 
     for idx, raw in enumerate(lines):
         key = (raw["parent_stage"], raw["child_item_id"])
         if key in seen:
-            raise ShippingError("같은 단계 안에 동일 품목이 중복되어 있습니다.")
+            raise ShippingError("媛숈? ?④퀎 ?덉뿉 ?숈씪 ?덈ぉ??以묐났?섏뼱 ?덉뒿?덈떎.")
         seen.add(key)
         db.add(
             ShippingRequestBomLine(
@@ -236,9 +250,10 @@ def _sync_checklist(db: Session, req: ShippingRequest) -> None:
 def create_request(db: Session, payload: dict) -> ShippingRequest:
     base_pf = _get_item(db, payload["base_pf_item_id"])
     if base_pf.process_type_code != "PF":
-        raise ShippingError("기준 품목은 PF여야 합니다.")
+        raise ShippingError("湲곗? ?덈ぉ? PF?ъ빞 ?⑸땲??")
     req = ShippingRequest(
         base_pf_item_id=base_pf.item_id,
+        request_quantity=_payload_request_quantity(payload),
         requested_by_name=payload.get("requested_by_name"),
         custom_pa_name=payload.get("custom_pa_name"),
         custom_pf_name=payload.get("custom_pf_name"),
@@ -247,9 +262,11 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     db.add(req)
     db.flush()
     _replace_bom_lines(db, req, _normalize_bom_lines(db, base_pf, payload.get("bom_lines")))
+    if payload.get("companion_lines") is not None:
+        _replace_companions(db, req, payload.get("companion_lines") or [])
     db.refresh(req)
     _sync_checklist(db, req)
-    _record_event(db, req, "REQUEST_CREATED", "출하 요청 생성")
+    _record_event(db, req, "REQUEST_CREATED", "異쒗븯 ?붿껌 ?앹꽦")
     db.flush()
     return req
 
@@ -257,7 +274,9 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
 def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
-        raise ShippingError("준비 완료된 요청은 먼저 준비 완료 취소 후 수정할 수 있습니다.")
+        raise ShippingError("以鍮??꾨즺???붿껌? 癒쇱? 以鍮??꾨즺 痍⑥냼 ???섏젙?????덉뒿?덈떎.")
+    if "request_quantity" in payload:
+        req.request_quantity = _payload_request_quantity(payload)
     if "requested_by_name" in payload:
         req.requested_by_name = payload.get("requested_by_name")
     if "custom_pa_name" in payload:
@@ -270,8 +289,10 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
         _replace_bom_lines(db, req, _normalize_bom_lines(db, req.base_pf_item, payload.get("bom_lines")))
         db.refresh(req)
         _sync_checklist(db, req)
+    if "companion_lines" in payload:
+        _replace_companions(db, req, payload.get("companion_lines") or [])
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "REQUEST_UPDATED", "출하 요청 수정")
+    _record_event(db, req, "REQUEST_UPDATED", "異쒗븯 ?붿껌 ?섏젙")
     db.flush()
     return req
 
@@ -280,18 +301,18 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
 def delete_request(db: Session, request_id: uuid.UUID) -> None:
     req = _get_request(db, request_id)
     if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
-        raise ShippingError("요청 또는 준비 중 상태에서만 출하 요청을 취소할 수 있습니다.")
+        raise ShippingError("?붿껌 ?먮뒗 以鍮?以??곹깭?먯꽌留?異쒗븯 ?붿껌??痍⑥냼?????덉뒿?덈떎.")
     db.delete(req)
     db.flush()
 
 def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.REQUESTED:
-        raise ShippingError("요청 상태에서만 준비 중으로 전환할 수 있습니다.")
+        raise ShippingError("?붿껌 ?곹깭?먯꽌留?以鍮?以묒쑝濡??꾪솚?????덉뒿?덈떎.")
     req.status = ShippingRequestStatusEnum.PREPARING
     req.updated_at = datetime.utcnow()
     _sync_checklist(db, req)
-    _record_event(db, req, "SENT_TO_PREP", "출하 준비 중 전환")
+    _record_event(db, req, "SENT_TO_PREP", "異쒗븯 以鍮?以??꾪솚")
     db.flush()
     return req
 
@@ -299,7 +320,7 @@ def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
 def update_checklist(db: Session, request_id: uuid.UUID, checks: dict[uuid.UUID, bool]) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
-        raise ShippingError("준비 중 상태에서만 체크리스트를 수정할 수 있습니다. 준비 완료 후에는 먼저 준비 완료 취소가 필요합니다.")
+        raise ShippingError("以鍮?以??곹깭?먯꽌留?泥댄겕由ъ뒪?몃? ?섏젙?????덉뒿?덈떎. 以鍮??꾨즺 ?꾩뿉??癒쇱? 以鍮??꾨즺 痍⑥냼媛 ?꾩슂?⑸땲??")
     rows = (
         db.query(ShippingRequestChecklistLine)
         .filter(ShippingRequestChecklistLine.request_id == req.request_id)
@@ -316,7 +337,7 @@ def update_checklist(db: Session, request_id: uuid.UUID, checks: dict[uuid.UUID,
 def clear_checklist(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
-        raise ShippingError("준비 중 상태에서만 체크리스트를 전체 해제할 수 있습니다. 준비 완료 후에는 먼저 준비 완료 취소가 필요합니다.")
+        raise ShippingError("以鍮?以??곹깭?먯꽌留?泥댄겕由ъ뒪?몃? ?꾩껜 ?댁젣?????덉뒿?덈떎. 以鍮??꾨즺 ?꾩뿉??癒쇱? 以鍮??꾨즺 痍⑥냼媛 ?꾩슂?⑸땲??")
     db.query(ShippingRequestChecklistLine).filter(
         ShippingRequestChecklistLine.request_id == req.request_id
     ).update({"checked": False}, synchronize_session=False)
@@ -335,7 +356,7 @@ def _create_item(db: Session, *, name: str, process_type_code: str, model_symbol
         .first()
     )
     if duplicate is not None:
-        raise ShippingError(f"같은 이름의 {process_type_code} 품목이 이미 있습니다: {name}")
+        raise ShippingError(f"媛숈? ?대쫫??{process_type_code} ?덈ぉ???대? ?덉뒿?덈떎: {name}")
     next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
     item = Item(
         item_name=name,
@@ -422,13 +443,13 @@ def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) ->
 def _resolve_or_create_pa(db: Session, req: ShippingRequest) -> Item:
     pa_lines = [(line.child_item_id, int(line.quantity), line.unit or "EA") for line in _request_stage_lines(req, "PA")]
     if not pa_lines:
-        raise ShippingError("PA 구성 BOM이 비어 있습니다.")
+        raise ShippingError("PA 援ъ꽦 BOM??鍮꾩뼱 ?덉뒿?덈떎.")
     sig = _signature((child_id, qty) for child_id, qty, _ in pa_lines)
     found = _find_item_by_signature(db, process_type_code="PA", signature=sig)
     if found is not None:
         return found
     if not (req.custom_pa_name and req.custom_pa_name.strip()):
-        raise ShippingError("동일 BOM이 없으므로 새 PA/PF 이름을 입력해야 합니다.")
+        raise ShippingError("?숈씪 BOM???놁쑝誘濡???PA/PF ?대쫫???낅젰?댁빞 ?⑸땲??")
     name = req.custom_pa_name
     pa = _create_item(db, name=name, process_type_code="PA", model_symbol=req.base_pf_item.model_symbol)
     _replace_item_bom(db, pa, pa_lines)
@@ -442,7 +463,7 @@ def _resolve_or_create_pf(db: Session, req: ShippingRequest, final_pa: Item) -> 
     if found is not None:
         return found
     if not (req.custom_pf_name and req.custom_pf_name.strip()):
-        raise ShippingError("동일 BOM이 없으므로 새 PA/PF 이름을 입력해야 합니다.")
+        raise ShippingError("?숈씪 BOM???놁쑝誘濡???PA/PF ?대쫫???낅젰?댁빞 ?⑸땲??")
     name = req.custom_pf_name
     pf = _create_item(db, name=name, process_type_code="PF", model_symbol=req.base_pf_item.model_symbol)
     _replace_item_bom(db, pf, pf_lines)
@@ -462,6 +483,7 @@ def _log_inventory_change(
     before_cells: dict,
     request_id: uuid.UUID,
     phase: str,
+    department: DepartmentEnum | None = None,
 ) -> TransactionLog:
     inv = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     log = TransactionLog(
@@ -478,13 +500,14 @@ def _log_inventory_change(
         inventory_effect=inv_effect.capture_effect(db, item.item_id, before_cells),
         shipping_request_id=request_id,
         shipping_phase=phase,
+        department=department.value if department is not None else None,
     )
     db.add(log)
     db.flush()
     return log
 
 
-def _backflush_warehouse(
+def _backflush_item_location(
     db: Session,
     req: ShippingRequest,
     item: Item,
@@ -493,7 +516,7 @@ def _backflush_warehouse(
     notes: str,
 ) -> None:
     before = inv_effect.snapshot_cells(db, item.item_id)
-    inv, qty_before = inventory_svc.consume_warehouse(db, item.item_id, Decimal(qty))
+    inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
     _log_inventory_change(
         db,
         item=item,
@@ -506,67 +529,50 @@ def _backflush_warehouse(
         before_cells=before,
         request_id=req.request_id,
         phase=PREPARE_PHASE,
+        department=dept,
     )
 
 
-def _produce_to_shipping_dept(db: Session, req: ShippingRequest, item: Item, reference_no: str, notes: str) -> None:
-    inv = inventory_svc.get_or_create_inventory(db, item.item_id)
-    before_total = int(inv.quantity or 0)
+def _produce_to_item_location(db: Session, req: ShippingRequest, item: Item, qty: int, reference_no: str, notes: str) -> None:
     before = inv_effect.snapshot_cells(db, item.item_id)
-    inventory_svc.receive_confirmed(db, item.item_id, Decimal(1), bucket="production", dept=DepartmentEnum.SHIPPING)
+    inv, qty_before, dept = inventory_svc.receive_to_item_department(db, item, Decimal(qty))
     _log_inventory_change(
         db,
         item=item,
         tx_type=TransactionTypeEnum.PRODUCE,
-        quantity_change=1,
-        quantity_before=before_total,
+        quantity_change=qty,
+        quantity_before=int(qty_before),
         reference_no=reference_no,
         produced_by=req.requested_by_name,
         notes=notes,
         before_cells=before,
         request_id=req.request_id,
         phase=PREPARE_PHASE,
+        department=dept,
     )
 
 
-def _consume_pa_from_shipping(db: Session, req: ShippingRequest, item: Item, qty: int, reference_no: str) -> None:
-    inv = inventory_svc.get_or_create_inventory(db, item.item_id)
-    before_total = int(inv.quantity or 0)
+def _consume_pa_from_item_location(db: Session, req: ShippingRequest, item: Item, qty: int, reference_no: str) -> None:
     before = inv_effect.snapshot_cells(db, item.item_id)
-    inventory_svc.consume_from_department(db, item.item_id, Decimal(qty), DepartmentEnum.SHIPPING)
+    inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
     _log_inventory_change(
         db,
         item=item,
         tx_type=TransactionTypeEnum.BACKFLUSH,
         quantity_change=-qty,
-        quantity_before=before_total,
+        quantity_before=int(qty_before),
         reference_no=reference_no,
         produced_by=req.requested_by_name,
-        notes=f"출하 준비 PF 생산 투입: {item.item_name} x {qty}",
+        notes=f"異쒗븯 以鍮?PF ?앹궛 ?ъ엯: {item.item_name} x {qty}",
         before_cells=before,
         request_id=req.request_id,
         phase=PREPARE_PHASE,
+        department=dept,
     )
 
 
-def _produce_pf_to_warehouse(db: Session, req: ShippingRequest, item: Item, reference_no: str) -> None:
-    inv = inventory_svc.get_or_create_inventory(db, item.item_id)
-    before_total = int(inv.quantity or 0)
-    before = inv_effect.snapshot_cells(db, item.item_id)
-    inventory_svc.receive_confirmed(db, item.item_id, Decimal(1))
-    _log_inventory_change(
-        db,
-        item=item,
-        tx_type=TransactionTypeEnum.PRODUCE,
-        quantity_change=1,
-        quantity_before=before_total,
-        reference_no=reference_no,
-        produced_by=req.requested_by_name,
-        notes=f"출하 준비 PF 완료: {item.item_name}",
-        before_cells=before,
-        request_id=req.request_id,
-        phase=PREPARE_PHASE,
-    )
+def _produce_pf_to_item_location(db: Session, req: ShippingRequest, item: Item, qty: int, reference_no: str) -> None:
+    _produce_to_item_location(db, req, item, qty, reference_no, f"출하 준비 PF 완료: {item.item_name} x {qty}")
 
 
 def _replace_companions(db: Session, req: ShippingRequest, companion_lines: list[dict]) -> None:
@@ -591,15 +597,11 @@ def _replace_companions(db: Session, req: ShippingRequest, companion_lines: list
     db.flush()
 
 
-def prepare_complete(
-    db: Session,
-    request_id: uuid.UUID,
-    *,
-    companion_lines: list[dict],
-) -> ShippingRequest:
+def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 상태에서만 준비 완료할 수 있습니다.")
+    request_qty = _request_quantity(req)
     final_pa = _resolve_or_create_pa(db, req)
     final_pf = _resolve_or_create_pf(db, req, final_pa)
     req.final_pa_item_id = final_pa.item_id
@@ -608,32 +610,33 @@ def prepare_complete(
 
     for line in _request_stage_lines(req, "PA"):
         child = _get_item(db, line.child_item_id)
-        _backflush_warehouse(
+        total_qty = int(line.quantity) * request_qty
+        _backflush_item_location(
             db,
             req,
             child,
-            int(line.quantity),
+            total_qty,
             reference_no,
-            f"출하 준비 PA 생산 투입: {child.item_name} x {int(line.quantity)}",
+            f"출하 준비 PA 생산 투입: {child.item_name} x {total_qty}",
         )
-    _produce_to_shipping_dept(db, req, final_pa, reference_no, f"출하 준비 PA 완료: {final_pa.item_name}")
+    _produce_to_item_location(db, req, final_pa, request_qty, reference_no, f"출하 준비 PA 완료: {final_pa.item_name} x {request_qty}")
 
     for child_id, qty, _unit in _pf_lines_with_final_pa(req, final_pa):
         child = _get_item(db, child_id)
+        total_qty = int(qty) * request_qty
         if child.item_id == final_pa.item_id:
-            _consume_pa_from_shipping(db, req, child, qty, reference_no)
+            _consume_pa_from_item_location(db, req, child, total_qty, reference_no)
         else:
-            _backflush_warehouse(
+            _backflush_item_location(
                 db,
                 req,
                 child,
-                qty,
+                total_qty,
                 reference_no,
-                f"출하 준비 PF 생산 투입: {child.item_name} x {qty}",
+                f"출하 준비 PF 생산 투입: {child.item_name} x {total_qty}",
             )
-    _produce_pf_to_warehouse(db, req, final_pf, reference_no)
+    _produce_pf_to_item_location(db, req, final_pf, request_qty, reference_no)
 
-    _replace_companions(db, req, companion_lines)
     req.status = ShippingRequestStatusEnum.PREPARED
     req.prepared_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
@@ -645,7 +648,7 @@ def prepare_complete(
 def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
-        raise ShippingError("준비 완료 상태에서만 취소할 수 있습니다.")
+        raise ShippingError("以鍮??꾨즺 ?곹깭?먯꽌留?痍⑥냼?????덉뒿?덈떎.")
     logs = (
         db.query(TransactionLog)
         .filter(
@@ -657,32 +660,29 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
         .all()
     )
     if not logs:
-        raise ShippingError("취소할 준비 완료 입출고 로그가 없습니다.")
+        raise ShippingError("痍⑥냼??以鍮??꾨즺 ?낆텧怨?濡쒓렇媛 ?놁뒿?덈떎.")
     for log in logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
         inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
         if inv is not None:
             _sync_total(db, inv)
         log.cancelled = True
-        log.cancel_reason = reason or "출하 준비 완료 취소"
+        log.cancel_reason = reason or "異쒗븯 以鍮??꾨즺 痍⑥냼"
         log.cancelled_at = datetime.utcnow()
     req.status = ShippingRequestStatusEnum.PREPARING
     req.prepared_at = None
     req.final_pa_item_id = None
     req.final_pf_item_id = None
     req.updated_at = datetime.utcnow()
-    db.query(ShippingRequestCompanionLine).filter(
-        ShippingRequestCompanionLine.request_id == req.request_id
-    ).delete(synchronize_session=False)
-    _record_event(db, req, "PREPARE_CANCELLED", reason or "출하 준비 완료 취소")
+    _record_event(db, req, "PREPARE_CANCELLED", reason or "異쒗븯 以鍮??꾨즺 痍⑥냼")
     db.flush()
     return req
 
 
-def _ship_from_warehouse(db: Session, req: ShippingRequest, item: Item, qty: int, notes: str) -> None:
+def _ship_from_item_location(db: Session, req: ShippingRequest, item: Item, qty: int, notes: str) -> None:
     reference_no = f"SHIP-{req.request_id.hex[:8]}"
     before = inv_effect.snapshot_cells(db, item.item_id)
-    inv, qty_before = inventory_svc.consume_warehouse(db, item.item_id, Decimal(qty))
+    inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
     _log_inventory_change(
         db,
         item=item,
@@ -695,21 +695,23 @@ def _ship_from_warehouse(db: Session, req: ShippingRequest, item: Item, qty: int
         before_cells=before,
         request_id=req.request_id,
         phase=PICKUP_PHASE,
+        department=dept,
     )
 
 
 def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
-        raise ShippingError("준비 완료 상태에서만 픽업 완료할 수 있습니다.")
+        raise ShippingError("以鍮??꾨즺 ?곹깭?먯꽌留??쎌뾽 ?꾨즺?????덉뒿?덈떎.")
     if req.final_pf_item is None:
-        raise ShippingError("최종 PF가 정해지지 않았습니다.")
-    _ship_from_warehouse(db, req, req.final_pf_item, 1, f"출하 픽업 완료: {req.final_pf_item.item_name}")
+        raise ShippingError("理쒖쥌 PF媛 ?뺥빐吏吏 ?딆븯?듬땲??")
+    request_qty = _request_quantity(req)
+    _ship_from_item_location(db, req, req.final_pf_item, request_qty, f"異쒗븯 ?쎌뾽 ?꾨즺: {req.final_pf_item.item_name} x {request_qty}")
     for line in req.companion_lines:
-        _ship_from_warehouse(db, req, line.item, int(line.quantity), f"출하 동반 품목: {line.item.item_name}")
+        _ship_from_item_location(db, req, line.item, int(line.quantity), f"異쒗븯 ?숇컲 ?덈ぉ: {line.item.item_name}")
     req.status = ShippingRequestStatusEnum.PICKED_UP
     req.picked_up_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "PICKED_UP", "배송업체 픽업 완료")
+    _record_event(db, req, "PICKED_UP", "諛곗넚?낆껜 ?쎌뾽 ?꾨즺")
     db.flush()
     return req
