@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
 import { NotificationPanel } from "../NotificationPanel";
 
+const TEXT = {
+  title: "알림",
+  loginPopup: "로그인 팝업",
+};
+
 const emptyHandlers = {
   onItemClick: vi.fn(),
   onMarkAll: vi.fn(),
@@ -27,7 +32,24 @@ function makeNotification(overrides: Partial<AppNotification> = {}): AppNotifica
 }
 
 describe("NotificationPanel", () => {
-  it("shows login popup enable action when the employee setting is off", () => {
+  it("keeps the title row separate from login popup controls", () => {
+    render(
+      <NotificationPanel
+        items={[makeNotification({ is_read: true })]}
+        unread={0}
+        loginPopupEnabled={true}
+        onToggleLoginPopup={vi.fn()}
+        {...emptyHandlers}
+      />,
+    );
+
+    expect(screen.getByText(TEXT.title)).toHaveClass("shrink-0");
+    expect(screen.getByText(TEXT.loginPopup)).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: TEXT.loginPopup })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "읽은 알림 삭제" })).toHaveClass("no-btn-inset");
+  });
+
+  it("renders the login popup switch off and toggles on click", () => {
     const onToggleLoginPopup = vi.fn();
     render(
       <NotificationPanel
@@ -39,12 +61,20 @@ describe("NotificationPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "로그인시 팝업 띄우기" }));
+    const toggle = screen.getByRole("switch", { name: TEXT.loginPopup });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(toggle).toHaveClass("no-btn-inset");
+    expect(screen.queryByText("켜기")).not.toBeInTheDocument();
+    expect(screen.queryByText("끄기")).not.toBeInTheDocument();
+    expect(screen.queryByText("켜짐")).not.toBeInTheDocument();
+    expect(screen.queryByText("꺼짐")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
 
     expect(onToggleLoginPopup).toHaveBeenCalledTimes(1);
   });
 
-  it("shows login popup stop action when the employee setting is on", () => {
+  it("renders the login popup switch on", () => {
     render(
       <NotificationPanel
         items={[]}
@@ -55,6 +85,8 @@ describe("NotificationPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "로그인시 팝업 띄우기 중지" })).toBeInTheDocument();
+    const toggle = screen.getByRole("switch", { name: TEXT.loginPopup });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(toggle).toHaveClass("no-btn-inset");
   });
 });
