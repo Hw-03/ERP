@@ -111,7 +111,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     });
     await expect(table).toBeVisible();
 
-    for (const name of ["일시", "작업", "대상", "흐름", "수량 · 재고", "상태 · 처리"]) {
+    for (const name of ["일시", "작업", "대상", "품목코드", "흐름", "수량 · 재고", "상태 · 처리"]) {
       await expect(table.getByRole("columnheader", { name })).toBeVisible();
     }
     await approveContext.close();

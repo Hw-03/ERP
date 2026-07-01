@@ -10,6 +10,8 @@ import {
   FlowBadge,
   FlowSummaryCell,
   HISTORY_CELL_TRANSITION,
+  ItemCodeCell,
+  SpacerCell,
   PeopleStatusCell,
   QuantityStockCell,
   TargetSummaryBlock,
@@ -51,9 +53,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       parts: [{ label: `${REWORK_LABEL} ${qty}${unit ? ` ${unit}` : ""}`, tone: "danger" }],
     },
     flow: {
-      ...basePresentation.flow,
-      label: "불량 처리",
-      hint: "회수 · 폐기 흐름",
+      label: REWORK_LABEL,
     },
   };
   const [hovered, setHovered] = useState(false);
@@ -103,7 +103,9 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
           icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
         />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <ItemCodeCell code={presentation.target.code} compact={compact} />
+      <SpacerCell compact={compact} />
+      <td className="whitespace-nowrap border-b px-5 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>

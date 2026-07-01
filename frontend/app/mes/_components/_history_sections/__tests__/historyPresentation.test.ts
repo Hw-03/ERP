@@ -191,7 +191,7 @@ describe("historyPresentation", () => {
     expect(row.target.title).toBe("AX-100");
     expect(row.target.meta).toEqual([]);
     expect(row.flow.label).toBe("창고 → 외부");
-    expect(row.stock?.label).toBe("처리 후 7 EA");
+    expect(row.stock?.label).toBe("창고 7 EA");
     expect(row.people).toEqual({ requester: "김민재", approver: "박승인" });
     expect(row.statusChips.map((chip) => chip.label)).toEqual(["취소"]);
   });
@@ -227,7 +227,7 @@ describe("historyPresentation", () => {
 
     expect(shipment.operationLabel).toBe("출하");
     expect(shipment.targetTitle).toBe("COGR + COCB + FET BD 70kV, 2mA");
-    expect(shipment.targetMeta).toEqual(["출하 구성 2라인"]);
+    expect(shipment.targetMeta).toEqual([]);
     expect(outbound.operationLabel).toBe("출고 구성");
     expect(outbound.targetTitle).toBe("출고 구성 2건");
   });
@@ -246,7 +246,7 @@ describe("historyPresentation", () => {
 
     expect(shipment.operationLabel).toBe("출하");
     expect(shipment.targetTitle).toBe("실제 출하품");
-    expect(shipment.targetMeta).toEqual(["출하 구성 3라인"]);
+    expect(shipment.targetMeta).toEqual([]);
   });
   it("describes shipment child rows by shipment workflow role", () => {
     expect(getReferenceBatchLinePresentation(
@@ -265,5 +265,70 @@ describe("historyPresentation", () => {
       makeLog({ transaction_type: "BACKFLUSH" }),
       "shipment",
     ).label).toBe("하위 차감");
+  });
+});
+
+describe("history immediate UX presentation policies", () => {
+  it("uses shipment flow and representative code for mixed shipping reference batches", () => {
+    const shipment = getReferenceBatchPresentation([
+      makeLog({
+        log_id: "prep-1",
+        transaction_type: "BACKFLUSH",
+        reference_no: "SHIP-mixed",
+        item_id: "ITEM-A",
+        mes_code: "8-HF-0014",
+      }),
+      makeLog({
+        log_id: "pickup-1",
+        transaction_type: "SHIP",
+        reference_no: "SHIP-mixed",
+        item_id: "ITEM-PF",
+        mes_code: "7-PF-0099",
+        item_name: "DX3000_60kV, 2mA_러시아_IP Tsizina S. A",
+        notes: "출하 픽업 완료: DX3000_60kV, 2mA_러시아_IP Tsizina S. A",
+      }),
+      makeLog({
+        log_id: "companion-1",
+        transaction_type: "SHIP",
+        reference_no: "SHIP-mixed",
+        item_id: "ITEM-PA",
+        mes_code: "7-PA-0001",
+        item_name: "동반 출하품",
+        notes: "출하 동반 품목: 동반 출하품",
+      }),
+    ]);
+
+    expect(shipment.operationLabel).toBe("출하");
+    expect(shipment.targetTitle).toBe("DX3000_60kV, 2mA_러시아_IP Tsizina S. A");
+    expect(shipment.targetCode).toBe("7-PF-0099");
+    expect(shipment.targetMeta).toEqual([]);
+    expect(shipment.movement.parts[0]?.label).toContain("출하");
+  });
+
+  it("labels shipping flow as shipment and stock label with its source scope", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "SHIP",
+      reference_no: "SHIP-single",
+      quantity_change: -5,
+      transfer_qty: 5,
+      quantity_after: 410,
+      notes: "출하 픽업 완료: DX3000_60kV, 2mA_러시아_IP Tsizina S. A",
+    }));
+
+    expect(row.operation.label).toBe("출하");
+    expect(row.flow.label).toBe("출하");
+    expect(row.stock?.label).toBe("창고 410 EA");
+    expect(row.flow.hint).toBeUndefined();
+  });
+
+  it("labels defective stock after quantities with the defective scope", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "DEFECT_SCRAP",
+      quantity_change: -2,
+      transfer_qty: 2,
+      quantity_after: 398,
+    }));
+
+    expect(row.stock?.label).toBe("불량 재고 398 EA");
   });
 });

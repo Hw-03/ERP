@@ -48,6 +48,7 @@ export interface HistoryFlowPresentation {
 
 export interface HistoryStockPresentation {
   label: string;
+  scopeLabel: string;
   before: number | null;
   after: number | null;
   unit: string;
@@ -136,29 +137,26 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
   const homogeneous = logs.length > 0 && logs.every((log) => log.item_id === first.item_id);
   const movementVerb = shipment ? "출하" : outbound ? "출고" : "하위";
   const movementTone = shipment || outbound ? "danger" : "muted";
-  const shipmentTarget = shipment ? getShippingTargetTitle(logs) : null;
+  const shipmentTarget = shipment ? getShippingTarget(logs) : null;
 
   return {
     kind,
     operationLabel,
-    targetTitle: shipmentTarget ?? `${titlePrefix} ${logs.length}건`,
-    targetCode: homogeneous ? first.mes_code : null,
-    targetMeta: shipment
-      ? [`출하 구성 ${logs.length}라인`]
-      : homogeneous
-        ? []
-        : [`${logs.length}라인`],
+    targetTitle: shipmentTarget?.title ?? `${titlePrefix} ${logs.length}건`,
+    targetCode: shipmentTarget?.code ?? (homogeneous ? first.mes_code : null),
+    targetMeta: [],
     movement: summarizeReferenceLogs(logs, movementVerb, movementTone),
   };
 }
 
-function getShippingTargetTitle(logs: TransactionLog[]): string | null {
+function getShippingTarget(logs: TransactionLog[]): { title: string; code: string | null } | null {
   for (const log of logs) {
     const parsed = parseShippingPickupNote(log.notes);
-    if (parsed) return parsed;
+    if (parsed) return { title: parsed, code: log.mes_code };
   }
   const pickupLog = logs.find((log) => log.transaction_type === "SHIP" && !isShippingCompanionLog(log));
-  return pickupLog?.item_name?.trim() || null;
+  const title = pickupLog?.item_name?.trim();
+  return title && pickupLog ? { title, code: pickupLog.mes_code } : null;
 }
 
 function parseShippingPickupNote(notes: string | null | undefined): string | null {
@@ -300,6 +298,9 @@ function getFlowPresentation(
   batch: IoBatch | null | undefined,
   hint?: string,
 ): HistoryFlowPresentation {
+  if (!batch && log.transaction_type === "SHIP" && isShippingReference(log)) {
+    return { label: "출하" };
+  }
   if (batch) {
     const endpoints = getBatchFlowEndpoints(batch);
     if (endpoints) {
@@ -308,11 +309,11 @@ function getFlowPresentation(
         from: endpoints.from,
         to: endpoints.to,
         mixed: endpoints.mixed,
-        hint,
+        hint: endpoints.mixed ? hint : undefined,
       };
     }
   }
-  return { label: getHistoryFlowLabel(log, batch), hint };
+  return { label: getHistoryFlowLabel(log, batch), hint: undefined };
 }
 
 function getStockPresentation(log: TransactionLog): HistoryStockPresentation | null {
@@ -323,13 +324,38 @@ function getStockPresentation(log: TransactionLog): HistoryStockPresentation | n
   const unit = log.item_unit?.trim() ?? "";
   const suffix = unit ? ` ${unit}` : "";
   const afterLabel = after == null ? "-" : `${formatQty(after)}${suffix}`;
+  const scopeLabel = getStockScopeLabel(log);
 
   return {
-    label: `처리 후 ${afterLabel}`,
+    label: `${scopeLabel} ${afterLabel}`,
+    scopeLabel,
     before,
     after,
     unit,
   };
+}
+
+function getStockScopeLabel(log: TransactionLog): string {
+  switch (log.transaction_type) {
+    case "MARK_DEFECTIVE":
+    case "UNMARK_DEFECTIVE":
+    case "DEFECT_SCRAP":
+    case "SUPPLIER_RETURN":
+      return "불량 재고";
+    case "TRANSFER_TO_WH":
+      return log.department?.trim() || "부서";
+    case "TRANSFER_TO_PROD":
+    case "SHIP":
+    case "RECEIVE":
+    case "BACKFLUSH":
+      return "창고";
+    case "TRANSFER_DEPT":
+    case "PRODUCE":
+    case "DISASSEMBLE":
+      return log.department?.trim() || "부서";
+    default:
+      return log.department?.trim() || "창고";
+  }
 }
 
 function getStatusChips(

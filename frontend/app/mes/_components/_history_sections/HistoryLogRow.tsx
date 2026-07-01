@@ -12,6 +12,8 @@ import {
   FlowBadge,
   FlowSummaryCell,
   HISTORY_CELL_TRANSITION,
+  ItemCodeCell,
+  SpacerCell,
   PeopleStatusCell,
   QuantityStockCell,
   TargetSummaryBlock,
@@ -80,7 +82,9 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
           icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
         />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <ItemCodeCell code={presentation.target.code} compact={compact} />
+      <SpacerCell compact={compact} />
+      <td className="whitespace-nowrap border-b px-5 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>

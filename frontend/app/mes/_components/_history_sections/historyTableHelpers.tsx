@@ -22,7 +22,7 @@ import {
   type MovementTone,
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
-import { getHistoryRowPresentation, getReferenceBatchPresentation } from "./historyPresentation";
+import { getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 
 const TX_ICON = {
@@ -165,33 +165,65 @@ export function TargetSummaryBlock({
           {titleOverride ?? presentation.target.title}
         </span>
       </div>
-      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-        {presentation.target.code && <span className="font-semibold">{presentation.target.code}</span>}
-        {meta.map((part) => (
-          <span key={part} className="rounded-full px-1.5 py-0.5" style={{ background: tint(LEGACY_COLORS.muted2, 10) }}>
-            {part}
-          </span>
-        ))}
-      </div>
+      {meta.length > 0 && (
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          {meta.map((part) => (
+            <span key={part} className="font-semibold">
+              {part}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+export function ItemCodeCell({
+  code,
+  compact,
+  dense = false,
+}: {
+  code?: string | null;
+  compact?: boolean;
+  dense?: boolean;
+}) {
+  const padX = compact ? "px-2" : "px-3";
+  const py = dense ? "py-1.5" : "py-3";
+  return (
+    <td
+      className={`whitespace-nowrap border-b ${padX} ${py} text-center text-xs font-semibold`}
+      style={{ borderColor: LEGACY_COLORS.border, color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted, transition: HISTORY_CELL_TRANSITION }}
+    >
+      {code || "-"}
+    </td>
+  );
+}
+
+export function SpacerCell({ compact, dense = false }: { compact?: boolean; dense?: boolean }) {
+  const py = dense ? "py-1.5" : "py-3";
+  return (
+    <td
+      aria-hidden
+      className={`${compact ? "px-1" : "px-2"} ${py} border-b`}
+      style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
+    />
   );
 }
 
 export function FlowSummaryCell({ presentation }: { presentation: HistoryRowPresentation }) {
   return (
-    <div className="flex flex-col items-center gap-1 text-xs">
+    <div className="flex flex-col items-center gap-1 text-xs leading-tight">
       <span className="rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
         {presentation.flow.label}
       </span>
       {presentation.flow.hint && (
-        <span className="max-w-[9rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="max-w-[8.5rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
           {presentation.flow.hint}
         </span>
       )}
     </div>
   );
 }
-
 export function QuantityStockCell({
   presentation,
   summary,
@@ -200,7 +232,7 @@ export function QuantityStockCell({
   summary?: MovementSummary;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-2 leading-tight">
       <MovementSummaryCell summary={summary ?? presentation.movement} />
       {presentation.stock && (
         <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -213,7 +245,7 @@ export function QuantityStockCell({
 
 export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPresentation }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-2 leading-tight">
       <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
         요청 {presentation.people.requester}
       </div>
@@ -379,6 +411,8 @@ export function BatchHeader({
       label: referencePresentation.operationLabel,
     },
     movement: summary,
+    flow: referencePresentation.kind === "shipment" ? { label: "출하" } : { ...basePresentation.flow, hint: undefined },
+    stock: null,
     target: {
       ...basePresentation.target,
       title: referencePresentation.targetTitle,
@@ -430,7 +464,9 @@ export function BatchHeader({
           icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
         />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <ItemCodeCell code={presentation.target.code} compact={compact} />
+      <SpacerCell compact={compact} />
+      <td className="whitespace-nowrap border-b px-5 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -451,21 +487,16 @@ export function ReferenceBatchDetail({
   compact?: boolean;
 }) {
   const presentation = getReferenceBatchPresentation(logs);
-  const lineLabel = presentation.kind === "shipment"
-    ? "출하품"
-    : presentation.kind === "outbound"
-      ? "출고품"
-      : "구성품";
-  const color = presentation.kind === "batch" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red;
+
+  const sortedLogs = [...logs].sort((a, b) => getReferenceBatchLineOrder(a, presentation.kind) - getReferenceBatchLineOrder(b, presentation.kind));
 
   return (
     <>
-      {logs.map((log) => (
+      {sortedLogs.map((log) => (
         <ReferenceBatchLineRow
           key={log.log_id}
           log={log}
-          label={lineLabel}
-          color={color}
+          kind={presentation.kind}
           compact={compact}
         />
       ))}
@@ -475,23 +506,23 @@ export function ReferenceBatchDetail({
 
 function ReferenceBatchLineRow({
   log,
-  label,
-  color,
+  kind,
   compact,
 }: {
   log: TransactionLog;
-  label: string;
-  color: string;
+  kind: ReturnType<typeof getReferenceBatchPresentation>["kind"];
   compact?: boolean;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const presentation = getHistoryRowPresentation(log);
+  const linePresentation = getReferenceBatchLinePresentation(log, kind);
+  const lineColor = PRESENTATION_TONE_COLOR[linePresentation.tone];
 
   return (
-    <tr style={{ background: "color-mix(in srgb, var(--c-blue) 3%, transparent)" }}>
+    <tr style={{ background: kind === "shipment" ? "color-mix(in srgb, var(--c-blue) 3%, transparent)" : "color-mix(in srgb, var(--c-red) 3%, transparent)" }}>
       <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
       <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={log.transaction_type} label={label} color={color} />
+        <FlowBadge type={log.transaction_type} label={linePresentation.label} color={lineColor} />
       </td>
       <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-start gap-2">
@@ -501,15 +532,12 @@ function ReferenceBatchLineRow({
             <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
               {log.item_name}
             </div>
-            {log.mes_code && (
-              <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {log.mes_code}
-              </div>
-            )}
           </div>
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <ItemCodeCell code={presentation.target.code} compact={compact} dense />
+      <SpacerCell compact={compact} dense />
+      <td className="whitespace-nowrap border-b px-5 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -521,6 +549,18 @@ function ReferenceBatchLineRow({
     </tr>
   );
 }
+function getReferenceBatchLineOrder(
+  log: TransactionLog,
+  kind: ReturnType<typeof getReferenceBatchPresentation>["kind"],
+): number {
+  if (kind !== "shipment") return 0;
+  const line = getReferenceBatchLinePresentation(log, kind);
+  if (line.label === "출하 대상") return 0;
+  if (line.label === "동반 출하품") return 1;
+  if (line.label === "출하 준비") return 2;
+  return 3;
+}
+
 /**
  * operation_batch_id 기반 묶음 헤더.
  * batch cache 가 있으면 IoBatch 기준 대상/흐름/라인 상태를 한 행에서 설명한다.
@@ -568,7 +608,7 @@ export function OpBatchHeader({
     target: {
       ...basePresentation.target,
       title: titleText,
-      meta: batch ? basePresentation.target.meta : [`${group.logs.length}라인`],
+      meta: [],
     },
   };
   const [hovered, setHovered] = useState(false);
@@ -617,7 +657,9 @@ export function OpBatchHeader({
           icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
         />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <ItemCodeCell code={presentation.target.code} compact={compact} />
+      <SpacerCell compact={compact} />
+      <td className="whitespace-nowrap border-b px-5 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>

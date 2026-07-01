@@ -12,7 +12,7 @@ import {
   getHistoryLineStatusLabel,
   type LineSignTone,
 } from "./historyBatchInterpreter";
-import { HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
+import { HISTORY_CELL_TRANSITION, ItemCodeCell, SpacerCell } from "./historyTableHelpers";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,
@@ -187,15 +187,12 @@ function BundleRows({
               <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
                 {bundle.title}
               </div>
-              {(bundle.source_mes_code || singleLineCode) && (
-                <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {bundle.source_mes_code ?? singleLineCode}
-                </div>
-              )}
             </div>
           </div>
         </td>
-        <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+        <ItemCodeCell code={bundle.source_mes_code ?? singleLineCode} compact={compact} dense />
+        <SpacerCell compact={compact} dense />
+        <td className="whitespace-nowrap border-b px-5 py-2 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
           {isBomParent ? `하위 ${childLines.length}라인` : "단품 라인"}
         </td>
         <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
@@ -242,15 +239,12 @@ function BomLineRow({ line, batch, bundle, compact }: { line: IoLine; batch: IoB
             <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
               {line.item_name}
             </div>
-            {line.mes_code && (
-              <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {line.mes_code}
-              </div>
-            )}
           </div>
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-1.5 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+      <ItemCodeCell code={line.mes_code} compact={compact} dense />
+      <SpacerCell compact={compact} dense />
+      <td className="whitespace-nowrap border-b px-5 py-1.5 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         {getLineRoleLabel(line, batch)}
       </td>
       <td className="whitespace-nowrap border-b px-4 py-1.5 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: qtyColor }}>

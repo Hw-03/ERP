@@ -35,24 +35,27 @@ type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left
 
 // 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 흐름 → 수량/재고 → 상태.
 const COLUMNS_DEFAULT: ColSpec[] = [
-  { label: "일시", width: "124px", align: "center" },
-  { label: "작업", width: "132px", align: "center" },
-  { label: "대상", minWidth: "240px" },
-  { label: "흐름", width: "150px", align: "center" },
-  { label: "수량 · 재고", width: "190px", align: "center" },
-  { label: "상태 · 처리", width: "190px" },
+  { label: "일시", width: "118px", align: "center" },
+  { label: "작업", width: "128px", align: "center" },
+  { label: "대상", minWidth: "360px" },
+  { label: "품목코드", width: "124px", align: "center" },
+  { label: "", width: "52px", align: "center", px: "px-1" },
+  { label: "흐름", width: "148px", align: "center" },
+  { label: "수량 · 재고", width: "204px", align: "center" },
+  { label: "상태 · 처리", width: "196px" },
 ];
 
-// 우측 패널 열림 — 대상/수량/상태가 남도록 일시·작업·흐름을 압축.
+// 우측 패널 열림 — 대상과 품목코드는 유지하고 판단 영역만 살짝 압축한다.
 const COLUMNS_COMPACT: ColSpec[] = [
   { label: "일시", width: "104px", align: "center", px: "px-2" },
   { label: "작업", width: "116px", align: "center", px: "px-2" },
-  { label: "대상", minWidth: "220px" },
+  { label: "대상", minWidth: "280px" },
+  { label: "품목코드", width: "108px", align: "center", px: "px-2" },
+  { label: "", width: "28px", align: "center", px: "px-1" },
   { label: "흐름", width: "132px", align: "center", px: "px-2" },
-  { label: "수량 · 재고", width: "172px", align: "center" },
-  { label: "상태 · 처리", width: "170px" },
+  { label: "수량 · 재고", width: "184px", align: "center" },
+  { label: "상태 · 처리", width: "180px" },
 ];
-
 const VISIBLE_FETCH_CONCURRENCY = 4;
 
 export function HistoryTable({
@@ -278,10 +281,11 @@ export function HistoryTable({
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-10">
               <tr style={{ background: LEGACY_COLORS.s2 }}>
-                {COLUMNS.map(({ label, width, minWidth, align, hidden, px }) => (
+                {COLUMNS.map(({ label, width, minWidth, align, hidden, px }, index) => (
                   <th
-                    key={label}
-                    scope="col"
+                    key={label || `spacer-${index}`}
+                    scope={label ? "col" : undefined}
+                    aria-hidden={label ? undefined : true}
                     className={`whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : "text-left"}`}
                     style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
@@ -354,7 +358,8 @@ export function HistoryTable({
                         selected={isSelected}
                         onSelect={() => {
                           onSelectLog(group.logs[0]);
-                          expandGroup(group.refNo);
+                          if (isSelected && expanded) collapseGroup(group.refNo);
+                          else expandGroup(group.refNo);
                         }}
                         compact={compact}
                       />
@@ -382,7 +387,8 @@ export function HistoryTable({
                       selected={isSelected}
                       onSelect={() => {
                         onSelectLog(group.logs[0]);
-                        expandGroup(group.refNo);
+                        if (isSelected && expanded) collapseGroup(group.refNo);
+                        else expandGroup(group.refNo);
                       }}
                       compact={compact}
                     />
