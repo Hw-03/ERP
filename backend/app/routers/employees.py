@@ -15,6 +15,7 @@ from app.schemas import (
     EmployeeCreate,
     EmployeePinChangeRequest,
     EmployeePinResetRequest,
+    EmployeeLoginNotificationPopupUpdate,
     EmployeeResponse,
     EmployeeThemeUpdate,
     EmployeeUpdate,
@@ -300,6 +301,7 @@ def create_employee(
         department_role=dept_role_value,
         io_enabled=io_enabled,
         hidden_sidebar_tabs=_serialize_hidden_sidebar_tabs(hidden_tabs),
+        login_notification_popup_enabled=bool(payload.login_notification_popup_enabled),
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
@@ -407,6 +409,11 @@ def update_employee(
         if (getattr(employee, "hidden_sidebar_tabs", "") or "") != hidden_raw:
             employee.hidden_sidebar_tabs = hidden_raw
             changed.append("hidden_sidebar_tabs")
+    if payload.login_notification_popup_enabled is not None:
+        next_login_popup = bool(payload.login_notification_popup_enabled)
+        if bool(getattr(employee, "login_notification_popup_enabled", False)) != next_login_popup:
+            employee.login_notification_popup_enabled = next_login_popup
+            changed.append("login_notification_popup_enabled")
     if payload.assigned_model_slots is not None:
         current = _assigned_slots_for(db, employee.employee_id)
         if current != payload.assigned_model_slots:
@@ -573,6 +580,23 @@ def reset_employee_pin(
     commit_only(db)
 
 
+
+@router.put("/{employee_id}/login-popup", response_model=EmployeeResponse, status_code=status.HTTP_200_OK)
+def update_employee_login_notification_popup(
+    employee_id: uuid.UUID,
+    payload: EmployeeLoginNotificationPopupUpdate,
+    db: Session = Depends(get_db),
+):
+    """직원 로그인 알림 팝업 설정 저장."""
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    employee.login_notification_popup_enabled = payload.login_notification_popup_enabled
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_and_refresh(db, employee)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+
 @router.put("/{employee_id}/theme", response_model=EmployeeResponse, status_code=status.HTTP_200_OK)
 def update_employee_theme(
     employee_id: uuid.UUID,
@@ -625,4 +649,5 @@ def _to_response(
         theme=getattr(employee, "theme", None),
         assigned_model_slots=assigned_model_slots or [],
         hidden_sidebar_tabs=_effective_hidden_sidebar_tabs(employee),
+        login_notification_popup_enabled=bool(getattr(employee, "login_notification_popup_enabled", False)),
     )

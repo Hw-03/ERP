@@ -36,6 +36,7 @@ export const employeesApi = {
     assigned_model_slots?: number[];
     /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. */
     hidden_sidebar_tabs?: string[];
+    login_notification_popup_enabled?: boolean;
   }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
 
   updateEmployee: (
@@ -56,6 +57,7 @@ export const employeesApi = {
       assigned_model_slots?: number[];
       /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. */
       hidden_sidebar_tabs?: string[];
+      login_notification_popup_enabled?: boolean;
     },
   ) => putJson<Employee>(toApiUrl(`/api/employees/${employeeId}`), payload),
 
@@ -74,6 +76,11 @@ export const employeesApi = {
   changeMyPin: (employeeId: string, currentPin: string, newPin: string) =>
     postJson<void>(toApiUrl(`/api/employees/${employeeId}/change-pin`), { current_pin: currentPin, new_pin: newPin }),
 
+
+  setLoginPopup: (employeeId: string, enabled: boolean) =>
+    putJson<Employee>(toApiUrl(`/api/employees/${employeeId}/login-popup`), {
+      login_notification_popup_enabled: enabled,
+    }),
   // 직원 테마 설정 저장
   setEmployeeTheme: (employeeId: string, theme: string | null) =>
     putJson<Employee>(toApiUrl(`/api/employees/${employeeId}/theme`), { theme }),

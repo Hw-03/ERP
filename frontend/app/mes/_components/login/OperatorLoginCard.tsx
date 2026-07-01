@@ -53,6 +53,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         assigned_model_slots: emp.assigned_model_slots ?? [],
         io_enabled: emp.io_enabled ?? true,
         hidden_sidebar_tabs: emp.hidden_sidebar_tabs ?? [],
+        loginPopupEnabled: emp.login_notification_popup_enabled ?? false,
       };
 
       // 백엔드에서 받은 theme을 DOM과 localStorage에 적용

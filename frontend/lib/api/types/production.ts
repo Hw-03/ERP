@@ -38,6 +38,8 @@ export interface TransactionLog {
   approved_at?: string | null;
   department: string | null;
   notes: string | null;
+  reason_category?: string | null;
+  reason_memo?: string | null;
   operation_batch_id: string | null;
   created_at: string;
   edit_count?: number;

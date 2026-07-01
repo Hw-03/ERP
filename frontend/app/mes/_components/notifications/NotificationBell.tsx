@@ -10,7 +10,8 @@ import {
   useMarkNotificationsReadMutation,
   useNotificationsQuery,
 } from "@/lib/queries/useNotificationsQuery";
-import { useCurrentOperator } from "../login/useCurrentOperator";
+import { employeesApi } from "@/lib/api/employees";
+import { getStoredBootId, setCurrentOperator, useCurrentOperator } from "../login/useCurrentOperator";
 import { NotificationPanel } from "./NotificationPanel";
 
 /** 상단 헤더 종 아이콘 — 안 읽은 알림 배지 + 드롭다운 패널. 30초 폴링. */
@@ -26,6 +27,7 @@ export function NotificationBell({
   const deleteNotification = useDeleteNotificationMutation();
   const deleteRead = useDeleteReadNotificationsMutation();
   const [open, setOpen] = useState(false);
+  const loginPopupShownRef = useRef<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const items = data?.items ?? [];
@@ -39,6 +41,13 @@ export function NotificationBell({
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+
+  useEffect(() => {
+    if (!employeeId || !operator?.loginPopupEnabled || !data) return;
+    if (loginPopupShownRef.current === employeeId) return;
+    loginPopupShownRef.current = employeeId;
+    if ((data.unread_count ?? 0) > 0) setOpen(true);
+  }, [data, employeeId, operator?.loginPopupEnabled]);
 
   if (!employeeId) return null;
 
@@ -65,13 +74,20 @@ export function NotificationBell({
     if (employeeId) deleteRead.mutate(employeeId);
   }
 
+  async function handleToggleLoginPopup() {
+    if (!operator || !employeeId) return;
+    const nextEnabled = !operator.loginPopupEnabled;
+    await employeesApi.setLoginPopup(employeeId, nextEnabled);
+    setCurrentOperator({ ...operator, loginPopupEnabled: nextEnabled }, getStoredBootId() ?? undefined);
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((prev) => !prev)}
         title="알림"
         aria-label={unread > 0 ? `알림 ${unread}건` : "알림"}
-        className="relative flex h-9 w-9 items-center justify-center rounded-[14px] border transition-opacity hover:opacity-90"
+        className="relative flex h-9 w-9 items-center justify-center rounded-[14px] border"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
       >
         <Bell
@@ -96,6 +112,8 @@ export function NotificationBell({
           onMarkAll={handleMarkAll}
           onDeleteItem={handleDeleteItem}
           onDeleteRead={handleDeleteRead}
+          loginPopupEnabled={operator?.loginPopupEnabled ?? false}
+          onToggleLoginPopup={() => void handleToggleLoginPopup()}
         />
       )}
     </div>

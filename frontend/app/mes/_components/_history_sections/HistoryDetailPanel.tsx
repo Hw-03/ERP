@@ -29,7 +29,7 @@ import {
 } from "./historyTableHelpers";
 import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
 import { toInventoryEffectRows, type InventoryEffectCell } from "./historyInventoryEffect";
-import { getHistoryRowPresentation } from "./historyPresentation";
+import { formatDefectReason, getHistoryRowPresentation } from "./historyPresentation";
 
 type Props = {
   selected: TransactionLog | null;
@@ -182,6 +182,8 @@ export function HistoryDetailPanel({
           취소된 거래 — {selected.cancel_reason}
         </div>
       )}
+
+      <HistoryDetailReason log={selected} />
 
       <HistoryDetailMemo notes={selected.notes} />
 
@@ -488,6 +490,19 @@ function HistoryDetailMetaStrip({
  * (요청 승인 처리, [dept_adj], [격리] 등)는 parseTransactionNotes 가 걸러냄.
  * HistoryBatchDetailPanel 에서도 재사용.
  */
+
+function HistoryDetailReason({ log }: { log: TransactionLog }) {
+  const reason = formatDefectReason(log);
+  if (!reason) return null;
+  return (
+    <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.yellow }}>사유</div>
+      <div className="whitespace-pre-wrap break-words text-sm leading-relaxed" style={{ color: LEGACY_COLORS.text }}>
+        {reason}
+      </div>
+    </div>
+  );
+}
 export function HistoryDetailMemo({ notes }: { notes: string | null | undefined }) {
   const { userMemo } = parseTransactionNotes(notes);
   if (!userMemo) return null;

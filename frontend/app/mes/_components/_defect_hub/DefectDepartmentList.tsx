@@ -105,6 +105,8 @@ export function DefectDepartmentList({
             <div className="divide-y" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
                 {rows.map((loc, idx) => {
                   const warn = isOverOneYear(loc.defective_at);
+                  const reasonCategory = loc.reason_category?.trim();
+                  const reasonMemo = loc.reason_memo?.trim();
                   return (
                     <div
                       key={`${loc.item_id}-${idx}`}
@@ -137,6 +139,11 @@ export function DefectDepartmentList({
                             </span>
                           )}
                         </div>
+                        {(reasonCategory || reasonMemo) && (
+                          <div className="mt-1 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                            사유 {reasonCategory}{reasonCategory && reasonMemo ? " · " : ""}{reasonMemo}
+                          </div>
+                        )}
                       </div>
 
                       {/* 처리 버튼 (Phase 5 placeholder) */}

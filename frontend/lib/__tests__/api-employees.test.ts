@@ -96,3 +96,18 @@ describe("employeesApi.updateEmployee", () => {
     expect(JSON.parse(init.body as string)).toEqual({ is_active: false });
   });
 });
+describe("employeesApi.setLoginPopup", () => {
+  it("PUTs the personal login popup setting without admin payload", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ employee_id: "emp-1", login_notification_popup_enabled: true })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await employeesApi.setLoginPopup("emp-1", true);
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/employees/emp-1/login-popup");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({ login_notification_popup_enabled: true });
+  });
+});

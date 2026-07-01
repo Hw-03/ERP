@@ -35,4 +35,5 @@ export interface Employee {
   assigned_model_slots?: number[];
   /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. 누락 시 []로 간주. */
   hidden_sidebar_tabs?: string[];
+  login_notification_popup_enabled?: boolean;
 }

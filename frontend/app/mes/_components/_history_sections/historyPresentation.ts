@@ -72,6 +72,17 @@ export interface HistoryRowPresentation {
 
 export type ReferenceBatchKind = "shipment" | "outbound" | "batch";
 
+export function formatDefectReason(input: {
+  reason_category?: string | null;
+  reason_memo?: string | null;
+}): string | null {
+  const category = input.reason_category?.trim();
+  const memo = input.reason_memo?.trim();
+  if (category && memo) return `${category} · ${memo}`;
+  return category || memo || null;
+}
+
+
 export interface ReferenceBatchPresentation {
   kind: ReferenceBatchKind;
   operationLabel: string;
@@ -79,6 +90,29 @@ export interface ReferenceBatchPresentation {
   targetCode: string | null;
   targetMeta: string[];
   movement: MovementSummary;
+}
+
+export interface ReferenceBatchLinePresentation {
+  label: string;
+  tone: HistoryPresentationTone;
+}
+
+export function getReferenceBatchLinePresentation(
+  log: TransactionLog,
+  kind: ReferenceBatchKind,
+): ReferenceBatchLinePresentation {
+  if (kind === "shipment") {
+    if (log.transaction_type === "BACKFLUSH") return { label: "하위 차감", tone: "warning" };
+    if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE" || log.transaction_type === "TRANSFER_TO_PROD" || log.transaction_type === "TRANSFER_TO_WH" || log.transaction_type === "TRANSFER_DEPT") {
+      return { label: "출하 준비", tone: "info" };
+    }
+    if (log.transaction_type === "SHIP") {
+      return { label: isShippingCompanionLog(log) ? "동반 출하품" : "출하 대상", tone: "danger" };
+    }
+    return { label: "출하 구성", tone: "muted" };
+  }
+  if (kind === "outbound") return { label: "출고품", tone: "danger" };
+  return { label: "구성품", tone: "muted" };
 }
 
 export function isShippingReference(input: {
@@ -102,15 +136,41 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
   const homogeneous = logs.length > 0 && logs.every((log) => log.item_id === first.item_id);
   const movementVerb = shipment ? "출하" : outbound ? "출고" : "하위";
   const movementTone = shipment || outbound ? "danger" : "muted";
+  const shipmentTarget = shipment ? getShippingTargetTitle(logs) : null;
 
   return {
     kind,
     operationLabel,
-    targetTitle: `${titlePrefix} ${logs.length}건`,
+    targetTitle: shipmentTarget ?? `${titlePrefix} ${logs.length}건`,
     targetCode: homogeneous ? first.mes_code : null,
-    targetMeta: homogeneous ? [] : [`${logs.length}라인`],
+    targetMeta: shipment
+      ? [`출하 구성 ${logs.length}라인`]
+      : homogeneous
+        ? []
+        : [`${logs.length}라인`],
     movement: summarizeReferenceLogs(logs, movementVerb, movementTone),
   };
+}
+
+function getShippingTargetTitle(logs: TransactionLog[]): string | null {
+  for (const log of logs) {
+    const parsed = parseShippingPickupNote(log.notes);
+    if (parsed) return parsed;
+  }
+  const pickupLog = logs.find((log) => log.transaction_type === "SHIP" && !isShippingCompanionLog(log));
+  return pickupLog?.item_name?.trim() || null;
+}
+
+function parseShippingPickupNote(notes: string | null | undefined): string | null {
+  const text = notes?.trim();
+  if (!text) return null;
+  const match = text.match(/^출하\s+픽업\s+완료:\s*(.+)$/);
+  const title = match?.[1]?.trim();
+  return title || null;
+}
+
+function isShippingCompanionLog(log: TransactionLog): boolean {
+  return /^출하\s+동반\s+품목/.test(log.notes?.trim() ?? "");
 }
 
 function summarizeReferenceLogs(
@@ -224,9 +284,8 @@ function getTargetPresentation(
     : first.title;
   const meta: string[] = [];
   if (stats) {
-    if (stats.bomBundleCount > 0) meta.push(`BOM ${stats.bomBundleCount}묶음`);
-    if (stats.directBundleCount > 0) meta.push(`단품 ${stats.directBundleCount}묶음`);
-    if (stats.lineCount > 0) meta.push(`${stats.lineCount}라인`);
+    if (stats.lineCount > 0) meta.push(`부품 차감 ${stats.lineCount}라인`);
+    else if (stats.directBundleCount > 0) meta.push(`단품 ${stats.directBundleCount}묶음`);
   }
 
   return {
@@ -285,6 +344,8 @@ function getStatusChips(
 
   const memo = parseTransactionNotes(batch?.notes ?? log.notes).userMemo;
   if (memo) chips.push({ label: "메모", tone: "primary", title: memo });
+  const defectReason = formatDefectReason(log);
+  if (defectReason) chips.push({ label: "\uC0AC\uC720", tone: "warning", title: defectReason });
 
 
   if (stats && stats.shortageCount > 0) chips.push({ label: `부족 ${stats.shortageCount}`, tone: "danger" });

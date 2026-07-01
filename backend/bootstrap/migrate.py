@@ -224,6 +224,7 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE employees ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
     # 2026-06-29: 직원별 사이드바/모바일 탭 숨김 목록. 빈 문자열이면 모든 탭 표시.
     "ALTER TABLE employees ADD COLUMN hidden_sidebar_tabs TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE employees ADD COLUMN login_notification_popup_enabled BOOLEAN NOT NULL DEFAULT 0",
     # Preserve saved employee permission settings on repeated bootstrap runs.
     "UPDATE employees SET io_enabled = io_enabled WHERE 0 = 1",
     # 2026-05-27: 불량·수량조정 부서 필터 수정 — 직접 생성된 TransactionLog 에 부서 기록.

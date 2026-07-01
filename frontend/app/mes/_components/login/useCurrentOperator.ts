@@ -26,6 +26,7 @@ export interface Operator {
   io_enabled: boolean;
   /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. 누락 시 [] (기존 세션 호환). */
   hidden_sidebar_tabs: string[];
+  loginPopupEnabled: boolean;
 }
 
 const OPERATOR_KEY = "dexcowin_mes_operator";
@@ -44,6 +45,7 @@ function readOperator(): Operator | null {
       department_role?: string | null;
       assigned_model_slots?: unknown;
       hidden_sidebar_tabs?: unknown;
+      loginPopupEnabled?: unknown;
     };
     if (!parsed.employee_id || !parsed.name) return null;
     const wh = (parsed.warehouse_role ?? "none").toLowerCase();
@@ -68,6 +70,7 @@ function readOperator(): Operator | null {
       assigned_model_slots: slots,
       io_enabled: parsed.io_enabled ?? true,
       hidden_sidebar_tabs: hiddenTabs,
+      loginPopupEnabled: parsed.loginPopupEnabled === true,
     };
   } catch {
     return null;

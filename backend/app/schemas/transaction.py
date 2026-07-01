@@ -74,6 +74,8 @@ class TransactionLogResponse(BaseModel):
     requested_at: Optional[UtcDatetime] = None
     approved_at: Optional[UtcDatetime] = None
     notes: Optional[str]
+    reason_category: Optional[str] = None
+    reason_memo: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
     created_at: UtcDatetime
     edit_count: int = 0

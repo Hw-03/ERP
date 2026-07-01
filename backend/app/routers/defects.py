@@ -138,9 +138,7 @@ def list_defect_locations(
         )
     ) if item_ids else set()
 
-    # item_id 별 최근 MARK_DEFECTIVE 로그 일괄 조회 — N+1 제거.
-    # 기존 단건 쿼리와 동일하게 item_id 기준(부서 무관) created_at 내림차순 최신 1건.
-    last_log_by_item: dict = {}
+    last_log_by_item_dept: dict[tuple[uuid.UUID, str], TransactionLog] = {}
     if item_ids:
         for log in (
             db.query(TransactionLog)
@@ -151,12 +149,13 @@ def list_defect_locations(
             .order_by(TransactionLog.created_at.desc())
             .all()
         ):
-            # 내림차순 순회 → 가장 먼저 만난(=최신) 로그만 남김.
-            last_log_by_item.setdefault(log.item_id, log)
+            if not log.department:
+                continue
+            last_log_by_item_dept.setdefault((log.item_id, str(log.department)), log)
 
     result: List[DefectLocationItem] = []
     for loc, item in rows:
-        last_log: Optional[TransactionLog] = last_log_by_item.get(loc.item_id)
+        last_log: Optional[TransactionLog] = last_log_by_item_dept.get((loc.item_id, str(loc.department)))
         result.append(
             DefectLocationItem(
                 item_id=item.item_id,

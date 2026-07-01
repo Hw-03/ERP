@@ -39,6 +39,8 @@ export function NotificationPanel({
   onMarkAll,
   onDeleteItem,
   onDeleteRead,
+  loginPopupEnabled,
+  onToggleLoginPopup,
 }: {
   items: AppNotification[];
   unread: number;
@@ -46,12 +48,14 @@ export function NotificationPanel({
   onMarkAll: () => void;
   onDeleteItem: (notificationId: string) => void;
   onDeleteRead: () => void;
+  loginPopupEnabled?: boolean;
+  onToggleLoginPopup?: () => void;
 }) {
   const hasRead = items.some((n) => n.is_read);
 
   return (
     <div
-      className="absolute right-0 top-full z-50 mt-2 w-[320px] max-w-[calc(100vw-1.5rem)] rounded-[20px] border p-2 shadow-lg"
+      className="absolute right-0 top-full z-50 mt-2 w-[320px] rounded-[20px] border p-2 shadow-lg"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="flex items-center justify-between px-3 py-2">
@@ -59,10 +63,20 @@ export function NotificationPanel({
           알림
         </div>
         <div className="flex items-center gap-3">
+          {onToggleLoginPopup && (
+            <button
+              type="button"
+              onClick={onToggleLoginPopup}
+              className="text-xs font-bold"
+              style={{ color: loginPopupEnabled ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
+            >
+              {loginPopupEnabled ? "\uB85C\uADF8\uC778\uC2DC \uD31D\uC5C5 \uB744\uC6B0\uAE30 \uC911\uC9C0" : "\uB85C\uADF8\uC778\uC2DC \uD31D\uC5C5 \uB744\uC6B0\uAE30"}
+            </button>
+          )}
           {hasRead && (
             <button
               onClick={onDeleteRead}
-              className="text-xs font-bold transition-opacity hover:opacity-80"
+              className="text-xs font-bold"
               style={{ color: LEGACY_COLORS.muted }}
             >
               읽은 알림 삭제
@@ -71,7 +85,7 @@ export function NotificationPanel({
           {unread > 0 && (
             <button
               onClick={onMarkAll}
-              className="text-xs font-bold transition-opacity hover:opacity-80"
+              className="text-xs font-bold"
               style={{ color: LEGACY_COLORS.blue }}
             >
               모두 읽음
@@ -99,7 +113,7 @@ export function NotificationPanel({
                   tabIndex={0}
                   onClick={() => onItemClick(n)}
                   onKeyDown={(e) => e.key === "Enter" && onItemClick(n)}
-                  className="flex flex-1 cursor-pointer flex-col gap-0.5 px-3 py-2 text-left transition-opacity hover:opacity-80"
+                  className="flex flex-1 cursor-pointer flex-col gap-0.5 px-3 py-2 text-left"
                 >
                   <div className="flex items-center gap-2">
                     {!n.is_read && (
@@ -123,7 +137,7 @@ export function NotificationPanel({
                     e.stopPropagation();
                     onDeleteItem(n.notification_id);
                   }}
-                  className="shrink-0 px-2 py-2 text-xs opacity-30 transition-opacity hover:opacity-70"
+                  className="shrink-0 px-2 py-2 text-xs opacity-30"
                   style={{ color: LEGACY_COLORS.muted }}
                   aria-label="알림 삭제"
                 >

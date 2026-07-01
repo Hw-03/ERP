@@ -1,9 +1,11 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { TransactionLog } from "@/lib/api/types/production";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import {
+  formatDefectReason,
   getBatchLineStats,
   getHistoryRowPresentation,
+  getReferenceBatchLinePresentation,
   getReferenceBatchPresentation,
 } from "../historyPresentation";
 
@@ -106,6 +108,17 @@ function makeBatch(overrides: Partial<IoBatch> & { bundles?: IoBundle[] } = {}):
   };
 }
 
+describe("formatDefectReason", () => {
+  it("combines category and memo for defect logs", () => {
+    expect(formatDefectReason({ reason_category: "dimension", reason_memo: "left bracket scratched" })).toBe(
+      "dimension · left bracket scratched",
+    );
+  });
+
+  it("returns null when no defect reason is present", () => {
+    expect(formatDefectReason({ reason_category: null, reason_memo: "" })).toBeNull();
+  });
+});
 describe("historyPresentation", () => {
   it("summarizes a production BOM batch as one field operation", () => {
     const parent = makeLine({ line_id: "parent", origin: "direct", quantity: 2 });
@@ -151,7 +164,7 @@ describe("historyPresentation", () => {
     });
     expect(row.operation.label).toBe("생산");
     expect(row.target.title).toBe("AX-100");
-    expect(row.target.meta).toEqual(["BOM 1묶음", "2라인"]);
+    expect(row.target.meta).toEqual(["부품 차감 2라인"]);
     expect(row.flow.label).toBe("조립");
     expect(row.people).toEqual({ requester: "김민재", approver: "박승인" });
     expect(row.statusChips.map((chip) => chip.label)).toEqual([
@@ -199,7 +212,12 @@ describe("historyPresentation", () => {
 
   it("classifies reference batches as shipment or outbound composition", () => {
     const shipment = getReferenceBatchPresentation([
-      makeLog({ log_id: "ship-1", transaction_type: "SHIP", reference_no: "SHIP-abc123" }),
+      makeLog({
+        log_id: "ship-1",
+        transaction_type: "SHIP",
+        reference_no: "SHIP-abc123",
+        notes: "출하 픽업 완료: COGR + COCB + FET BD 70kV, 2mA",
+      }),
       makeLog({ log_id: "ship-2", transaction_type: "SHIP", reference_no: "SHIP-abc123", item_id: "ITEM-2" }),
     ]);
     const outbound = getReferenceBatchPresentation([
@@ -208,7 +226,8 @@ describe("historyPresentation", () => {
     ]);
 
     expect(shipment.operationLabel).toBe("출하");
-    expect(shipment.targetTitle).toBe("출하 구성 2건");
+    expect(shipment.targetTitle).toBe("COGR + COCB + FET BD 70kV, 2mA");
+    expect(shipment.targetMeta).toEqual(["출하 구성 2라인"]);
     expect(outbound.operationLabel).toBe("출고 구성");
     expect(outbound.targetTitle).toBe("출고 구성 2건");
   });
@@ -216,10 +235,35 @@ describe("historyPresentation", () => {
     const shipment = getReferenceBatchPresentation([
       makeLog({ log_id: "prep-1", transaction_type: "BACKFLUSH", reference_no: "SHIP-mixed", item_id: "ITEM-A" }),
       makeLog({ log_id: "prep-2", transaction_type: "PRODUCE", reference_no: "SHIP-mixed", item_id: "ITEM-B" }),
-      makeLog({ log_id: "pickup-1", transaction_type: "SHIP", reference_no: "SHIP-mixed", item_id: "ITEM-C" }),
+      makeLog({
+        log_id: "pickup-1",
+        transaction_type: "SHIP",
+        reference_no: "SHIP-mixed",
+        item_id: "ITEM-C",
+        item_name: "실제 출하품",
+      }),
     ]);
 
     expect(shipment.operationLabel).toBe("출하");
-    expect(shipment.targetTitle).toBe("출하 구성 3건");
+    expect(shipment.targetTitle).toBe("실제 출하품");
+    expect(shipment.targetMeta).toEqual(["출하 구성 3라인"]);
+  });
+  it("describes shipment child rows by shipment workflow role", () => {
+    expect(getReferenceBatchLinePresentation(
+      makeLog({ transaction_type: "SHIP", notes: "출하 픽업 완료: 최종 출하품" }),
+      "shipment",
+    ).label).toBe("출하 대상");
+    expect(getReferenceBatchLinePresentation(
+      makeLog({ transaction_type: "SHIP", notes: "출하 동반 품목: PA 보드" }),
+      "shipment",
+    ).label).toBe("동반 출하품");
+    expect(getReferenceBatchLinePresentation(
+      makeLog({ transaction_type: "PRODUCE" }),
+      "shipment",
+    ).label).toBe("출하 준비");
+    expect(getReferenceBatchLinePresentation(
+      makeLog({ transaction_type: "BACKFLUSH" }),
+      "shipment",
+    ).label).toBe("하위 차감");
   });
 });

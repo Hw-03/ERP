@@ -1,197 +1,130 @@
 "use client";
 
-/**
- * dirty-guard.tsx — W2 통합 모듈.
- *
- * "저장 안 된 변경" 가드를 단일 깊은 모듈로 제공.
- *
- * 공개 API (4개):
- *   <DirtyGuardProvider>          — 단일 Modal mount + 단일 beforeunload listener
- *   useRegisterDirty(key, d, s)   — 섹션 등록 (parent nav 가드용 aggregate)
- *   useConfirmNavigation()        — 상위(탭/사이드바)에서 트리거
- *   useLocalDirtyGuard(d, s)      — 섹션 내부 in-page swap
- */
-
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
-  useId,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
-import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 
-// ---------------------------------------------------------------------------
-// 내부 타입
-// ---------------------------------------------------------------------------
+type DirtyGuardMode = "save" | "confirm-only";
 
 type ModalState = {
   open: boolean;
   busy: boolean;
   save: () => Promise<void> | void;
   proceed: () => void;
+  confirmOnly: boolean;
 };
 
 type DirtyEntry = {
   dirty: boolean;
   save: () => Promise<void> | void;
-  /** "저장하지 않고 이동" 선택 시 호출. 자동 저장된 임시본 폐기 등에 사용. */
   discard?: () => Promise<void> | void;
+  confirmOnly: boolean;
 };
 
 type ProviderContextValue = {
-  /** Provider의 단일 modal을 열기 위한 함수 */
-  openModal: (save: () => Promise<void> | void, proceed: () => void) => void;
-  /** aggregate dirty 체크용 registry 참조 */
+  openModal: (save: () => Promise<void> | void, proceed: () => void, confirmOnly?: boolean) => void;
   registryRef: React.MutableRefObject<Map<string, DirtyEntry>>;
-  bumpVersion: () => void;
 };
 
 const DirtyGuardContext = createContext<ProviderContextValue | null>(null);
 
-// ---------------------------------------------------------------------------
-// 내부 모달 컴포넌트
-// ---------------------------------------------------------------------------
-
-function DirtyModal({ modal, onSaveAndProceed, onProceedWithoutSave, onCancel }: {
+function DirtyModal({
+  modal,
+  onSaveAndProceed,
+  onProceedWithoutSave,
+  onCancel,
+}: {
   modal: ModalState;
   onSaveAndProceed: () => void;
   onProceedWithoutSave: () => void;
   onCancel: () => void;
 }) {
-  const titleId = useId();
-  const panelRef = useFocusTrap<HTMLDivElement>(modal.open);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   useEffect(() => {
     if (!modal.open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (modal.busy) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-      }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!modal.busy && e.key === "Escape") onCancel();
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [modal.open, modal.busy, onCancel]);
+  if (!modal.open) return null;
+  const confirmOnly = modal.confirmOnly;
 
-  if (!modal.open || !mounted) return null;
-
-  const toneAccent = LEGACY_COLORS.yellow;
-
-  return createPortal(
+  return (
     <div
-      className="fixed inset-0 z-[400] flex items-center justify-center px-4"
+      className="fixed inset-0 z-[400] flex items-center justify-center"
       style={{ background: "rgba(0,0,0,.55)" }}
       onClick={() => {
         if (!modal.busy) onCancel();
       }}
       role="dialog"
       aria-modal="true"
-      aria-labelledby={titleId}
     >
       <div
-        ref={panelRef}
-        className="w-full max-w-[520px] rounded-[24px] border p-6"
+        className="w-full max-w-[520px] rounded-[20px] border p-5"
         style={{
           background: LEGACY_COLORS.s1,
-          borderColor: `color-mix(in srgb, ${toneAccent} 50%, transparent)`,
-          boxShadow: "var(--c-card-shadow)",
+          borderColor: LEGACY_COLORS.border,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5" style={{ color: toneAccent }} />
-          <div
-            id={titleId}
-            className="text-lg font-black"
-            style={{ color: LEGACY_COLORS.text }}
-          >
-            저장하지 않은 변경 사항이 있습니다.
-          </div>
+        <div className="mb-4 text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
+          {confirmOnly ? "나갈까요?" : "저장"}
         </div>
-
-        <div
-          className="mb-4 rounded-[12px] border px-3 py-2 text-xs font-bold"
-          style={{
-            background: `color-mix(in srgb, ${toneAccent} 10%, transparent)`,
-            borderColor: `color-mix(in srgb, ${toneAccent} 40%, transparent)`,
-            color: toneAccent,
-          }}
-        >
-          저장하지 않고 이동하면 입력 내용이 사라집니다.
-        </div>
-
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             onClick={onProceedWithoutSave}
             disabled={modal.busy}
-            className="rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors hover:brightness-125 disabled:opacity-50"
+            className="rounded-[14px] border px-5 py-2.5 text-sm font-bold"
             style={{
               borderColor: LEGACY_COLORS.border,
               color: LEGACY_COLORS.muted2,
               background: LEGACY_COLORS.s2,
             }}
           >
-            저장하지 않고 이동
+            {confirmOnly ? "나가기" : "저장하지 않고 이동"}
           </button>
-          <button
-            type="button"
-            onClick={onSaveAndProceed}
-            disabled={modal.busy}
-            className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-            style={{ background: LEGACY_COLORS.blue }}
-          >
-            {modal.busy ? "저장 중..." : "저장하고 이동"}
-          </button>
+          {!confirmOnly && (
+            <button
+              type="button"
+              onClick={onSaveAndProceed}
+              disabled={modal.busy}
+              className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white"
+              style={{ background: LEGACY_COLORS.blue }}
+            >
+              {modal.busy ? "저장 중..." : "저장하고 이동"}
+            </button>
+          )}
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
-
 export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   const registryRef = useRef<Map<string, DirtyEntry>>(new Map());
-  const [_version, setVersion] = useState(0);
-  const bumpVersion = useCallback(() => setVersion((v) => v + 1), []);
-
-  // 단일 modal 상태
   const [modal, setModal] = useState<ModalState>({
     open: false,
     busy: false,
     save: () => {},
     proceed: () => {},
+    confirmOnly: false,
   });
 
-  const openModal = useCallback(
-    (save: () => Promise<void> | void, proceed: () => void) => {
-      setModal({ open: true, busy: false, save, proceed });
-    },
-    [],
-  );
+  const openModal = useCallback((save: () => Promise<void> | void, proceed: () => void, confirmOnly = false) => {
+    setModal({ open: true, busy: false, save, proceed, confirmOnly });
+  }, []);
 
-  // 단일 beforeunload listener — 등록된 entry 중 하나라도 dirty면 prompt
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      const anyDirty = Array.from(registryRef.current.values()).some((e) => e.dirty);
+      const anyDirty = Array.from(registryRef.current.values()).some((entry) => entry.dirty);
       if (!anyDirty) return;
       e.preventDefault();
       e.returnValue = "";
@@ -200,10 +133,7 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  const ctx = useMemo<ProviderContextValue>(
-    () => ({ openModal, registryRef, bumpVersion }),
-    [openModal, bumpVersion],
-  );
+  const ctx: ProviderContextValue = { openModal, registryRef };
 
   const handleSaveAndProceed = useCallback(() => {
     if (modal.busy) return;
@@ -222,20 +152,9 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
 
   const handleProceedWithoutSave = useCallback(() => {
     if (modal.busy) return;
-    // 등록된 dirty entry 들의 discard() 를 fire-and-forget 으로 호출. 자동 저장된 임시본
-    // 폐기 등은 백그라운드에서 처리하고 사용자 navigate 는 즉시 진행 (실패해도 진행).
     Array.from(registryRef.current.values()).forEach((entry) => {
       if (entry.dirty && entry.discard) {
-        try {
-          const result = entry.discard();
-          if (result && typeof (result as Promise<void>).then === "function") {
-            (result as Promise<void>).catch(() => {
-              /* discard 실패 무시 — 사용자가 이미 폐기 선택 */
-            });
-          }
-        } catch {
-          /* sync throw 도 무시 */
-        }
+        try { void entry.discard(); } catch {}
       }
     });
     const proceed = modal.proceed;
@@ -246,7 +165,7 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   const handleCancel = useCallback(() => {
     if (modal.busy) return;
     setModal((prev) => ({ ...prev, open: false }));
-  }, [modal]);
+  }, [modal.busy]);
 
   return (
     <DirtyGuardContext.Provider value={ctx}>
@@ -261,20 +180,12 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// useRegisterDirty
-// ---------------------------------------------------------------------------
-
-/**
- * 섹션에서 자기 dirty/save 를 Provider 레지스트리에 등록.
- * 상위의 useConfirmNavigation() 이 aggregate dirty 체크에 사용.
- * discard 는 "저장하지 않고 이동" 선택 시 호출 — 자동 저장된 임시본 폐기 등에 사용 (optional).
- */
 export function useRegisterDirty(
   key: string,
   dirty: boolean,
   save: () => Promise<void> | void,
   discard?: () => Promise<void> | void,
+  options?: { mode?: DirtyGuardMode },
 ): void {
   const ctx = useContext(DirtyGuardContext);
   const saveRef = useRef(save);
@@ -292,24 +203,14 @@ export function useRegisterDirty(
       dirty,
       save: () => saveRef.current(),
       discard: () => discardRef.current?.(),
+      confirmOnly: options?.mode === "confirm-only",
     });
-    ctx.bumpVersion();
     return () => {
       ctx.registryRef.current.delete(key);
-      ctx.bumpVersion();
     };
-  }, [ctx, key, dirty]);
+  }, [ctx, key, dirty, options?.mode]);
 }
 
-// ---------------------------------------------------------------------------
-// useConfirmNavigation
-// ---------------------------------------------------------------------------
-
-/**
- * 상위(탭/사이드바)에서 호출.
- * 등록된 섹션 중 하나라도 dirty면 모달, 아니면 즉시 proceed.
- * aggregate save: dirty인 섹션의 save 모두 순차 호출.
- */
 export function useConfirmNavigation(): (proceed: () => void) => void {
   const ctx = useContext(DirtyGuardContext);
   if (!ctx) {
@@ -318,9 +219,7 @@ export function useConfirmNavigation(): (proceed: () => void) => void {
 
   return useCallback(
     (proceed: () => void) => {
-      const dirtyEntries = Array.from(ctx.registryRef.current.values()).filter(
-        (e) => e.dirty,
-      );
+      const dirtyEntries = Array.from(ctx.registryRef.current.values()).filter((entry) => entry.dirty);
       if (dirtyEntries.length === 0) {
         proceed();
         return;
@@ -330,21 +229,12 @@ export function useConfirmNavigation(): (proceed: () => void) => void {
           await Promise.resolve(entry.save());
         }
       };
-      ctx.openModal(aggregateSave, proceed);
+      ctx.openModal(aggregateSave, proceed, dirtyEntries.every((entry) => entry.confirmOnly));
     },
     [ctx],
   );
 }
 
-// ---------------------------------------------------------------------------
-// useLocalDirtyGuard
-// ---------------------------------------------------------------------------
-
-/**
- * 섹션 내부 in-page swap (예: 직원 A → 직원 B 선택).
- * Provider의 단일 Modal 재사용.
- * Provider 밖에서 사용하면 throw.
- */
 export function useLocalDirtyGuard(
   dirty: boolean,
   save: () => Promise<void> | void,

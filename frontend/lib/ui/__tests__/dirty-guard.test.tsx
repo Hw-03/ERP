@@ -42,6 +42,21 @@ function RegisteredSection({
   useRegisterDirty(sectionKey, dirty, save);
   return <NavButton onProceed={onProceed} />;
 }
+/** useRegisterDirty + NavButton confirm-only helper */
+function ConfirmOnlyRegisteredSection({
+  sectionKey,
+  dirty,
+  save,
+  onProceed,
+}: {
+  sectionKey: string;
+  dirty: boolean;
+  save: () => Promise<void> | void;
+  onProceed: () => void;
+}) {
+  useRegisterDirty(sectionKey, dirty, save, undefined, { mode: "confirm-only" });
+  return <NavButton onProceed={onProceed} />;
+}
 
 /** useLocalDirtyGuard 를 쓰는 컴포넌트 */
 function LocalSection({
@@ -202,6 +217,30 @@ describe("dirty-guard", () => {
     fireEvent.click(screen.getByRole("button", { name: "로컬이동" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "저장하지 않고 이동" }));
+    expect(proceed).toHaveBeenCalledTimes(1);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("confirm-only mode shows a leave confirmation without a save action", () => {
+    const proceed = vi.fn();
+    const save = vi.fn();
+    render(
+      <DirtyGuardProvider>
+        <ConfirmOnlyRegisteredSection
+          sectionKey="shipping"
+          dirty={true}
+          save={save}
+          onProceed={proceed}
+        />
+      </DirtyGuardProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이동" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "저장하고 이동" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+
     expect(proceed).toHaveBeenCalledTimes(1);
     expect(save).not.toHaveBeenCalled();
   });

@@ -22,6 +22,7 @@ import { api, type Item, type ShippingBomLineInput, type ShippingBomMatchRespons
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { AppSelect } from "./common/AppSelect";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { Operator } from "./login/useCurrentOperator";
 
 type SectionTab = "request" | "prep" | "history";
@@ -225,6 +226,9 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     [history, selectedHistoryId],
   );
   const canEditDraft = !selectedRequest || selectedRequest.status === "REQUESTED" || selectedRequest.status === "PREPARING";
+  const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "historyWork";
+  const saveShippingWork = useCallback(() => {}, []);
+  useRegisterDirty("shipping-work", shippingWorkDirty, saveShippingWork, undefined, { mode: "confirm-only" });
   function buildShippingUrl(nextView: ViewMode, requestId?: string | null) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", "shipping");

@@ -426,6 +426,8 @@ def _to_log_response(
         requested_at=requested_at if requested_at is not None else log.created_at,
         approved_at=approved_at if approved_at is not None else log.created_at,
         notes=log.notes,
+        reason_category=log.reason_category,
+        reason_memo=log.reason_memo,
         operation_batch_id=log.operation_batch_id,
         created_at=log.created_at,
         edit_count=edit_count,

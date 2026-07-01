@@ -338,3 +338,52 @@ def test_update_employee_rejects_hiding_last_admin_tab_access(db_session, client
         json={"hidden_sidebar_tabs": ["admin"]},
     )
     assert resp.status_code == 422, resp.text
+
+def test_employee_login_notification_popup_setting_round_trips(db_session, client):
+    """login_notification_popup_enabled is saved and returned by create/update/login."""
+    create_resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(
+            name="Login popup employee",
+            login_notification_popup_enabled=True,
+        ),
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    emp_id = create_resp.json()["employee_id"]
+    assert create_resp.json()["login_notification_popup_enabled"] is True
+
+    update_resp = client.put(
+        f"/api/employees/{emp_id}",
+        headers=ADMIN_HEADERS,
+        json={"login_notification_popup_enabled": False},
+    )
+    assert update_resp.status_code == 200, update_resp.text
+    assert update_resp.json()["login_notification_popup_enabled"] is False
+
+    list_resp = client.get("/api/employees")
+    assert list_resp.status_code == 200, list_resp.text
+    emp = next(e for e in list_resp.json() if e["employee_id"] == emp_id)
+    assert emp["login_notification_popup_enabled"] is False
+
+    login_resp = client.post(f"/api/employees/{emp_id}/verify-pin", json={"pin": "0000"})
+    assert login_resp.status_code == 200, login_resp.text
+    assert login_resp.json()["login_notification_popup_enabled"] is False
+
+def test_employee_login_notification_popup_can_update_without_admin_pin(db_session, client):
+    """개인 알림 팝업 설정은 관리자 PIN 없이 저장되어야 한다."""
+    create_resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="Login popup self setting"),
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    emp_id = create_resp.json()["employee_id"]
+
+    update_resp = client.put(
+        f"/api/employees/{emp_id}/login-popup",
+        json={"login_notification_popup_enabled": True},
+    )
+
+    assert update_resp.status_code == 200, update_resp.text
+    assert update_resp.json()["login_notification_popup_enabled"] is True

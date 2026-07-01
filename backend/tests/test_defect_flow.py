@@ -627,3 +627,64 @@ def test_draft_upsert_preserves_reason_category(db_session, client, make_item):
     assert draft is not None
     assert draft.reason_category == "기타"
     assert draft.reason_memo == "장바구니 단계 사유"
+
+def test_locations_reason_is_department_specific(db_session, client, make_item):
+    """GET /api/defects/locations keeps the latest reason per item and department."""
+    item = make_item(name="REASON-DEPT", process_type_code="TR", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="RDEP1", name="reason actor")
+    db_session.commit()
+
+    first = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "2",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "reason_category": "assembly-category",
+        "reason_memo": "assembly memo",
+        "actor_employee_id": str(actor.employee_id),
+    })
+    assert first.status_code == 200, first.text
+
+    second = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "3",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.HIGH_VOLTAGE.value,
+        "reason_category": "high-voltage-category",
+        "reason_memo": "high voltage memo",
+        "actor_employee_id": str(actor.employee_id),
+    })
+    assert second.status_code == 200, second.text
+
+    res = client.get("/api/defects/locations")
+    assert res.status_code == 200, res.text
+    rows = {row["department"]: row for row in res.json() if row["item_id"] == str(item.item_id)}
+
+    assert rows[DepartmentEnum.ASSEMBLY.value]["reason_category"] == "assembly-category"
+    assert rows[DepartmentEnum.ASSEMBLY.value]["reason_memo"] == "assembly memo"
+    assert rows[DepartmentEnum.HIGH_VOLTAGE.value]["reason_category"] == "high-voltage-category"
+    assert rows[DepartmentEnum.HIGH_VOLTAGE.value]["reason_memo"] == "high voltage memo"
+
+
+def test_transactions_include_defect_reason_fields(db_session, client, make_item):
+    """Transaction history exposes defect reason_category and reason_memo."""
+    item = make_item(name="REASON-TX", process_type_code="TR", warehouse_qty=Decimal("5"))
+    actor = _make_employee(db_session, code="RTX1", name="reason tx actor")
+    db_session.commit()
+
+    res = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "1",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "reason_category": "tx-category",
+        "reason_memo": "tx memo",
+        "actor_employee_id": str(actor.employee_id),
+    })
+    assert res.status_code == 200, res.text
+
+    history = client.get("/api/inventory/transactions", params={"item_id": str(item.item_id), "limit": 10})
+    assert history.status_code == 200, history.text
+    mark = next(row for row in history.json() if row["transaction_type"] == TransactionTypeEnum.MARK_DEFECTIVE.value)
+    assert mark["reason_category"] == "tx-category"
+    assert mark["reason_memo"] == "tx memo"

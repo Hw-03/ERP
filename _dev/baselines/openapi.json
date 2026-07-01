@@ -1756,6 +1756,11 @@
             "$ref": "#/components/schemas/EmployeeLevelEnum",
             "default": "staff"
           },
+          "login_notification_popup_enabled": {
+            "default": false,
+            "title": "Login Notification Popup Enabled",
+            "type": "boolean"
+          },
           "name": {
             "maxLength": 100,
             "title": "Name",
@@ -1801,6 +1806,19 @@
         ],
         "title": "EmployeeLevelEnum",
         "type": "string"
+      },
+      "EmployeeLoginNotificationPopupUpdate": {
+        "properties": {
+          "login_notification_popup_enabled": {
+            "title": "Login Notification Popup Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "login_notification_popup_enabled"
+        ],
+        "title": "EmployeeLoginNotificationPopupUpdate",
+        "type": "object"
       },
       "EmployeePinChangeRequest": {
         "properties": {
@@ -1893,6 +1911,11 @@
           },
           "level": {
             "$ref": "#/components/schemas/EmployeeLevelEnum"
+          },
+          "login_notification_popup_enabled": {
+            "default": false,
+            "title": "Login Notification Popup Enabled",
+            "type": "boolean"
           },
           "name": {
             "title": "Name",
@@ -2081,6 +2104,17 @@
                 "type": "null"
               }
             ]
+          },
+          "login_notification_popup_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Notification Popup Enabled"
           },
           "name": {
             "anyOf": [
@@ -7458,6 +7492,28 @@
             "title": "Quantity Change",
             "type": "integer"
           },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
+          },
           "reference_no": {
             "anyOf": [
               {
@@ -11059,6 +11115,60 @@
           }
         },
         "summary": "Change Employee Pin",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/employees/{employee_id}/login-popup": {
+      "put": {
+        "description": "직원 로그인 알림 팝업 설정 저장.",
+        "operationId": "update_employee_login_notification_popup_api_employees__employee_id__login_popup_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeLoginNotificationPopupUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Employee Login Notification Popup",
         "tags": [
           "Employees"
         ]

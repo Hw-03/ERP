@@ -103,9 +103,18 @@ function DesktopMesShellInner() {
       return;
     }
     if (tab === activeTab) {
-      // admin 은 key 가 고정이라 리마운트되지 않음 — 의도적 제외 (내부 폼 입력 보호)
-      if (tab !== "admin") {
-        setRefreshNonce((n) => n + 1);
+      const doReset = () => {
+        if (tab === "warehouse" || tab === "shipping") {
+          router.push(`?tab=${tab}`, { scroll: false });
+        }
+        if (tab !== "admin") {
+          setRefreshNonce((n) => n + 1);
+        }
+      };
+      if (tab === "warehouse" || tab === "shipping") {
+        confirmAdminNavigation(doReset);
+      } else {
+        doReset();
       }
       return;
     }
