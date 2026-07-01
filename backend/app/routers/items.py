@@ -9,7 +9,7 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query as SAQuery, Session
 
 from sqlalchemy import func
 
@@ -45,7 +45,7 @@ from app.repositories import item_repository, inventory_repository
 router = APIRouter()
 
 
-def _build_item_query(db: Session):
+def _build_item_query(db: Session) -> SAQuery:
     return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
 
 

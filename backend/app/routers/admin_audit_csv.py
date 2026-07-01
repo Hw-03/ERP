@@ -11,6 +11,7 @@ import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -53,7 +54,7 @@ def list_files() -> List[AuditCsvFile]:
 
 
 @router.get("/audit-csv/{month}.csv", dependencies=[Depends(require_admin_pin)])
-def download_csv(month: str):
+def download_csv(month: str) -> StreamingResponse:
     _validate_month(month)
     path = svc.get_csv_dir() / f"inout_{month}.csv"
     if not path.exists():
@@ -66,7 +67,7 @@ def download_csv(month: str):
 
 
 @router.get("/audit-csv/{month}.xlsx", dependencies=[Depends(require_admin_pin)])
-def download_xlsx(month: str):
+def download_xlsx(month: str) -> StreamingResponse:
     _validate_month(month)
     path = svc.get_csv_dir() / f"inout_{month}.csv"
     if not path.exists():

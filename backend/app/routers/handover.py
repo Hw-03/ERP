@@ -6,7 +6,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query as SAQuery, Session
 
 from app.database import get_db
 from app.models import Employee, HandoverDoc, HandoverStatusEnum
@@ -37,7 +37,7 @@ def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
     return emp
 
 
-def _inbox_query(db: Session, actor: Employee):
+def _inbox_query(db: Session, actor: Employee) -> Optional[SAQuery]:
     """인수 대기함 쿼리 — submitted + 본인 소속 부서 대상. None=권한 없음.
 
     받는 부서(고압/진공) 소속만 자기 부서로 온 인수인계를 본다. 인수 확인은 현장

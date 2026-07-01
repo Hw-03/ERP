@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -144,7 +144,7 @@ def _to_response(db: Session, req: ShippingRequest) -> ShippingRequestResponse:
     )
 
 
-def _commit_or_422(db: Session, func, *args, **kwargs):
+def _commit_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     try:
         obj = func(db, *args, **kwargs)
         db.commit()

@@ -11,8 +11,8 @@ import uuid
 from datetime import date, datetime, time
 from typing import NamedTuple, Optional
 
-from sqlalchemy import and_, case, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import ColumnElement, and_, case, func, or_
+from sqlalchemy.orm import Query, Session
 
 from app.models import (
     IoBatch,
@@ -47,7 +47,7 @@ _SUMMARY_DEFECT_TYPES = [
 ]
 
 
-def _department_label_expr():
+def _department_label_expr() -> ColumnElement:
     """거래 한 건의 부서 라벨 식.
 
     1) 부서계열(PRODUCE/BACKFLUSH/…): IoBatch.to/from_department.
@@ -79,7 +79,7 @@ def _department_label_expr():
     )
 
 
-def _process_step_filter(process_step: Optional[str]):
+def _process_step_filter(process_step: Optional[str]) -> Optional[ColumnElement]:
     """process_type_code 마지막 글자(R 원자재 / A 중간공정 / F 공정완료) IN 필터.
     쉼표 복수. 자재목록 대시보드와 같은 기준(코드 끝 1글자). 없으면 None.
     """
@@ -94,7 +94,7 @@ def _process_step_filter(process_step: Optional[str]):
     return last_char.in_(steps)
 
 
-def _model_filter(db: Session, model: Optional[str]):
+def _model_filter(db: Session, model: Optional[str]) -> Optional[ColumnElement]:
     """model_name IN 필터 — Item.mes_code prefix 기반.
 
     회사 규약: 품목 코드의 첫 '-' 앞 글자열의 각 글자가 ProductSymbol.symbol 과 1:1 대응.
@@ -132,7 +132,7 @@ def _model_filter(db: Session, model: Optional[str]):
     return and_(Item.mes_code.isnot(None), dash_pos > 0, or_(*clauses))
 
 
-def _department_filter(department: Optional[str]):
+def _department_filter(department: Optional[str]) -> Optional[ColumnElement]:
     """부서 라벨 IN 필터. 쉼표 복수 가능. 없으면 None.
     _department_label_expr() 기준(부서계열→부서명·창고계열→'창고'·그외→'미상').
     """
@@ -178,7 +178,7 @@ _TX_OP: dict[str, str] = {
 _DETERMINING_SUBTYPES: set[str] = set(_SUBTYPE_OP)
 
 
-def _operation_filter(transaction_types: Optional[str]):
+def _operation_filter(transaction_types: Optional[str]) -> Optional[ColumnElement]:
     """화면 표시 구분 기준 operation-aware 필터.
 
     transaction_types 가 쉼표로 들어오면 각 tx 코드가 가리키는 화면 라벨 L 을 구해,
@@ -235,7 +235,7 @@ def _operation_filter(transaction_types: Optional[str]):
 
 
 def _apply_common_filters(
-    query,
+    query: Query,
     db: Session,
     *,
     transaction_types: Optional[str],
@@ -246,7 +246,7 @@ def _apply_common_filters(
     date_from: Optional[date],
     date_to: Optional[date],
     include_archived: bool,
-):
+) -> Query:
     """list_transactions / get_transactions_summary 공통 필터.
 
     TransactionLog + Item join + IoBatch outerjoin 이 이미 적용된 query 를 받아
