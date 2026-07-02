@@ -68,7 +68,7 @@ class Employee(Base):
     # 기본값 True — 신규 직원은 부서 권한만 만족하면 입출고 가능.
     io_enabled = Column(Boolean, nullable=False, default=True, server_default="true")
     hidden_sidebar_tabs = Column(Text, nullable=False, default="", server_default="")
-    login_notification_popup_enabled = Column(Boolean, nullable=False, default=False, server_default="false")
+    login_notification_popup_enabled = Column(Boolean, nullable=False, default=True, server_default="true")
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(BoolAsString, nullable=False, default=True)
     # 작업자 식별용 PIN 해시 — 실제 보안 인증이 아님. None이면 기본 PIN 0000 적용

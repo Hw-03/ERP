@@ -43,7 +43,7 @@ class EmployeeCreate(BaseModel):
     assigned_model_slots: Optional[List[int]] = None
     # 직원별 좌측 사이드바/모바일 탭 숨김 목록. 빈 목록이면 모든 탭 표시.
     hidden_sidebar_tabs: List[str] = Field(default_factory=list)
-    login_notification_popup_enabled: bool = False
+    login_notification_popup_enabled: bool = True
 
 
 class EmployeeUpdate(BaseModel):
@@ -90,7 +90,7 @@ class EmployeeResponse(BaseModel):
     assigned_model_slots: List[int] = Field(default_factory=list)
     # 직원별 좌측 사이드바/모바일 탭 숨김 목록.
     hidden_sidebar_tabs: List[str] = Field(default_factory=list)
-    login_notification_popup_enabled: bool = False
+    login_notification_popup_enabled: bool = True
 
 
 class EmployeeLoginNotificationPopupUpdate(BaseModel):

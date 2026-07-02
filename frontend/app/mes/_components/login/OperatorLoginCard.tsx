@@ -11,7 +11,7 @@ import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { api, type Employee } from "@/lib/api";
 import { PIN_LENGTH } from "@/lib/auth/constants";
-import { setCurrentOperator, type Operator } from "./useCurrentOperator";
+import { markLoginNotificationPopupPending, setCurrentOperator, type Operator } from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
 import { EmployeeCombobox } from "./EmployeeCombobox";
 
@@ -53,7 +53,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         assigned_model_slots: emp.assigned_model_slots ?? [],
         io_enabled: emp.io_enabled ?? true,
         hidden_sidebar_tabs: emp.hidden_sidebar_tabs ?? [],
-        loginPopupEnabled: emp.login_notification_popup_enabled ?? false,
+        loginPopupEnabled: emp.login_notification_popup_enabled ?? true,
       };
 
       // 백엔드에서 받은 theme을 DOM과 localStorage에 적용
@@ -63,6 +63,10 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         } else if (op.theme === "light") {
           document.documentElement.classList.remove("dark");
         }
+      }
+
+      if (op.loginPopupEnabled) {
+        markLoginNotificationPopupPending(op.employee_id);
       }
 
       try {

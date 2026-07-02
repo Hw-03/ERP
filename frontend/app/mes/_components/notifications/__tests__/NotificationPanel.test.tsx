@@ -62,12 +62,14 @@ describe("NotificationPanel", () => {
     );
 
     const toggle = screen.getByRole("switch", { name: TEXT.loginPopup });
+    const knob = screen.getByTestId("login-popup-switch-knob");
     expect(toggle).toHaveAttribute("aria-checked", "false");
     expect(toggle).toHaveClass("no-btn-inset");
+    expect(screen.getByText("꺼짐")).toBeInTheDocument();
+    expect(knob).toHaveStyle({ left: "2px", transform: "translateX(0px)" });
     expect(screen.queryByText("켜기")).not.toBeInTheDocument();
     expect(screen.queryByText("끄기")).not.toBeInTheDocument();
     expect(screen.queryByText("켜짐")).not.toBeInTheDocument();
-    expect(screen.queryByText("꺼짐")).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
 
@@ -86,7 +88,25 @@ describe("NotificationPanel", () => {
     );
 
     const toggle = screen.getByRole("switch", { name: TEXT.loginPopup });
+    const knob = screen.getByTestId("login-popup-switch-knob");
     expect(toggle).toHaveAttribute("aria-checked", "true");
     expect(toggle).toHaveClass("no-btn-inset");
+    expect(screen.getByText("켜짐")).toBeInTheDocument();
+    expect(knob).toHaveStyle({ left: "2px", transform: "translateX(20px)" });
+  });
+
+  it("disables the login popup switch while saving", () => {
+    render(
+      <NotificationPanel
+        items={[]}
+        unread={0}
+        loginPopupEnabled={true}
+        loginPopupUpdating={true}
+        onToggleLoginPopup={vi.fn()}
+        {...emptyHandlers}
+      />,
+    );
+
+    expect(screen.getByRole("switch", { name: TEXT.loginPopup })).toBeDisabled();
   });
 });

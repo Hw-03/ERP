@@ -411,7 +411,7 @@ def update_employee(
             changed.append("hidden_sidebar_tabs")
     if payload.login_notification_popup_enabled is not None:
         next_login_popup = bool(payload.login_notification_popup_enabled)
-        if bool(getattr(employee, "login_notification_popup_enabled", False)) != next_login_popup:
+        if bool(getattr(employee, "login_notification_popup_enabled", True)) != next_login_popup:
             employee.login_notification_popup_enabled = next_login_popup
             changed.append("login_notification_popup_enabled")
     if payload.assigned_model_slots is not None:
@@ -649,5 +649,5 @@ def _to_response(
         theme=getattr(employee, "theme", None),
         assigned_model_slots=assigned_model_slots or [],
         hidden_sidebar_tabs=_effective_hidden_sidebar_tabs(employee),
-        login_notification_popup_enabled=bool(getattr(employee, "login_notification_popup_enabled", False)),
+        login_notification_popup_enabled=bool(getattr(employee, "login_notification_popup_enabled", True)),
     )

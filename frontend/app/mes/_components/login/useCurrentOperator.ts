@@ -31,6 +31,7 @@ export interface Operator {
 
 const OPERATOR_KEY = "dexcowin_mes_operator";
 const BOOT_KEY = "dexcowin_mes_boot_id";
+const LOGIN_NOTIFICATION_POPUP_PENDING_KEY = "dexcowin_mes_login_popup_pending";
 // 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
 // localStorage `storage` 이벤트는 다른 탭에만 발화하므로 별도 CustomEvent 필요.
 const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
@@ -70,7 +71,7 @@ function readOperator(): Operator | null {
       assigned_model_slots: slots,
       io_enabled: parsed.io_enabled ?? true,
       hidden_sidebar_tabs: hiddenTabs,
-      loginPopupEnabled: parsed.loginPopupEnabled === true,
+      loginPopupEnabled: parsed.loginPopupEnabled !== false,
     };
   } catch {
     return null;
@@ -101,6 +102,18 @@ export function clearCurrentOperator(): void {
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
+export function markLoginNotificationPopupPending(employeeId: string): void {
+  if (typeof window === "undefined" || !employeeId) return;
+  window.sessionStorage.setItem(LOGIN_NOTIFICATION_POPUP_PENDING_KEY, employeeId);
+}
+
+export function consumeLoginNotificationPopupPending(employeeId: string): boolean {
+  if (typeof window === "undefined" || !employeeId) return false;
+  const pendingEmployeeId = window.sessionStorage.getItem(LOGIN_NOTIFICATION_POPUP_PENDING_KEY);
+  if (pendingEmployeeId !== employeeId) return false;
+  window.sessionStorage.removeItem(LOGIN_NOTIFICATION_POPUP_PENDING_KEY);
+  return true;
+}
 export function useCurrentOperator(): Operator | null {
   const [operator, setOperator] = useState<Operator | null>(null);
 

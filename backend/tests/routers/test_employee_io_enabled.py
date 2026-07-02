@@ -61,6 +61,15 @@ def test_create_employee_explicit_io_enabled_false(db_session, client):
 # ────────────────────────── 케이스 2: update 토글 ──────────────────────────
 
 
+def test_create_employee_defaults_login_notification_popup_enabled_true(db_session, client):
+    """New employees start with the login notification popup enabled unless explicitly disabled."""
+    resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="Default login popup"),
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["login_notification_popup_enabled"] is True
 def test_update_employee_io_enabled_false(db_session, client):
     """PUT 으로 io_enabled=False 설정 시 응답·재조회 모두 False."""
     create_resp = client.post("/api/employees", headers=ADMIN_HEADERS, json=_emp_payload(name="업데이트직원"))
@@ -202,6 +211,40 @@ def test_repeated_migration_does_not_overwrite_saved_employee_io_enabled(db_sess
     assert bool(saved.io_enabled) is True
 
 
+def test_migration_enables_existing_employee_login_popup_once(db_session, monkeypatch):
+    """Existing employees are flipped on once, but later user opt-out survives reruns."""
+    from bootstrap import migrate
+
+    emp = Employee(
+        employee_code="POPUP_ONCE",
+        name="popup once",
+        role="r",
+        department="조립",
+        level=EmployeeLevelEnum.STAFF,
+        display_order=10,
+        is_active="true",
+        login_notification_popup_enabled=False,
+    )
+    db_session.add(emp)
+    db_session.commit()
+
+    monkeypatch.setattr(migrate, "engine", db_session.bind)
+    result = migrate.run_migrations()
+    assert result["errors"] == []
+
+    db_session.expire_all()
+    saved = db_session.query(Employee).filter(Employee.employee_code == "POPUP_ONCE").one()
+    assert bool(saved.login_notification_popup_enabled) is True
+
+    saved.login_notification_popup_enabled = False
+    db_session.commit()
+
+    result = migrate.run_migrations()
+    assert result["errors"] == []
+
+    db_session.expire_all()
+    saved = db_session.query(Employee).filter(Employee.employee_code == "POPUP_ONCE").one()
+    assert bool(saved.login_notification_popup_enabled) is False
 def test_create_employee_defaults_hidden_sidebar_tabs_empty(db_session, client):
     """New employees can see every sidebar tab unless explicitly restricted."""
     resp = client.post(

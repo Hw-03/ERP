@@ -17,11 +17,6 @@ const NOTIFICATION_COPY = {
   loginPopup: "로그인 팝업",
 };
 
-/**
- * 알림 본문 정리 — 백엔드가 본문에 request_type 원시값(예: "warehouse_to_dept")을
- * 그대로 넣는 경우(notifications.py `_summary`)를 화면에서 한국어 라벨로 치환한다.
- * 본문은 " · " 구분 토큰("요청자 · 유형 · 코드") 이므로 토큰별로 라벨 매핑.
- */
 function humanizeBody(body: string): string {
   return body
     .split(" · ")
@@ -39,9 +34,11 @@ function timeLabel(iso: string): string {
 
 function LoginPopupSwitch({
   enabled,
+  disabled,
   onToggle,
 }: {
   enabled: boolean;
+  disabled?: boolean;
   onToggle: () => void;
 }) {
   return (
@@ -50,16 +47,22 @@ function LoginPopupSwitch({
       role="switch"
       aria-label={NOTIFICATION_COPY.loginPopup}
       aria-checked={enabled}
+      disabled={disabled}
       onClick={onToggle}
-      className="no-btn-inset relative h-6 w-11 shrink-0 rounded-full transition-colors duration-150"
+      className="no-btn-inset relative h-6 w-11 shrink-0 rounded-full transition-colors duration-150 disabled:cursor-wait disabled:opacity-70"
       style={{
         background: enabled ? LEGACY_COLORS.green : LEGACY_COLORS.s3,
         boxShadow: `inset 0 0 0 1px ${enabled ? "rgba(255,255,255,0.12)" : "rgba(76,97,130,0.12)"}`,
       }}
     >
       <span
-        className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150"
-        style={{ transform: enabled ? "translateX(20px)" : "translateX(2px)" }}
+        data-testid="login-popup-switch-knob"
+        className="absolute top-0.5 h-5 w-5 rounded-full shadow-sm transition-transform duration-150"
+        style={{
+          left: "2px",
+          transform: enabled ? "translateX(20px)" : "translateX(0px)",
+          background: LEGACY_COLORS.white,
+        }}
       />
     </button>
   );
@@ -73,6 +76,7 @@ export function NotificationPanel({
   onDeleteItem,
   onDeleteRead,
   loginPopupEnabled,
+  loginPopupUpdating = false,
   onToggleLoginPopup,
 }: {
   items: AppNotification[];
@@ -82,6 +86,7 @@ export function NotificationPanel({
   onDeleteItem: (notificationId: string) => void;
   onDeleteRead: () => void;
   loginPopupEnabled?: boolean;
+  loginPopupUpdating?: boolean;
   onToggleLoginPopup?: () => void;
 }) {
   const hasRead = items.some((n) => n.is_read);
@@ -122,7 +127,19 @@ export function NotificationPanel({
             <div className="min-w-0 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
               {NOTIFICATION_COPY.loginPopup}
             </div>
-            <LoginPopupSwitch enabled={loginPopupEnabled} onToggle={onToggleLoginPopup} />
+            <div className="flex shrink-0 items-center gap-2">
+              <span
+                className="text-xs font-black"
+                style={{ color: loginPopupEnabled ? LEGACY_COLORS.green : LEGACY_COLORS.muted2 }}
+              >
+                {loginPopupEnabled ? "켜짐" : "꺼짐"}
+              </span>
+              <LoginPopupSwitch
+                enabled={loginPopupEnabled}
+                disabled={loginPopupUpdating}
+                onToggle={onToggleLoginPopup}
+              />
+            </div>
           </div>
         )}
       </div>

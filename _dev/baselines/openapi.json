@@ -1757,7 +1757,7 @@
             "default": "staff"
           },
           "login_notification_popup_enabled": {
-            "default": false,
+            "default": true,
             "title": "Login Notification Popup Enabled",
             "type": "boolean"
           },
@@ -1913,7 +1913,7 @@
             "$ref": "#/components/schemas/EmployeeLevelEnum"
           },
           "login_notification_popup_enabled": {
-            "default": false,
+            "default": true,
             "title": "Login Notification Popup Enabled",
             "type": "boolean"
           },
