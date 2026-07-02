@@ -110,17 +110,20 @@ export function IoLineRow({
   // line.quantity 는 backend Decimal 직렬화로 string 일 수 있어 Number 강제 변환 (string concat 방지)
   const currentQty = Number(line.quantity) || 0;
 
+  function nextShortageFor(quantity: number) {
+    if (!isOutgoing(line)) return 0;
+    return available === null ? line.shortage : Math.max(0, quantity - available);
+  }
+
   function onStep(delta: number) {
     const next = Math.max(0, currentQty + delta);
-    const nextShortage = available === null ? line.shortage : Math.max(0, next - available);
-    onQuantityChange(next, nextShortage);
+    onQuantityChange(next, nextShortageFor(next));
   }
 
   function onInputChange(value: string) {
     const next = Number(value);
     const safe = Number.isFinite(next) ? Math.max(0, next) : 0;
-    const nextShortage = available === null ? line.shortage : Math.max(0, safe - available);
-    onQuantityChange(safe, nextShortage);
+    onQuantityChange(safe, nextShortageFor(safe));
   }
 
   return (

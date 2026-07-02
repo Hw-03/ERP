@@ -57,5 +57,11 @@ export function useInventoryData(opts: UseInventoryDataOptions): UseInventoryDat
     void loadItems();
   }, [loadItems]);
 
+  useEffect(() => {
+    const onItems = () => { void loadItems(); };
+    window.addEventListener("items", onItems);
+    return () => window.removeEventListener("items", onItems);
+  }, [loadItems]);
+
   return { items, setItems, loading, error, loadItems };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type Employee, type Item, type ProductModel } from "@/lib/api";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 
@@ -15,11 +15,8 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loadFailure, setLoadFailure] = useState<string | null>(null);
-  // Phase 4: 로딩 플래그 — 메인 데이터(items/employees) 첫 로딩 동안 true.
-  // productModels 는 부수 데이터이므로 플래그에 포함하지 않는다.
   const [loading, setLoading] = useState(true);
 
-  // 모델 목록은 React Query 캐시 공유 (R2-3). 부수 데이터이므로 로딩 플래그엔 미포함.
   const { data: productModels, error: modelsError } = useModelsQuery();
   useEffect(() => {
     if (!modelsError) return;
@@ -27,7 +24,7 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     onStatusChange(msg);
   }, [modelsError, onStatusChange]);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     setLoading(true);
     void Promise.all([
       api.getEmployees({ activeOnly: true }),
@@ -45,6 +42,15 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
       })
       .finally(() => setLoading(false));
   }, [globalSearch, onStatusChange]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    window.addEventListener("items", loadData);
+    return () => window.removeEventListener("items", loadData);
+  }, [loadData]);
 
   return {
     employees,

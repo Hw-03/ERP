@@ -39,7 +39,6 @@ export function InventoryItemsTable({
   onResetAllFilters,
   imageManifest,
 }: Props) {
-  // 항목 2-4 — 현재고/안전재고 정렬 제거. 표시 순서는 들어온 filteredItems(등록·관리자 설정 순) 그대로.
   if (error) {
     return <LoadFailureCard message={error} onRetry={onRetry} />;
   }
@@ -84,7 +83,7 @@ export function InventoryItemsTable({
                   { label: "이미지", nowrap: true, width: "60px", center: true, hidden: true },
                   { label: "품목명", nowrap: false, minWidth: "140px" },
                   { label: "품목 코드", nowrap: true, width: "160px", hidden: true },
-                  { label: "부서", nowrap: true, width: "160px", center: true, hidden: true },
+                  { label: "부서별 재고", nowrap: true, width: "220px", center: true, hidden: true },
                 ] as { label: string; nowrap: boolean; width?: string; minWidth?: string; center?: boolean; hidden?: boolean }[]
               ).map(({ label, nowrap, width, minWidth, center, hidden }) => (
                 <th
@@ -101,15 +100,13 @@ export function InventoryItemsTable({
                   {label}
                 </th>
               ))}
-              {/* 현재고 — 항목 2-4: 정렬 제거, 일반 텍스트 헤더 */}
               <th
                 scope="col"
                 className="border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-right sm:text-center"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
               >
-                현재고
+                총재고
               </th>
-              {/* 안전재고 — 항목 2-4: 정렬 제거, 일반 텍스트 헤더 */}
               <th
                 scope="col"
                 className="hidden sm:table-cell border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center"
@@ -143,9 +140,7 @@ export function InventoryItemsTable({
             color: LEGACY_COLORS.muted2,
           }}
         >
-          100개 더 보기 (
-          {formatQty(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} /{" "}
-          {formatQty(filteredItems.length)})
+          100개 더 보기 ({formatQty(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} / {formatQty(filteredItems.length)})
         </button>
       )}
       {filteredItems.length > 0 && (

@@ -8,6 +8,10 @@ import { useEffect, useState } from "react";
 import type { Item } from "@/lib/api";
 import { api } from "@/lib/api";
 
+function notifyItemsChanged() {
+  window.dispatchEvent(new Event("items"));
+}
+
 export type ItemEditForm = {
   item_name: string;
   legacy_item_type: string;
@@ -137,6 +141,7 @@ export function useAdminMasterItemsForm({
       // useEffect deps 가 selectedItem.item_id 라 같은 부품 갱신은 발화 안 함 → 명시 호출 필요.
       setFormState(itemToEditForm(updated));
       setDirty(false);
+      notifyItemsChanged();
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       onShowSave?.("저장됐습니다.");
     } catch (error) {
@@ -157,6 +162,7 @@ export function useAdminMasterItemsForm({
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
       setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
+      notifyItemsChanged();
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -170,6 +176,7 @@ export function useAdminMasterItemsForm({
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
       setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
+      notifyItemsChanged();
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");

@@ -1,0 +1,62 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { Item } from "../types";
+import { IoTargetPicker } from "../IoTargetPicker";
+
+vi.mock("../useItemOrderDrag", () => ({
+  useItemOrderDrag: () => ({
+    dragId: null,
+    dropTargetId: null,
+    makeHandlers: () => ({}),
+  }),
+}));
+
+vi.mock("@/lib/queries/useMyItemOrderQuery", () => ({
+  useMyItemOrderQuery: () => ({ data: null }),
+  usePutMyItemOrderMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useResetMyItemOrderMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock("../login/useCurrentOperator", () => ({
+  useCurrentOperator: () => ({ employee_id: "emp-1", assigned_model_slots: [] }),
+}));
+
+function makeItem(): Item {
+  return {
+    item_id: "item-1",
+    item_name: "행 클릭 품목",
+    mes_code: "3-TR-0001",
+    quantity: 0,
+    warehouse_qty: 0,
+    min_stock: null,
+    locations: [],
+    model_slots: [],
+    deleted_at: null,
+  } as unknown as Item;
+}
+
+const baseProps = {
+  workType: "receive" as const,
+  subType: "receive_supplier" as const,
+  deptIoDirection: null,
+  bundleSubType: null,
+  bomParents: new Set<string>(),
+  items: [makeItem()],
+  productModels: [],
+  bundles: [],
+  search: "",
+  onSearchChange: vi.fn(),
+  onAddItem: vi.fn(),
+  onAdvance: vi.fn(),
+};
+
+describe("IoTargetPicker row click", () => {
+  it("adds a single-only receive item when the row is clicked", () => {
+    const onAddItem = vi.fn();
+    render(<IoTargetPicker {...baseProps} onAddItem={onAddItem} />);
+
+    fireEvent.click(screen.getByText("행 클릭 품목").closest("tr")!);
+
+    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual");
+  });
+});

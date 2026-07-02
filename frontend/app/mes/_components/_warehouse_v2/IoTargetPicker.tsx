@@ -513,10 +513,13 @@ function ItemTable({
             const noDeptStock = prodByDept.size === 0;
             const wQty = Number(item.warehouse_qty) || 0;
             const isHighlight = highlightItemId === item.item_id;
+            const rowClickEnabled = mode === "single_only" && !busy;
+            const addSingleItem = () => onAdd(item, "manual");
             return (
               <HighlightableRow
                 key={item.item_id}
                 isHighlight={isHighlight}
+                onClick={rowClickEnabled ? addSingleItem : undefined}
               >
                 <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                   {/* 모바일(<sm): 사양·괄호·구형/신형까지 보이도록 2줄. 데스크톱(sm:≥640): 기존 한 줄 truncate 보존. */}
@@ -679,7 +682,10 @@ function ItemTable({
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => onAdd(item, "manual")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          addSingleItem();
+                        }}
                         className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
                         style={{ background: LEGACY_COLORS.blue }}
                         title="선택 — 선택 품목만 처리"
@@ -835,9 +841,11 @@ function EditOrderTable({
 // 자동 카트 추가는 하지 않고 사용자가 직접 BOM/낱개를 선택하게 한다.
 function HighlightableRow({
   isHighlight,
+  onClick,
   children,
 }: {
   isHighlight: boolean;
+  onClick?: () => void;
   children: React.ReactNode;
 }) {
   const rowRef = useRef<HTMLTableRowElement | null>(null);
@@ -864,7 +872,8 @@ function HighlightableRow({
   return (
     <tr
       ref={rowRef}
-      className={`transition-colors duration-150 hover:bg-[var(--c-s4)]${flash ? " animate-row-flash" : ""}`}
+      onClick={onClick}
+      className={`transition-colors duration-150 hover:bg-[var(--c-s4)]${onClick ? " cursor-pointer" : ""}${flash ? " animate-row-flash" : ""}`}
     >
       {children}
     </tr>

@@ -79,4 +79,25 @@ describe("useAdminMasterItemsCommands", () => {
     expect(args.setSelectedItem).toHaveBeenCalled();
     expect(result.current.addMode).toBe(false);
   });
+
+  it("emits item-change event after add success", async () => {
+    createMutateAsync.mockResolvedValue({
+      item_id: "101",
+      item_name: "New item",
+      mes_code: "N-101",
+    });
+    const onItemsChanged = vi.fn();
+    window.addEventListener("items", onItemsChanged);
+    const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), { wrapper });
+    act(() => {
+      result.current.setAddForm((form) => ({ ...form, item_name: "New item" }));
+    });
+
+    await act(async () => {
+      result.current.add();
+    });
+
+    await waitFor(() => expect(onItemsChanged).toHaveBeenCalledTimes(1));
+    window.removeEventListener("items", onItemsChanged);
+  });
 });

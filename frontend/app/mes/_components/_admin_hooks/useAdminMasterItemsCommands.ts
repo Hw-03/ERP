@@ -13,6 +13,10 @@ import {
 import { itemsApi } from "@/lib/api/items";
 import { EMPTY_ADD_FORM, type AddForm } from "../_admin_sections/adminShared";
 
+function notifyItemsChanged() {
+  window.dispatchEvent(new Event("items"));
+}
+
 export type UseAdminMasterItemsCommandsArgs = {
   setItems: (updater: (prev: Item[]) => Item[]) => void;
   setSelectedItem: (i: Item | null) => void;
@@ -72,6 +76,7 @@ export function useAdminMasterItemsCommands({
       setSelectedItem(created);
       setAddMode(false);
       setAddForm(() => EMPTY_ADD_FORM);
+      notifyItemsChanged();
       onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.mes_code})`);
       onShowSave?.(`'${created.item_name}' 품목이 추가됐습니다.`);
     } catch (error) {
@@ -99,6 +104,7 @@ export function useAdminMasterItemsCommands({
       setItems((prev) => prev.map((it) => (it.item_id === itemId ? updated : it)));
       setSelectedItem(updated);
       onStatusChange("품목이 삭제됐습니다. 목록에서 복구할 수 있습니다.");
+      notifyItemsChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "품목 삭제에 실패했습니다.");
     }
@@ -110,6 +116,7 @@ export function useAdminMasterItemsCommands({
       setItems((prev) => prev.map((it) => (it.item_id === itemId ? updated : it)));
       setSelectedItem(updated);
       onStatusChange("품목이 복구됐습니다.");
+      notifyItemsChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "품목 복구에 실패했습니다.");
     }

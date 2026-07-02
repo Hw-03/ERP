@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api-core";
+import { PIN_LENGTH } from "@/lib/auth/constants";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import { useWarehouseQueueQuery, useApproveStockRequestMutation, useRejectStockRequestMutation } from "@/lib/queries/useStockRequestsQuery";
@@ -45,7 +46,11 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   };
 
   const submitApprove = (requestId: string) => {
-    if (!approvePin) return;
+    if (approvePin.length !== PIN_LENGTH) {
+      setApproveError(`PIN 자리를 입력해 주세요.`);
+      return;
+    }
+    setApproveError(null);
     setBusyId(requestId);
     approveMutation.mutate(
       { requestId, payload: { actor_employee_id: approverEmployeeId, pin: approvePin } },
@@ -66,7 +71,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   };
 
   const submitReject = (requestId: string) => {
-    if (!rejectPin || !rejectReason.trim()) {
+    if (rejectPin.length !== PIN_LENGTH || !rejectReason.trim()) {
       setRejectError("PIN과 반려 사유를 모두 입력해 주세요.");
       return;
     }

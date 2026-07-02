@@ -78,6 +78,7 @@ function DesktopMesShellInner() {
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [warehouseMapFullscreen, setWarehouseMapFullscreen] = useState(false);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleStatusChange = useCallback((msg: string) => {
@@ -95,6 +96,10 @@ function DesktopMesShellInner() {
   }, []);
 
   function handleTabChange(tab: DesktopTabId) {
+    if (warehouseMapFullscreen) {
+      setWarehouseMapFullscreen(false);
+      if (tab === activeTab) return;
+    }
     if (!canOpenTab(tab)) {
       if (fallbackTab !== activeTab) {
         setActiveTab(fallbackTab);
@@ -122,6 +127,7 @@ function DesktopMesShellInner() {
     // 가드. 없으면 즉시 이동. confirmAdminNavigation 은 useConfirmNavigation 의
     // 결과로, 등록된 모든 dirty entry 를 자동 집계한다.
     const doSwitch = () => {
+      setWarehouseMapFullscreen(false);
       setActiveTab(tab);
       router.push(`?tab=${tab}`, { scroll: false });
     };
@@ -165,6 +171,12 @@ function DesktopMesShellInner() {
 
     setDefectDeptFilter(canOpenTab("defect") ? dept : null);
   }, [searchParams, activeTab, canOpenTab, fallbackTab, router]);
+
+  useEffect(() => {
+    if (activeTab !== "warehouseMap" && warehouseMapFullscreen) {
+      setWarehouseMapFullscreen(false);
+    }
+  }, [activeTab, warehouseMapFullscreen]);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
 
@@ -224,7 +236,14 @@ function DesktopMesShellInner() {
       return <DesktopShippingView key={key} operator={operator} onStatusChange={handleStatusChange} />;
     }
     if (activeTab === "warehouseMap") {
-      return <DesktopWarehouseMapTab key={key} onStatusChange={handleStatusChange} />;
+      return (
+        <DesktopWarehouseMapTab
+          key={key}
+          onStatusChange={handleStatusChange}
+          fullscreen={warehouseMapFullscreen}
+          onFullscreenChange={setWarehouseMapFullscreen}
+        />
+      );
     }
     if (activeTab === "defect") {
       return (
@@ -247,7 +266,7 @@ function DesktopMesShellInner() {
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator]);
+  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
 
   return (
     <>
@@ -266,8 +285,9 @@ function DesktopMesShellInner() {
           />
 
           <div className="min-w-0 flex-1 flex flex-col">
-            <DesktopTopbar
-              title={activeMeta.title}
+            {!warehouseMapFullscreen && (
+              <DesktopTopbar
+                title={activeMeta.title}
               icon={activeMeta.icon}
               iconColor={DESKTOP_TAB_ICON_COLORS[activeTab]}
               onRefresh={() => {
@@ -281,10 +301,11 @@ function DesktopMesShellInner() {
                   <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
                 ) : undefined
               }
-              onNavigate={handleNotificationNavigate}
-            />
+                onNavigate={handleNotificationNavigate}
+              />
+            )}
 
-            <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>
+            <div className={`${warehouseMapFullscreen ? "" : "mt-1"} min-h-0 flex-1 overflow-hidden flex`}>{content}</div>
           </div>
         </div>
       </div>

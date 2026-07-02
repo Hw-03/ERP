@@ -31,8 +31,12 @@ const EDITOR_TABS = [
 
 export function DesktopWarehouseMapTab({
   onStatusChange,
+  fullscreen = false,
+  onFullscreenChange,
 }: {
   onStatusChange?: (msg: string) => void;
+  fullscreen?: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const operator = useCurrentOperator();
   const isManager =
@@ -94,6 +98,16 @@ export function DesktopWarehouseMapTab({
     setEditMode(false);
     setEditorError(null);
     onStatusChange?.("창고 지도");
+  }
+
+  if (fullscreen) {
+    return (
+      <DesktopWarehouseMapView
+        onStatusChange={onStatusChange}
+        fullscreen
+        onFullscreenChange={onFullscreenChange}
+      />
+    );
   }
 
   return (
@@ -172,6 +186,13 @@ export function DesktopWarehouseMapTab({
             </button>
           )}
         </div>
+      )}
+
+
+      {!editMode && (
+        <button type="button" onClick={() => onFullscreenChange?.(true)} className="self-end rounded-[12px] border px-3 py-2 text-[13px] font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+          전체화면
+        </button>
       )}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -256,7 +277,11 @@ export function DesktopWarehouseMapTab({
             </div>
           </div>
         ) : (
-          <DesktopWarehouseMapView onStatusChange={onStatusChange} />
+          <DesktopWarehouseMapView
+            onStatusChange={onStatusChange}
+            fullscreen={fullscreen}
+            onFullscreenChange={onFullscreenChange}
+          />
         )}
       </div>
     </div>

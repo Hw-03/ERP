@@ -59,6 +59,9 @@ const inputStyle = {
   color: LEGACY_COLORS.text,
 };
 
+const WAREHOUSE_LOCATION = "창고";
+const MATERIAL_TYPE_OPTIONS = ["원자재", "부자재", "불용", "기타"] as const;
+
 /** model_slots + process_type_code 로 권장 prefix 계산 */
 function previewCodePrefix(slots: number[], processType: string, models: ProductModel[]): string {
   const sorted = [...slots].sort((a, b) => a - b);
@@ -139,6 +142,13 @@ function MesCodeSection({
 export function ItemFormFields({ form, setForm, showInitialQuantity, showInitialLocations, showMesCode, productModels = [] }: Props) {
   const departments = useDepartments();
   const deptOptions = departments.map((d) => ({ value: d.name, label: d.name }));
+  const locationOptions = [{ value: WAREHOUSE_LOCATION, label: WAREHOUSE_LOCATION }, ...deptOptions];
+  const materialOptions = [
+    ...(form.legacy_item_type && !MATERIAL_TYPE_OPTIONS.includes(form.legacy_item_type as (typeof MATERIAL_TYPE_OPTIONS)[number])
+      ? [{ value: form.legacy_item_type, label: "현재값: " + form.legacy_item_type }]
+      : []),
+    ...MATERIAL_TYPE_OPTIONS.map((value) => ({ value, label: value })),
+  ];
 
   const locs = form.initial_locations ?? [];
   const totalQty = locs.reduce((s, r) => s + Number(r.quantity || 0), 0);
@@ -180,7 +190,8 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
                     }
                     size="lg"
                     triggerStyle={{ background: LEGACY_COLORS.s1 }}
-                    options={deptOptions}
+                    triggerAriaLabel="초기 재고 위치"
+                    options={locationOptions}
                   />
                 </div>
                 <input
@@ -222,7 +233,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
                 ...f,
                 initial_locations: [
                   ...(f.initial_locations ?? []),
-                  { department: deptOptions[0]?.value ?? "", quantity: "" },
+                  { department: WAREHOUSE_LOCATION, quantity: "" },
                 ],
               }))
             }
@@ -239,8 +250,20 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         </div>
       )}
 
+      <div>
+        <FieldLabel label="자재분류" badge="선택" />
+        <AppSelect
+          value={form.legacy_item_type}
+          onChange={(v) => setForm((f) => ({ ...f, legacy_item_type: v }))}
+          size="lg"
+          triggerAriaLabel="자재분류"
+          triggerStyle={{ background: LEGACY_COLORS.s1 }}
+          options={materialOptions}
+          placeholder="선택"
+        />
+      </div>
+
       {([
-        { key: "legacy_item_type", label: "자재분류", type: "text",   placeholder: "예: 필라멘트, 애자" },
         { key: "supplier",         label: "공급사",   type: "text",   placeholder: "예: 삼성특수금속" },
         { key: "min_stock",        label: "안전재고", type: "number", placeholder: "0" },
       ] as const).map(({ key, label, type, placeholder }) => (

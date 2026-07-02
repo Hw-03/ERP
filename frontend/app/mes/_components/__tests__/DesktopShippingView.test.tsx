@@ -402,6 +402,22 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByTestId("shipping-wizard-step-4")).not.toBeInTheDocument();
   });
 
+  it("clears a zero shipping quantity on focus so typing replaces it", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+
+    const quantityInput = await screen.findByTestId("shipping-request-quantity");
+    fireEvent.change(quantityInput, { target: { value: "0" } });
+    expect(quantityInput).toHaveValue(0);
+
+    fireEvent.focus(quantityInput);
+
+    expect(quantityInput).toHaveValue(null);
+  });
+
   it("moves through PF, BOM, match, request info, and final send steps", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 

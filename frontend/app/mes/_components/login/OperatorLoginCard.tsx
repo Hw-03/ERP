@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowRight, Loader2, Lock, RotateCcw } from "lucide-react";
+import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { api, type Employee } from "@/lib/api";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { setCurrentOperator, type Operator } from "./useCurrentOperator";
@@ -197,33 +197,6 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
               </>
             )}
           </button>
-        </div>
-
-        {/* PIN 초기화 요청 — 항상 보이는 보조 안내 */}
-        <div
-          className="mt-5"
-          style={{ animation: "mes-field-rise 0.5s 0.30s ease both" }}
-        >
-          <div className="flex flex-col items-center gap-1">
-            <span
-              role="button"
-              tabIndex={-1}
-              aria-disabled="true"
-              title="관리자에게 문의해 주세요."
-              className="inline-flex items-center gap-1.5 text-sm"
-              style={{
-                color: "var(--c-blue)",
-                cursor: "not-allowed",
-                opacity: 0.7,
-              }}
-            >
-              <RotateCcw size={14} />
-              PIN 초기화 요청
-            </span>
-            <span className="text-[11px]" style={{ color: "var(--c-muted)" }}>
-              관리자에게 문의해 주세요.
-            </span>
-          </div>
         </div>
 
         {/* 하단 보안 안내 */}

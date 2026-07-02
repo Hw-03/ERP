@@ -84,4 +84,19 @@ describe("useAdminMasterItemsForm", () => {
     expect(args.setItems).toHaveBeenCalled();
     expect(args.setSelectedItem).toHaveBeenCalledWith(updated);
   });
+
+  it("emits item-change event after save success", async () => {
+    const updated = I({ item_name: "Changed" });
+    updateItemMock.mockResolvedValue(updated);
+    const onItemsChanged = vi.fn();
+    window.addEventListener("items", onItemsChanged);
+    const { result } = renderHook(() => useAdminMasterItemsForm(baseArgs({ selectedItem: I() })));
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    await waitFor(() => expect(onItemsChanged).toHaveBeenCalledTimes(1));
+    window.removeEventListener("items", onItemsChanged);
+  });
 });

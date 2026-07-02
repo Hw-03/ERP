@@ -187,7 +187,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [basePfId, setBasePfId] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
-  const [requestQuantity, setRequestQuantity] = useState(1);
+  const [requestQuantity, setRequestQuantity] = useState<number | "">(1);
   const [customPaName, setCustomPaName] = useState("");
   const [customPfName, setCustomPfName] = useState("");
   const [notes, setNotes] = useState("");
@@ -1151,7 +1151,7 @@ function RequestSection(props: {
   itemOptions: Item[];
   basePfId: string;
   requestedBy: string;
-  requestQuantity: number;
+  requestQuantity: number | "";
   companionDraft: CompanionDraftLine[];
   customPaName: string;
   customPfName: string;
@@ -1166,7 +1166,7 @@ function RequestSection(props: {
   onSelectRequest: (req: ShippingRequest) => void;
   onBasePfChange: (value: string) => void;
   onRequestedBy: (value: string) => void;
-  onRequestQuantity: (value: number) => void;
+  onRequestQuantity: (value: number | "") => void;
   onCustomPaName: (value: string) => void;
   onCustomPfName: (value: string) => void;
   onNotes: (value: string) => void;
@@ -1328,7 +1328,13 @@ function RequestSection(props: {
                       step={1}
                       value={props.requestQuantity}
                       disabled={locked || props.pending !== null}
-                      onChange={(event) => props.onRequestQuantity(Number(event.target.value))}
+                      onFocus={() => {
+                        if (Number(props.requestQuantity) < 1) props.onRequestQuantity("");
+                      }}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        props.onRequestQuantity(value === "" ? "" : Number(value));
+                      }}
                       className="h-12 w-full min-w-0 rounded-[12px] border px-3 text-center text-sm font-black outline-none focus-visible:ring-2"
                       style={{ background: LEGACY_COLORS.bg, borderColor: validRequestQuantity ? LEGACY_COLORS.border : LEGACY_COLORS.red, color: LEGACY_COLORS.text }}
                     />

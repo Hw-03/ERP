@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
@@ -34,6 +34,8 @@ export function DesktopWarehouseMapView({
   editable,
   items,
   onMapMutated,
+  fullscreen = false,
+  onFullscreenChange,
 }: {
   onStatusChange?: (msg: string) => void;
   /** 편집 모드(창고 관리자): 줄확대 화면에서 박스 드래그 이동 + 칸 패널에서 박스 넣기/편집/빼기. */
@@ -42,6 +44,8 @@ export function DesktopWarehouseMapView({
   items?: Item[];
   /** 박스 생성/수정/삭제 성공 시 호출 — 부모(탭)가 미배치 배너 등을 갱신. */
   onMapMutated?: () => void;
+  fullscreen?: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const [map, setMap] = useState<WarehouseMap | null>(null);
   const [loading, setLoading] = useState(true);
@@ -327,12 +331,13 @@ export function DesktopWarehouseMapView({
         if (addBox) setAddBox(null);
         else if (panel) setPanel(null);
         else if (query) clearSearch();
+        else if (fullscreen) onFullscreenChange?.(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panel, query, addBox]);
+  }, [panel, query, addBox, fullscreen, onFullscreenChange]);
 
   // ── Browser back/forward ──
   useEffect(() => {
@@ -547,7 +552,7 @@ export function DesktopWarehouseMapView({
   })();
 
   return (
-    <div style={{ display: "flex", minHeight: 0, flex: 1, minWidth: 0 }}>
+    <div style={{ display: "flex", minHeight: 0, flex: 1, minWidth: 0, height: "100%" }}>
       {/* 편집 모드: 박스 넣기/편집 오버레이가 좌측 지도 카드를 대체. 아니면 지도 카드. */}
       {addBox && panel && editable ? (
         <AddBoxScreen
@@ -565,20 +570,22 @@ export function DesktopWarehouseMapView({
       ) : (
       /* Map card */
       <div
+        data-testid="warehouse-map-card"
         style={{
           flex: 1,
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
-          borderRadius: 24,
-          background: LEGACY_COLORS.s1,
-          border: `1px solid ${LEGACY_COLORS.border}`,
-          boxShadow: "var(--c-card-shadow)",
-          backgroundImage: "var(--c-panel-glow)",
+          borderRadius: fullscreen ? 0 : 24,
+          background: fullscreen ? "transparent" : LEGACY_COLORS.s1,
+          border: fullscreen ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+          boxShadow: fullscreen ? "none" : "var(--c-card-shadow)",
+          backgroundImage: fullscreen ? "none" : "var(--c-panel-glow)",
           overflow: "hidden",
         }}
       >
         {/* Header strip */}
+        {!fullscreen && (
         <div
           style={{
             flexShrink: 0,
@@ -752,9 +759,10 @@ export function DesktopWarehouseMapView({
             )}
           </div>
         </div>
+        )}
 
         {/* Location guide strip */}
-        {locGuide && locGuide.hits.length > 0 && (
+        {!fullscreen && locGuide && locGuide.hits.length > 0 && (
           <div
             style={{
               flexShrink: 0,

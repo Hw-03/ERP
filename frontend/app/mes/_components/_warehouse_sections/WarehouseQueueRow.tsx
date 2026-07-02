@@ -1,10 +1,15 @@
 "use client";
 
 import type { StockRequest } from "@/lib/api";
+import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
+
+function normalizePin(value: string) {
+  return value.replace(/\D/g, "").slice(0, PIN_LENGTH);
+}
 
 /**
  * Round-13 (#4) 추출 — WarehouseQueuePanel 의 단일 request 행.
@@ -114,9 +119,9 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
             type="password"
             inputMode="numeric"
             value={approvePin}
-            onChange={(e) => setApprovePin(e.target.value)}
+            onChange={(e) => setApprovePin(normalizePin(e.target.value))}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing && approvePin) {
+              if ((e.key === "Enter" || e.key === " ") && !e.nativeEvent.isComposing && approvePin.length === PIN_LENGTH) {
                 e.preventDefault();
                 submitApprove(req.request_id);
               }
@@ -124,6 +129,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
             className="rounded border px-2 py-1 text-sm"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, width: "8rem" }}
             placeholder="0000"
+            maxLength={PIN_LENGTH}
             autoFocus
           />
           <button
@@ -168,12 +174,12 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
               type="password"
               inputMode="numeric"
               value={rejectPin}
-              onChange={(e) => setRejectPin(e.target.value)}
+              onChange={(e) => setRejectPin(normalizePin(e.target.value))}
               onKeyDown={(e) => {
                 if (
                   e.key === "Enter" &&
                   !e.nativeEvent.isComposing &&
-                  rejectPin &&
+                  rejectPin.length === PIN_LENGTH &&
                   rejectReason.trim()
                 ) {
                   e.preventDefault();
@@ -183,6 +189,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
               className="rounded border px-2 py-1 text-sm"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, width: "8rem" }}
               placeholder="0000"
+              maxLength={PIN_LENGTH}
             />
             <button
               type="button"
