@@ -175,6 +175,16 @@ describe("historyPresentation", () => {
     ]);
   });
 
+  it("does not show requester as approver when approval data is missing", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      requester_name: "김현우",
+      approver_name: null,
+      produced_by: "김현우",
+    }));
+
+    expect(row.people).toEqual({ requester: "김현우", approver: "-" });
+  });
+
   it("keeps single-log stock, actor, and cancel signals visible without reference chips", () => {
     const row = getHistoryRowPresentation(
       makeLog({

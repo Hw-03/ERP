@@ -432,7 +432,7 @@ function HistoryDetailMetaStrip({
 }) {
   const processMeta = PROCESS_TYPE_META[log.item_process_type_code ?? ""];
   const reqName = getHistoryActor(log);
-  const approverName = log.approver_name ?? reqName;
+  const approverName = log.approver_name ?? "-";
 
   return (
     <div

@@ -32,6 +32,7 @@ from app.models import (
 )
 from app.services import io_dispatch as svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.routers.inventory._tx_filters import _batch_name_map
 
 D = Decimal
 ASSEMBLY = DepartmentEnum.ASSEMBLY
@@ -681,9 +682,12 @@ def test_execute_batch_after_dept_approval_applies_inventory(
         requester_name=requester.name,
         requester_department=requester.department.value,
         request_type=svc.StockRequestTypeEnum.MANUAL_ADJUSTMENT,
+        request_code="SR-TEST-MANUAL-ADJUST",
         status=StockRequestStatusEnum.SUBMITTED,
         requires_warehouse_approval=False,
         requires_department_approval=True,
+        department_approved_by_employee_id=approver.employee_id,
+        department_approved_by_name=approver.name,
         operation_batch_id=batch.batch_id,
     )
     db_session.add(request)
@@ -696,6 +700,9 @@ def test_execute_batch_after_dept_approval_applies_inventory(
     assert _prod_qty(db_session, item.item_id) == D("5")
     log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
     assert log.transaction_type == TransactionTypeEnum.ADJUST
+    assert log.reference_no == request.request_code
+    mapped = _batch_name_map(db_session, {batch.batch_id})[batch.batch_id]
+    assert mapped.approver_name == approver.name
     # operator_name 은 승인자 기준으로 기록.
     assert log.produced_by == approver.name
 
@@ -709,6 +716,7 @@ def test_execute_batch_after_dept_approval_missing_batch_raises(db_session):
         requester_name=requester.name,
         requester_department=requester.department.value,
         request_type=svc.StockRequestTypeEnum.MANUAL_ADJUSTMENT,
+        request_code="SR-TEST-MANUAL-ADJUST",
         status=StockRequestStatusEnum.SUBMITTED,
         requires_warehouse_approval=False,
         requires_department_approval=True,

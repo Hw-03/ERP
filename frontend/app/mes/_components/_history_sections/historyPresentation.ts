@@ -249,7 +249,7 @@ export function getHistoryRowPresentation(
     : { parts: [getSingleLogMovement(log)] };
   const stock = getStockPresentation(log);
   const requester = batch?.requester_name ?? getHistoryActor(log);
-  const approver = batch?.approver_name ?? log.approver_name ?? requester;
+  const approver = batch?.approver_name ?? log.approver_name ?? "-";
 
   return {
     operation,

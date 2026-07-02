@@ -111,6 +111,8 @@ def _request_bucket(value: str) -> RequestBucketEnum:
 def _link_stock_request(db: Session, *, batch: IoBatch, request: StockRequest, lines: Sequence[IoLine]) -> None:
     request.operation_batch_id = batch.batch_id
     batch.stock_request_id = request.request_id
+    if request.request_code and not batch.reference_no:
+        batch.reference_no = request.request_code
     # 창고 또는 부서 결재 어느 쪽이든 필요하면 결재 대기로 표시.
     batch.requires_approval = bool(
         request.requires_warehouse_approval or request.requires_department_approval
@@ -240,6 +242,10 @@ def execute_batch_after_dept_approval(
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("작업 묶음을 찾을 수 없습니다.")
+    if not batch.stock_request_id:
+        batch.stock_request_id = request.request_id
+    if request.request_code and not batch.reference_no:
+        batch.reference_no = request.request_code
 
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)

@@ -324,13 +324,16 @@ def _batch_name_map(
     sr_approver: dict[uuid.UUID, Optional[str]] = {}
     sr_approved_at: dict[uuid.UUID, Optional[datetime]] = {}
     if sr_ids:
-        for sr_id, app_name, app_emp_id, req_emp_id, app_at in (
+        for sr_id, app_name, app_emp_id, req_emp_id, app_at, dept_name, dept_emp_id, dept_at in (
             db.query(
                 StockRequest.request_id,
                 StockRequest.approved_by_name,
                 StockRequest.approved_by_employee_id,
                 StockRequest.requester_employee_id,
                 StockRequest.approved_at,
+                StockRequest.department_approved_by_name,
+                StockRequest.department_approved_by_employee_id,
+                StockRequest.department_approved_at,
             )
             .filter(StockRequest.request_id.in_(sr_ids))
             .all()
@@ -339,9 +342,12 @@ def _batch_name_map(
             if app_emp_id and app_emp_id != req_emp_id:
                 sr_approver[sr_id] = app_name
                 sr_approved_at[sr_id] = app_at
+            elif dept_emp_id and dept_emp_id != req_emp_id:
+                sr_approver[sr_id] = dept_name
+                sr_approved_at[sr_id] = dept_at
             else:
                 sr_approver[sr_id] = None
-                sr_approved_at[sr_id] = None  # 즉시 처리 → approved_at fallback은 호출부에서 log.created_at
+                sr_approved_at[sr_id] = None  # 즉시 처리 시 approved_at fallback은 호출부에서 log.created_at
     for b in batches:
         approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
         approved_at = sr_approved_at.get(b.stock_request_id) if b.stock_request_id else None
