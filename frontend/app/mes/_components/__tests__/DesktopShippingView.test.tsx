@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingRequest } from "@/lib/api";
@@ -303,6 +303,12 @@ describe("DesktopShippingView", () => {
     fireEvent.click(await screen.findByTestId("shipping-pf-option-pf-1"));
   }
 
+  async function addCompanionItem() {
+    const input = await screen.findByTestId("shipping-companion-search");
+    fireEvent.change(input, { target: { value: "Carton" } });
+    fireEvent.click(await screen.findByTestId("shipping-companion-add-carton-1"));
+  }
+
   it("loads the shipping hub without waiting for items or history", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -321,6 +327,7 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     openHubCard(container, "request");
+    await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
     openNewRequest(container);
 
     expect(await screen.findByTestId("shipping-pf-option-pf-1")).toBeInTheDocument();
@@ -408,6 +415,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-bom-editor-pa")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-request-info-fields")).not.toBeInTheDocument();
+    await addCompanionItem();
 
     nextStep(container);
     expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
@@ -453,8 +461,10 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-bom-editor-pa")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: /Cable Set/ }));
     expect(container.querySelector('[data-bom-line-child="acc-1"][data-bom-line-included="false"]')).toBeTruthy();
-    fireEvent.click(screen.getByTestId("shipping-add-pa-line"));
-    expect(container.querySelector('[data-bom-line-origin="CUSTOM"]')).toBeTruthy();
+    fireEvent.change(screen.getByTestId("shipping-bom-search-pa"), { target: { value: "Bracket" } });
+    fireEvent.click(await screen.findByTestId("shipping-bom-add-pa-bracket-1"));
+    expect(container.querySelector('[data-bom-line-child="bracket-1"][data-bom-line-origin="CUSTOM"]')).toBeTruthy();
+    await addCompanionItem();
 
     nextStep(container);
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
@@ -594,6 +604,7 @@ describe("DesktopShippingView", () => {
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
+    await addCompanionItem();
     nextStep(container);
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
     nextStep(container);
@@ -683,6 +694,7 @@ describe("DesktopShippingView", () => {
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
+    await addCompanionItem();
     nextStep(container);
 
     expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
@@ -690,7 +702,7 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByRole("button", { name: /기본 BOM 다시 불러오기/ })).not.toBeInTheDocument();
   });
 
-  it("shows existing BOM rows as read-only and only new rows use a selector", async () => {
+  it("adds BOM rows from search results without row selectors", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -701,9 +713,12 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
     expect(screen.getAllByTestId("shipping-bom-readonly-item").length).toBeGreaterThan(0);
     expect(screen.queryByRole("combobox", { name: /품목 선택/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-add-pa-line")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("shipping-add-pa-line"));
-    expect(screen.getByRole("combobox", { name: /PA 구성품 추가 품목 선택/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("shipping-bom-search-pa"), { target: { value: "Bracket" } });
+    fireEvent.click(await screen.findByTestId("shipping-bom-add-pa-bracket-1"));
+    expect(screen.getAllByTestId("shipping-bom-readonly-item").some((node) => node.textContent?.includes("Bracket Kit"))).toBe(true);
+    expect(screen.queryByRole("combobox", { name: /PA 구성품 추가 품목 선택/ })).not.toBeInTheDocument();
   });
 
   it("uses defect-style shipping hub cards without duplicate open buttons", async () => {
@@ -749,6 +764,7 @@ describe("DesktopShippingView", () => {
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
+    await addCompanionItem();
     nextStep(container);
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
     nextStep(container);
@@ -756,7 +772,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-request-info-fields")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-requester-summary")).toHaveTextContent("김현우");
     expect(screen.queryByLabelText("요청자")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("요청 메모")).toHaveClass("min-h-[220px]");
+    expect(screen.getByLabelText("요청 메모")).toHaveClass("min-h-[300px]");
   });
 
   it("summarizes new or reused PA/PF names and item codes on the final step", async () => {
@@ -768,6 +784,7 @@ describe("DesktopShippingView", () => {
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
+    await addCompanionItem();
     nextStep(container);
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
     nextStep(container);
@@ -792,6 +809,7 @@ describe("DesktopShippingView", () => {
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
+    await addCompanionItem();
     nextStep(container);
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
     nextStep(container);
@@ -803,6 +821,46 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByText("준비 중으로 보내기")).not.toBeInTheDocument();
     expect(actionBar).toContainElement(screen.getByRole("button", { name: /출하 요청/ }));
     expect(actionBar).toContainElement(screen.getByTestId("shipping-send-to-prep"));
+  });
+
+
+  it("requires at least one companion item before leaving the BOM step", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-wizard-next")).toBeDisabled();
+    expect(screen.getByTestId("shipping-companion-required-message")).toBeInTheDocument();
+
+    await addCompanionItem();
+    expect(screen.getByTestId("shipping-wizard-next")).not.toBeDisabled();
+  });
+
+  it("shows a detailed BOM change table on the matching step", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    openHubCard(container, "request");
+    openRequestById(container, "requested-1");
+    fireEvent.click(await screen.findByTestId("shipping-edit-request"));
+
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /Cable Set/ }));
+    fireEvent.change(screen.getByTestId("shipping-bom-search-pa"), { target: { value: "Bracket" } });
+    fireEvent.click(await screen.findByTestId("shipping-bom-add-pa-bracket-1"));
+    await addCompanionItem();
+    nextStep(container);
+
+    const table = await screen.findByTestId("shipping-bom-change-table");
+    expect(table).toHaveTextContent("Cable Set");
+    expect(table).toHaveTextContent("Bracket Kit");
+    expect(table).toHaveTextContent("R-BR");
   });
 
 });
