@@ -19,15 +19,21 @@ $StopScript = Join-Path $RepoRoot "scripts\dev\stop-backend.ps1"
 # 1) preflight - 좀비 정리
 & $StopScript
 
-# 2) 새 PowerShell 창에서 uvicorn 시작
-$reloadFlag = if ($NoReload) { "" } else { "--reload" }
-$uvicornCmd = "py -m uvicorn app.main:app --host 0.0.0.0 --port 8011 $reloadFlag"
-
-Start-Process powershell -ArgumentList @(
-    "-NoExit",
-    "-Command",
-    "Set-Location '$BackendDir'; $uvicornCmd"
+# 2) powershell.exe 래퍼 없이 py 를 직접 띄움
+$uvicornArgs = @(
+    "-m",
+    "uvicorn",
+    "app.main:app",
+    "--host",
+    "0.0.0.0",
+    "--port",
+    "8011"
 )
+if (-not $NoReload) {
+    $uvicornArgs += "--reload"
+}
+
+Start-Process -FilePath "py" -ArgumentList $uvicornArgs -WorkingDirectory $BackendDir -WindowStyle Hidden
 
 # 3) /health/live 헬스 체크 (최대 15초)
 $ok = $false
