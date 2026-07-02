@@ -5,7 +5,7 @@
  * 라인이 없어 approvalKind="none" → 즉시 반영. 따라서 최종 버튼은 "즉시 반영하기 N건"이고,
  * 확인 다이얼로그의 확정 버튼은 "즉시 반영"이다.
  *
- * 자식 자재는 부서(조립) PRODUCTION 재고에서 소비된다 — globalSetup 이 조립 부서에 시드.
+ * 자식 자재는 품목 소속 공정(TR → 튜브) PRODUCTION 재고에서 소비된다 — globalSetup 이 튜브 공정에 시드.
  */
 import { expect, test } from "@playwright/test";
 import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
@@ -31,7 +31,7 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
       .getByRole("button", { name: "BOM", exact: true })
       .click();
 
-    // 4. 품목 확인 → 제출확인 (부서 생산재고 시드로 재고 충분 → 활성화)
+    // 4. 품목 확인 → 제출확인 (자식 품목 소속 공정 생산재고 시드로 재고 충분 → 활성화)
     await page.getByRole("button", { name: /제출확인/ }).click();
 
     // 5. 최종 확인 — 즉시 반영하기 (결재 없음)

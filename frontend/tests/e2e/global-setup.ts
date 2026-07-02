@@ -131,7 +131,7 @@ async function seed() {
     "db = SessionLocal()",
     "try:",
     "    child = db.query(Item).filter(Item.process_type_code=='TR').first()",
-    "    transfer_to_production(db, child.item_id, Decimal('50'), DepartmentEnum.ASSEMBLY)",
+    "    transfer_to_production(db, child.item_id, Decimal('50'), DepartmentEnum.TUBE)",
     "    db.commit()",
     "finally:",
     "    db.close()",
