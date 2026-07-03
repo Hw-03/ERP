@@ -22,7 +22,7 @@ import {
   type MovementTone,
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
-import { getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation } from "./historyPresentation";
+import { getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 
 const TX_ICON = {
@@ -261,6 +261,10 @@ export type LogGroup =
   | { type: "batch"; refNo: string; logs: TransactionLog[] }
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] };
 
+function referenceGroupKey(log: TransactionLog): string {
+  return `${log.reference_no ?? ""}::${log.shipping_phase ?? ""}`;
+}
+
 export function buildGroups(logs: TransactionLog[]): LogGroup[] {
   const opBatches = new Map<string, TransactionLog[]>();
   const refBatches = new Map<string, TransactionLog[]>();
@@ -271,9 +275,10 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
       g.push(log);
       opBatches.set(log.operation_batch_id, g);
     } else if (log.reference_no) {
-      const g = refBatches.get(log.reference_no) ?? [];
+      const key = referenceGroupKey(log);
+      const g = refBatches.get(key) ?? [];
       g.push(log);
-      refBatches.set(log.reference_no, g);
+      refBatches.set(key, g);
     }
   }
 
@@ -297,9 +302,10 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
         });
       }
     } else if (log.reference_no) {
-      if (seenRef.has(log.reference_no)) continue;
-      seenRef.add(log.reference_no);
-      const refLogs = refBatches.get(log.reference_no)!;
+      const key = referenceGroupKey(log);
+      if (seenRef.has(key)) continue;
+      seenRef.add(key);
+      const refLogs = refBatches.get(key)!;
       if (refLogs.length === 1) {
         groups.push({ type: "solo", log: refLogs[0] });
       } else {
@@ -411,7 +417,7 @@ export function BatchHeader({
       label: referencePresentation.operationLabel,
     },
     movement: summary,
-    flow: referencePresentation.kind === "shipment" ? { label: "출하" } : { ...basePresentation.flow, hint: undefined },
+    flow: referencePresentation.kind === "shipment" ? { label: getShippingPhaseFlowLabel(referencePresentation.phase) ?? "출하" } : { ...basePresentation.flow, hint: undefined },
     stock: null,
     target: {
       ...basePresentation.target,
@@ -554,6 +560,9 @@ function getReferenceBatchLineOrder(
   kind: ReturnType<typeof getReferenceBatchPresentation>["kind"],
 ): number {
   if (kind !== "shipment") return 0;
+  if (log.shipping_phase === "PICKUP") return log.transaction_type === "SHIP" && !/^출하\s+동반\s+품목/.test(log.notes?.trim() ?? "") ? 0 : 1;
+  if (log.shipping_phase === "PREPARE") return log.transaction_type === "PRODUCE" ? 0 : log.transaction_type === "BACKFLUSH" ? 1 : 2;
+  if (log.shipping_phase === "COMPONENT_CHANGE") return log.transaction_type === "PRODUCE" ? 0 : log.transaction_type === "RECEIVE" ? 1 : 2;
   const line = getReferenceBatchLinePresentation(log, kind);
   if (line.label === "출하 대상") return 0;
   if (line.label === "동반 출하품") return 1;

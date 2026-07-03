@@ -86,6 +86,7 @@ export function formatDefectReason(input: {
 
 export interface ReferenceBatchPresentation {
   kind: ReferenceBatchKind;
+  phase: string | null;
   operationLabel: string;
   targetTitle: string;
   targetCode: string | null;
@@ -98,11 +99,55 @@ export interface ReferenceBatchLinePresentation {
   tone: HistoryPresentationTone;
 }
 
+const SHIPPING_PHASE_OPERATION_LABEL: Record<string, string> = {
+  COMPONENT_CHANGE: "구성품 변경",
+  PREPARE: "출하 준비 완료",
+  PICKUP: "출하 픽업 완료",
+};
+
+const SHIPPING_PHASE_FLOW_LABEL: Record<string, string> = {
+  COMPONENT_CHANGE: "구성품 변경",
+  PREPARE: "출하 준비",
+  PICKUP: "출하",
+};
+
+const SHIPPING_PHASE_MOVEMENT_VERB: Record<string, string> = {
+  COMPONENT_CHANGE: "변경",
+  PREPARE: "준비",
+  PICKUP: "출하",
+};
+
+function getShippingPhase(logs: TransactionLog[]): string | null {
+  return logs.find((log) => log.shipping_phase)?.shipping_phase ?? null;
+}
+
+function getShippingPhaseOperationLabel(phase: string | null | undefined): string | null {
+  return phase ? SHIPPING_PHASE_OPERATION_LABEL[phase] ?? null : null;
+}
+
+export function getShippingPhaseFlowLabel(phase: string | null | undefined): string | null {
+  return phase ? SHIPPING_PHASE_FLOW_LABEL[phase] ?? null : null;
+}
+
 export function getReferenceBatchLinePresentation(
   log: TransactionLog,
   kind: ReferenceBatchKind,
 ): ReferenceBatchLinePresentation {
   if (kind === "shipment") {
+    if (log.shipping_phase === "COMPONENT_CHANGE") {
+      if (log.transaction_type === "BACKFLUSH") return { label: "소스/추가 차감", tone: "warning" };
+      if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") return { label: "변경 반영", tone: "success" };
+      return { label: "구성품 변경", tone: "muted" };
+    }
+    if (log.shipping_phase === "PREPARE") {
+      if (log.transaction_type === "BACKFLUSH") return { label: "final PA 차감", tone: "warning" };
+      if (log.transaction_type === "PRODUCE") return { label: "final PF 준비", tone: "success" };
+      return { label: "출하 준비", tone: "info" };
+    }
+    if (log.shipping_phase === "PICKUP") {
+      if (log.transaction_type === "SHIP") return { label: isShippingCompanionLog(log) ? "동반 출하품" : "final PF 출하", tone: "danger" };
+      return { label: "출하 픽업", tone: "muted" };
+    }
     if (log.transaction_type === "BACKFLUSH") return { label: "하위 차감", tone: "warning" };
     if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE" || log.transaction_type === "TRANSFER_TO_PROD" || log.transaction_type === "TRANSFER_TO_WH" || log.transaction_type === "TRANSFER_DEPT") {
       return { label: "출하 준비", tone: "info" };
@@ -128,19 +173,22 @@ export function isShippingReference(input: {
 
 export function getReferenceBatchPresentation(logs: TransactionLog[]): ReferenceBatchPresentation {
   const first = logs[0];
+  const phase = getShippingPhase(logs);
+  const phaseOperationLabel = getShippingPhaseOperationLabel(phase);
   const hasShip = logs.some((log) => log.transaction_type === "SHIP");
-  const shipment = logs.some((log) => isShippingReference(log));
+  const shipment = logs.some((log) => isShippingReference(log)) || Boolean(phaseOperationLabel);
   const outbound = hasShip && !shipment;
   const kind: ReferenceBatchKind = shipment ? "shipment" : outbound ? "outbound" : "batch";
-  const operationLabel = shipment ? "출하" : outbound ? "출고 구성" : "묶음";
-  const titlePrefix = shipment ? "출하 구성" : outbound ? "출고 구성" : "묶음";
+  const operationLabel = phaseOperationLabel ?? (shipment ? "출하" : outbound ? "출고 구성" : "묶음");
+  const titlePrefix = phaseOperationLabel ?? (shipment ? "출하 구성" : outbound ? "출고 구성" : "묶음");
   const homogeneous = logs.length > 0 && logs.every((log) => log.item_id === first.item_id);
-  const movementVerb = shipment ? "출하" : outbound ? "출고" : "하위";
+  const movementVerb = phase ? SHIPPING_PHASE_MOVEMENT_VERB[phase] ?? "출하" : shipment ? "출하" : outbound ? "출고" : "하위";
   const movementTone = shipment || outbound ? "danger" : "muted";
-  const shipmentTarget = shipment ? getShippingTarget(logs) : null;
+  const shipmentTarget = shipment ? getShippingTarget(logs, phase) : null;
 
   return {
     kind,
+    phase,
     operationLabel,
     targetTitle: shipmentTarget?.title ?? `${titlePrefix} ${logs.length}건`,
     targetCode: shipmentTarget?.code ?? (homogeneous ? first.mes_code : null),
@@ -149,7 +197,17 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
   };
 }
 
-function getShippingTarget(logs: TransactionLog[]): { title: string; code: string | null } | null {
+function getShippingTarget(logs: TransactionLog[], phase?: string | null): { title: string; code: string | null } | null {
+  if (phase === "COMPONENT_CHANGE") {
+    const targetPaLog = logs.find((log) => (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") && log.quantity_change > 0);
+    const title = targetPaLog?.item_name?.trim();
+    if (title && targetPaLog) return { title, code: targetPaLog.mes_code };
+  }
+  if (phase === "PREPARE") {
+    const finalPfLog = logs.find((log) => log.transaction_type === "PRODUCE" && log.quantity_change > 0);
+    const title = finalPfLog?.item_name?.trim();
+    if (title && finalPfLog) return { title, code: finalPfLog.mes_code };
+  }
   for (const log of logs) {
     const parsed = parseShippingPickupNote(log.notes);
     if (parsed) return { title: parsed, code: log.mes_code };
@@ -199,6 +257,8 @@ function getHistoryOperationPresentationLabel(
   log: TransactionLog,
   batch?: IoBatch | null,
 ): string {
+  const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);
+  if (!batch && phaseLabel) return phaseLabel;
   if (!batch && log.transaction_type === "SHIP" && isShippingReference(log)) return "출하";
   return getHistoryDisplayLabel(log, batch);
 }
@@ -298,6 +358,10 @@ function getFlowPresentation(
   batch: IoBatch | null | undefined,
   hint?: string,
 ): HistoryFlowPresentation {
+  const phaseFlowLabel = getShippingPhaseFlowLabel(log.shipping_phase);
+  if (!batch && phaseFlowLabel) {
+    return { label: phaseFlowLabel };
+  }
   if (!batch && log.transaction_type === "SHIP" && isShippingReference(log)) {
     return { label: "출하" };
   }

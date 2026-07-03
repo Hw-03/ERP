@@ -342,3 +342,70 @@ describe("history immediate UX presentation policies", () => {
     expect(row.stock?.label).toBe("불량 재고 398 EA");
   });
 });
+describe("shipping phase history presentation", () => {
+  it("labels shipping component-change batches by phase", () => {
+    const componentChange = getReferenceBatchPresentation([
+      makeLog({
+        log_id: "source-pa",
+        transaction_type: "BACKFLUSH",
+        reference_no: "SHIP-COMP-1",
+        shipping_phase: "COMPONENT_CHANGE",
+        item_name: "\uAE30\uC874 PA",
+        mes_code: "3-PA-0001",
+      }),
+      makeLog({
+        log_id: "target-pa",
+        transaction_type: "PRODUCE",
+        reference_no: "SHIP-COMP-1",
+        shipping_phase: "COMPONENT_CHANGE",
+        item_name: "\uBCC0\uACBD PA",
+        mes_code: "3-PA-0002",
+      }),
+    ]);
+
+    expect(componentChange.operationLabel).toBe("\uAD6C\uC131\uD488 \uBCC0\uACBD");
+    expect(componentChange.targetTitle).toBe("\uBCC0\uACBD PA");
+    expect(componentChange.targetCode).toBe("3-PA-0002");
+    expect(componentChange.movement.parts[0]?.label).toContain("\uBCC0\uACBD");
+  });
+
+  it("labels shipping prepare and pickup batches as separate workflow steps", () => {
+    const prepare = getReferenceBatchPresentation([
+      makeLog({
+        log_id: "prepare-pa",
+        transaction_type: "BACKFLUSH",
+        reference_no: "SHIP-REQ-1",
+        shipping_phase: "PREPARE",
+        item_name: "\uBCC0\uACBD PA",
+        mes_code: "3-PA-0002",
+      }),
+      makeLog({
+        log_id: "prepare-pf",
+        transaction_type: "PRODUCE",
+        reference_no: "SHIP-REQ-1",
+        shipping_phase: "PREPARE",
+        item_name: "\uCD5C\uC885 PF",
+        mes_code: "3-PF-0002",
+      }),
+    ]);
+    const pickup = getReferenceBatchPresentation([
+      makeLog({
+        log_id: "pickup-pf",
+        transaction_type: "SHIP",
+        reference_no: "SHIP-REQ-1",
+        shipping_phase: "PICKUP",
+        item_name: "\uCD5C\uC885 PF",
+        mes_code: "3-PF-0002",
+        notes: "\uCD9C\uD558 \uD53D\uC5C5 \uC644\uB8CC: \uCD5C\uC885 PF",
+      }),
+    ]);
+
+    expect(prepare.operationLabel).toBe("\uCD9C\uD558 \uC900\uBE44 \uC644\uB8CC");
+    expect(prepare.targetTitle).toBe("\uCD5C\uC885 PF");
+    expect(prepare.targetCode).toBe("3-PF-0002");
+    expect(prepare.movement.parts[0]?.label).toContain("\uC900\uBE44");
+    expect(pickup.operationLabel).toBe("\uCD9C\uD558 \uD53D\uC5C5 \uC644\uB8CC");
+    expect(pickup.targetTitle).toBe("\uCD5C\uC885 PF");
+    expect(pickup.targetCode).toBe("3-PF-0002");
+  });
+});
