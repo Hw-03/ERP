@@ -41,6 +41,7 @@ export interface TransactionLog {
   reason_category?: string | null;
   reason_memo?: string | null;
   operation_batch_id: string | null;
+  shipping_phase?: string | null;
   created_at: string;
   edit_count?: number;
   cancelled: boolean;

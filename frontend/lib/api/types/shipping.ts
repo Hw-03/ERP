@@ -1,4 +1,4 @@
-﻿import type { TransactionType } from "./shared";
+import type { TransactionType } from "./shared";
 
 export type ShippingRequestStatus = "REQUESTED" | "PREPARING" | "PREPARED" | "PICKED_UP";
 export type ShippingBomParentStage = "PA" | "PF";
@@ -52,6 +52,51 @@ export interface ShippingPrepareCancelPayload {
   reason?: string | null;
 }
 
+export interface ShippingComponentChangeExecutePayload {
+  source_pa_item_id: string;
+  target_pa_item_id?: string;
+  quantity: number;
+  memo?: string | null;
+}
+
+export interface ShippingComponentChangeLine {
+  item_id: string;
+  item_name: string;
+  mes_code: string | null;
+  process_type_code: string | null;
+  source_quantity: number;
+  target_quantity: number;
+  delta_per_unit: number;
+  total_delta: number;
+  unit: string;
+  department: string | null;
+  current_quantity: number;
+  available_quantity: number;
+  shortage_quantity: number;
+}
+
+export interface ShippingComponentChangePreview {
+  request_id: string | null;
+  source_item_id: string;
+  source_item_name: string;
+  source_mes_code: string | null;
+  target_item_id: string;
+  target_item_name: string;
+  target_mes_code: string | null;
+  quantity: number;
+  source_department: string | null;
+  source_current_quantity: number;
+  source_available_quantity: number;
+  source_shortage_quantity: number;
+  lines: ShippingComponentChangeLine[];
+}
+
+export interface ShippingComponentChangeResult extends ShippingComponentChangePreview {
+  reference_no: string;
+  memo: string | null;
+  completed_at: string;
+  transactions: ShippingTransactionLog[];
+}
 export interface ShippingBomLine {
   line_id: string;
   parent_stage: ShippingBomParentStage;
@@ -90,6 +135,24 @@ export interface ShippingEvent {
   event_type: string;
   message: string | null;
   created_at: string;
+}
+
+export interface ShippingAllocation {
+  allocation_id: string;
+  request_id: string;
+  item_id: string;
+  item_name: string;
+  mes_code: string | null;
+  process_type_code: string | null;
+  quantity: number;
+  unit: string;
+  department: string | null;
+  status: "RESERVED" | "RELEASED" | "CONSUMED" | string;
+  reference_no: string | null;
+  created_at: string;
+  released_at: string | null;
+  consumed_at: string | null;
+  released_reason: string | null;
 }
 
 export interface ShippingTransactionLog {
@@ -138,6 +201,7 @@ export interface ShippingRequest {
   checklist_lines: ShippingChecklistLine[];
   events: ShippingEvent[];
   transactions: ShippingTransactionLog[];
+  allocations: ShippingAllocation[];
   transaction_count: number;
 }
 

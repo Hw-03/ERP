@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingRequest } from "@/lib/api";
@@ -28,6 +28,10 @@ vi.mock("@/lib/api", () => ({
     deleteShippingRequest: vi.fn(),
     updateShippingChecklist: vi.fn(),
     clearShippingChecklist: vi.fn(),
+    getShippingComponentChangePreview: vi.fn(),
+    executeShippingComponentChange: vi.fn(),
+    getIndependentShippingComponentChangePreview: vi.fn(),
+    executeIndependentShippingComponentChange: vi.fn(),
     prepareShippingComplete: vi.fn(),
     cancelShippingPrepare: vi.fn(),
     completeShippingPickup: vi.fn(),
@@ -71,7 +75,8 @@ function item(id: string, name: string, process: string, mes = id): Item {
 const items = [
   item("pf-1", "Standard PF", "PF", "PF-001"),
   item("pa-1", "Standard PA", "PA", "PA-001"),
-  item("af-1", "AF Main", "AF", "AF-001"),
+  item("pa-target", "Custom PA", "PA", "PA-T"),
+  item("af-1", "AF Main", "AF-001"),
   item("acc-1", "Cable Set", "R", "R-001"),
   item("bracket-1", "Bracket Kit", "R", "R-BR"),
   item("carton-1", "Carton Box", "R", "R-BOX"),
@@ -158,6 +163,7 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
     ],
     events: [],
     transactions: [],
+    allocations: [],
     transaction_count: 0,
     ...overrides,
   };
@@ -263,6 +269,149 @@ beforeEach(() => {
     checklist_lines: request().checklist_lines.map((line) => line.item_id === "acc-1" ? { ...line, checked: true } : line),
   }));
   vi.mocked(api.clearShippingChecklist).mockResolvedValue(request());
+  vi.mocked(api.getShippingComponentChangePreview).mockResolvedValue({
+    request_id: "req-1",
+    source_item_id: "pa-1",
+    source_item_name: "Standard PA",
+    source_mes_code: "PA-001",
+    target_item_id: "pa-target",
+    target_item_name: "Custom PA",
+    target_mes_code: "PA-T",
+    quantity: 1,
+    source_department: "??",
+    source_current_quantity: 3,
+    source_available_quantity: 3,
+    source_shortage_quantity: 0,
+    lines: [
+      {
+        item_id: "acc-1",
+        item_name: "Cable Set",
+        mes_code: "R-001",
+        process_type_code: "R",
+        source_quantity: 1,
+        target_quantity: 2,
+        delta_per_unit: 1,
+        total_delta: 1,
+        unit: "EA",
+        department: "??",
+        current_quantity: 10,
+        available_quantity: 10,
+        shortage_quantity: 0,
+      },
+    ],
+  });
+  vi.mocked(api.executeShippingComponentChange).mockResolvedValue(request({
+    transactions: [{
+      log_id: "comp-1",
+      item_id: "pa-target",
+      item_name: "Custom PA",
+      mes_code: "PA-T",
+      item_process_type_code: "PA",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      quantity_before: 0,
+      quantity_after: 1,
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      reference_no: "SHIP-COMP-req",
+      produced_by: "shipping",
+      notes: "component change",
+      shipping_phase: "COMPONENT_CHANGE",
+      created_at: "2026-06-26T00:00:00Z",
+      cancelled: false,
+      cancel_reason: null,
+      cancelled_at: null,
+      inventory_effect: [{ scope: "location", delta: 1 }],
+    }],
+    transaction_count: 1,
+  }));
+  vi.mocked(api.getIndependentShippingComponentChangePreview).mockResolvedValue({
+    request_id: null,
+    source_item_id: "pa-1",
+    source_item_name: "Standard PA",
+    source_mes_code: "PA-001",
+    target_item_id: "pa-target",
+    target_item_name: "Custom PA",
+    target_mes_code: "PA-T",
+    quantity: 1,
+    source_department: "조립",
+    source_current_quantity: 3,
+    source_available_quantity: 3,
+    source_shortage_quantity: 0,
+    lines: [
+      {
+        item_id: "acc-1",
+        item_name: "Cable Set",
+        mes_code: "R-001",
+        process_type_code: "R",
+        source_quantity: 1,
+        target_quantity: 2,
+        delta_per_unit: 1,
+        total_delta: 1,
+        unit: "EA",
+        department: "창고",
+        current_quantity: 10,
+        available_quantity: 10,
+        shortage_quantity: 0,
+      },
+    ],
+  });
+  vi.mocked(api.executeIndependentShippingComponentChange).mockResolvedValue({
+    request_id: null,
+    source_item_id: "pa-1",
+    source_item_name: "Standard PA",
+    source_mes_code: "PA-001",
+    target_item_id: "pa-target",
+    target_item_name: "Custom PA",
+    target_mes_code: "PA-T",
+    quantity: 1,
+    source_department: "조립",
+    source_current_quantity: 3,
+    source_available_quantity: 3,
+    source_shortage_quantity: 0,
+    reference_no: "SHIP-COMP-independent",
+    memo: "test memo",
+    completed_at: "2026-06-26T00:00:00Z",
+    lines: [
+      {
+        item_id: "acc-1",
+        item_name: "Cable Set",
+        mes_code: "R-001",
+        process_type_code: "R",
+        source_quantity: 1,
+        target_quantity: 2,
+        delta_per_unit: 1,
+        total_delta: 1,
+        unit: "EA",
+        department: "창고",
+        current_quantity: 10,
+        available_quantity: 10,
+        shortage_quantity: 0,
+      },
+    ],
+    transactions: [{
+      log_id: "comp-1",
+      item_id: "pa-target",
+      item_name: "Custom PA",
+      mes_code: "PA-T",
+      item_process_type_code: "PA",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      quantity_before: 0,
+      quantity_after: 1,
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      reference_no: "SHIP-COMP-independent",
+      produced_by: "shipping",
+      notes: "component change",
+      shipping_phase: "COMPONENT_CHANGE",
+      created_at: "2026-06-26T00:00:00Z",
+      cancelled: false,
+      cancel_reason: null,
+      cancelled_at: null,
+      inventory_effect: [{ scope: "location", delta: 1 }],
+    }],
+  });
   vi.mocked(api.createShippingRequest).mockResolvedValue(request({ request_id: "new-1", status: "REQUESTED" }));
   vi.mocked(api.updateShippingRequest).mockResolvedValue(request({ request_id: "requested-1", status: "REQUESTED" }));
   vi.mocked(api.sendShippingToPrep).mockResolvedValue(request({ request_id: "requested-1", status: "PREPARING" }));
@@ -273,7 +422,7 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
-  function openHubCard(container: HTMLElement, id: "request" | "prep" | "history") {
+  function openHubCard(container: HTMLElement, id: "request" | "prep" | "componentChange" | "history") {
     const button = container.querySelector(`[data-shipping-hub-card="${id}"]`);
     expect(button).toBeTruthy();
     fireEvent.click(button as HTMLElement);
@@ -368,14 +517,32 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     const requestCard = container.querySelector('[data-shipping-hub-card="request"]') as HTMLElement;
     expect(requestCard.className).toContain("h-full");
-    expect(requestCard.className).toContain("min-h-0");
-    expect(requestCard.className).not.toContain("min-h-[360px]");
+    expect(requestCard.className).toContain("min-h-[360px]");
     expect(screen.queryByText("작업 선택")).not.toBeInTheDocument();
     expect(container.querySelector('[data-testid="shipping-hub-accent"]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy();
     expect(container.querySelector('[data-shipping-hub-card="history"]')).toBeTruthy();
   });
 
+  it("shows a component-change hub card without a count badge", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
+    expect(screen.getByText("구성품 변경")).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="shipping-hub-count-componentChange"]')).not.toBeInTheDocument();
+  });
+
+  it("opens component change as an independent PA conversion screen", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
+    openHubCard(container, "componentChange");
+
+    expect(await screen.findByTestId("shipping-component-change-work")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-component-source-search")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-component-target-search")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-component-change-panel")).not.toBeInTheDocument();
+  });
   it("keeps a single primary new-request action in the empty request list", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
@@ -519,6 +686,35 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByTestId("shipping-clear-checklist")).not.toBeInTheDocument();
     expect(api.updateShippingChecklist).not.toHaveBeenCalled();
     expect(api.clearShippingChecklist).not.toHaveBeenCalled();
+  });
+
+
+  it("previews and executes an independent PA component change", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
+    openHubCard(container, "componentChange");
+
+    const sourceSearch = await screen.findByTestId("shipping-component-source-search");
+    fireEvent.change(sourceSearch, { target: { value: "pa-1" } });
+
+    const targetSearch = await screen.findByTestId("shipping-component-target-search");
+    fireEvent.change(targetSearch, { target: { value: "pa-target" } });
+
+    fireEvent.click(screen.getByTestId("shipping-component-preview-button"));
+
+    await waitFor(() => {
+      expect(api.getIndependentShippingComponentChangePreview).toHaveBeenCalledWith({ source_pa_item_id: "pa-1", target_pa_item_id: "pa-target", quantity: 1 });
+    });
+    expect(await screen.findByTestId("shipping-component-preview")).toHaveTextContent("Cable Set");
+
+    fireEvent.click(screen.getByTestId("shipping-component-execute-button"));
+    fireEvent.click(await screen.findByTestId("shipping-component-confirm-button"));
+
+    await waitFor(() => {
+      expect(api.executeIndependentShippingComponentChange).toHaveBeenCalledWith({ source_pa_item_id: "pa-1", target_pa_item_id: "pa-target", quantity: 1, memo: null });
+    });
+    expect(await screen.findByTestId("shipping-component-change-complete")).toHaveTextContent("구성품 변경 완료");
   });
   it("opens shipping history details with linked transaction logs", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);

@@ -18,15 +18,15 @@ import {
   Truck,
   XCircle,
 } from "lucide-react";
-import { api, type Item, type ShippingBomLineInput, type ShippingBomMatchResponse, type ShippingCompanionLineInput, type ShippingRequest, type ShippingRequestStatus } from "@/lib/api";
+import { api, type Item, type ShippingBomLineInput, type ShippingBomMatchResponse, type ShippingCompanionLineInput, type ShippingComponentChangePreview, type ShippingComponentChangeResult, type ShippingRequest, type ShippingRequestStatus } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { Operator } from "./login/useCurrentOperator";
 
-type SectionTab = "request" | "prep" | "history";
-type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "historyList" | "historyWork";
-const VIEW_MODE_VALUES: ViewMode[] = ["hub", "requestList", "requestDetail", "requestWork", "prepList", "prepWork", "historyList", "historyWork"];
+type SectionTab = "request" | "prep" | "componentChange" | "history";
+type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "componentChangeWork" | "componentChangeComplete" | "historyList" | "historyWork";
+const VIEW_MODE_VALUES: ViewMode[] = ["hub", "requestList", "requestDetail", "requestWork", "prepList", "prepWork", "componentChangeWork", "componentChangeComplete", "historyList", "historyWork"];
 function isShippingViewMode(value: string | null): value is ViewMode {
   return Boolean(value && VIEW_MODE_VALUES.includes(value as ViewMode));
 }
@@ -194,6 +194,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
   const [matchResult, setMatchResult] = useState<ShippingBomMatchResponse | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [componentChangeResult, setComponentChangeResult] = useState<ShippingComponentChangeResult | null>(null);
   const [companionDraft, setCompanionDraft] = useState<CompanionDraftLine[]>([]);
 
   const displayItems = useMemo(() => {
@@ -225,7 +226,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     [history, selectedHistoryId],
   );
   const canEditDraft = !selectedRequest || selectedRequest.status === "REQUESTED" || selectedRequest.status === "PREPARING";
-  const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "historyWork";
+  const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "componentChangeWork" || view === "historyWork";
   const saveShippingWork = useCallback(() => {}, []);
   useRegisterDirty("shipping-work", shippingWorkDirty, saveShippingWork, undefined, { mode: "confirm-only" });
   function buildShippingUrl(nextView: ViewMode, requestId?: string | null) {
@@ -334,6 +335,11 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       setView(nextView);
       return;
     }
+    if (nextView === "componentChangeWork" || nextView === "componentChangeComplete") {
+      setView(nextView);
+      if (nextView === "componentChangeWork") void ensureItemsLoaded();
+      return;
+    }
     if (nextView === "requestDetail") {
       if (!requestId) {
         setView("requestList");
@@ -386,7 +392,11 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
-  }, [searchParams, requests, loading, view, ensurePfItemsLoaded]);
+  }, [searchParams, requests, loading, view, ensurePfItemsLoaded, ensureItemsLoaded]);
+
+  useEffect(() => {
+    if (view === "componentChangeWork") void ensureItemsLoaded();
+  }, [view, ensureItemsLoaded]);
 
   function clearDraft() {
     navigateView("requestWork");
@@ -739,13 +749,14 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   }, [basePfId, draftLines, itemById, view]);
 
   function openSection(next: SectionTab) {
-    navigateView(next === "request" ? "requestList" : next === "prep" ? "prepList" : "historyList");
+    navigateView(next === "request" ? "requestList" : next === "prep" ? "prepList" : next === "componentChange" ? "componentChangeWork" : "historyList");
   }
 
   function renderActiveView() {
     const counts = {
       request: activeRequests.length,
       prep: prepRequests.length,
+      componentChange: 0,
       history: history.length,
     };
 
@@ -865,6 +876,39 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       );
     }
 
+    if (view === "componentChangeWork") {
+      return (
+        <div className="grid gap-3">
+          <ViewHeader title="구성품 변경" subtitle="소스 PA 재고를 다른 PA 구성으로 전환합니다." onBack={() => navigateView("hub")} />
+          <ComponentChangeSection
+            items={displayItems}
+            loading={itemsLoading}
+            onComplete={(result) => {
+              setComponentChangeResult(result);
+              navigateView("componentChangeComplete");
+            }}
+          />
+        </div>
+      );
+    }
+
+    if (view === "componentChangeComplete") {
+      return (
+        <div className="grid gap-3">
+          <ViewHeader title="구성품 변경 완료" subtitle="처리된 재고 변동을 확인합니다." onBack={() => navigateView("componentChangeWork")} />
+          <ComponentChangeCompleteView
+            result={componentChangeResult}
+            onNew={() => {
+              setComponentChangeResult(null);
+              navigateView("componentChangeWork");
+            }}
+            onHistory={() => router.push("?tab=history", { scroll: false })}
+            onShipping={() => navigateView("hub")}
+          />
+        </div>
+      );
+    }
+
     if (view === "historyList") {
       return (
         <HistoryListEntry
@@ -946,34 +990,35 @@ function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
 
 function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void }) {
   return (
-    <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-3">
-      <HubCard id="request" icon={ClipboardList} title="출하 요청" body="요청 목록, 상세, BOM 편집" detail="요청 목록을 확인하고 BOM을 수정합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
-      <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" body="준비 체크, 준비 완료, 픽업" detail="구성품 체크와 준비 완료를 처리합니다." count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
-      <HubCard id="history" icon={History} title="출하 이력" body="완료 요청, 재고 로그, 이벤트" detail="픽업 완료와 재고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
+    <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-4">
+      <HubCard id="request" icon={ClipboardList} title="출하 요청" body="요청 목록, BOM 편집" detail="요청 목록을 확인하고 BOM을 수정합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
+      <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" body="준비 체크, 픽업" detail="구성품 체크와 준비 완료를 처리합니다." count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
+      <HubCard id="componentChange" icon={PackageCheck} title="구성품 변경" body="PA 재고를 다른 PA 구성으로 전환" detail="소스 PA와 대상 PA를 선택해 재고를 재구성합니다." tone={LEGACY_COLORS.cyan} onClick={() => onOpen("componentChange")} />
+      <HubCard id="history" icon={History} title="출하 이력" body="완료 요청, 재고 로그" detail="픽업 완료와 재고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
     </div>
   );
 }
 
-function HubCard({ id, icon: Icon, title, body, detail, count, tone, onClick }: { id: SectionTab; icon: typeof PackageCheck; title: string; body: string; detail: string; count: number; tone: string; onClick: () => void }) {
+function HubCard({ id, icon: Icon, title, body, detail, count, tone, onClick }: { id: SectionTab; icon: typeof PackageCheck; title: string; body: string; detail: string; count?: number; tone: string; onClick: () => void }) {
   return (
     <button
       type="button"
       data-shipping-hub-card={id}
       onClick={onClick}
-      className="flex h-full min-h-0 flex-col items-start justify-between rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99] xl:p-12"
+      className="flex h-full min-h-[360px] min-w-0 flex-col items-start justify-between rounded-[22px] border p-7 text-left transition-all hover:brightness-110 active:scale-[0.99] xl:p-8"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
     >
-      <div className="flex w-full items-start justify-between gap-5">
-        <div className="flex min-w-0 items-center gap-5">
-          <Icon className="h-10 w-10 shrink-0" style={{ color: tone }} />
+      <div className="flex w-full items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <Icon className="h-8 w-8 shrink-0" style={{ color: tone }} />
           <div className="min-w-0">
-            <div className="text-3xl font-black leading-tight xl:text-4xl" style={{ color: LEGACY_COLORS.text }}>{title}</div>
-            <div className="mt-3 text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>{body}</div>
+            <div className="text-2xl font-black leading-tight xl:text-3xl" style={{ color: LEGACY_COLORS.text }}>{title}</div>
+            <div className="mt-2 text-base font-bold leading-tight xl:text-lg" style={{ color: LEGACY_COLORS.muted2 }}>{body}</div>
           </div>
         </div>
-        <span data-testid={"shipping-hub-count-" + id} className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>
+        {count !== undefined && <span data-testid={"shipping-hub-count-" + id} className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>}
       </div>
-      <div className="mt-auto text-lg font-black leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>{detail}</div>
+      <div className="mt-auto text-sm font-black leading-tight xl:text-base" style={{ color: LEGACY_COLORS.muted2 }}>{detail}</div>
     </button>
   );
 }
@@ -1570,6 +1615,50 @@ function PrepSection({
   );
 }
 
+function ComponentChangeSection({ items, loading, onComplete }: { items: Item[]; loading: boolean; onComplete: (result: ShippingComponentChangeResult) => void }) {
+  const [sourceId, setSourceId] = useState("");
+  const [targetId, setTargetId] = useState("");
+  const [quantity, setQuantity] = useState<number | "">(1);
+  const [memo, setMemo] = useState("");
+  const [preview, setPreview] = useState<ShippingComponentChangePreview | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const paItems = useMemo(() => items.filter((item) => item.process_type_code === "PA" && !item.deleted_at), [items]);
+  const source = paItems.find((item) => item.item_id === sourceId);
+  const target = paItems.find((item) => item.item_id === targetId);
+  const changeQty = quantity === "" ? 0 : toPositiveInt(quantity);
+  const sourceLimit = source?.quantity ?? 0;
+  const sameItem = Boolean(sourceId && targetId && sourceId === targetId);
+  const sourceOver = Boolean(source && changeQty > sourceLimit);
+  const hasShortage = Boolean(preview && (preview.source_shortage_quantity > 0 || preview.lines.some((line) => line.shortage_quantity > 0)));
+  const canPreview = Boolean(sourceId && targetId && !sameItem && isValidPositiveInt(changeQty) && !sourceOver && !busy);
+  const canExecute = Boolean(preview && preview.lines.length > 0 && !sameItem && !sourceOver && !hasShortage && !busy);
+  const clearPreview = () => { setPreview(null); setError(null); setConfirmOpen(false); };
+  const renderPaSelect = (kind: "source" | "target", title: string, value: string, onChange: (value: string) => void, excludeId?: string) => {
+    const selected = paItems.find((item) => item.item_id === value);
+    return <label className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}><span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{title}</span><select data-testid={`shipping-component-${kind}-search`} value={value} disabled={loading} onChange={(event) => { onChange(event.target.value); clearPreview(); }} className={SHIPPING_TEXT_INPUT_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}><option value="">PA 선택</option>{paItems.filter((item) => item.item_id !== excludeId).map((item) => <option key={item.item_id} value={item.item_id}>{item.mes_code ?? "-"} · {item.item_name} · 현재 {item.quantity} {item.unit}</option>)}</select>{selected && <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{selected.mes_code ?? "-"} · 현재 {selected.quantity} {selected.unit}</div>}</label>;
+  };
+  async function loadPreview() {
+    if (!canPreview) return;
+    setBusy(true); setError(null);
+    try { setPreview(await api.getIndependentShippingComponentChangePreview({ source_pa_item_id: sourceId, target_pa_item_id: targetId, quantity: changeQty })); }
+    catch (err) { setPreview(null); setError(err instanceof Error ? err.message : "구성품 차이를 확인하지 못했습니다."); }
+    finally { setBusy(false); }
+  }
+  async function executeChange() {
+    if (!canExecute || !preview) return;
+    setBusy(true); setError(null);
+    try { onComplete(await api.executeIndependentShippingComponentChange({ source_pa_item_id: sourceId, target_pa_item_id: targetId, quantity: preview.quantity, memo: memo.trim() || null })); }
+    catch (err) { setError(err instanceof Error ? err.message : "구성품 변경을 처리하지 못했습니다."); }
+    finally { setBusy(false); setConfirmOpen(false); }
+  }
+  return <Panel dataTestId="shipping-component-change-work" className="flex min-h-0 flex-col"><div className="grid gap-3 xl:grid-cols-2">{renderPaSelect("source", "소스 PA", sourceId, setSourceId)}{renderPaSelect("target", "대상 PA", targetId, setTargetId, sourceId)}</div><div className="mt-3 grid gap-3 xl:grid-cols-[220px_minmax(0,1fr)_auto]"><label className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}><span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>변경 수량</span><input data-testid="shipping-component-quantity" type="number" min={1} max={sourceLimit || undefined} value={quantity} onChange={(event) => { setQuantity(event.target.value === "" ? "" : toPositiveInt(event.target.value)); clearPreview(); }} className={SHIPPING_TEXT_INPUT_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} /></label><label className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}><span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>메모</span><input data-testid="shipping-component-memo" value={memo} onChange={(event) => setMemo(event.target.value)} className={SHIPPING_TEXT_INPUT_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="선택 입력" /></label><div className="self-end"><ActionButton icon={CheckCircle2} label={busy ? "확인 중" : "차이 확인"} tone={LEGACY_COLORS.cyan} onClick={() => void loadPreview()} disabled={!canPreview} dataTestId="shipping-component-preview-button" /></div></div>{(sameItem || sourceOver || error) && <Notice tone={LEGACY_COLORS.red} title="확인 필요" body={sameItem ? "소스 PA와 대상 PA는 달라야 합니다." : sourceOver ? `소스 PA 현재 재고 ${sourceLimit} EA 이하로 입력하세요.` : error ?? ""} />}<div data-testid="shipping-component-preview" className="mt-3 flex min-h-0 flex-1 flex-col rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>{!preview ? <EmptyState title="차이 확인 전" body="소스 PA, 대상 PA, 수량을 선택한 뒤 차이를 확인하세요." /> : preview.lines.length === 0 ? <EmptyState title="변경 품목 없음" body="직계 BOM 차이가 없어 실행할 수 없습니다." /> : <div className={SHIPPING_SCROLL_LIST_CLASS}>{preview.lines.map((line) => { const add = line.total_delta > 0; const tone = add ? LEGACY_COLORS.yellow : LEGACY_COLORS.green; return <div key={line.item_id} className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: line.shortage_quantity > 0 ? tint(LEGACY_COLORS.red, 45) : LEGACY_COLORS.border }}><div className="flex flex-wrap items-center justify-between gap-2"><div className="min-w-0"><div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div><div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "-"} · 소스 {line.source_quantity} / 대상 {line.target_quantity} {line.unit}</div></div><div className="rounded-full px-3 py-1 text-sm font-black" style={{ background: tint(tone, 16), color: tone }}>{add ? "추가 차감" : "회수 입고"} {Math.abs(line.total_delta)} {line.unit}</div></div>{line.shortage_quantity > 0 && <div className="mt-1 text-xs font-black" style={{ color: LEGACY_COLORS.red }}>부족 {line.shortage_quantity} {line.unit}</div>}</div>; })}</div>}</div><div className="mt-3 flex justify-end gap-2"><ActionButton icon={PackageCheck} label="구성품 변경 실행" tone={LEGACY_COLORS.green} onClick={() => setConfirmOpen(true)} disabled={!canExecute} dataTestId="shipping-component-execute-button" /></div>{confirmOpen && preview && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-6"><div className="w-full max-w-xl rounded-[22px] border p-5 shadow-xl" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}><div className="text-xl font-black">구성품 변경을 확정할까요?</div><div className="mt-3 grid gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}><div>{preview.source_item_name} -{preview.quantity} EA</div><div>{preview.target_item_name} +{preview.quantity} EA</div><div>변경 구성품 {preview.lines.length}개</div></div><div className="mt-5 flex justify-end gap-2"><ActionButton icon={XCircle} label="취소" tone={LEGACY_COLORS.muted2} onClick={() => setConfirmOpen(false)} /><ActionButton icon={CheckCircle2} label="확정" tone={LEGACY_COLORS.green} onClick={() => void executeChange()} disabled={busy} dataTestId="shipping-component-confirm-button" /></div></div></div>}</Panel>;
+}
+
+function ComponentChangeCompleteView({ result, onNew, onHistory, onShipping }: { result: ShippingComponentChangeResult | null; onNew: () => void; onHistory: () => void; onShipping: () => void }) {
+  return <Panel dataTestId="shipping-component-change-complete" className="flex min-h-0 flex-col">{result ? <><PanelTitle icon={CheckCircle2} title="구성품 변경 완료" subtitle={`${result.source_item_name} → ${result.target_item_name} · ${result.quantity} EA`} /><div className="mt-4 grid gap-3 md:grid-cols-2"><Metric label="소스 PA" value={`-${result.quantity} EA`} /><Metric label="대상 PA" value={`+${result.quantity} EA`} /></div></> : <EmptyState title="완료 이력 없음" body="새 구성품 변경을 시작하세요." />}<div className="mt-4 flex flex-wrap justify-end gap-2"><ActionButton icon={PackageCheck} label="새 구성품 변경" tone={LEGACY_COLORS.cyan} onClick={onNew} /><ActionButton icon={History} label="입출고 내역에서 보기" tone={LEGACY_COLORS.purple} onClick={onHistory} /><ActionButton icon={Truck} label="출하로 돌아가기" tone={LEGACY_COLORS.blue} onClick={onShipping} /></div></Panel>;
+}
 function PrepRequirementList({ title, lines, requestQuantity, tone }: { title: string; lines: ShippingRequest["bom_lines"]; requestQuantity: number; tone: string }) {
   return (
     <div className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
