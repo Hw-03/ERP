@@ -1,4 +1,4 @@
-﻿"""Shipping request workflow service."""
+"""Shipping request workflow service."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from app.models import (
     DepartmentEnum,
     Inventory,
     Item,
+    ShippingAllocation,
     ShippingRequest,
     ShippingRequestBomLine,
     ShippingRequestChecklistLine,
@@ -32,6 +33,10 @@ from app.utils.mes_code import next_serial_no
 
 PREPARE_PHASE = "PREPARE"
 PICKUP_PHASE = "PICKUP"
+COMPONENT_CHANGE_PHASE = "COMPONENT_CHANGE"
+ALLOCATION_RESERVED = "RESERVED"
+ALLOCATION_RELEASED = "RELEASED"
+ALLOCATION_CONSUMED = "CONSUMED"
 
 
 class ShippingError(ValueError):
@@ -265,6 +270,8 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     if payload.get("companion_lines") is not None:
         _replace_companions(db, req, payload.get("companion_lines") or [])
     db.refresh(req)
+    _resolve_final_items(db, req)
+    db.refresh(req)
     _sync_checklist(db, req)
     _record_event(db, req, "REQUEST_CREATED", "異쒗븯 ?붿껌 ?앹꽦")
     db.flush()
@@ -291,6 +298,8 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
         _sync_checklist(db, req)
     if "companion_lines" in payload:
         _replace_companions(db, req, payload.get("companion_lines") or [])
+    db.refresh(req)
+    _resolve_final_items(db, req)
     req.updated_at = datetime.utcnow()
     _record_event(db, req, "REQUEST_UPDATED", "異쒗븯 ?붿껌 ?섏젙")
     db.flush()
@@ -470,6 +479,62 @@ def _resolve_or_create_pf(db: Session, req: ShippingRequest, final_pa: Item) -> 
     return pf
 
 
+def _resolve_final_items(db: Session, req: ShippingRequest) -> tuple[Item, Item]:
+    final_pa = _resolve_or_create_pa(db, req)
+    final_pf = _resolve_or_create_pf(db, req, final_pa)
+    req.final_pa_item_id = final_pa.item_id
+    req.final_pf_item_id = final_pf.item_id
+    db.flush()
+    return final_pa, final_pf
+
+
+def _require_final_items(db: Session, req: ShippingRequest) -> tuple[Item, Item]:
+    if req.final_pa_item is None or req.final_pf_item is None:
+        return _resolve_final_items(db, req)
+    return req.final_pa_item, req.final_pf_item
+
+
+def _active_allocation_quantity(db: Session, item_id: uuid.UUID) -> int:
+    total = (
+        db.query(func.coalesce(func.sum(ShippingAllocation.quantity), 0))
+        .filter(
+            ShippingAllocation.item_id == item_id,
+            ShippingAllocation.status == ALLOCATION_RESERVED,
+        )
+        .scalar()
+    )
+    return int(total or 0)
+
+
+def _active_allocations_for_request(db: Session, req: ShippingRequest) -> list[ShippingAllocation]:
+    return (
+        db.query(ShippingAllocation)
+        .filter(
+            ShippingAllocation.request_id == req.request_id,
+            ShippingAllocation.status == ALLOCATION_RESERVED,
+        )
+        .order_by(ShippingAllocation.created_at.asc(), ShippingAllocation.allocation_id.asc())
+        .all()
+    )
+
+
+def _item_location_available_after_shipping_allocations(db: Session, item: Item) -> tuple[DepartmentEnum, int, int]:
+    dept, current = inventory_svc.item_department_stock(db, item)
+    reserved = _active_allocation_quantity(db, item.item_id)
+    return dept, int(current or 0), int(current or 0) - reserved
+
+
+def _require_item_location_available(db: Session, item: Item, required: int) -> DepartmentEnum:
+    dept, current, available = _item_location_available_after_shipping_allocations(db, item)
+    if available < required:
+        code = item.mes_code or str(item.item_id)
+        raise ShippingError(
+            f"?? ?? ?? ??: {code} / {item.item_name} / ?? {dept.value} / "
+            f"?? {current} / ?? {_active_allocation_quantity(db, item.item_id)} / ?? {available} / ?? {required}"
+        )
+    return dept
+
+
 def _log_inventory_change(
     db: Session,
     *,
@@ -514,6 +579,7 @@ def _backflush_item_location(
     qty: int,
     reference_no: str,
     notes: str,
+    phase: str = PREPARE_PHASE,
 ) -> None:
     before = inv_effect.snapshot_cells(db, item.item_id)
     inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
@@ -528,18 +594,27 @@ def _backflush_item_location(
         notes=notes,
         before_cells=before,
         request_id=req.request_id,
-        phase=PREPARE_PHASE,
+        phase=phase,
         department=dept,
     )
 
 
-def _produce_to_item_location(db: Session, req: ShippingRequest, item: Item, qty: int, reference_no: str, notes: str) -> None:
+def _produce_to_item_location(
+    db: Session,
+    req: ShippingRequest,
+    item: Item,
+    qty: int,
+    reference_no: str,
+    notes: str,
+    phase: str = PREPARE_PHASE,
+    tx_type: TransactionTypeEnum = TransactionTypeEnum.PRODUCE,
+) -> None:
     before = inv_effect.snapshot_cells(db, item.item_id)
     inv, qty_before, dept = inventory_svc.receive_to_item_department(db, item, Decimal(qty))
     _log_inventory_change(
         db,
         item=item,
-        tx_type=TransactionTypeEnum.PRODUCE,
+        tx_type=tx_type,
         quantity_change=qty,
         quantity_before=int(qty_before),
         reference_no=reference_no,
@@ -547,7 +622,7 @@ def _produce_to_item_location(db: Session, req: ShippingRequest, item: Item, qty
         notes=notes,
         before_cells=before,
         request_id=req.request_id,
-        phase=PREPARE_PHASE,
+        phase=phase,
         department=dept,
     )
 
@@ -597,50 +672,333 @@ def _replace_companions(db: Session, req: ShippingRequest, companion_lines: list
     db.flush()
 
 
+def _bom_qty_map(rows: list[tuple[uuid.UUID, int, str]]) -> dict[uuid.UUID, tuple[int, str]]:
+    out: dict[uuid.UUID, tuple[int, str]] = {}
+    for item_id, qty, unit in rows:
+        out[item_id] = (out.get(item_id, (0, unit))[0] + int(qty), unit or "EA")
+    return out
+
+
+def _component_change_lines(db: Session, source_pa: Item, target_pa: Item, quantity: int) -> list[dict]:
+    source_map = _bom_qty_map(_direct_children(db, source_pa.item_id))
+    target_map = _bom_qty_map(_direct_children(db, target_pa.item_id))
+    item_ids = sorted(set(source_map) | set(target_map), key=lambda item_id: _get_item(db, item_id).item_name)
+    lines: list[dict] = []
+    for item_id in item_ids:
+        item = _get_item(db, item_id)
+        source_qty, source_unit = source_map.get(item_id, (0, item.unit or "EA"))
+        target_qty, target_unit = target_map.get(item_id, (0, item.unit or "EA"))
+        delta = int(target_qty) - int(source_qty)
+        total_delta = delta * quantity
+        dept, current, available = _item_location_available_after_shipping_allocations(db, item)
+        shortage = max(total_delta - available, 0) if total_delta > 0 else 0
+        if total_delta == 0:
+            continue
+        lines.append(
+            {
+                "item_id": item.item_id,
+                "item_name": item.item_name,
+                "mes_code": item.mes_code,
+                "process_type_code": item.process_type_code,
+                "source_quantity": int(source_qty),
+                "target_quantity": int(target_qty),
+                "delta_per_unit": delta,
+                "total_delta": total_delta,
+                "unit": target_unit or source_unit or item.unit or "EA",
+                "department": dept.value,
+                "current_quantity": current,
+                "available_quantity": available,
+                "shortage_quantity": shortage,
+            }
+        )
+    return lines
+
+
+def _component_change_preview_core(
+    db: Session,
+    source_pa_item_id: uuid.UUID,
+    target_pa_item_id: uuid.UUID,
+    quantity: int,
+    request_id: uuid.UUID | None = None,
+) -> dict:
+    if quantity <= 0:
+        raise ShippingError("변경 수량은 1 이상이어야 합니다.")
+    source_pa = _get_item(db, source_pa_item_id)
+    target_pa = _get_item(db, target_pa_item_id)
+    if source_pa.item_id == target_pa.item_id:
+        raise ShippingError("소스 PA와 대상 PA는 달라야 합니다.")
+    if source_pa.process_type_code != "PA" or target_pa.process_type_code != "PA":
+        raise ShippingError("소스와 대상은 모두 PA 품목이어야 합니다.")
+    source_dept, source_current, source_available = _item_location_available_after_shipping_allocations(db, source_pa)
+    lines = _component_change_lines(db, source_pa, target_pa, quantity)
+    if not lines:
+        raise ShippingError("변경할 구성품 차이가 없습니다.")
+    return {
+        "request_id": request_id,
+        "source_item_id": source_pa.item_id,
+        "source_item_name": source_pa.item_name,
+        "source_mes_code": source_pa.mes_code,
+        "target_item_id": target_pa.item_id,
+        "target_item_name": target_pa.item_name,
+        "target_mes_code": target_pa.mes_code,
+        "quantity": quantity,
+        "source_department": source_dept.value,
+        "source_current_quantity": source_current,
+        "source_available_quantity": source_available,
+        "source_shortage_quantity": max(quantity - source_current, 0),
+        "lines": lines,
+    }
+
+
+def component_change_preview(
+    db: Session,
+    request_id: uuid.UUID,
+    source_pa_item_id: uuid.UUID,
+    quantity: int,
+) -> dict:
+    req = _get_request(db, request_id)
+    if req.status != ShippingRequestStatusEnum.PREPARING:
+        raise ShippingError("준비 중 요청에서만 구성품 변경을 할 수 있습니다.")
+    final_pa, _final_pf = _require_final_items(db, req)
+    return _component_change_preview_core(db, source_pa_item_id, final_pa.item_id, quantity, req.request_id)
+
+
+def component_change_preview_independent(
+    db: Session,
+    source_pa_item_id: uuid.UUID,
+    target_pa_item_id: uuid.UUID,
+    quantity: int,
+) -> dict:
+    return _component_change_preview_core(db, source_pa_item_id, target_pa_item_id, quantity)
+
+
+def _backflush_component_location(
+    db: Session,
+    item: Item,
+    qty: int,
+    reference_no: str,
+    notes: str,
+    request_id: uuid.UUID | None,
+) -> TransactionLog:
+    before = inv_effect.snapshot_cells(db, item.item_id)
+    inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
+    return _log_inventory_change(
+        db,
+        item=item,
+        tx_type=TransactionTypeEnum.BACKFLUSH,
+        quantity_change=-qty,
+        quantity_before=int(qty_before),
+        reference_no=reference_no,
+        produced_by="구성품 변경",
+        notes=notes,
+        before_cells=before,
+        request_id=request_id,
+        phase=COMPONENT_CHANGE_PHASE,
+        department=dept,
+    )
+
+
+def _receive_component_location(
+    db: Session,
+    item: Item,
+    qty: int,
+    reference_no: str,
+    notes: str,
+    request_id: uuid.UUID | None,
+    tx_type: TransactionTypeEnum = TransactionTypeEnum.PRODUCE,
+) -> TransactionLog:
+    before = inv_effect.snapshot_cells(db, item.item_id)
+    inv, qty_before, dept = inventory_svc.receive_to_item_department(db, item, Decimal(qty))
+    return _log_inventory_change(
+        db,
+        item=item,
+        tx_type=tx_type,
+        quantity_change=qty,
+        quantity_before=int(qty_before),
+        reference_no=reference_no,
+        produced_by="구성품 변경",
+        notes=notes,
+        before_cells=before,
+        request_id=request_id,
+        phase=COMPONENT_CHANGE_PHASE,
+        department=dept,
+    )
+
+
+def _execute_component_change_core(
+    db: Session,
+    source_pa_item_id: uuid.UUID,
+    target_pa_item_id: uuid.UUID,
+    quantity: int,
+    memo: str | None = None,
+    request_id: uuid.UUID | None = None,
+) -> dict:
+    preview = _component_change_preview_core(db, source_pa_item_id, target_pa_item_id, quantity, request_id)
+    if preview["source_shortage_quantity"] > 0:
+        raise ShippingError("소스 PA 재고가 부족해 구성품 변경을 할 수 없습니다.")
+    shortages = [line for line in preview["lines"] if line["shortage_quantity"] > 0]
+    if shortages:
+        names = ", ".join(f"{line['item_name']} {line['shortage_quantity']}" for line in shortages)
+        raise ShippingError(f"추가 구성품 재고가 부족합니다: {names}")
+
+    source_pa = _get_item(db, source_pa_item_id)
+    target_pa = _get_item(db, target_pa_item_id)
+    reference_no = f"SHIP-COMP-{(request_id.hex[:8] if request_id else uuid.uuid4().hex[:8])}"
+    notes_suffix = f" / {memo}" if memo else ""
+    logs: list[TransactionLog] = []
+
+    logs.append(_backflush_component_location(
+        db,
+        source_pa,
+        quantity,
+        reference_no,
+        f"구성품 변경 소스 PA 사용: {source_pa.item_name} x {quantity}{notes_suffix}",
+        request_id,
+    ))
+    for line in preview["lines"]:
+        delta = int(line["total_delta"])
+        if delta > 0:
+            item = _get_item(db, line["item_id"])
+            logs.append(_backflush_component_location(
+                db,
+                item,
+                delta,
+                reference_no,
+                f"구성품 변경 추가 차감: {item.item_name} x {delta}{notes_suffix}",
+                request_id,
+            ))
+
+    logs.append(_receive_component_location(
+        db,
+        target_pa,
+        quantity,
+        reference_no,
+        f"구성품 변경 대상 PA 입고: {target_pa.item_name} x {quantity}{notes_suffix}",
+        request_id,
+    ))
+    for line in preview["lines"]:
+        delta = int(line["total_delta"])
+        if delta < 0:
+            item = _get_item(db, line["item_id"])
+            recovered = abs(delta)
+            logs.append(_receive_component_location(
+                db,
+                item,
+                recovered,
+                reference_no,
+                f"구성품 변경 회수 입고: {item.item_name} x {recovered}{notes_suffix}",
+                request_id,
+                TransactionTypeEnum.RECEIVE,
+            ))
+
+    completed_at = datetime.utcnow()
+    db.flush()
+    return {
+        **preview,
+        "reference_no": reference_no,
+        "memo": memo,
+        "completed_at": completed_at,
+        "transactions": logs,
+    }
+
+
+def execute_component_change_independent(
+    db: Session,
+    source_pa_item_id: uuid.UUID,
+    target_pa_item_id: uuid.UUID,
+    quantity: int,
+    memo: str | None = None,
+) -> dict:
+    return _execute_component_change_core(db, source_pa_item_id, target_pa_item_id, quantity, memo)
+
+
+def execute_component_change(
+    db: Session,
+    request_id: uuid.UUID,
+    source_pa_item_id: uuid.UUID,
+    quantity: int,
+) -> ShippingRequest:
+    req = _get_request(db, request_id)
+    if req.status != ShippingRequestStatusEnum.PREPARING:
+        raise ShippingError("준비 중 요청에서만 구성품 변경을 할 수 있습니다.")
+    final_pa, _final_pf = _require_final_items(db, req)
+    _execute_component_change_core(db, source_pa_item_id, final_pa.item_id, quantity, request_id=req.request_id)
+    req.updated_at = datetime.utcnow()
+    _record_event(db, req, "COMPONENT_CHANGED", f"구성품 변경 {quantity} EA")
+    db.flush()
+    return req
+
+
+def _reserve_companions(db: Session, req: ShippingRequest, reference_no: str) -> None:
+    for line in req.companion_lines:
+        qty = int(line.quantity or 0)
+        if qty <= 0:
+            continue
+        dept = _require_item_location_available(db, line.item, qty)
+        db.add(
+            ShippingAllocation(
+                request_id=req.request_id,
+                item_id=line.item_id,
+                quantity=qty,
+                unit=line.unit or line.item.unit or "EA",
+                department=dept.value,
+                status=ALLOCATION_RESERVED,
+                reference_no=reference_no,
+            )
+        )
+    db.flush()
+
+
+def _release_companion_allocations(db: Session, req: ShippingRequest, reason: str | None) -> None:
+    now = datetime.utcnow()
+    for allocation in _active_allocations_for_request(db, req):
+        allocation.status = ALLOCATION_RELEASED
+        allocation.released_at = now
+        allocation.released_reason = reason or "?? ?? ?? ??"
+    db.flush()
+
+
+def _consume_companion_allocations(db: Session, req: ShippingRequest) -> None:
+    allocations = _active_allocations_for_request(db, req)
+    if not allocations:
+        for line in req.companion_lines:
+            _ship_from_item_location(db, req, line.item, int(line.quantity), f"?? ?? ??: {line.item.item_name}")
+        return
+    now = datetime.utcnow()
+    for allocation in allocations:
+        item = allocation.item
+        qty = int(allocation.quantity or 0)
+        _ship_from_item_location(db, req, item, qty, f"?? ?? ??: {item.item_name}")
+        allocation.status = ALLOCATION_CONSUMED
+        allocation.consumed_at = now
+    db.flush()
+
+
+
 def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
-        raise ShippingError("준비 중 상태에서만 준비 완료할 수 있습니다.")
+        raise ShippingError("?? ? ????? ?? ??? ? ????.")
     request_qty = _request_quantity(req)
-    final_pa = _resolve_or_create_pa(db, req)
-    final_pf = _resolve_or_create_pf(db, req, final_pa)
-    req.final_pa_item_id = final_pa.item_id
-    req.final_pf_item_id = final_pf.item_id
-    reference_no = f"SHIP-{req.request_id.hex[:8]}"
+    final_pa, final_pf = _require_final_items(db, req)
+    _require_item_location_available(db, final_pa, request_qty)
+    reference_no = f"SHIP-PREP-{req.request_id.hex[:8]}"
 
-    for line in _request_stage_lines(req, "PA"):
-        child = _get_item(db, line.child_item_id)
-        total_qty = int(line.quantity) * request_qty
-        _backflush_item_location(
-            db,
-            req,
-            child,
-            total_qty,
-            reference_no,
-            f"출하 준비 PA 생산 투입: {child.item_name} x {total_qty}",
-        )
-    _produce_to_item_location(db, req, final_pa, request_qty, reference_no, f"출하 준비 PA 완료: {final_pa.item_name} x {request_qty}")
-
-    for child_id, qty, _unit in _pf_lines_with_final_pa(req, final_pa):
-        child = _get_item(db, child_id)
-        total_qty = int(qty) * request_qty
-        if child.item_id == final_pa.item_id:
-            _consume_pa_from_item_location(db, req, child, total_qty, reference_no)
-        else:
-            _backflush_item_location(
-                db,
-                req,
-                child,
-                total_qty,
-                reference_no,
-                f"출하 준비 PF 생산 투입: {child.item_name} x {total_qty}",
-            )
+    _backflush_item_location(
+        db,
+        req,
+        final_pa,
+        request_qty,
+        reference_no,
+        f"?? ?? final PA ??: {final_pa.item_name} x {request_qty}",
+    )
     _produce_pf_to_item_location(db, req, final_pf, request_qty, reference_no)
+    _reserve_companions(db, req, reference_no)
 
     req.status = ShippingRequestStatusEnum.PREPARED
     req.prepared_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "PREPARED", "출하 준비 완료")
+    _record_event(db, req, "PREPARED", "?? ?? ??")
     db.flush()
     return req
 
@@ -648,7 +1006,7 @@ def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
 def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
-        raise ShippingError("以鍮??꾨즺 ?곹깭?먯꽌留?痍⑥냼?????덉뒿?덈떎.")
+        raise ShippingError("?? ?? ????? ??? ? ????.")
     logs = (
         db.query(TransactionLog)
         .filter(
@@ -660,24 +1018,22 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
         .all()
     )
     if not logs:
-        raise ShippingError("痍⑥냼??以鍮??꾨즺 ?낆텧怨?濡쒓렇媛 ?놁뒿?덈떎.")
+        raise ShippingError("??? ?? ?? ??? ??? ????.")
     for log in logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
         inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
         if inv is not None:
             _sync_total(db, inv)
         log.cancelled = True
-        log.cancel_reason = reason or "異쒗븯 以鍮??꾨즺 痍⑥냼"
+        log.cancel_reason = reason or "?? ?? ?? ??"
         log.cancelled_at = datetime.utcnow()
+    _release_companion_allocations(db, req, reason)
     req.status = ShippingRequestStatusEnum.PREPARING
     req.prepared_at = None
-    req.final_pa_item_id = None
-    req.final_pf_item_id = None
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "PREPARE_CANCELLED", reason or "異쒗븯 以鍮??꾨즺 痍⑥냼")
+    _record_event(db, req, "PREPARE_CANCELLED", reason or "?? ?? ?? ??")
     db.flush()
     return req
-
 
 def _ship_from_item_location(db: Session, req: ShippingRequest, item: Item, qty: int, notes: str) -> None:
     reference_no = f"SHIP-{req.request_id.hex[:8]}"
@@ -699,19 +1055,19 @@ def _ship_from_item_location(db: Session, req: ShippingRequest, item: Item, qty:
     )
 
 
+
 def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
-        raise ShippingError("以鍮??꾨즺 ?곹깭?먯꽌留??쎌뾽 ?꾨즺?????덉뒿?덈떎.")
+        raise ShippingError("?? ?? ????? ?? ??? ? ????.")
     if req.final_pf_item is None:
-        raise ShippingError("理쒖쥌 PF媛 ?뺥빐吏吏 ?딆븯?듬땲??")
+        raise ShippingError("?? PF? ???? ?????.")
     request_qty = _request_quantity(req)
-    _ship_from_item_location(db, req, req.final_pf_item, request_qty, f"異쒗븯 ?쎌뾽 ?꾨즺: {req.final_pf_item.item_name} x {request_qty}")
-    for line in req.companion_lines:
-        _ship_from_item_location(db, req, line.item, int(line.quantity), f"異쒗븯 ?숇컲 ?덈ぉ: {line.item.item_name}")
+    _ship_from_item_location(db, req, req.final_pf_item, request_qty, f"?? ?? ??: {req.final_pf_item.item_name} x {request_qty}")
+    _consume_companion_allocations(db, req)
     req.status = ShippingRequestStatusEnum.PICKED_UP
     req.picked_up_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "PICKED_UP", "諛곗넚?낆껜 ?쎌뾽 ?꾨즺")
+    _record_event(db, req, "PICKED_UP", "???? ?? ??")
     db.flush()
     return req

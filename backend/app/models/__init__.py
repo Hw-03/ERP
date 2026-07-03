@@ -45,6 +45,7 @@ from app.models.item import (
     Item,
 )
 from app.models.shipping import (
+    ShippingAllocation,
     ShippingRequest,
     ShippingRequestBomLine,
     ShippingRequestChecklistLine,
@@ -102,6 +103,7 @@ __all__ = [
     "TransactionEditLog",
     "TransactionTypeEnum",
     # shipping
+    "ShippingAllocation",
     "ShippingRequest",
     "ShippingRequestBomLine",
     "ShippingRequestChecklistLine",

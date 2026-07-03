@@ -27,6 +27,7 @@ __all__ = [
     "ShippingRequestBomLine",
     "ShippingRequestChecklistLine",
     "ShippingRequestCompanionLine",
+    "ShippingAllocation",
     "ShippingRequestEvent",
     "ShippingRequestStatusEnum",
 ]
@@ -84,6 +85,12 @@ class ShippingRequest(Base):
         cascade="all, delete-orphan",
         order_by="ShippingRequestCompanionLine.sort_order",
     )
+    allocations = relationship(
+        "ShippingAllocation",
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="ShippingAllocation.created_at",
+    )
     checklist_lines = relationship(
         "ShippingRequestChecklistLine",
         back_populates="request",
@@ -134,6 +141,31 @@ class ShippingRequestCompanionLine(Base):
 
     request = relationship("ShippingRequest", back_populates="companion_lines")
     item = relationship("Item")
+
+
+class ShippingAllocation(Base):
+    __tablename__ = "shipping_allocations"
+
+    allocation_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUIDString, ForeignKey("shipping_requests.request_id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="RESTRICT"), nullable=False, index=True)
+    quantity = Column(IntQuantity, nullable=False)
+    unit = Column(String(20), nullable=False, default="EA")
+    department = Column(String(50), nullable=True)
+    status = Column(String(20), nullable=False, default="RESERVED", server_default="RESERVED", index=True)
+    reference_no = Column(String(100), nullable=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+    released_at = Column(DateTime, nullable=True)
+    consumed_at = Column(DateTime, nullable=True)
+    released_reason = Column(Text, nullable=True)
+
+    request = relationship("ShippingRequest", back_populates="allocations")
+    item = relationship("Item")
+
+    __table_args__ = (
+        Index("ix_shipping_alloc_req_status", "request_id", "status"),
+        Index("ix_shipping_alloc_item_status", "item_id", "status"),
+    )
 
 
 class ShippingRequestChecklistLine(Base):

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from decimal import Decimal
 
@@ -16,15 +16,16 @@ def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
     }
 
 
+
 def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, make_bom, make_location):
-    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
-    pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=2)
-    carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("3"), model_symbol="4", serial_no=3)
+    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
     base_pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
     base_pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
     make_bom(base_pa.item_id, af.item_id, Decimal("1"))
     make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
-    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    make_location(base_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     make_location(pouch.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     db_session.commit()
@@ -45,14 +46,33 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     request_id = create.json()["request_id"]
     assert create.json()["status"] == ShippingRequestStatusEnum.REQUESTED.value
     assert create.json()["request_quantity"] == 2
+    assert create.json()["final_pa_item_name"] == "Base PF with Pouch PA"
+    assert create.json()["final_pf_item_name"] == "Base PF with Pouch"
     assert create.json()["companion_lines"][0]["item_name"] == "Carton"
     assert create.json()["companion_lines"][0]["quantity"] == 2
     assert len(create.json()["bom_lines"]) == 3
+    assert create.json()["transaction_count"] == 0
 
     prep = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
     assert prep.status_code == 200, prep.text
     assert prep.json()["status"] == ShippingRequestStatusEnum.PREPARING.value
     assert any(line["item_name"] == "Pouch" for line in prep.json()["checklist_lines"])
+
+    preview = client.get(
+        f"/api/shipping/requests/{request_id}/component-change-preview",
+        params={"source_pa_item_id": str(base_pa.item_id), "quantity": 2},
+    )
+    assert preview.status_code == 200, preview.text
+    pouch_line = [line for line in preview.json()["lines"] if line["item_name"] == "Pouch"][0]
+    assert pouch_line["total_delta"] == 2
+    assert pouch_line["shortage_quantity"] == 0
+
+    component_change = client.post(
+        f"/api/shipping/requests/{request_id}/component-change",
+        json={"source_pa_item_id": str(base_pa.item_id), "quantity": 2},
+    )
+    assert component_change.status_code == 200, component_change.text
+    assert any(log["shipping_phase"] == "COMPONENT_CHANGE" for log in component_change.json()["transactions"])
 
     checklist_id = [line for line in prep.json()["checklist_lines"] if line["item_name"] == "Pouch"][0]["item_id"]
     checked = client.patch(
@@ -78,6 +98,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     )
     assert cancel.status_code == 200, cancel.text
     assert cancel.json()["status"] == ShippingRequestStatusEnum.PREPARING.value
+    assert cancel.json()["final_pa_item_name"] == "Base PF with Pouch PA"
 
     prepared_again = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
@@ -95,6 +116,10 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     assert history.json()[0]["transaction_count"] >= 2
     assert history.json()[0]["transaction_count"] == len(history.json()[0]["transactions"])
     assert any(
+        log["shipping_phase"] == "COMPONENT_CHANGE"
+        for log in history.json()[0]["transactions"]
+    )
+    assert any(
         log["shipping_phase"] == "PREPARE" and log["cancelled"]
         for log in history.json()[0]["transactions"]
     )
@@ -106,6 +131,56 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     clear_after_pickup = client.post(f"/api/shipping/requests/{request_id}/checklist/clear")
     assert clear_after_pickup.status_code == 422, clear_after_pickup.text
 
+
+def test_component_change_api_runs_without_shipping_request(client, db_session, make_item, make_bom, make_location):
+    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    cable = make_item(name="Cable", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    target_pa = make_item(name="Target PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    make_bom(source_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, cable.item_id, Decimal("2"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
+    make_location(cable.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("4"))
+    db_session.commit()
+
+    preview = client.get(
+        "/api/shipping/component-change-preview",
+        params={
+            "source_pa_item_id": str(source_pa.item_id),
+            "target_pa_item_id": str(target_pa.item_id),
+            "quantity": 2,
+        },
+    )
+
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["request_id"] is None
+    assert body["source_item_name"] == "Source PA"
+    assert body["target_item_name"] == "Target PA"
+    assert [line["item_name"] for line in body["lines"]] == ["Cable"]
+    assert body["lines"][0]["total_delta"] == 4
+
+    executed = client.post(
+        "/api/shipping/component-change",
+        json={
+            "source_pa_item_id": str(source_pa.item_id),
+            "target_pa_item_id": str(target_pa.item_id),
+            "quantity": 2,
+            "memo": "sample change",
+        },
+    )
+
+    assert executed.status_code == 200, executed.text
+    done = executed.json()
+    assert done["request_id"] is None
+    assert done["source_item_name"] == "Source PA"
+    assert done["target_item_name"] == "Target PA"
+    assert done["quantity"] == 2
+    assert done["memo"] == "sample change"
+    assert len(done["transactions"]) == 3
+    assert {log["shipping_phase"] for log in done["transactions"]} == {"COMPONENT_CHANGE"}
+    assert {log["reference_no"] for log in done["transactions"]} == {done["reference_no"]}
 
 def test_shipping_mobile_list_is_read_only_shape(client, db_session, make_item, make_bom):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
@@ -194,9 +269,9 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
     )
     assert match.status_code == 200, match.text
     assert match.json()["matched_pa_item_name"] == "Shared PA"
-    assert match.json()["matched_pf_item_id"] is None
+    assert match.json()["matched_pf_item_id"] == update.json()["final_pf_item_id"]
     assert match.json()["requires_pa_name"] is False
-    assert match.json()["requires_pf_name"] is True
+    assert match.json()["requires_pf_name"] is False
 
 
 def test_requested_and_preparing_shipping_requests_can_be_deleted(client, db_session, make_item, make_bom):
@@ -244,7 +319,7 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
     pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    make_location(af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     db_session.commit()
 
     create = client.post(
@@ -287,8 +362,8 @@ def test_shipping_prepare_complete_requires_process_department_stock(client, db_
 
     assert prepared.status_code == 422, prepared.text
     body = prepared.text
-    assert af.mes_code in body
-    assert "AF Main" in body
-    assert DepartmentEnum.ASSEMBLY.value in body
+    assert pa.mes_code in body
+    assert "Base PA" in body
+    assert DepartmentEnum.SHIPPING.value in body
     assert "0" in body
     assert "1" in body

@@ -1,4 +1,4 @@
-﻿"""Shipping request schemas."""
+"""Shipping request schemas."""
 
 from __future__ import annotations
 
@@ -64,6 +64,51 @@ class ShippingPrepareCancelRequest(BaseModel):
     reason: Optional[str] = Field(None, max_length=300)
 
 
+class ShippingComponentChangePreviewRequest(BaseModel):
+    source_pa_item_id: uuid.UUID
+    target_pa_item_id: Optional[uuid.UUID] = None
+    quantity: int = Field(..., gt=0)
+
+
+class ShippingComponentChangeExecuteRequest(BaseModel):
+    source_pa_item_id: uuid.UUID
+    target_pa_item_id: Optional[uuid.UUID] = None
+    quantity: int = Field(..., gt=0)
+    memo: Optional[str] = Field(None, max_length=300)
+
+
+class ShippingComponentChangeLineResponse(BaseModel):
+    item_id: uuid.UUID
+    item_name: str
+    mes_code: Optional[str] = None
+    process_type_code: Optional[str] = None
+    source_quantity: int
+    target_quantity: int
+    delta_per_unit: int
+    total_delta: int
+    unit: str = "EA"
+    department: Optional[str] = None
+    current_quantity: int = 0
+    available_quantity: int = 0
+    shortage_quantity: int = 0
+
+
+class ShippingComponentChangePreviewResponse(BaseModel):
+    request_id: Optional[uuid.UUID] = None
+    source_item_id: uuid.UUID
+    source_item_name: str
+    source_mes_code: Optional[str] = None
+    target_item_id: uuid.UUID
+    target_item_name: str
+    target_mes_code: Optional[str] = None
+    quantity: int
+    source_department: Optional[str] = None
+    source_current_quantity: int = 0
+    source_available_quantity: int = 0
+    source_shortage_quantity: int = 0
+    lines: list[ShippingComponentChangeLineResponse] = []
+
+
 class ShippingBomMatchRequest(BaseModel):
     base_pf_item_id: uuid.UUID
     bom_lines: list[ShippingBomLineInput]
@@ -119,6 +164,24 @@ class ShippingEventResponse(BaseModel):
     message: Optional[str] = None
     created_at: UtcDatetime
 
+class ShippingAllocationResponse(BaseModel):
+    allocation_id: uuid.UUID
+    request_id: uuid.UUID
+    item_id: uuid.UUID
+    item_name: str
+    mes_code: Optional[str] = None
+    process_type_code: Optional[str] = None
+    quantity: int
+    unit: str = "EA"
+    department: Optional[str] = None
+    status: str
+    reference_no: Optional[str] = None
+    created_at: UtcDatetime
+    released_at: Optional[UtcDatetime] = None
+    consumed_at: Optional[UtcDatetime] = None
+    released_reason: Optional[str] = None
+
+
 class ShippingTransactionLogResponse(BaseModel):
     log_id: uuid.UUID
     item_id: uuid.UUID
@@ -140,6 +203,13 @@ class ShippingTransactionLogResponse(BaseModel):
     cancel_reason: Optional[str] = None
     cancelled_at: Optional[UtcDatetime] = None
     inventory_effect: Optional[list[dict[str, Any]]] = None
+
+
+class ShippingComponentChangeResultResponse(ShippingComponentChangePreviewResponse):
+    reference_no: str
+    memo: Optional[str] = None
+    completed_at: UtcDatetime
+    transactions: list[ShippingTransactionLogResponse] = []
 
 class ShippingRequestResponse(BaseModel):
     request_id: uuid.UUID
@@ -165,4 +235,5 @@ class ShippingRequestResponse(BaseModel):
     checklist_lines: list[ShippingChecklistLineResponse] = []
     events: list[ShippingEventResponse] = []
     transactions: list[ShippingTransactionLogResponse] = []
+    allocations: list[ShippingAllocationResponse] = []
     transaction_count: int = 0

@@ -325,6 +325,23 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE transaction_logs ADD COLUMN shipping_request_id CHAR(36)",
     "ALTER TABLE transaction_logs ADD COLUMN shipping_phase VARCHAR(20)",
     "CREATE INDEX IF NOT EXISTS ix_tx_shipping_request ON transaction_logs(shipping_request_id, created_at)",
+    """CREATE TABLE IF NOT EXISTS shipping_allocations (
+        allocation_id CHAR(36) PRIMARY KEY,
+        request_id CHAR(36) NOT NULL REFERENCES shipping_requests(request_id) ON DELETE CASCADE,
+        item_id CHAR(36) NOT NULL REFERENCES items(item_id),
+        quantity INTEGER NOT NULL,
+        unit VARCHAR(20) NOT NULL DEFAULT 'EA',
+        department VARCHAR(50),
+        status VARCHAR(20) NOT NULL DEFAULT 'RESERVED',
+        reference_no VARCHAR(100),
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        released_at DATETIME,
+        consumed_at DATETIME,
+        released_reason TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_alloc_req_status ON shipping_allocations(request_id, status)",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_alloc_item_status ON shipping_allocations(item_id, status)",
+    "CREATE INDEX IF NOT EXISTS ix_shipping_alloc_reference ON shipping_allocations(reference_no)",
     # 2026-06-04: 결재 알림 — 요청 도착(승인자)/승인·반려(요청자) 알림 영속 테이블.
     """CREATE TABLE IF NOT EXISTS notifications (
         notification_id CHAR(36) PRIMARY KEY,

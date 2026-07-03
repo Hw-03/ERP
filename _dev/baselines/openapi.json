@@ -5470,6 +5470,137 @@
         "title": "ReservationLineResponse",
         "type": "object"
       },
+      "ShippingAllocationResponse": {
+        "properties": {
+          "allocation_id": {
+            "format": "uuid",
+            "title": "Allocation Id",
+            "type": "string"
+          },
+          "consumed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "released_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released Reason"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "unit": {
+            "default": "EA",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allocation_id",
+          "request_id",
+          "item_id",
+          "item_name",
+          "quantity",
+          "status",
+          "created_at"
+        ],
+        "title": "ShippingAllocationResponse",
+        "type": "object"
+      },
       "ShippingBomLineInput": {
         "properties": {
           "child_item_id": {
@@ -5844,6 +5975,378 @@
         "title": "ShippingCompanionLineResponse",
         "type": "object"
       },
+      "ShippingComponentChangeExecuteRequest": {
+        "properties": {
+          "memo": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memo"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "source_pa_item_id": {
+            "format": "uuid",
+            "title": "Source Pa Item Id",
+            "type": "string"
+          },
+          "target_pa_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Pa Item Id"
+          }
+        },
+        "required": [
+          "source_pa_item_id",
+          "quantity"
+        ],
+        "title": "ShippingComponentChangeExecuteRequest",
+        "type": "object"
+      },
+      "ShippingComponentChangeLineResponse": {
+        "properties": {
+          "available_quantity": {
+            "default": 0,
+            "title": "Available Quantity",
+            "type": "integer"
+          },
+          "current_quantity": {
+            "default": 0,
+            "title": "Current Quantity",
+            "type": "integer"
+          },
+          "delta_per_unit": {
+            "title": "Delta Per Unit",
+            "type": "integer"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
+          "shortage_quantity": {
+            "default": 0,
+            "title": "Shortage Quantity",
+            "type": "integer"
+          },
+          "source_quantity": {
+            "title": "Source Quantity",
+            "type": "integer"
+          },
+          "target_quantity": {
+            "title": "Target Quantity",
+            "type": "integer"
+          },
+          "total_delta": {
+            "title": "Total Delta",
+            "type": "integer"
+          },
+          "unit": {
+            "default": "EA",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "source_quantity",
+          "target_quantity",
+          "delta_per_unit",
+          "total_delta"
+        ],
+        "title": "ShippingComponentChangeLineResponse",
+        "type": "object"
+      },
+      "ShippingComponentChangePreviewResponse": {
+        "properties": {
+          "lines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingComponentChangeLineResponse"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "source_available_quantity": {
+            "default": 0,
+            "title": "Source Available Quantity",
+            "type": "integer"
+          },
+          "source_current_quantity": {
+            "default": 0,
+            "title": "Source Current Quantity",
+            "type": "integer"
+          },
+          "source_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Department"
+          },
+          "source_item_id": {
+            "format": "uuid",
+            "title": "Source Item Id",
+            "type": "string"
+          },
+          "source_item_name": {
+            "title": "Source Item Name",
+            "type": "string"
+          },
+          "source_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Mes Code"
+          },
+          "source_shortage_quantity": {
+            "default": 0,
+            "title": "Source Shortage Quantity",
+            "type": "integer"
+          },
+          "target_item_id": {
+            "format": "uuid",
+            "title": "Target Item Id",
+            "type": "string"
+          },
+          "target_item_name": {
+            "title": "Target Item Name",
+            "type": "string"
+          },
+          "target_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Mes Code"
+          }
+        },
+        "required": [
+          "source_item_id",
+          "source_item_name",
+          "target_item_id",
+          "target_item_name",
+          "quantity"
+        ],
+        "title": "ShippingComponentChangePreviewResponse",
+        "type": "object"
+      },
+      "ShippingComponentChangeResultResponse": {
+        "properties": {
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "lines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingComponentChangeLineResponse"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memo"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "reference_no": {
+            "title": "Reference No",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "source_available_quantity": {
+            "default": 0,
+            "title": "Source Available Quantity",
+            "type": "integer"
+          },
+          "source_current_quantity": {
+            "default": 0,
+            "title": "Source Current Quantity",
+            "type": "integer"
+          },
+          "source_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Department"
+          },
+          "source_item_id": {
+            "format": "uuid",
+            "title": "Source Item Id",
+            "type": "string"
+          },
+          "source_item_name": {
+            "title": "Source Item Name",
+            "type": "string"
+          },
+          "source_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Mes Code"
+          },
+          "source_shortage_quantity": {
+            "default": 0,
+            "title": "Source Shortage Quantity",
+            "type": "integer"
+          },
+          "target_item_id": {
+            "format": "uuid",
+            "title": "Target Item Id",
+            "type": "string"
+          },
+          "target_item_name": {
+            "title": "Target Item Name",
+            "type": "string"
+          },
+          "target_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Mes Code"
+          },
+          "transactions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingTransactionLogResponse"
+            },
+            "title": "Transactions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_item_id",
+          "source_item_name",
+          "target_item_id",
+          "target_item_name",
+          "quantity",
+          "reference_no",
+          "completed_at"
+        ],
+        "title": "ShippingComponentChangeResultResponse",
+        "type": "object"
+      },
       "ShippingEventResponse": {
         "properties": {
           "created_at": {
@@ -6009,6 +6512,14 @@
       },
       "ShippingRequestResponse": {
         "properties": {
+          "allocations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingAllocationResponse"
+            },
+            "title": "Allocations",
+            "type": "array"
+          },
           "base_pf_item_id": {
             "format": "uuid",
             "title": "Base Pf Item Id",
@@ -7547,6 +8058,17 @@
               }
             ],
             "title": "Requester Name"
+          },
+          "shipping_phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Phase"
           },
           "transaction_type": {
             "$ref": "#/components/schemas/TransactionTypeEnum"
@@ -15408,6 +15930,110 @@
         ]
       }
     },
+    "/api/shipping/component-change": {
+      "post": {
+        "operationId": "component_change_independent_api_shipping_component_change_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingComponentChangeExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingComponentChangeResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Component Change Independent",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/component-change-preview": {
+      "get": {
+        "operationId": "component_change_preview_independent_api_shipping_component_change_preview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_pa_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Pa Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_pa_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Pa Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quantity",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "title": "Quantity",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingComponentChangePreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Component Change Preview Independent",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
     "/api/shipping/history": {
       "get": {
         "operationId": "history_api_shipping_history_get",
@@ -15703,6 +16329,122 @@
           }
         },
         "summary": "Clear Checklist",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/component-change": {
+      "post": {
+        "operationId": "component_change_api_shipping_requests__request_id__component_change_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingComponentChangeExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Component Change",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/component-change-preview": {
+      "get": {
+        "operationId": "component_change_preview_api_shipping_requests__request_id__component_change_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_pa_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Pa Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quantity",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "title": "Quantity",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingComponentChangePreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Component Change Preview",
         "tags": [
           "Shipping"
         ]

@@ -77,6 +77,7 @@ class TransactionLogResponse(BaseModel):
     reason_category: Optional[str] = None
     reason_memo: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
+    shipping_phase: Optional[str] = None
     created_at: UtcDatetime
     edit_count: int = 0
     cancelled: bool = False

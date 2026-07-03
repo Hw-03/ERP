@@ -1,4 +1,4 @@
-﻿"""Shipping request router."""
+"""Shipping request router."""
 
 from __future__ import annotations
 
@@ -16,19 +16,23 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.schemas.shipping import (
+    ShippingAllocationResponse,
     ShippingBomLineInput,
     ShippingBomLineResponse,
     ShippingBomMatchRequest,
     ShippingBomMatchResponse,
     ShippingChecklistLineResponse,
     ShippingChecklistUpdate,
+    ShippingComponentChangeExecuteRequest,
+    ShippingComponentChangePreviewResponse,
+    ShippingComponentChangeResultResponse,
     ShippingCompanionLineResponse,
     ShippingPrepareCancelRequest,
     ShippingPrepareCompleteRequest,
     ShippingRequestCreate,
     ShippingRequestResponse,
-    ShippingTransactionLogResponse,
     ShippingRequestUpdate,
+    ShippingTransactionLogResponse,
 )
 from app.services import shipping as shipping_svc
 from app.services.shipping import ShippingError
@@ -47,6 +51,31 @@ def _companion_payload(lines) -> list[dict] | None:
     if lines is None:
         return None
     return [line.model_dump() for line in lines]
+
+
+def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
+    return ShippingTransactionLogResponse(
+        log_id=log.log_id,
+        item_id=log.item_id,
+        item_name=log.item.item_name,
+        mes_code=log.item.mes_code,
+        item_process_type_code=log.item.process_type_code,
+        transaction_type=log.transaction_type,
+        quantity_change=int(log.quantity_change),
+        quantity_before=int(log.quantity_before) if log.quantity_before is not None else None,
+        quantity_after=int(log.quantity_after) if log.quantity_after is not None else None,
+        warehouse_qty_before=int(log.warehouse_qty_before) if log.warehouse_qty_before is not None else None,
+        warehouse_qty_after=int(log.warehouse_qty_after) if log.warehouse_qty_after is not None else None,
+        reference_no=log.reference_no,
+        produced_by=log.produced_by,
+        notes=log.notes,
+        shipping_phase=log.shipping_phase,
+        created_at=log.created_at,
+        cancelled=bool(log.cancelled),
+        cancel_reason=log.cancel_reason,
+        cancelled_at=log.cancelled_at,
+        inventory_effect=log.inventory_effect,
+    )
 
 
 def _to_response(db: Session, req: ShippingRequest) -> ShippingRequestResponse:
@@ -115,30 +144,26 @@ def _to_response(db: Session, req: ShippingRequest) -> ShippingRequestResponse:
             for line in req.checklist_lines
         ],
         events=list(req.events),
-        transactions=[
-            ShippingTransactionLogResponse(
-                log_id=log.log_id,
-                item_id=log.item_id,
-                item_name=log.item.item_name,
-                mes_code=log.item.mes_code,
-                item_process_type_code=log.item.process_type_code,
-                transaction_type=log.transaction_type,
-                quantity_change=int(log.quantity_change),
-                quantity_before=int(log.quantity_before) if log.quantity_before is not None else None,
-                quantity_after=int(log.quantity_after) if log.quantity_after is not None else None,
-                warehouse_qty_before=int(log.warehouse_qty_before) if log.warehouse_qty_before is not None else None,
-                warehouse_qty_after=int(log.warehouse_qty_after) if log.warehouse_qty_after is not None else None,
-                reference_no=log.reference_no,
-                produced_by=log.produced_by,
-                notes=log.notes,
-                shipping_phase=log.shipping_phase,
-                created_at=log.created_at,
-                cancelled=bool(log.cancelled),
-                cancel_reason=log.cancel_reason,
-                cancelled_at=log.cancelled_at,
-                inventory_effect=log.inventory_effect,
+        transactions=[_tx_log_response(log) for log in tx_rows],
+        allocations=[
+            ShippingAllocationResponse(
+                allocation_id=allocation.allocation_id,
+                request_id=allocation.request_id,
+                item_id=allocation.item_id,
+                item_name=allocation.item.item_name,
+                mes_code=allocation.item.mes_code,
+                process_type_code=allocation.item.process_type_code,
+                quantity=int(allocation.quantity),
+                unit=allocation.unit,
+                department=allocation.department,
+                status=allocation.status,
+                reference_no=allocation.reference_no,
+                created_at=allocation.created_at,
+                released_at=allocation.released_at,
+                consumed_at=allocation.consumed_at,
+                released_reason=allocation.released_reason,
             )
-            for log in tx_rows
+            for allocation in req.allocations
         ],
         transaction_count=len(tx_rows),
     )
@@ -158,6 +183,47 @@ def _commit_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: 
         db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
+
+@router.get("/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
+def component_change_preview_independent(
+    source_pa_item_id: uuid.UUID = Query(...),
+    target_pa_item_id: uuid.UUID = Query(...),
+    quantity: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+):
+    try:
+        return shipping_svc.component_change_preview_independent(db, source_pa_item_id, target_pa_item_id, quantity)
+    except ShippingError as exc:
+        db.rollback()
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
+
+
+@router.post("/component-change", response_model=ShippingComponentChangeResultResponse)
+def component_change_independent(
+    payload: ShippingComponentChangeExecuteRequest,
+    db: Session = Depends(get_db),
+):
+    if payload.target_pa_item_id is None:
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, "대상 PA를 선택해야 합니다.")
+    try:
+        result = shipping_svc.execute_component_change_independent(
+            db,
+            payload.source_pa_item_id,
+            payload.target_pa_item_id,
+            payload.quantity,
+            payload.memo,
+        )
+        db.commit()
+        return ShippingComponentChangeResultResponse(
+            **{key: value for key, value in result.items() if key != "transactions"},
+            transactions=[_tx_log_response(log) for log in result["transactions"]],
+        )
+    except ShippingError as exc:
+        db.rollback()
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
+    except ValueError as exc:
+        db.rollback()
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 @router.get("/requests", response_model=list[ShippingRequestResponse])
 def list_requests(
@@ -222,6 +288,30 @@ def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, db
 @router.post("/requests/{request_id}/checklist/clear", response_model=ShippingRequestResponse)
 def clear_checklist(request_id: uuid.UUID, db: Session = Depends(get_db)):
     req = _commit_or_422(db, shipping_svc.clear_checklist, request_id)
+    return _to_response(db, req)
+
+
+@router.get("/requests/{request_id}/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
+def component_change_preview(
+    request_id: uuid.UUID,
+    source_pa_item_id: uuid.UUID = Query(...),
+    quantity: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+):
+    try:
+        return shipping_svc.component_change_preview(db, request_id, source_pa_item_id, quantity)
+    except ShippingError as exc:
+        db.rollback()
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
+
+
+@router.post("/requests/{request_id}/component-change", response_model=ShippingRequestResponse)
+def component_change(
+    request_id: uuid.UUID,
+    payload: ShippingComponentChangeExecuteRequest,
+    db: Session = Depends(get_db),
+):
+    req = _commit_or_422(db, shipping_svc.execute_component_change, request_id, payload.source_pa_item_id, payload.quantity)
     return _to_response(db, req)
 
 

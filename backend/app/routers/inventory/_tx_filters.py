@@ -435,6 +435,7 @@ def _to_log_response(
         reason_category=log.reason_category,
         reason_memo=log.reason_memo,
         operation_batch_id=log.operation_batch_id,
+        shipping_phase=log.shipping_phase,
         created_at=log.created_at,
         edit_count=edit_count,
         cancelled=bool(log.cancelled),
