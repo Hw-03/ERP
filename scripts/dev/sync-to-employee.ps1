@@ -116,7 +116,28 @@ foreach ($old in $oldBackups) {
 }
 
 # ---------------------------------------------------------------
-# 4) 서버 정지
+# 4) 직원 실행 스크립트 동기화
+# ---------------------------------------------------------------
+Write-Host ""
+Write-Host "[sync] 직원 실행 스크립트 갱신 중..."
+$EmpScriptDir = Join-Path $EmpRoot "scripts\dev"
+New-Item -ItemType Directory -Force -Path $EmpScriptDir | Out-Null
+$runtimeScripts = @(
+    "resolve-server-profile.ps1",
+    "start-backend.ps1",
+    "stop-backend.ps1",
+    "start-frontend.ps1",
+    "stop-frontend.ps1"
+)
+foreach ($scriptName in $runtimeScripts) {
+    $sourceScript = Join-Path $DevRoot "scripts\dev\$scriptName"
+    $targetScript = Join-Path $EmpScriptDir $scriptName
+    Copy-Item $sourceScript $targetScript -Force
+    Write-Host "[sync] script: $scriptName"
+}
+
+# ---------------------------------------------------------------
+# 5) 서버 정지
 # ---------------------------------------------------------------
 Write-Host ""
 Write-Host "[stop] 직원 서버 정지 중..."
@@ -124,7 +145,7 @@ powershell -ExecutionPolicy Bypass -File (Join-Path $EmpRoot "scripts\dev\stop-b
 powershell -ExecutionPolicy Bypass -File (Join-Path $EmpRoot "scripts\dev\stop-frontend.ps1")
 
 # ---------------------------------------------------------------
-# 5) robocopy /MIR 실사행
+# 6) robocopy /MIR 실사행
 # ---------------------------------------------------------------
 Write-Host ""
 Write-Host "[sync] 백엔드 동기화 중..."
@@ -152,13 +173,13 @@ if ($frontendExit -ge 8) {
 Write-Host "[sync] 프론트엔드 robocopy exit $frontendExit (정상)"
 
 # ---------------------------------------------------------------
-# 6) .next 캐시 삭제
+# 7) .next 캐시 삭제
 # ---------------------------------------------------------------
 Remove-Item (Join-Path $EmpFrontend ".next") -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "[sync] .next 캐시 삭제 완료"
 
 # ---------------------------------------------------------------
-# 7) DB 마이그레이션
+# 8) DB 마이그레이션
 # ---------------------------------------------------------------
 Write-Host ""
 Write-Host "[migrate] 실행 중..."
@@ -185,15 +206,21 @@ if ($failedCount -gt 0) {
 Write-Host "[migrate] 완료"
 
 # ---------------------------------------------------------------
-# 8) 재기동
+# 9) 재기동
 # ---------------------------------------------------------------
 Write-Host ""
 Write-Host "[start] 직원 서버 재기동 중..."
 Start-Process cmd -ArgumentList "/k", "cd /d `"$EmpBackend`" && py -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload" -WindowStyle Normal
-Start-Process cmd -ArgumentList "/k", "cd /d `"$EmpFrontend`" && npm run dev" -WindowStyle Normal
+Start-Process powershell -ArgumentList @(
+    "-NoExit",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    (Join-Path $EmpRoot "scripts\dev\start-frontend.ps1")
+) -WindowStyle Normal
 
 # ---------------------------------------------------------------
-# 9) 헬스체크
+# 10) 헬스체크
 # ---------------------------------------------------------------
 Write-Host "[health] 백엔드(8010) 확인 중..."
 $backendOk = $false
@@ -222,7 +249,7 @@ if (-not $backendOk -or -not $frontendOk) {
 }
 
 # ---------------------------------------------------------------
-# 10) 요약
+# 11) 요약
 # ---------------------------------------------------------------
 Write-Host ""
 Write-Host "===================================================="

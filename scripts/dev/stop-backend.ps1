@@ -1,38 +1,56 @@
 ﻿# scripts/dev/stop-backend.ps1
-# 포트 8011 을 잡고 있는 모든 프로세스 + uvicorn 명령줄을 가진 모든 python 강제 종료.
-# 좀비 uvicorn worker 재발 방지용.
-#
-# 두 단계 사용 이유:
-# 1) 포트 8011 listen PID 죽이기 — 일반 케이스
-# 2) cmdline 매칭 python 죽이기 — reloader 가 죽은 뒤 worker 가 부모를 잃고 살아남은 케이스.
-#    netstat 가 죽은 부모 PID 를 계속 보여줘서 listen-PID 만 죽이면 worker 를 못 잡음.
+# Stop the backend for the current DEXCOWIN MES root.
+# C:\ERP     -> port 8011
+# C:\ERP-dev -> port 8010
 
 $ErrorActionPreference = "Stop"
 
-function Get-Port8011Pids {
+$Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+$Port = [int] $Profile.BackendPort
+
+function Get-ListenPidsFromNetstat {
     @(
-        Get-NetTCPConnection -LocalPort 8011 -State Listen -ErrorAction SilentlyContinue |
-            Select-Object -ExpandProperty OwningProcess -Unique
+        & netstat.exe -ano -p tcp 2>$null |
+            ForEach-Object {
+                if ($_ -match "^\s*TCP\s+\S+:$Port\s+\S+\s+LISTENING\s+(\d+)\s*$") {
+                    [int] $Matches[1]
+                }
+            } |
+            Sort-Object -Unique
     )
 }
 
+function Get-PortPids {
+    $combined = @()
+    $tcpPids = @(
+        Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty OwningProcess -Unique
+    )
+    $netstatPids = Get-ListenPidsFromNetstat
+    if ($tcpPids) { foreach ($p in $tcpPids) { $combined += [int] $p } }
+    if ($netstatPids) { foreach ($p in $netstatPids) { $combined += [int] $p } }
+    return @($combined | Where-Object { $_ } | Sort-Object -Unique)
+}
+
 function Get-UvicornPythonPids {
-    # CIM_Process.CommandLine 검사 — uvicorn app.main:app + 포트 8011 패턴
     @(
         Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='py.exe'" -ErrorAction SilentlyContinue |
-            Where-Object { $_.CommandLine -and ($_.CommandLine -match 'uvicorn\s+app\.main:app') -and ($_.CommandLine -match '--port\s+8011') } |
+            Where-Object {
+                $_.CommandLine -and
+                ($_.CommandLine -match 'uvicorn\s+app\.main:app') -and
+                ($_.CommandLine -match "--port\s+$Port")
+            } |
             Select-Object -ExpandProperty ProcessId
     )
 }
 
-# 최대 3회 sweep — reloader 와 worker 가 연쇄적으로 죽고 살아나는 케이스 대응
+# Sweep up to 3 times to handle uvicorn reload parent/worker handoff.
 for ($attempt = 1; $attempt -le 3; $attempt++) {
-    $listenPids   = Get-Port8011Pids
-    $uvicornPids  = Get-UvicornPythonPids
-    # typed array 끼리 + 했을 때 op_Addition 못 찾는 케이스 회피 — 한 칸씩 [object[]] 에 채움.
+    $listenPids = Get-PortPids
+    $uvicornPids = Get-UvicornPythonPids
     $combined = @()
-    if ($listenPids)  { foreach ($p in $listenPids)  { $combined += [int]$p } }
-    if ($uvicornPids) { foreach ($p in $uvicornPids) { $combined += [int]$p } }
+    if ($listenPids) { foreach ($p in $listenPids) { $combined += [int] $p } }
+    if ($uvicornPids) { foreach ($p in $uvicornPids) { $combined += [int] $p } }
     $allPids = @($combined | Sort-Object -Unique)
 
     if ($allPids.Count -eq 0) { break }
@@ -50,11 +68,11 @@ for ($attempt = 1; $attempt -le 3; $attempt++) {
     Start-Sleep -Milliseconds 1000
 }
 
-$stillListen  = Get-Port8011Pids
+$stillListen = Get-PortPids
 $stillUvicorn = Get-UvicornPythonPids
 if ($stillListen.Count -gt 0 -or $stillUvicorn.Count -gt 0) {
-    $msg = "정리 실패 - listen: $($stillListen -join ','), uvicorn-py: $($stillUvicorn -join ',')"
+    $msg = "Failed to stop $($Profile.Label) backend port $Port - listen: $($stillListen -join ','), uvicorn-py: $($stillUvicorn -join ',')"
     throw $msg
 }
 
-Write-Host "[stop] OK - port 8011 free, no uvicorn python alive"
+Write-Host "[stop] OK - $($Profile.Label) port $Port free, no uvicorn python alive"

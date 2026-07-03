@@ -41,6 +41,7 @@ const port = process.env.PORT || "3000";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
 const lanIp = detectLanIp();
 const rootDir = path.resolve(__dirname, "..");
+const backendInternalUrl = process.env.BACKEND_INTERNAL_URL || "(default)";
 const diagnostics = createDiagnostics(rootDir);
 const startTime = new Date();
 const receivedSignals = [];
@@ -54,6 +55,8 @@ function banner() {
   out.write(`  ${C.magenta}${C.bold}DEXCOWIN MES${C.reset}  ${C.gray}dev server${C.reset}\n`);
   out.write(`  ${C.gray}${"-".repeat(44)}${C.reset}\n`);
   out.write(`  ${C.dim}Network ${C.reset}  ${C.green}${url}${C.reset}\n`);
+  out.write(`  ${C.dim}Root    ${C.reset}  ${C.cyan}${rootDir}${C.reset}\n`);
+  out.write(`  ${C.dim}Backend ${C.reset}  ${C.cyan}${backendInternalUrl}${C.reset}\n`);
   out.write(`  ${C.gray}${"-".repeat(44)}${C.reset}\n\n`);
 }
 
@@ -94,6 +97,7 @@ function writeExitDumpOnce(reason, details = {}) {
     port,
     hostname,
     cwd: rootDir,
+    backendInternalUrl,
     receivedSignals,
     error: details.error ?? null,
   });
@@ -111,6 +115,7 @@ diagnostics.log("dev server wrapper started", {
   port,
   hostname,
   cwd: rootDir,
+  backendInternalUrl,
   pid: process.pid,
 });
 

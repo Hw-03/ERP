@@ -1,10 +1,7 @@
-﻿# scripts/dev/start-backend.ps1
-# preflight stop → uvicorn 시작 → /health/live 헬스 확인.
-# 좀비가 있던 자리도 무조건 정리 후 띄우므로 "백엔드 로그 0줄" 패턴 차단.
-#
-# 사용법:
-#   powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
-#   powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1 -NoReload
+# scripts/dev/start-backend.ps1
+# Start the backend for the current DEXCOWIN MES root after clearing stale workers.
+# C:\ERP     -> backend 8011
+# C:\ERP-dev -> backend 8010
 
 param(
     [switch] $NoReload
@@ -12,14 +9,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot   = git rev-parse --show-toplevel
+$Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+$RepoRoot = $Profile.RepoRoot
 $BackendDir = Join-Path $RepoRoot "backend"
 $StopScript = Join-Path $RepoRoot "scripts\dev\stop-backend.ps1"
 
-# 1) preflight - 좀비 정리
+if (-not (Test-Path $BackendDir)) {
+    throw "백엔드 경로를 찾을 수 없습니다: $BackendDir"
+}
+
+# 1) preflight - clear stale workers for this profile port only.
 & $StopScript
 
-# 2) powershell.exe 래퍼 없이 py 를 직접 띄움
+# 2) Start py directly without a powershell.exe wrapper.
 $uvicornArgs = @(
     "-m",
     "uvicorn",
@@ -27,7 +29,7 @@ $uvicornArgs = @(
     "--host",
     "0.0.0.0",
     "--port",
-    "8011"
+    [string] $Profile.BackendPort
 )
 if (-not $NoReload) {
     $uvicornArgs += "--reload"
@@ -35,22 +37,22 @@ if (-not $NoReload) {
 
 Start-Process -FilePath "py" -ArgumentList $uvicornArgs -WorkingDirectory $BackendDir -WindowStyle Hidden
 
-# 3) /health/live 헬스 체크 (최대 15초)
+# 3) /health/live check, max 15 seconds.
 $ok = $false
+$healthUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"
 for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Milliseconds 500
     try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8011/health/live" `
-            -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+        $resp = Invoke-WebRequest -Uri $healthUrl -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
         if ($resp.StatusCode -eq 200) { $ok = $true; break }
     }
     catch {
-        # 아직 기동 중 — 무시
+        # still starting
     }
 }
 
 if (-not $ok) {
-    throw "[start] uvicorn 이 8011 에서 응답하지 않음 - 좀비/기동실패 점검 필요"
+    throw "[start] uvicorn 이 $($Profile.BackendPort) 에서 응답하지 않음 - 좀비/기동실패 점검 필요"
 }
 
-Write-Host "[start] OK - backend live on http://127.0.0.1:8011"
+Write-Host "[start] OK - $($Profile.Label) backend live on $healthUrl"

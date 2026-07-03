@@ -1,10 +1,22 @@
 # scripts/dev/start-frontend.ps1
-# dev 전용 — 포트 3001, 백엔드 8011
-# 탭 제목("MES 개발")은 frontend/.env.local 의 NEXT_PUBLIC_MES_ENV=dev 로 제어.
-# (한글은 UTF-8 소스에만 두고 셸 환경변수로 전달하지 않음 — CP949 깨짐 방지)
+# Start the Next.js dev server for the current DEXCOWIN MES root.
+# C:\ERP     -> frontend 3001, backend 8011
+# C:\ERP-dev -> frontend 3000, backend 8010
 
-$env:PORT                 = "3001"
-$env:BACKEND_INTERNAL_URL = "http://localhost:8011"
+$ErrorActionPreference = "Stop"
 
-Set-Location "C:\ERP\frontend"
+$Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+$FrontendDir = Join-Path $Profile.RepoRoot "frontend"
+
+if (-not (Test-Path $FrontendDir)) {
+    throw "프론트엔드 경로를 찾을 수 없습니다: $FrontendDir"
+}
+
+$env:PORT = [string] $Profile.FrontendPort
+$env:BACKEND_INTERNAL_URL = $Profile.BackendInternalUrl
+
+Write-Host "[start-frontend] profile=$($Profile.Label) root=$($Profile.RepoRoot)"
+Write-Host "[start-frontend] frontend=http://127.0.0.1:$($Profile.FrontendPort) backend=$($Profile.BackendInternalUrl)"
+
+Set-Location $FrontendDir
 npm run dev

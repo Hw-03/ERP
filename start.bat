@@ -103,14 +103,22 @@ rem main.py 의 Base.metadata.create_all 부작용을 제거했으므로,
 rem 신규 모델/컬럼 추가 시 idempotent 하게 반영하기 위해 schema + migrate 둘 다 실행.
 pushd "%~dp0backend"
 echo [MES] Ensuring DB schema is up to date...
-py bootstrap_db.py --schema --migrate --seed
+py bootstrap_db.py --schema --migrate
 if errorlevel 1 (
-    echo [MES] ERROR: bootstrap_db.py --schema --migrate --seed failed. Aborting.
+    echo [MES] ERROR: bootstrap_db.py --schema --migrate failed. Aborting.
     popd
     pause
     exit /b 1
 )
 popd
+
+rem ====== Resolve dev/employee server profile (ports, URL) ======
+for /f "usebackq tokens=1,2 delims==" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=& '%~dp0scripts\dev\resolve-server-profile.ps1'; 'PROFILE='+$p.Name; 'FRONTEND_PORT='+$p.FrontendPort; 'BACKEND_PORT='+$p.BackendPort; 'BACKEND_URL='+$p.BackendInternalUrl"`) do set "%%A=%%B"
+if not defined FRONTEND_PORT (
+    echo [MES] ERROR: server profile could not be resolved. Aborting.
+    pause
+    exit /b 1
+)
 
 rem ====== Auto-detect current LAN IPv4 (active adapter with default gateway) ======
 powershell -NoProfile -Command "$c = Get-NetIPConfiguration; $t = $c | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -eq 'Up' } | Select-Object -First 1; if ($t) { $t.IPv4Address.IPAddress }" > "%TEMP%\mes_ip.txt" 2>nul
@@ -120,15 +128,27 @@ del "%TEMP%\mes_ip.txt" >nul 2>&1
 if not defined IP set "IP=127.0.0.1"
 
 echo.
+echo [MES] Profile: %PROFILE%
 echo [MES] Detected IP: %IP%
-echo [MES] URL: http://%IP%:3001
+echo [MES] URL: http://%IP%:%FRONTEND_PORT%
+echo [MES] Backend: %BACKEND_URL%
 echo.
 
-rem preflight - 포트 8011/3001 좀비 정리 (워커 고아화 재발 방지)
+rem preflight - stop only this repo profile ports before opening visible CMD windows
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-backend.ps1"
+if errorlevel 1 (
+    echo [MES] ERROR: backend port cleanup failed. Aborting.
+    pause
+    exit /b 1
+)
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-frontend.ps1"
-start "Backend" cmd /k "cd /d "%~dp0backend" && py -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload"
-start "Frontend" cmd /k "cd /d "%~dp0frontend" && set "PORT=3001" && set "BACKEND_INTERNAL_URL=http://localhost:8011" && npm run dev"
+if errorlevel 1 (
+    echo [MES] ERROR: frontend port cleanup failed. Aborting.
+    pause
+    exit /b 1
+)
+start "Backend" cmd /k "cd /d "%~dp0backend" && py -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload"
+start "Frontend" cmd /k "cd /d "%~dp0frontend" && set "PORT=%FRONTEND_PORT%" && set "BACKEND_INTERNAL_URL=%BACKEND_URL%" && npm run dev"
 timeout /t 5 /nobreak >nul
 
 endlocal
