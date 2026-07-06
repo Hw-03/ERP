@@ -266,6 +266,111 @@
   animation: rowFlash 0.5s ease-in-out 3;
 }
 
+/* 입출고 요청 작성 전용 작업 화면 */
+.iwh,
+.ich {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  background: var(--c-s1);
+  padding: 1rem;
+}
+
+.ich {
+  border-radius: 18px;
+  padding: 0.75rem 1rem;
+}
+
+.iwc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.iwcm {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.iwb {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-bg);
+  color: var(--c-blue);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.iwb::before,
+.ict::before {
+  content: "← ";
+}
+
+.iwt,
+.ict {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iwt {
+  color: var(--c-text);
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.iwd {
+  min-width: 160px;
+  color: var(--c-muted2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.ict {
+  border: 0;
+  background: transparent;
+  font-size: 1.25rem;
+  font-weight: 900;
+  text-align: left;
+}
+
+.iwp {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.iwpb {
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-s2) 86%, transparent);
+  color: var(--c-text);
+  padding: 0.5rem 0.65rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.iwpb.a {
+  border-color: var(--c-blue);
+  background: color-mix(in srgb, var(--c-blue) 12%, transparent);
+  color: var(--c-blue);
+}
+
 /* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */
 @media (prefers-reduced-motion: reduce) {
   *,

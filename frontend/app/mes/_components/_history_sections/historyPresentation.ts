@@ -100,13 +100,13 @@ export interface ReferenceBatchLinePresentation {
 }
 
 const SHIPPING_PHASE_OPERATION_LABEL: Record<string, string> = {
-  COMPONENT_CHANGE: "구성품 변경",
+  COMPONENT_CHANGE: "품목 전환",
   PREPARE: "출하 준비 완료",
   PICKUP: "출하 픽업 완료",
 };
 
 const SHIPPING_PHASE_FLOW_LABEL: Record<string, string> = {
-  COMPONENT_CHANGE: "구성품 변경",
+  COMPONENT_CHANGE: "품목 전환",
   PREPARE: "출하 준비",
   PICKUP: "출하",
 };
@@ -137,7 +137,7 @@ export function getReferenceBatchLinePresentation(
     if (log.shipping_phase === "COMPONENT_CHANGE") {
       if (log.transaction_type === "BACKFLUSH") return { label: "소스/추가 차감", tone: "warning" };
       if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") return { label: "변경 반영", tone: "success" };
-      return { label: "구성품 변경", tone: "muted" };
+      return { label: "품목 전환", tone: "muted" };
     }
     if (log.shipping_phase === "PREPARE") {
       if (log.transaction_type === "BACKFLUSH") return { label: "final PA 차감", tone: "warning" };

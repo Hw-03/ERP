@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { tint } from "@/lib/mes/colorUtils";
-import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
+import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item, type ShippingComponentChangeResult } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
@@ -26,6 +26,7 @@ import { useIoUrlSync } from "./useIoUrlSync";
 import { useIoPreselect } from "./useIoPreselect";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { IoComposeViewProps } from "./types";
+import { ItemConversionCompleteView, ItemConversionWorkView } from "./ItemConversionView";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -51,6 +52,14 @@ function findScrollContainer(startEl: HTMLElement): HTMLElement | null {
 
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function ItemConversionHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="ich">
+      <button className="ict" onClick={onBack}>{title}</button>
+    </div>
+  );
 }
 
 function scrollToElement(container: HTMLElement, target: HTMLElement, offset = AUTO_SCROLL_OFFSET) {
@@ -114,6 +123,8 @@ export function IoComposeView({
   const absorbedRestoreRef = useRef<string | null>(null);
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
   const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
+  const [itemConversionView, setItemConversionView] = useState<"compose" | "work" | "complete">("compose");
+  const [itemConversionResult, setItemConversionResult] = useState<ShippingComponentChangeResult | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
   const intentAppliedRef = useRef(false);
@@ -400,6 +411,17 @@ export function IoComposeView({
     state.goTo(2);
   }
 
+  function openItemConversion() {
+    setError(null);
+    setItemConversionView("work");
+  }
+
+  function closeItemConversion() {
+    setItemConversionResult(null);
+    setItemConversionView("compose");
+    state.goTo(1);
+  }
+
   async function handleSaveDraft() {
     if (!employeeId) {
       setError("작업자를 선택하세요.");
@@ -574,10 +596,59 @@ export function IoComposeView({
     : 0;
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
-  const stepState = (n: IoStep): "active" | "complete" | "locked" =>
-    step === n ? "active" : step > n ? "complete" : "locked";
   const accent = isExitWorkType(state.workType) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const stepWrapperClass = (n: IoStep) => `flex flex-col${step > n ? " pt-[9px]" : ""}`;
+  const workTypeInfo = IO_WORK_TYPES.find((row) => row.id === state.workType);
+  const currentWorkTitle = workTypeInfo?.label ?? workTypeLabel(state.workType);
+
+  function stepTitle(stepId: IoStep) {
+    if (stepId === 3) return `${pickerDirectionLabel(state.subType)} 품목 선택`;
+    return stepId === 1
+      ? "작업 유형 선택"
+      : stepId === 2
+        ? "세부 작업과 부서 선택"
+        : stepId === 4
+          ? "품목 확인"
+          : "최종 확인";
+  }
+
+  function stepSummary(stepId: IoStep) {
+    if (stepId === 2) return stepTwoSummary;
+    if (stepId === 3) return `${state.bundles.length}개 묶음 · 라인 ${lineCount}개`;
+    return `반영 ${includedCount}개 · 제외 ${excludedCount}개`;
+  }
+
+  function returnToWorkTypeStep() {
+    restoredDraftRef.current = null;
+    restoredNonceRef.current = null;
+    state.goTo(1);
+  }
+
+  const workChrome = step > 1 ? (
+    <div className="iwc">
+      <div className="iwcm">
+        <button onClick={returnToWorkTypeStep} className="iwb">작업 유형 선택</button>
+        <strong className="iwt">{currentWorkTitle}</strong>
+      </div>
+      <nav className="iwp">
+        {([2, 3, 4, 5] as IoStep[]).map((stepId) => {
+          const active = stepId === step;
+          if (stepId < step) {
+            return (
+              <button key={stepId} onClick={() => state.goTo(stepId)} className="iwpb">
+                {stepTitle(stepId)}
+              </button>
+            );
+          }
+          return (
+            <span key={stepId} className={active ? "iwpb a" : "iwpb"}>
+              {stepTitle(stepId)}
+            </span>
+          );
+        })}
+      </nav>
+    </div>
+  ) : null;
 
   // step 변경 시 직전(step-1) 카드를 viewport top으로 스크롤 → 그 아래 active step 카드가 자연스럽게 노출
   const stepRefs = useRef<Partial<Record<IoStep, HTMLDivElement | null>>>({});
@@ -748,6 +819,49 @@ export function IoComposeView({
     return () => clearTimeout(timer);
   }, [step]);
 
+  if (itemConversionView === "work") {
+    return (
+      <div className="flex flex-col gap-3">
+        <ItemConversionHeader
+          title="품목 전환"
+          onBack={closeItemConversion}
+        />
+        <ItemConversionWorkView
+          items={items}
+          onComplete={(nextResult) => {
+            setItemConversionResult(nextResult);
+            setItemConversionView("complete");
+            void api
+              .getItems({ limit: 2000, search: globalSearch.trim() || undefined })
+              .then(setItems)
+              .catch(() => {});
+            onSubmitSuccess?.();
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (itemConversionView === "complete") {
+    return (
+      <div className="flex flex-col gap-3">
+        <ItemConversionHeader
+          title="품목 전환 완료"
+          onBack={() => setItemConversionView("work")}
+        />
+        <ItemConversionCompleteView
+          result={itemConversionResult}
+          onNew={() => {
+            setItemConversionResult(null);
+            setItemConversionView("work");
+          }}
+          onHistory={() => router.push("?tab=history", { scroll: false })}
+          onWarehouse={closeItemConversion}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {error && (
@@ -763,41 +877,44 @@ export function IoComposeView({
         </div>
       )}
 
+      {step === 1 && (
       <div
         ref={(el) => { stepRefs.current[1] = el; }}
         className={stepWrapperClass(1)}
       >
         <WizardStepCard
           n={1}
-          title="작업 유형 선택"
-          state={stepState(1)}
+          title={stepTitle(1)}
+          state="active"
           summary={workTypeLabel(state.workType)}
-          onChange={() => {
-            // 1단계(새 작업)로 되돌아가면 복원 추적 해제 → 같은 '이어서 작업' 재선택 시 재복원.
-            restoredDraftRef.current = null;
-            restoredNonceRef.current = null;
-            state.goTo(1);
-          }}
+          onChange={returnToWorkTypeStep}
           accent={accent}
-          fill={step === 1}
+          fill
         >
-          <IoWorkTypeStep workType={state.workType} operator={operator} onWorkTypeChange={handleWorkTypeChange} />
+          <IoWorkTypeStep
+            workType={state.workType}
+            operator={operator}
+            onWorkTypeChange={handleWorkTypeChange}
+            onItemConversion={openItemConversion}
+          />
         </WizardStepCard>
       </div>
+      )}
 
-      {step >= 2 && (
+      {step === 2 && (
         <div
           ref={(el) => { stepRefs.current[2] = el; }}
           className={stepWrapperClass(2)}
         >
           <WizardStepCard
               n={2}
-              title="세부 작업과 부서 선택"
-              state={stepState(2)}
+              title={stepTitle(2)}
+              state="active"
               summary={stepTwoSummary}
               onChange={() => state.goTo(2)}
               accent={accent}
-              fill={step === 2}
+              chrome={workChrome}
+              fill
             >
               <div className="flex h-full min-h-0 flex-col">
                 <div className="min-h-0 flex-1">
@@ -834,19 +951,20 @@ export function IoComposeView({
         </div>
       )}
 
-      {step >= 3 && (
+      {step === 3 && (
         <div
           ref={(el) => { stepRefs.current[3] = el; }}
           className={stepWrapperClass(3)}
         >
           <WizardStepCard
             n={3}
-            title={`${pickerDirectionLabel(state.subType)} 품목 선택`}
-            state={stepState(3)}
-            summary={`${state.bundles.length}개 묶음 · 라인 ${lineCount}개`}
+            title={stepTitle(3)}
+            state="active"
+            summary={stepSummary(3)}
             onChange={() => state.goTo(3)}
             accent={accent}
-            fill={step === 3}
+            chrome={workChrome}
+            fill
           >
             <IoTargetPicker
               workType={state.workType}
@@ -864,13 +982,7 @@ export function IoComposeView({
               onAddItem={(item, sourceKind, subTypeOverride) =>
                 addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
               onAdvance={() => {
-                const step4El = stepRefs.current[4];
-                if (!step4El) return;
-                const scrollContainer = findScrollContainer(step4El);
-                if (!scrollContainer) return;
-                requestAnimationFrame(() => {
-                  scrollToElement(scrollContainer, step4El, STEP4_SCROLL_OFFSET);
-                });
+                if (state.bundles.length > 0) state.goTo(4);
               }}
               busy={previewing}
             />
@@ -878,19 +990,20 @@ export function IoComposeView({
         </div>
       )}
 
-      {(step >= 4 || (step === 3 && state.bundles.length > 0)) && (
+      {step === 4 && (
         <div
           ref={(el) => { stepRefs.current[4] = el; }}
           className={stepWrapperClass(4)}
         >
           <WizardStepCard
             n={4}
-            title="품목 확인"
-            state={(step === 3 && state.bundles.length > 0) || step === 4 ? "active" : stepState(4)}
-            summary={`반영 ${includedCount}개 · 제외 ${excludedCount}개`}
+            title={stepTitle(4)}
+            state="active"
+            summary={stepSummary(4)}
             onChange={() => state.goTo(4)}
             accent={accent}
-            fill={step === 4 || (step === 3 && state.bundles.length > 0)}
+            chrome={workChrome}
+            fill
           >
             <IoBundleCart
               bundles={state.bundles}
@@ -941,18 +1054,19 @@ export function IoComposeView({
         </div>
       )}
 
-      {step >= 5 && (
+      {step === 5 && (
         <div
           ref={(el) => { stepRefs.current[5] = el; }}
           className={stepWrapperClass(5)}
         >
           <WizardStepCard
             n={5}
-            title="최종 확인"
-            state={stepState(5)}
+            title={stepTitle(5)}
+            state="active"
             summary="제출 준비 완료"
             accent={accent}
-            fill={step === 5}
+            chrome={workChrome}
+            fill
           >
             <IoConfirmStep
               workType={state.workType}

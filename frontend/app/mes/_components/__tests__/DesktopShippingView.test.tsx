@@ -440,7 +440,7 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
-  async function openHubCard(container: HTMLElement, id: "request" | "prep" | "componentChange" | "history") {
+  async function openHubCard(container: HTMLElement, id: "request" | "prep" | "history") {
     let button: Element | null = null;
     await waitFor(() => {
       button = container.querySelector(`[data-shipping-hub-card="${id}"]`);
@@ -551,24 +551,12 @@ describe("DesktopShippingView", () => {
     expect(container.querySelector('[data-shipping-hub-card="history"]')).toBeTruthy();
   });
 
-  it("shows a component-change hub card without a count badge", async () => {
+  it("does not show item conversion in the shipping hub", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
-    expect(screen.getByText("구성품 변경")).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-testid="shipping-hub-count-componentChange"]')).not.toBeInTheDocument();
-  });
-
-  it("opens component change as an independent PA conversion screen", async () => {
-    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
-
-    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
-    await openHubCard(container, "componentChange");
-
-    expect(await screen.findByTestId("shipping-component-change-work")).toBeInTheDocument();
-    expect(screen.getByTestId("shipping-component-source-search")).toBeInTheDocument();
-    expect(screen.getByTestId("shipping-component-target-search")).toBeInTheDocument();
-    expect(screen.queryByTestId("shipping-component-change-panel")).not.toBeInTheDocument();
   });
   it("keeps a single primary new-request action in the empty request list", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);
@@ -716,33 +704,6 @@ describe("DesktopShippingView", () => {
   });
 
 
-  it("previews and executes an independent PA component change", async () => {
-    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
-
-    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
-    await openHubCard(container, "componentChange");
-
-    const sourceSearch = await screen.findByTestId("shipping-component-source-search");
-    fireEvent.change(sourceSearch, { target: { value: "pa-1" } });
-
-    const targetSearch = await screen.findByTestId("shipping-component-target-search");
-    fireEvent.change(targetSearch, { target: { value: "pa-target" } });
-
-    fireEvent.click(screen.getByTestId("shipping-component-preview-button"));
-
-    await waitFor(() => {
-      expect(api.getIndependentShippingComponentChangePreview).toHaveBeenCalledWith({ source_pa_item_id: "pa-1", target_pa_item_id: "pa-target", quantity: 1 });
-    });
-    expect(await screen.findByTestId("shipping-component-preview")).toHaveTextContent("Cable Set");
-
-    fireEvent.click(screen.getByTestId("shipping-component-execute-button"));
-    fireEvent.click(await screen.findByTestId("shipping-component-confirm-button"));
-
-    await waitFor(() => {
-      expect(api.executeIndependentShippingComponentChange).toHaveBeenCalledWith({ source_pa_item_id: "pa-1", target_pa_item_id: "pa-target", quantity: 1, memo: null });
-    });
-    expect(await screen.findByTestId("shipping-component-change-complete")).toHaveTextContent("구성품 변경 완료");
-  });
   it("opens shipping history details with linked transaction logs", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 

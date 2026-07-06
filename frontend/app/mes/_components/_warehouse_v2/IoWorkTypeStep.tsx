@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, PackageCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
@@ -11,14 +11,15 @@ interface WorkTypeProps {
   workType: IoWorkType;
   operator: OperatorLike | null;
   onWorkTypeChange: (workType: IoWorkType) => void;
+  onItemConversion?: () => void;
 }
 
 /**
  * Step 1 본문 — 큰 작업 유형 카드 5개. WizardStepCard 안에 들어감.
  */
-export function IoWorkTypeStep({ workType, operator, onWorkTypeChange }: WorkTypeProps) {
+export function IoWorkTypeStep({ workType, operator, onWorkTypeChange, onItemConversion }: WorkTypeProps) {
   const visibleWorkTypes = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
-  const n = visibleWorkTypes.length;
+  const n = visibleWorkTypes.length + (onItemConversion ? 1 : 0);
   const cols = n <= 3 ? n : n === 4 ? 2 : 3;
   const rows = Math.ceil(n / cols);
   return (
@@ -60,6 +61,27 @@ export function IoWorkTypeStep({ workType, operator, onWorkTypeChange }: WorkTyp
           </button>
         );
       })}
+      {onItemConversion && (
+        <button
+          type="button"
+          data-testid="warehouse-item-conversion-card"
+          onClick={onItemConversion}
+          className="flex h-full min-h-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+          }}
+        >
+          <div className="flex items-center gap-5">
+            <PackageCheck className="h-10 w-10 shrink-0" style={{ color: LEGACY_COLORS.cyan }} />
+            <span className="text-4xl font-black leading-tight">품목 전환</span>
+          </div>
+          <span className="text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
+            소스 PA 재고를 대상 PA 재고로 전환
+          </span>
+        </button>
+      )}
     </div>
   );
 }

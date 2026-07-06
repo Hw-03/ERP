@@ -55,6 +55,7 @@ export function WizardStepCard({
   summary,
   onChange,
   accent,
+  chrome,
   fill = false,
   children,
 }: {
@@ -64,6 +65,7 @@ export function WizardStepCard({
   summary?: React.ReactNode;
   onChange?: () => void;
   accent?: string;
+  chrome?: React.ReactNode;
   /** active 상태에서 부모 flex 컬럼 안에서 남은 세로 공간을 모두 차지 (기본 false). */
   fill?: boolean;
   children?: React.ReactNode;
@@ -94,17 +96,18 @@ export function WizardStepCard({
           ...animStyle,
         }}
       >
-        <header className="mb-5 flex items-center gap-3">
+        <header className={chrome ? "mb-5 flex items-start gap-3" : "mb-5 flex items-center gap-3"}>
           <span
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-black text-white"
             style={{ background: tone }}
           >
             {n}
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-xl font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>
               {title}
             </div>
+            {chrome}
           </div>
         </header>
         {fill ? (

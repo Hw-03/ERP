@@ -363,7 +363,7 @@ describe("shipping phase history presentation", () => {
       }),
     ]);
 
-    expect(componentChange.operationLabel).toBe("\uAD6C\uC131\uD488 \uBCC0\uACBD");
+    expect(componentChange.operationLabel).toBe("\uD488\uBAA9 \uC804\uD658");
     expect(componentChange.targetTitle).toBe("\uBCC0\uACBD PA");
     expect(componentChange.targetCode).toBe("3-PA-0002");
     expect(componentChange.movement.parts[0]?.label).toContain("\uBCC0\uACBD");
