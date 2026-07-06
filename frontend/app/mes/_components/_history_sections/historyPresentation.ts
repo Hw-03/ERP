@@ -88,6 +88,7 @@ export interface ReferenceBatchPresentation {
   kind: ReferenceBatchKind;
   phase: string | null;
   operationLabel: string;
+  flowLabel: string | null;
   targetTitle: string;
   targetCode: string | null;
   targetMeta: string[];
@@ -117,6 +118,32 @@ const SHIPPING_PHASE_MOVEMENT_VERB: Record<string, string> = {
   PICKUP: "출하",
 };
 
+function isComponentChangePhase(phase: string | null | undefined): boolean {
+  return phase === "COMPONENT_CHANGE";
+}
+
+function isComponentChangeDetailLog(log: TransactionLog): boolean {
+  const notes = log.notes?.trim() ?? "";
+  return notes.includes("품목 전환 추가 차감") || notes.includes("품목 전환 회수 입고");
+}
+
+function getComponentChangeMode(logs: TransactionLog[]): "SPEC" | "BOM" {
+  return logs.some(isComponentChangeDetailLog) || logs.length > 2 ? "BOM" : "SPEC";
+}
+
+function getComponentChangeFlowLabel(logs: TransactionLog[]): string {
+  return getComponentChangeMode(logs) === "BOM" ? "구성 전환" : "사양 전환";
+}
+
+function getComponentChangeLineLabel(log: TransactionLog): ReferenceBatchLinePresentation | null {
+  const notes = log.notes?.trim() ?? "";
+  if (notes.includes("품목 전환 소스")) return { label: "소스 차감", tone: "warning" };
+  if (notes.includes("품목 전환 추가 차감")) return { label: "추가 차감", tone: "warning" };
+  if (notes.includes("품목 전환 회수 입고")) return { label: "회수 입고", tone: "success" };
+  if (notes.includes("품목 전환 대상")) return { label: "대상 입고", tone: "success" };
+  return null;
+}
+
 function getShippingPhase(logs: TransactionLog[]): string | null {
   return logs.find((log) => log.shipping_phase)?.shipping_phase ?? null;
 }
@@ -135,8 +162,10 @@ export function getReferenceBatchLinePresentation(
 ): ReferenceBatchLinePresentation {
   if (kind === "shipment") {
     if (log.shipping_phase === "COMPONENT_CHANGE") {
+      const componentLabel = getComponentChangeLineLabel(log);
+      if (componentLabel) return componentLabel;
       if (log.transaction_type === "BACKFLUSH") return { label: "소스/추가 차감", tone: "warning" };
-      if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") return { label: "변경 반영", tone: "success" };
+      if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") return { label: "대상 입고", tone: "success" };
       return { label: "품목 전환", tone: "muted" };
     }
     if (log.shipping_phase === "PREPARE") {
@@ -182,7 +211,12 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
   const operationLabel = phaseOperationLabel ?? (shipment ? "출하" : outbound ? "출고 구성" : "묶음");
   const titlePrefix = phaseOperationLabel ?? (shipment ? "출하 구성" : outbound ? "출고 구성" : "묶음");
   const homogeneous = logs.length > 0 && logs.every((log) => log.item_id === first.item_id);
-  const movementVerb = phase ? SHIPPING_PHASE_MOVEMENT_VERB[phase] ?? "출하" : shipment ? "출하" : outbound ? "출고" : "하위";
+  const flowLabel = isComponentChangePhase(phase) ? getComponentChangeFlowLabel(logs) : getShippingPhaseFlowLabel(phase);
+  const movementVerb = isComponentChangePhase(phase)
+    ? flowLabel ?? "변경"
+    : phase
+      ? SHIPPING_PHASE_MOVEMENT_VERB[phase] ?? "출하"
+      : shipment ? "출하" : outbound ? "출고" : "하위";
   const movementTone = shipment || outbound ? "danger" : "muted";
   const shipmentTarget = shipment ? getShippingTarget(logs, phase) : null;
 
@@ -190,6 +224,7 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
     kind,
     phase,
     operationLabel,
+    flowLabel,
     targetTitle: shipmentTarget?.title ?? `${titlePrefix} ${logs.length}건`,
     targetCode: shipmentTarget?.code ?? (homogeneous ? first.mes_code : null),
     targetMeta: [],

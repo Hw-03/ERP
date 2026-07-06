@@ -21,8 +21,8 @@ vi.mock("@/lib/api", () => ({
     getDraft: vi.fn(),
     deleteDraft: vi.fn(),
     submit: vi.fn(),
-    getIndependentShippingComponentChangePreview: vi.fn(),
-    executeIndependentShippingComponentChange: vi.fn(),
+    getItemConversionPreview: vi.fn(),
+    executeItemConversion: vi.fn(),
   },
 }));
 
@@ -55,25 +55,36 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
-  it("replaces the work-type card with a dedicated work screen after selecting a work type", async () => {
+  it("keeps one five-step navigation row and removes duplicate active headers", async () => {
     renderCompose();
 
-    expect(screen.getByRole("button", { name: /창고 입출고/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "작업 유형 선택" })).not.toBeInTheDocument();
+    const getWarehouseWorkCard = () =>
+      screen
+        .getAllByRole("button", { name: /창고 입출고/ })
+        .find((button) => button.hasAttribute("aria-pressed"));
 
-    fireEvent.click(screen.getByRole("button", { name: /창고 입출고/ }));
+    expect(getWarehouseWorkCard()).toBeInTheDocument();
+    expect(screen.getByTestId("io-step-nav")).toBeInTheDocument();
+    expect(screen.getAllByTestId("io-step-nav-item")).toHaveLength(5);
+    expect(screen.queryByTestId("wizard-active-step-number")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("wizard-active-step-title")).not.toBeInTheDocument();
+
+    fireEvent.click(getWarehouseWorkCard()!);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "작업 유형 선택" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /작업 유형 선택/ })).toBeInTheDocument();
     });
+    expect(screen.getAllByTestId("io-step-nav-item")).toHaveLength(5);
+    expect(screen.queryByTestId("wizard-active-step-number")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("wizard-active-step-title")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /품목 전환/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "세부 작업과 부서 선택" })).not.toBeInTheDocument();
+    expect(screen.getByText("세부 작업과 부서 선택")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "작업 유형 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: /작업 유형 선택/ }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /창고 입출고/ })).toBeInTheDocument();
+      expect(getWarehouseWorkCard()).toBeInTheDocument();
     });
-    expect(screen.queryAllByRole("button", { name: "작업 유형 선택" })).toHaveLength(0);
+    expect(screen.getAllByTestId("io-step-nav-item")).toHaveLength(5);
   });
 });

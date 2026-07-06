@@ -352,50 +352,17 @@
 }
 
 .iwc {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
+  width: 100%;
 }
 
-.iwcm {
-  display: grid;
-  grid-template-columns: auto minmax(180px, 1fr);
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.iwb {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  border: 1px solid var(--c-border);
-  border-radius: 999px;
-  background: var(--c-bg);
-  color: var(--c-blue);
-  padding: 0.55rem 0.8rem;
-  font-size: 0.8rem;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.iwb::before,
 .ict::before {
   content: "← ";
 }
 
-.iwt,
 .ict {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.iwt {
-  color: var(--c-text);
-  font-size: 1.15rem;
-  font-weight: 900;
-  line-height: 1.25;
 }
 
 .iwd {
@@ -417,25 +384,65 @@
 
 .iwp {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.4rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
 .iwpb {
+  display: flex;
+  min-height: 46px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
   border: 1px solid var(--c-border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--c-s2) 86%, transparent);
   color: var(--c-text);
-  padding: 0.5rem 0.65rem;
+  padding: 0.48rem 0.65rem;
   text-align: center;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, filter 160ms ease;
+}
+
+.iwpb.done {
+  cursor: pointer;
+}
+
+.iwpb.done:hover {
+  border-color: color-mix(in srgb, var(--c-blue) 34%, var(--c-border));
+  filter: brightness(1.06);
+}
+
+.iwpb:disabled {
+  cursor: default;
+}
+
+.iwpl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.78rem;
   font-weight: 900;
+  line-height: 1.15;
+}
+
+.iwps {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-muted2);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.15;
 }
 
 .iwpb.a {
   border-color: var(--c-blue);
   background: color-mix(in srgb, var(--c-blue) 12%, transparent);
   color: var(--c-blue);
+}
+
+.iwpb.a .iwps {
+  color: color-mix(in srgb, var(--c-blue) 72%, var(--c-muted2));
 }
 
 /* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */

@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { tint } from "@/lib/mes/colorUtils";
-import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item, type ShippingComponentChangeResult } from "@/lib/api";
+import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item, type ItemConversionResult } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
@@ -124,7 +124,7 @@ export function IoComposeView({
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
   const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
   const [itemConversionView, setItemConversionView] = useState<"compose" | "work" | "complete">("compose");
-  const [itemConversionResult, setItemConversionResult] = useState<ShippingComponentChangeResult | null>(null);
+  const [itemConversionResult, setItemConversionResult] = useState<ItemConversionResult | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
   const intentAppliedRef = useRef(false);
@@ -624,31 +624,48 @@ export function IoComposeView({
     state.goTo(1);
   }
 
-  const workChrome = step > 1 ? (
+  const workChrome = (
     <div className="iwc">
-      <div className="iwcm">
-        <button onClick={returnToWorkTypeStep} className="iwb">작업 유형 선택</button>
-        <strong className="iwt">{currentWorkTitle}</strong>
-      </div>
-      <nav className="iwp">
-        {([2, 3, 4, 5] as IoStep[]).map((stepId) => {
+      <nav className="iwp" data-testid="io-step-nav">
+        {([1, 2, 3, 4, 5] as IoStep[]).map((stepId) => {
           const active = stepId === step;
+          const done = stepId < step;
+          const summaryText =
+            stepId === 1
+              ? currentWorkTitle
+              : done && stepId > 1
+                ? stepSummary(stepId)
+                : "";
           if (stepId < step) {
             return (
-              <button key={stepId} onClick={() => state.goTo(stepId)} className="iwpb">
-                {stepTitle(stepId)}
+              <button
+                key={stepId}
+                type="button"
+                onClick={stepId === 1 ? returnToWorkTypeStep : () => state.goTo(stepId)}
+                className="iwpb done"
+                data-testid="io-step-nav-item"
+              >
+                <span className="iwpl">{stepTitle(stepId)}</span>
+                {summaryText && <span className="iwps">{summaryText}</span>}
               </button>
             );
           }
           return (
-            <span key={stepId} className={active ? "iwpb a" : "iwpb"}>
-              {stepTitle(stepId)}
-            </span>
+            <button
+              key={stepId}
+              type="button"
+              disabled
+              className={active ? "iwpb a" : "iwpb"}
+              data-testid="io-step-nav-item"
+            >
+              <span className="iwpl">{stepTitle(stepId)}</span>
+              {summaryText && <span className="iwps">{summaryText}</span>}
+            </button>
           );
         })}
       </nav>
     </div>
-  ) : null;
+  );
 
   // step 변경 시 직전(step-1) 카드를 viewport top으로 스크롤 → 그 아래 active step 카드가 자연스럽게 노출
   const stepRefs = useRef<Partial<Record<IoStep, HTMLDivElement | null>>>({});
@@ -889,6 +906,8 @@ export function IoComposeView({
           summary={workTypeLabel(state.workType)}
           onChange={returnToWorkTypeStep}
           accent={accent}
+          chrome={workChrome}
+          chromeOnly
           fill
         >
           <IoWorkTypeStep
@@ -914,6 +933,7 @@ export function IoComposeView({
               onChange={() => state.goTo(2)}
               accent={accent}
               chrome={workChrome}
+              chromeOnly
               fill
             >
               <div className="flex h-full min-h-0 flex-col">
@@ -964,6 +984,7 @@ export function IoComposeView({
             onChange={() => state.goTo(3)}
             accent={accent}
             chrome={workChrome}
+            chromeOnly
             fill
           >
             <IoTargetPicker
@@ -1003,6 +1024,7 @@ export function IoComposeView({
             onChange={() => state.goTo(4)}
             accent={accent}
             chrome={workChrome}
+            chromeOnly
             fill
           >
             <IoBundleCart
@@ -1066,6 +1088,7 @@ export function IoComposeView({
             summary="제출 준비 완료"
             accent={accent}
             chrome={workChrome}
+            chromeOnly
             fill
           >
             <IoConfirmStep

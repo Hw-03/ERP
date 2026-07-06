@@ -364,9 +364,59 @@ describe("shipping phase history presentation", () => {
     ]);
 
     expect(componentChange.operationLabel).toBe("\uD488\uBAA9 \uC804\uD658");
+    expect(componentChange.flowLabel).toBe("\uC0AC\uC591 \uC804\uD658");
     expect(componentChange.targetTitle).toBe("\uBCC0\uACBD PA");
     expect(componentChange.targetCode).toBe("3-PA-0002");
-    expect(componentChange.movement.parts[0]?.label).toContain("\uBCC0\uACBD");
+    expect(componentChange.movement.parts[0]?.label).toContain("\uC0AC\uC591 \uC804\uD658");
+  });
+
+  it("distinguishes BOM item-conversion lines in history batches", () => {
+    const logs = [
+      makeLog({
+        log_id: "source-pa",
+        transaction_type: "BACKFLUSH",
+        reference_no: "ITEM-CONV-1",
+        shipping_phase: "COMPONENT_CHANGE",
+        notes: "\uD488\uBAA9 \uC804\uD658 \uC18C\uC2A4 PA \uC0AC\uC6A9: \uAE30\uC874 PA x 1",
+        item_name: "\uAE30\uC874 PA",
+        mes_code: "3-PA-0001",
+      }),
+      makeLog({
+        log_id: "add-part",
+        transaction_type: "BACKFLUSH",
+        reference_no: "ITEM-CONV-1",
+        shipping_phase: "COMPONENT_CHANGE",
+        notes: "\uD488\uBAA9 \uC804\uD658 \uCD94\uAC00 \uCC28\uAC10: \uCD94\uAC00\uD488 x 1",
+        item_name: "\uCD94\uAC00\uD488",
+        mes_code: "3-PR-0001",
+      }),
+      makeLog({
+        log_id: "recover-part",
+        transaction_type: "RECEIVE",
+        reference_no: "ITEM-CONV-1",
+        shipping_phase: "COMPONENT_CHANGE",
+        notes: "\uD488\uBAA9 \uC804\uD658 \uD68C\uC218 \uC785\uACE0: \uD68C\uC218\uD488 x 1",
+        item_name: "\uD68C\uC218\uD488",
+        mes_code: "3-PR-0002",
+      }),
+      makeLog({
+        log_id: "target-pa",
+        transaction_type: "PRODUCE",
+        reference_no: "ITEM-CONV-1",
+        shipping_phase: "COMPONENT_CHANGE",
+        notes: "\uD488\uBAA9 \uC804\uD658 \uB300\uC0C1 PA \uC785\uACE0: \uBCC0\uACBD PA x 1",
+        item_name: "\uBCC0\uACBD PA",
+        mes_code: "3-PA-0002",
+      }),
+    ];
+    const componentChange = getReferenceBatchPresentation(logs);
+
+    expect(componentChange.flowLabel).toBe("\uAD6C\uC131 \uC804\uD658");
+    expect(componentChange.movement.parts[0]?.label).toContain("\uAD6C\uC131 \uC804\uD658");
+    expect(getReferenceBatchLinePresentation(logs[0], "shipment").label).toBe("\uC18C\uC2A4 \uCC28\uAC10");
+    expect(getReferenceBatchLinePresentation(logs[1], "shipment").label).toBe("\uCD94\uAC00 \uCC28\uAC10");
+    expect(getReferenceBatchLinePresentation(logs[2], "shipment").label).toBe("\uD68C\uC218 \uC785\uACE0");
+    expect(getReferenceBatchLinePresentation(logs[3], "shipment").label).toBe("\uB300\uC0C1 \uC785\uACE0");
   });
 
   it("labels shipping prepare and pickup batches as separate workflow steps", () => {

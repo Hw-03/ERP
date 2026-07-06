@@ -1,5 +1,8 @@
 import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type {
+  ItemConversionPayload,
+  ItemConversionPreview,
+  ItemConversionResult,
   IoBatch,
   IoDraftPayload,
   IoPreviewPayload,
@@ -11,6 +14,24 @@ import type {
 export const ioApi = {
   preview: (payload: IoPreviewPayload) =>
     postJson<IoPreviewResponse>(toApiUrl("/api/io/preview"), payload),
+
+  getItemConversionPreview: (
+    params: Omit<ItemConversionPayload, "memo">,
+    opts?: { signal?: AbortSignal },
+  ) => {
+    const qs = new URLSearchParams();
+    qs.set("source_item_id", params.source_item_id);
+    qs.set("target_item_id", params.target_item_id);
+    qs.set("quantity", String(params.quantity));
+    qs.set("requested_mode", params.requested_mode);
+    return fetcher<ItemConversionPreview>(
+      toApiUrl(`/api/io/item-conversion-preview?${qs.toString()}`),
+      opts?.signal,
+    );
+  },
+
+  executeItemConversion: (payload: ItemConversionPayload) =>
+    postJson<ItemConversionResult>(toApiUrl("/api/io/item-conversion"), payload),
 
   saveDraft: (payload: IoDraftPayload) =>
     putJson<IoBatch>(toApiUrl("/api/io/draft"), payload),

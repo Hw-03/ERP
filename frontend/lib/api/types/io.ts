@@ -1,4 +1,5 @@
 import type { Department } from "./shared";
+import type { ShippingTransactionLog } from "./shipping";
 
 export type IoWorkType = "receive" | "warehouse_io" | "process" | "defect";
 
@@ -119,4 +120,58 @@ export interface IoSubmitResponse {
   requires_approval: boolean;
   stock_request_id: string | null;
   message: string;
+}
+
+export type ItemConversionMode = "SPEC" | "BOM";
+
+export interface ItemConversionLine {
+  item_id: string;
+  item_name: string;
+  mes_code: string | null;
+  process_type_code: string | null;
+  source_quantity: number;
+  target_quantity: number;
+  delta_per_unit: number;
+  total_delta: number;
+  unit: string;
+  department: string | null;
+  current_quantity: number;
+  available_quantity: number;
+  shortage_quantity: number;
+  line_kind: "consume" | "recover" | string | null;
+}
+
+export interface ItemConversionPreview {
+  request_id: string | null;
+  requested_mode: ItemConversionMode;
+  resolved_mode: ItemConversionMode;
+  executable: boolean;
+  blocking_reason: string | null;
+  source_item_id: string;
+  source_item_name: string;
+  source_mes_code: string | null;
+  target_item_id: string;
+  target_item_name: string;
+  target_mes_code: string | null;
+  quantity: number;
+  source_department: string | null;
+  source_current_quantity: number;
+  source_available_quantity: number;
+  source_shortage_quantity: number;
+  lines: ItemConversionLine[];
+}
+
+export interface ItemConversionPayload {
+  source_item_id: string;
+  target_item_id: string;
+  quantity: number;
+  requested_mode: ItemConversionMode;
+  memo?: string | null;
+}
+
+export interface ItemConversionResult extends ItemConversionPreview {
+  reference_no: string;
+  memo: string | null;
+  completed_at: string;
+  transactions: ShippingTransactionLog[];
 }

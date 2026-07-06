@@ -3,9 +3,6 @@ import type {
   ShippingBomLineInput,
   ShippingBomMatchResponse,
   ShippingChecklistUpdatePayload,
-  ShippingComponentChangeExecutePayload,
-  ShippingComponentChangePreview,
-  ShippingComponentChangeResult,
   ShippingPrepareCancelPayload,
   ShippingPrepareCompletePayload,
   ShippingRequest,
@@ -43,39 +40,6 @@ export const shippingApi = {
   clearShippingChecklist: (requestId: string) =>
     postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/checklist/clear`), {}),
 
-  getShippingComponentChangePreview: (
-    requestId: string,
-    params: { source_pa_item_id: string; quantity: number },
-    opts?: { signal?: AbortSignal },
-  ) => {
-    const qs = new URLSearchParams();
-    qs.set("source_pa_item_id", params.source_pa_item_id);
-    qs.set("quantity", String(params.quantity));
-    return fetcher<ShippingComponentChangePreview>(
-      toApiUrl(`/api/shipping/requests/${requestId}/component-change-preview?${qs}`),
-      opts?.signal,
-    );
-  },
-
-  executeShippingComponentChange: (requestId: string, payload: ShippingComponentChangeExecutePayload) =>
-    postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/component-change`), payload),
-
-  getIndependentShippingComponentChangePreview: (
-    params: { source_pa_item_id: string; target_pa_item_id: string; quantity: number },
-    opts?: { signal?: AbortSignal },
-  ) => {
-    const qs = new URLSearchParams();
-    qs.set("source_pa_item_id", params.source_pa_item_id);
-    qs.set("target_pa_item_id", params.target_pa_item_id);
-    qs.set("quantity", String(params.quantity));
-    return fetcher<ShippingComponentChangePreview>(
-      toApiUrl(`/api/shipping/component-change-preview?${qs}`),
-      opts?.signal,
-    );
-  },
-
-  executeIndependentShippingComponentChange: (payload: ShippingComponentChangeExecutePayload) =>
-    postJson<ShippingComponentChangeResult>(toApiUrl("/api/shipping/component-change"), payload),
   prepareShippingComplete: (requestId: string, payload: ShippingPrepareCompletePayload = {}) =>
     postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/prepare-complete`), payload),
 

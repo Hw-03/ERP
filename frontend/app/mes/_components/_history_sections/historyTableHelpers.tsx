@@ -417,7 +417,7 @@ export function BatchHeader({
       label: referencePresentation.operationLabel,
     },
     movement: summary,
-    flow: referencePresentation.kind === "shipment" ? { label: getShippingPhaseFlowLabel(referencePresentation.phase) ?? "출하" } : { ...basePresentation.flow, hint: undefined },
+    flow: referencePresentation.kind === "shipment" ? { label: referencePresentation.flowLabel ?? getShippingPhaseFlowLabel(referencePresentation.phase) ?? "출하" } : { ...basePresentation.flow, hint: undefined },
     stock: null,
     target: {
       ...basePresentation.target,
@@ -562,12 +562,24 @@ function getReferenceBatchLineOrder(
   if (kind !== "shipment") return 0;
   if (log.shipping_phase === "PICKUP") return log.transaction_type === "SHIP" && !/^출하\s+동반\s+품목/.test(log.notes?.trim() ?? "") ? 0 : 1;
   if (log.shipping_phase === "PREPARE") return log.transaction_type === "PRODUCE" ? 0 : log.transaction_type === "BACKFLUSH" ? 1 : 2;
-  if (log.shipping_phase === "COMPONENT_CHANGE") return log.transaction_type === "PRODUCE" ? 0 : log.transaction_type === "RECEIVE" ? 1 : 2;
+  if (log.shipping_phase === "COMPONENT_CHANGE") return getComponentChangeLineOrder(log);
   const line = getReferenceBatchLinePresentation(log, kind);
   if (line.label === "출하 대상") return 0;
   if (line.label === "동반 출하품") return 1;
   if (line.label === "출하 준비") return 2;
   return 3;
+}
+
+function getComponentChangeLineOrder(log: TransactionLog): number {
+  const notes = log.notes?.trim() ?? "";
+  if (notes.includes("품목 전환 소스")) return 0;
+  if (notes.includes("품목 전환 추가 차감")) return 1;
+  if (notes.includes("품목 전환 회수 입고")) return 2;
+  if (notes.includes("품목 전환 대상")) return 3;
+  if (log.transaction_type === "BACKFLUSH") return 1;
+  if (log.transaction_type === "RECEIVE") return 2;
+  if (log.transaction_type === "PRODUCE") return 3;
+  return 4;
 }
 
 /**

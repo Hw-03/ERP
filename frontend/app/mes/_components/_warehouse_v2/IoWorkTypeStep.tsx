@@ -49,7 +49,7 @@ export function IoWorkTypeStep({ workType, operator, onWorkTypeChange, onItemCon
             }}
           >
             <div className="flex items-center gap-5">
-              <Icon className="h-10 w-10 shrink-0" />
+              <Icon className="h-10 w-10 shrink-0" style={{ color: cardAccent }} />
               <span className="text-4xl font-black leading-tight">{row.label}</span>
             </div>
             <span
