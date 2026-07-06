@@ -136,6 +136,11 @@ foreach ($scriptName in $runtimeScripts) {
     Write-Host "[sync] script: $scriptName"
 }
 
+$sourceStartBat = Join-Path $DevRoot "start.bat"
+$targetStartBat = Join-Path $EmpRoot "start.bat"
+Copy-Item $sourceStartBat $targetStartBat -Force
+Write-Host "[sync] script: start.bat"
+
 # ---------------------------------------------------------------
 # 5) 서버 정지
 # ---------------------------------------------------------------

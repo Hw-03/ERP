@@ -21,18 +21,18 @@ function Test-SamePath {
 
 if (Test-SamePath $RepoRoot $DevRoot) {
     $name = "development"
-    $label = "개발"
+    $label = "development"
     $frontendPort = 3001
     $backendPort = 8011
 }
 elseif (Test-SamePath $RepoRoot $EmployeeRoot) {
     $name = "employee"
-    $label = "직원"
+    $label = "employee"
     $frontendPort = 3000
     $backendPort = 8010
 }
 else {
-    throw "알 수 없는 DEXCOWIN MES 실행 루트입니다: $RepoRoot. 허용: $DevRoot 또는 $EmployeeRoot"
+    throw "Unknown DEXCOWIN MES runtime root: $RepoRoot. Allowed: $DevRoot or $EmployeeRoot"
 }
 
 [pscustomobject]@{
