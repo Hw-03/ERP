@@ -96,10 +96,12 @@ export function MobileIoComposeWizard({
   onSubmitSuccess,
   onDirtyChange,
   flushDraftRef,
+  onStepChange,
 }: IoComposeViewProps & {
   // 모바일 전용 — 섹션 탭 이탈 가드(D2)용. 데스크톱 IoComposeView 는 미사용.
   onDirtyChange?: (dirty: boolean) => void;
   flushDraftRef?: MutableRefObject<(() => void) | null>;
+  onStepChange?: (step: IoStep) => void;
 }) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
@@ -462,6 +464,10 @@ export function MobileIoComposeWizard({
   const step = state.step;
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
 
+  useEffect(() => {
+    onStepChange?.(step);
+  }, [onStepChange, step]);
+
   const stepTitle =
     step === 1
       ? "작업 유형 선택"
@@ -487,23 +493,24 @@ export function MobileIoComposeWizard({
         ) : (
           <div className="h-11 w-11 shrink-0" aria-hidden />
         )}
-        <div className="min-w-0 flex-1">
-          <WizardProgress steps={STEP_META} current={step - 1} />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h2
+            className="min-w-0 max-w-[132px] truncate text-sm font-black"
+            style={{ color: LEGACY_COLORS.text }}
+          >
+            {stepTitle}
+          </h2>
+          <WizardProgress
+            steps={STEP_META}
+            current={step - 1}
+            variant="inline"
+            className="flex-1"
+          />
         </div>
       </div>
 
-      {/* 항목 2-3 — 단계 제목을 스크롤 컨테이너 밖(고정)으로. H2 36px가 컨테이너 안에 있으면
-          Step1·2 의 min-h-full 자식과 합쳐져 오버플로우→스크롤이 생긴다. 밖으로 빼면 본문이
-          컨테이너 높이를 그대로 채워 스크롤이 사라진다. Step3~5 는 그대로 스크롤 허용. */}
-      <h2
-        className="shrink-0 px-3 pt-3 pb-2 text-base font-black"
-        style={{ color: LEGACY_COLORS.text }}
-      >
-        {stepTitle}
-      </h2>
-
       {/* 본문: 현재 스텝만 스크롤. 항목 5-4·5-5 — 하단 pb 축소해 sticky 푸터를 네비바에 근접. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-1">
+      <div className="sg min-h-0 flex-1 overflow-y-auto px-3 pb-1">
         {error && (
           <div
             className="mb-3 rounded-[12px] border px-4 py-3 text-sm font-bold"
