@@ -68,12 +68,22 @@ class ShippingComponentChangePreviewRequest(BaseModel):
     source_pa_item_id: uuid.UUID
     target_pa_item_id: Optional[uuid.UUID] = None
     quantity: int = Field(..., gt=0)
+    requested_mode: str = Field("BOM", pattern="^(SPEC|BOM)$")
 
 
 class ShippingComponentChangeExecuteRequest(BaseModel):
     source_pa_item_id: uuid.UUID
     target_pa_item_id: Optional[uuid.UUID] = None
     quantity: int = Field(..., gt=0)
+    memo: Optional[str] = Field(None, max_length=300)
+    requested_mode: str = Field("BOM", pattern="^(SPEC|BOM)$")
+
+
+class ItemConversionExecuteRequest(BaseModel):
+    source_item_id: uuid.UUID
+    target_item_id: uuid.UUID
+    quantity: int = Field(..., gt=0)
+    requested_mode: str = Field("BOM", pattern="^(SPEC|BOM)$")
     memo: Optional[str] = Field(None, max_length=300)
 
 
@@ -91,10 +101,15 @@ class ShippingComponentChangeLineResponse(BaseModel):
     current_quantity: int = 0
     available_quantity: int = 0
     shortage_quantity: int = 0
+    line_kind: Optional[str] = None
 
 
 class ShippingComponentChangePreviewResponse(BaseModel):
     request_id: Optional[uuid.UUID] = None
+    requested_mode: str = "BOM"
+    resolved_mode: str = "BOM"
+    executable: bool = True
+    blocking_reason: Optional[str] = None
     source_item_id: uuid.UUID
     source_item_name: str
     source_mes_code: Optional[str] = None

@@ -37,6 +37,7 @@ COMPONENT_CHANGE_PHASE = "COMPONENT_CHANGE"
 ALLOCATION_RESERVED = "RESERVED"
 ALLOCATION_RELEASED = "RELEASED"
 ALLOCATION_CONSUMED = "CONSUMED"
+ITEM_CONVERSION_ALLOWED_PROCESS_TYPES = {"PA", "AF", "AA"}
 
 
 class ShippingError(ValueError):
@@ -679,9 +680,44 @@ def _bom_qty_map(rows: list[tuple[uuid.UUID, int, str]]) -> dict[uuid.UUID, tupl
     return out
 
 
+def _expanded_leaf_qty_map(
+    db: Session,
+    item_id: uuid.UUID,
+    *,
+    multiplier: int = 1,
+    seen: tuple[uuid.UUID, ...] = (),
+) -> dict[uuid.UUID, tuple[int, str]]:
+    if item_id in seen:
+        item = _get_item(db, item_id)
+        raise ShippingError(f"BOM 순환 참조가 있어 품목 전환을 할 수 없습니다: {item.item_name}")
+    children = _direct_children(db, item_id)
+    if not children:
+        item = _get_item(db, item_id)
+        return {item_id: (int(multiplier), item.unit or "EA")}
+    out: dict[uuid.UUID, tuple[int, str]] = {}
+    for child_id, qty, unit in children:
+        child_children = _direct_children(db, child_id)
+        if not child_children:
+            out[child_id] = (out.get(child_id, (0, unit))[0] + int(qty) * multiplier, unit or "EA")
+            continue
+        nested = _expanded_leaf_qty_map(
+            db,
+            child_id,
+            multiplier=int(qty) * multiplier,
+            seen=seen + (item_id,),
+        )
+        for nested_id, (nested_qty, nested_unit) in nested.items():
+            out[nested_id] = (out.get(nested_id, (0, nested_unit))[0] + nested_qty, nested_unit)
+    return out
+
+
+def _item_has_bom(db: Session, item_id: uuid.UUID) -> bool:
+    return bool(_direct_children(db, item_id))
+
+
 def _component_change_lines(db: Session, source_pa: Item, target_pa: Item, quantity: int) -> list[dict]:
-    source_map = _bom_qty_map(_direct_children(db, source_pa.item_id))
-    target_map = _bom_qty_map(_direct_children(db, target_pa.item_id))
+    source_map = _expanded_leaf_qty_map(db, source_pa.item_id)
+    target_map = _expanded_leaf_qty_map(db, target_pa.item_id)
     item_ids = sorted(set(source_map) | set(target_map), key=lambda item_id: _get_item(db, item_id).item_name)
     lines: list[dict] = []
     for item_id in item_ids:
@@ -709,6 +745,7 @@ def _component_change_lines(db: Session, source_pa: Item, target_pa: Item, quant
                 "current_quantity": current,
                 "available_quantity": available,
                 "shortage_quantity": shortage,
+                "line_kind": "consume" if total_delta > 0 else "recover",
             }
         )
     return lines
@@ -720,21 +757,43 @@ def _component_change_preview_core(
     target_pa_item_id: uuid.UUID,
     quantity: int,
     request_id: uuid.UUID | None = None,
+    requested_mode: str = "BOM",
 ) -> dict:
+    requested_mode = (requested_mode or "BOM").upper()
+    if requested_mode not in {"SPEC", "BOM"}:
+        raise ShippingError("품목 전환 방식은 SPEC 또는 BOM이어야 합니다.")
     if quantity <= 0:
         raise ShippingError("변경 수량은 1 이상이어야 합니다.")
     source_pa = _get_item(db, source_pa_item_id)
     target_pa = _get_item(db, target_pa_item_id)
     if source_pa.item_id == target_pa.item_id:
-        raise ShippingError("소스 PA와 대상 PA는 달라야 합니다.")
-    if source_pa.process_type_code != "PA" or target_pa.process_type_code != "PA":
-        raise ShippingError("소스와 대상은 모두 PA 품목이어야 합니다.")
+        raise ShippingError("소스 품목과 대상 품목은 달라야 합니다.")
+    if source_pa.process_type_code not in ITEM_CONVERSION_ALLOWED_PROCESS_TYPES:
+        raise ShippingError("품목 전환은 PA, AF, AA 품목만 가능합니다.")
+    if target_pa.process_type_code not in ITEM_CONVERSION_ALLOWED_PROCESS_TYPES:
+        raise ShippingError("품목 전환은 PA, AF, AA 품목만 가능합니다.")
+    if source_pa.process_type_code != target_pa.process_type_code:
+        raise ShippingError("소스와 대상은 같은 품목 단계끼리만 전환할 수 있습니다.")
+    if not _item_has_bom(db, source_pa.item_id) or not _item_has_bom(db, target_pa.item_id):
+        raise ShippingError("소스와 대상은 모두 BOM이 등록된 품목이어야 합니다.")
     source_dept, source_current, source_available = _item_location_available_after_shipping_allocations(db, source_pa)
     lines = _component_change_lines(db, source_pa, target_pa, quantity)
-    if not lines:
-        raise ShippingError("변경할 구성품 차이가 없습니다.")
+    resolved_mode = "BOM" if lines else "SPEC"
+    source_shortage = max(quantity - source_available, 0)
+    line_shortages = [line for line in lines if line["shortage_quantity"] > 0]
+    blocking_reason = None
+    if requested_mode == "SPEC" and resolved_mode == "BOM":
+        blocking_reason = "BOM 차이가 있어 사양 전환으로 처리할 수 없습니다. 구성 전환으로 진행하세요."
+    elif source_shortage > 0:
+        blocking_reason = "소스 품목 재고가 부족합니다."
+    elif line_shortages:
+        blocking_reason = "추가 구성품 재고가 부족합니다."
     return {
         "request_id": request_id,
+        "requested_mode": requested_mode,
+        "resolved_mode": resolved_mode,
+        "executable": blocking_reason is None,
+        "blocking_reason": blocking_reason,
         "source_item_id": source_pa.item_id,
         "source_item_name": source_pa.item_name,
         "source_mes_code": source_pa.mes_code,
@@ -745,7 +804,7 @@ def _component_change_preview_core(
         "source_department": source_dept.value,
         "source_current_quantity": source_current,
         "source_available_quantity": source_available,
-        "source_shortage_quantity": max(quantity - source_current, 0),
+        "source_shortage_quantity": source_shortage,
         "lines": lines,
     }
 
@@ -755,12 +814,13 @@ def component_change_preview(
     request_id: uuid.UUID,
     source_pa_item_id: uuid.UUID,
     quantity: int,
+    requested_mode: str = "BOM",
 ) -> dict:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 요청에서만 구성품 변경을 할 수 있습니다.")
     final_pa, _final_pf = _require_final_items(db, req)
-    return _component_change_preview_core(db, source_pa_item_id, final_pa.item_id, quantity, req.request_id)
+    return _component_change_preview_core(db, source_pa_item_id, final_pa.item_id, quantity, req.request_id, requested_mode)
 
 
 def component_change_preview_independent(
@@ -768,8 +828,9 @@ def component_change_preview_independent(
     source_pa_item_id: uuid.UUID,
     target_pa_item_id: uuid.UUID,
     quantity: int,
+    requested_mode: str = "BOM",
 ) -> dict:
-    return _component_change_preview_core(db, source_pa_item_id, target_pa_item_id, quantity)
+    return _component_change_preview_core(db, source_pa_item_id, target_pa_item_id, quantity, requested_mode=requested_mode)
 
 
 def _backflush_component_location(
@@ -832,10 +893,22 @@ def _execute_component_change_core(
     quantity: int,
     memo: str | None = None,
     request_id: uuid.UUID | None = None,
+    requested_mode: str = "BOM",
 ) -> dict:
-    preview = _component_change_preview_core(db, source_pa_item_id, target_pa_item_id, quantity, request_id)
+    preview = _component_change_preview_core(
+        db,
+        source_pa_item_id,
+        target_pa_item_id,
+        quantity,
+        request_id,
+        requested_mode,
+    )
+    if not preview["executable"]:
+        raise ShippingError(preview["blocking_reason"] or "품목 전환을 실행할 수 없습니다.")
+    if preview["resolved_mode"] == "BOM" and not (memo and memo.strip()):
+        raise ShippingError("구성 전환은 메모를 입력해야 합니다.")
     if preview["source_shortage_quantity"] > 0:
-        raise ShippingError("소스 PA 재고가 부족해 구성품 변경을 할 수 없습니다.")
+        raise ShippingError("소스 품목 재고가 부족해 품목 전환을 할 수 없습니다.")
     shortages = [line for line in preview["lines"] if line["shortage_quantity"] > 0]
     if shortages:
         names = ", ".join(f"{line['item_name']} {line['shortage_quantity']}" for line in shortages)
@@ -843,16 +916,22 @@ def _execute_component_change_core(
 
     source_pa = _get_item(db, source_pa_item_id)
     target_pa = _get_item(db, target_pa_item_id)
-    reference_no = f"SHIP-COMP-{(request_id.hex[:8] if request_id else uuid.uuid4().hex[:8])}"
+    reference_no = (
+        f"SHIP-COMP-{request_id.hex[:8]}"
+        if request_id
+        else f"ITEM-CONV-{uuid.uuid4().hex[:8]}"
+    )
     notes_suffix = f" / {memo}" if memo else ""
     logs: list[TransactionLog] = []
+    source_label = source_pa.process_type_code or "품목"
+    target_label = target_pa.process_type_code or "품목"
 
     logs.append(_backflush_component_location(
         db,
         source_pa,
         quantity,
         reference_no,
-        f"구성품 변경 소스 PA 사용: {source_pa.item_name} x {quantity}{notes_suffix}",
+        f"품목 전환 소스 {source_label} 사용: {source_pa.item_name} x {quantity}{notes_suffix}",
         request_id,
     ))
     for line in preview["lines"]:
@@ -864,7 +943,7 @@ def _execute_component_change_core(
                 item,
                 delta,
                 reference_no,
-                f"구성품 변경 추가 차감: {item.item_name} x {delta}{notes_suffix}",
+                f"품목 전환 추가 차감: {item.item_name} x {delta}{notes_suffix}",
                 request_id,
             ))
 
@@ -873,7 +952,7 @@ def _execute_component_change_core(
         target_pa,
         quantity,
         reference_no,
-        f"구성품 변경 대상 PA 입고: {target_pa.item_name} x {quantity}{notes_suffix}",
+        f"품목 전환 대상 {target_label} 입고: {target_pa.item_name} x {quantity}{notes_suffix}",
         request_id,
     ))
     for line in preview["lines"]:
@@ -886,7 +965,7 @@ def _execute_component_change_core(
                 item,
                 recovered,
                 reference_no,
-                f"구성품 변경 회수 입고: {item.item_name} x {recovered}{notes_suffix}",
+                f"품목 전환 회수 입고: {item.item_name} x {recovered}{notes_suffix}",
                 request_id,
                 TransactionTypeEnum.RECEIVE,
             ))
@@ -908,8 +987,9 @@ def execute_component_change_independent(
     target_pa_item_id: uuid.UUID,
     quantity: int,
     memo: str | None = None,
+    requested_mode: str = "BOM",
 ) -> dict:
-    return _execute_component_change_core(db, source_pa_item_id, target_pa_item_id, quantity, memo)
+    return _execute_component_change_core(db, source_pa_item_id, target_pa_item_id, quantity, memo, requested_mode=requested_mode)
 
 
 def execute_component_change(
@@ -917,14 +997,24 @@ def execute_component_change(
     request_id: uuid.UUID,
     source_pa_item_id: uuid.UUID,
     quantity: int,
+    requested_mode: str = "BOM",
+    memo: str | None = None,
 ) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 요청에서만 구성품 변경을 할 수 있습니다.")
     final_pa, _final_pf = _require_final_items(db, req)
-    _execute_component_change_core(db, source_pa_item_id, final_pa.item_id, quantity, request_id=req.request_id)
+    _execute_component_change_core(
+        db,
+        source_pa_item_id,
+        final_pa.item_id,
+        quantity,
+        memo,
+        request_id=req.request_id,
+        requested_mode=requested_mode,
+    )
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "COMPONENT_CHANGED", f"구성품 변경 {quantity} EA")
+    _record_event(db, req, "COMPONENT_CHANGED", f"품목 전환 {quantity} EA")
     db.flush()
     return req
 

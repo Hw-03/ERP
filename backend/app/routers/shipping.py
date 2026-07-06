@@ -189,10 +189,17 @@ def component_change_preview_independent(
     source_pa_item_id: uuid.UUID = Query(...),
     target_pa_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
+    requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
     try:
-        return shipping_svc.component_change_preview_independent(db, source_pa_item_id, target_pa_item_id, quantity)
+        return shipping_svc.component_change_preview_independent(
+            db,
+            source_pa_item_id,
+            target_pa_item_id,
+            quantity,
+            requested_mode,
+        )
     except ShippingError as exc:
         db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
@@ -212,6 +219,7 @@ def component_change_independent(
             payload.target_pa_item_id,
             payload.quantity,
             payload.memo,
+            payload.requested_mode,
         )
         db.commit()
         return ShippingComponentChangeResultResponse(
@@ -296,10 +304,11 @@ def component_change_preview(
     request_id: uuid.UUID,
     source_pa_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
+    requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
     try:
-        return shipping_svc.component_change_preview(db, request_id, source_pa_item_id, quantity)
+        return shipping_svc.component_change_preview(db, request_id, source_pa_item_id, quantity, requested_mode)
     except ShippingError as exc:
         db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
@@ -311,7 +320,15 @@ def component_change(
     payload: ShippingComponentChangeExecuteRequest,
     db: Session = Depends(get_db),
 ):
-    req = _commit_or_422(db, shipping_svc.execute_component_change, request_id, payload.source_pa_item_id, payload.quantity)
+    req = _commit_or_422(
+        db,
+        shipping_svc.execute_component_change,
+        request_id,
+        payload.source_pa_item_id,
+        payload.quantity,
+        payload.requested_mode,
+        payload.memo,
+    )
     return _to_response(db, req)
 
 

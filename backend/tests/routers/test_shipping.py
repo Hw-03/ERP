@@ -69,7 +69,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     component_change = client.post(
         f"/api/shipping/requests/{request_id}/component-change",
-        json={"source_pa_item_id": str(base_pa.item_id), "quantity": 2},
+        json={"source_pa_item_id": str(base_pa.item_id), "quantity": 2, "memo": "출하 구성 전환"},
     )
     assert component_change.status_code == 200, component_change.text
     assert any(log["shipping_phase"] == "COMPONENT_CHANGE" for log in component_change.json()["transactions"])
@@ -181,6 +181,120 @@ def test_component_change_api_runs_without_shipping_request(client, db_session, 
     assert len(done["transactions"]) == 3
     assert {log["shipping_phase"] for log in done["transactions"]} == {"COMPONENT_CHANGE"}
     assert {log["reference_no"] for log in done["transactions"]} == {done["reference_no"]}
+
+
+def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, make_item, make_bom, make_location):
+    source_leaf = make_item(name="Shared leaf", process_type_code="TR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    source_aa = make_item(name="Domestic AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    target_aa = make_item(name="Export AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    source_af = make_item(name="Domestic AF", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    target_af = make_item(name="Export AF", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    make_bom(source_aa.item_id, source_leaf.item_id, Decimal("2"))
+    make_bom(target_aa.item_id, source_leaf.item_id, Decimal("2"))
+    make_bom(source_af.item_id, source_aa.item_id, Decimal("1"))
+    make_bom(target_af.item_id, target_aa.item_id, Decimal("1"))
+    make_location(source_af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("3"))
+    db_session.commit()
+
+    spec_preview = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "source_item_id": str(source_af.item_id),
+            "target_item_id": str(target_af.item_id),
+            "quantity": 2,
+            "requested_mode": "SPEC",
+        },
+    )
+
+    assert spec_preview.status_code == 200, spec_preview.text
+    spec_body = spec_preview.json()
+    assert spec_body["requested_mode"] == "SPEC"
+    assert spec_body["resolved_mode"] == "SPEC"
+    assert spec_body["executable"] is True
+    assert spec_body["lines"] == []
+
+    executed = client.post(
+        "/api/io/item-conversion",
+        json={
+            "source_item_id": str(source_af.item_id),
+            "target_item_id": str(target_af.item_id),
+            "quantity": 2,
+            "requested_mode": "SPEC",
+        },
+    )
+
+    assert executed.status_code == 200, executed.text
+    done = executed.json()
+    assert done["resolved_mode"] == "SPEC"
+    assert done["reference_no"].startswith("ITEM-CONV-")
+    assert len(done["transactions"]) == 2
+
+    added_leaf = make_item(name="Export-only leaf", process_type_code="TR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=6)
+    source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=7)
+    target_pa = make_item(name="Target PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=8)
+    make_bom(source_pa.item_id, source_af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, source_af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, added_leaf.item_id, Decimal("1"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(added_leaf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+
+    bom_preview = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "source_item_id": str(source_pa.item_id),
+            "target_item_id": str(target_pa.item_id),
+            "quantity": 1,
+            "requested_mode": "BOM",
+        },
+    )
+
+    assert bom_preview.status_code == 200, bom_preview.text
+    bom_body = bom_preview.json()
+    assert bom_body["resolved_mode"] == "BOM"
+    assert [line["item_name"] for line in bom_body["lines"]] == ["Export-only leaf"]
+    assert bom_body["lines"][0]["total_delta"] == 1
+
+
+def test_item_conversion_api_blocks_wrong_level_and_spec_with_bom_difference(
+    client, db_session, make_item, make_bom, make_location
+):
+    leaf_a = make_item(name="Leaf A", process_type_code="TR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
+    leaf_b = make_item(name="Leaf B", process_type_code="TR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=2)
+    source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    target_pa = make_item(name="Target PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    source_af = make_item(name="Source AF", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    make_bom(source_pa.item_id, leaf_a.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, leaf_b.item_id, Decimal("1"))
+    make_bom(source_af.item_id, leaf_a.item_id, Decimal("1"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+
+    wrong_level = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "source_item_id": str(source_pa.item_id),
+            "target_item_id": str(source_af.item_id),
+            "quantity": 1,
+            "requested_mode": "BOM",
+        },
+    )
+    assert wrong_level.status_code == 422, wrong_level.text
+
+    spec_with_diff = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "source_item_id": str(source_pa.item_id),
+            "target_item_id": str(target_pa.item_id),
+            "quantity": 1,
+            "requested_mode": "SPEC",
+        },
+    )
+    assert spec_with_diff.status_code == 200, spec_with_diff.text
+    body = spec_with_diff.json()
+    assert body["resolved_mode"] == "BOM"
+    assert body["executable"] is False
+    assert "구성 전환" in body["blocking_reason"]
 
 def test_shipping_mobile_list_is_read_only_shape(client, db_session, make_item, make_bom):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)

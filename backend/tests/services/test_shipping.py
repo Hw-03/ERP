@@ -168,7 +168,13 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     assert added["total_delta"] == 1
     assert added["available_quantity"] == 2
 
-    changed = shipping_svc.execute_component_change(db_session, req.request_id, source_pa.item_id, 1)
+    changed = shipping_svc.execute_component_change(
+        db_session,
+        req.request_id,
+        source_pa.item_id,
+        1,
+        memo="출하 요청 구성 전환",
+    )
     final_pa = changed.final_pa_item
     final_pf = changed.final_pf_item
     assert _location_qty(db_session, source_pa, DepartmentEnum.SHIPPING) == 0
@@ -244,8 +250,15 @@ def test_independent_component_change_rejects_invalid_pairs_and_shortages(
     with pytest.raises(shipping_svc.ShippingError):
         shipping_svc.component_change_preview_independent(db_session, source_pa.item_id, source_pa.item_id, 1)
 
-    with pytest.raises(shipping_svc.ShippingError):
-        shipping_svc.component_change_preview_independent(db_session, source_pa.item_id, same_bom_pa.item_id, 1)
+    same_bom_preview = shipping_svc.component_change_preview_independent(
+        db_session,
+        source_pa.item_id,
+        same_bom_pa.item_id,
+        1,
+        "SPEC",
+    )
+    assert same_bom_preview["resolved_mode"] == "SPEC"
+    assert same_bom_preview["lines"] == []
 
     with pytest.raises(shipping_svc.ShippingError):
         shipping_svc.execute_component_change_independent(db_session, source_pa.item_id, target_pa.item_id, 2)

@@ -19,12 +19,91 @@ from app.schemas import (
     IoSubmitRequest,
     IoSubmitResponse,
 )
+from app.schemas.shipping import (
+    ItemConversionExecuteRequest,
+    ShippingComponentChangePreviewResponse,
+    ShippingComponentChangeResultResponse,
+    ShippingTransactionLogResponse,
+)
 from app._evt import emit as _evt_emit
 from app.services import io as io_svc
+from app.services import shipping as shipping_svc
+from app.services.shipping import ShippingError
 from app.services._tx import commit_only
+from app.models import TransactionLog
 
 
 router = APIRouter()
+
+
+def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
+    return ShippingTransactionLogResponse(
+        log_id=log.log_id,
+        item_id=log.item_id,
+        item_name=log.item.item_name,
+        mes_code=log.item.mes_code,
+        item_process_type_code=log.item.process_type_code,
+        transaction_type=log.transaction_type,
+        quantity_change=int(log.quantity_change),
+        quantity_before=int(log.quantity_before) if log.quantity_before is not None else None,
+        quantity_after=int(log.quantity_after) if log.quantity_after is not None else None,
+        warehouse_qty_before=int(log.warehouse_qty_before) if log.warehouse_qty_before is not None else None,
+        warehouse_qty_after=int(log.warehouse_qty_after) if log.warehouse_qty_after is not None else None,
+        reference_no=log.reference_no,
+        produced_by=log.produced_by,
+        notes=log.notes,
+        shipping_phase=log.shipping_phase,
+        created_at=log.created_at,
+        cancelled=bool(log.cancelled),
+        cancel_reason=log.cancel_reason,
+        cancelled_at=log.cancelled_at,
+        inventory_effect=log.inventory_effect,
+    )
+
+
+@router.get("/item-conversion-preview", response_model=ShippingComponentChangePreviewResponse)
+def item_conversion_preview(
+    source_item_id: uuid.UUID = Query(...),
+    target_item_id: uuid.UUID = Query(...),
+    quantity: int = Query(..., gt=0),
+    requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
+    db: Session = Depends(get_db),
+):
+    try:
+        return shipping_svc.component_change_preview_independent(
+            db,
+            source_item_id,
+            target_item_id,
+            quantity,
+            requested_mode,
+        )
+    except ShippingError as exc:
+        db.rollback()
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
+
+
+@router.post("/item-conversion", response_model=ShippingComponentChangeResultResponse)
+def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session = Depends(get_db)):
+    try:
+        result = shipping_svc.execute_component_change_independent(
+            db,
+            payload.source_item_id,
+            payload.target_item_id,
+            payload.quantity,
+            payload.memo,
+            payload.requested_mode,
+        )
+        db.commit()
+        return ShippingComponentChangeResultResponse(
+            **{key: value for key, value in result.items() if key != "transactions"},
+            transactions=[_tx_log_response(log) for log in result["transactions"]],
+        )
+    except ShippingError as exc:
+        db.rollback()
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
+    except ValueError as exc:
+        db.rollback()
+        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 
 @router.post("/preview", response_model=IoPreviewResponse)

@@ -3707,6 +3707,50 @@
         "title": "IoSubmitResponse",
         "type": "object"
       },
+      "ItemConversionExecuteRequest": {
+        "properties": {
+          "memo": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memo"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "requested_mode": {
+            "default": "BOM",
+            "pattern": "^(SPEC|BOM)$",
+            "title": "Requested Mode",
+            "type": "string"
+          },
+          "source_item_id": {
+            "format": "uuid",
+            "title": "Source Item Id",
+            "type": "string"
+          },
+          "target_item_id": {
+            "format": "uuid",
+            "title": "Target Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_item_id",
+          "target_item_id",
+          "quantity"
+        ],
+        "title": "ItemConversionExecuteRequest",
+        "type": "object"
+      },
       "ItemCreate": {
         "properties": {
           "initial_locations": {
@@ -5994,6 +6038,12 @@
             "title": "Quantity",
             "type": "integer"
           },
+          "requested_mode": {
+            "default": "BOM",
+            "pattern": "^(SPEC|BOM)$",
+            "title": "Requested Mode",
+            "type": "string"
+          },
           "source_pa_item_id": {
             "format": "uuid",
             "title": "Source Pa Item Id",
@@ -6055,6 +6105,17 @@
             "title": "Item Name",
             "type": "string"
           },
+          "line_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Kind"
+          },
           "mes_code": {
             "anyOf": [
               {
@@ -6113,6 +6174,22 @@
       },
       "ShippingComponentChangePreviewResponse": {
         "properties": {
+          "blocking_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocking Reason"
+          },
+          "executable": {
+            "default": true,
+            "title": "Executable",
+            "type": "boolean"
+          },
           "lines": {
             "default": [],
             "items": {
@@ -6136,6 +6213,16 @@
               }
             ],
             "title": "Request Id"
+          },
+          "requested_mode": {
+            "default": "BOM",
+            "title": "Requested Mode",
+            "type": "string"
+          },
+          "resolved_mode": {
+            "default": "BOM",
+            "title": "Resolved Mode",
+            "type": "string"
           },
           "source_available_quantity": {
             "default": 0,
@@ -6216,10 +6303,26 @@
       },
       "ShippingComponentChangeResultResponse": {
         "properties": {
+          "blocking_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocking Reason"
+          },
           "completed_at": {
             "format": "date-time",
             "title": "Completed At",
             "type": "string"
+          },
+          "executable": {
+            "default": true,
+            "title": "Executable",
+            "type": "boolean"
           },
           "lines": {
             "default": [],
@@ -6259,6 +6362,16 @@
               }
             ],
             "title": "Request Id"
+          },
+          "requested_mode": {
+            "default": "BOM",
+            "title": "Requested Mode",
+            "type": "string"
+          },
+          "resolved_mode": {
+            "default": "BOM",
+            "title": "Resolved Mode",
+            "type": "string"
           },
           "source_available_quantity": {
             "default": 0,
@@ -13740,6 +13853,121 @@
         ]
       }
     },
+    "/api/io/item-conversion": {
+      "post": {
+        "operationId": "execute_item_conversion_api_io_item_conversion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemConversionExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingComponentChangeResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute Item Conversion",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/io/item-conversion-preview": {
+      "get": {
+        "operationId": "item_conversion_preview_api_io_item_conversion_preview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Target Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quantity",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "title": "Quantity",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requested_mode",
+            "required": false,
+            "schema": {
+              "default": "BOM",
+              "pattern": "^(SPEC|BOM)$",
+              "title": "Requested Mode",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingComponentChangePreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Item Conversion Preview",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
     "/api/io/preview": {
       "post": {
         "operationId": "preview_io_api_io_preview_post",
@@ -16004,6 +16232,17 @@
               "title": "Quantity",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "requested_mode",
+            "required": false,
+            "schema": {
+              "default": "BOM",
+              "pattern": "^(SPEC|BOM)$",
+              "title": "Requested Mode",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16419,6 +16658,17 @@
               "exclusiveMinimum": 0,
               "title": "Quantity",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requested_mode",
+            "required": false,
+            "schema": {
+              "default": "BOM",
+              "pattern": "^(SPEC|BOM)$",
+              "title": "Requested Mode",
+              "type": "string"
             }
           }
         ],
