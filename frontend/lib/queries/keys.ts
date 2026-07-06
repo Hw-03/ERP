@@ -38,6 +38,11 @@ export const queryKeys = {
     }) => ["items", "list", params ?? {}] as const,
     detail: (itemId: string) => ["items", "detail", itemId] as const,
   },
+  shipping: {
+    all: ["shipping"] as const,
+    requests: (params?: { status?: string }) =>
+      ["shipping", "requests", params ?? {}] as const,
+  },
   transactions: {
     all: ["transactions"] as const,
     list: (params?: object) => ["transactions", "list", params ?? {}] as const,

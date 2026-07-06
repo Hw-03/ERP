@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { PackageSearch } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -7,6 +8,7 @@ import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common/EmptyState";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import { InventoryItemRow } from "./InventoryItemRow";
+import { useChunkedRender } from "../_hooks/useChunkedRender";
 
 const PAGE_SIZE = 100;
 
@@ -39,6 +41,17 @@ export function InventoryItemsTable({
   onResetAllFilters,
   imageManifest,
 }: Props) {
+  // 좌측 사이드바 탭 전환 시 실제 렌더 비용(Long Task) 완화: displayLimit(최대
+  // 100개) 전부를 한 번에 마운트하지 않고 chunk(20개) 단위로 나눠 그린다.
+  // 스크롤이 sentinel 근처에 오면 다음 chunk를 이어 붙인다. 행 하나당 이미지 +
+  // 게이지 + 배지 계산이 있어 50개 단위로도 간헐적 Long Task가 남아 20으로 축소.
+  // useMemo 필수 — .slice()는 매 렌더 새 배열 참조를 만드는데, useChunkedRender는
+  // items 참조가 바뀌면 count를 chunkSize로 리셋한다. 메모 없이 넘기면 스크롤로
+  // count가 늘어나 리렌더될 때마다 새 slice 참조가 리셋을 유발해 chunk가
+  // 영원히 20개에서 멈춘다.
+  const displayedItems = useMemo(() => filteredItems.slice(0, displayLimit), [filteredItems, displayLimit]);
+  const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, 20);
+
   if (error) {
     return <LoadFailureCard message={error} onRetry={onRetry} />;
   }
@@ -117,7 +130,7 @@ export function InventoryItemsTable({
             </tr>
           </thead>
           <tbody>
-            {filteredItems.slice(0, displayLimit).map((item) => (
+            {chunkedItems.map((item) => (
               <InventoryItemRow
                 key={item.item_id}
                 item={item}
@@ -128,6 +141,7 @@ export function InventoryItemsTable({
             ))}
           </tbody>
         </table>
+        {hasMoreChunk && <div ref={sentinelRef as React.RefObject<HTMLDivElement>} aria-hidden className="h-px" />}
       </div>
 
       {filteredItems.length > displayLimit && (

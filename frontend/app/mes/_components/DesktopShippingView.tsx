@@ -18,7 +18,10 @@ import {
   Truck,
   XCircle,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api, type Item, type ShippingBomLineInput, type ShippingBomMatchResponse, type ShippingCompanionLineInput, type ShippingComponentChangePreview, type ShippingComponentChangeResult, type ShippingRequest, type ShippingRequestStatus } from "@/lib/api";
+import { useShippingRequestsQuery } from "@/lib/queries/useShippingQuery";
+import { queryKeys } from "@/lib/queries/keys";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
@@ -172,9 +175,25 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [view, setView] = useState<ViewMode>("hub");
   const [items, setItems] = useState<Item[]>([]);
   const [pfItems, setPfItems] = useState<Item[]>([]);
-  const [requests, setRequests] = useState<ShippingRequest[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const shippingRequestsQuery = useShippingRequestsQuery();
+  const requests = useMemo(() => shippingRequestsQuery.data ?? [], [shippingRequestsQuery.data]);
+  const setRequests = useCallback(
+    (next: ShippingRequest[] | ((prev: ShippingRequest[]) => ShippingRequest[])) => {
+      queryClient.setQueryData<ShippingRequest[]>(queryKeys.shipping.requests(), (prev) =>
+        typeof next === "function" ? (next as (prev: ShippingRequest[]) => ShippingRequest[])(prev ?? []) : next,
+      );
+    },
+    [queryClient],
+  );
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const setError = setMutationError;
+  const error = mutationError ?? (shippingRequestsQuery.error
+    ? shippingRequestsQuery.error instanceof Error
+      ? shippingRequestsQuery.error.message
+      : "?? ???? ???? ?????."
+    : null);
+  const loading = shippingRequestsQuery.isLoading;
   const [itemsLoading, setItemsLoading] = useState(false);
   const [pfItemsLoading, setPfItemsLoading] = useState(false);
   const [pfItemsLoaded, setPfItemsLoaded] = useState(false);
@@ -253,26 +272,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       const rest = prev.filter((row) => row.request_id !== next.request_id);
       return [next, ...rest];
     });
-  }, []);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setPending("load");
-    try {
-      const nextRequests = await api.getShippingRequests();
-      setRequests(nextRequests);
-      setSelectedPrepId((current) => current ?? nextRequests.find((req) => req.status === "PREPARING" || req.status === "PREPARED")?.request_id ?? null);
-      setSelectedHistoryId((current) => current ?? nextRequests.find((req) => req.status === "PICKED_UP")?.request_id ?? null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "출하 데이터를 불러오지 못했습니다.";
-      setError(msg);
-      onStatusChange(msg);
-    } finally {
-      setPending(null);
-      setLoading(false);
-    }
-  }, [onStatusChange]);
+  }, [setRequests]);
 
   const ensureItemsLoaded = useCallback(async (): Promise<Item[] | null> => {
     if (items.length > 0) return items;
@@ -293,7 +293,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       setItemsLoading(false);
       setPending(null);
     }
-  }, [items, itemsLoading, onStatusChange]);
+  }, [items, itemsLoading, onStatusChange, setError]);
 
   const ensurePfItemsLoaded = useCallback(async () => {
     if (pfItemsLoaded || pfItems.length > 0) return true;
@@ -315,9 +315,20 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     }
   }, [pfItems.length, pfItemsLoaded, pfItemsLoading, onStatusChange]);
 
+  // ?? ???? ? ?? flicker ??: ??? ??? useShippingRequestsQuery
+  // ? ???? ?? ?? fetch(+ React Query ??)??. ? effect? ? ???
+  // ??? ? selectedPrepId/selectedHistoryId ???? ????.
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    if (shippingRequestsQuery.isLoading) return;
+    const data = shippingRequestsQuery.data ?? [];
+    setSelectedPrepId((current) => current ?? data.find((req) => req.status === "PREPARING" || req.status === "PREPARED")?.request_id ?? null);
+    setSelectedHistoryId((current) => current ?? data.find((req) => req.status === "PICKED_UP")?.request_id ?? null);
+    if (shippingRequestsQuery.error) {
+      const msg = shippingRequestsQuery.error instanceof Error ? shippingRequestsQuery.error.message : "?? ???? ???? ?????.";
+      onStatusChange(msg);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shippingRequestsQuery.data, shippingRequestsQuery.isLoading, shippingRequestsQuery.error]);
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") return;
     const currentSearch = searchParams.toString();

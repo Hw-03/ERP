@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement, ReactNode } from "react";
 import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingRequest } from "@/lib/api";
 
@@ -167,6 +169,22 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
     transaction_count: 0,
     ...overrides,
   };
+}
+
+function makeClient(overrides?: { gcTime?: number; staleTime?: number }) {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: overrides?.gcTime ?? 0, staleTime: overrides?.staleTime ?? 0 },
+    },
+  });
+}
+
+function render(ui: ReactElement) {
+  const client = makeClient();
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return rtlRender(ui, { wrapper: Wrapper });
 }
 
 beforeEach(() => {
@@ -422,21 +440,30 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
-  function openHubCard(container: HTMLElement, id: "request" | "prep" | "componentChange" | "history") {
-    const button = container.querySelector(`[data-shipping-hub-card="${id}"]`);
-    expect(button).toBeTruthy();
+  async function openHubCard(container: HTMLElement, id: "request" | "prep" | "componentChange" | "history") {
+    let button: Element | null = null;
+    await waitFor(() => {
+      button = container.querySelector(`[data-shipping-hub-card="${id}"]`);
+      expect(button).toBeTruthy();
+    });
     fireEvent.click(button as HTMLElement);
   }
 
-  function openNewRequest(container: HTMLElement) {
-    const button = container.querySelector('[data-primary-action="new-shipping-request"]');
-    expect(button).toBeTruthy();
+  async function openNewRequest(container: HTMLElement) {
+    let button: Element | null = null;
+    await waitFor(() => {
+      button = container.querySelector('[data-primary-action="new-shipping-request"]');
+      expect(button).toBeTruthy();
+    });
     fireEvent.click(button as HTMLElement);
   }
 
-  function openRequestById(container: HTMLElement, requestId: string) {
-    const button = container.querySelector(`[data-shipping-request-id="${requestId}"]`);
-    expect(button).toBeTruthy();
+  async function openRequestById(container: HTMLElement, requestId: string) {
+    let button: Element | null = null;
+    await waitFor(() => {
+      button = container.querySelector(`[data-shipping-request-id="${requestId}"]`);
+      expect(button).toBeTruthy();
+    });
     fireEvent.click(button as HTMLElement);
   }
 
@@ -475,9 +502,9 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
+    await openHubCard(container, "request");
     await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
-    openNewRequest(container);
+    await openNewRequest(container);
 
     expect(await screen.findByTestId("shipping-pf-option-pf-1")).toBeInTheDocument();
     expect(api.getItems).toHaveBeenCalledWith({ process_type_code: "PF", limit: 2000 });
@@ -501,8 +528,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
 
     expect(await screen.findByText("PF 후보를 불러오는 중입니다.")).toBeInTheDocument();
 
@@ -536,7 +563,7 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
-    openHubCard(container, "componentChange");
+    await openHubCard(container, "componentChange");
 
     expect(await screen.findByTestId("shipping-component-change-work")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-component-source-search")).toBeInTheDocument();
@@ -548,7 +575,7 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
+    await openHubCard(container, "request");
 
     await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
     expect(container.querySelectorAll('[data-primary-action="new-shipping-request"]')).toHaveLength(1);
@@ -560,8 +587,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
 
     expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-request-work-shell")).toHaveClass("flex-1");
@@ -573,8 +600,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
 
     const quantityInput = await screen.findByTestId("shipping-request-quantity");
     fireEvent.change(quantityInput, { target: { value: "0" } });
@@ -589,8 +616,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
 
@@ -623,8 +650,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "requested-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "requested-1");
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("shipping-edit-request"));
@@ -635,8 +662,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "requested-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "requested-1");
     fireEvent.click(await screen.findByTestId("shipping-edit-request"));
 
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
@@ -673,7 +700,7 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy());
-    openHubCard(container, "prep");
+    await openHubCard(container, "prep");
     expect(await screen.findByTestId("shipping-prep-list")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: /Standard PF/ })[0]);
 
@@ -693,7 +720,7 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="componentChange"]')).toBeTruthy());
-    openHubCard(container, "componentChange");
+    await openHubCard(container, "componentChange");
 
     const sourceSearch = await screen.findByTestId("shipping-component-source-search");
     fireEvent.change(sourceSearch, { target: { value: "pa-1" } });
@@ -720,7 +747,7 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="history"]')).toBeTruthy());
-    openHubCard(container, "history");
+    await openHubCard(container, "history");
     expect(await screen.findByTestId("shipping-history-list")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Standard PF/ }));
 
@@ -732,11 +759,11 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
+    await openHubCard(container, "request");
     await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
     expect(screen.queryByText(/requested-1/)).not.toBeInTheDocument();
 
-    openRequestById(container, "requested-1");
+    await openRequestById(container, "requested-1");
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
     expect(screen.queryByText(/requested-1/)).not.toBeInTheDocument();
   });
@@ -745,8 +772,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "requested-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "requested-1");
 
     fireEvent.click(await screen.findByTestId("shipping-detail-send-to-prep"));
 
@@ -759,8 +786,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "requested-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "requested-1");
 
     fireEvent.click(await screen.findByTestId("shipping-delete-request"));
     fireEvent.click(await screen.findByTestId("shipping-confirm-action"));
@@ -774,8 +801,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "prepared-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "prepared-1");
 
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-edit-request")).not.toBeInTheDocument();
@@ -784,13 +811,13 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
+    await openHubCard(container, "request");
 
     await waitFor(() => {
       expect(navigationMock.push).toHaveBeenCalledWith(expect.stringContaining("shippingView=requestList"), expect.any(Object));
     });
 
-    openRequestById(container, "requested-1");
+    await openRequestById(container, "requested-1");
 
     await waitFor(() => {
       expect(navigationMock.push).toHaveBeenCalledWith(expect.stringContaining("shippingView=requestDetail"), expect.any(Object));
@@ -811,8 +838,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView operator={operator} onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
@@ -833,8 +860,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
 
     expect(await screen.findByTestId("shipping-work-title")).toBeInTheDocument();
     expect(container.querySelectorAll('[data-testid="shipping-work-title"]')).toHaveLength(1);
@@ -845,7 +872,7 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
+    await openHubCard(container, "request");
 
     expect(await screen.findByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("flex-1");
     expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("flex-1");
@@ -855,7 +882,7 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
+    await openHubCard(container, "request");
 
     const requestedBody = await screen.findByTestId("shipping-request-column-body-REQUESTED");
     const requestedColumn = requestedBody.closest("section");
@@ -884,8 +911,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "req-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "req-1");
 
     const summary = await screen.findByTestId("shipping-request-detail-summary");
     expect(summary).toHaveTextContent("기준 PF");
@@ -898,8 +925,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
 
     const header = await screen.findByTestId("shipping-work-header");
     expect(header).toContainElement(screen.getByTestId("shipping-step-tabs"));
@@ -918,8 +945,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "requested-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "requested-1");
     fireEvent.click(await screen.findByTestId("shipping-edit-request"));
 
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
@@ -949,8 +976,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
 
     expect(await screen.findByText("1. 기준 PF 선택")).toBeInTheDocument();
     expect(screen.getByText("5. 저장 및 전환")).toBeInTheDocument();
@@ -971,8 +998,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} operator={{ name: "김현우", role: "조립" }} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
@@ -991,8 +1018,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
@@ -1016,8 +1043,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
@@ -1040,8 +1067,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openNewRequest(container);
+    await openHubCard(container, "request");
+    await openNewRequest(container);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
@@ -1058,8 +1085,8 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
-    openHubCard(container, "request");
-    openRequestById(container, "requested-1");
+    await openHubCard(container, "request");
+    await openRequestById(container, "requested-1");
     fireEvent.click(await screen.findByTestId("shipping-edit-request"));
 
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
@@ -1073,6 +1100,22 @@ describe("DesktopShippingView", () => {
     expect(table).toHaveTextContent("Cable Set");
     expect(table).toHaveTextContent("Bracket Kit");
     expect(table).toHaveTextContent("R-BR");
+  });
+
+  it("탭 재마운트 시(같은 QueryClient) 캐시 히트로 재요청 없음 — flicker 회귀 방지", async () => {
+    const client = makeClient({ gcTime: 5 * 60_000, staleTime: 5 * 60_000 });
+    function Wrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    }
+    const { container, unmount } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, { wrapper: Wrapper });
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    const callCountAfterFirstMount = vi.mocked(api.getShippingRequests).mock.calls.length;
+
+    unmount();
+
+    const { container: container2 } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, { wrapper: Wrapper });
+    await waitFor(() => expect(container2.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    expect(vi.mocked(api.getShippingRequests).mock.calls.length).toBe(callCountAfterFirstMount);
   });
 
 });
