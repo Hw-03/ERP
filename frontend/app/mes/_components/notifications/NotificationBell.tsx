@@ -300,7 +300,7 @@ export function NotificationBell({
           onToggleLoginPopup={() => void handleToggleLoginPopup()}
         />
       )}
-      {loginDialogOpen && unreadItems.length > 0 && (
+      {false && (
         <LoginNotificationDialog
           items={unreadItems}
           unread={unread}
