@@ -5,8 +5,8 @@ import type { AppNotification } from "@/lib/api/types";
 const state = vi.hoisted(() => ({
   operator: {
     employee_id: "emp-1",
-    name: "김현우",
-    department: "조립",
+    name: "Kim",
+    department: "Assembly",
     level: "staff",
     employee_code: "E1",
     warehouse_role: "none",
@@ -59,8 +59,8 @@ function notification(overrides: Partial<AppNotification> = {}): AppNotification
     notification_id: "n-1",
     recipient_employee_id: "emp-1",
     type: "approval_approved",
-    title: "결재 승인됨",
-    body: "김현우 · 창고 → 부서 · SR-1",
+    title: "Approval done",
+    body: "Kim - warehouse - SR-1",
     target_tab: null,
     target_section: null,
     related_request_id: null,
@@ -70,12 +70,12 @@ function notification(overrides: Partial<AppNotification> = {}): AppNotification
   };
 }
 
-describe("NotificationBell login popup", () => {
+describe("NotificationBell", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
     state.operator.loginPopupEnabled = true;
     state.notifications = {
-      items: [notification(), notification({ notification_id: "n-2", title: "새 인수인계 도착" })],
+      items: [notification(), notification({ notification_id: "n-2", title: "New handover" })],
       unread_count: 2,
     };
     state.markRead.mockClear();
@@ -86,27 +86,19 @@ describe("NotificationBell login popup", () => {
     state.setCurrentOperator.mockClear();
   });
 
-  it("shows a centered login notification dialog only when the login flag is pending", async () => {
+  it("does not show automatic notification dialogs while keeping the notification panel available", async () => {
     window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
 
     render(<NotificationBell />);
 
-    expect(await screen.findByRole("dialog", { name: "로그인 알림" })).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "로그인 알림" }).parentElement).toHaveStyle({
-      position: "fixed",
-      display: "flex",
-      zIndex: "260",
-    });
-    expect(screen.getByRole("button", { name: "모두 읽음" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "알림 보기" })).toBeInTheDocument();
-  });
-
-  it("does not open the login dialog during a restored session", async () => {
-    render(<NotificationBell />);
-
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "로그인 알림" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
     });
+
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(screen.getByText("New handover")).toBeInTheDocument();
   });
 
   it("does not consume the login popup flag from a hidden shell", async () => {
@@ -122,42 +114,17 @@ describe("NotificationBell login popup", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
     expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBe("emp-1");
-
-    render(<NotificationBell />);
-
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
   });
 
-  it("marks all unread notifications from the login dialog", async () => {
-    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
-    render(<NotificationBell />);
-
-    fireEvent.click(await screen.findByRole("button", { name: "모두 읽음" }));
-
-    expect(state.markRead).toHaveBeenCalledWith({ recipient_employee_id: "emp-1" });
-    expect(screen.queryByRole("dialog", { name: "로그인 알림" })).not.toBeInTheDocument();
-  });
-
-  it("opens the notification panel from the login dialog", async () => {
-    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
-    render(<NotificationBell />);
-
-    fireEvent.click(await screen.findByRole("button", { name: "알림 보기" }));
-
-    expect(screen.queryByRole("dialog", { name: "로그인 알림" })).not.toBeInTheDocument();
-    expect(screen.getByText("새 인수인계 도착")).toBeInTheDocument();
-  });
-
-  it("marks an item read and navigates when an item is clicked in the login dialog", async () => {
+  it("marks an item read and navigates when an item is clicked in the notification panel", async () => {
     const onNavigate = vi.fn();
-    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
     state.notifications.items = [notification({ target_tab: "history", target_section: "detail" })];
     state.notifications.unread_count = 1;
 
     render(<NotificationBell onNavigate={onNavigate} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /결재 승인됨/ }));
+    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByText("Approval done"));
 
     expect(state.markRead).toHaveBeenCalledWith({
       recipient_employee_id: "emp-1",

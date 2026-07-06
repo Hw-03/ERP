@@ -332,7 +332,7 @@ export function MobileHistoryScreen() {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
       <div className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-3 px-3 pb-6 pt-3">
+        <div className="mhf flex flex-col gap-3 p-3 pb-6">
           <HistoryStatsBar
             baseline={baselineSummary}
             currentCount={summary?.total ?? null}

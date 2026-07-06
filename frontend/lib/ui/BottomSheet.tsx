@@ -19,6 +19,7 @@ export function BottomSheet({
   onClose,
   title,
   children,
+  maxWidthClassName = "max-w-[430px] md:max-w-[720px]",
   dismissThresholdPx = 96,
   dismissVelocity = 0.5,
   ariaLabel,
@@ -27,6 +28,7 @@ export function BottomSheet({
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  maxWidthClassName?: string;
   /** 이 픽셀 이상 끌어내리면 닫힘 (기본 96) */
   dismissThresholdPx?: number;
   /** 이 속도(px/ms) 이상으로 끌어내리면 닫힘 (기본 0.5) */
@@ -167,7 +169,7 @@ export function BottomSheet({
     >
       <div
         ref={sheetRef}
-        className="w-full max-w-full overflow-y-auto rounded-t-[22px] border-t"
+        className={`w-full ${maxWidthClassName} overflow-y-auto rounded-t-[22px] border-t`}
         style={{
           // 모달 시트는 불투명해야 함 — --c-s1 은 반투명이라 뒤 화면이 비친다.
           // 불투명 --c-bg 위에 s1 표면 틴트를 합성해 불투명 + 표면감 유지.

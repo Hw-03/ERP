@@ -42,14 +42,14 @@ export function MobileHistoryList({
 }) {
   if (loading) {
     return (
-      <div className="px-3 py-2">
+      <div className="py-2">
         <LoadingSkeleton variant="list" rows={8} />
       </div>
     );
   }
   if (filteredLogs.length === 0) {
     return (
-      <div className="px-3 py-10">
+      <div className="py-10">
         <EmptyState variant="no-data" />
       </div>
     );
@@ -58,7 +58,7 @@ export function MobileHistoryList({
   const groups = buildGroups(filteredLogs);
 
   return (
-    <div className="flex flex-col gap-2 px-3 pb-4">
+    <div className="flex flex-col gap-2 pb-4">
       {groups.map((g) => {
         if (g.type === "solo") {
           const log = g.log;

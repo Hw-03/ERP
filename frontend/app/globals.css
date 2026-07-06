@@ -151,6 +151,10 @@
     background-image: var(--c-panel-glow);
   }
 
+  .mhf .card {
+    box-shadow: none;
+  }
+
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
@@ -206,6 +210,46 @@
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+.sg {
+  scrollbar-gutter: stable;
+}
+
+.mw0 {
+  min-width: 0;
+}
+
+.oh {
+  overflow: hidden;
+}
+
+.wt {
+  overflow: hidden;
+  transition:
+    max-height 0.2s ease-out,
+    opacity 0.2s ease-out,
+    transform 0.2s ease-out,
+    margin-top 0.2s ease-out;
+}
+
+.wo {
+  margin-top: 0.5rem;
+  max-height: 76px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.wc {
+  pointer-events: none;
+  margin-top: 0;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-0.25rem);
+}
+
+.ba {
+  word-break: break-all;
 }
 
 /* 카테고리 흐름 화살표 애니메이션 */

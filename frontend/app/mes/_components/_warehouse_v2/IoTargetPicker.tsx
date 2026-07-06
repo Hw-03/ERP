@@ -442,14 +442,14 @@ function ItemTable({
   return (
     <>
       <table className="w-full border-collapse text-sm">
-        {/* 모바일(<sm): 숨긴 3열(품목코드/창고/부서)을 0폭으로 접고 품목명열이 남는 폭 흡수 → 액션이 행 우측 끝.
-            데스크톱(sm:≥640): 원래 5열 비율 복원(회귀 0). */}
+        {/* 모바일(<lg): 숨긴 3열(품목코드/창고/부서)을 0폭으로 접고 품목명열이 남는 폭 흡수 → 액션이 행 우측 끝.
+            데스크톱(lg:≥1024): 원래 5열 비율 복원(회귀 0). */}
         <colgroup>
-          <col className="w-full sm:w-[58%]" />
-          <col className="w-0 sm:w-[14%]" />
-          <col className="w-0 sm:w-[7%]" />
-          <col className="w-0 sm:w-[8%]" />
-          <col className="w-auto sm:w-[13%]" />
+          <col className="w-full lg:w-[58%]" />
+          <col className="w-0 lg:w-[14%]" />
+          <col className="w-0 lg:w-[7%]" />
+          <col className="w-0 lg:w-[8%]" />
+          <col className="w-auto lg:w-[13%]" />
         </colgroup>
         <thead className="sticky top-0 z-10">
           <tr
@@ -466,7 +466,7 @@ function ItemTable({
               품목명
             </th>
             <th
-              className="hidden px-3 py-2 text-center sm:table-cell"
+              className="hidden px-3 py-2 text-center lg:table-cell"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -475,7 +475,7 @@ function ItemTable({
               품목 코드
             </th>
             <th
-              className="hidden whitespace-nowrap px-3 py-2 text-center sm:table-cell"
+              className="hidden whitespace-nowrap px-3 py-2 text-center lg:table-cell"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -484,7 +484,7 @@ function ItemTable({
               창고
             </th>
             <th
-              className="hidden whitespace-nowrap px-3 py-2 text-center sm:table-cell"
+              className="hidden whitespace-nowrap px-3 py-2 text-center lg:table-cell"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -522,16 +522,16 @@ function ItemTable({
                 onClick={rowClickEnabled ? addSingleItem : undefined}
               >
                 <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-                  {/* 모바일(<sm): 사양·괄호·구형/신형까지 보이도록 2줄. 데스크톱(sm:≥640): 기존 한 줄 truncate 보존. */}
+                  {/* 모바일(<lg): 사양·괄호·구형/신형까지 보이도록 2줄. 데스크톱(lg:≥1024): 기존 한 줄 truncate 보존. */}
                   <div
-                    className="line-clamp-2 text-base font-bold leading-tight sm:line-clamp-none sm:truncate sm:leading-normal"
+                    className="line-clamp-2 text-base font-bold leading-tight lg:line-clamp-none lg:truncate lg:leading-normal"
                     style={{ color: LEGACY_COLORS.text }}
                   >
                     {item.item_name}
                   </div>
                 </td>
                 <td
-                  className="hidden px-3 py-2 text-center sm:table-cell"
+                  className="hidden px-3 py-2 text-center lg:table-cell"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -539,7 +539,7 @@ function ItemTable({
                   </span>
                 </td>
                 <td
-                  className="hidden px-3 py-2 text-center text-base font-black tabular-nums sm:table-cell"
+                  className="hidden px-3 py-2 text-center text-base font-black tabular-nums lg:table-cell"
                   style={{
                     color: wQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                     borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -548,7 +548,7 @@ function ItemTable({
                   {formatQty(wQty)}
                 </td>
                 <td
-                  className="hidden px-3 py-2 text-center sm:table-cell"
+                  className="hidden px-3 py-2 text-center lg:table-cell"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   {noDeptStock ? (

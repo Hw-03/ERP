@@ -21,6 +21,31 @@ describe("BottomSheet", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("기본 시트 폭은 모바일/태블릿 프레임 안으로 제한한다", () => {
+    render(
+      <BottomSheet open onClose={() => {}} title="품목 선택">
+        <p>본문</p>
+      </BottomSheet>,
+    );
+
+    const sheet = getSheet();
+
+    expect(sheet).toHaveClass("w-full", "max-w-[430px]", "md:max-w-[720px]");
+  });
+
+  it("호출자가 필요한 경우 시트 최대 폭 클래스를 바꿀 수 있다", () => {
+    render(
+      <BottomSheet open onClose={() => {}} title="품목 선택" maxWidthClassName="max-w-[520px]">
+        <p>본문</p>
+      </BottomSheet>,
+    );
+
+    const sheet = getSheet();
+
+    expect(sheet).toHaveClass("max-w-[520px]");
+    expect(sheet).not.toHaveClass("max-w-[430px]");
+  });
+
   it("open=false 면 아무것도 렌더 안 함", () => {
     render(
       <BottomSheet open={false} onClose={() => {}} title="hidden">

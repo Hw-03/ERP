@@ -74,6 +74,9 @@ export function MobileWarehouseScreen({
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
   // '이어서 하기' 클릭마다 증가 — 같은 draft 재선택에도 복원이 재발동하도록.
   const [restoreNonce, setRestoreNonce] = useState(0);
+  const [composeStep, setComposeStep] = useState(1);
+  const showSectionTabs = !(sectionTab === "compose" && composeStep >= 2);
+  const [sectionTabsMounted, setSectionTabsMounted] = useState(showSectionTabs);
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
   // D2 — compose 작성 중(담은 묶음 있음) 다른 섹션 이탈 가드.
   const [composeDirty, setComposeDirty] = useState(false);
@@ -86,6 +89,15 @@ export function MobileWarehouseScreen({
   useEffect(() => {
     onComposeDirtyChange?.(composeDirty);
   }, [composeDirty, onComposeDirtyChange]);
+
+  useEffect(() => {
+    if (showSectionTabs) {
+      setSectionTabsMounted(true);
+      return;
+    }
+    const timeoutId = setTimeout(() => setSectionTabsMounted(false), 200);
+    return () => clearTimeout(timeoutId);
+  }, [showSectionTabs]);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =
@@ -161,19 +173,26 @@ export function MobileWarehouseScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex flex-col gap-2 px-3 pt-3">
+      <div className="flex flex-col px-3 pt-3">
         <WarehouseHeader loadFailure={loadFailure} />
-        <WarehouseSectionTabs
-          active={sectionTab}
-          onChange={handleSectionChange}
-          showQueue={canSeeQueue}
-          showDeptQueue={canSeeDeptQueue}
-          showHandover={showHandover}
-          cartCount={cartCount}
-          queueCount={warehouseQueueCount}
-          deptQueueCount={deptQueueCount}
-          handoverInboxCount={handoverInboxCount}
-        />
+        {sectionTabsMounted && (
+          <div
+            aria-hidden={!showSectionTabs}
+            className={showSectionTabs ? "wt wo" : "wt wc"}
+          >
+            <WarehouseSectionTabs
+              active={sectionTab}
+              onChange={handleSectionChange}
+              showQueue={canSeeQueue}
+              showDeptQueue={canSeeDeptQueue}
+              showHandover={showHandover}
+              cartCount={cartCount}
+              queueCount={warehouseQueueCount}
+              deptQueueCount={deptQueueCount}
+              handoverInboxCount={handoverInboxCount}
+            />
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -191,6 +210,7 @@ export function MobileWarehouseScreen({
             entryIntent={entryIntent}
             onDirtyChange={setComposeDirty}
             flushDraftRef={flushDraftRef}
+            onStepChange={setComposeStep}
             onStatusChange={(status) => {
               onStatusChange(status);
               setPanelRefreshNonce((n) => n + 1);

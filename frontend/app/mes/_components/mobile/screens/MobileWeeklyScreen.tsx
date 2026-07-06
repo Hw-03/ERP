@@ -8,6 +8,7 @@ import type {
   WeeklyReportResponse,
   WeeklyProductionModelRow,
 } from "@/lib/api/types/weekly";
+import { WeeklyWeekPicker } from "../../_weekly_sections/WeeklyWeekPicker";
 import { WeeklyGroupCards } from "../../_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "../../_weekly_sections/WeeklyDetailTable";
 // 항목 4-13 — 모바일 생산현황을 PC 와 동일한 매트릭스 표로(frozen 컴포넌트 import 만, 수정 금지).
@@ -46,7 +47,7 @@ function Kpi({ label, tone }: { label: string; tone?: string }) {
   );
 }
 
-export function MobileWeeklyScreen({ weekMon }: { weekMon: Date }) {
+export function MobileWeeklyScreen({ weekMon, onWeekChange }: { weekMon: Date; onWeekChange?: (date: Date) => void }) {
   const [data, setData] = useState<WeeklyReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +100,14 @@ export function MobileWeeklyScreen({ weekMon }: { weekMon: Date }) {
       {/* 항목 5-8 — min-w-0 로 flex 자식이 main(414) 폭으로 줄어들게(없으면 콘텐츠 min-content=490 으로 부풀어
           공정별 변화 카드 우측 '현재/±0'가 잘림). 공정 전환과 무관하게 폭 고정. */}
       <div className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+        {onWeekChange && (
+          <div
+            className="sticky top-0 z-20 -mx-3 border-b px-3 py-2"
+            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
+          >
+            <WeeklyWeekPicker weekMon={weekMon} onChange={onWeekChange} />
+          </div>
+        )}
         <AsyncState
           loading={loading && !data}
           error={error}
