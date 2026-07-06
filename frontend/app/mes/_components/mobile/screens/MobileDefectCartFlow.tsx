@@ -302,44 +302,28 @@ export function MobileDefectCartFlow({
     );
   }
 
+  const stepTotal = isRework ? 3 : 2;
   const header = (
     <div className="flex items-center gap-2">
       <IconButton icon={ArrowLeft} label={step === 1 && !(isDirect && directAction !== null) ? "취소" : "이전"} size="md" onClick={goBack} />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <h2 className={clsx(TYPO.headline, "font-black")} style={{ color: LEGACY_COLORS.text }}>
-            {title}
-          </h2>
-          {step >= 2 && (
-            <span
-              className={clsx(TYPO.caption, "rounded-full border px-2 py-0.5 font-bold")}
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-            >
-              {lockedMetaLabel} · {lockedMetaValue}
-            </span>
-          )}
-        </div>
-        <div className={clsx(TYPO.caption, "flex flex-wrap items-center gap-1.5 font-bold")}>
-          {isDirect && (
-            <>
-              <span style={{ color: LEGACY_COLORS.muted2 }}>① 작업 선택</span>
-              <span style={{ color: LEGACY_COLORS.muted }}>→</span>
-            </>
-          )}
-          <span style={{ color: step === 1 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
-            {isDirect ? "②" : "①"} 출처·부서
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <h2 className={clsx(TYPO.title, "min-w-0 truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+          {title}
+        </h2>
+        {step >= 2 && (
+          <span
+            className={clsx(TYPO.caption, "hidden min-w-0 truncate rounded-full border px-2 py-0.5 font-bold min-[390px]:inline")}
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+          >
+            {lockedMetaLabel} · {lockedMetaValue}
           </span>
-          <span style={{ color: LEGACY_COLORS.muted }}>→</span>
-          <span style={{ color: step === 2 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
-            {isDirect ? "③" : "②"} 품목 선택
-          </span>
-          {isRework && (
-            <>
-              <span style={{ color: LEGACY_COLORS.muted }}>→</span>
-              <span style={{ color: step === 3 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>④ BOM 확인</span>
-            </>
-          )}
-        </div>
+        )}
+        <span
+          className={clsx(TYPO.caption, "ml-auto shrink-0 font-bold uppercase tracking-[1px]")}
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          STEP {step} / {stepTotal}
+        </span>
       </div>
     </div>
   );

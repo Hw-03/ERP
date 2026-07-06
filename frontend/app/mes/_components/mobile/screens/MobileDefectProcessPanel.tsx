@@ -144,15 +144,18 @@ export function MobileDefectProcessPanel({
   if (step === 2) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex shrink-0 items-center gap-2 pb-3">
+        <div className="flex shrink-0 items-center gap-2 pb-2">
           <IconButton icon={ArrowLeft} label="이전" size="md" onClick={() => setStep(1)} />
-          <div className="min-w-0">
-            <h2 className={clsx(TYPO.headline, "font-black")} style={{ color: LEGACY_COLORS.text }}>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <h2 className={clsx(TYPO.title, "min-w-0 truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
               불량 처리
             </h2>
-            <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-              ① 처리 선택 → <span style={{ color: LEGACY_COLORS.yellow }}>② BOM 확인</span>
-            </div>
+            <span
+              className={clsx(TYPO.caption, "ml-auto shrink-0 font-bold uppercase tracking-[1px]")}
+              style={{ color: LEGACY_COLORS.muted2 }}
+            >
+              STEP 2 / 2
+            </span>
           </div>
         </div>
 
