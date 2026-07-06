@@ -101,7 +101,7 @@ export function HistoryTable({
 
   const batchKeys = useMemo(
     () => groups.flatMap((g) =>
-      g.type === "batch" ? [g.refNo] : g.type === "op_batch" ? [g.batchId] : []
+      g.type === "batch" ? [g.refKey] : g.type === "op_batch" ? [g.batchId] : []
     ),
     [groups],
   );
@@ -344,22 +344,23 @@ export function HistoryTable({
 
                 // type === "batch" (reference_no 기준 레거시 그룹)
                 // 재작업(defect-disassemble) 배치 → 트리 뷰
+                const groupKey = group.refKey;
                 if (group.refNo.startsWith("defect-disassemble:")) {
-                  const expanded = expandedGroups.has(group.refNo);
+                  const expanded = expandedGroups.has(groupKey);
                   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
                   const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
                   const isSelected = selectedLogId === group.logs[0]?.log_id;
                   return (
-                    <Fragment key={`ref-${group.refNo}`}>
+                    <Fragment key={`ref-${groupKey}`}>
                       <ReworkBatchHeader
                         group={group}
                         expanded={expanded}
-                        onToggle={() => toggleGroup(group.refNo)}
+                        onToggle={() => toggleGroup(groupKey)}
                         selected={isSelected}
                         onSelect={() => {
                           onSelectLog(group.logs[0]);
-                          if (isSelected && expanded) collapseGroup(group.refNo);
-                          else expandGroup(group.refNo);
+                          if (isSelected && expanded) collapseGroup(groupKey);
+                          else expandGroup(groupKey);
                         }}
                         compact={compact}
                       />
@@ -376,19 +377,19 @@ export function HistoryTable({
                 }
 
                 // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
-                const expanded = expandedGroups.has(group.refNo);
+                const expanded = expandedGroups.has(groupKey);
                 const isSelected = selectedLogId === group.logs[0]?.log_id;
                 return (
-                  <Fragment key={`ref-${group.refNo}`}>
+                  <Fragment key={`ref-${groupKey}`}>
                     <BatchHeader
                       group={group}
                       expanded={expanded}
-                      onToggle={() => toggleGroup(group.refNo)}
+                      onToggle={() => toggleGroup(groupKey)}
                       selected={isSelected}
                       onSelect={() => {
                         onSelectLog(group.logs[0]);
-                        if (isSelected && expanded) collapseGroup(group.refNo);
-                        else expandGroup(group.refNo);
+                        if (isSelected && expanded) collapseGroup(groupKey);
+                        else expandGroup(groupKey);
                       }}
                       compact={compact}
                     />

@@ -258,7 +258,7 @@ export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPre
 }
 export type LogGroup =
   | { type: "solo"; log: TransactionLog }
-  | { type: "batch"; refNo: string; logs: TransactionLog[] }
+  | { type: "batch"; refKey: string; refNo: string; logs: TransactionLog[] }
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] };
 
 function referenceGroupKey(log: TransactionLog): string {
@@ -309,7 +309,7 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
       if (refLogs.length === 1) {
         groups.push({ type: "solo", log: refLogs[0] });
       } else {
-        groups.push({ type: "batch", refNo: log.reference_no, logs: refLogs });
+        groups.push({ type: "batch", refKey: key, refNo: log.reference_no, logs: refLogs });
       }
     } else {
       groups.push({ type: "solo", log });

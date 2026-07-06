@@ -172,6 +172,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const router = useRouter();
   const searchParams = useSearchParams();
   const lastUrlSearchRef = useRef(searchParams.toString());
+  const pendingUrlSearchRef = useRef<string | null>(null);
   const [view, setView] = useState<ViewMode>("hub");
   const [items, setItems] = useState<Item[]>([]);
   const [pfItems, setPfItems] = useState<Item[]>([]);
@@ -262,8 +263,10 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   }
 
   function navigateView(nextView: ViewMode, requestId?: string | null) {
+    const url = buildShippingUrl(nextView, requestId);
+    pendingUrlSearchRef.current = url.startsWith("?") ? url.slice(1) : url;
     setView(nextView);
-    router.push(buildShippingUrl(nextView, requestId), { scroll: false });
+    router.push(url, { scroll: false });
   }
 
   const upsertRequest = useCallback((next: ShippingRequest) => {
@@ -331,6 +334,13 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") return;
     const currentSearch = searchParams.toString();
+    if (pendingUrlSearchRef.current) {
+      if (currentSearch === pendingUrlSearchRef.current) {
+        pendingUrlSearchRef.current = null;
+      } else {
+        return;
+      }
+    }
     const hasSubview = searchParams.has("shippingView");
     if (!hasSubview && lastUrlSearchRef.current === currentSearch && view !== "hub") return;
     lastUrlSearchRef.current = currentSearch;

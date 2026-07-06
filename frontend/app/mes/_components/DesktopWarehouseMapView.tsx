@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -20,6 +21,8 @@ import { buildCellIndex, cellColor, cellKey, rowLabel } from "./_warehouse_map_s
 import { FloorStage, FrontStage, RowStage } from "./_warehouse_map_sections/WarehouseStages";
 import { WarehouseJariPanel } from "./_warehouse_map_sections/WarehouseJariPanel";
 import { AddBoxScreen } from "./_warehouse_map_sections/AddBoxScreen";
+import { queryKeys } from "@/lib/queries/keys";
+import { useWarehouseMapQuery } from "@/lib/queries/useWarehouseMapQuery";
 import styles from "./_warehouse_map_sections/warehouseMap.module.css";
 
 type Stage = "floor" | "front" | "row";
@@ -47,11 +50,19 @@ export function DesktopWarehouseMapView({
   fullscreen?: boolean;
   onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
-  const [map, setMap] = useState<WarehouseMap | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const mapQuery = useWarehouseMapQuery();
+  const [map, setMap] = useState<WarehouseMap | null>(() => mapQuery.data ?? null);
+  const loading = mapQuery.isLoading && !map;
+  const error = mapQuery.error
+    ? mapQuery.error instanceof Error
+      ? mapQuery.error.message
+      : "창고 지도를 불러오지 못했습니다."
+    : null;
 
   const [stage, setStage] = useState<Stage>("floor");
+  const [stageAnimationSeq, setStageAnimationSeq] = useState(0);
+  const stageRef = useRef<Stage>("floor");
   const [curAngle, setCurAngle] = useState<WarehouseAngle | null>(null);
   const [curRow, setCurRow] = useState(1);
   const [panel, setPanel] = useState<PanelCell | null>(null);
@@ -75,38 +86,29 @@ export function DesktopWarehouseMapView({
   // history drill depth — 드릴다운을 browser history에 쌓아 브라우저 뒤로가기 지원 (DesktopHistoryView 선례)
   const wmDepthRef = useRef(0);
 
-  // ── Load map ──
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const data = await warehouseMapApi.getMap();
-        if (!cancelled) {
-          setMap(data);
-          setError(null);
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "창고 지도를 불러오지 못했습니다.";
-        if (!cancelled) {
-          setError(msg);
-          onStatusChange?.(msg);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [onStatusChange]);
+    if (mapQuery.data) setMap(mapQuery.data);
+  }, [mapQuery.data]);
+
+  useEffect(() => {
+    if (error) onStatusChange?.(error);
+  }, [error, onStatusChange]);
 
   const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
   const angles = map?.angles ?? [];
 
+  function setAnimatedStage(next: Stage) {
+    if (stageRef.current !== next) {
+      stageRef.current = next;
+      setStageAnimationSeq((n) => n + 1);
+    }
+    setStage(next);
+  }
+
   // 박스 생성/수정/삭제는 서버가 box_id·재배치를 돌려주므로 낙관적 대신 reload(정확성 우선).
   async function reloadMap() {
     const data = await warehouseMapApi.getMap();
+    queryClient.setQueryData(queryKeys.warehouseMap.map(), data);
     setMap(data);
     return data;
   }
@@ -349,15 +351,15 @@ export function DesktopWarehouseMapView({
       wmDepthRef.current = s?.wmDepth ?? 0;
       const wm = s?.wm;
       if (!wm) {
-        setStage("floor"); setCurAngle(null); setPanel(null);
+        setAnimatedStage("floor"); setCurAngle(null); setPanel(null);
       } else if (wm.stage === "front") {
         const angle = map?.angles.find((a) => a.id === wm.angleId) ?? null;
-        if (angle) { setCurAngle(angle); setStage("front"); }
-        else { setStage("floor"); setCurAngle(null); }
+        if (angle) { setCurAngle(angle); setAnimatedStage("front"); }
+        else { setAnimatedStage("floor"); setCurAngle(null); }
         setPanel(null);
       } else if (wm.stage === "row" && wm.row != null) {
         const angle = map?.angles.find((a) => a.id === wm.angleId) ?? null;
-        if (angle) { setCurAngle(angle); setCurRow(wm.row); setStage("row"); }
+        if (angle) { setCurAngle(angle); setCurRow(wm.row); setAnimatedStage("row"); }
         setPanel(null);
       }
     };
@@ -373,7 +375,7 @@ export function DesktopWarehouseMapView({
       setPanel({ angle: a, row: 1, layer: 1 });
       return;
     }
-    setStage("front");
+    setAnimatedStage("front");
     setPanel(null);
     wmDepthRef.current += 1;
     window.history.pushState({ wm: { stage: "front", angleId: a.id }, wmDepth: wmDepthRef.current }, "");
@@ -382,7 +384,7 @@ export function DesktopWarehouseMapView({
     setZonePanel(null);
     if (!curAngle) return;
     setCurRow(row);
-    setStage("row");
+    setAnimatedStage("row");
     setPanel({ angle: curAngle, row, layer });
     wmDepthRef.current += 1;
     window.history.pushState({ wm: { stage: "row", angleId: curAngle.id, row }, wmDepth: wmDepthRef.current }, "");
@@ -518,7 +520,7 @@ export function DesktopWarehouseMapView({
     }
     setCurAngle(a);
     setCurRow(hit.row);
-    setStage("row");
+    setAnimatedStage("row");
     setPanel({ angle: a, row: hit.row, layer: hit.layer });
     setPulse({ layer: hit.layer });
     window.setTimeout(() => setPulse(null), 1600);
@@ -867,7 +869,11 @@ export function DesktopWarehouseMapView({
               {error}
             </div>
           ) : (
-            <div key={stage} className={styles.stageEnter} style={{ flex: 1, minWidth: 0, display: "flex", minHeight: 0 }}>
+            <div
+              key={stage}
+              className={stageAnimationSeq > 0 ? styles.stageEnter : undefined}
+              style={{ flex: 1, minWidth: 0, display: "flex", minHeight: 0 }}
+            >
               {stage === "floor" && (
                 <FloorStage
                   angles={angles}

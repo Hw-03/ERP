@@ -493,6 +493,16 @@ describe("DesktopShippingView", () => {
     expect(api.getItems).not.toHaveBeenCalled();
     expect(api.getShippingHistory).not.toHaveBeenCalled();
   });
+
+  it("keeps the shipping hub mounted while the first request fetch is pending", () => {
+    vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
+
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(screen.queryByText("출하 데이터를 불러오는 중입니다.")).not.toBeInTheDocument();
+    expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy();
+  });
+
   it("loads PF candidates separately and delays the full item list until PF selection", async () => {
     vi.mocked(api.getItems).mockImplementation(async (params?: any) => {
       if (params?.process_type_code === "PF") return [items[0]];

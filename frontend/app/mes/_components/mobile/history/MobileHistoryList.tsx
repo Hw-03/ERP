@@ -116,7 +116,7 @@ export function MobileHistoryList({
         // batch | op_batch — 묶음 카드
         const logs = g.logs;
         const first = logs[0];
-        const key = g.type === "op_batch" ? g.batchId : g.refNo;
+        const key = g.type === "op_batch" ? g.batchId : g.refKey;
         const active = selectedKey === `batch:${key}`;
         const tcolor = transactionColor(first.transaction_type);
         return (

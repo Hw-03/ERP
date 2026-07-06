@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
+import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
 import { DESKTOP_TAB_ICON_COLORS, DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
@@ -22,6 +24,8 @@ import {
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
 import type { Item, ProductionCapacity } from "@/lib/api";
+import { warehouseMapApi } from "@/lib/api/warehouse-map";
+import { queryKeys } from "@/lib/queries/keys";
 import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
@@ -34,6 +38,24 @@ import {
 
 const VALID_TABS = new Set<DesktopTabId>(SIDEBAR_TAB_IDS);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
+const MS_PER_DAY = 86400000;
+
+type DesktopTabNavigation = "push" | "replace" | "none";
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => {
+    finished: Promise<void>;
+    ready: Promise<void>;
+    updateCallbackDone: Promise<void>;
+  };
+};
+
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function shouldReduceMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
 
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   dashboard: { title: "대시보드", icon: Boxes },
@@ -57,6 +79,7 @@ export function DesktopMesShell() {
 function DesktopMesShellInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const confirmAdminNavigation = useConfirmNavigation();
   const operator = useCurrentOperator();
   const visibleTabs = useMemo(
@@ -80,6 +103,7 @@ function DesktopMesShellInner() {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [warehouseMapFullscreen, setWarehouseMapFullscreen] = useState(false);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
 
   const handleStatusChange = useCallback((msg: string) => {
     if (autoRevertTimerRef.current) clearTimeout(autoRevertTimerRef.current);
@@ -95,15 +119,49 @@ function DesktopMesShellInner() {
     }
   }, []);
 
+  const commitDesktopTab = useCallback((
+    tab: DesktopTabId,
+    options?: {
+      navigation?: DesktopTabNavigation;
+      url?: string;
+      closeWarehouseMapFullscreen?: boolean;
+    },
+  ) => {
+    const navigation = options?.navigation ?? "push";
+    const url = options?.url ?? `?tab=${tab}`;
+    const closeWarehouseMapFullscreen = options?.closeWarehouseMapFullscreen ?? true;
+    const updateTabState = () => {
+      if (closeWarehouseMapFullscreen) setWarehouseMapFullscreen(false);
+      setActiveTab(tab);
+    };
+
+    if (navigation !== "none") pendingUrlTabRef.current = tab;
+
+    const transitionDocument = document as ViewTransitionDocument;
+    if (
+      activeTab !== tab &&
+      !shouldReduceMotion() &&
+      typeof transitionDocument.startViewTransition === "function"
+    ) {
+      transitionDocument.startViewTransition(() => {
+        flushSync(updateTabState);
+      });
+    } else {
+      updateTabState();
+    }
+
+    if (navigation === "push") router.push(url, { scroll: false });
+    if (navigation === "replace") router.replace(url, { scroll: false });
+  }, [activeTab, router]);
+
   function handleTabChange(tab: DesktopTabId) {
-    if (warehouseMapFullscreen) {
-      setWarehouseMapFullscreen(false);
-      if (tab === activeTab) return;
+    if (warehouseMapFullscreen && tab === activeTab) {
+      commitDesktopTab(tab, { navigation: "none" });
+      return;
     }
     if (!canOpenTab(tab)) {
       if (fallbackTab !== activeTab) {
-        setActiveTab(fallbackTab);
-        router.push(`?tab=${fallbackTab}`, { scroll: false });
+        commitDesktopTab(fallbackTab);
       }
       return;
     }
@@ -127,9 +185,7 @@ function DesktopMesShellInner() {
     // 가드. 없으면 즉시 이동. confirmAdminNavigation 은 useConfirmNavigation 의
     // 결과로, 등록된 모든 dirty entry 를 자동 집계한다.
     const doSwitch = () => {
-      setWarehouseMapFullscreen(false);
-      setActiveTab(tab);
-      router.push(`?tab=${tab}`, { scroll: false });
+      commitDesktopTab(tab);
     };
     confirmAdminNavigation(doSwitch);
   }
@@ -139,15 +195,14 @@ function DesktopMesShellInner() {
     if (!VALID_TABS.has(tab as DesktopTabId) || !canOpenTab(tab as DesktopTabId)) return;
     const target = tab as DesktopTabId;
     confirmAdminNavigation(() => {
-      router.push(
-        section ? `?tab=${target}&section=${section}` : `?tab=${target}`,
-        { scroll: false },
-      );
+      const url = section ? `?tab=${target}&section=${section}` : `?tab=${target}`;
       if (target === activeTab) {
         // 같은 탭이면 리마운트를 강제해 섹션 초기화 로직(?section=)이 다시 실행되게 한다.
+        pendingUrlTabRef.current = target;
+        router.push(url, { scroll: false });
         setRefreshNonce((n) => n + 1);
       } else {
-        setActiveTab(target);
+        commitDesktopTab(target, { url });
       }
     });
   }
@@ -159,18 +214,29 @@ function DesktopMesShellInner() {
     const t = searchParams.get("tab") as DesktopTabId | null;
     const dept = searchParams.get("defect_dept");
     const targetFromUrl = t && VALID_TABS.has(t) ? t : !t && dept ? "defect" : null;
+    const pendingUrlTab = pendingUrlTabRef.current;
+
+    if (pendingUrlTab) {
+      if (targetFromUrl === pendingUrlTab) {
+        pendingUrlTabRef.current = null;
+      } else if (activeTab === pendingUrlTab) {
+        setDefectDeptFilter(canOpenTab("defect") ? dept : null);
+        return;
+      }
+    }
 
     if (targetFromUrl) {
       const target = canOpenTab(targetFromUrl) ? targetFromUrl : fallbackTab;
-      if (target !== activeTab) setActiveTab(target);
+      if (target !== activeTab) {
+        commitDesktopTab(target, { navigation: "none", closeWarehouseMapFullscreen: false });
+      }
       if (target !== targetFromUrl) router.replace(`?tab=${target}`, { scroll: false });
     } else if (!canOpenTab(activeTab)) {
-      setActiveTab(fallbackTab);
-      router.replace(`?tab=${fallbackTab}`, { scroll: false });
+      commitDesktopTab(fallbackTab, { navigation: "replace" });
     }
 
     setDefectDeptFilter(canOpenTab("defect") ? dept : null);
-  }, [searchParams, activeTab, canOpenTab, fallbackTab, router]);
+  }, [searchParams, activeTab, canOpenTab, fallbackTab, router, commitDesktopTab]);
 
   useEffect(() => {
     if (activeTab !== "warehouseMap" && warehouseMapFullscreen) {
@@ -179,6 +245,24 @@ function DesktopMesShellInner() {
   }, [activeTab, warehouseMapFullscreen]);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
+
+  useEffect(() => {
+    const weekStart = toDateStr(weekMon);
+    const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
+
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.weekly.report(weekStart, weekEnd),
+      queryFn: () => api.getWeeklyReport({ week_start: weekStart, week_end: weekEnd }),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.warehouseMap.map(),
+      queryFn: () => warehouseMapApi.getMap(),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.shipping.requests(),
+      queryFn: ({ signal }) => api.getShippingRequests(undefined, { signal }),
+    });
+  }, [queryClient, weekMon]);
 
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
@@ -198,10 +282,9 @@ function DesktopMesShellInner() {
     if (!canOpenTab("warehouse")) return;
     setWarehousePreselected(item);
     setWarehouseIntent(intent ?? null);
-    setActiveTab("warehouse");
+    commitDesktopTab("warehouse");
     // tab 만 전환 — step 은 위저드(useIoUrlSync)가 tab=warehouse 와 함께 기록한다.
-    router.push("?tab=warehouse", { scroll: false });
-  }, [router, canOpenTab]);
+  }, [canOpenTab, commitDesktopTab]);
 
   const content = useMemo(() => {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
@@ -305,7 +388,7 @@ function DesktopMesShellInner() {
               />
             )}
 
-            <div className={`${warehouseMapFullscreen ? "" : "mt-1"} min-h-0 flex-1 overflow-hidden flex`}>{content}</div>
+            <div className={`${warehouseMapFullscreen ? "" : "mt-1"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>{content}</div>
           </div>
         </div>
       </div>

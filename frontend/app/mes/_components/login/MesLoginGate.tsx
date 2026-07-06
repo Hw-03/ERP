@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { warehouseMapApi } from "@/lib/api/warehouse-map";
+import { queryKeys } from "@/lib/queries/keys";
 import { OperatorLoginCard } from "./OperatorLoginCard";
 import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
 
@@ -21,12 +24,27 @@ const SHRINK_TRANSFORM = "scale(0.45) translateY(calc(-55.56vh - 311.11px))";
 const CENTER_TRANSFORM = "scale(1) translateY(0)";
 // 항목 5-2 — 모바일만 인트로를 작게 시작(작게→크게 반전). 데스크톱은 CENTER_TRANSFORM(scale 1) 유지.
 const MOBILE_CENTER_TRANSFORM = "scale(0.33) translateY(0)";
+const MS_PER_DAY = 86400000;
+
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function getWeekStartMonday(d: Date): Date {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
 
 interface MesLoginGateProps {
   children: React.ReactNode;
 }
 
 export function MesLoginGate({ children }: MesLoginGateProps) {
+  const queryClient = useQueryClient();
   const [phase, setPhase] = useState<GatePhase>("loading");
   const [logoState, setLogoState] = useState<LogoState>("center");
   // 항목 5-2 — 모바일(<1024px)만 인트로 시작 스케일을 작게(작게→크게 반전). 데스크톱은 현행 유지.
@@ -63,6 +81,18 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       goToLogin();
       return () => { cancelled = true; };
     }
+
+    const weekMon = getWeekStartMonday(new Date());
+    const weekStart = toDateStr(weekMon);
+    const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.weekly.report(weekStart, weekEnd),
+      queryFn: () => api.getWeeklyReport({ week_start: weekStart, week_end: weekEnd }),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.warehouseMap.map(),
+      queryFn: () => warehouseMapApi.getMap(),
+    });
 
     void (async () => {
       // boot_id 불일치 시 서버 재시작 감지 → 재로그인 강제
@@ -101,7 +131,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [queryClient]);
 
   // 인트로 단계 진입 → 로고 축소 → 카드 등장 (≤ 1.5s 절제된 시퀀스)
   useEffect(() => {

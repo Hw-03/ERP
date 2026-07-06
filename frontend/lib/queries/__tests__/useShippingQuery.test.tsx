@@ -59,7 +59,7 @@ describe("useShippingRequestsQuery", () => {
       wrapper: makeWrapper(client),
     });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.data).toEqual(sampleRequests));
     expect(result.current.data).toEqual(sampleRequests);
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/shipping/requests");
   });

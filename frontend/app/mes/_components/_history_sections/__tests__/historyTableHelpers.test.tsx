@@ -47,7 +47,7 @@ describe("buildGroups shipping phase grouping", () => {
     ]);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0]).toMatchObject({ type: "batch", refNo: "SHIP-REQ-1" });
+    expect(groups[0]).toMatchObject({ type: "batch", refNo: "SHIP-REQ-1", refKey: "SHIP-REQ-1::PREPARE" });
     expect(groups[1]).toMatchObject({ type: "solo" });
     if (groups[0].type === "batch") {
       expect(groups[0].logs.map((log) => log.shipping_phase)).toEqual(["PREPARE", "PREPARE"]);

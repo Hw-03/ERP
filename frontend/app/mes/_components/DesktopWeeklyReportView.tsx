@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { api } from "@/lib/api";
-import type { WeeklyReportResponse, WeeklyProductionModelRow } from "@/lib/api/types/weekly";
+import type { WeeklyProductionModelRow } from "@/lib/api/types/weekly";
+import { useWeeklyReportQuery } from "@/lib/queries/useWeeklyQuery";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklyProductionMatrix } from "./_weekly_sections/WeeklyProductionMatrix";
@@ -18,43 +18,24 @@ interface Props {
 }
 
 export function DesktopWeeklyReportView({ weekMon }: Props) {
-  const [data, setData] = useState<WeeklyReportResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState("TF");
 
   const weekStart = toDateStr(weekMon);
   const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * 86400000));
+  const reportQuery = useWeeklyReportQuery({ week_start: weekStart, week_end: weekEnd });
+  const data = reportQuery.data ?? null;
+  const loading = reportQuery.isLoading && !data;
+  const error = reportQuery.error ? "주간보고 데이터를 불러오지 못했습니다." : null;
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    api
-      .getWeeklyReport({ week_start: weekStart, week_end: weekEnd })
-      .then((res) => {
-        if (cancelled) return;
-        setData(res);
-        setSelectedCode((prev) => {
-          if (res.groups.length > 0 && !res.groups.find((g) => g.process_code === prev)) {
-            return res.groups[0].process_code;
-          }
-          return prev;
-        });
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
-          setError("주간보고 데이터를 불러오지 못했습니다.");
-          console.error(e);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [weekStart, weekEnd]);
+    if (!data) return;
+    setSelectedCode((prev) => {
+      if (data.groups.length > 0 && !data.groups.find((g) => g.process_code === prev)) {
+        return data.groups[0].process_code;
+      }
+      return prev;
+    });
+  }, [data]);
 
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
 

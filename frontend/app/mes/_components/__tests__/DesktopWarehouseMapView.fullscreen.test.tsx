@@ -1,5 +1,6 @@
-﻿import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { DesktopWarehouseMapView } from "../DesktopWarehouseMapView";
 
@@ -47,11 +48,20 @@ beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
 });
 
+function renderWithClient(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
 describe("DesktopWarehouseMapView fullscreen", () => {
   it("keeps search chrome in regular mode", async () => {
     mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
 
-    render(<DesktopWarehouseMapView />);
+    renderWithClient(<DesktopWarehouseMapView />);
 
     expect(await screen.findByText("앵글 1")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toBeInTheDocument();
@@ -61,7 +71,7 @@ describe("DesktopWarehouseMapView fullscreen", () => {
     const onFullscreenChange = vi.fn();
     mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
 
-    render(<DesktopWarehouseMapView fullscreen onFullscreenChange={onFullscreenChange} />);
+    renderWithClient(<DesktopWarehouseMapView fullscreen onFullscreenChange={onFullscreenChange} />);
 
     expect(await screen.findByText("앵글 1")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/품목명.*코드 검색/)).toBeNull();
@@ -74,5 +84,18 @@ describe("DesktopWarehouseMapView fullscreen", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(onFullscreenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("does not run the stage enter animation on the initial tab mount", async () => {
+    mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
+
+    const { container } = renderWithClient(<DesktopWarehouseMapView />);
+
+    expect(await screen.findByText("앵글 1")).toBeInTheDocument();
+    expect(container.querySelector('[class*="stageEnter"]')).toBeNull();
+
+    fireEvent.click(screen.getByText("앵글 1"));
+
+    expect(container.querySelector('[class*="stageEnter"]')).not.toBeNull();
   });
 });

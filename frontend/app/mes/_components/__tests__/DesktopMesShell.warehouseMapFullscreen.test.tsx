@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
 
+const queryClientMock = vi.hoisted(() => ({
+  prefetchQuery: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => queryClientMock,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams("tab=warehouseMap"),

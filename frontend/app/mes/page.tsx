@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useLayoutEffect, useState } from "react";
 import { MobileShell } from "./_components/mobile/MobileShell";
 import { DesktopMesShell } from "./_components/DesktopMesShell";
 import { MesLoginGate } from "./_components/login/MesLoginGate";
@@ -25,15 +25,24 @@ export default function MesPage() {
 }
 
 function MesBody() {
-  return (
-    <>
-      <div className="lg:hidden">
-        <MobileShell />
-      </div>
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
 
-      <Suspense>
-        <DesktopMesShell />
-      </Suspense>
-    </>
+  useLayoutEffect(() => {
+    const syncViewport = () => setIsDesktop(window.innerWidth >= 1024);
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
+
+  if (isDesktop === null) return null;
+
+  if (!isDesktop) {
+    return <MobileShell />;
+  }
+
+  return (
+    <Suspense>
+      <DesktopMesShell />
+    </Suspense>
   );
 }

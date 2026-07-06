@@ -26,5 +26,6 @@ export function useShippingRequestsQuery(params?: Parameters<typeof api.getShipp
   return useQuery({
     queryKey: queryKeys.shipping.requests(params),
     queryFn: ({ signal }) => api.getShippingRequests(params, { signal }),
+    placeholderData: [],
   });
 }
