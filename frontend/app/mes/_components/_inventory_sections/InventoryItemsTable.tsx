@@ -25,6 +25,7 @@ type Props = {
   onRetry: () => void;
   onResetAllFilters: () => void;
   imageManifest?: Record<string, string>;
+  compact?: boolean;
 };
 
 export function InventoryItemsTable({
@@ -40,7 +41,20 @@ export function InventoryItemsTable({
   onRetry,
   onResetAllFilters,
   imageManifest,
+  compact,
 }: Props) {
+  const headerColumns = compact
+    ? [
+        { label: "상태", nowrap: true, width: "90px" },
+        { label: "품목명", nowrap: false, minWidth: "140px" },
+      ]
+    : [
+        { label: "상태", nowrap: true, width: "90px" },
+        { label: "이미지", nowrap: true, width: "60px", center: true, hidden: true },
+        { label: "품목명", nowrap: false, minWidth: "140px" },
+        { label: "품목 코드", nowrap: true, width: "160px", hidden: true },
+        { label: "부서별 재고", nowrap: true, width: "220px", center: true, hidden: true },
+      ];
   // 좌측 사이드바 탭 전환 시 실제 렌더 비용(Long Task) 완화: displayLimit(최대
   // 100개) 전부를 한 번에 마운트하지 않고 chunk(20개) 단위로 나눠 그린다.
   // 스크롤이 sentinel 근처에 오면 다음 chunk를 이어 붙인다. 행 하나당 이미지 +
@@ -90,15 +104,7 @@ export function InventoryItemsTable({
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead className="sticky top-0 z-10">
             <tr style={{ background: LEGACY_COLORS.s2 }}>
-              {(
-                [
-                  { label: "상태", nowrap: true, width: "90px" },
-                  { label: "이미지", nowrap: true, width: "60px", center: true, hidden: true },
-                  { label: "품목명", nowrap: false, minWidth: "140px" },
-                  { label: "품목 코드", nowrap: true, width: "160px", hidden: true },
-                  { label: "부서별 재고", nowrap: true, width: "220px", center: true, hidden: true },
-                ] as { label: string; nowrap: boolean; width?: string; minWidth?: string; center?: boolean; hidden?: boolean }[]
-              ).map(({ label, nowrap, width, minWidth, center, hidden }) => (
+              {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }) => (
                 <th
                   key={label}
                   scope="col"
@@ -115,18 +121,20 @@ export function InventoryItemsTable({
               ))}
               <th
                 scope="col"
-                className="border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-right sm:text-center"
-                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
+                className={`border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "text-center" : "text-right sm:text-center"}`}
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
               >
                 총재고
               </th>
-              <th
-                scope="col"
-                className="hidden sm:table-cell border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center"
-                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
-              >
-                안전재고
-              </th>
+              {!compact && (
+                <th
+                  scope="col"
+                  className="hidden sm:table-cell border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center"
+                  style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
+                >
+                  안전재고
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -137,6 +145,7 @@ export function InventoryItemsTable({
                 selected={selectedItem?.item_id === item.item_id}
                 onSelect={onSelectItem}
                 imageFilename={item.mes_code ? imageManifest?.[item.mes_code] : undefined}
+                compact={compact}
               />
             ))}
           </tbody>

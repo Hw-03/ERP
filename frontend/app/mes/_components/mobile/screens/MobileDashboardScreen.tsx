@@ -171,8 +171,8 @@ export function MobileDashboardScreen({
         className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto"
         style={{ background: LEGACY_COLORS.bg }}
       >
-        <div className="flex flex-col gap-3 px-3 pb-6 pt-3">
-          <section className="card" style={{ padding: "14px 16px" }}>
+        <div className="flex flex-col gap-1 px-3 pb-6 pt-3">
+          <section className="flex flex-col gap-3">
             <InventoryKpiPanel
               cards={kpiCards}
               activeKey={kpi}
@@ -182,7 +182,7 @@ export function MobileDashboardScreen({
               }}
             />
             {capacityData && (
-              <div className="mt-3">
+              <div>
                 <button
                   type="button"
                   onClick={() => setCapacityOpen((o) => !o)}
@@ -239,12 +239,10 @@ export function MobileDashboardScreen({
             )}
           </section>
 
-          {/* 항목 4-2 — 검색/필터 바를 card 밖 스크롤 컨테이너 직속 풀폭 sticky 로 분리.
-              (card 안에 두면 스크롤 시 card 상단 라운드/그라데이션이 띠처럼 비쳐 틈처럼 보였음.)
-              -mx-3 로 좌우 패딩을 상쇄해 헤더 바로 아래 풀폭으로 붙는다. */}
+          {/* 검색/필터 영역은 배경 위 도구줄로 두고, 입력 컨트롤 자체만 테두리를 가진다. */}
           <div
-            className="sticky top-0 z-20 -mx-3 flex flex-col gap-2 px-3 py-2.5"
-            style={{ background: LEGACY_COLORS.s1 }}
+            className="sticky top-0 z-20 -mx-3 flex flex-col gap-2 px-3 py-1.5"
+            style={{ background: LEGACY_COLORS.bg }}
           >
             <div className="flex items-center gap-2">
               <InlineSearch
@@ -276,12 +274,11 @@ export function MobileDashboardScreen({
                 )}
               </button>
             </div>
-            <div
-              className="flex items-center justify-between px-0.5 text-xs font-semibold"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              <span>총 {filteredItems.length}건</span>
-              {isFiltered && (
+            {isFiltered && (
+              <div
+                className="flex items-center justify-end px-0.5 text-xs font-semibold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
                 <button
                   type="button"
                   onClick={resetAllFilters}
@@ -290,11 +287,11 @@ export function MobileDashboardScreen({
                 >
                   필터 초기화
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
           {/* 항목 2 — 필터 칩은 sticky 밖(일반 흐름)에 둬서 열려도 목록을 가리지 않고 아래로 밀어낸다.
-              4-2 — 검색바와 함께 card 밖, -mx-3 풀폭. */}
+              4-2 — 검색바와 함께 card 밖, 화면 배경 위에 배치. */}
           {filtersOpen && (
             <div className="-mx-3 px-3 pb-2.5">
               <InventoryFilters
@@ -314,8 +311,8 @@ export function MobileDashboardScreen({
               />
             </div>
           )}
-          {/* 항목 4-2 — 목록만 card 로 감쌈(검색바·칩은 위에서 card 밖으로 분리). */}
-          <section className="card">
+          {/* 목록 테이블 자체가 둥근 테두리를 가지므로 바깥 카드는 두지 않는다. */}
+          <section>
             <InventoryItemsTable
               error={error}
               loading={loading || filterChanging}
@@ -329,6 +326,7 @@ export function MobileDashboardScreen({
               onRetry={() => void loadItems()}
               onResetAllFilters={resetAllFilters}
               imageManifest={imageManifest}
+              compact
             />
           </section>
         </div>

@@ -100,4 +100,32 @@ describe("InventoryItemRow quantity summary", () => {
     expect(screen.queryByRole("columnheader", { name: "부서" })).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "현재고" })).toBeNull();
   });
+
+  it("uses compact dashboard columns with total stock aligned to its values", () => {
+    render(
+      <InventoryItemsTable
+        error={null}
+        loading={false}
+        filteredItems={[makeItem()]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+        selectedItem={null}
+        onSelectItem={() => {}}
+        activeFilterCount={0}
+        hasKpiFilter={false}
+        onRetry={() => {}}
+        onResetAllFilters={() => {}}
+        compact
+      />,
+    );
+
+    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+      "상태",
+      "품목명",
+      "총재고",
+    ]);
+    expect(screen.queryByText("3-TR-0001")).toBeNull();
+    expect(screen.getByRole("columnheader", { name: "총재고" })).toHaveClass("text-center");
+    expect(screen.getByTestId("inventory-total-stock")).toHaveClass("text-center");
+  });
 });

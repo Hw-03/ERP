@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, type KeyboardEvent } from "react";
 import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
@@ -25,9 +25,10 @@ type Props = {
   selected: boolean;
   onSelect: (item: Item | null) => void;
   imageFilename?: string;
+  compact?: boolean;
 };
 
-function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props) {
+function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact }: Props) {
   const getDeptColor = useDeptColorLookup();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -87,35 +88,51 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
 
   const StockIcon = stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
   const handleSelect = () => onSelect(selected ? null : item);
+  const stockBar = Number(item.quantity) === 0 ? (
+    <div className="mt-[20px] h-[6px] overflow-hidden rounded-full" style={{ background: DEFECT_RED }} title="품절" />
+  ) : (
+    <div
+      className="mt-[20px] flex h-[6px] overflow-hidden rounded-full"
+      style={{ background: LEGACY_COLORS.s3 }}
+      title={segments.map((s) => s.label).join(" / ")}
+      role="img"
+      aria-label={`재고 분포: ${segments.map((s) => `${s.label} ${s.pct.toFixed(0)}%`).join(", ")}`}
+    >
+      {segments.map((s, i) => (
+        <div key={i} className="h-full shrink-0" style={{ width: `${s.pct}%`, background: s.color }} />
+      ))}
+    </div>
+  );
+  const rowProps = {
+    onClick: handleSelect,
+    onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handleSelect();
+      }
+    },
+    tabIndex: 0,
+    role: "button",
+    "aria-pressed": selected,
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    className: "group cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]",
+    style: {
+      background: selected
+        ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+        : hovered
+          ? LEGACY_COLORS.s4
+          : undefined,
+      boxShadow: selected
+        ? `inset 3px 0 0 ${LEGACY_COLORS.blue}`
+        : hovered
+          ? `inset 3px 0 0 ${tint(LEGACY_COLORS.blue, 45)}`
+          : undefined,
+    },
+  };
 
   return (
-    <tr
-      onClick={handleSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          handleSelect();
-        }
-      }}
-      tabIndex={0}
-      role="button"
-      aria-pressed={selected}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="group cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
-      style={{
-        background: selected
-          ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
-          : hovered
-            ? LEGACY_COLORS.s4
-            : undefined,
-        boxShadow: selected
-          ? `inset 3px 0 0 ${LEGACY_COLORS.blue}`
-          : hovered
-            ? `inset 3px 0 0 ${tint(LEGACY_COLORS.blue, 45)}`
-            : undefined,
-      }}
-    >
+    <tr {...rowProps}>
       <td className="border-b px-4 py-5 align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
         <span
           className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"
@@ -125,6 +142,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
           {stock.label}
         </span>
       </td>
+      {!compact && (
       <td className="hidden sm:table-cell border-b px-1 py-5 text-center align-middle" style={{ borderColor: LEGACY_COLORS.border, width: 60 }}>
         {imageFilename ? (
           <>
@@ -141,25 +159,14 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
             <ImageLightbox open={lightboxOpen} src={`/images/items/${imageFilename}`} alt={item.item_name} onClose={() => setLightboxOpen(false)} />
           </>
         ) : null}
-      </td>
-      <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="font-semibold">{item.item_name}</div>
-        {Number(item.quantity) === 0 ? (
-          <div className="mt-[20px] h-[6px] overflow-hidden rounded-full" style={{ background: DEFECT_RED }} title="품절" />
-        ) : (
-          <div
-            className="mt-[20px] flex h-[6px] overflow-hidden rounded-full"
-            style={{ background: LEGACY_COLORS.s3 }}
-            title={segments.map((s) => s.label).join(" / ")}
-            role="img"
-            aria-label={`재고 분포: ${segments.map((s) => `${s.label} ${s.pct.toFixed(0)}%`).join(", ")}`}
-          >
-            {segments.map((s, i) => (
-              <div key={i} className="h-full shrink-0" style={{ width: `${s.pct}%`, background: s.color }} />
-            ))}
-          </div>
-        )}
-      </td>
+        </td>
+      )}
+        <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="font-semibold">{item.item_name}</div>
+          {stockBar}
+        </td>
+      {!compact && (
+        <>
       <td className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-sm" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}>
         {item.mes_code ?? "-"}
       </td>
@@ -180,16 +187,20 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
           ))}
         </div>
       </td>
+        </>
+      )}
       <td
         className="border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
         data-testid="inventory-total-stock"
-        style={{ borderColor: LEGACY_COLORS.border, color: isCritical ? stock.color : LEGACY_COLORS.text }}
+        style={{ borderColor: LEGACY_COLORS.border, color: isCritical ? stock.color : LEGACY_COLORS.text, width: compact ? 104 : undefined }}
       >
         {formatQty(qty)}
       </td>
+      {!compact && (
       <td className="hidden sm:table-cell border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         {item.min_stock == null ? "-" : formatQty(item.min_stock)}
       </td>
+      )}
     </tr>
   );
 }
