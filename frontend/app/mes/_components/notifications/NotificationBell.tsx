@@ -176,8 +176,10 @@ function LoginNotificationDialog({
 
 export function NotificationBell({
   onNavigate,
+  suppressLoginDialog = true,
 }: {
   onNavigate?: (tab: string, section: string | null) => void;
+  suppressLoginDialog?: boolean;
 }) {
   const operator = useCurrentOperator();
   const employeeId = operator?.employee_id;
@@ -207,9 +209,10 @@ export function NotificationBell({
     if (!employeeId || !operator?.loginPopupEnabled || !data || unread <= 0) return;
     if (!isVisibleInMountedTree(ref.current)) return;
     if (!consumeLoginNotificationPopupPending(employeeId)) return;
+    if (suppressLoginDialog) return;
     setOpen(false);
     setLoginDialogOpen(true);
-  }, [data, employeeId, operator?.loginPopupEnabled, unread]);
+  }, [data, employeeId, operator?.loginPopupEnabled, suppressLoginDialog, unread]);
 
   if (!employeeId) return null;
 

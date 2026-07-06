@@ -23,13 +23,12 @@ import {
   MobileMoreScreen,
   MobileShippingScreen,
 } from "./screens";
-import { WeeklyWeekPicker, getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
+import { getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
-import { NotificationBell } from "../notifications/NotificationBell";
-import { StatusPill, inferToneFromStatus } from "../common";
+import { useNotificationsQuery } from "@/lib/queries/useNotificationsQuery";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
@@ -40,6 +39,7 @@ import {
   isSidebarTabVisible,
   mobileMoreHasVisibleEntries,
 } from "../tabAccess";
+import { MobileViewportFrame } from "./MobileViewportFrame";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
 export type MobileTabId =
@@ -80,8 +80,6 @@ const VALID_TAB_IDS: MobileTabId[] = [
 ];
 
 // 항목 3-1 — 데스크톱 상단바와 동일한 기본 브랜드 상태 텍스트.
-const DEFAULT_STATUS = "DEXCOWIN MES System";
-
 /**
  * 하단 탭바 버튼 — 4개 탭 + "더보기"가 같은 형태를 공유한다.
  * 활성 표시: 데스크톱 사이드바 톤에 맞춰 또렷한 blue tint pill + 고정 strokeWidth.
@@ -90,11 +88,13 @@ function NavButton({
   icon: Icon,
   label,
   active,
+  badgeCount,
   onClick,
 }: {
   icon: LucideIcon;
   label: string;
   active: boolean;
+  badgeCount?: number;
   onClick: () => void;
 }) {
   return (
@@ -102,7 +102,6 @@ function NavButton({
       type="button"
       onClick={onClick}
       className="no-btn-inset flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 outline-none transition-[transform] active:scale-[0.92]"
-      style={{ WebkitTapHighlightColor: "transparent" }}
       aria-label={label}
       aria-current={active ? "page" : undefined}
     >
@@ -111,6 +110,15 @@ function NavButton({
         style={{ background: "transparent" }}
       >
         <Icon size={20} strokeWidth={2} color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2} />
+        {badgeCount !== undefined && badgeCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none text-white"
+            style={{ background: LEGACY_COLORS.red }}
+          >
+            {badgeCount}
+          </span>
+        )}
       </span>
       <div
         className="text-xs"
@@ -129,12 +137,9 @@ function NavButton({
 
 export function MobileShell() {
   const operator = useCurrentOperator();
+  const employeeId = operator?.employee_id;
+  const { data: notificationsData } = useNotificationsQuery(employeeId);
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
-  // 항목 3-1 — 데스크톱 상단바와 동일: 모든 상태/알림(info·에러)을 헤더 상태 칩 하나에 표시.
-  // 기본은 brand "DEXCOWIN MES System", 메시지 도착 시 일시 표시 후 3초 뒤 복귀(에러는 sticky).
-  const [headerStatus, setHeaderStatus] = useState(DEFAULT_STATUS);
-  const [statusNonce, setStatusNonce] = useState(0);
-  const headerStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
@@ -161,21 +166,9 @@ export function MobileShell() {
   const warehouseFlushRef = useRef<(() => void) | null>(null);
   const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
 
-  // 항목 3-1 — 데스크톱 DesktopMesShell.handleStatusChange 와 동일 로직: 모든 메시지를 헤더 칩에.
-  // 기본 복귀, 에러(sticky)는 자동 복귀 안 함. (기존 "에러만 하단 토스트" 분리는 제거.)
-  const handleStatusChange = useCallback((msg: string) => {
-    if (headerStatusTimerRef.current) clearTimeout(headerStatusTimerRef.current);
-    setHeaderStatus(msg);
-    setStatusNonce((n) => n + 1);
-    if (msg === DEFAULT_STATUS) return;
-    const isSticky = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
-    if (!isSticky) {
-      headerStatusTimerRef.current = setTimeout(() => {
-        setHeaderStatus(DEFAULT_STATUS);
-        setStatusNonce((n) => n + 1);
-      }, 3000);
-    }
-  }, []);
+  const unreadNotifications = notificationsData?.unread_count ?? 0;
+
+  const handleStatusChange = useCallback((_msg: string) => {}, []);
 
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
@@ -216,6 +209,14 @@ export function MobileShell() {
     setActiveTab(target);
   }, [activeTab, canOpenMobileTab, fallbackTab, warehouseDirty]);
 
+  const handleNotificationNavigate = useCallback((tab: string, section: string | null) => {
+    if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
+    const target = tab as MobileTabId;
+    if (!canOpenMobileTab(target)) return;
+    handleTabChange(target);
+    if (target === "defect" && section) setDefectDeptFilter(section);
+  }, [canOpenMobileTab, handleTabChange]);
+
   const canReceive = canSeeWorkType("receive", operator) && canOpenMobileTab("warehouse");
 
   const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
@@ -246,7 +247,8 @@ export function MobileShell() {
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
   // 항목 2-9 — weekly/warehouseMap 은 '더보기' 탭으로 진입한 하위 화면이라 TAB_BAR_IDS 에 없다.
   // 하단 네비에선 '더보기' 슬롯을 활성으로 매핑해 pill·강조가 더보기에 붙도록 한다.
-  const isMoreSubScreen = activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping";
+  const isMoreSubScreen =
+    activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping";
   const effectiveNavTab: MobileTabId = isMoreSubScreen ? "more" : activeTab;
   const activeIndex = visibleTabs.indexOf(effectiveNavTab);
 
@@ -305,6 +307,10 @@ export function MobileShell() {
       return (
         <MobileMoreScreen
           key={key}
+          operator={operator}
+          unreadCount={unreadNotifications}
+          onProfile={() => setUserMenuOpen(true)}
+          onNotificationNavigate={handleNotificationNavigate}
           onWeekly={() => handleTabChange("weekly")}
           onShipping={() => handleTabChange("shipping")}
           onWarehouseMap={() => handleTabChange("warehouseMap")}
@@ -316,7 +322,7 @@ export function MobileShell() {
       return <MobileShippingScreen key={key} />;
     }
     if (activeTab === "weekly") {
-      return <MobileWeeklyScreen key={key} weekMon={weekMon} />;
+      return <MobileWeeklyScreen key={key} weekMon={weekMon} onWeekChange={setWeekMon} />;
     }
     if (activeTab === "warehouseMap") {
       return (
@@ -343,12 +349,15 @@ export function MobileShell() {
     loadCapacity,
     defectDeptFilter,
     visibleMoreEntries,
+    operator,
+    unreadNotifications,
+    handleNotificationNavigate,
   ]);
 
   return (
-    <div className="h-[100dvh] overflow-hidden sm:bg-black" data-testid="mobile-shell">
+    <MobileViewportFrame>
       <div
-        className="flex h-full flex-col overflow-hidden"
+        className="relative flex h-full flex-col overflow-hidden"
         style={{
           background: LEGACY_COLORS.bg,
           color: LEGACY_COLORS.text,
@@ -361,63 +370,6 @@ export function MobileShell() {
             background: LEGACY_COLORS.s1 as string,
           }}
         />
-
-        <header
-          className="relative flex shrink-0 items-center justify-between px-4 py-2"
-          style={{
-            background: LEGACY_COLORS.s1,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-          }}
-        >
-          <div className="min-w-0 flex-1">
-            {activeTab !== "weekly" && (
-              // 항목 3-1 — 데스크톱 상단바와 동일한 상태 칩(StatusPill). 기본 brand, 메시지 도착 시 tone 추론.
-              <span
-                key={statusNonce}
-                role="status"
-                aria-live="polite"
-                style={{ animation: "statusFlash 0.35s ease-out" }}
-              >
-                <StatusPill
-                  tone={headerStatus === DEFAULT_STATUS ? "brand" : inferToneFromStatus(headerStatus)}
-                  label={headerStatus}
-                  title={headerStatus}
-                  maxWidth="100%"
-                  className={headerStatus === DEFAULT_STATUS ? "font-black tracking-[0.04em]" : ""}
-                />
-              </span>
-            )}
-          </div>
-          {activeTab === "weekly" && (
-            <div className="flex items-center gap-2 shrink-0">
-              <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
-            </div>
-          )}
-          {operator && (
-            <div className="ml-2 shrink-0">
-              <NotificationBell
-                onNavigate={(tab) => {
-                  // 알림이 가리키는 탭이 유효하고 현재 직원에게 보일 때만 전환한다.
-                  if ((VALID_TAB_IDS as string[]).includes(tab)) {
-                    const target = tab as MobileTabId;
-                    if (canOpenMobileTab(target)) handleTabChange(target);
-                  }
-                }}
-              />
-            </div>
-          )}
-          {operator && (
-            <button
-              type="button"
-              onClick={() => setUserMenuOpen(true)}
-              aria-label="사용자 메뉴"
-              className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black transition-opacity active:opacity-70"
-              style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
-            >
-              {operator.name[0] ?? "?"}
-            </button>
-          )}
-        </header>
 
         <main className="relative flex-1 overflow-hidden flex" data-testid="screen-root">
           <h1 className="sr-only">{TAB_META[activeTab].label} — DEXCOWIN MES</h1>
@@ -463,6 +415,7 @@ export function MobileShell() {
                   icon={meta.icon}
                   label={meta.label}
                   active={tab === effectiveNavTab}
+                  badgeCount={tab === "more" ? unreadNotifications : undefined}
                   onClick={() => handleTabChange(tab)}
                 />
               );
@@ -504,6 +457,6 @@ export function MobileShell() {
         open={userMenuOpen}
         onClose={() => setUserMenuOpen(false)}
       />
-    </div>
+    </MobileViewportFrame>
   );
 }
