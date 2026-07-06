@@ -13,6 +13,11 @@
   - `test-driven-development`: feature or bugfix implementation.
   - `writing-plans` and `executing-plans`: planning and carrying out implementation plans.
   - `verification-before-completion`: before claiming work is complete.
+- Prefer proactive subagent use for broad investigations, code reviews, plan validation, and 2+ independent tasks:
+  - Use `dispatching-parallel-agents` for parallel research/review when agents can work without editing the same files.
+  - Use `subagent-driven-development` when executing a plan with independent implementation tasks in the current session.
+  - Keep final integration, verification, commit, push, and deployment decisions in the parent session.
+  - Do not dispatch multiple implementation subagents to edit the same files or tightly coupled behavior at the same time.
 - Keep `.agents/skills/` aligned with the user's Claude/Codex skill set when intentionally updating shared workflows.
 
 ## Project Rules
@@ -40,6 +45,7 @@
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.
 - **Renames and moves must be complete in the same change.** After renaming or moving a file/symbol/route, grep the old name across BOTH code and docs (`_attic/docs/`, READMEs) and update every hit — or explicitly note the ones intentionally kept (e.g. the `legacy_part` / `legacy_item_type` data fields). An orphaned name like `DesktopLegacyShell` left behind after a `legacy→mes` rename makes the next reader treat live code as dead. The same applies to facts inside docs: if you change a behavior, fix or mark `[STALE]` the doc sentence that now lies about it.
 - **Verify a claim about the code before reporting it.** Any judgment — "this is duplicated / untestable / not extracted into a service / a bug / needs refactoring" — must be confirmed against the actual file and cited as `file:line`, not inferred from a name or a partial read. Separate what you verified by reading from what you only inferred. Rationale: in vibe-coding the user cannot easily fact-check, so a confident-but-wrong assessment silently becomes accepted truth and drives wasted or risky work. (Real case 2026-06-19: a first-pass scan claimed "no service layer" / "maps duplicated" / "untestable"; deep-read verification refuted all three — most of the work was already done.)
+- **Windows text encoding safety:** When editing Korean or other non-ASCII documents on Windows, prefer `apply_patch`. If a shell-based write is unavoidable, do not place Korean replacement text directly in the command line; use explicit UTF-8 file APIs or a temporary UTF-8 file/patch, preserve the existing encoding, and verify the real file content with `git diff` or a byte-safe read. Treat terminal mojibake as a display problem until the file bytes prove otherwise.
 
 ## Plan Mode — Model Recommendation
 
