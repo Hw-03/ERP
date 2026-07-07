@@ -1,6 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { DEFECT_HUB_CARDS, type DefectHubCardId } from "./defectHubCards";
 
 interface Props {
@@ -28,7 +29,7 @@ export function DefectHubEntry({ onSelect }: Props) {
             key={card.id}
             type="button"
             onClick={() => onSelect(card.id)}
-            className="flex h-full min-h-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110"
+            className="flex h-full min-h-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99]"
             style={{
               background: LEGACY_COLORS.s2,
               borderColor: LEGACY_COLORS.border,
@@ -41,7 +42,9 @@ export function DefectHubEntry({ onSelect }: Props) {
                 className="h-10 w-10 shrink-0"
                 style={{ color: accent }}
               />
-              <span className="text-4xl font-black leading-tight">{card.label}</span>
+              <span className="text-4xl font-black leading-tight" style={{ color: tint(accent, 92) }}>
+                {card.label}
+              </span>
             </div>
             <span
               className="text-xl font-bold leading-tight"

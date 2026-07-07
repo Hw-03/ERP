@@ -393,6 +393,10 @@
   gap: 0.5rem;
 }
 
+.iwp--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .iwpb {
   display: flex;
   min-height: 46px;

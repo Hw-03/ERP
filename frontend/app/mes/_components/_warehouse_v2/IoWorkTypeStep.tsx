@@ -9,6 +9,7 @@ import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, deptVisibility, isExitWork
 
 interface WorkTypeProps {
   workType: IoWorkType;
+  selectedWorkType?: IoWorkType | null;
   operator: OperatorLike | null;
   onWorkTypeChange: (workType: IoWorkType) => void;
   onItemConversion?: () => void;
@@ -17,7 +18,7 @@ interface WorkTypeProps {
 /**
  * Step 1 본문 — 큰 작업 유형 카드 5개. WizardStepCard 안에 들어감.
  */
-export function IoWorkTypeStep({ workType, operator, onWorkTypeChange, onItemConversion }: WorkTypeProps) {
+export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeChange, onItemConversion }: WorkTypeProps) {
   const visibleWorkTypes = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
   const n = visibleWorkTypes.length + (onItemConversion ? 1 : 0);
   const cols = n <= 3 ? n : n === 4 ? 2 : 3;
@@ -32,7 +33,7 @@ export function IoWorkTypeStep({ workType, operator, onWorkTypeChange, onItemCon
     >
       {visibleWorkTypes.map((row) => {
         const Icon = row.icon;
-        const active = workType === row.id;
+        const active = selectedWorkType === row.id;
         const cardAccent = isExitWorkType(row.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
         return (
           <button

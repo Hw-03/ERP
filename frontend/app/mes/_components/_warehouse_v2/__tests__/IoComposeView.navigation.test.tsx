@@ -98,6 +98,36 @@ describe("IoComposeView navigation chrome", () => {
     expect(screen.getAllByTestId("io-step-nav-item")).toHaveLength(5);
   });
 
+  it("does not show a preselected work type while choosing Step 1", async () => {
+    renderCompose();
+
+    const navItems = screen.getAllByTestId("io-step-nav-item");
+    expect(navItems[0]).toHaveClass("a");
+    expect(navItems[0]).toHaveTextContent("작업 유형 선택");
+    expect(navItems[0]).not.toHaveTextContent("원자재 입고");
+    expect(navItems[0]).not.toHaveTextContent("창고 입출고");
+    expect(navItems[0]).not.toHaveTextContent("부서 입출고");
+
+    const getDepartmentWorkCard = () =>
+      screen
+        .getAllByRole("button", { name: /부서 입출고/ })
+        .find((button) => button.hasAttribute("aria-pressed"));
+
+    fireEvent.click(getDepartmentWorkCard()!);
+    await waitFor(() => {
+      expect(screen.getByText("세부 작업과 부서 선택")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /작업 유형 선택/ }));
+    await waitFor(() => {
+      expect(getDepartmentWorkCard()).toBeInTheDocument();
+    });
+
+    expect(getDepartmentWorkCard()).toHaveAttribute("aria-pressed", "false");
+    const resetNavItems = screen.getAllByTestId("io-step-nav-item");
+    expect(resetNavItems[0]).not.toHaveTextContent("부서 입출고");
+  });
+
   it("closes item conversion on browser back like other warehouse work screens", async () => {
     const pushStateSpy = vi.spyOn(window.history, "pushState");
     renderCompose();

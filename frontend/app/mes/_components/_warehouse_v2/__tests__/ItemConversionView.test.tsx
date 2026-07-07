@@ -121,14 +121,63 @@ describe("ItemConversionView", () => {
     expect(onItemConversion).toHaveBeenCalledTimes(1);
   });
 
-  it("previews and executes an AF BOM item conversion in five steps", async () => {
+  it("renders item conversion with the same compact step chrome as warehouse compose", () => {
+    const onComplete = vi.fn();
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+
+    expect(screen.getByTestId("item-conversion-step-nav")).toBeInTheDocument();
+    const navItems = screen.getAllByTestId("item-conversion-step-nav-item");
+    expect(navItems).toHaveLength(4);
+    expect(navItems.map((node) => node.getAttribute("data-state"))).toEqual([
+      "active",
+      "locked",
+      "locked",
+      "locked",
+    ]);
+    expect(screen.queryByText(/① 방식 선택/)).not.toBeInTheDocument();
+  });
+
+  it("marks mode selection done and returns to it from the conversion step chrome", () => {
     const onComplete = vi.fn();
     render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
 
     fireEvent.click(screen.getByRole("button", { name: /구성 전환/ }));
+
+    let navItems = screen.getAllByTestId("item-conversion-step-nav-item");
+    expect(navItems.map((node) => node.getAttribute("data-state"))).toEqual([
+      "done",
+      "active",
+      "locked",
+      "locked",
+    ]);
+
+    fireEvent.click(navItems[0]);
+
+    navItems = screen.getAllByTestId("item-conversion-step-nav-item");
+    expect(navItems.map((node) => node.getAttribute("data-state"))).toEqual([
+      "active",
+      "locked",
+      "locked",
+      "locked",
+    ]);
+    expect(screen.getByRole("button", { name: /사양 전환/ })).toBeInTheDocument();
+  });
+
+  it("previews and executes an AF BOM item conversion with the four-step chrome", async () => {
+    const onComplete = vi.fn();
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+
+    expect(screen.getByTestId("item-conversion-step-nav")).toBeInTheDocument();
+    expect(screen.getAllByTestId("item-conversion-step-nav-item")).toHaveLength(4);
+    expect(screen.queryByText(/① 방식 선택/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /구성 전환/ }));
+    expect(screen.getByText("구성 전환")).toBeInTheDocument();
+    expect(screen.getByText("소스 품목")).toBeInTheDocument();
+    expect(screen.getByText("대상 품목")).toBeInTheDocument();
+    expect(screen.getByText("실행 요약")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "af-1" } });
     fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "af-2" } });
-    fireEvent.click(screen.getByRole("button", { name: /비교/ }));
+    fireEvent.click(screen.getByTestId("item-conversion-preview-button"));
 
     await waitFor(() => {
       expect(apiMock.getItemConversionPreview).toHaveBeenCalledWith({
@@ -140,7 +189,7 @@ describe("ItemConversionView", () => {
     });
     expect(await screen.findByTestId("item-conversion-preview")).toHaveTextContent("Cable Set");
 
-    fireEvent.click(screen.getByRole("button", { name: /확인/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^확인$/ }));
     fireEvent.change(screen.getByTestId("item-conversion-memo"), { target: { value: "수출 사양 구성 전환" } });
     fireEvent.click(await screen.findByTestId("item-conversion-confirm-button"));
 

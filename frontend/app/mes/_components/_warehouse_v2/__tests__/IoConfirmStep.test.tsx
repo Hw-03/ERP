@@ -70,6 +70,7 @@ describe("IoConfirmStep", () => {
 
     const rowButton = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
     expect(rowButton).toHaveClass("w-full");
+    expect(rowButton.closest("article")).not.toHaveClass("border-2");
     expect(screen.queryByText("ADX6000 BODY RIGHT ASSY")).not.toBeInTheDocument();
 
     fireEvent.click(rowButton);

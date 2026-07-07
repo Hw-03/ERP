@@ -54,14 +54,6 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function ItemConversionHeader({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <div className="ich shrink-0">
-      <button className="ict" onClick={onBack}>{title}</button>
-    </div>
-  );
-}
-
 type ItemConversionHistoryView = "work" | "complete";
 
 function pushItemConversionHistory(view: ItemConversionHistoryView): void {
@@ -682,7 +674,9 @@ export function IoComposeView({
           const done = stepId < step;
           const summaryText =
             stepId === 1
-              ? currentWorkTitle
+              ? step > 1
+                ? currentWorkTitle
+                : ""
               : done && stepId > 1
                 ? stepSummary(stepId)
                 : "";
@@ -868,12 +862,9 @@ export function IoComposeView({
   if (itemConversionView === "work") {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3">
-        <ItemConversionHeader
-          title="품목 전환"
-          onBack={backFromItemConversion}
-        />
         <ItemConversionWorkView
           items={items}
+          onBack={backFromItemConversion}
           onComplete={(nextResult) => {
             setItemConversionResult(nextResult);
             pushItemConversionHistory("complete");
@@ -892,10 +883,6 @@ export function IoComposeView({
   if (itemConversionView === "complete") {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3">
-        <ItemConversionHeader
-          title="품목 전환 완료"
-          onBack={backFromItemConversion}
-        />
         <ItemConversionCompleteView
           result={itemConversionResult}
           onNew={() => {
@@ -933,7 +920,7 @@ export function IoComposeView({
           n={1}
           title={stepTitle(1)}
           state="active"
-          summary={workTypeLabel(state.workType)}
+          summary={step > 1 ? workTypeLabel(state.workType) : undefined}
           onChange={returnToWorkTypeStep}
           accent={accent}
           chrome={workChrome}
@@ -942,6 +929,7 @@ export function IoComposeView({
         >
           <IoWorkTypeStep
             workType={state.workType}
+            selectedWorkType={step > 1 ? state.workType : null}
             operator={operator}
             onWorkTypeChange={handleWorkTypeChange}
             onItemConversion={openItemConversion}
