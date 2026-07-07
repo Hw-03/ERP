@@ -7,6 +7,35 @@ import { NotificationBell } from "../../notifications/NotificationBell";
 
 export type MobileMoreEntryId = "weekly" | "shipping" | "warehouseMap";
 
+const MORE_ENTRIES: Record<
+  MobileMoreEntryId,
+  {
+    icon: LucideIcon;
+    label: string;
+    description: string;
+    accent: string;
+  }
+> = {
+  weekly: {
+    icon: BarChart2,
+    label: "주간보고",
+    description: "생산·재고 주간 흐름",
+    accent: LEGACY_COLORS.blue,
+  },
+  shipping: {
+    icon: PackageCheck,
+    label: "출하",
+    description: "요청·준비·이력 조회",
+    accent: LEGACY_COLORS.green,
+  },
+  warehouseMap: {
+    icon: MapPinned,
+    label: "창고 지도",
+    description: "위치별 재고 조회",
+    accent: LEGACY_COLORS.cyan,
+  },
+};
+
 export function MobileMoreScreen({
   operator,
   onProfile,
@@ -25,6 +54,13 @@ export function MobileMoreScreen({
   onWarehouseMap: () => void;
   visibleEntries?: MobileMoreEntryId[];
 }) {
+  const handlers: Record<MobileMoreEntryId, () => void> = {
+    weekly: onWeekly,
+    shipping: onShipping,
+    warehouseMap: onWarehouseMap,
+  };
+  const entries = visibleEntries.map((id) => ({ id, ...MORE_ENTRIES[id], onClick: handlers[id] }));
+
   return (
     <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
       <div
@@ -44,68 +80,68 @@ export function MobileMoreScreen({
             </span>
           </button>
         )}
-        <div className="shrink-0">
+        <div
+          data-testid="mobile-more-notification-target"
+          className="flex h-16 w-14 shrink-0 items-center justify-center [&_button]:h-12 [&_button]:w-12"
+        >
           <NotificationBell onNavigate={onNotificationNavigate} suppressLoginDialog />
         </div>
       </div>
 
-      {visibleEntries.includes("weekly") && (
-        <BigCard
-          icon={BarChart2}
-          label="주간보고"
-          description="생산·재고 주간 흐름"
-          accent={LEGACY_COLORS.blue}
-          onClick={onWeekly}
-        />
-      )}
-      {visibleEntries.includes("shipping") && (
-        <BigCard
-          icon={PackageCheck}
-          label="출하"
-          description="요청·준비·이력 조회"
-          accent={LEGACY_COLORS.green}
-          onClick={onShipping}
-        />
-      )}
-      {visibleEntries.includes("warehouseMap") && (
-        <BigCard
-          icon={MapPinned}
-          label="창고 지도"
-          description="위치별 재고 조회"
-          accent={LEGACY_COLORS.cyan}
-          onClick={onWarehouseMap}
-        />
+      {entries.length > 0 && (
+        <div
+          data-testid="mobile-more-menu-list"
+          className="overflow-hidden rounded-[18px] border"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        >
+          {entries.map((entry, index) => (
+            <MenuRow
+              key={entry.id}
+              icon={entry.icon}
+              label={entry.label}
+              description={entry.description}
+              accent={entry.accent}
+              onClick={entry.onClick}
+              divided={index > 0}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-function BigCard({
+function MenuRow({
   icon: Icon,
   label,
   description,
   accent,
   onClick,
+  divided,
 }: {
   icon: LucideIcon;
   label: string;
   description: string;
   accent: string;
   onClick: () => void;
+  divided: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[96px] items-center gap-5 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+      className="flex min-h-[92px] w-full items-center gap-5 border-t-0 px-4 py-4 text-left transition-[transform] active:scale-[0.99]"
+      style={{
+        borderTop: divided ? `1px solid ${LEGACY_COLORS.border}` : "none",
+        color: LEGACY_COLORS.text,
+      }}
     >
       <span
-        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px]"
         style={{ background: `color-mix(in srgb, ${accent} 20%, transparent)` }}
       >
         <Icon
-          className="h-8 w-8"
+          className="h-7 w-7"
           style={{ color: `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})` }}
         />
       </span>

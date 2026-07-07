@@ -98,7 +98,7 @@ export function IoBundleCart({
       ) : (
         <div
           data-keep-scroll
-          className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+          className="sg min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
           style={{ overscrollBehavior: "contain" }}
         >
           {bundles.map((bundle) => (

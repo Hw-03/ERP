@@ -190,7 +190,7 @@ export function IoConfirmStep({
     : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       {/* 작업 요약 */}
       <div
         className="flex flex-wrap items-center justify-between gap-2 lg:gap-4 rounded-[18px] border px-5 py-3 lg:py-4"
@@ -264,7 +264,7 @@ export function IoConfirmStep({
             type="button"
             onClick={onSaveDraft}
             disabled={saveDisabled}
-            className="flex shrink-0 items-center justify-center gap-2 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:rounded-[22px] lg:border-2 lg:px-6 lg:py-7 lg:text-base"
+            className="flex shrink-0 items-center justify-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-2 lg:rounded-[22px] lg:border-2 lg:px-6 lg:py-7 lg:text-base"
             style={{
               borderColor: LEGACY_COLORS.border,
               background: LEGACY_COLORS.s2,
@@ -388,28 +388,32 @@ function ConfirmBundleCard({
         borderColor: tint(tone, 40),
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (isCollapsible) setCollapsed((v) => !v);
-          }}
-          disabled={!isCollapsible}
-          className="flex min-w-0 items-center gap-2 text-left disabled:cursor-default"
-          title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
-          aria-expanded={isCollapsible ? !collapsed : undefined}
-        >
+      <button
+        type="button"
+        onClick={() => {
+          if (isCollapsible) setCollapsed((v) => !v);
+        }}
+        disabled={!isCollapsible}
+        className="flex w-full items-start justify-between gap-3 text-left disabled:cursor-default"
+        aria-expanded={isCollapsible ? !collapsed : undefined}
+      >
+        <span className="flex min-w-0 items-start gap-2">
           <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-            {bundle.title}
-          </h3>
+          <span className="min-w-0 flex-1">
+            <span
+              className="line-clamp-2 text-base font-black leading-tight lg:truncate lg:line-clamp-none"
+              style={{ color: LEGACY_COLORS.text }}
+            >
+              {bundle.title}
+            </span>
+          </span>
           {isCollapsible &&
             (collapsed ? (
               <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
             ) : (
               <ChevronUp className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
             ))}
-        </button>
+        </span>
         {headerLine && (
           <span
             className="shrink-0 text-xl font-black tabular-nums"
@@ -419,7 +423,7 @@ function ConfirmBundleCard({
             {headerQty}
           </span>
         )}
-      </div>
+      </button>
 
       {/* 헤더 메타 한 줄 */}
       {isSingle && headerLine && (

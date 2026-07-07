@@ -12,6 +12,7 @@ import { isBomForced, lineTagLabel, type LineTagTone } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { BomSubExpander } from "./BomSubExpander";
 import { ExpandableItemName } from "./ExpandableItemName";
+import { QuantityStepper } from "./QuantityStepper";
 
 interface Props {
   line: IoLine;
@@ -115,15 +116,8 @@ export function IoLineRow({
     return available === null ? line.shortage : Math.max(0, quantity - available);
   }
 
-  function onStep(delta: number) {
-    const next = Math.max(0, currentQty + delta);
+  function onStepperChange(next: number) {
     onQuantityChange(next, nextShortageFor(next));
-  }
-
-  function onInputChange(value: string) {
-    const next = Number(value);
-    const safe = Number.isFinite(next) ? Math.max(0, next) : 0;
-    onQuantityChange(safe, nextShortageFor(safe));
   }
 
   return (
@@ -162,7 +156,8 @@ export function IoLineRow({
           {/* 항목 4-7A — 모바일에서 긴 품목명 탭하면 전체 펼침(PC 는 1줄+title 유지). */}
           <ExpandableItemName
             name={line.item_name}
-            className="text-sm font-black"
+            className="text-sm font-black leading-tight"
+            collapsedClassName="line-clamp-2 whitespace-normal lg:line-clamp-none"
             style={{ color: titleColor }}
           />
           {line.has_children && (
@@ -212,44 +207,15 @@ export function IoLineRow({
       )}
 
       {/* 4. 수량 stepper (모바일에선 한 줄 차지) */}
-      <div className="flex w-full flex-col items-center gap-0.5 lg:w-auto">
-        <span
-          className="text-[9px] font-bold uppercase tracking-[1.5px]"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          수량
-        </span>
-        <div className="flex items-center gap-1">
-          <StepBtn tone={LEGACY_COLORS.red} disabled={stepperDisabled} onClick={() => onStep(-10)}>
-            -10
-          </StepBtn>
-          <StepBtn tone={LEGACY_COLORS.red} disabled={stepperDisabled} onClick={() => onStep(-1)}>
-            -1
-          </StepBtn>
-          <input
-            type="number"
-            min={0}
-            step="any"
-            value={currentQty}
-            disabled={qtyLocked}
-            onChange={(e) => onInputChange(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            title={qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
-            className="w-[72px] min-h-[44px] rounded-[10px] border px-2 py-2 text-center text-base font-black tabular-nums outline-none focus:border-[var(--c-blue)] disabled:opacity-60 lg:min-h-0 lg:py-1.5 lg:text-sm"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          />
-          <StepBtn tone={LEGACY_COLORS.green} disabled={incrementDisabled} onClick={() => onStep(1)}>
-            +1
-          </StepBtn>
-          <StepBtn tone={LEGACY_COLORS.green} disabled={incrementDisabled} onClick={() => onStep(10)}>
-            +10
-          </StepBtn>
-        </div>
-      </div>
+      <QuantityStepper
+        value={currentQty}
+        onChange={onStepperChange}
+        disabled={qtyLocked}
+        decrementDisabled={stepperDisabled}
+        incrementDisabled={incrementDisabled}
+        inputTitle={qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
+        className="w-full lg:w-auto"
+      />
 
       {/* 항목 5-6 — 모바일만 가능재고+실행후를 가운데 정렬·간격 확보. lg:contents 로 데스크톱 7열 그리드 유지. */}
       <div className="flex w-full items-start justify-center gap-10 lg:contents">
@@ -329,36 +295,14 @@ export function IoLineRow({
         <span aria-hidden className="block" />
       )}
     </div>
-    {line.has_children && <BomSubExpander itemId={line.item_id} open={showChildren} />}
+    {line.has_children && (
+      <BomSubExpander
+        itemId={line.item_id}
+        open={showChildren}
+        compact
+        tapToExpandName
+      />
+    )}
     </div>
-  );
-}
-
-function StepBtn({
-  tone,
-  onClick,
-  disabled,
-  children,
-}: {
-  tone: string;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      // 항목 15 — 모바일 터치 타깃 44px+, 데스크톱(lg)은 기존 컴팩트 크기.
-      className="min-h-[44px] rounded-[10px] border px-3 py-2 text-sm font-black transition-colors hover:brightness-110 disabled:opacity-40 lg:min-h-0 lg:px-2 lg:py-1 lg:text-xs"
-      style={{
-        background: tint(tone, 10),
-        borderColor: tint(tone, 30),
-        color: tone,
-      }}
-    >
-      {children}
-    </button>
   );
 }

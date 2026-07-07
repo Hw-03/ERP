@@ -7,6 +7,8 @@ import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, Item } from "./types";
 import { IoLineRow, isOutgoing, expectedAfter } from "./IoLineRow";
 import { formatQty } from "@/lib/mes/format";
+import { ExpandableItemName } from "./ExpandableItemName";
+import { QuantityStepper } from "./QuantityStepper";
 
 interface Props {
   bundle: IoBundle;
@@ -121,14 +123,6 @@ export function IoBundleCard({
       onBundleQuantityChange(safe);
     }
   }
-  function stepBundle(delta: number) {
-    applyStepperQty(stepperQty + delta);
-  }
-  function setBundleFromInput(value: string) {
-    const next = Number(value);
-    applyStepperQty(Number.isFinite(next) ? next : 0);
-  }
-
   return (
     <article
       className="rounded-[18px] border-2 p-4"
@@ -146,22 +140,14 @@ export function IoBundleCard({
         aria-expanded={isCollapsible ? !collapsed : undefined}
       >
         <div className="min-w-0 pr-12 lg:pr-0">
-          <div
-            className="flex min-w-0 items-center gap-2 text-left"
-            title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
-          >
+          <div className="flex min-w-0 items-start gap-2 text-left">
             <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-            <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-              {bundle.title}
-            </h3>
-            {bundleCode && (
-              <span
-                className="shrink-0 truncate text-[11px] font-semibold"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                {bundleCode}
-              </span>
-            )}
+            <ExpandableItemName
+              name={bundle.title}
+              className="text-base font-black leading-tight"
+              collapsedClassName="line-clamp-2 whitespace-normal lg:line-clamp-none"
+              style={{ color: LEGACY_COLORS.text }}
+            />
             {isCollapsible &&
               (collapsed ? (
                 <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
@@ -173,80 +159,8 @@ export function IoBundleCard({
             className="mt-1 flex flex-wrap items-center gap-1 text-xs font-semibold"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
-            {showBundleQtyStepper ? (
-              <span className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <span className="text-[10px] font-bold uppercase tracking-[1.5px]">
-                  기준 수량
-                </span>
-                <button
-                  type="button"
-                  onClick={() => stepBundle(-10)}
-                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px] disabled:opacity-40"
-                  style={{
-                    background: tint(LEGACY_COLORS.red, 10),
-                    borderColor: tint(LEGACY_COLORS.red, 30),
-                    color: LEGACY_COLORS.red,
-                  }}
-                  disabled={stepperQty <= 0}
-                >
-                  -10
-                </button>
-                <button
-                  type="button"
-                  onClick={() => stepBundle(-1)}
-                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px] disabled:opacity-40"
-                  style={{
-                    background: tint(LEGACY_COLORS.red, 10),
-                    borderColor: tint(LEGACY_COLORS.red, 30),
-                    color: LEGACY_COLORS.red,
-                  }}
-                  disabled={stepperQty <= 0}
-                >
-                  -1
-                </button>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={stepperQty}
-                  onChange={(e) => setBundleFromInput(e.target.value)}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="w-[64px] rounded-[8px] border px-1.5 py-2 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)] lg:py-0.5"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.text,
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => stepBundle(1)}
-                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px]"
-                  style={{
-                    background: tint(LEGACY_COLORS.green, 10),
-                    borderColor: tint(LEGACY_COLORS.green, 30),
-                    color: LEGACY_COLORS.green,
-                  }}
-                >
-                  +1
-                </button>
-                <button
-                  type="button"
-                  onClick={() => stepBundle(10)}
-                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px]"
-                  style={{
-                    background: tint(LEGACY_COLORS.green, 10),
-                    borderColor: tint(LEGACY_COLORS.green, 30),
-                    color: LEGACY_COLORS.green,
-                  }}
-                >
-                  +10
-                </button>
-              </span>
-            ) : (
-              <span>기준 수량 {formatQty(bundle.quantity)}</span>
-            )}
-            <span>·</span>
+            {bundleCode && <span>{bundleCode}</span>}
+            {bundleCode && <span>·</span>}
             <span>반영 {included.length}개</span>
             {excluded > 0 && (
               <>
@@ -259,6 +173,24 @@ export function IoBundleCard({
                 <span>·</span>
                 <span>{compositionLabel}</span>
               </>
+            )}
+          </div>
+          <div onClick={(e) => e.stopPropagation()} className="mt-3">
+            {showBundleQtyStepper ? (
+              <QuantityStepper
+                value={stepperQty}
+                onChange={applyStepperQty}
+                label="기준 수량"
+                decrementDisabled={stepperQty <= 0}
+                className="items-start"
+              />
+            ) : (
+              <div
+                className="text-xs font-bold uppercase tracking-[1.5px]"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                기준 수량 {formatQty(bundle.quantity)}
+              </div>
             )}
           </div>
         </div>

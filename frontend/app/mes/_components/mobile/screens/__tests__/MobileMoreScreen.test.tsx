@@ -45,4 +45,32 @@ describe("MobileMoreScreen", () => {
     expect(screen.getByRole("button", { name: "notification bell" })).toBeInTheDocument();
     expect(screen.getByText("Kim")).toBeInTheDocument();
   });
+
+  it("renders a large notification target and the three entries as one full-width menu list", () => {
+    const onWeekly = vi.fn();
+    const onShipping = vi.fn();
+    const onWarehouseMap = vi.fn();
+
+    render(
+      <MobileMoreScreen
+        operator={operator}
+        onProfile={() => {}}
+        onNotificationNavigate={() => {}}
+        onWeekly={onWeekly}
+        onShipping={onShipping}
+        onWarehouseMap={onWarehouseMap}
+      />,
+    );
+
+    expect(screen.getByTestId("mobile-more-notification-target")).toHaveClass("h-16");
+    expect(screen.getByTestId("mobile-more-menu-list")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /주간보고/ }));
+    fireEvent.click(screen.getByRole("button", { name: /출하/ }));
+    fireEvent.click(screen.getByRole("button", { name: /창고 지도/ }));
+
+    expect(onWeekly).toHaveBeenCalledTimes(1);
+    expect(onShipping).toHaveBeenCalledTimes(1);
+    expect(onWarehouseMap).toHaveBeenCalledTimes(1);
+  });
 });

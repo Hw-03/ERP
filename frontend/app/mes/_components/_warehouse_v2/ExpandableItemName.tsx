@@ -16,10 +16,14 @@ import clsx from "clsx";
 export function ExpandableItemName({
   name,
   className,
+  collapsedClassName = "truncate",
+  expandedClassName = "whitespace-normal break-words",
   style,
 }: {
   name: string;
   className?: string;
+  collapsedClassName?: string;
+  expandedClassName?: string;
   style?: React.CSSProperties;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -35,7 +39,7 @@ export function ExpandableItemName({
       className={clsx(
         className,
         "no-btn-inset min-w-0 max-w-full text-left",
-        expanded ? "whitespace-normal break-words" : "truncate",
+        expanded ? expandedClassName : collapsedClassName,
         "lg:pointer-events-none lg:truncate",
       )}
     >

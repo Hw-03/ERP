@@ -1,19 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBundle, Item } from "@/lib/api";
-import { DepartmentsProvider } from "../../DepartmentsContext";
 import { IoBundleCart } from "../IoBundleCart";
 
-vi.mock("@/lib/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api")>();
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      getDepartments: vi.fn().mockResolvedValue([]),
-    },
-  };
-});
+vi.mock("../../DepartmentsContext", () => ({
+  useDeptColorLookup: () => () => "#64748b",
+}));
 
 const line = {
   line_id: "line-1",
@@ -59,24 +51,23 @@ const item = {
 describe("IoBundleCart layout", () => {
   it("keeps helper copy in the summary row and scrolls only the bundle list", () => {
     const { container } = render(
-      <DepartmentsProvider>
-        <IoBundleCart
-          bundles={[bundle]}
-          subType="warehouse_to_dept"
-          itemMap={new Map([[item.item_id, item]])}
-          getAvailable={() => 10}
-          onToggleLine={vi.fn()}
-          onQuantityChange={vi.fn()}
-          onRemoveLine={vi.fn()}
-          onRemoveBundle={vi.fn()}
-          onAdvance={vi.fn()}
-          canAdvance
-        />
-      </DepartmentsProvider>,
+      <IoBundleCart
+        bundles={[bundle]}
+        subType="warehouse_to_dept"
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 10}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        canAdvance
+      />,
     );
 
     expect(screen.queryByTestId("io-bundle-cart-standalone-help")).not.toBeInTheDocument();
     expect(screen.getByText("체크를 해제하면 이번 작업에서 제외됩니다.")).toBeInTheDocument();
     expect(container.querySelector("[data-keep-scroll].overflow-y-auto")).toBeInTheDocument();
+    expect(container.querySelector("[data-keep-scroll].sg")).toBeInTheDocument();
   });
 });

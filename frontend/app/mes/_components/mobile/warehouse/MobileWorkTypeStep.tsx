@@ -94,14 +94,16 @@ function DeptGrid({
   label,
   value,
   onChange,
+  className = "flex flex-1 flex-col",
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  className?: string;
 }) {
   return (
     // 항목 4-4A — 섹션 높이를 채우도록 grid 를 flex-1 + auto-rows-fr 로(버튼 균등 확대).
-    <div className="flex flex-1 flex-col">
+    <div className={className}>
       <Label text={label} />
       <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
         {PROD_DEPTS.map((d) => {
@@ -115,7 +117,7 @@ function DeptGrid({
               aria-label={d}
               aria-pressed={active}
               onClick={() => onChange(d)}
-              className="min-h-[48px] rounded-[14px] border text-xl font-black transition-[transform] active:scale-95"
+              className="min-h-[56px] rounded-[14px] border text-xl font-black transition-[transform] active:scale-95"
               style={{
                 background: active ? tint(color, 14) : LEGACY_COLORS.s2,
                 borderColor: active ? color : LEGACY_COLORS.border,
@@ -202,7 +204,7 @@ export function MobileSubTypeStep({
   return (
     // 항목 7 — 세부 작업/부서 섹션이 화면 높이를 균등 분할.
     <div className="flex min-h-full flex-col gap-4">
-      <div className="flex flex-1 flex-col">
+      <div className={showAnyDept ? "flex basis-[40%] flex-[4_1_0] flex-col" : "flex flex-1 flex-col"}>
         <Label text="세부 작업" />
         <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5">
           {subRows.map((row) => {
@@ -233,28 +235,26 @@ export function MobileSubTypeStep({
       </div>
 
       {showAnyDept && dept.from && (
-        <div className="flex flex-1 flex-col">
-          <DeptGrid
-            label={
-              subType === "supplier_return"
-                ? "반품할 부서 (불량 출처)"
-                : subType === "defect_quarantine"
-                ? "불량 격리 부서"
-                : "출발 부서"
-            }
-            value={fromDepartment}
-            onChange={onFromDepartmentChange}
-          />
-        </div>
+        <DeptGrid
+          className="flex basis-[60%] flex-[6_1_0] flex-col"
+          label={
+            subType === "supplier_return"
+              ? "반품할 부서 (불량 출처)"
+              : subType === "defect_quarantine"
+              ? "불량 격리 부서"
+              : "출발 부서"
+          }
+          value={fromDepartment}
+          onChange={onFromDepartmentChange}
+        />
       )}
       {showAnyDept && dept.to && (
-        <div className="flex flex-1 flex-col">
-          <DeptGrid
-            label={subType === "warehouse_to_dept" ? "도착 부서" : "대상 부서"}
-            value={toDepartment}
-            onChange={onToDepartmentChange}
-          />
-        </div>
+        <DeptGrid
+          className="flex basis-[60%] flex-[6_1_0] flex-col"
+          label={subType === "warehouse_to_dept" ? "도착 부서" : "대상 부서"}
+          value={toDepartment}
+          onChange={onToDepartmentChange}
+        />
       )}
 
       {caution && (
