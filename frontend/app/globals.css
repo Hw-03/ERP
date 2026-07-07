@@ -117,18 +117,21 @@
 
   /* 스크롤바 스타일 */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--c-s3);
+    border: 2px solid transparent;
+    background: color-mix(in srgb, var(--c-blue) 64%, var(--c-s3));
+    background-clip: content-box;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--c-muted);
+    background: color-mix(in srgb, var(--c-blue) 86%, var(--c-muted));
+    background-clip: content-box;
   }
 
   /* 모바일 iOS 자동 줌 방지: input 폰트 크기 16px 이상으로 유지 */
@@ -213,6 +216,8 @@
 }
 
 .sg {
+  scrollbar-color: color-mix(in srgb, var(--c-blue) 64%, var(--c-s3)) transparent;
+  scrollbar-width: thin;
   scrollbar-gutter: stable;
 }
 

@@ -25,9 +25,9 @@ export const DESKTOP_TAB_ICON_COLORS: Record<DesktopTabId, string> = {
 const MAIN_TABS: TabDef[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: DESKTOP_TAB_ICON_COLORS.dashboard },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: DESKTOP_TAB_ICON_COLORS.warehouse },
+  { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History, color: DESKTOP_TAB_ICON_COLORS.history },
   { id: "shipping", label: "출하", subtitle: "요청·준비·픽업 완료", icon: Truck, color: DESKTOP_TAB_ICON_COLORS.shipping },
   { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle, color: DESKTOP_TAB_ICON_COLORS.defect },
-  { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History, color: DESKTOP_TAB_ICON_COLORS.history },
   { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned, color: DESKTOP_TAB_ICON_COLORS.warehouseMap },
   { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2, color: DESKTOP_TAB_ICON_COLORS.weekly },
 ];

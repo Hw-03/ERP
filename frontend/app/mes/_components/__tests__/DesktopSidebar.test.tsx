@@ -8,6 +8,31 @@ vi.mock("next/image", () => ({
 }));
 
 describe("DesktopSidebar", () => {
+  it("places history directly below warehouse in the main sidebar order", () => {
+    render(
+      <DesktopSidebar
+        activeTab="dashboard"
+        onTabChange={vi.fn()}
+        visibleTabs={["dashboard", "warehouse", "shipping", "defect", "history", "warehouseMap", "weekly", "admin"]}
+      />,
+    );
+
+    const mainLabels = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent ?? "")
+      .filter((text) => ["대시보드", "입출고", "입출고 내역", "출하", "불량", "창고 지도", "주간보고"].some((label) => text.includes(label)));
+
+    expect(mainLabels).toEqual([
+      expect.stringContaining("대시보드"),
+      expect.stringContaining("입출고"),
+      expect.stringContaining("입출고 내역"),
+      expect.stringContaining("출하"),
+      expect.stringContaining("불량"),
+      expect.stringContaining("창고 지도"),
+      expect.stringContaining("주간보고"),
+    ]);
+  });
+
   it("renders the shipping icon slightly larger than the default icon size", () => {
     const { container } = render(
       <DesktopSidebar

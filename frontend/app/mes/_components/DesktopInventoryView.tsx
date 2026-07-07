@@ -156,7 +156,7 @@ export function DesktopInventoryView({
       {/* ── 좌측: 스크롤 컨테이너 ── */}
       <div
         ref={scrollRef}
-        className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border"
+        className="sg min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border"
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
       >
         <div className="flex flex-col gap-3 pb-6">
