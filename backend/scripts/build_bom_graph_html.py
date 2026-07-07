@@ -21,17 +21,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import text
 
 from app.database import SessionLocal
-from app.models import Item
-from app.services.bom import build_bom_cache
+from scripts.bom_graph_data import (
+    build_graph_tree,
+    build_limited_bom_cache,
+    collect_item_ids,
+    load_item_maps,
+    load_model_labels,
+    load_process_levels,
+)
 
-MODEL_LABEL = {"3": "DX3000", "4": "ADX4000W", "6": "ADX6000FB", "7": "COCOON", "8": "SOLO", "9": "신제품"}
 MAX_DEPTH = 10
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 D3_PATH = os.path.join(SCRIPT_DIR, "vendor", "d3.v7.min.js")
 OUT_PATH = os.path.join(SCRIPT_DIR, "bom_family_graph.html")
 
 
-def build_tree(item_id, cache, items_map, visiting, depth):
+def _legacy_build_tree_unused(item_id, cache, items_map, visiting, depth):
     item = items_map.get(item_id)
     node = {
         "code": item.mes_code if item else None,
@@ -42,8 +47,8 @@ def build_tree(item_id, cache, items_map, visiting, depth):
     if depth > MAX_DEPTH or item_id in visiting:
         return node
     nv = visiting | {item_id}
-    for child_id, _qty in cache.get(item_id, []):
-        node["children"].append(build_tree(child_id, cache, items_map, nv, depth + 1))
+    for child_id, qty in cache.get(item_id, []):
+        node["children"].append(_legacy_build_tree_unused(child_id, cache, items_map, nv, depth + 1))
     return node
 
 
@@ -62,17 +67,21 @@ def main():
         pins = db.execute(
             text("SELECT model_symbol, pf_item_id FROM model_pf_pins ORDER BY CAST(model_symbol AS INTEGER)")
         ).fetchall()
-        bom_cache = build_bom_cache(db)
-        items_map = {i.item_id: i for i in db.query(Item).all()}
+        root_ids = [uuid.UUID(str(pf_id)) for _ms, pf_id in pins]
+        bom_cache = build_limited_bom_cache(db, root_ids, max_depth=MAX_DEPTH)
+        maps = load_item_maps(db, collect_item_ids(root_ids, bom_cache))
+        model_labels = load_model_labels(db)
+        process_levels = load_process_levels(db)
 
         models = []
         summary = []
         for ms, pf_id in pins:
-            item = items_map.get(uuid.UUID(pf_id))
+            root_id = uuid.UUID(str(pf_id))
+            item = maps.items.get(root_id)
             if not item:
                 continue
-            tree = build_tree(item.item_id, bom_cache, items_map, frozenset(), 0)
-            label = MODEL_LABEL.get(str(ms)) or (item.item_name or "").split("_")[0]
+            tree = build_graph_tree(root_id, bom_cache, maps, max_depth=MAX_DEPTH)
+            label = model_labels.get(str(ms)) or (item.item_name or "").split("_")[0]
             models.append({"key": str(ms), "label": label, "code": item.mes_code, "tree": tree})
             summary.append(f"{label} ({item.mes_code}): {count_nodes(tree)} 노드")
     finally:
@@ -81,8 +90,14 @@ def main():
     with open(D3_PATH, encoding="utf-8") as f:
         d3_js = f.read()
     data_json = json.dumps(models, ensure_ascii=False)
+    levels_json = json.dumps(process_levels, ensure_ascii=False)
 
-    doc = HTML_TEMPLATE.replace("@@D3@@", d3_js).replace("@@DATA@@", data_json)
+    doc = (
+        HTML_TEMPLATE
+        .replace("@@D3@@", d3_js)
+        .replace("@@DATA@@", data_json)
+        .replace("@@PROCESS_LEVELS@@", levels_json)
+    )
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         f.write(doc)
 
@@ -122,6 +137,8 @@ HTML_TEMPLATE = """<!doctype html>
   .node.dim { opacity:.12; }
   .links path.dim { opacity:.06; }
   .node.sel rect.box { stroke:#244a86; stroke-width:4px; }
+  .node.danger rect.box { stroke:#d64545; }
+  .node.warning rect.box { stroke:#e0a72f; }
   /* foreignObject 안의 HTML 카드 (자동 줄바꿈으로 글자 안 짤림) */
   .card { box-sizing:border-box; width:100%; height:100%; display:flex; flex-direction:column;
     justify-content:center; padding:12px 16px 12px 22px; overflow:hidden;
@@ -131,6 +148,10 @@ HTML_TEMPLATE = """<!doctype html>
   .card .nm { margin-top:5px; font-size:18px; line-height:1.25; color:#5a6473;
     white-space:normal; word-break:break-word; overflow-wrap:anywhere;
     display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .card .meta { margin-top:6px; font-size:13px; line-height:1.25; color:#697386;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .summaryText { font:700 18px Consolas,"Courier New",monospace; fill:#1f2a44; pointer-events:none; }
+  .summaryMeta { font:12px "Malgun Gothic","Segoe UI",sans-serif; fill:#697386; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -138,14 +159,22 @@ HTML_TEMPLATE = """<!doctype html>
   <h1>BOM 가계도</h1>
   <label style="font-size:14px;color:#697386;">모델</label>
   <select id="model"></select>
+  <label style="font-size:14px;color:#697386;">탐색</label>
+  <select id="mode">
+    <option value="down">하위 소요 자재 (정전개)</option>
+    <option value="up">상위 사용처 (역전개)</option>
+    <option value="direct">직접 연결</option>
+  </select>
   <button id="fit">화면 맞춤</button>
-  <span class="hint">단계별 정렬 · 휠 = 줌 · 빈 공간 드래그 = 이동 · 노드 클릭 = 하위 하이라이트</span>
+  <button id="fitSelected">선택 주변</button>
+  <span class="hint">단계별 정렬 · 휠 = 줌 · 빈 공간 드래그 = 이동 · 노드 클릭 = 선택 모드 하이라이트</span>
 </div>
 <div class="legend" id="legend"></div>
 <svg id="canvas"></svg>
 
 <script>@@D3@@</script>
 <script>window.MODELS = @@DATA@@;</script>
+<script>window.PROCESS_LEVELS = @@PROCESS_LEVELS@@;</script>
 <script>
 (function () {
   // ── 치수 ───────────────────────────────────────────────────
@@ -166,6 +195,9 @@ HTML_TEMPLATE = """<!doctype html>
     ["TF", "튜브 완료"], ["TA", "튜브 중간"], ["TR", "튜브 원자재"],
   ];
   const LEVEL_INDEX = {};
+  const DB_LEVEL_LABELS = {};
+  (window.PROCESS_LEVELS || []).forEach((lv) => { DB_LEVEL_LABELS[lv.code] = lv.label || lv.code; });
+  LEVELS.forEach((lv) => { if (DB_LEVEL_LABELS[lv[0]]) lv[1] = DB_LEVEL_LABELS[lv[0]]; });
   LEVELS.forEach((lv, i) => { LEVEL_INDEX[lv[0]] = i; });
   const EXTRA_INDEX = LEVELS.length;  // 코드 매칭 안 되는 노드 → 맨 아래 "기타"
   function levelOf(t) { return (t && LEVEL_INDEX[t] != null) ? LEVEL_INDEX[t] : EXTRA_INDEX; }
@@ -221,6 +253,9 @@ HTML_TEMPLATE = """<!doctype html>
   const zoom = d3.zoom().scaleExtent([0.03, 2.5]).on("zoom", (e) => g.attr("transform", e.transform));
   svg.call(zoom);
   let cur = null;
+  let curSelected = null;
+  let curFocusSet = null;
+  let reapplySelection = null;
 
   function linkPath(d) {
     const sx = d.source.x, sy = d.source.y + H / 2;
@@ -263,28 +298,36 @@ HTML_TEMPLATE = """<!doctype html>
     // 노드 (위치 고정 — 드래그 없음, 클릭만 동작)
     let selected = null;
     const node = g.append("g").selectAll("g.node").data(L.nodes).join("g")
-      .attr("class", "node").attr("transform", (d) => `translate(${d.x},${d.y})`)
+      .attr("class", (d) => `node ${d.data.stock_tone || "normal"}`)
+      .attr("transform", (d) => `translate(${d.x},${d.y})`)
       .on("click", function (e, d) { e.stopPropagation(); toggleSel(d); });
 
     // 클릭 → 그 노드의 모든 하위 하이라이트, 나머지 흐리게 (빈 공간 클릭 = 해제)
     function applyHL(d) {
-      const isRaw = d.data.type && d.data.type.endsWith("R");
-      const isInter = d.data.type && d.data.type.endsWith("A");
+      const mode = d3.select("#mode").property("value") || "down";
       let set;
-      if (isRaw) {
+      if (mode === "up") {
         set = new Set(d.ancestors());
+      } else if (mode === "direct") {
+        set = new Set([d]);
+        if (d.parent) set.add(d.parent);
+        d.children?.forEach(c => set.add(c));
       } else {
         set = new Set(d.descendants());
-        if (isInter) {
-          const dept = d.data.type[0];
-          d.ancestors().forEach(a => { if (a.data.type && a.data.type[0] === dept && a.data.type.endsWith("A")) set.add(a); });
-        }
       }
+      curSelected = d;
+      curFocusSet = set;
       node.classed("dim", (n) => !set.has(n)).classed("sel", (n) => n === d);
       linkSel.classed("dim", (l) => !(set.has(l.source) && set.has(l.target)));
     }
-    function clearHL() { node.classed("dim", false).classed("sel", false); linkSel.classed("dim", false); }
+    function clearHL() {
+      curSelected = null;
+      curFocusSet = null;
+      node.classed("dim", false).classed("sel", false);
+      linkSel.classed("dim", false);
+    }
     function toggleSel(d) { if (selected === d) { selected = null; clearHL(); } else { selected = d; applyHL(d); } }
+    reapplySelection = () => { if (selected) applyHL(selected); };
     svg.on("click.sel", (e) => {
       const onNode = e.target.closest && e.target.closest("g.node");
       if (!onNode) { selected = null; clearHL(); }
@@ -304,13 +347,31 @@ HTML_TEMPLATE = """<!doctype html>
         return `<div class="code">${esc(d.data.code || "·")}</div><div class="nm">${esc(d.data.name)}</div>`;
       });
 
-    node.append("title").text((d) => (d.data.code ? d.data.code + "  " : "") + (d.data.name || ""));
+    if (L.nodes.length >= 500) {
+      node.selectAll("foreignObject").remove();
+      node.append("text").attr("class", "summaryText")
+        .attr("x", -W / 2 + 24).attr("y", -8)
+        .text((d) => d.data.code || "-");
+    }
+
+    node.append("text").attr("class", "summaryMeta")
+      .attr("x", -W / 2 + 24).attr("y", H / 2 - 12)
+      .text((d) => `필요 ${d.data.required_quantity ?? 1}${d.data.unit || ""} · 계획 ${d.data.available_quantity ?? 0} · 창고 ${d.data.warehouse_available ?? 0}`);
+
+    node.append("title").text((d) => {
+      const unit = d.data.unit || "EA";
+      return `${d.data.code || "-"}  ${d.data.name || ""}
+필요: ${d.data.required_quantity ?? 1} ${unit}
+계획가용: ${d.data.available_quantity ?? 0} ${unit}
+창고가용: ${d.data.warehouse_available ?? 0} ${unit}
+안전재고: ${d.data.min_stock ?? "-"} ${unit}`;
+    });
 
     fit(L);
   }
 
-  function fit(L) {
-    const ns = L.nodes;
+  function fit(L, nodeSubset) {
+    const ns = nodeSubset || L.nodes;
     if (!ns.length) return;
     const xs = ns.map((d) => d.x), ys = ns.map((d) => d.y);
     const minX = Math.min(...xs) - PAD_L, maxX = Math.max(...xs) + W;
@@ -332,7 +393,16 @@ HTML_TEMPLATE = """<!doctype html>
   d3.select("#legend").selectAll("span").data(LEGEND).join("span")
     .html((d) => `<i style="background:${d[1]}"></i>${d[0]}`);
 
+  d3.select("#mode").on("change", () => {
+    if (reapplySelection) reapplySelection();
+  });
+
   d3.select("#fit").on("click", () => { if (cur) fit(cur); });
+  d3.select("#fitSelected").on("click", () => {
+    if (!cur) return;
+    const nodes = curFocusSet ? Array.from(curFocusSet) : null;
+    fit(cur, nodes);
+  });
   window.addEventListener("resize", () => { if (cur) fit(cur); });
 
   if (window.MODELS && window.MODELS.length) { sel.property("value", 0); render(window.MODELS[0]); }
