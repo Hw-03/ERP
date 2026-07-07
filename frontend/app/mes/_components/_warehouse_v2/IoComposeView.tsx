@@ -56,10 +56,26 @@ function prefersReducedMotion() {
 
 function ItemConversionHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
-    <div className="ich">
+    <div className="ich shrink-0">
       <button className="ict" onClick={onBack}>{title}</button>
     </div>
   );
+}
+
+type ItemConversionHistoryView = "work" | "complete";
+
+function pushItemConversionHistory(view: ItemConversionHistoryView): void {
+  window.history.pushState(
+    { ...(window.history.state || {}), wic: view },
+    "",
+    window.location.href,
+  );
+}
+
+function clearItemConversionHistoryState(): void {
+  const next = { ...(window.history.state || {}) };
+  delete next.wic;
+  window.history.replaceState(next, "", window.location.href);
 }
 
 function scrollToElement(container: HTMLElement, target: HTMLElement, offset = AUTO_SCROLL_OFFSET) {
@@ -125,6 +141,7 @@ export function IoComposeView({
   const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
   const [itemConversionView, setItemConversionView] = useState<"compose" | "work" | "complete">("compose");
   const [itemConversionResult, setItemConversionResult] = useState<ItemConversionResult | null>(null);
+  const itemConversionViewRef = useRef(itemConversionView);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
   const intentAppliedRef = useRef(false);
@@ -149,6 +166,29 @@ export function IoComposeView({
     // stale tab(=dashboard) 을 보존해 셸이 대시보드로 되돌리는 튕김을 차단한다.
     tabParam: "warehouse",
   });
+
+  useEffect(() => {
+    itemConversionViewRef.current = itemConversionView;
+  }, [itemConversionView]);
+
+  useEffect(() => {
+    function handleItemConversionPop(event: PopStateEvent) {
+      const next = (event.state as { wic?: unknown } | null)?.wic;
+      if (next === "work" || next === "complete") {
+        setItemConversionView(next);
+        return;
+      }
+      if (itemConversionViewRef.current !== "compose") {
+        setItemConversionResult(null);
+        setItemConversionView("compose");
+        state.goTo(1);
+        clearItemConversionHistoryState();
+      }
+    }
+
+    window.addEventListener("popstate", handleItemConversionPop);
+    return () => window.removeEventListener("popstate", handleItemConversionPop);
+  }, [state]);
 
   // entryIntent 1회 적용 — 빠른작업으로 진입 시 작업유형/방향/세부작업을 프리셋하고 Step3 으로 점프.
   useEffect(() => {
@@ -413,6 +453,7 @@ export function IoComposeView({
 
   function openItemConversion() {
     setError(null);
+    pushItemConversionHistory("work");
     setItemConversionView("work");
   }
 
@@ -420,6 +461,15 @@ export function IoComposeView({
     setItemConversionResult(null);
     setItemConversionView("compose");
     state.goTo(1);
+    clearItemConversionHistoryState();
+  }
+
+  function backFromItemConversion() {
+    if (window.history.state?.wic) {
+      window.history.back();
+      return;
+    }
+    closeItemConversion();
   }
 
   async function handleSaveDraft() {
@@ -597,7 +647,7 @@ export function IoComposeView({
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
   const accent = isExitWorkType(state.workType) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
-  const stepWrapperClass = (n: IoStep) => `flex flex-col${step > n ? " pt-[9px]" : ""}`;
+  const stepWrapperClass = (n: IoStep) => `flex min-h-0 flex-1 flex-col${step > n ? " pt-[9px]" : ""}`;
   const workTypeInfo = IO_WORK_TYPES.find((row) => row.id === state.workType);
   const currentWorkTitle = workTypeInfo?.label ?? workTypeLabel(state.workType);
 
@@ -655,7 +705,7 @@ export function IoComposeView({
               key={stepId}
               type="button"
               disabled
-              className={active ? "iwpb a" : "iwpb"}
+              className={active ? "iwpb a" : "iwpb locked"}
               data-testid="io-step-nav-item"
             >
               <span className="iwpl">{stepTitle(stepId)}</span>
@@ -713,12 +763,9 @@ export function IoComposeView({
     const scrollContainer = findScrollContainer(firstWrapper);
     if (!scrollContainer) return;
 
-    // top margin = gap-3 (12px). carbon 을 사이드바 bottom 까지 확장 — BOTTOM 음수 (clientH 측정이 실제 사이드바보다 작은 보정).
+    // 모든 작업 카드는 같은 하단 기준을 사용한다. 높이는 wrapper가 고정하고
+    // 내부 표/목록만 스크롤되게 해서 단계별로 박스가 출렁이지 않게 한다.
     const BOTTOM = 12;
-    const STEP2_BOTTOM = -21;
-    const STEP3_EMPTY_BOTTOM = -21;
-    const STEP4_BOTTOM = 36;
-    const STEP5_BOTTOM = -21;
     const GAP = 12;
 
     for (const s of targetSteps) {
@@ -742,26 +789,11 @@ export function IoComposeView({
         wrapperTopInContainer = AUTO_SCROLL_OFFSET + prevCollapsed.offsetHeight + GAP;
       }
 
-      const bottom =
-        s === 2
-          ? STEP2_BOTTOM
-          : s === 3 && state.bundles.length === 0
-            ? STEP3_EMPTY_BOTTOM
-            : s === 4
-              ? STEP4_BOTTOM
-              : s === 5
-                ? STEP5_BOTTOM
-                : BOTTOM;
-      const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - bottom;
+      const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - BOTTOM;
       if (newHeight > 0) {
         const next = `${newHeight}px`;
-        if (s === 4 || s === 5) {
-          if (wrapper.style.height) wrapper.style.height = "";
-          if (wrapper.style.minHeight !== next) wrapper.style.minHeight = next;
-        } else {
-          if (wrapper.style.minHeight) wrapper.style.minHeight = "";
-          if (wrapper.style.height !== next) wrapper.style.height = next;
-        }
+        if (wrapper.style.minHeight) wrapper.style.minHeight = "";
+        if (wrapper.style.height !== next) wrapper.style.height = next;
       }
     }
 
@@ -791,11 +823,8 @@ export function IoComposeView({
         const nextSize = currentSize + scrollDeficit;
         const next = `${nextSize}px`;
 
-        if (extendStep === 4) {
-          if (extendWrapper.style.minHeight !== next) extendWrapper.style.minHeight = next;
-        } else {
-          if (extendWrapper.style.height !== next) extendWrapper.style.height = next;
-        }
+        if (extendWrapper.style.minHeight) extendWrapper.style.minHeight = "";
+        if (extendWrapper.style.height !== next) extendWrapper.style.height = next;
       }
     }
 
@@ -838,15 +867,16 @@ export function IoComposeView({
 
   if (itemConversionView === "work") {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex h-full min-h-0 flex-col gap-3">
         <ItemConversionHeader
           title="품목 전환"
-          onBack={closeItemConversion}
+          onBack={backFromItemConversion}
         />
         <ItemConversionWorkView
           items={items}
           onComplete={(nextResult) => {
             setItemConversionResult(nextResult);
+            pushItemConversionHistory("complete");
             setItemConversionView("complete");
             void api
               .getItems({ limit: 2000, search: globalSearch.trim() || undefined })
@@ -861,10 +891,10 @@ export function IoComposeView({
 
   if (itemConversionView === "complete") {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex h-full min-h-0 flex-col gap-3">
         <ItemConversionHeader
           title="품목 전환 완료"
-          onBack={() => setItemConversionView("work")}
+          onBack={backFromItemConversion}
         />
         <ItemConversionCompleteView
           result={itemConversionResult}
@@ -880,7 +910,7 @@ export function IoComposeView({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       {error && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"

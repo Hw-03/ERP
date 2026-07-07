@@ -136,9 +136,11 @@ export function DesktopWarehouseView({
     onStatusChange("구형 장바구니는 새 입출고 화면에서 직접 복원되지 않습니다.");
   }
 
+  const isComposeSection = sectionTab === "compose";
+
   return (
-    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-y-auto lg:pr-4">
-      <div className="flex min-h-full w-full flex-col gap-3 px-3 lg:px-6 pb-10 pt-4">
+    <div className="flex h-full min-h-0 flex-1 min-w-0 lg:pr-4">
+      <div className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto px-3 pt-4 lg:px-6 ${isComposeSection ? "pb-0" : "pb-10"}`}>
         <WarehouseHeader loadFailure={loadFailure} />
         <WarehouseSectionTabs
           active={sectionTab}
@@ -178,27 +180,29 @@ export function DesktopWarehouseView({
           }}
         />
 
-        {sectionTab === "compose" && (
-          <IoComposeView
-            globalSearch={globalSearch}
-            operator={operator}
-            employees={employees}
-            items={items}
-            productModels={productModels}
-            setItems={setItems}
-            preselectedItem={preselectedItem}
-            restoreDraft={restoreIoDraft}
-            restoreNonce={restoreNonce}
-            entryIntent={entryIntent}
-            onStatusChange={(status) => {
-              onStatusChange(status);
-              setPanelRefreshNonce((n) => n + 1);
-            }}
-            onSubmitSuccess={() => {
-              setPanelRefreshNonce((n) => n + 1);
-              onSubmitSuccess?.();
-            }}
-          />
+        {isComposeSection && (
+          <div className="min-h-0 flex-1">
+            <IoComposeView
+              globalSearch={globalSearch}
+              operator={operator}
+              employees={employees}
+              items={items}
+              productModels={productModels}
+              setItems={setItems}
+              preselectedItem={preselectedItem}
+              restoreDraft={restoreIoDraft}
+              restoreNonce={restoreNonce}
+              entryIntent={entryIntent}
+              onStatusChange={(status) => {
+                onStatusChange(status);
+                setPanelRefreshNonce((n) => n + 1);
+              }}
+              onSubmitSuccess={() => {
+                setPanelRefreshNonce((n) => n + 1);
+                onSubmitSuccess?.();
+              }}
+            />
+          </div>
         )}
       </div>
     </div>

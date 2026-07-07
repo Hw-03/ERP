@@ -246,7 +246,7 @@ function DeptGrid({
   // 7개 옵션(PROD_DEPTS + 창고) 일 때 grid-cols-7 자동. 그 외엔 기존 grid-cols-6 유지.
   const colsClass = items.length === 1 ? "grid-cols-1" : items.length === 7 ? "grid-cols-7" : "grid-cols-6";
   return (
-    <div className={fill ? "flex min-h-0 flex-col" : undefined}>
+    <div className={fill ? "flex h-full min-h-0 flex-col" : undefined}>
       <Step2Label label={label} />
       <div className={fill ? `grid min-h-0 flex-1 ${colsClass} gap-3` : `grid ${colsClass} gap-3`}>
         {items.map((d) => {

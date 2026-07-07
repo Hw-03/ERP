@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type Item, type ItemConversionMode, type ItemConversionPreview, type ItemConversionResult } from "@/lib/api";
 
 interface WorkProps {
@@ -39,6 +39,14 @@ function isConvertibleItem(item: Item) {
   return ALLOWED_PROCESS_TYPES.includes(item.process_type_code ?? "") && !item.deleted_at;
 }
 
+function pushConversionModeHistory(mode: ItemConversionMode): void {
+  window.history.pushState(
+    { ...(window.history.state || {}), wic: "work", wicm: mode },
+    "",
+    window.location.href,
+  );
+}
+
 export function ItemConversionWorkView({ items, loading = false, onComplete }: WorkProps) {
   const [mode, setMode] = useState<ItemConversionMode | null>(null);
   const [sourceId, setSourceId] = useState("");
@@ -67,11 +75,41 @@ export function ItemConversionWorkView({ items, loading = false, onComplete }: W
     setError("");
   };
 
+  const resetMode = () => {
+    setMode(null);
+    setSourceId("");
+    setTargetId("");
+    setQuantity(1);
+    setMemo("");
+    clearPreview();
+  };
+
   const chooseMode = (nextMode: ItemConversionMode) => {
+    pushConversionModeHistory(nextMode);
     setMode(nextMode);
     setMemo("");
     clearPreview();
   };
+
+  const backToModeSelection = () => {
+    if (window.history.state?.wicm) {
+      window.history.back();
+      return;
+    }
+    resetMode();
+  };
+
+  useEffect(() => {
+    function handleModePop(event: PopStateEvent) {
+      if (!(event.state as { wicm?: unknown } | null)?.wicm) {
+        resetMode();
+      }
+    }
+
+    window.addEventListener("popstate", handleModePop);
+    return () => window.removeEventListener("popstate", handleModePop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const renderSelect = (
     kind: "source" | "target",
@@ -147,13 +185,25 @@ export function ItemConversionWorkView({ items, loading = false, onComplete }: W
 
   if (!mode) {
     return (
-      <section className={`grid gap-3 ${panelClass} xl:grid-cols-2`}>
-        <button className="min-h-32 rounded border bg-white p-4 text-left" onClick={() => chooseMode("SPEC")}>
-          <div className="text-2xl font-black">사양 전환</div>
-        </button>
-        <button className="min-h-32 rounded border bg-white p-4 text-left" onClick={() => chooseMode("BOM")}>
-          <div className="text-2xl font-black">구성 전환</div>
-        </button>
+      <section className="icmw">
+        <div className="icmg">
+          <button
+            type="button"
+            className="icmc"
+            onClick={() => chooseMode("SPEC")}
+          >
+            <span className="icmt text-blue-600">사양 전환</span>
+            <span className="icmd">표시 사양만 전환</span>
+          </button>
+          <button
+            type="button"
+            className="icmc"
+            onClick={() => chooseMode("BOM")}
+          >
+            <span className="icmt text-amber-600">구성 전환</span>
+            <span className="icmd">BOM 차이 반영</span>
+          </button>
+        </div>
       </section>
     );
   }
@@ -162,7 +212,7 @@ export function ItemConversionWorkView({ items, loading = false, onComplete }: W
     <section className={`grid gap-3 ${panelClass}`}>
       <div className="flex items-center justify-between gap-2 border p-2">
         <div className="text-xs font-black text-blue-700">{mode === "SPEC" ? "사양 전환" : "구성 전환"}</div>
-        <button className={buttonBase} onClick={() => setMode(null)}>방식 선택</button>
+        <button className={buttonBase} onClick={backToModeSelection}>방식 선택</button>
       </div>
       <div className="grid gap-3 xl:grid-cols-2">
         {renderSelect("source", "소스", sourceId, setSourceId, candidates)}

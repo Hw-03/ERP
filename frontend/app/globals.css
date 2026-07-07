@@ -405,15 +405,25 @@
 
 .iwpb.done {
   cursor: pointer;
+  border-color: color-mix(in srgb, var(--c-green) 36%, var(--c-border));
+  background: color-mix(in srgb, var(--c-green) 12%, var(--c-s2));
+  color: color-mix(in srgb, var(--c-green) 80%, var(--c-text));
 }
 
 .iwpb.done:hover {
-  border-color: color-mix(in srgb, var(--c-blue) 34%, var(--c-border));
+  border-color: color-mix(in srgb, var(--c-green) 52%, var(--c-border));
   filter: brightness(1.06);
 }
 
 .iwpb:disabled {
   cursor: default;
+}
+
+.iwpb.locked {
+  border-color: color-mix(in srgb, var(--c-border) 72%, transparent);
+  background: color-mix(in srgb, var(--c-s2) 56%, transparent);
+  color: var(--c-muted2);
+  opacity: 0.48;
 }
 
 .iwpl {
@@ -445,7 +455,63 @@
   color: color-mix(in srgb, var(--c-blue) 72%, var(--c-muted2));
 }
 
+.iwpb.done .iwps {
+  color: color-mix(in srgb, var(--c-green) 64%, var(--c-muted2));
+}
+
 /* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */
+.icmw {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.icmg {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.icmc {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid rgb(226 232 240);
+  border-radius: 22px;
+  background: white;
+  padding: 2.5rem;
+  text-align: left;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.icmc:hover {
+  filter: brightness(1.1);
+}
+
+.icmc:active {
+  transform: scale(0.99);
+}
+
+.icmt {
+  font-size: 2.25rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.icmd {
+  color: rgb(100 116 139);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

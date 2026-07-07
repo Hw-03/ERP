@@ -60,25 +60,28 @@ export function IoBundleCart({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      {/* 항목 12 — 안내 문구는 모바일에서 숨김(데스크톱 ≥lg 은 유지). */}
-      <p className="hidden text-sm lg:block" style={{ color: LEGACY_COLORS.muted2 }}>
-        체크된 품목만 재고에 반영됩니다. 체크를 해제하면 이번 작업에서 제외됩니다.
-      </p>
-
       {bundles.length > 0 && (
         <div
-          className="flex items-center justify-between rounded-[14px] border px-4 py-2.5"
+          className="flex shrink-0 items-center justify-between gap-4 rounded-[14px] border px-4 py-2.5"
           style={{
             background: tint(LEGACY_COLORS.blue, 6),
             borderColor: tint(LEGACY_COLORS.blue, 24),
           }}
         >
-          <span
-            className="text-[11px] font-bold uppercase tracking-[1.5px]"
-            style={{ color: LEGACY_COLORS.muted2 }}
-          >
-            반영 라인 {includedCount}개 · 총 수량
-          </span>
+          <div className="min-w-0">
+            <div
+              className="text-[11px] font-bold uppercase tracking-[1.5px]"
+              style={{ color: LEGACY_COLORS.muted2 }}
+            >
+              반영 라인 {includedCount}개 · 총 수량
+            </div>
+            <div
+              className="mt-1 text-xs font-semibold"
+              style={{ color: LEGACY_COLORS.muted2 }}
+            >
+              체크를 해제하면 이번 작업에서 제외됩니다.
+            </div>
+          </div>
           <span className="text-2xl font-black tabular-nums" style={{ color: LEGACY_COLORS.blue }}>
             {formatQty(totalQty)}
           </span>
@@ -93,7 +96,11 @@ export function IoBundleCart({
           description="이전 단계에서 대상을 다시 선택하세요."
         />
       ) : (
-        <div className="space-y-3">
+        <div
+          data-keep-scroll
+          className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+          style={{ overscrollBehavior: "contain" }}
+        >
           {bundles.map((bundle) => (
             <IoBundleCard
               key={bundle.bundle_id}

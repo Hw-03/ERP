@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 import { api } from "@/lib/api";
@@ -154,6 +154,32 @@ describe("ItemConversionView", () => {
       });
     });
     expect(onComplete).toHaveBeenCalledWith(result);
+  });
+
+  it("returns from conversion mode detail to mode selection on browser back", async () => {
+    const pushStateSpy = vi.spyOn(window.history, "pushState");
+    const onComplete = vi.fn();
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /구성 전환/ }));
+
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ wic: "work", wicm: "BOM" }),
+      "",
+      expect.any(String),
+    );
+    expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { wic: "work" } }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /사양 전환/ })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("item-conversion-source-search")).not.toBeInTheDocument();
+
+    pushStateSpy.mockRestore();
   });
 
   it("renders the item conversion completion actions", () => {
