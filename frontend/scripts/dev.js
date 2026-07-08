@@ -3,7 +3,7 @@
 // - Suppresses Next's default banner lines
 // - Records exit dumps under frontend/logs when the dev server stops
 
-const { spawn } = require("child_process");
+const { execFileSync, spawn } = require("child_process");
 const os = require("os");
 const path = require("path");
 const { createDiagnostics } = require("./dev-diagnostics");
@@ -45,19 +45,85 @@ const backendInternalUrl = process.env.BACKEND_INTERNAL_URL || "(default)";
 const diagnostics = createDiagnostics(rootDir);
 const startTime = new Date();
 const receivedSignals = [];
+const pipeErrors = [];
 let dumpWritten = false;
 let child = null;
+
+function recordPipeError(streamName, error) {
+  const entry = {
+    stream: streamName,
+    message: error?.message || String(error),
+    code: error?.code || null,
+    timestamp: new Date().toISOString(),
+  };
+  pipeErrors.push(entry);
+  diagnostics.log("wrapper pipe error", entry);
+}
+
+function safeWrite(streamName, stream, value) {
+  try {
+    stream.write(value);
+  } catch (error) {
+    recordPipeError(streamName, error);
+  }
+}
+
+function getProcessDetails(pid) {
+  if (!pid) return null;
+  if (process.platform !== "win32") {
+    return { pid };
+  }
+  try {
+    const script = [
+      `$p = Get-CimInstance Win32_Process -Filter "ProcessId = ${Number(pid)}"`,
+      "if ($p) { $p | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress }",
+    ].join("; ");
+    const raw = execFileSync("powershell", ["-NoProfile", "-Command", script], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 2000,
+    }).trim();
+    if (!raw) return { pid };
+    const parsed = JSON.parse(raw);
+    return {
+      pid: parsed.ProcessId ?? pid,
+      parentPid: parsed.ParentProcessId ?? null,
+      commandLine: parsed.CommandLine ?? null,
+    };
+  } catch (error) {
+    return { pid, lookupError: error.message };
+  }
+}
+
+function getPortOwners(targetPort) {
+  if (process.platform !== "win32") return [];
+  try {
+    const raw = execFileSync("netstat.exe", ["-ano", "-p", "tcp"], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 2000,
+    });
+    return raw
+      .split(/\r?\n/)
+      .map((line) => line.trim().match(/^TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)$/i))
+      .filter(Boolean)
+      .filter((match) => match[1] === String(targetPort))
+      .map((match) => ({ localPort: Number(match[1]), pid: Number(match[2]) }));
+  } catch (error) {
+    return [{ lookupError: error.message }];
+  }
+}
 
 function banner() {
   const out = process.stdout;
   const url = lanIp ? `http://${lanIp}:${port}` : `http://localhost:${port}`;
-  out.write("\n");
-  out.write(`  ${C.magenta}${C.bold}DEXCOWIN MES${C.reset}  ${C.gray}dev server${C.reset}\n`);
-  out.write(`  ${C.gray}${"-".repeat(44)}${C.reset}\n`);
-  out.write(`  ${C.dim}Network ${C.reset}  ${C.green}${url}${C.reset}\n`);
-  out.write(`  ${C.dim}Root    ${C.reset}  ${C.cyan}${rootDir}${C.reset}\n`);
-  out.write(`  ${C.dim}Backend ${C.reset}  ${C.cyan}${backendInternalUrl}${C.reset}\n`);
-  out.write(`  ${C.gray}${"-".repeat(44)}${C.reset}\n\n`);
+  safeWrite("stdout", out, "\n");
+  safeWrite("stdout", out, `  ${C.magenta}${C.bold}DEXCOWIN MES${C.reset}  ${C.gray}dev server${C.reset}\n`);
+  safeWrite("stdout", out, `  ${C.gray}${"-".repeat(44)}${C.reset}\n`);
+  safeWrite("stdout", out, `  ${C.dim}Network ${C.reset}  ${C.green}${url}${C.reset}\n`);
+  safeWrite("stdout", out, `  ${C.dim}Root    ${C.reset}  ${C.cyan}${rootDir}${C.reset}\n`);
+  safeWrite("stdout", out, `  ${C.dim}Backend ${C.reset}  ${C.cyan}${backendInternalUrl}${C.reset}\n`);
+  safeWrite("stdout", out, `  ${C.gray}${"-".repeat(44)}${C.reset}\n\n`);
 }
 
 const SUPPRESS_PATTERNS = [
@@ -79,7 +145,7 @@ function createLineFilter(stream) {
     const parts = buf.split("\n");
     buf = parts.pop();
     for (const line of parts) {
-      if (!shouldSuppress(line)) stream.write(line + "\n");
+      if (!shouldSuppress(line)) safeWrite(stream === process.stderr ? "stderr" : "stdout", stream, line + "\n");
     }
   };
 }
@@ -99,6 +165,10 @@ function writeExitDumpOnce(reason, details = {}) {
     cwd: rootDir,
     backendInternalUrl,
     receivedSignals,
+    parentProcess: getProcessDetails(process.ppid),
+    childProcess: getProcessDetails(child?.pid),
+    pipeErrors,
+    portOwners: getPortOwners(port),
     error: details.error ?? null,
   });
 }
@@ -134,6 +204,10 @@ diagnostics.log("next dev child spawned", { childPid: child.pid });
 
 child.stdout.on("data", createLineFilter(process.stdout));
 child.stderr.on("data", createLineFilter(process.stderr));
+process.stdout.on("error", (error) => recordPipeError("stdout", error));
+process.stderr.on("error", (error) => recordPipeError("stderr", error));
+process.stdin.on("close", () => diagnostics.log("wrapper stdin closed"));
+process.stdin.on("end", () => diagnostics.log("wrapper stdin ended"));
 
 child.on("error", (error) => {
   diagnostics.log("next dev child error", { message: error.message });
@@ -149,6 +223,7 @@ child.on("exit", (code, signal) => {
 
 process.on("SIGINT", () => forwardSignal("SIGINT"));
 process.on("SIGTERM", () => forwardSignal("SIGTERM"));
+process.on("SIGHUP", () => forwardSignal("SIGHUP"));
 
 process.on("uncaughtException", (error) => {
   diagnostics.log("wrapper uncaught exception", { message: error.message });

@@ -134,21 +134,26 @@ echo [MES] URL: http://%IP%:%FRONTEND_PORT%
 echo [MES] Backend: %BACKEND_URL%
 echo.
 
-rem preflight - stop only this repo profile ports before opening visible CMD windows
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-backend.ps1"
+rem Start servers detached from the visible monitor window.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\start-backend.ps1"
 if errorlevel 1 (
-    echo [MES] ERROR: backend port cleanup failed. Aborting.
+    echo [MES] ERROR: backend startup failed. Aborting.
     pause
     exit /b 1
 )
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-frontend.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\start-frontend.ps1"
 if errorlevel 1 (
-    echo [MES] ERROR: frontend port cleanup failed. Aborting.
+    echo [MES] ERROR: frontend startup failed. Aborting.
     pause
     exit /b 1
 )
-start "Backend" cmd /k "cd /d "%~dp0backend" && py -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload"
-start "Frontend" cmd /k "cd /d "%~dp0frontend" && set "PORT=%FRONTEND_PORT%" && set "BACKEND_INTERNAL_URL=%BACKEND_URL%" && npm run dev"
-timeout /t 5 /nobreak >nul
+
+echo.
+echo [MES] Servers are running in the background.
+echo [MES] Monitor again : double-click watch.bat
+echo [MES] Stop servers  : double-click stop.bat
+echo.
+start "DEXCOWIN MES Watch" "%~dp0watch.bat"
+timeout /t 2 /nobreak >nul
 
 endlocal

@@ -127,7 +127,9 @@ $runtimeScripts = @(
     "start-backend.ps1",
     "stop-backend.ps1",
     "start-frontend.ps1",
-    "stop-frontend.ps1"
+    "stop-frontend.ps1",
+    "stop-servers.ps1",
+    "watch-servers.ps1"
 )
 foreach ($scriptName in $runtimeScripts) {
     $sourceScript = Join-Path $DevRoot "scripts\dev\$scriptName"
@@ -140,6 +142,13 @@ $sourceStartBat = Join-Path $DevRoot "start.bat"
 $targetStartBat = Join-Path $EmpRoot "start.bat"
 Copy-Item $sourceStartBat $targetStartBat -Force
 Write-Host "[sync] script: start.bat"
+
+foreach ($batName in @("watch.bat", "stop.bat")) {
+    $sourceBat = Join-Path $DevRoot $batName
+    $targetBat = Join-Path $EmpRoot $batName
+    Copy-Item $sourceBat $targetBat -Force
+    Write-Host "[sync] script: $batName"
+}
 
 # ---------------------------------------------------------------
 # 5) 서버 정지
@@ -215,14 +224,9 @@ Write-Host "[migrate] 완료"
 # ---------------------------------------------------------------
 Write-Host ""
 Write-Host "[start] 직원 서버 재기동 중..."
-Start-Process cmd -ArgumentList "/k", "cd /d `"$EmpBackend`" && py -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload" -WindowStyle Normal
-Start-Process powershell -ArgumentList @(
-    "-NoExit",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    (Join-Path $EmpRoot "scripts\dev\start-frontend.ps1")
-) -WindowStyle Normal
+powershell -ExecutionPolicy Bypass -File (Join-Path $EmpRoot "scripts\dev\start-backend.ps1")
+powershell -ExecutionPolicy Bypass -File (Join-Path $EmpRoot "scripts\dev\start-frontend.ps1")
+Start-Process -FilePath (Join-Path $EmpRoot "watch.bat") -WindowStyle Normal
 
 # ---------------------------------------------------------------
 # 10) 헬스체크

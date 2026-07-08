@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
 $Port = [int] $Profile.BackendPort
+$RuntimeFile = Join-Path $Profile.RepoRoot "backend\logs\backend-runtime.json"
 
 function Get-ListenPidsFromNetstat {
     @(
@@ -44,13 +45,29 @@ function Get-UvicornPythonPids {
     )
 }
 
+function Get-RuntimePid {
+    if (-not (Test-Path $RuntimeFile)) { return @() }
+    try {
+        $runtime = Get-Content -Raw $RuntimeFile | ConvertFrom-Json
+        if ($runtime.pid -and (Get-Process -Id ([int] $runtime.pid) -ErrorAction SilentlyContinue)) {
+            return @([int] $runtime.pid)
+        }
+    }
+    catch {
+        return @()
+    }
+    return @()
+}
+
 # Sweep up to 3 times to handle uvicorn reload parent/worker handoff.
 for ($attempt = 1; $attempt -le 3; $attempt++) {
     $listenPids = Get-PortPids
     $uvicornPids = Get-UvicornPythonPids
+    $runtimePids = Get-RuntimePid
     $combined = @()
     if ($listenPids) { foreach ($p in $listenPids) { $combined += [int] $p } }
     if ($uvicornPids) { foreach ($p in $uvicornPids) { $combined += [int] $p } }
+    if ($runtimePids) { foreach ($p in $runtimePids) { $combined += [int] $p } }
     $allPids = @($combined | Sort-Object -Unique)
 
     if ($allPids.Count -eq 0) { break }
@@ -62,7 +79,7 @@ for ($attempt = 1; $attempt -le 3; $attempt++) {
         }
         else {
             Write-Host "[stop] taskkill /T /F PID $procId ($($proc.ProcessName)) - attempt $attempt"
-            & taskkill.exe /T /F /PID $procId | Out-Null
+            & cmd.exe /c "taskkill.exe /T /F /PID $procId >NUL 2>NUL"
         }
     }
     Start-Sleep -Milliseconds 1000

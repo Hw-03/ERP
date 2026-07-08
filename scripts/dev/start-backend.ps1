@@ -13,15 +13,21 @@ $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
 $RepoRoot = $Profile.RepoRoot
 $BackendDir = Join-Path $RepoRoot "backend"
 $StopScript = Join-Path $RepoRoot "scripts\dev\stop-backend.ps1"
+$LogDir = Join-Path $BackendDir "logs"
+$StdoutLog = Join-Path $LogDir "backend-dev.out.log"
+$StderrLog = Join-Path $LogDir "backend-dev.err.log"
+$RuntimeFile = Join-Path $LogDir "backend-runtime.json"
 
 if (-not (Test-Path $BackendDir)) {
-    throw "백엔드 경로를 찾을 수 없습니다: $BackendDir"
+    throw "Backend directory not found: $BackendDir"
 }
+
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
 # 1) preflight - clear stale workers for this profile port only.
 & $StopScript
 
-# 2) Start py directly without a powershell.exe wrapper.
+# 2) Start py directly and detach server lifetime from the visible monitor window.
 $uvicornArgs = @(
     "-m",
     "uvicorn",
@@ -35,7 +41,27 @@ if (-not $NoReload) {
     $uvicornArgs += "--reload"
 }
 
-Start-Process -FilePath "py" -ArgumentList $uvicornArgs -WorkingDirectory $BackendDir -WindowStyle Hidden
+$proc = Start-Process `
+    -FilePath "py" `
+    -ArgumentList $uvicornArgs `
+    -WorkingDirectory $BackendDir `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput $StdoutLog `
+    -RedirectStandardError $StderrLog `
+    -PassThru
+
+@{
+    profile = $Profile.Label
+    repoRoot = $RepoRoot
+    service = "backend"
+    port = [int] $Profile.BackendPort
+    pid = $proc.Id
+    startedAt = (Get-Date).ToString("o")
+    stdoutLog = $StdoutLog
+    stderrLog = $StderrLog
+    command = "py $($uvicornArgs -join ' ')"
+    cwd = $BackendDir
+} | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 $RuntimeFile
 
 # 3) /health/live check, max 15 seconds.
 $ok = $false
@@ -52,7 +78,8 @@ for ($i = 0; $i -lt 30; $i++) {
 }
 
 if (-not $ok) {
-    throw "[start] uvicorn 이 $($Profile.BackendPort) 에서 응답하지 않음 - 좀비/기동실패 점검 필요"
+    throw "[start-backend] Backend did not respond on $healthUrl. Check logs: $StdoutLog / $StderrLog"
 }
 
-Write-Host "[start] OK - $($Profile.Label) backend live on $healthUrl"
+Write-Host "[start-backend] OK - $($Profile.Label) backend live on $healthUrl"
+Write-Host "[start-backend] logs: $StdoutLog / $StderrLog"

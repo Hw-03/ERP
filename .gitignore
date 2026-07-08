@@ -23,6 +23,7 @@ frontend/.vitest/
 
 # Backend runtime logs (Phase 4)
 backend/logs/
+frontend/logs/
 
 # Playwright e2e (전용 DB mes_e2e.db* 는 위 *.db 규칙으로 이미 제외)
 frontend/test-results/

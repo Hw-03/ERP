@@ -18,6 +18,20 @@ function errorToJson(error) {
   return { message: String(error) };
 }
 
+function classifyExitReason({
+  reason,
+  code,
+  signal,
+  receivedSignals = [],
+  pipeErrors = [],
+}) {
+  if (pipeErrors.length > 0) return "output-pipe-broken";
+  if (signal) return `signal-${signal}`;
+  if (receivedSignals.length > 0) return `forwarded-${receivedSignals[receivedSignals.length - 1].signal}`;
+  if (reason === "child-exit" && code === 0) return "child-exit-zero-unexpected";
+  return reason;
+}
+
 function buildExitDump({
   reason,
   code,
@@ -29,11 +43,17 @@ function buildExitDump({
   hostname,
   cwd,
   receivedSignals = [],
+  parentProcess = null,
+  childProcess = null,
+  pipeErrors = [],
+  portOwners = [],
   error = null,
 }) {
+  const classification = classifyExitReason({ reason, code, signal, receivedSignals, pipeErrors });
   return {
     timestamp: endTime.toISOString(),
     reason,
+    classification,
     exitCode: code ?? null,
     signal: signal ?? null,
     pid: process.pid,
@@ -50,6 +70,10 @@ function buildExitDump({
       arch: process.arch,
       argv: process.argv,
     },
+    parentProcess,
+    childProcess,
+    pipeErrors,
+    portOwners,
     memory: {
       process: process.memoryUsage(),
       system: {
@@ -100,6 +124,7 @@ function createDiagnostics(rootDir) {
 
 module.exports = {
   buildExitDump,
+  classifyExitReason,
   createDiagnostics,
   timestampForFile,
 };
