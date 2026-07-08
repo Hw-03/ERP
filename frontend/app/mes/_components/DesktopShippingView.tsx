@@ -1247,6 +1247,25 @@ function RequestSection(props: {
       return `${label} ${item?.mes_code ?? "코드 없음"} ${item?.item_name ?? "품목 없음"} ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`;
     }).join(" / ")
     : "표시할 BOM 구성이 없습니다.";
+  const requestQty = toPositiveInt(props.requestQuantity);
+  const shipmentName = basePfItem?.item_name ?? finalPfSummary.name ?? "출하 품목 미선택";
+  const shipmentCode = basePfItem ? itemCodeText(basePfItem) : finalPfSummary.code;
+  const matchReady = Boolean(props.matchResult);
+  const canFinalizeMatch = matchReady && !missingNewBomNames;
+  const matchConclusionTitle = !matchReady
+    ? "BOM 매칭 필요"
+    : canFinalizeMatch
+      ? "출하 요청 가능"
+      : "새 PA/PF 이름 필요";
+  const matchConclusionBody = !matchReady
+    ? "변경된 BOM 기준으로 PA/PF 재사용 여부를 먼저 확인하세요."
+    : canFinalizeMatch
+      ? "현재 구성으로 다음 단계에서 요청 정보를 입력할 수 있습니다."
+      : "새로 생성될 PA/PF 품목명을 입력해야 다음 단계로 이동할 수 있습니다.";
+  const matchConclusionTone = !matchReady ? LEGACY_COLORS.yellow : canFinalizeMatch ? LEGACY_COLORS.green : LEGACY_COLORS.red;
+  const bomChangedSummary = bomChangedLines.length > 0
+    ? `${bomChangedLines.length}개 변경`
+    : "기본 BOM 유지";
   const canOpenStep = (step: RequestWizardStep) => {
     if (locked && step !== props.wizardStep) return false;
     if (props.pending !== null && step !== props.wizardStep) return false;
@@ -1262,11 +1281,7 @@ function RequestSection(props: {
   );
   const footerHint = props.wizardStep === 1 && !props.basePfId
     ? "기준 PF를 먼저 선택하세요."
-    : props.wizardStep === 2
-      ? "필요하면 카톤·동반 출하품을 추가하세요."
-      : props.wizardStep === 5
-        ? ""
-        : "현재 단계를 확인하세요.";
+    : `출하 수량 ${requestQty}대`;
   const goPrev = () => props.onWizardStep(Math.max(1, props.wizardStep - 1) as RequestWizardStep);
   const goNext = () => {
     if (!canGoNext) return;
@@ -1408,15 +1423,25 @@ function RequestSection(props: {
 
           {props.wizardStep === 3 && (
             <WorkStep number={3} title="BOM 매칭" body="변경된 구성과 PA/PF 재사용 여부를 확인합니다." dataTestId="shipping-wizard-step-3">
-              <div className="grid min-h-0 content-start gap-3 overflow-hidden">
-                <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
-                  <div data-testid="shipping-bom-change-table"><Notice tone={bomChangedLines.length > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.green} title={bomChangedLines.length > 0 ? `BOM 변경 ${bomChangedLines.length}건` : "BOM 구성 요약"} body={bomSummaryBody} /></div>
+              <div className="grid min-h-0 content-start gap-3 overflow-y-auto pr-1">
+                <ShippingConclusionCard
+                  tone={matchConclusionTone}
+                  title={matchConclusionTitle}
+                  body={matchConclusionBody}
+                  metrics={[
+                    { label: "BOM 상태", value: bomChangedSummary },
+                    { label: "PA", value: finalPaSummary.label },
+                    { label: "PF", value: finalPfSummary.label },
+                  ]}
+                />
+                <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div data-testid="shipping-bom-change-table">
+                    <BomChangeSummaryCard lines={bomChangedLines} itemById={props.itemById} fallbackBody={bomSummaryBody} />
+                  </div>
                   <div className="grid content-start gap-3">
-                    <Notice tone={!props.matchResult ? LEGACY_COLORS.cyan : !requiresPaName && !requiresPfName ? LEGACY_COLORS.green : LEGACY_COLORS.yellow} title={!props.matchResult ? "BOM 매칭 대기" : !requiresPaName && !requiresPfName ? "동일 BOM 후보" : "BOM 매칭 결과"} body={matchNoticeBody} />
-                    <div className="grid gap-2">
-                      <FinalItemCard label={finalPaSummary.label} name={finalPaSummary.name} code={finalPaSummary.code} tone={reusingExistingPa ? LEGACY_COLORS.green : requiresPaName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
-                      <FinalItemCard label={finalPfSummary.label} name={finalPfSummary.name} code={finalPfSummary.code} tone={reusingExistingPf ? LEGACY_COLORS.green : requiresPfName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
-                    </div>
+                    <FinalItemCard label={finalPaSummary.label} name={finalPaSummary.name} code={finalPaSummary.code} tone={reusingExistingPa ? LEGACY_COLORS.green : requiresPaName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
+                    <FinalItemCard label={finalPfSummary.label} name={finalPfSummary.name} code={finalPfSummary.code} tone={reusingExistingPf ? LEGACY_COLORS.green : requiresPfName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
+                    <Notice tone={!props.matchResult ? LEGACY_COLORS.yellow : !requiresPaName && !requiresPfName ? LEGACY_COLORS.green : LEGACY_COLORS.yellow} title={!props.matchResult ? "재사용 확인 전" : "PA/PF 재사용 판단"} body={matchNoticeBody} />
                   </div>
                 </div>
                 {(requiresPaName || requiresPfName) && (
@@ -1439,7 +1464,7 @@ function RequestSection(props: {
 
           {props.wizardStep === 4 && (
             <WorkStep number={4} title="요청 정보" body="요청자와 메모를 확인합니다." dataTestId="shipping-wizard-step-4">
-              <div data-testid="shipping-request-info-fields" className="grid h-full min-h-0 content-start gap-4">
+              <div data-testid="shipping-request-info-fields" className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4">
                 <div data-testid="shipping-requester-summary" className="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-[14px] border px-4 py-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
                   <div className="min-w-0">
                     <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>요청자</div>
@@ -1447,9 +1472,10 @@ function RequestSection(props: {
                   </div>
                   <span className="rounded-full px-3 py-1.5 text-xs font-black" style={{ background: tint(LEGACY_COLORS.blue, 14), color: LEGACY_COLORS.blue }}>로그인 사용자 자동 반영</span>
                 </div>
-                <Field label="요청 메모">
-                  <textarea aria-label="요청 메모" value={props.notes} disabled={locked} onChange={(event) => props.onNotes(event.target.value)} className="min-h-[300px] w-full min-w-0 resize-none rounded-[12px] border px-3 py-3 text-sm font-bold outline-none focus-visible:ring-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="출하 준비자가 알아야 할 변경 사항" />
-                </Field>
+                <div className="flex min-h-0 flex-col gap-1">
+                  <span className="text-xs font-black uppercase" style={{ color: LEGACY_COLORS.muted2 }}>요청 메모</span>
+                  <textarea aria-label="요청 메모" value={props.notes} disabled={locked} onChange={(event) => props.onNotes(event.target.value)} className="min-h-0 flex-1 w-full min-w-0 resize-none rounded-[12px] border px-4 py-4 text-base font-bold leading-7 outline-none focus-visible:ring-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="출하 준비자가 알아야 할 변경 사항" />
+                </div>
               </div>
             </WorkStep>
           )}
@@ -1457,22 +1483,25 @@ function RequestSection(props: {
           {props.wizardStep === 5 && (
             <WorkStep number={5} title="저장 및 전환" body="요청 내용을 확인한 뒤 출하 요청을 등록합니다." dataTestId="shipping-wizard-step-5">
               <div data-testid="shipping-final-summary" className="grid min-h-0 content-start gap-3 overflow-y-auto pr-1">
-                <div className="grid gap-3 md:grid-cols-4">
-                  <Metric label="기준 PF" value={basePfItem ? itemCodeText(basePfItem) + " · " + basePfItem.item_name : "미선택"} />
-                  <Metric label="출하 수량" value={`${toPositiveInt(props.requestQuantity)}대`} />
+                <ShippingShipmentHero name={shipmentName} code={shipmentCode} quantity={requestQty} />
+                <div className="grid gap-3 md:grid-cols-3">
                   <Metric label="PA 구성" value={grouped.PA.filter((line) => line.included).length + "개 포함"} />
-                  <Metric label="PF·동반" value={`PF ${grouped.PF.filter((line) => line.included).length}개 · 동반 ${props.companionDraft.length}개`} />
+                  <Metric label="PF 구성" value={grouped.PF.filter((line) => line.included).length + "개 포함"} />
+                  <Metric label="동반 출하품" value={`${props.companionDraft.length}개`} />
                 </div>
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-                  <div data-testid="shipping-bom-change-table"><Notice tone={bomChangedLines.length > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.green} title={bomChangedLines.length > 0 ? `BOM 변경 ${bomChangedLines.length}건` : "BOM 구성 요약"} body={bomSummaryBody} /></div>
+                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                   <div className="grid content-start gap-3">
                     <FinalItemCard label={finalPaSummary.label} name={finalPaSummary.name} code={finalPaSummary.code} tone={reusingExistingPa ? LEGACY_COLORS.green : requiresPaName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
                     <FinalItemCard label={finalPfSummary.label} name={finalPfSummary.name} code={finalPfSummary.code} tone={reusingExistingPf ? LEGACY_COLORS.green : requiresPfName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
-                    <Notice tone={LEGACY_COLORS.blue} title="요청 정보" body={`${props.requestedBy || "로그인 사용자 없음"} · ${props.notes.trim() || "입력된 메모 없음"}`} />
+                  </div>
+                  <div data-testid="shipping-bom-change-table">
+                    <BomChangeSummaryCard lines={bomChangedLines} itemById={props.itemById} fallbackBody={bomSummaryBody} />
                   </div>
                 </div>
-                <CompanionFinalSummary lines={props.companionDraft} itemById={props.itemById} />
-                <Notice tone={LEGACY_COLORS.cyan} title="마지막 확인" body={finalActionIsUpdateOnly ? "변경사항을 반영합니다." : "등록 후 준비 중으로 이동합니다."} />
+                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <CompanionFinalSummary lines={props.companionDraft} itemById={props.itemById} />
+                  <ShippingRequestMemoCard requester={props.requestedBy || "로그인 사용자 없음"} notes={props.notes} finalActionIsUpdateOnly={finalActionIsUpdateOnly} />
+                </div>
               </div>
             </WorkStep>
           )}
@@ -1883,8 +1912,8 @@ function BomEditor({
                 style={{ background: isExcluded ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.s1, borderColor: isExcluded ? tint(LEGACY_COLORS.red, 36) : LEGACY_COLORS.border }}
               >
                 <div className="grid min-w-0 gap-1">
-                  <div data-testid="shipping-bom-readonly-item" className="min-h-9 rounded-[9px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: isExcluded ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}>
-                    <div className="truncate text-sm font-black">{item?.item_name ?? "품목 없음"}</div>
+                  <div data-testid="shipping-bom-readonly-item" className="min-h-9 min-w-0 rounded-[9px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: isExcluded ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}>
+                    <div className="line-clamp-2 break-words text-sm font-black leading-snug" title={item?.item_name ?? "품목 없음"}>{item?.item_name ?? "품목 없음"}</div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="rounded-full px-2 py-0.5 text-[11px] font-black" style={{ background: tint(badgeTone, 18), color: badgeTone }}>{badgeLabel}</span>
@@ -2153,6 +2182,120 @@ function Notice({ tone, title, body }: { tone: string; title: string; body: stri
       <div className="text-sm font-black" style={{ color: tone }}>{title}</div>
       <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{body}</div>
     </div>
+  );
+}
+
+function ShippingConclusionCard({
+  tone,
+  title,
+  body,
+  metrics,
+}: {
+  tone: string;
+  title: string;
+  body: string;
+  metrics: { label: string; value: string }[];
+}) {
+  return (
+    <section className="rounded-[16px] border px-4 py-3" style={{ background: tint(tone, 9), borderColor: tint(tone, 42) }}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xl font-black" style={{ color: tone }}>{title}</div>
+          <div className="mt-1 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{body}</div>
+        </div>
+        <div className="grid min-w-[360px] flex-1 gap-2 sm:grid-cols-3">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: tint(tone, 20) }}>
+              <div className="text-[11px] font-black" style={{ color: LEGACY_COLORS.muted2 }}>{metric.label}</div>
+              <div className="mt-0.5 line-clamp-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{metric.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BomChangeSummaryCard({
+  lines,
+  itemById,
+  fallbackBody,
+}: {
+  lines: DraftLine[];
+  itemById: Map<string, Item>;
+  fallbackBody: string;
+}) {
+  if (lines.length === 0) {
+    return <Notice tone={LEGACY_COLORS.green} title="BOM 변경 없음" body="기본 BOM 구성을 그대로 사용합니다." />;
+  }
+  return (
+    <section className="rounded-[14px] border p-3" style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-black" style={{ color: LEGACY_COLORS.yellow }}>변경된 구성품 {lines.length}개</div>
+        <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>세부 목록</div>
+      </div>
+      <div className="mt-2 grid gap-1.5">
+        {lines.slice(0, 6).map((line) => {
+          const item = itemById.get(line.child_item_id);
+          const label = !line.included ? "제외" : line.origin === "CUSTOM" ? "추가" : "포함";
+          const tone = !line.included ? LEGACY_COLORS.red : line.origin === "CUSTOM" ? LEGACY_COLORS.cyan : LEGACY_COLORS.green;
+          return (
+            <div key={line.key} className="grid min-h-10 items-center gap-2 rounded-[10px] border px-3 py-2 md:grid-cols-[74px_minmax(0,1fr)_auto]" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+              <span className="rounded-full px-2 py-1 text-center text-xs font-black" style={{ background: tint(tone, 14), color: tone }}>{label}</span>
+              <span className="min-w-0">
+                <span className="line-clamp-2 text-sm font-black leading-snug" title={item?.item_name ?? "품목 없음"} style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</span>
+                <span className="block truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "코드 없음"}</span>
+              </span>
+              <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.quantity}{line.unit ? ` ${line.unit}` : ""}</span>
+            </div>
+          );
+        })}
+      </div>
+      {lines.length > 6 && <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>외 {lines.length - 6}개는 저장 후 상세에서 확인합니다.</div>}
+      <div className="sr-only">{fallbackBody}</div>
+    </section>
+  );
+}
+
+function ShippingShipmentHero({ name, code, quantity }: { name: string; code: string; quantity: number }) {
+  return (
+    <section className="rounded-[16px] border px-4 py-3" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 34) }}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>출하 품목</div>
+          <div className="mt-1 line-clamp-2 text-xl font-black leading-snug" title={name} style={{ color: LEGACY_COLORS.text }}>{name}</div>
+          <div className="mt-1 truncate text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{code}</div>
+        </div>
+        <div className="rounded-[14px] border px-5 py-3 text-right" style={{ background: LEGACY_COLORS.bg, borderColor: tint(LEGACY_COLORS.blue, 24) }}>
+          <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</div>
+          <div className="mt-1 text-2xl font-black" style={{ color: LEGACY_COLORS.blue }}>{quantity}대</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ShippingRequestMemoCard({ requester, notes, finalActionIsUpdateOnly }: { requester: string; notes: string; finalActionIsUpdateOnly: boolean }) {
+  const memo = notes.trim();
+  return (
+    <section className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>요청 정보</div>
+      <div className="mt-2 grid gap-2">
+        <div className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+          <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>요청자</div>
+          <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{requester}</div>
+        </div>
+        <div className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+          <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>메모</div>
+          <div className="line-clamp-4 whitespace-pre-wrap text-sm font-bold" style={{ color: memo ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
+            {memo || "입력된 메모 없음"}
+          </div>
+        </div>
+        <div className="rounded-[12px] border px-3 py-2 text-xs font-black" style={{ background: tint(finalActionIsUpdateOnly ? LEGACY_COLORS.blue : LEGACY_COLORS.green, 10), borderColor: tint(finalActionIsUpdateOnly ? LEGACY_COLORS.blue : LEGACY_COLORS.green, 28), color: finalActionIsUpdateOnly ? LEGACY_COLORS.blue : LEGACY_COLORS.green }}>
+          {finalActionIsUpdateOnly ? "변경사항 반영 예정" : "등록 후 준비 중으로 이동"}
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -835,7 +835,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-request-info-fields")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-requester-summary")).toHaveTextContent("김현우");
     expect(screen.queryByLabelText("요청자")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("요청 메모")).toHaveClass("min-h-[300px]");
+    expect(screen.getByLabelText("요청 메모")).toHaveClass("flex-1");
   });
 
   it("summarizes new or reused PA/PF names and item codes on the final step", async () => {
