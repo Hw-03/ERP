@@ -114,3 +114,6 @@ _attic/screenshots/
 
 # /understand 지식 그래프 산출물 (코드에서 재생성 가능한 로컬 파생물·머신 전용 경로 포함)
 .understand-anything/
+
+# verify_local / 로컬 dev 실행 로그 (재생성 가능)
+frontend/frontend-dev-verify.log
