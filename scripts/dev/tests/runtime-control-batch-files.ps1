@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 
@@ -54,7 +54,8 @@ Assert-FileExists $StopServersScript
 Assert-ContentNotMatch $StartBat 'cmd\s*/k.*(uvicorn|npm\s+run\s+dev)' "start.bat must not attach server processes to cmd /k."
 Assert-ContentMatch $StartBat 'start-backend\.ps1' "start.bat must call start-backend.ps1."
 Assert-ContentMatch $StartBat 'start-frontend\.ps1' "start.bat must call start-frontend.ps1."
-Assert-ContentMatch $StartBat 'watch\.bat' "start.bat must open or mention watch.bat for reopening the monitor."
+Assert-ContentMatch $StartBat 'watch\.bat' "start.bat must mention watch.bat for manual monitoring."
+Assert-ContentNotMatch $StartBat 'start\s+"[^"]*"\s+"%~dp0watch\.bat"|Start-Process\s+.*watch\.bat' "start.bat must not open the monitor automatically."
 Assert-ContentMatch $StartBat 'stop\.bat' "start.bat must mention stop.bat for full shutdown."
 
 Assert-ContentMatch $WatchBat 'open-watch\.ps1' "watch.bat must open the split monitoring launcher."
@@ -67,6 +68,7 @@ Assert-ContentMatch $StopServersScript 'stop-frontend\.ps1' "stop-servers.ps1 mu
 Assert-ContentMatch $OpenWatchScript 'wt(\.exe)?' "open-watch.ps1 must prefer Windows Terminal for split panes."
 Assert-ContentMatch $OpenWatchScript 'split-pane' "open-watch.ps1 must create a split pane for frontend/backend monitoring."
 Assert-ContentMatch $OpenWatchScript 'watch-service\.ps1' "open-watch.ps1 must launch service-specific watchers."
+Assert-ContentMatch $OpenWatchScript 'TabTitle' "open-watch.ps1 must set a profile-specific monitor tab title."
 Assert-ContentMatch $OpenWatchScript 'Start-Process' "open-watch.ps1 must fall back to separate monitor windows when wt.exe is unavailable."
 Assert-ContentNotMatch $OpenWatchScript 'taskkill|Stop-Process|stop-backend|stop-frontend|stop-servers|start-backend|start-frontend' "open-watch.ps1 must not start or stop servers."
 
@@ -75,18 +77,15 @@ Assert-ContentNotMatch $WatchScript 'taskkill|Stop-Process|stop-backend|stop-fro
 
 Assert-ContentMatch $WatchServiceScript 'param\s*\(' "watch-service.ps1 must accept parameters."
 Assert-ContentMatch $WatchServiceScript 'Service' "watch-service.ps1 must support service selection."
-Assert-ContentMatch $WatchServiceScript 'Get-Content\s+.*-Tail' "watch-service.ps1 must show recent important logs while monitoring."
-Assert-ContentMatch $WatchServiceScript 'health/live' "watch-service.ps1 must monitor backend health."
-Assert-ContentMatch $WatchServiceScript '/mes' "watch-service.ps1 must monitor frontend health."
+Assert-ContentMatch $WatchServiceScript 'Get-Content\s+.*-Tail' "watch-service.ps1 must show recent logs while monitoring."
+Assert-ContentMatch $WatchServiceScript '-Wait' "watch-service.ps1 must stream logs continuously instead of redrawing a status panel."
+Assert-ContentNotMatch $WatchServiceScript 'health/live|Test-Url|Get-NetTCPConnection|State\s+:' "watch-service.ps1 must not render a status dashboard."
+Assert-ContentNotMatch $WatchServiceScript 'Profile\s+:|URL\s+:|Runtime\s+:|Restart\s+:|Watch\s+:|Stop\s+:' "watch-service.ps1 must keep the pane content focused on logs only."
 Assert-ContentMatch $WatchServiceScript 'NO_COLOR' "watch-service.ps1 must filter noisy frontend color warnings."
 Assert-ContentNotMatch $WatchServiceScript 'GET\s+/mes\s+200|GET /mes 200' "watch-service.ps1 must keep frontend success logs visible so the monitor resembles the old frontend log view."
 Assert-ContentMatch $WatchServiceScript 'FrontendStdoutNoise' "watch-service.ps1 must keep frontend stdout filtering separate from stderr filtering."
 Assert-ContentMatch $WatchServiceScript 'FrontendStderrNoise' "watch-service.ps1 must keep frontend stderr noise filtering separate from stdout logs."
-Assert-ContentNotMatch $WatchServiceScript 'Clear-Host' "watch-service.ps1 must not clear the whole pane on every refresh because that causes visible flicker."
-Assert-ContentMatch $WatchServiceScript 'SetCursorPosition' "watch-service.ps1 must redraw in-place instead of clearing the whole pane."
-Assert-ContentMatch $WatchServiceScript 'LastRender' "watch-service.ps1 must cache the last rendered screen."
-Assert-ContentMatch $WatchServiceScript 'Render-MonitorScreen' "watch-service.ps1 must build a complete screen before deciding whether to redraw."
-Assert-ContentMatch $WatchServiceScript 'if\s*\(\s*\$screen\s+-ne\s+\$LastRender\s*\)' "watch-service.ps1 must redraw only when the rendered screen changed."
+Assert-ContentNotMatch $WatchServiceScript 'Clear-Host|SetCursorPosition|LastRender|Render-MonitorScreen' "watch-service.ps1 must not redraw a synthetic screen."
 Assert-ContentNotMatch $WatchServiceScript 'taskkill|Stop-Process|stop-backend|stop-frontend|stop-servers|start-backend|start-frontend' "watch-service.ps1 must not start or stop servers."
 
 Assert-ContentMatch $SyncToEmployeeScript 'open-watch\.ps1' "sync-to-employee.ps1 must copy open-watch.ps1 to the employee server."

@@ -1,4 +1,4 @@
-# Open the DEXCOWIN MES monitor as Backend/Frontend split panes when Windows Terminal is available.
+﻿# Open the DEXCOWIN MES monitor as Backend/Frontend split panes when Windows Terminal is available.
 
 $ErrorActionPreference = "Stop"
 
@@ -6,11 +6,15 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $WatchService = Join-Path $PSScriptRoot "watch-service.ps1"
 $PowerShellExe = (Get-Command powershell.exe -ErrorAction Stop).Source
 $Wt = Get-Command wt.exe -ErrorAction SilentlyContinue
+$Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+$EmployeeTitle = -join ([char[]] @(0xC9C1, 0xC6D0, 0xC6A9))
+$DevelopmentTitle = -join ([char[]] @(0xAC1C, 0xBC1C, 0xC6A9))
+$TabTitle = if ($Profile.Name -eq "employee") { $EmployeeTitle } else { $DevelopmentTitle }
 
 if ($Wt) {
     $wtArgs = @(
         "new-tab",
-        "--title", "Backend",
+        "--title", $TabTitle,
         "--startingDirectory", $RepoRoot,
         $PowerShellExe,
         "-NoProfile",
@@ -21,7 +25,7 @@ if ($Wt) {
         ";",
         "split-pane",
         "--vertical",
-        "--title", "Frontend",
+        "--title", $TabTitle,
         "--startingDirectory", $RepoRoot,
         $PowerShellExe,
         "-NoProfile",

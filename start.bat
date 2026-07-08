@@ -150,10 +150,8 @@ if errorlevel 1 (
 
 echo.
 echo [MES] Servers are running in the background.
-echo [MES] Monitor again : double-click watch.bat
+echo [MES] Monitor      : double-click watch.bat
 echo [MES] Stop servers  : double-click stop.bat
 echo.
-start "DEXCOWIN MES Watch" "%~dp0watch.bat"
-timeout /t 2 /nobreak >nul
 
 endlocal
