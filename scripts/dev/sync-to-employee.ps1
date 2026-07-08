@@ -129,6 +129,8 @@ $runtimeScripts = @(
     "start-frontend.ps1",
     "stop-frontend.ps1",
     "stop-servers.ps1",
+    "open-watch.ps1",
+    "watch-service.ps1",
     "watch-servers.ps1"
 )
 foreach ($scriptName in $runtimeScripts) {
