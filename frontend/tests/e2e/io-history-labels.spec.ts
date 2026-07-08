@@ -9,7 +9,7 @@
  *  - "원자재 입고"(receive)는 창고 정/부 직원에게만 노출 → 창고 역할로 로그인.
  */
 import { expect, test } from "@playwright/test";
-import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 // "생산 | 입고" 처럼 정규식 메타문자(|)가 든 단어는 text=/.../ 가 alternation 으로
 // 오해석한다(=오매칭). 정확 일치는 getByText(word,{exact:true}) 로 검증한다.
@@ -88,6 +88,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "낱개", exact: true })
       .click();
+    await advanceToQuantityStep(submitPage);
     await submitPage.getByRole("button", { name: /제출확인/ }).click();
     await submitPage.getByRole("button", { name: /창고 결재 요청/ }).click();
     await submitPage.getByRole("button", { name: "결재 요청", exact: true }).click();

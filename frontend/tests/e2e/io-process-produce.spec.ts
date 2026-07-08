@@ -8,7 +8,7 @@
  * 자식 자재는 품목 소속 공정(TR → 튜브) PRODUCTION 재고에서 소비된다 — globalSetup 이 튜브 공정에 시드.
  */
 import { expect, test } from "@playwright/test";
-import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("입출고 V2 — 부서 입출고(생산)", () => {
   test.beforeEach(async ({ page }) => {
@@ -30,6 +30,7 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
       .getByRole("row", { name: /E2E조립튜브/ })
       .getByRole("button", { name: "BOM", exact: true })
       .click();
+    await advanceToQuantityStep(page);
 
     // 4. 품목 확인 → 제출확인 (자식 품목 소속 공정 생산재고 시드로 재고 충분 → 활성화)
     await page.getByRole("button", { name: /제출확인/ }).click();
@@ -56,13 +57,15 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
       .getByRole("row", { name: /E2E조립튜브/ })
       .getByRole("button", { name: "BOM", exact: true })
       .click();
+    await advanceToQuantityStep(page);
 
     // 품목 확인 묶음 카드 펼치기 → 자식 라인 노출
     // (76e4ffd2 — BOM 상위에 mes_code span 추가로 accessible name 사이에 코드가 끼어듦)
     await page.getByRole("button", { name: /E2E조립튜브.*기준 수량/ }).click();
 
-    // 자식은 "상위 품목과 함께 자동 처리" + 수량 잠김(자동 계산, disabled)
+    // 자식은 "상위 품목과 함께 자동 처리" + 수량 잠김(disabled)
     await expect(page.getByText("상위 품목과 함께 자동 처리")).toBeVisible();
-    await expect(page.getByRole("spinbutton", { name: /자동 계산/ })).toBeDisabled();
+    const childLine = page.getByRole("listitem").filter({ hasText: "상위 품목과 함께 자동 처리" });
+    await expect(childLine.getByRole("spinbutton", { name: /수량/ })).toBeDisabled();
   });
 });

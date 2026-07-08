@@ -6,7 +6,7 @@
  * → "창고 결재 요청 완료" 다이얼로그. 창고 정/부(이필욱)에게 "창고 승인함" 큐도 존재.
  */
 import { expect, test } from "@playwright/test";
-import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("입출고 V2 — 창고 → 부서 결재 요청", () => {
   test.beforeEach(async ({ page }) => {
@@ -29,6 +29,7 @@ test.describe("입출고 V2 — 창고 → 부서 결재 요청", () => {
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "낱개", exact: true })
       .click();
+    await advanceToQuantityStep(page);
 
     // 4. 품목 확인 → 제출확인
     await page.getByRole("button", { name: /제출확인/ }).click();

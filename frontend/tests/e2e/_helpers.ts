@@ -100,6 +100,16 @@ export async function clickNextStep(page: Page): Promise<void> {
     .click({ noWaitAfter: true });
 }
 
+/** 품목 선택 단계에서 담긴 품목을 수량 확인 단계로 넘긴다. */
+export async function advanceToQuantityStep(page: Page): Promise<void> {
+  await page
+    .getByRole("button", { name: /수량 조정/ })
+    .filter({ visible: true })
+    .first()
+    .click({ noWaitAfter: true });
+  await expect(page.getByRole("button", { name: /제출확인/ }).filter({ visible: true }).first()).toBeVisible();
+}
+
 /** globalSetup 이 저장한 시드(.e2e-seed.json) 를 읽어 테스트에서 품목/직원 식별자에 접근. */
 export function readSeed(): {
   rawItem: any;

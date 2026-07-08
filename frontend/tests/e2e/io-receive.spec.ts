@@ -8,7 +8,7 @@
  * 원자재 입고 work type 은 창고 정/부 직원에게만 노출 → 창고 역할로 로그인.
  */
 import { expect, test } from "@playwright/test";
-import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("입출고 V2 — 원자재 입고", () => {
   test.beforeEach(async ({ page }) => {
@@ -29,6 +29,7 @@ test.describe("입출고 V2 — 원자재 입고", () => {
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "선택" })
       .click();
+    await advanceToQuantityStep(page);
 
     // 4. 품목 확인 → 제출확인
     await page.getByRole("button", { name: /제출확인/ }).click();

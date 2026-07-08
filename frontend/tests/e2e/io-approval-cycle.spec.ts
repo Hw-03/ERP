@@ -8,7 +8,7 @@
  *  - 창고 승인함에는 E01 의 warehouse_to_dept 요청만 적재됨(다른 spec 은 E22 자가승인) → 큐 소멸 검증 안전.
  */
 import { expect, test } from "@playwright/test";
-import { clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("결재 풀사이클 — 창고 승인", () => {
   test("E01 제출(창고→부서) → E22 창고 승인함 PIN 승인 → 큐 소멸", async ({ browser }) => {
@@ -25,6 +25,7 @@ test.describe("결재 풀사이클 — 창고 승인", () => {
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "낱개", exact: true })
       .click();
+    await advanceToQuantityStep(a);
     await a.getByRole("button", { name: /제출확인/ }).click();
     await a.getByRole("button", { name: /창고 결재 요청/ }).click();
     await a.getByRole("button", { name: "결재 요청", exact: true }).click();
