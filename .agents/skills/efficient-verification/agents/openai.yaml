@@ -1,0 +1,4 @@
+interface:
+  display_name: "Efficient Verification"
+  short_description: "Run the right verification without wasting time."
+  default_prompt: "Use efficient verification for this change."

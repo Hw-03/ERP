@@ -887,7 +887,7 @@ describe("DesktopShippingView", () => {
   });
 
 
-  it("requires at least one companion item before leaving the BOM step", async () => {
+  it("allows leaving the BOM step without a companion item", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -898,11 +898,12 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
-    expect(screen.getByTestId("shipping-wizard-next")).toBeDisabled();
-    expect(screen.getByTestId("shipping-companion-required-message")).toBeInTheDocument();
-
-    await addCompanionItem();
     expect(screen.getByTestId("shipping-wizard-next")).not.toBeDisabled();
+    expect(screen.queryByTestId("shipping-companion-required-message")).not.toBeInTheDocument();
+    expect(screen.getByText(/선택\s*0개/)).toBeInTheDocument();
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
   });
 
   it("shows a detailed BOM change table on the matching step", async () => {

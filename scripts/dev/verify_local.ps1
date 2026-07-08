@@ -137,7 +137,7 @@ function Invoke-FrontendGates {
     # coverage gate (Round-10A #5) — CI 와 동일한 threshold 50/50/50/50.
     Invoke-Check "Frontend tests + coverage" $FrontendRoot { npm run test:coverage }
     Invoke-Check "Frontend production build" $FrontendRoot { npm run build }
-    # Round-16 #4 — bundle size gate (.next-prod/static/chunks 합산 ≤ 2.0 MB).
+    # Round-16 #4 — bundle size gate (.next-prod/static/chunks, frontend script 기준).
     Invoke-Check "Frontend bundle size" $FrontendRoot { npm run check:bundle-size }
 }
 

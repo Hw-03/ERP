@@ -12,6 +12,7 @@
   - `systematic-debugging`: bugs, test failures, and unexpected behavior.
   - `test-driven-development`: feature or bugfix implementation.
   - `writing-plans` and `executing-plans`: planning and carrying out implementation plans.
+  - `efficient-verification`: before choosing broad test/verify commands, especially to avoid repeated slow full gates while keeping final proof reliable.
   - `verification-before-completion`: before claiming work is complete.
 - Prefer proactive subagent use for broad investigations, code reviews, plan validation, and 2+ independent tasks:
   - Use `dispatching-parallel-agents` for parallel research/review when agents can work without editing the same files.

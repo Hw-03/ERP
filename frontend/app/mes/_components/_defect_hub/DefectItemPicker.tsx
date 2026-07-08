@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -67,6 +67,7 @@ export function DefectItemPicker({
   const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT);
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<Item[]>([]);
+  const tableRef = useRef<HTMLDivElement | null>(null);
   const operator = useCurrentOperator();
 
   const { data: myOrderData } = useMyItemOrderQuery(operator?.employee_id);
@@ -103,6 +104,10 @@ export function DefectItemPicker({
     );
     return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
   }, [items, effectiveDept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
+
+  useEffect(() => {
+    if (tableRef.current) tableRef.current.scrollTop = 0;
+  }, [effectiveDept, model, stage, keyword]);
 
   const allItemsSorted = useMemo(() => {
     return sortItemsForPicker(items, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
@@ -259,11 +264,12 @@ export function DefectItemPicker({
 
       {/* 결과 표 */}
       <div
-        data-testid="defect-picker-table" className="min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border"
+        ref={tableRef}
+        data-testid="defect-picker-table" className="min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
-          overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
         }}
       >
         {editMode ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import clsx from "clsx";
 import { Plus, ScanLine, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -29,6 +29,8 @@ export function MobileSingleAdjustForm({
   onRemoveBundle,
   getAvailable,
   onScan,
+  onSaveDraft,
+  saving,
   onSubmit,
   submitting,
   busy,
@@ -44,6 +46,8 @@ export function MobileSingleAdjustForm({
   onRemoveBundle: (bundleId: string) => void;
   getAvailable: (line: IoLine) => number | null;
   onScan: () => void;
+  onSaveDraft: () => void;
+  saving: boolean;
   onSubmit: () => void;
   submitting: boolean;
   busy: boolean;
@@ -51,6 +55,7 @@ export function MobileSingleAdjustForm({
 }) {
   const isOut = subType === "adjust_out";
   const accent = isOut ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const results = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -69,12 +74,24 @@ export function MobileSingleAdjustForm({
     [bundles],
   );
 
+  function handleAddItem(item: Item) {
+    onAddItem(item);
+    onSearchChange("");
+    searchInputRef.current?.focus();
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {/* 검색 + 스캔 */}
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <InlineSearch value={search} onChange={onSearchChange} placeholder="품목명 또는 코드" />
+          <InlineSearch
+            value={search}
+            onChange={onSearchChange}
+            placeholder="품목명 또는 코드"
+            inputRef={searchInputRef}
+            autoFocus
+          />
         </div>
         {/* 항목 8 — 스캔 버튼 당분간 UI에서 숨김(코드·onScan 유지, hidden). */}
         <span className="hidden">
@@ -97,15 +114,14 @@ export function MobileSingleAdjustForm({
 
       {/* 검색 결과 */}
       {results.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex max-h-[42vh] flex-col gap-1.5 overflow-y-auto">
           {results.map((it) => (
             <button
               key={it.item_id}
               type="button"
               disabled={busy}
               onClick={() => {
-                onAddItem(it);
-                onSearchChange("");
+                handleAddItem(it);
               }}
               className="flex items-center gap-3 rounded-[16px] border px-4 py-3 text-left transition-[transform] active:scale-[0.98] disabled:opacity-50"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
@@ -183,14 +199,24 @@ export function MobileSingleAdjustForm({
         단품 {isOut ? "출고" : "입고"}는 부서 결재로 처리됩니다.
       </div>
 
-      <PrimaryActionButton
-        label={isOut ? "단품 출고 제출" : "단품 입고 제출"}
-        intent={isOut ? "danger" : "primary"}
-        count={bundles.length || undefined}
-        onClick={onSubmit}
-        disabled={bundles.length === 0 || submitting}
-        loadingText="처리 중…"
-      />
+      <div className="grid grid-cols-2 gap-2">
+        <PrimaryActionButton
+          label="작성 중 저장"
+          intent="neutral"
+          count={bundles.length || undefined}
+          onClick={onSaveDraft}
+          disabled={bundles.length === 0 || saving || submitting}
+          loadingText={saving ? "저장 중…" : undefined}
+        />
+        <PrimaryActionButton
+          label={isOut ? "단품 출고 제출" : "단품 입고 제출"}
+          intent={isOut ? "danger" : "primary"}
+          count={bundles.length || undefined}
+          onClick={onSubmit}
+          disabled={bundles.length === 0 || submitting || saving}
+          loadingText={submitting ? "처리 중…" : undefined}
+        />
+      </div>
     </div>
   );
 }

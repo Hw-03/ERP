@@ -1219,9 +1219,8 @@ function RequestSection(props: {
       ].filter(Boolean).join(" / ")
     : "BOM 변경 시 자동으로 동일 후보를 확인합니다.";
   const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
-  const hasRequiredCompanion = props.companionDraft.length > 0;
   const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
-  const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || !hasRequiredCompanion || missingNewBomNames || props.selectedRequest?.status === "PREPARED";
+  const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || props.selectedRequest?.status === "PREPARED";
   const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "저장 및 전환"];
   const basePfItem = props.pfItems.find((item) => item.item_id === props.basePfId) ?? props.itemById.get(props.basePfId);
   const matchedPaItem = props.matchResult?.matched_pa_item_id ? props.itemById.get(props.matchResult.matched_pa_item_id) : undefined;
@@ -1252,20 +1251,19 @@ function RequestSection(props: {
     if (locked && step !== props.wizardStep) return false;
     if (props.pending !== null && step !== props.wizardStep) return false;
     if (step >= 2 && (!props.basePfId || !validRequestQuantity)) return false;
-    if (step >= 3 && !hasRequiredCompanion) return false;
     if (step >= 4 && missingNewBomNames) return false;
     return true;
   };
   const canGoNext = props.pending === null && !locked && (
     props.wizardStep === 1 ? Boolean(props.basePfId && validRequestQuantity) :
-    props.wizardStep === 2 ? hasRequiredCompanion :
+    props.wizardStep === 2 ? true :
     props.wizardStep === 3 ? !missingNewBomNames :
     props.wizardStep < 5
   );
   const footerHint = props.wizardStep === 1 && !props.basePfId
     ? "기준 PF를 먼저 선택하세요."
-    : props.wizardStep === 2 && !hasRequiredCompanion
-      ? "카톤·동반 출하품을 추가하세요."
+    : props.wizardStep === 2
+      ? "필요하면 카톤·동반 출하품을 추가하세요."
       : props.wizardStep === 5
         ? ""
         : "현재 단계를 확인하세요.";
@@ -1463,7 +1461,7 @@ function RequestSection(props: {
                   <Metric label="기준 PF" value={basePfItem ? itemCodeText(basePfItem) + " · " + basePfItem.item_name : "미선택"} />
                   <Metric label="출하 수량" value={`${toPositiveInt(props.requestQuantity)}대`} />
                   <Metric label="PA 구성" value={grouped.PA.filter((line) => line.included).length + "개 포함"} />
-                  <Metric label="PF·동반" value={`${grouped.PF.filter((line) => line.included).length}개 / ${props.companionDraft.length}개`} />
+                  <Metric label="PF·동반" value={`PF ${grouped.PF.filter((line) => line.included).length}개 · 동반 ${props.companionDraft.length}개`} />
                 </div>
                 <div className="grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
                   <div data-testid="shipping-bom-change-table"><Notice tone={bomChangedLines.length > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.green} title={bomChangedLines.length > 0 ? `BOM 변경 ${bomChangedLines.length}건` : "BOM 구성 요약"} body={bomSummaryBody} /></div>
@@ -1765,15 +1763,10 @@ function CompanionEditor({
           <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>검색 결과에서 바로 추가합니다.</div>
         </div>
         <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-black" style={{ background: tint(lines.length > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.yellow, 14), color: lines.length > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.yellow }}>
-          필수 {lines.length}개
+          선택 {lines.length}개
         </span>
       </div>
       <ItemSearchAdd query={query} setQuery={setQuery} itemOptions={itemOptions} disabled={disabled} inputTestId="shipping-companion-search" buttonTestPrefix="shipping-companion-add" ariaLabel="카톤·동반 출하품 검색" placeholder="동반 출하품 검색" tone={LEGACY_COLORS.cyan} onAdd={onAdd} />
-      {lines.length === 0 && (
-        <div data-testid="shipping-companion-required-message" className="mb-2 rounded-[12px] border px-3 py-2 text-xs font-black" style={{ background: tint(LEGACY_COLORS.yellow, 12), borderColor: tint(LEGACY_COLORS.yellow, 35), color: LEGACY_COLORS.yellow }}>
-          카톤·동반 출하품을 추가하세요.
-        </div>
-      )}
       <div className="mt-2 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
         {lines.length === 0 ? (
           <div className="flex min-h-[92px] items-center justify-center rounded-[12px] border text-xs font-bold" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>추가된 동반 출하품 없음</div>

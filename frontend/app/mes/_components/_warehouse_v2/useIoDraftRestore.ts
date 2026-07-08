@@ -59,7 +59,7 @@ export function useIoDraftRestore(params: {
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
     state.setBundles(draftToRestore.bundles);
-    state.goTo(4);
+    state.goTo(draftToRestore.sub_type === "adjust_in" || draftToRestore.sub_type === "adjust_out" ? 3 : 4);
     onStatusChange("임시저장 작업을 불러왔습니다.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftToRestore?.batch_id, restoreNonce]);

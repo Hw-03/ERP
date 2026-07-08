@@ -230,6 +230,9 @@ export function MobileIoComposeWizard({
       } else {
         state.setBundles((prev) => [...prev, ...newBundles]);
       }
+      if (effectiveSubType === "adjust_in" || effectiveSubType === "adjust_out") {
+        setSearch("");
+      }
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");
@@ -558,9 +561,7 @@ export function MobileIoComposeWizard({
               bundles={state.bundles}
               search={search}
               onSearchChange={setSearch}
-              onAddItem={(item) => {
-                void addItem(item, "manual");
-              }}
+              onAddItem={(item) => addItem(item, "manual")}
               onBundleQuantityChange={(bundleId, qty) =>
                 state.setBundles((prev) =>
                   applyBundleQuantityChange(prev, bundleId, qty, state.subType, getAvailable),
@@ -571,6 +572,10 @@ export function MobileIoComposeWizard({
               }
               getAvailable={getAvailable}
               onScan={() => setScanOpen(true)}
+              onSaveDraft={() => {
+                void handleSaveDraft();
+              }}
+              saving={drafting}
               onSubmit={() => {
                 void handleSubmit();
               }}

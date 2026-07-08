@@ -479,11 +479,11 @@ export function MobileDefectCartFlow({
     );
   }
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="shrink-0 pb-3">{header}</div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-3 pb-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden pb-3">
+        <div className="min-h-0 flex-1 overflow-hidden">
           <DefectItemPicker
             items={pickerItems}
             productModels={productModels}
@@ -493,7 +493,9 @@ export function MobileDefectCartFlow({
             onAdd={addItem}
             onRemove={removeItemById}
           />
+        </div>
 
+        <div className="max-h-[34vh] shrink-0 overflow-y-auto overscroll-contain">
           <SectionCard title={isRework ? "재작업 품목" : `장바구니 ${lines.length}건`} padding={lines.length === 0 ? "md" : "sm"}>
             {lines.length === 0 ? (
               <div className={clsx(TYPO.body, "py-2 text-center font-bold")} style={{ color: LEGACY_COLORS.muted }}>

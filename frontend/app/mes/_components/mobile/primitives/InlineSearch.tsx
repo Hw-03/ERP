@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import clsx from "clsx";
 import { Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -18,12 +18,14 @@ export function InlineSearch({
   placeholder = "검색",
   className,
   autoFocus = false,
+  inputRef,
 }: {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
 }) {
   const composingRef = useRef(false);
   const [draft, setDraft] = useState(value);
@@ -50,6 +52,7 @@ export function InlineSearch({
       <Search size={16} color={LEGACY_COLORS.muted} strokeWidth={2} />
       <input
         autoFocus={autoFocus}
+        ref={inputRef}
         value={draft}
         onChange={(e) => handleChange(e.target.value)}
         onCompositionStart={() => {
