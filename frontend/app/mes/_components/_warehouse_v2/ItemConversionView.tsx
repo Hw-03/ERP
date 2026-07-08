@@ -357,7 +357,7 @@ function ItemConversionStepChrome({
   });
 
   return (
-    <nav className="iwp" data-testid="item-conversion-step-nav" aria-label="품목 전환 단계">
+    <nav className="iwp ic-conversion-progress" data-testid="item-conversion-step-nav" aria-label="품목 전환 단계">
       <button
         type="button"
         className="iwpb done"
@@ -614,9 +614,7 @@ function ReviewStep({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-preview">
       <PreviewSummary preview={preview} mode={mode} />
-      <div className="icf sg min-h-0 flex-1 overflow-y-auto rounded-[18px] border p-3">
-        <PreviewLines preview={preview} />
-      </div>
+      <PreviewDifferencePanels preview={preview} />
       <div className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
         <label className="grid gap-1.5">
           <span className="icm text-xs font-black">
@@ -715,40 +713,87 @@ function PreviewSummary({ preview, mode }: { preview: ItemConversionPreview; mod
   );
 }
 
-function PreviewLines({ preview }: { preview: ItemConversionPreview }) {
+function PreviewDifferencePanels({ preview }: { preview: ItemConversionPreview }) {
   if (preview.lines.length === 0) {
     return (
-      <div className="icm flex h-full min-h-[220px] items-center justify-center rounded-[14px] border text-sm font-bold">
+      <div className="icm flex min-h-0 flex-1 items-center justify-center rounded-[18px] border text-sm font-bold">
         변경되는 구성품이 없습니다. 소스 품목 차감과 대상 품목 입고만 처리됩니다.
       </div>
     );
   }
 
+  const consumeLines = preview.lines.filter((line) => line.line_kind === "consume" || line.total_delta > 0);
+  const recoverLines = preview.lines.filter((line) => !consumeLines.includes(line));
+
   return (
-    <div className="grid gap-2">
-      {preview.lines.map((line) => {
-        const consume = line.line_kind === "consume" || line.total_delta > 0;
-        return (
-          <div
-            key={`${line.item_id}-${line.line_kind}`}
-            className="icf flex min-h-14 items-center justify-between gap-3 rounded-[14px] border px-4 py-3"
-          >
-            <div className="min-w-0">
-              <div className="ict truncate text-sm font-black">
-                {line.item_name}
-              </div>
-              <div className="icm mt-0.5 text-xs font-bold">
-                {line.mes_code ?? "-"} · {line.department ?? "창고"}
-              </div>
-            </div>
-            <span className={consume ? "ic-delta ic-delta-consume" : "ic-delta ic-delta-return"}>
-              {consume ? "추가 차감" : "회수 입고"} {consume ? "-" : "+"}
-              {formatQty(Math.abs(line.total_delta), line.unit)}
-            </span>
-          </div>
-        );
-      })}
+    <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-2">
+      <DifferencePanel
+        title="소스 BOM에서 빠지는 구성"
+        description="소스 품목에서 빠지는 구성품은 회수 입고로 돌아옵니다."
+        emptyText="회수할 구성품 없음"
+        lines={recoverLines}
+        kind="recover"
+      />
+      <DifferencePanel
+        title="대상 BOM 때문에 필요한 구성"
+        description="대상 품목에 더 필요한 구성품은 추가 차감됩니다."
+        emptyText="추가 차감할 구성품 없음"
+        lines={consumeLines}
+        kind="consume"
+      />
     </div>
+  );
+}
+
+function DifferencePanel({
+  title,
+  description,
+  emptyText,
+  lines,
+  kind,
+}: {
+  title: string;
+  description: string;
+  emptyText: string;
+  lines: ItemConversionPreview["lines"];
+  kind: "consume" | "recover";
+}) {
+  return (
+    <section className="icf flex min-h-0 flex-col rounded-[18px] border p-4">
+      <div className="shrink-0">
+        <div className="ict text-lg font-black">{title}</div>
+        <div className="icm mt-1 text-xs font-bold">{description}</div>
+      </div>
+      <div className="sg mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+        {lines.length === 0 ? (
+          <div className="icm flex h-full min-h-[180px] items-center justify-center rounded-[14px] border text-sm font-bold">
+            {emptyText}
+          </div>
+        ) : (
+          <div className="grid gap-2">
+            {lines.map((line) => (
+              <div
+                key={`${line.item_id}-${line.line_kind}`}
+                className="icf flex min-h-14 items-center justify-between gap-3 rounded-[14px] border px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="ict line-clamp-2 text-sm font-black">
+                    {line.item_name}
+                  </div>
+                  <div className="icm mt-0.5 text-xs font-bold">
+                    {line.mes_code ?? "-"} · {line.department ?? "창고"}
+                  </div>
+                </div>
+                <span className={kind === "consume" ? "ic-delta ic-delta-consume" : "ic-delta ic-delta-return"}>
+                  {kind === "consume" ? "추가 차감 -" : "회수 입고 +"}
+                  {formatQty(Math.abs(line.total_delta), line.unit)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

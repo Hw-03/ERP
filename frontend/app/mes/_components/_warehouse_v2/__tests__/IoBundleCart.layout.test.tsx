@@ -49,7 +49,7 @@ const item = {
 } as unknown as Item;
 
 describe("IoBundleCart layout", () => {
-  it("keeps helper copy in the summary row and scrolls only the bundle list", () => {
+  it("removes the old summary helper copy and scrolls only the bundle list", () => {
     const { container } = render(
       <IoBundleCart
         bundles={[bundle]}
@@ -66,7 +66,6 @@ describe("IoBundleCart layout", () => {
     );
 
     expect(screen.queryByTestId("io-bundle-cart-standalone-help")).not.toBeInTheDocument();
-    expect(screen.getByText("체크를 해제하면 이번 작업에서 제외됩니다.")).toBeInTheDocument();
     expect(container.querySelector("[data-keep-scroll].overflow-y-auto")).toBeInTheDocument();
     expect(container.querySelector("[data-keep-scroll].sg")).toBeInTheDocument();
   });

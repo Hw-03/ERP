@@ -64,12 +64,7 @@ describe("IoComposeView navigation chrome", () => {
         .find((button) => button.hasAttribute("aria-pressed"));
 
     expect(getWarehouseWorkCard()).toBeInTheDocument();
-    expect(screen.getByTestId("io-step-nav")).toBeInTheDocument();
-    let navItems = screen.getAllByTestId("io-step-nav-item");
-    expect(navItems).toHaveLength(5);
-    expect(navItems[0]).toHaveClass("a");
-    expect(navItems.slice(1).every((item) => item.classList.contains("locked"))).toBe(true);
-    expect(navItems.slice(1).every((item) => item.hasAttribute("disabled"))).toBe(true);
+    expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument();
     expect(screen.queryByTestId("wizard-active-step-number")).not.toBeInTheDocument();
     expect(screen.queryByTestId("wizard-active-step-title")).not.toBeInTheDocument();
 
@@ -78,7 +73,7 @@ describe("IoComposeView navigation chrome", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /작업 유형 선택/ })).toBeInTheDocument();
     });
-    navItems = screen.getAllByTestId("io-step-nav-item");
+    const navItems = screen.getAllByTestId("io-step-nav-item");
     expect(navItems).toHaveLength(5);
     expect(navItems[0]).toHaveClass("done");
     expect(navItems[1]).toHaveClass("a");
@@ -95,39 +90,32 @@ describe("IoComposeView navigation chrome", () => {
     await waitFor(() => {
       expect(getWarehouseWorkCard()).toBeInTheDocument();
     });
-    expect(screen.getAllByTestId("io-step-nav-item")).toHaveLength(5);
+    expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument();
   });
 
   it("does not show a preselected work type while choosing Step 1", async () => {
     renderCompose();
 
-    const navItems = screen.getAllByTestId("io-step-nav-item");
-    expect(navItems[0]).toHaveClass("a");
-    expect(navItems[0]).toHaveTextContent("작업 유형 선택");
-    expect(navItems[0]).not.toHaveTextContent("원자재 입고");
-    expect(navItems[0]).not.toHaveTextContent("창고 입출고");
-    expect(navItems[0]).not.toHaveTextContent("부서 입출고");
+    const getWorkCards = () =>
+      screen.getAllByRole("button").filter((button) => button.hasAttribute("aria-pressed"));
 
-    const getDepartmentWorkCard = () =>
-      screen
-        .getAllByRole("button", { name: /부서 입출고/ })
-        .find((button) => button.hasAttribute("aria-pressed"));
+    expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument();
+    expect(getWorkCards()).toHaveLength(2);
+    expect(getWorkCards().every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
 
-    fireEvent.click(getDepartmentWorkCard()!);
+    fireEvent.click(getWorkCards()[1]);
     await waitFor(() => {
-      expect(screen.getByText("세부 작업과 부서 선택")).toBeInTheDocument();
+      expect(screen.getByTestId("io-step-nav")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /작업 유형 선택/ }));
+    fireEvent.click(screen.getAllByTestId("io-step-nav-item")[0]);
     await waitFor(() => {
-      expect(getDepartmentWorkCard()).toBeInTheDocument();
+      expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument();
     });
 
-    expect(getDepartmentWorkCard()).toHaveAttribute("aria-pressed", "false");
-    const resetNavItems = screen.getAllByTestId("io-step-nav-item");
-    expect(resetNavItems[0]).not.toHaveTextContent("부서 입출고");
+    expect(getWorkCards()).toHaveLength(2);
+    expect(getWorkCards().every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
   });
-
   it("closes item conversion on browser back like other warehouse work screens", async () => {
     const pushStateSpy = vi.spyOn(window.history, "pushState");
     renderCompose();

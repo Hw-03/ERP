@@ -935,7 +935,7 @@ export function IoComposeView({
           summary={step > 1 ? workTypeLabel(state.workType) : undefined}
           onChange={returnToWorkTypeStep}
           accent={accent}
-          chrome={workChrome}
+          chrome={undefined}
           chromeOnly
           fill
         >
@@ -1101,6 +1101,7 @@ export function IoComposeView({
               onTogglePull={togglePull}
               onPullFromWarehouse={pullFromWarehouse}
               pullCount={pullCount}
+              onSaveDraft={handleSaveDraft}
             />
           </WizardStepCard>
         </div>

@@ -168,11 +168,6 @@ export function IoConfirmStep({
   const visibleIncludedLines = includedLines.filter(
     (line) => !bomParentLineIds.has(line.line_id),
   );
-  const totalQty = visibleIncludedLines.reduce(
-    (acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0),
-    0,
-  );
-
   const displayBundles = bundles.filter((b) =>
     b.lines.some((l) => l.included && !bomParentLineIds.has(l.line_id)),
   );
@@ -204,7 +199,7 @@ export function IoConfirmStep({
             {meta.summaryLabel}
           </div>
           <div className="text-lg lg:text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
-            {headerLabel} · 반영 {visibleIncludedLines.length}건 · 총 {formatQty(totalQty)}
+            {headerLabel} · BOM · 반영 {visibleIncludedLines.length}건
           </div>
         </div>
         {isApproval ? (
@@ -264,7 +259,7 @@ export function IoConfirmStep({
             type="button"
             onClick={onSaveDraft}
             disabled={saveDisabled}
-            className="flex shrink-0 items-center justify-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-2 lg:rounded-[22px] lg:border-2 lg:px-6 lg:py-7 lg:text-base"
+            className="flex shrink-0 items-center justify-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-2 lg:px-6"
             style={{
               borderColor: LEGACY_COLORS.border,
               background: LEGACY_COLORS.s2,
@@ -278,7 +273,7 @@ export function IoConfirmStep({
             type="button"
             onClick={() => setConfirmOpen(true)}
             disabled={submitDisabled}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:rounded-[22px] lg:px-7 lg:py-7 lg:text-xl"
+            className="flex flex-1 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:px-7"
             style={{ background: accent }}
           >
             <ClipboardCheck className="h-4 w-4 lg:h-6 lg:w-6" />
@@ -303,7 +298,7 @@ export function IoConfirmStep({
         }}
       >
         <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-          {headerLabel} · 반영 {visibleIncludedLines.length}건 · 총 {formatQty(totalQty)}
+          {headerLabel} · BOM · 반영 {visibleIncludedLines.length}건
         </div>
       </ConfirmModal>
     </div>
@@ -382,20 +377,26 @@ function ConfirmBundleCard({
 
   return (
     <article
-      className="rounded-[18px] p-4"
+      role={isCollapsible ? "button" : undefined}
+      aria-expanded={isCollapsible ? !collapsed : undefined}
+      tabIndex={isCollapsible ? 0 : undefined}
+      onClick={() => {
+        if (isCollapsible) setCollapsed((v) => !v);
+      }}
+      onKeyDown={(event) => {
+        if (!isCollapsible) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setCollapsed((v) => !v);
+        }
+      }}
+      className="rounded-[18px] p-4 outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] hover:brightness-[1.01]"
       style={{
         background: tint(tone, 6),
+        cursor: isCollapsible ? "pointer" : "default",
       }}
     >
-      <button
-        type="button"
-        onClick={() => {
-          if (isCollapsible) setCollapsed((v) => !v);
-        }}
-        disabled={!isCollapsible}
-        className="flex w-full items-start justify-between gap-3 text-left disabled:cursor-default"
-        aria-expanded={isCollapsible ? !collapsed : undefined}
-      >
+      <div className="flex w-full items-start justify-between gap-3 text-left">
         <span className="flex min-w-0 items-start gap-2">
           <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
           <span className="min-w-0 flex-1">
@@ -422,7 +423,7 @@ function ConfirmBundleCard({
             {headerQty}
           </span>
         )}
-      </button>
+      </div>
 
       {/* 헤더 메타 한 줄 */}
       {isSingle && headerLine && (

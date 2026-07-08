@@ -468,6 +468,25 @@
   color: color-mix(in srgb, var(--c-green) 64%, var(--c-muted2));
 }
 
+.ic-conversion-progress {
+  gap: 0.6rem;
+}
+
+.ic-conversion-progress .iwpb {
+  min-height: 52px;
+  padding: 0.58rem 0.8rem;
+}
+
+.ic-conversion-progress .iwpl {
+  font-size: 0.94rem;
+  line-height: 1.12;
+}
+
+.ic-conversion-progress .iwps {
+  font-size: 0.78rem;
+  line-height: 1.1;
+}
+
 .icf {
   background: var(--c-s2);
   border-color: var(--c-border);

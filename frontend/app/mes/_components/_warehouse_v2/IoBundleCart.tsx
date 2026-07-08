@@ -6,7 +6,6 @@ import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
 import type { IoBundle, IoLine, IoSubType, Item } from "./types";
 import { IoBundleCard } from "./IoBundleCard";
-import { formatQty } from "@/lib/mes/format";
 
 interface Props {
   bundles: IoBundle[];
@@ -52,42 +51,8 @@ export function IoBundleCart({
   onPullFromWarehouse,
   pullCount,
 }: Props) {
-  const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
-  const totalQty = bundles
-    .flatMap((bundle) => bundle.lines)
-    .filter((line) => line.included)
-    .reduce((acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0), 0);
-
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      {bundles.length > 0 && (
-        <div
-          className="flex shrink-0 items-center justify-between gap-4 rounded-[14px] border px-4 py-2.5"
-          style={{
-            background: tint(LEGACY_COLORS.blue, 6),
-            borderColor: tint(LEGACY_COLORS.blue, 24),
-          }}
-        >
-          <div className="min-w-0">
-            <div
-              className="text-[11px] font-bold uppercase tracking-[1.5px]"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              반영 라인 {includedCount}개 · 총 수량
-            </div>
-            <div
-              className="mt-1 text-xs font-semibold"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              체크를 해제하면 이번 작업에서 제외됩니다.
-            </div>
-          </div>
-          <span className="text-2xl font-black tabular-nums" style={{ color: LEGACY_COLORS.blue }}>
-            {formatQty(totalQty)}
-          </span>
-        </div>
-      )}
-
       {bundles.length === 0 ? (
         <EmptyState
           compact

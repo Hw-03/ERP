@@ -132,10 +132,13 @@ export function IoBundleCard({
       }}
     >
       <div
-        // 항목 14 — 모바일: 휴지통 우상단 분리 + 가능재고/실행후는 아래 행. 데스크톱(lg)은 기존 한 줄 배치.
-        className="relative mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between lg:gap-3"
+        className="relative mb-3 grid gap-3 lg:items-center"
         onClick={() => { if (isCollapsible) setCollapsed((v) => !v); }}
-        style={{ cursor: isCollapsible ? "pointer" : "default" }}
+        style={{
+          cursor: isCollapsible ? "pointer" : "default",
+          gridTemplateColumns:
+            "minmax(0,1.6fr) minmax(132px,auto) minmax(80px,auto) minmax(80px,auto) 44px",
+        }}
         role={isCollapsible ? "button" : undefined}
         aria-expanded={isCollapsible ? !collapsed : undefined}
       >
@@ -175,28 +178,28 @@ export function IoBundleCard({
               </>
             )}
           </div>
-          <div onClick={(e) => e.stopPropagation()} className="mt-3">
-            {showBundleQtyStepper ? (
-              <QuantityStepper
-                value={stepperQty}
-                onChange={applyStepperQty}
-                label="기준 수량"
-                decrementDisabled={stepperQty <= 0}
-                className="items-start"
-              />
-            ) : (
-              <div
-                className="text-xs font-bold uppercase tracking-[1.5px]"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                기준 수량 {formatQty(bundle.quantity)}
-              </div>
-            )}
-          </div>
+        </div>
+        <div onClick={(e) => e.stopPropagation()} className="self-center">
+          {showBundleQtyStepper ? (
+            <QuantityStepper
+              value={stepperQty}
+              onChange={applyStepperQty}
+              label="기준 수량"
+              decrementDisabled={stepperQty <= 0}
+              className="items-center"
+            />
+          ) : (
+            <div
+              className="text-center text-xs font-bold uppercase tracking-[1.5px]"
+              style={{ color: LEGACY_COLORS.muted2 }}
+            >
+              기준 수량 {formatQty(bundle.quantity)}
+            </div>
+          )}
         </div>
         {directParentLine && (
-          <div className="flex items-center gap-6 self-center lg:shrink-0 lg:self-center">
-            <div className="text-center lg:text-right">
+          <>
+            <div className="self-center text-center">
               <div
                 className="text-[9px] font-bold uppercase tracking-[1.5px]"
                 style={{ color: LEGACY_COLORS.muted2 }}
@@ -210,7 +213,7 @@ export function IoBundleCard({
                 {parentAvailable === null ? "-" : formatQty(parentAvailable)}
               </div>
             </div>
-            <div className="text-center lg:text-right">
+            <div className="self-center text-center">
               <div
                 className="text-[9px] font-bold uppercase tracking-[1.5px]"
                 style={{ color: LEGACY_COLORS.muted2 }}
@@ -224,12 +227,18 @@ export function IoBundleCard({
                 {parentExpected === null ? "-" : formatQty(parentExpected)}
               </div>
             </div>
-          </div>
+          </>
+        )}
+        {!directParentLine && (
+          <>
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+          </>
         )}
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRemoveBundle(); }}
-          className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:h-12 lg:w-12 lg:shrink-0 lg:self-center"
+          className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:h-11 lg:w-11 lg:self-center"
           style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
           title="묶음 삭제"
         >

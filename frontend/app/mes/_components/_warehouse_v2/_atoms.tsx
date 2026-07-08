@@ -98,8 +98,8 @@ export function WizardStepCard({
           ...animStyle,
         }}
       >
-        {chromeOnly && chrome ? (
-          <header className="mb-5">{chrome}</header>
+        {chromeOnly ? (
+          chrome ? <header className="mb-5">{chrome}</header> : null
         ) : (
           <header className={chrome ? "mb-5 flex items-start gap-3" : "mb-5 flex items-center gap-3"}>
             <span

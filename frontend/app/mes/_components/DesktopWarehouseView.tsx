@@ -82,10 +82,27 @@ export function DesktopWarehouseView({
   // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속)이면 탭 노출. 결재권자는 제외.
   const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
+  const normalizeSectionTab = (value: string | null): WarehouseSectionTab => {
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue", "handover"];
+    if (!value || !valid.includes(value as WarehouseSectionTab)) return "compose";
+    if (value === "queue" && !canSeeQueue) return "compose";
+    if (value === "dept-queue" && !canSeeDeptQueue) return "compose";
+    if (value === "handover" && !showHandover) return "compose";
+    return value as WarehouseSectionTab;
+  };
 
   useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
   }, [operator, employeeId]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const next = normalizeSectionTab(new URLSearchParams(window.location.search).get("section"));
+      setSectionTab(next);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  });
 
   useEffect(() => {
     if (!operatorEmployeeId) return;
@@ -137,11 +154,29 @@ export function DesktopWarehouseView({
     onStatusChange("구형 장바구니는 새 입출고 화면에서 직접 복원되지 않습니다.");
   }
 
+  function handleSectionTabChange(next: WarehouseSectionTab) {
+    setSectionTab(next);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", "warehouse");
+    if (next === "compose") {
+      params.delete("section");
+    } else {
+      params.set("section", next);
+    }
+    const query = params.toString();
+    window.history.pushState(
+      { ...(window.history.state || {}), warehouseSection: next },
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}`,
+    );
+  }
+
   const isComposeSection = sectionTab === "compose";
   const hideSectionTabs = isComposeSection && itemConversionFocused;
 
   return (
-    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden lg:pr-4">
+    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden">
       <div className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden px-0 pt-4 ${isComposeSection ? "pb-0" : "pb-10"}`}>
         <WarehouseHeader loadFailure={loadFailure} />
         <div
@@ -152,7 +187,7 @@ export function DesktopWarehouseView({
         >
           <WarehouseSectionTabs
             active={sectionTab}
-            onChange={setSectionTab}
+            onChange={handleSectionTabChange}
             showQueue={canSeeQueue}
             showDeptQueue={canSeeDeptQueue}
             showHandover={showHandover}

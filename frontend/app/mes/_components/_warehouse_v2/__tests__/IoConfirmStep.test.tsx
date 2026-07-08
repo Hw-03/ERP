@@ -69,12 +69,14 @@ describe("IoConfirmStep", () => {
     renderConfirmStep();
 
     const rowButton = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
-    expect(rowButton).toHaveClass("w-full");
-    expect(rowButton.closest("article")).not.toHaveClass("border-2");
+    expect(rowButton.tagName).toBe("ARTICLE");
+    expect(rowButton).not.toHaveClass("border-2");
+    expect(rowButton).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("ADX6000 BODY RIGHT ASSY")).not.toBeInTheDocument();
 
     fireEvent.click(rowButton);
 
+    expect(rowButton).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("ADX6000 BODY RIGHT ASSY")).toBeInTheDocument();
   });
 
