@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
 import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
@@ -47,6 +47,24 @@ export function DesktopSidebar({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<DesktopTabId | null>(null);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openSidebar = useCallback(() => {
+    if (collapseTimerRef.current) {
+      clearTimeout(collapseTimerRef.current);
+      collapseTimerRef.current = null;
+    }
+    setExpanded(true);
+  }, []);
+
+  const closeSidebarSoon = useCallback(() => {
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    collapseTimerRef.current = setTimeout(() => {
+      setExpanded(false);
+      setHoveredTab(null);
+      collapseTimerRef.current = null;
+    }, 220);
+  }, []);
 
   return (
     <div
@@ -55,8 +73,8 @@ export function DesktopSidebar({
         width: expanded ? 220 : 72,
         transition: "width 180ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseEnter={openSidebar}
+      onMouseLeave={closeSidebarSoon}
     >
       <aside
         className="flex h-full w-full flex-col overflow-hidden rounded-[32px] border px-3 py-5"
@@ -123,6 +141,7 @@ export function DesktopSidebar({
               expanded={expanded}
               hovered={hoveredTab === tab.id}
               onTabChange={onTabChange}
+              onKeepExpanded={openSidebar}
               onHover={setHoveredTab}
             />
           ))}
@@ -138,6 +157,7 @@ export function DesktopSidebar({
               expanded={expanded}
               hovered={hoveredTab === tab.id}
               onTabChange={onTabChange}
+              onKeepExpanded={openSidebar}
               onHover={setHoveredTab}
             />
           ))}
@@ -154,6 +174,7 @@ function TabButton({
   expanded,
   hovered,
   onTabChange,
+  onKeepExpanded,
   onHover,
 }: {
   tab: TabDef;
@@ -161,13 +182,17 @@ function TabButton({
   expanded: boolean;
   hovered: boolean;
   onTabChange: (id: DesktopTabId) => void;
+  onKeepExpanded: () => void;
   onHover: (id: DesktopTabId | null) => void;
 }) {
   const Icon = tab.icon;
   const iconSizeClass = tab.id === "shipping" ? "h-[22px] w-[22px]" : "h-5 w-5";
   return (
     <button
-      onClick={() => onTabChange(tab.id)}
+      onClick={() => {
+        onKeepExpanded();
+        onTabChange(tab.id);
+      }}
       onMouseEnter={() => onHover(tab.id)}
       onMouseLeave={() => onHover(null)}
       aria-current={active ? "page" : undefined}

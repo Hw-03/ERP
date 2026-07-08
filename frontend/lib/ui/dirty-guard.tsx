@@ -59,9 +59,9 @@ function DirtyModal({
   if (!modal.open) return null;
   const confirmOnly = modal.confirmOnly;
   const title = confirmOnly ? "이 화면에서 나갈까요?" : "작성 중인 입출고가 있어요";
-  const body = confirmOnly
-    ? "현재 진행 중인 작업이 있습니다. 나가면 이 작업 화면에서 벗어납니다."
-    : "임시저장하면 ‘내 요청’에서 이어서 진행할 수 있습니다. 저장하지 않고 이동하면 현재 작성 중인 내용은 사라집니다.";
+  const bodyLines = confirmOnly
+    ? ["현재 진행 중인 작업이 있습니다.", "나가면 이 작업 화면에서 벗어납니다."]
+    : ["임시저장하면 ‘내 요청’에서 이어서 진행할 수 있습니다.", "저장하지 않고 이동하면 현재 작성 중인 내용은 사라집니다."];
 
   return (
     <div
@@ -86,8 +86,8 @@ function DirtyModal({
             <span
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
               style={{
-                background: tint(confirmOnly ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue, 12),
-                color: confirmOnly ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue,
+                background: tint(confirmOnly ? LEGACY_COLORS.red : LEGACY_COLORS.blue, 12),
+                color: confirmOnly ? LEGACY_COLORS.red : LEGACY_COLORS.blue,
               }}
             >
               <AlertTriangle className="h-5 w-5" />
@@ -97,7 +97,11 @@ function DirtyModal({
                 {title}
               </div>
               <p className="mt-2 text-sm font-bold leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-                {body}
+                {bodyLines.map((line) => (
+                  <span key={line} className="block">
+                    {line}
+                  </span>
+                ))}
               </p>
             </div>
           </div>
@@ -163,7 +167,7 @@ function DirtyModal({
                 onClick={onProceedWithoutSave}
                 disabled={modal.busy}
                 className="w-full rounded-[16px] px-5 py-3.5 text-base font-black text-white transition-all hover:brightness-105 disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.yellow }}
+                style={{ background: LEGACY_COLORS.red }}
               >
                 나가기
               </button>
