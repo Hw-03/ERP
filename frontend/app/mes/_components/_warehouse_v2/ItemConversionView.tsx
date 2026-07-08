@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeftRight,
-  CheckCircle2,
-  ClipboardCheck,
-  GitCompareArrows,
-  Layers,
-  PackageCheck,
-} from "lucide-react";
-import { api, type Item, type ItemConversionMode, type ItemConversionPreview, type ItemConversionResult } from "@/lib/api";
-import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
+  api,
+  type Item,
+  type ItemConversionMode,
+  type ItemConversionPreview,
+  type ItemConversionResult,
+} from "@/lib/api";
 
 interface WorkProps {
   items: Item[];
@@ -27,59 +23,53 @@ interface CompleteProps {
   onWarehouse: () => void;
 }
 
+type ConversionStepId = 1 | 2 | 3 | 4;
+type ConversionStepState = "done" | "active" | "locked";
+type PickerKind = "source" | "target";
+
 const ALLOWED_PROCESS_TYPES = ["PA", "AF", "AA"];
-const panelClass = "rounded-[22px] border p-4";
-const buttonBase = "rounded-[16px] border px-4 py-3 text-sm font-black transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45";
-const fieldClass = "grid gap-2 rounded-[18px] border p-4";
-const inputClass = "h-12 rounded-[14px] border px-3 text-sm font-bold outline-none focus:border-[var(--c-blue)]";
+const CONVERSION_STEPS: Array<{ id: ConversionStepId; title: string }> = [
+  { id: 1, title: "방식 선택" },
+  { id: 2, title: "소스·대상 선택" },
+  { id: 3, title: "차이 확인" },
+  { id: 4, title: "실행" },
+];
 
-function conversionPanelStyle(accent: string = LEGACY_COLORS.blue) {
-  return {
-    background: LEGACY_COLORS.s1,
-    borderColor: LEGACY_COLORS.border,
-    boxShadow: "var(--c-card-shadow)",
-    backgroundImage: `linear-gradient(135deg, ${tint(accent, 5)}, transparent 42%)`,
-  };
-}
+const buttonPrimary = "icb icb-primary";
+const buttonSecondary = "icb icb-secondary";
 
-function fieldStyle() {
-  return {
-    background: LEGACY_COLORS.s2,
-    borderColor: LEGACY_COLORS.border,
-  };
-}
-
-function primaryButtonStyle(accent: string = LEGACY_COLORS.blue) {
-  return {
-    background: accent,
-    borderColor: accent,
-    color: "white",
-  };
-}
-
-function secondaryButtonStyle() {
-  return {
-    background: LEGACY_COLORS.s2,
-    borderColor: LEGACY_COLORS.border,
-    color: LEGACY_COLORS.text,
-  };
-}
-
-function positiveInt(value: string | number) {
+function positiveInt(value: string | number): number {
   const n = Math.floor(Number(value));
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-function formatQty(value: number, unit = "EA") {
+function formatQty(value: number, unit = "EA"): string {
   return `${value} ${unit}`;
 }
 
-function itemLabel(item: Item) {
-  return `${item.mes_code ?? "-"} · ${item.item_name} · ${formatQty(Number(item.quantity || 0), item.unit)}`;
+function itemStock(item: Item): number {
+  return Number(item.quantity || 0);
 }
 
-function isConvertibleItem(item: Item) {
+function itemLabel(item: Item): string {
+  return `${item.mes_code ?? "-"} · ${item.item_name} · ${formatQty(itemStock(item), item.unit)}`;
+}
+
+function isConvertibleItem(item: Item): boolean {
   return ALLOWED_PROCESS_TYPES.includes(item.process_type_code ?? "") && !item.deleted_at;
+}
+
+function conversionModeLabel(mode: ItemConversionMode | null): string {
+  if (mode === "SPEC") return "사양 전환";
+  if (mode === "BOM") return "구성 전환";
+  return "";
+}
+
+function conversionStep(mode: ItemConversionMode | null, preview: ItemConversionPreview | null, ready: boolean): ConversionStepId {
+  if (ready) return 4;
+  if (preview) return 3;
+  if (mode) return 2;
+  return 1;
 }
 
 function pushConversionModeHistory(mode: ItemConversionMode): void {
@@ -90,27 +80,252 @@ function pushConversionModeHistory(mode: ItemConversionMode): void {
   );
 }
 
-type ConversionStepId = 1 | 2 | 3 | 4;
-type ConversionStepState = "done" | "active" | "locked";
-
-const CONVERSION_STEPS: Array<{ id: ConversionStepId; title: string }> = [
-  { id: 1, title: "방식 선택" },
-  { id: 2, title: "소스·대상 선택" },
-  { id: 3, title: "차이 확인" },
-  { id: 4, title: "실행" },
-];
-
-function conversionModeLabel(mode: ItemConversionMode | null) {
-  if (mode === "SPEC") return "사양 전환";
-  if (mode === "BOM") return "구성 전환";
-  return "";
+function filterCandidates(candidates: Item[], query: string): Item[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return candidates;
+  return candidates.filter((item) => {
+    const name = item.item_name.toLowerCase();
+    const code = (item.mes_code ?? "").toLowerCase();
+    const process = (item.process_type_code ?? "").toLowerCase();
+    return name.includes(normalized) || code.includes(normalized) || process.includes(normalized);
+  });
 }
 
-function conversionCurrentStep(mode: ItemConversionMode | null, preview: ItemConversionPreview | null, ready: boolean): ConversionStepId {
-  if (ready) return 4;
-  if (preview) return 3;
-  if (mode) return 2;
-  return 1;
+export function ItemConversionWorkView({ items, loading = false, onBack, onComplete }: WorkProps) {
+  const [mode, setMode] = useState<ItemConversionMode | null>(null);
+  const [sourceId, setSourceId] = useState("");
+  const [targetId, setTargetId] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [memo, setMemo] = useState("");
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [targetQuery, setTargetQuery] = useState("");
+  const [preview, setPreview] = useState<ItemConversionPreview | null>(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const candidates = useMemo(
+    () => items.filter(isConvertibleItem).sort((a, b) => (a.mes_code ?? "").localeCompare(b.mes_code ?? "")),
+    [items],
+  );
+  const sourceItem = candidates.find((item) => item.item_id === sourceId) ?? null;
+  const targetItem = candidates.find((item) => item.item_id === targetId) ?? null;
+  const targetCandidates = sourceItem
+    ? candidates.filter(
+        (item) =>
+          item.item_id !== sourceItem.item_id &&
+          item.process_type_code === sourceItem.process_type_code,
+      )
+    : [];
+  const filteredSources = filterCandidates(candidates, sourceQuery).slice(0, 80);
+  const filteredTargets = filterCandidates(targetCandidates, targetQuery).slice(0, 80);
+  const currentStep = conversionStep(mode, preview, ready);
+  const sourceOver = sourceItem ? quantity > itemStock(sourceItem) : false;
+  const canPreview = Boolean(mode && sourceItem && targetItem && !sourceOver && quantity >= 1);
+  const memoRequired = mode === "BOM";
+  const memoReady = !memoRequired || memo.trim().length > 0;
+  const canGoExecute = Boolean(preview?.executable && memoReady);
+
+  const clearPreviewState = useCallback((): void => {
+    setPreview(null);
+    setReady(false);
+    setError(null);
+  }, []);
+
+  const resetToModeSelection = useCallback((): void => {
+    setMode(null);
+    setSourceId("");
+    setTargetId("");
+    setQuantity(1);
+    setMemo("");
+    setSourceQuery("");
+    setTargetQuery("");
+    clearPreviewState();
+  }, [clearPreviewState]);
+
+  useEffect(() => {
+    const handlePop = (event: PopStateEvent) => {
+      const state = (event.state || {}) as { wic?: string; wicm?: ItemConversionMode };
+      if (state.wic === "work" && state.wicm) return;
+      resetToModeSelection();
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, [resetToModeSelection]);
+
+  function selectMode(nextMode: ItemConversionMode): void {
+    setMode(nextMode);
+    setSourceId("");
+    setTargetId("");
+    setQuantity(1);
+    setMemo("");
+    setSourceQuery("");
+    setTargetQuery("");
+    clearPreviewState();
+    pushConversionModeHistory(nextMode);
+  }
+
+  function selectSource(item: Item): void {
+    setSourceId(item.item_id);
+    setSourceQuery(itemLabel(item));
+    setTargetId("");
+    setTargetQuery("");
+    clearPreviewState();
+  }
+
+  function selectTarget(item: Item): void {
+    setTargetId(item.item_id);
+    setTargetQuery(itemLabel(item));
+    clearPreviewState();
+  }
+
+  async function loadPreview(): Promise<void> {
+    if (!mode || !sourceItem || !targetItem || sourceOver) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await api.getItemConversionPreview({
+        source_item_id: sourceItem.item_id,
+        target_item_id: targetItem.item_id,
+        quantity,
+        requested_mode: mode,
+      });
+      setPreview(next);
+      setReady(false);
+    } catch (err) {
+      setPreview(null);
+      setReady(false);
+      setError(err instanceof Error ? err.message : "품목 전환 차이 확인에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function execute(): Promise<void> {
+    if (!mode || !sourceItem || !targetItem || !preview || !canGoExecute) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.executeItemConversion({
+        source_item_id: sourceItem.item_id,
+        target_item_id: targetItem.item_id,
+        quantity,
+        requested_mode: mode,
+        memo: memo.trim() || null,
+      });
+      onComplete(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "전환 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleBackToWorkType(): void {
+    if (window.history.state?.wicm) {
+      window.history.back();
+      return;
+    }
+    onBack?.();
+  }
+
+  function handleStepClick(step: ConversionStepId): void {
+    if (step === 1) {
+      resetToModeSelection();
+      return;
+    }
+    if (step === 2 && preview) {
+      clearPreviewState();
+      return;
+    }
+    if (step === 3 && ready) {
+      setReady(false);
+    }
+  }
+
+  return (
+    <section
+      className="flex h-full min-h-0 flex-col gap-3"
+      data-testid="item-conversion-work"
+    >
+      <ItemConversionStepChrome
+        mode={mode}
+        preview={preview}
+        ready={ready}
+        onBack={handleBackToWorkType}
+        onStepClick={handleStepClick}
+      />
+
+      {loading ? (
+        <div className="icf flex flex-1 items-center justify-center rounded-[22px] border text-sm font-bold">
+          품목 정보를 불러오는 중입니다.
+        </div>
+      ) : !mode ? (
+        <ModeSelection onSelect={selectMode} />
+      ) : currentStep === 2 ? (
+        <SelectionStep
+          mode={mode}
+          sourceItem={sourceItem}
+          targetItem={targetItem}
+          sourceQuery={sourceQuery}
+          targetQuery={targetQuery}
+          sourceCandidates={filteredSources}
+          targetCandidates={filteredTargets}
+          quantity={quantity}
+          sourceOver={sourceOver}
+          busy={busy}
+          canNext={canPreview}
+          error={error}
+          onSourceQuery={(value) => {
+            setSourceQuery(value);
+            if (sourceItem && value !== itemLabel(sourceItem)) {
+              setSourceId("");
+              setTargetId("");
+              setTargetQuery("");
+              clearPreviewState();
+            }
+          }}
+          onTargetQuery={(value) => {
+            setTargetQuery(value);
+            if (targetItem && value !== itemLabel(targetItem)) {
+              setTargetId("");
+              clearPreviewState();
+            }
+          }}
+          onSourceSelect={selectSource}
+          onTargetSelect={selectTarget}
+          onQuantity={(value) => {
+            setQuantity(positiveInt(value));
+            clearPreviewState();
+          }}
+          onNext={() => void loadPreview()}
+        />
+      ) : currentStep === 3 && mode && preview ? (
+        <ReviewStep
+          mode={mode}
+          preview={preview}
+          memo={memo}
+          memoRequired={memoRequired}
+          busy={busy}
+          error={error}
+          canNext={canGoExecute}
+          onMemo={setMemo}
+          onBack={() => clearPreviewState()}
+          onNext={() => setReady(true)}
+        />
+      ) : mode && preview ? (
+        <ExecuteStep
+          mode={mode}
+          preview={preview}
+          memo={memo}
+          busy={busy}
+          error={error}
+          onBack={() => setReady(false)}
+          onExecute={() => void execute()}
+        />
+      ) : null}
+    </section>
+  );
 }
 
 function ItemConversionStepChrome({
@@ -118,413 +333,459 @@ function ItemConversionStepChrome({
   preview,
   ready,
   onBack,
-  onModeSelection,
-  onPreviewStep,
+  onStepClick,
 }: {
   mode: ItemConversionMode | null;
   preview: ItemConversionPreview | null;
   ready: boolean;
   onBack?: () => void;
-  onModeSelection: () => void;
-  onPreviewStep: () => void;
+  onStepClick: (step: ConversionStepId) => void;
 }) {
-  const currentStep = conversionCurrentStep(mode, preview, ready);
+  const currentStep = conversionStep(mode, preview, ready);
+  const conversionNav = CONVERSION_STEPS.map((step) => {
+    const state: ConversionStepState =
+      step.id < currentStep ? "done" : step.id === currentStep ? "active" : "locked";
+    const summary =
+      step.id === 1 && mode
+        ? conversionModeLabel(mode)
+        : step.id === 3 && preview
+        ? `${preview.lines.length}개 차이`
+        : step.id === 4 && ready
+        ? "최종 확인"
+        : "";
+    return { ...step, state, summary };
+  });
 
   return (
-    <div className="iwc shrink-0">
-      <div className="grid gap-2 xl:grid-cols-[180px_minmax(0,1fr)]">
-        {onBack && (
-          <button
-            type="button"
-            className="iwpb done"
-            onClick={onBack}
-            data-testid="item-conversion-back"
-          >
-            <span className="iwpl">← 작업 유형 선택</span>
-          </button>
-        )}
-        <nav className="iwp iwp--four" data-testid="item-conversion-step-nav">
-          {CONVERSION_STEPS.map((step) => {
-            const state: ConversionStepState =
-              step.id < currentStep ? "done" : step.id === currentStep ? "active" : "locked";
-            const summary = step.id === 1 && mode ? conversionModeLabel(mode) : "";
-            const onClick =
-              state === "done" && step.id === 1
-                ? onModeSelection
-                : state === "done" && (step.id === 2 || step.id === 3)
-                  ? onPreviewStep
-                  : undefined;
+    <nav className="iwp" data-testid="item-conversion-step-nav" aria-label="품목 전환 단계">
+      <button
+        type="button"
+        className="iwpb done"
+        data-testid="item-conversion-step-nav-item"
+        data-state="done"
+        onClick={onBack}
+        disabled={!onBack}
+      >
+        <span className="iwpl">작업 유형 선택</span>
+        <span className="iwps">품목 전환</span>
+      </button>
+      {conversionNav.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          className={`iwpb ${item.state === "active" ? "a" : item.state}`}
+          data-testid="item-conversion-step-nav-item"
+          data-state={item.state}
+          disabled={item.state === "locked" || item.state === "active"}
+          onClick={() => onStepClick(item.id)}
+        >
+          <span className="iwpl">{item.title}</span>
+          {item.summary && <span className="iwps">{item.summary}</span>}
+        </button>
+      ))}
+    </nav>
+  );
+}
 
-            return (
-              <button
-                key={step.id}
-                type="button"
-                className={state === "active" ? "iwpb a" : state === "done" ? "iwpb done" : "iwpb locked"}
-                data-state={state}
-                data-testid="item-conversion-step-nav-item"
-                disabled={!onClick}
-                onClick={onClick}
-              >
-                <span className="iwpl">{step.title}</span>
-                {summary && <span className="iwps">{summary}</span>}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+function ModeSelection({ onSelect }: { onSelect: (mode: ItemConversionMode) => void }) {
+  return (
+    <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+      <button
+        type="button"
+        className="icmc"
+        onClick={() => onSelect("SPEC")}
+      >
+        <div className="ic-blue-text text-3xl font-black">사양 전환</div>
+        <div className="icm mt-auto text-base font-bold">
+          표시 사양만 전환
+        </div>
+      </button>
+      <button
+        type="button"
+        className="icmc"
+        onClick={() => onSelect("BOM")}
+      >
+        <div className="ic-yellow-text text-3xl font-black">구성 전환</div>
+        <div className="icm mt-auto text-base font-bold">
+          BOM 차이 반영
+        </div>
+      </button>
     </div>
   );
 }
 
-export function ItemConversionWorkView({ items, loading = false, onBack, onComplete }: WorkProps) {
-  const [mode, setMode] = useState<ItemConversionMode | null>(null);
-  const [sourceId, setSourceId] = useState("");
-  const [targetId, setTargetId] = useState("");
-  const [quantity, setQuantity] = useState<number | "">(1);
-  const [memo, setMemo] = useState("");
-  const [preview, setPreview] = useState<ItemConversionPreview | null>(null);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const candidates = items.filter(isConvertibleItem);
-  const source = candidates.find((item) => item.item_id === sourceId);
-  const targetCandidates = source
-    ? candidates.filter((item) => item.item_id !== sourceId && item.process_type_code === source.process_type_code)
-    : candidates;
-  const changeQty = quantity === "" ? 0 : positiveInt(quantity);
-  const sourceOver = Boolean(source && changeQty > Number(source.quantity || 0));
-  const needsMemo = preview?.resolved_mode === "BOM";
-  const canPreview = Boolean(mode && source && targetId && changeQty >= 1 && !sourceOver && !busy);
-  const canExecute = Boolean(preview?.executable && !sourceOver && (!needsMemo || memo.trim()) && !busy);
-
-  const clearPreview = () => {
-    setPreview(null);
-    setReady(false);
-    setError("");
-  };
-
-  const resetMode = () => {
-    setMode(null);
-    setSourceId("");
-    setTargetId("");
-    setQuantity(1);
-    setMemo("");
-    clearPreview();
-  };
-
-  const chooseMode = (nextMode: ItemConversionMode) => {
-    pushConversionModeHistory(nextMode);
-    setMode(nextMode);
-    setMemo("");
-    clearPreview();
-  };
-
-  const backToModeSelection = () => {
-    if (window.history.state?.wicm) {
-      window.history.back();
-      return;
-    }
-    resetMode();
-  };
-
-  useEffect(() => {
-    function handleModePop(event: PopStateEvent) {
-      if (!(event.state as { wicm?: unknown } | null)?.wicm) {
-        resetMode();
-      }
-    }
-
-    window.addEventListener("popstate", handleModePop);
-    return () => window.removeEventListener("popstate", handleModePop);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const renderSelect = (
-    kind: "source" | "target",
-    label: string,
-    value: string,
-    setValue: (value: string) => void,
-    choices: Item[],
-  ) => (
-    <label className={fieldClass} style={fieldStyle()}>
-      <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{label}</span>
-      <select
-        data-testid={`item-conversion-${kind}-search`}
-        value={value}
-        disabled={loading || (kind === "target" && !source)}
-        onChange={(event) => {
-          setValue(event.target.value);
-          clearPreview();
-        }}
-        className={inputClass}
-        style={{
-          background: LEGACY_COLORS.s1,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
-      >
-        <option value="">{kind === "source" ? "품목 선택" : source ? `${source.process_type_code} 품목 선택` : "소스 먼저 선택"}</option>
-        {choices.map((item) => (
-          <option key={item.item_id} value={item.item_id} disabled={!item.bom_completed_at}>
-            {itemLabel(item)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-
-  async function loadPreview() {
-    if (!canPreview || !mode) return;
-    setBusy(true);
-    setError("");
-    try {
-      setPreview(await api.getItemConversionPreview({
-        source_item_id: sourceId,
-        target_item_id: targetId,
-        quantity: changeQty,
-        requested_mode: mode,
-      }));
-    } catch (err) {
-      setPreview(null);
-      setError(err instanceof Error ? err.message : "확인 실패");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function executeChange() {
-    if (!canExecute || !preview || !mode) return;
-    setBusy(true);
-    setError("");
-    try {
-      onComplete(await api.executeItemConversion({
-        source_item_id: sourceId,
-        target_item_id: targetId,
-        quantity: preview.quantity,
-        requested_mode: mode,
-        memo: memo.trim() || null,
-      }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "처리 실패");
-    } finally {
-      setBusy(false);
-      setReady(false);
-    }
-  }
-
-  const alert = sourceOver
-    ? `재고 ${formatQty(Number(source?.quantity || 0), source?.unit)} 이하`
-    : preview?.blocking_reason || error;
-
-  if (!mode) {
-    return (
-      <section className="flex h-full min-h-0 flex-col gap-4 rounded-[28px] border p-4" style={conversionPanelStyle(LEGACY_COLORS.cyan)}>
-        <ItemConversionStepChrome
-          mode={mode}
-          preview={preview}
-          ready={ready}
-          onBack={onBack}
-          onModeSelection={resetMode}
-          onPreviewStep={() => setReady(false)}
-        />
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-          <button
-            type="button"
-            className="flex h-full min-h-0 flex-col items-start justify-between rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99]"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.blue,
-            }}
-            onClick={() => chooseMode("SPEC")}
-          >
-            <div className="flex items-center gap-5">
-              <ArrowLeftRight className="h-10 w-10" />
-              <span className="text-4xl font-black leading-tight">사양 전환</span>
-            </div>
-            <span className="text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
-              표시 사양만 전환
-            </span>
-          </button>
-          <button
-            type="button"
-            className="flex h-full min-h-0 flex-col items-start justify-between rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99]"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.yellow,
-            }}
-            onClick={() => chooseMode("BOM")}
-          >
-            <div className="flex items-center gap-5">
-              <Layers className="h-10 w-10" />
-              <span className="text-4xl font-black leading-tight">구성 전환</span>
-            </div>
-            <span className="text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
-              BOM 차이 반영
-            </span>
-          </button>
-        </div>
-      </section>
-    );
-  }
-
-  const modeAccent = mode === "SPEC" ? LEGACY_COLORS.blue : LEGACY_COLORS.yellow;
+function SelectionStep({
+  mode,
+  sourceItem,
+  targetItem,
+  sourceQuery,
+  targetQuery,
+  sourceCandidates,
+  targetCandidates,
+  quantity,
+  sourceOver,
+  busy,
+  canNext,
+  error,
+  onSourceQuery,
+  onTargetQuery,
+  onSourceSelect,
+  onTargetSelect,
+  onQuantity,
+  onNext,
+}: {
+  mode: ItemConversionMode;
+  sourceItem: Item | null;
+  targetItem: Item | null;
+  sourceQuery: string;
+  targetQuery: string;
+  sourceCandidates: Item[];
+  targetCandidates: Item[];
+  quantity: number;
+  sourceOver: boolean;
+  busy: boolean;
+  canNext: boolean;
+  error: string | null;
+  onSourceQuery: (value: string) => void;
+  onTargetQuery: (value: string) => void;
+  onSourceSelect: (item: Item) => void;
+  onTargetSelect: (item: Item) => void;
+  onQuantity: (value: string | number) => void;
+  onNext: () => void;
+}) {
+  const selectionHint = sourceOver
+    ? "소스 재고 초과 수량입니다."
+    : sourceItem && targetItem
+      ? "선택 완료 · 차이를 확인합니다."
+      : "소스·대상·수량을 선택하세요.";
+  const selectionHintClass = sourceOver ? "ic-red" : "icm";
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-3 rounded-[28px] border p-4" style={conversionPanelStyle(modeAccent)}>
-      <ItemConversionStepChrome
-        mode={mode}
-        preview={preview}
-        ready={ready}
-        onBack={onBack}
-        onModeSelection={resetMode}
-        onPreviewStep={() => setReady(false)}
-      />
-      <div className="grid shrink-0 gap-3 xl:grid-cols-2">
-        {renderSelect("source", "소스 품목", sourceId, setSourceId, candidates)}
-        {renderSelect("target", "대상 품목", targetId, setTargetId, targetCandidates)}
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
+        <CandidatePanel
+          kind="source"
+          title="소스 품목"
+          query={sourceQuery}
+          selected={sourceItem}
+          candidates={sourceCandidates}
+          placeholder="품명 · 품목 코드 검색"
+          onQuery={onSourceQuery}
+          onSelect={onSourceSelect}
+        />
+        <CandidatePanel
+          kind="target"
+          title="대상 품목"
+          query={targetQuery}
+          selected={targetItem}
+          candidates={targetCandidates}
+          placeholder={sourceItem ? "품명 · 품목 코드 검색" : "소스 품목을 먼저 선택"}
+          disabled={!sourceItem}
+          emptyText={sourceItem ? "대상 품목이 없습니다." : "소스 먼저 선택"}
+          onQuery={onTargetQuery}
+          onSelect={onTargetSelect}
+        />
       </div>
-      <div className="grid shrink-0 gap-3 xl:grid-cols-[180px_minmax(0,1fr)_auto]">
-        <label className={fieldClass} style={fieldStyle()}>
-          <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>전환 수량</span>
+      <div className="grid shrink-0 gap-2 lg:grid-cols-[120px_minmax(0,1fr)_140px]">
+        <label className="grid gap-1.5">
+          <span className="icm text-xs font-black">전환 수량</span>
           <input
+            data-testid="item-conversion-quantity"
             type="number"
             min={1}
             value={quantity}
-            onChange={(event) => {
-              setQuantity(event.target.value === "" ? "" : positiveInt(event.target.value));
-              clearPreview();
-            }}
-            className={inputClass}
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
+            onChange={(event) => onQuantity(event.target.value)}
+            className="ici"
           />
         </label>
-        <label className={fieldClass} style={fieldStyle()}>
-          <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            메모 {needsMemo ? "(필수)" : "(선택)"}
-          </span>
-          <input
-            data-testid="item-conversion-memo"
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            className={inputClass}
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          />
-        </label>
+        <div className="icf flex min-h-12 items-center rounded-[14px] border px-4 text-sm font-bold">
+          <span className={selectionHintClass}>{selectionHint}</span>
+        </div>
         <button
-          data-testid="item-conversion-preview-button"
-          className={`${buttonBase} self-end`}
-          style={primaryButtonStyle(modeAccent)}
-          disabled={!canPreview}
-          onClick={() => void loadPreview()}
+          type="button"
+          className={canNext ? buttonPrimary : buttonSecondary}
+          disabled={!canNext}
+          onClick={onNext}
         >
-          {busy ? "확인 중" : "차이 확인"}
+          {busy ? "확인 중" : "다음 단계로"}
         </button>
       </div>
-      {alert && (
-        <div
-          className="shrink-0 rounded-[16px] border px-4 py-3 text-sm font-bold"
-          style={{ background: tint(LEGACY_COLORS.red, 8), borderColor: tint(LEGACY_COLORS.red, 30), color: LEGACY_COLORS.red }}
-        >
-          {alert}
+      {error && <ErrorNotice message={error} />}
+    </div>
+  );
+}
+
+function CandidatePanel({
+  kind,
+  title,
+  query,
+  selected,
+  candidates,
+  placeholder,
+  disabled = false,
+  emptyText = "검색 결과가 없습니다.",
+  onQuery,
+  onSelect,
+}: {
+  kind: PickerKind;
+  title: string;
+  query: string;
+  selected: Item | null;
+  candidates: Item[];
+  placeholder: string;
+  disabled?: boolean;
+  emptyText?: string;
+  onQuery: (value: string) => void;
+  onSelect: (item: Item) => void;
+}) {
+  return (
+    <section className="icf flex min-h-0 flex-col gap-3 rounded-[18px] border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="ict text-base font-black">{title}</div>
         </div>
-      )}
-      <div data-testid="item-conversion-preview" className="min-h-0 flex-1 rounded-[22px] border p-4" style={fieldStyle()}>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <GitCompareArrows className="h-5 w-5" style={{ color: modeAccent }} />
-            <span className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>실행 요약</span>
-          </div>
-          {preview && (
-            <span className="rounded-full px-3 py-1 text-xs font-black" style={{ background: tint(modeAccent, 14), color: modeAccent }}>
-              {preview.lines.length > 0 ? `구성품 ${preview.lines.length}건` : "품목만 전환"}
-            </span>
-          )}
-        </div>
-        {!preview ? (
-          <div className="flex h-full min-h-[180px] items-center justify-center rounded-[18px] border border-dashed text-center text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-            소스 품목, 대상 품목, 수량을 선택한 뒤 차이를 확인하세요.
-          </div>
-        ) : preview.lines.length === 0 ? (
-          <div className="flex min-h-[180px] items-center justify-center gap-2 rounded-[18px] border text-sm font-black" style={{ borderColor: tint(LEGACY_COLORS.green, 28), background: tint(LEGACY_COLORS.green, 8), color: LEGACY_COLORS.green }}>
-            <CheckCircle2 className="h-5 w-5" />
-            BOM 차이 없음
+      </div>
+      <label className="icf flex min-h-12 items-center gap-2 rounded-[14px] border px-3">
+        <input
+          data-testid={`item-conversion-${kind}-search`}
+          value={query}
+          disabled={disabled}
+          onChange={(event) => onQuery(event.target.value)}
+          placeholder={placeholder}
+          className="ict h-full min-w-0 flex-1 bg-transparent text-sm font-bold outline-none disabled:cursor-not-allowed"
+        />
+      </label>
+      <div className="icpnl sg min-h-0 flex-1 overflow-y-auto rounded-[14px] border p-2">
+        {disabled || candidates.length === 0 ? (
+          <div className="icm flex h-full min-h-[180px] items-center justify-center text-sm font-bold">
+            {emptyText}
           </div>
         ) : (
-          <div className="grid max-h-full gap-2 overflow-y-auto pr-1">
-            {preview.lines.map((line) => {
-              const add = line.total_delta > 0;
+          <div className="grid gap-2">
+            {candidates.map((item) => {
+              const active = selected?.item_id === item.item_id;
               return (
-                <div key={line.item_id} className="rounded-[16px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                  <div className="flex justify-between gap-2">
-                    <div className="font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
-                    <span className="font-black" style={{ color: add ? LEGACY_COLORS.yellow : LEGACY_COLORS.green }}>
-                      {add ? "추가 차감" : "회수 입고"} {formatQty(Math.abs(line.total_delta), line.unit)}
+                <button
+                  key={item.item_id}
+                  type="button"
+                  data-testid={`item-conversion-${kind}-option-${item.item_id}`}
+                  onClick={() => onSelect(item)}
+                  className={`ico${active ? " ico-active" : ""}`}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-black">{item.item_name}</span>
+                    <span className="icm mt-0.5 block truncate text-xs font-bold">
+                      {item.mes_code ?? "-"} · {formatQty(itemStock(item), item.unit)} · {item.bom_completed_at ? "BOM" : "확인 필요"}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               );
             })}
           </div>
         )}
       </div>
-      <div className="flex shrink-0 justify-end">
-        <button className={buttonBase} style={secondaryButtonStyle()} disabled={!preview || !canPreview} onClick={() => setReady(true)}>
-          확인
+    </section>
+  );
+}
+
+function ReviewStep({
+  mode,
+  preview,
+  memo,
+  memoRequired,
+  busy,
+  error,
+  canNext,
+  onMemo,
+  onBack,
+  onNext,
+}: {
+  mode: ItemConversionMode;
+  preview: ItemConversionPreview;
+  memo: string;
+  memoRequired: boolean;
+  busy: boolean;
+  error: string | null;
+  canNext: boolean;
+  onMemo: (value: string) => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-preview">
+      <PreviewSummary preview={preview} mode={mode} />
+      <div className="icf sg min-h-0 flex-1 overflow-y-auto rounded-[18px] border p-3">
+        <PreviewLines preview={preview} />
+      </div>
+      <div className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+        <label className="grid gap-1.5">
+          <span className="icm text-xs font-black">
+            메모 {memoRequired ? "(필수)" : "(선택)"}
+          </span>
+          <input
+            data-testid="item-conversion-memo"
+            value={memo}
+            onChange={(event) => onMemo(event.target.value)}
+            placeholder={memoRequired ? "구성 전환 사유를 입력하세요" : "선택 입력"}
+            className="ici"
+          />
+        </label>
+        <button type="button" className={buttonSecondary} onClick={onBack}>
+          소스·대상 다시 선택
+        </button>
+        <button
+          type="button"
+          className={canNext ? buttonPrimary : buttonSecondary}
+          disabled={!canNext || busy}
+          onClick={onNext}
+        >
+          실행 단계로
         </button>
       </div>
-      {ready && preview && (
-        <div className="shrink-0 rounded-[22px] border p-4" style={{ background: tint(modeAccent, 8), borderColor: tint(modeAccent, 28) }}>
-          <div className="flex items-center gap-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-            <ClipboardCheck className="h-4 w-4" style={{ color: modeAccent }} />
-            실행 전 확인
-          </div>
-          <div className="mt-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-            {preview.source_item_name} -{formatQty(preview.quantity)} / {preview.target_item_name} +{formatQty(preview.quantity)}
-            {preview.lines.length > 0 ? ` / 구성품 ${preview.lines.length}건` : ""}
-          </div>
-          <div className="mt-3 flex justify-end gap-2">
-            <button className={buttonBase} style={secondaryButtonStyle()} onClick={() => setReady(false)}>취소</button>
-            <button data-testid="item-conversion-confirm-button" className={buttonBase} style={primaryButtonStyle(modeAccent)} disabled={!canExecute} onClick={() => void executeChange()}>
-              품목 전환 실행
-            </button>
-          </div>
+      {!preview.executable && preview.blocking_reason && <ErrorNotice message={preview.blocking_reason} />}
+      {error && <ErrorNotice message={error} />}
+    </div>
+  );
+}
+
+function ExecuteStep({
+  mode,
+  preview,
+  memo,
+  busy,
+  error,
+  onBack,
+  onExecute,
+}: {
+  mode: ItemConversionMode;
+  preview: ItemConversionPreview;
+  memo: string;
+  busy: boolean;
+  error: string | null;
+  onBack: () => void;
+  onExecute: () => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-execute-step">
+      <div className="icf rounded-[20px] border p-5">
+        <div className="ict text-xl font-black">최종 실행</div>
+        <div className="ict mt-3 grid gap-2 text-sm font-bold">
+          <div>{preview.source_item_name} -{formatQty(preview.quantity)}</div>
+          <div>{preview.target_item_name} +{formatQty(preview.quantity)}</div>
+          <div>{conversionModeLabel(mode)} · 구성품 차이 {preview.lines.length}건</div>
+          <div>메모 {memo.trim() || "-"}</div>
         </div>
-      )}
-    </section>
+      </div>
+      <div className="mt-auto flex justify-end gap-2">
+        <button type="button" className={buttonSecondary} onClick={onBack}>
+          차이 다시 보기
+        </button>
+        <button
+          type="button"
+          className={buttonPrimary}
+          data-testid="item-conversion-confirm-button"
+          disabled={busy}
+          onClick={onExecute}
+        >
+          {busy ? "실행중" : "전환 실행"}
+        </button>
+      </div>
+      {error && <ErrorNotice message={error} />}
+    </div>
+  );
+}
+
+function PreviewSummary({ preview, mode }: { preview: ItemConversionPreview; mode: ItemConversionMode }) {
+  const status = preview.executable ? "실행 가능" : "확인 필요";
+
+  return (
+    <div className="icf shrink-0 rounded-[18px] border p-4">
+      <div className="min-w-0">
+        <div className="icm text-xs font-black">
+          {conversionModeLabel(mode)} · {preview.lines.length}개 차이 · {status}
+        </div>
+        <div className="ict mt-1 truncate text-xl font-black">
+          {preview.source_item_name} → {preview.target_item_name}
+        </div>
+        <div className="icm mt-1 text-sm font-bold">
+          {preview.source_mes_code ?? "-"} → {preview.target_mes_code ?? "-"} · {formatQty(preview.quantity)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewLines({ preview }: { preview: ItemConversionPreview }) {
+  if (preview.lines.length === 0) {
+    return (
+      <div className="icm flex h-full min-h-[220px] items-center justify-center rounded-[14px] border text-sm font-bold">
+        변경되는 구성품이 없습니다. 소스 품목 차감과 대상 품목 입고만 처리됩니다.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      {preview.lines.map((line) => {
+        const consume = line.line_kind === "consume" || line.total_delta > 0;
+        return (
+          <div
+            key={`${line.item_id}-${line.line_kind}`}
+            className="icf flex min-h-14 items-center justify-between gap-3 rounded-[14px] border px-4 py-3"
+          >
+            <div className="min-w-0">
+              <div className="ict truncate text-sm font-black">
+                {line.item_name}
+              </div>
+              <div className="icm mt-0.5 text-xs font-bold">
+                {line.mes_code ?? "-"} · {line.department ?? "창고"}
+              </div>
+            </div>
+            <span className={consume ? "ic-delta ic-delta-consume" : "ic-delta ic-delta-return"}>
+              {consume ? "추가 차감" : "회수 입고"} {consume ? "-" : "+"}
+              {formatQty(Math.abs(line.total_delta), line.unit)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ErrorNotice({ message }: { message: string }) {
+  return (
+    <div className="ic-error">
+      <span>{message}</span>
+    </div>
   );
 }
 
 export function ItemConversionCompleteView({ result, onNew, onHistory, onWarehouse }: CompleteProps) {
   return (
-    <section data-testid="item-conversion-complete" className="flex h-full min-h-0 flex-col rounded-[28px] border p-6" style={conversionPanelStyle(LEGACY_COLORS.green)}>
-      {result ? (
-        <div className="rounded-[22px] border p-5" style={fieldStyle()}>
-          <div className="flex items-center gap-3 text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>
-            <PackageCheck className="h-7 w-7" />
-            품목 전환 완료
-          </div>
-          <div className="mt-3 text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
-            {result.source_item_name} → {result.target_item_name} · {formatQty(result.quantity)}
-          </div>
+    <section
+      className="ic-card flex h-full min-h-0 flex-col rounded-[24px] p-6"
+      data-testid="item-conversion-complete"
+    >
+      <div className="icf rounded-[22px] border p-6">
+        <div className="ict text-2xl font-black">
+          품목 전환 완료
         </div>
-      ) : (
-        <div className="flex flex-1 items-center justify-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>새 작업</div>
-      )}
+        <div className="ict mt-3 text-base font-bold leading-relaxed">
+          {result
+            ? `${result.source_item_name} → ${result.target_item_name} · ${formatQty(result.quantity)}`
+            : "전환 결과 없음"}
+        </div>
+      </div>
       <div className="mt-auto flex flex-wrap justify-end gap-2 pt-5">
-        <button className={buttonBase} style={primaryButtonStyle(LEGACY_COLORS.green)} onClick={onNew}>새 품목 전환</button>
-        <button className={buttonBase} style={secondaryButtonStyle()} onClick={onHistory}>입출고 내역에서 보기</button>
-        <button className={buttonBase} style={secondaryButtonStyle()} onClick={onWarehouse}>입출고로 돌아가기</button>
+        <button type="button" className={buttonPrimary} onClick={onNew}>
+          새 품목 전환
+        </button>
+        <button type="button" className={buttonSecondary} onClick={onHistory}>
+          입출고 내역
+        </button>
+        <button type="button" className={buttonSecondary} onClick={onWarehouse}>
+          입출고로 돌아가기
+        </button>
       </div>
     </section>
   );

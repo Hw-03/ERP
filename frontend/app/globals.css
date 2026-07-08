@@ -439,7 +439,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 900;
   line-height: 1.15;
 }
@@ -449,7 +449,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--c-muted2);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 800;
   line-height: 1.15;
 }
@@ -466,6 +466,178 @@
 
 .iwpb.done .iwps {
   color: color-mix(in srgb, var(--c-green) 64%, var(--c-muted2));
+}
+
+.icf {
+  background: var(--c-s2);
+  border-color: var(--c-border);
+  color: var(--c-text);
+}
+
+.icpnl {
+  background: var(--c-s1);
+  border-color: var(--c-border);
+}
+
+.ic-card {
+  background: var(--c-s1);
+  box-shadow: var(--c-card-shadow);
+}
+
+.ict {
+  color: var(--c-text);
+}
+
+.icm {
+  color: var(--c-muted2);
+}
+
+.ic-red {
+  color: var(--c-red);
+}
+
+.ic-blue-text {
+  color: var(--c-blue);
+}
+
+.ic-yellow-text {
+  color: var(--c-yellow);
+}
+
+.icmc {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border: 1px solid var(--c-border);
+  border-radius: 22px;
+  background: var(--c-s2);
+  padding: 2rem;
+  text-align: left;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.icmc:hover {
+  filter: brightness(1.05);
+}
+
+.icmc:active {
+  transform: scale(.99);
+}
+
+.icb {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  padding: .75rem 1.25rem;
+  font-size: .875rem;
+  font-weight: 900;
+  transition: filter 160ms ease, opacity 160ms ease;
+}
+
+.icb:hover {
+  filter: brightness(1.05);
+}
+
+.icb:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.icb-primary {
+  background: var(--c-blue);
+  border-color: var(--c-blue);
+  color: var(--c-white);
+}
+
+.icb-secondary {
+  background: var(--c-s2);
+  border-color: var(--c-border);
+  color: var(--c-text);
+}
+
+.ici {
+  height: 3rem;
+  width: 100%;
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  background: var(--c-s2);
+  padding-inline: .75rem;
+  color: var(--c-text);
+  font-size: .875rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.ici:focus-visible {
+  border-color: var(--c-blue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-blue) 18%, transparent);
+}
+
+.ico {
+  display: grid;
+  min-height: 4rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: .75rem;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: var(--c-s2);
+  color: var(--c-text);
+  padding: .5rem .75rem;
+  text-align: left;
+  transition: filter 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.ico:hover {
+  filter: brightness(1.05);
+}
+
+.ico-active {
+  border-color: var(--c-blue);
+  background: color-mix(in srgb, var(--c-blue) 10%, transparent);
+}
+
+.ic-delta {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  padding: .25rem .75rem;
+  font-size: .875rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ic-delta-consume {
+  background: color-mix(in srgb, var(--c-red) 14%, transparent);
+  color: var(--c-red);
+}
+
+.ic-delta-return {
+  background: color-mix(in srgb, var(--c-green) 14%, transparent);
+  color: var(--c-green);
+}
+
+.ic-error {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: .5rem;
+  border: 1px solid color-mix(in srgb, var(--c-red) 32%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c-red) 8%, transparent);
+  color: var(--c-red);
+  padding: .75rem 1rem;
+  font-size: .875rem;
+  font-weight: 900;
+}
+
+@media (min-width: 1024px) {
+  .icmc {
+    padding: 2.5rem;
+  }
 }
 
 /* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */

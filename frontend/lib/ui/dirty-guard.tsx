@@ -58,10 +58,10 @@ function DirtyModal({
   }, [modal.open, modal.busy, onCancel]);
   if (!modal.open) return null;
   const confirmOnly = modal.confirmOnly;
-  const title = confirmOnly ? "이 화면을 나갈까요?" : "작성 중인 내용이 있어요";
+  const title = confirmOnly ? "이 화면에서 나갈까요?" : "작성 중인 입출고가 있어요";
   const body = confirmOnly
     ? "현재 진행 중인 작업이 있습니다. 나가면 이 작업 화면에서 벗어납니다."
-    : "임시저장하면 나중에 이어서 진행할 수 있습니다. 저장하지 않고 이동하면 지금 작성 중인 내용은 사라집니다.";
+    : "임시저장하면 ‘내 요청’에서 이어서 진행할 수 있습니다. 저장하지 않고 이동하면 현재 작성 중인 내용은 사라집니다.";
 
   return (
     <div

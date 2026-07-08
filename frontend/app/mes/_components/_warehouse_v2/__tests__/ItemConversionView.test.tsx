@@ -74,7 +74,7 @@ const result = {
   source_available_quantity: 5,
   source_shortage_quantity: 0,
   reference_no: "ITEM-CONV-1234",
-  memo: "수출 사양 구성 전환",
+  memo: "출하 사양 구성 전환",
   completed_at: "2026-07-06T00:00:00Z",
   lines: [
     {
@@ -95,7 +95,7 @@ const result = {
     },
   ],
   transactions: [],
-};
+} as const;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -121,40 +121,42 @@ describe("ItemConversionView", () => {
     expect(onItemConversion).toHaveBeenCalledTimes(1);
   });
 
-  it("renders item conversion with the same compact step chrome as warehouse compose", () => {
-    const onComplete = vi.fn();
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+  it("renders item conversion with work-type return and four conversion steps", () => {
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
 
-    expect(screen.getByTestId("item-conversion-step-nav")).toBeInTheDocument();
     const navItems = screen.getAllByTestId("item-conversion-step-nav-item");
-    expect(navItems).toHaveLength(4);
+    expect(navItems).toHaveLength(5);
     expect(navItems.map((node) => node.getAttribute("data-state"))).toEqual([
+      "done",
       "active",
       "locked",
       "locked",
       "locked",
     ]);
-    expect(screen.queryByText(/① 방식 선택/)).not.toBeInTheDocument();
+    expect(navItems[0]).toHaveTextContent("작업 유형 선택");
+    expect(navItems[0]).toHaveTextContent("품목 전환");
+    expect(screen.queryByText("① 방식 선택 → ② 소스·대상 선택 → ③ 차이 확인 → ④ 실행")).not.toBeInTheDocument();
   });
 
   it("marks mode selection done and returns to it from the conversion step chrome", () => {
-    const onComplete = vi.fn();
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
 
     fireEvent.click(screen.getByRole("button", { name: /구성 전환/ }));
 
     let navItems = screen.getAllByTestId("item-conversion-step-nav-item");
     expect(navItems.map((node) => node.getAttribute("data-state"))).toEqual([
       "done",
+      "done",
       "active",
       "locked",
       "locked",
     ]);
 
-    fireEvent.click(navItems[0]);
+    fireEvent.click(navItems[1]);
 
     navItems = screen.getAllByTestId("item-conversion-step-nav-item");
     expect(navItems.map((node) => node.getAttribute("data-state"))).toEqual([
+      "done",
       "active",
       "locked",
       "locked",
@@ -163,21 +165,22 @@ describe("ItemConversionView", () => {
     expect(screen.getByRole("button", { name: /사양 전환/ })).toBeInTheDocument();
   });
 
-  it("previews and executes an AF BOM item conversion with the four-step chrome", async () => {
-    const onComplete = vi.fn();
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+  it("uses searchable source and target selection before moving to preview", async () => {
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
 
-    expect(screen.getByTestId("item-conversion-step-nav")).toBeInTheDocument();
-    expect(screen.getAllByTestId("item-conversion-step-nav-item")).toHaveLength(4);
-    expect(screen.queryByText(/① 방식 선택/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /구성 전환/ }));
-    expect(screen.getByText("구성 전환")).toBeInTheDocument();
-    expect(screen.getByText("소스 품목")).toBeInTheDocument();
-    expect(screen.getByText("대상 품목")).toBeInTheDocument();
-    expect(screen.getByText("실행 요약")).toBeInTheDocument();
-    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "af-1" } });
-    fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "af-2" } });
-    fireEvent.click(screen.getByTestId("item-conversion-preview-button"));
+
+    expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-target-search")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-memo")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-preview")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "Domestic" } });
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "Export" } });
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    fireEvent.click(screen.getByRole("button", { name: "다음 단계로" }));
 
     await waitFor(() => {
       expect(apiMock.getItemConversionPreview).toHaveBeenCalledWith({
@@ -187,11 +190,37 @@ describe("ItemConversionView", () => {
         requested_mode: "BOM",
       });
     });
-    expect(await screen.findByTestId("item-conversion-preview")).toHaveTextContent("Cable Set");
 
-    fireEvent.click(screen.getByRole("button", { name: /^확인$/ }));
-    fireEvent.change(screen.getByTestId("item-conversion-memo"), { target: { value: "수출 사양 구성 전환" } });
-    fireEvent.click(await screen.findByTestId("item-conversion-confirm-button"));
+    expect(await screen.findByTestId("item-conversion-preview")).toHaveTextContent("Cable Set");
+    expect(screen.getByTestId("item-conversion-memo")).toBeInTheDocument();
+  });
+
+  it("previews and executes an AF BOM item conversion through review and execute steps", async () => {
+    const onComplete = vi.fn();
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /구성 전환/ }));
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    fireEvent.click(screen.getByRole("button", { name: "다음 단계로" }));
+
+    expect(await screen.findByTestId("item-conversion-preview")).toHaveTextContent("Cable Set");
+    fireEvent.change(screen.getByTestId("item-conversion-memo"), {
+      target: { value: "출하 사양 구성 전환" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "실행 단계로" }));
+
+    const navItems = screen.getAllByTestId("item-conversion-step-nav-item");
+    expect(navItems.map((node) => node.getAttribute("data-state"))).toEqual([
+      "done",
+      "done",
+      "done",
+      "done",
+      "active",
+    ]);
+    expect(screen.getByTestId("item-conversion-execute-step")).toHaveTextContent("Domestic AF");
+
+    fireEvent.click(screen.getByTestId("item-conversion-confirm-button"));
 
     await waitFor(() => {
       expect(apiMock.executeItemConversion).toHaveBeenCalledWith({
@@ -199,7 +228,7 @@ describe("ItemConversionView", () => {
         target_item_id: "af-2",
         quantity: 1,
         requested_mode: "BOM",
-        memo: "수출 사양 구성 전환",
+        memo: "출하 사양 구성 전환",
       });
     });
     expect(onComplete).toHaveBeenCalledWith(result);
@@ -207,8 +236,7 @@ describe("ItemConversionView", () => {
 
   it("returns from conversion mode detail to mode selection on browser back", async () => {
     const pushStateSpy = vi.spyOn(window.history, "pushState");
-    const onComplete = vi.fn();
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
 
     fireEvent.click(screen.getByRole("button", { name: /구성 전환/ }));
 

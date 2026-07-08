@@ -107,6 +107,7 @@ export function IoComposeView({
   entryIntent,
   onStatusChange,
   onSubmitSuccess,
+  onItemConversionFocusChange,
 }: IoComposeViewProps) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
@@ -162,6 +163,17 @@ export function IoComposeView({
   useEffect(() => {
     itemConversionViewRef.current = itemConversionView;
   }, [itemConversionView]);
+
+  useEffect(() => {
+    onItemConversionFocusChange?.(itemConversionView !== "compose");
+  }, [itemConversionView, onItemConversionFocusChange]);
+
+  useEffect(
+    () => () => {
+      onItemConversionFocusChange?.(false);
+    },
+    [onItemConversionFocusChange],
+  );
 
   useEffect(() => {
     function handleItemConversionPop(event: PopStateEvent) {

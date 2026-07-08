@@ -968,14 +968,14 @@ function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
 function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void }) {
   return (
     <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-3">
-      <HubCard id="request" icon={ClipboardList} title="출하 요청" body="요청 목록, BOM 편집" detail="요청 목록을 확인하고 BOM을 수정합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
-      <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" body="준비 체크, 픽업" detail="구성품 체크와 준비 완료를 처리합니다." count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
-      <HubCard id="history" icon={History} title="출하 이력" body="완료 요청, 재고 로그" detail="픽업 완료와 재고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
+      <HubCard id="request" icon={ClipboardList} title="출하 요청" detail="요청 목록을 확인하고 BOM을 수정합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
+      <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" detail="구성품 체크와 준비 완료를 처리합니다." count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
+      <HubCard id="history" icon={History} title="출하 이력" detail="픽업 완료와 재고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
     </div>
   );
 }
 
-function HubCard({ id, icon: Icon, title, body, detail, count, tone, onClick }: { id: SectionTab; icon: typeof PackageCheck; title: string; body: string; detail: string; count?: number; tone: string; onClick: () => void }) {
+function HubCard({ id, icon: Icon, title, detail, count, tone, onClick }: { id: SectionTab; icon: typeof PackageCheck; title: string; detail: string; count?: number; tone: string; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -988,8 +988,7 @@ function HubCard({ id, icon: Icon, title, body, detail, count, tone, onClick }: 
         <div className="flex min-w-0 items-center gap-4">
           <Icon className="h-8 w-8 shrink-0" style={{ color: tone }} />
           <div className="min-w-0">
-            <div className="text-2xl font-black leading-tight xl:text-3xl" style={{ color: LEGACY_COLORS.text }}>{title}</div>
-            <div className="mt-2 text-base font-bold leading-tight xl:text-lg" style={{ color: LEGACY_COLORS.muted2 }}>{body}</div>
+            <div className="text-3xl font-black leading-tight xl:text-4xl" style={{ color: LEGACY_COLORS.text }}>{title}</div>
           </div>
         </div>
         {count !== undefined && <span data-testid={"shipping-hub-count-" + id} className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>}

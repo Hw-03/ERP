@@ -72,6 +72,7 @@ export function DesktopWarehouseView({
   // '이어서 하기' 클릭마다 증가 — 같은 draft 재선택(batch_id 불변)에도 복원이 재발동하도록.
   const [restoreNonce, setRestoreNonce] = useState(0);
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
+  const [itemConversionFocused, setItemConversionFocused] = useState(false);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =
@@ -137,22 +138,30 @@ export function DesktopWarehouseView({
   }
 
   const isComposeSection = sectionTab === "compose";
+  const hideSectionTabs = isComposeSection && itemConversionFocused;
 
   return (
-    <div className="flex h-full min-h-0 flex-1 min-w-0 lg:pr-4">
-      <div className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto px-3 pt-4 lg:px-6 ${isComposeSection ? "pb-0" : "pb-10"}`}>
+    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden lg:pr-4">
+      <div className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden px-0 pt-4 ${isComposeSection ? "pb-0" : "pb-10"}`}>
         <WarehouseHeader loadFailure={loadFailure} />
-        <WarehouseSectionTabs
-          active={sectionTab}
-          onChange={setSectionTab}
-          showQueue={canSeeQueue}
-          showDeptQueue={canSeeDeptQueue}
-          showHandover={showHandover}
-          cartCount={cartCount}
-          queueCount={warehouseQueueCount}
-          deptQueueCount={deptQueueCount}
-          handoverInboxCount={handoverInboxCount}
-        />
+        <div
+          className={`overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ${
+            hideSectionTabs ? "max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"
+          }`}
+          aria-hidden={hideSectionTabs}
+        >
+          <WarehouseSectionTabs
+            active={sectionTab}
+            onChange={setSectionTab}
+            showQueue={canSeeQueue}
+            showDeptQueue={canSeeDeptQueue}
+            showHandover={showHandover}
+            cartCount={cartCount}
+            queueCount={warehouseQueueCount}
+            deptQueueCount={deptQueueCount}
+            handoverInboxCount={handoverInboxCount}
+          />
+        </div>
 
         <WarehouseDraftPanelTabs
           sectionTab={sectionTab}
@@ -201,6 +210,7 @@ export function DesktopWarehouseView({
                 setPanelRefreshNonce((n) => n + 1);
                 onSubmitSuccess?.();
               }}
+              onItemConversionFocusChange={setItemConversionFocused}
             />
           </div>
         )}

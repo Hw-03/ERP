@@ -1,7 +1,6 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
 import { DEFECT_HUB_CARDS, type DefectHubCardId } from "./defectHubCards";
 
 interface Props {
@@ -42,7 +41,7 @@ export function DefectHubEntry({ onSelect }: Props) {
                 className="h-10 w-10 shrink-0"
                 style={{ color: accent }}
               />
-              <span className="text-4xl font-black leading-tight" style={{ color: tint(accent, 92) }}>
+              <span className="text-4xl font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>
                 {card.label}
               </span>
             </div>

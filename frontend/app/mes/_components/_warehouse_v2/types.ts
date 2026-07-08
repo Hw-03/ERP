@@ -46,4 +46,5 @@ export interface IoComposeViewProps {
   entryIntent?: IoEntryIntent | null;
   onStatusChange: (status: string) => void;
   onSubmitSuccess?: () => void;
+  onItemConversionFocusChange?: (focused: boolean) => void;
 }

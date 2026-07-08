@@ -382,10 +382,9 @@ function ConfirmBundleCard({
 
   return (
     <article
-      className="rounded-[18px] border p-4"
+      className="rounded-[18px] p-4"
       style={{
         background: tint(tone, 6),
-        borderColor: tint(tone, 24),
       }}
     >
       <button

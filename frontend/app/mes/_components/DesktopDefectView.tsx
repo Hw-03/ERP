@@ -243,7 +243,7 @@ function DefectViewInner({
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       <div
         className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-[28px] border"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
+        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
       >
         {view.kind === "hub" && (
           <div key="hub" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
