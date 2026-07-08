@@ -29,9 +29,10 @@ type Props = {
   onCached: (batchId: string, batch: IoBatch) => void;
   /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
   compact?: boolean;
+  highlightItemId?: string | null;
 };
 
-export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact }: Props) {
+export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId }: Props) {
   const [batch, setBatch] = useState<IoBatch | null>(cache.get(batchId) ?? null);
   const [loading, setLoading] = useState(!cache.has(batchId));
   const [expandedBundles, setExpandedBundles] = useState<Set<string>>(new Set());
@@ -56,6 +57,20 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact }: P
       });
     return () => { cancelled = true; };
   }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!batch || !highlightItemId) return;
+    const matchedBundle = batch.bundles.find((bundle) =>
+      bundle.lines.some((line) => line.item_id === highlightItemId),
+    );
+    if (!matchedBundle) return;
+    setExpandedBundles((prev) => {
+      if (prev.has(matchedBundle.bundle_id)) return prev;
+      const next = new Set(prev);
+      next.add(matchedBundle.bundle_id);
+      return next;
+    });
+  }, [batch, highlightItemId]);
 
   function toggleBundle(bundleId: string) {
     setExpandedBundles((prev) => {
@@ -92,6 +107,7 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact }: P
           expanded={expandedBundles.has(bundle.bundle_id)}
           onToggle={() => toggleBundle(bundle.bundle_id)}
           compact={compact}
+          highlightItemId={highlightItemId}
         />
       ))}
     </>
@@ -121,12 +137,14 @@ function BundleRows({
   expanded,
   onToggle,
   compact,
+  highlightItemId,
 }: {
   bundle: IoBundle;
   batch: IoBatch;
   expanded: boolean;
   onToggle: () => void;
   compact?: boolean;
+  highlightItemId?: string | null;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const isBomParent = bundle.source_kind === "bom_parent";
@@ -184,7 +202,7 @@ function BundleRows({
                 : <ChevronRight className="mt-0.5 h-3 w-3 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
             ) : null}
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+              <div className="line-clamp-2 min-w-0 break-words text-xs font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>
                 {bundle.title}
               </div>
             </div>
@@ -210,21 +228,40 @@ function BundleRows({
       </tr>
 
       {canExpand && expanded && childLines.map((line) => (
-        <BomLineRow key={line.line_id} line={line} batch={batch} bundle={bundle} compact={compact} />
+        <BomLineRow key={line.line_id} line={line} batch={batch} bundle={bundle} compact={compact} highlightItemId={highlightItemId} />
       ))}
     </>
   );
 }
 
-function BomLineRow({ line, batch, bundle, compact }: { line: IoLine; batch: IoBatch; bundle: IoBundle; compact?: boolean }) {
+function BomLineRow({
+  line,
+  batch,
+  bundle,
+  compact,
+  highlightItemId,
+}: {
+  line: IoLine;
+  batch: IoBatch;
+  bundle: IoBundle;
+  compact?: boolean;
+  highlightItemId?: string | null;
+}) {
   const padX = compact ? "px-2" : "px-4";
   const dim = !line.included;
   const signed = getHistoryLineSignedQuantity(line, batch, bundle);
   const qtyColor = SIGN_TONE_HEX[signed.tone];
+  const highlighted = highlightItemId === line.item_id;
   return (
     <tr
+      data-history-focus-line={highlighted ? "true" : undefined}
       style={{
-        background: line.included ? "color-mix(in srgb, var(--c-blue) 3%, transparent)" : "color-mix(in srgb, var(--c-red) 5%, transparent)",
+        background: highlighted
+          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+          : line.included
+            ? "color-mix(in srgb, var(--c-blue) 3%, transparent)"
+            : "color-mix(in srgb, var(--c-red) 5%, transparent)",
+        boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
         opacity: dim ? 0.58 : 1,
       }}
     >
@@ -236,7 +273,7 @@ function BomLineRow({ line, batch, bundle, compact }: { line: IoLine; batch: IoB
         <div className="flex min-w-0 items-start gap-2">
           <span className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+            <div className="line-clamp-2 min-w-0 break-words text-xs font-semibold leading-snug" style={{ color: LEGACY_COLORS.text }}>
               {line.item_name}
             </div>
           </div>

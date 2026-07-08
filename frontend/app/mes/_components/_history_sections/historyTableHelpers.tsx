@@ -121,7 +121,7 @@ const PRESENTATION_TONE_COLOR: Record<HistoryPresentationTone, string> = {
 
 export function StatusChipStrip({ presentation }: { presentation: HistoryRowPresentation }) {
   if (presentation.statusChips.length === 0) {
-    return <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
+    return <span className="min-h-4" aria-label="상태 없음" />;
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -161,7 +161,7 @@ export function TargetSummaryBlock({
     <div className="min-w-0">
       <div className="flex min-w-0 items-center gap-1.5">
         {icon}
-        <span className="min-w-0 truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+        <span className="line-clamp-2 min-w-0 break-words text-sm font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>
           {titleOverride ?? presentation.target.title}
         </span>
       </div>
@@ -244,14 +244,17 @@ export function QuantityStockCell({
 }
 
 export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPresentation }) {
+  const approver = presentation.people.approver?.trim();
   return (
     <div className="flex min-w-0 flex-col gap-2 leading-tight">
       <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
         요청 {presentation.people.requester}
       </div>
-      <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-        승인 {presentation.people.approver}
-      </div>
+      {approver && approver !== "-" && (
+        <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          승인 {approver}
+        </div>
+      )}
       <StatusChipStrip presentation={presentation} />
     </div>
   );
@@ -342,7 +345,7 @@ function ActorCell({ name }: { name: string }) {
 export function MemoCell({ notes }: { notes?: string | null }) {
   const { userMemo } = parseTransactionNotes(notes);
   if (!userMemo) {
-    return <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
+    return <span className="block min-h-4" aria-label="메모 없음" />;
   }
   return (
     <div className="flex justify-center" title={userMemo}>
@@ -488,9 +491,11 @@ export function BatchHeader({
 export function ReferenceBatchDetail({
   logs,
   compact,
+  highlightLogId,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
+  highlightLogId?: string | null;
 }) {
   const presentation = getReferenceBatchPresentation(logs);
 
@@ -504,6 +509,7 @@ export function ReferenceBatchDetail({
           log={log}
           kind={presentation.kind}
           compact={compact}
+          highlightLogId={highlightLogId}
         />
       ))}
     </>
@@ -514,18 +520,31 @@ function ReferenceBatchLineRow({
   log,
   kind,
   compact,
+  highlightLogId,
 }: {
   log: TransactionLog;
   kind: ReturnType<typeof getReferenceBatchPresentation>["kind"];
   compact?: boolean;
+  highlightLogId?: string | null;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const presentation = getHistoryRowPresentation(log);
   const linePresentation = getReferenceBatchLinePresentation(log, kind);
   const lineColor = PRESENTATION_TONE_COLOR[linePresentation.tone];
+  const highlighted = highlightLogId === log.log_id;
 
   return (
-    <tr style={{ background: kind === "shipment" ? "color-mix(in srgb, var(--c-blue) 3%, transparent)" : "color-mix(in srgb, var(--c-red) 3%, transparent)" }}>
+    <tr
+      data-history-focus-line={highlighted ? "true" : undefined}
+      style={{
+        background: highlighted
+          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+          : kind === "shipment"
+            ? "color-mix(in srgb, var(--c-blue) 3%, transparent)"
+            : "color-mix(in srgb, var(--c-red) 3%, transparent)",
+        boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
+      }}
+    >
       <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
       <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <FlowBadge type={log.transaction_type} label={linePresentation.label} color={lineColor} />

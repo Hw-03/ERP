@@ -151,6 +151,7 @@ export function parseTransactionNotes(notes: string | null | undefined): {
 } {
   const text = notes?.trim();
   if (!text) return { userMemo: null };
+  if (isGeneratedHistorySystemNote(text)) return { userMemo: null };
 
   // 1·2·3: 요청 (승인|즉시) 처리 — "/ 비고: ..." 가 있으면 그 부분만 사용자 메모.
   if (/^요청 (?:승인|즉시) 처리:/.test(text)) {
@@ -191,6 +192,22 @@ export function parseTransactionNotes(notes: string | null | undefined): {
 
   // 알려진 시스템 prefix 아님 → 전체가 사용자 메모
   return { userMemo: text };
+}
+
+function isGeneratedHistorySystemNote(text: string): boolean {
+  if (text.startsWith("??") || text.includes("\uFFFD")) return true;
+
+  const systemFragments = [
+    "품목 전환 소스",
+    "품목 전환 대상",
+    "품목 전환 추가 차감",
+    "품목 전환 회수 입고",
+    "출하 준비",
+    "출하 픽업",
+    "출하 동반",
+    "final PF",
+  ];
+  return systemFragments.some((fragment) => text.includes(fragment));
 }
 
 // 작업 의도 라벨 — base 라벨은 모두 glossary 단일 사전에서 가져옴 (P0-1).

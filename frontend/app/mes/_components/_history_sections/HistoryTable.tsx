@@ -15,6 +15,13 @@ import { BomBatchDetail } from "./BomBatchDetail";
 import { ReworkBatchHeader } from "./ReworkBatchHeader";
 import { ReworkBatchDetail } from "./ReworkBatchDetail";
 
+export type HistoryTableFocusTarget = {
+  groupKey: string;
+  logId?: string | null;
+  itemId?: string | null;
+  nonce: number;
+};
+
 type Props = {
   loading: boolean;
   filteredLogs: TransactionLog[];
@@ -29,6 +36,7 @@ type Props = {
   canLoadMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
+  focusTarget?: HistoryTableFocusTarget | null;
 };
 
 type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean; px?: string };
@@ -47,14 +55,14 @@ const COLUMNS_DEFAULT: ColSpec[] = [
 
 // 우측 패널 열림 — 대상과 품목코드는 유지하고 판단 영역만 살짝 압축한다.
 const COLUMNS_COMPACT: ColSpec[] = [
-  { label: "일시", width: "104px", align: "center", px: "px-2" },
-  { label: "작업", width: "116px", align: "center", px: "px-2" },
-  { label: "대상", minWidth: "280px" },
-  { label: "품목코드", width: "108px", align: "center", px: "px-2" },
-  { label: "", width: "28px", align: "center", px: "px-1" },
-  { label: "흐름", width: "132px", align: "center", px: "px-2" },
-  { label: "수량 · 재고", width: "184px", align: "center" },
-  { label: "상태 · 처리", width: "180px" },
+  { label: "일시", width: "96px", align: "center", px: "px-2" },
+  { label: "작업", width: "104px", align: "center", px: "px-2" },
+  { label: "대상", minWidth: "220px" },
+  { label: "품목코드", width: "96px", align: "center", px: "px-2" },
+  { label: "", width: "12px", align: "center", px: "px-0" },
+  { label: "흐름", width: "116px", align: "center", px: "px-2" },
+  { label: "수량 · 재고", width: "152px", align: "center", px: "px-2" },
+  { label: "상태 · 처리", width: "148px", px: "px-2" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
 
@@ -70,8 +78,9 @@ export function HistoryTable({
   canLoadMore,
   loadingMore,
   onLoadMore,
+  focusTarget,
 }: Props) {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
 
   // 선택 변화에 따른 op_batch 자동 토글 — "선택해서 열린" 묶음만 자동 접힘.
   // 단건/다른 묶음/none 으로 selection 이 바뀌면 이전 선택 묶음 접기 + 새 묶음이면 펼침.
@@ -82,20 +91,22 @@ export function HistoryTable({
     const prevBatchId = prevSelectedBatchRef.current;
     prevSelectedBatchRef.current = currentBatchId;
     if (prevBatchId === currentBatchId) return;
-    setExpandedGroups((s) => {
-      let changed = false;
-      const next = new Set(s);
-      if (prevBatchId && next.has(prevBatchId)) {
-        next.delete(prevBatchId);
-        changed = true;
-      }
-      if (currentBatchId && !next.has(currentBatchId)) {
-        next.add(currentBatchId);
-        changed = true;
-      }
-      return changed ? next : s;
-    });
+    if (currentBatchId) {
+      setExpandedGroupKey(currentBatchId);
+    } else if (prevBatchId) {
+      setExpandedGroupKey((prev) => (prev === prevBatchId ? null : prev));
+    }
   }, [selection]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    setExpandedGroupKey(focusTarget.groupKey);
+    const handle = window.setTimeout(() => {
+      const el = document.querySelector('[data-history-focus-line="true"]') as HTMLElement | null;
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 80);
+    return () => window.clearTimeout(handle);
+  }, [focusTarget]);
 
   const groups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
 
@@ -192,30 +203,15 @@ export function HistoryTable({
   }, [groups, enqueueBatchFetch]);
 
   function toggleGroup(key: string) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setExpandedGroupKey((prev) => (prev === key ? null : key));
   }
 
   function expandGroup(key: string) {
-    setExpandedGroups((prev) => {
-      if (prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
+    setExpandedGroupKey(key);
   }
 
   function collapseGroup(key: string) {
-    setExpandedGroups((prev) => {
-      if (!prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
+    setExpandedGroupKey((prev) => (prev === key ? null : prev));
   }
 
   function handleCacheBatch(batchId: string, batch: IoBatch) {
@@ -231,11 +227,8 @@ export function HistoryTable({
   const compact = selection != null;
   const COLUMNS = compact ? COLUMNS_COMPACT : COLUMNS_DEFAULT;
 
-  const allExpanded = batchKeys.length > 0 && batchKeys.every((k) => expandedGroups.has(k));
-
-  function toggleAll() {
-    if (allExpanded) setExpandedGroups(new Set());
-    else setExpandedGroups(new Set(batchKeys));
+  function collapseExpandedGroup() {
+    setExpandedGroupKey(null);
   }
 
   // selection helpers
@@ -257,13 +250,13 @@ export function HistoryTable({
             {formatHistoryDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatHistoryDate(filteredLogs[0].created_at)}
           </span>
         )}
-        {batchKeys.length > 0 && (
+        {batchKeys.length > 0 && expandedGroupKey && (
           <button
-            onClick={toggleAll}
+            onClick={collapseExpandedGroup}
             className="ml-auto rounded-full border px-3 py-1 text-xs font-semibold transition-opacity hover:opacity-80"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
           >
-            {allExpanded ? "전체 접기" : "전체 펼치기"}
+            펼침 닫기
           </button>
         )}
       </div>
@@ -309,9 +302,10 @@ export function HistoryTable({
                 }
 
                 if (group.type === "op_batch") {
-                  const expanded = expandedGroups.has(group.batchId);
+                  const expanded = expandedGroupKey === group.batchId;
                   const batch = batchCache.get(group.batchId) ?? null;
                   const isSelected = selectedBatchId === group.batchId;
+                  const focusItemId = focusTarget?.groupKey === group.batchId ? focusTarget.itemId ?? null : null;
                   return (
                     <Fragment key={`op-${group.batchId}`}>
                       <OpBatchHeader
@@ -336,6 +330,7 @@ export function HistoryTable({
                           cache={batchCache}
                           onCached={handleCacheBatch}
                           compact={compact}
+                          highlightItemId={focusItemId}
                         />
                       )}
                     </Fragment>
@@ -346,7 +341,7 @@ export function HistoryTable({
                 // 재작업(defect-disassemble) 배치 → 트리 뷰
                 const groupKey = group.refKey;
                 if (group.refNo.startsWith("defect-disassemble:")) {
-                  const expanded = expandedGroups.has(groupKey);
+                  const expanded = expandedGroupKey === groupKey;
                   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
                   const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
                   const isSelected = selectedLogId === group.logs[0]?.log_id;
@@ -377,8 +372,9 @@ export function HistoryTable({
                 }
 
                 // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
-                const expanded = expandedGroups.has(groupKey);
+                const expanded = expandedGroupKey === groupKey;
                 const isSelected = selectedLogId === group.logs[0]?.log_id;
+                const focusLogId = focusTarget?.groupKey === groupKey ? focusTarget.logId ?? null : null;
                 return (
                   <Fragment key={`ref-${groupKey}`}>
                     <BatchHeader
@@ -397,6 +393,7 @@ export function HistoryTable({
                       <ReferenceBatchDetail
                         logs={group.logs}
                         compact={compact}
+                        highlightLogId={focusLogId}
                       />
                     )}
                   </Fragment>

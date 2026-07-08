@@ -432,7 +432,8 @@ function HistoryDetailMetaStrip({
 }) {
   const processMeta = PROCESS_TYPE_META[log.item_process_type_code ?? ""];
   const reqName = getHistoryActor(log);
-  const approverName = log.approver_name ?? "-";
+  const rawApproverName = (log.approver_name ?? "").trim();
+  const approverName = rawApproverName && rawApproverName !== reqName ? rawApproverName : null;
 
   return (
     <div
@@ -463,12 +464,14 @@ function HistoryDetailMetaStrip({
             {" "}
             {formatHistoryDateTimeLong(log.requested_at ?? log.created_at)}
           </span>
-          <span>
-            승인자{" "}
-            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{approverName}</span>
-            {" "}
-            {formatHistoryDateTimeLong(log.approved_at ?? log.created_at)}
-          </span>
+          {approverName && (
+            <span>
+              승인자{" "}
+              <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{approverName}</span>
+              {" "}
+              {formatHistoryDateTimeLong(log.approved_at ?? log.created_at)}
+            </span>
+          )}
         </div>
       </div>
       {!log.cancelled && (

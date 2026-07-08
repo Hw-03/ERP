@@ -344,7 +344,8 @@ export function getHistoryRowPresentation(
     : { parts: [getSingleLogMovement(log)] };
   const stock = getStockPresentation(log);
   const requester = batch?.requester_name ?? getHistoryActor(log);
-  const approver = batch?.approver_name ?? log.approver_name ?? "-";
+  const rawApprover = (batch?.approver_name ?? log.approver_name ?? "").trim();
+  const approver = rawApprover && rawApprover !== requester ? rawApprover : "";
 
   return {
     operation,

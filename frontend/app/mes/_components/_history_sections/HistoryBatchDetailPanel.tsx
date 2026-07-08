@@ -31,6 +31,7 @@ import {
 } from "./historyTableHelpers";
 import { HistoryDetailMemo } from "./HistoryDetailPanel";
 import { getHistoryRowPresentation } from "./historyPresentation";
+import type { HistoryTableFocusTarget } from "./HistoryTable";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,
@@ -50,8 +51,9 @@ type Props = {
   logs: TransactionLog[];
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
-  onSelectLog: (log: TransactionLog) => void;
   onBatchCancelled: (batchId: string) => void;
+  onFocusLineInList?: (target: Omit<HistoryTableFocusTarget, "nonce">) => void;
+  onSelectLog?: (log: TransactionLog) => void;
   variant?: "default" | "desktop";
 };
 
@@ -69,8 +71,9 @@ export function HistoryBatchDetailPanel({
   logs,
   batchCache,
   setBatchCache,
-  onSelectLog,
   onBatchCancelled,
+  onFocusLineInList,
+  onSelectLog,
   variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
@@ -152,7 +155,17 @@ export function HistoryBatchDetailPanel({
 
   function handleLineClick(line: IoLine) {
     const matched = logByItemId.get(line.item_id);
-    if (matched) onSelectLog(matched);
+    if (onFocusLineInList) {
+      onFocusLineInList({
+        groupKey: batchId,
+        logId: matched?.log_id ?? null,
+        itemId: line.item_id,
+      });
+      return;
+    }
+    if (matched) {
+      onSelectLog?.(matched);
+    }
   }
 
   return (
@@ -334,7 +347,8 @@ function HistoryBatchHero({
   }
 
   const reqName = batch?.requester_name ?? getHistoryActor(first);
-  const approverName = batch?.approver_name ?? first.approver_name ?? null;
+  const rawApproverName = (batch?.approver_name ?? first.approver_name ?? "").trim();
+  const approverName = rawApproverName && rawApproverName !== reqName ? rawApproverName : null;
 
   return (
     <div className="rounded-[20px] border p-4 space-y-3" style={heroStyle}>
@@ -404,14 +418,16 @@ function HistoryBatchHero({
           {" "}
           {formatHistoryDateTimeLong(first.requested_at ?? first.created_at)}
         </span>
+        {approverName && (
         <span>
           승인자{" "}
           <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-            {approverName ?? reqName}
+            {approverName}
           </span>
           {" "}
           {formatHistoryDateTimeLong(first.approved_at ?? first.created_at)}
         </span>
+        )}
       </div>
 
       {!isBatchCancelled && (

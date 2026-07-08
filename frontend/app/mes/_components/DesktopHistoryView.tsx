@@ -10,6 +10,7 @@ import { HistoryFilterPanel } from "./_history_sections/HistoryFilterPanel";
 import { HistoryCalendarPanel } from "./_history_sections/HistoryCalendarPanel";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
+import type { HistoryTableFocusTarget } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
 import { useToggleSet } from "./_hooks/useToggleSet";
@@ -53,6 +54,7 @@ export function DesktopHistoryView() {
   );
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
+  const [focusTarget, setFocusTarget] = useState<HistoryTableFocusTarget | null>(null);
   // 우측 패널 내 드릴(BOM 하위) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
 
@@ -294,6 +296,10 @@ export function DesktopHistoryView() {
     });
   }
 
+  function focusHistoryLineInList(target: Omit<HistoryTableFocusTarget, "nonce">) {
+    setFocusTarget({ ...target, nonce: Date.now() });
+  }
+
   // 한 단계 뒤로 — 스택 pop. 비면 무시(패널 유지).
   function goBack() {
     setSelectionStack((s) => {
@@ -423,6 +429,7 @@ export function DesktopHistoryView() {
             canLoadMore={canLoadMore}
             loadingMore={loadingMore}
             onLoadMore={() => void loadMore()}
+            focusTarget={focusTarget}
           />
         </div>
       </div>
@@ -437,6 +444,7 @@ export function DesktopHistoryView() {
         onBack={goBack}
         onLogUpdated={handleLogUpdated}
         onBatchCancelled={handleBatchCancelled}
+        onFocusLineInList={focusHistoryLineInList}
         onClose={() => {
           setSelectionStack([]);
           setSelection(null);

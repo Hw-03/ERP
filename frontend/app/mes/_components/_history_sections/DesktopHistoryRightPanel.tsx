@@ -9,6 +9,7 @@ import { DesktopRightPanel } from "../DesktopRightPanel";
 import { HistoryDetailPanel } from "./HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
 import type { HistorySelection } from "./historyConstants";
+import type { HistoryTableFocusTarget } from "./HistoryTable";
 
 /**
  * Round-13 (#15) 추출 — DesktopHistoryView 우측 슬라이딩 상세 패널.
@@ -26,6 +27,7 @@ export interface DesktopHistoryRightPanelProps {
   onBack: () => void;
   onLogUpdated: (updated: TransactionLog) => void;
   onBatchCancelled: (batchId: string) => void;
+  onFocusLineInList: (target: Omit<HistoryTableFocusTarget, "nonce">) => void;
   /** 패널 닫기 (선택 해제). */
   onClose: () => void;
 }
@@ -40,6 +42,7 @@ export function DesktopHistoryRightPanel({
   onBack,
   onLogUpdated,
   onBatchCancelled,
+  onFocusLineInList,
   onClose,
 }: DesktopHistoryRightPanelProps) {
   const backButtonNode = canGoBack ? (
@@ -99,8 +102,8 @@ export function DesktopHistoryRightPanel({
               logs={displaySelection.logs}
               batchCache={batchCache}
               setBatchCache={setBatchCache}
-              onSelectLog={onSelectLog}
               onBatchCancelled={onBatchCancelled}
+              onFocusLineInList={onFocusLineInList}
               variant="desktop"
             />
           </DesktopRightPanel>

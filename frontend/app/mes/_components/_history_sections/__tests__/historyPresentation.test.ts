@@ -182,7 +182,7 @@ describe("historyPresentation", () => {
       produced_by: "김현우",
     }));
 
-    expect(row.people).toEqual({ requester: "김현우", approver: "-" });
+    expect(row.people).toEqual({ requester: "김현우", approver: "" });
   });
 
   it("keeps single-log stock, actor, and cancel signals visible without reference chips", () => {
