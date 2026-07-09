@@ -58,6 +58,7 @@ export const productionApi = {
       itemId?: string;
       transactionType?: TransactionType;
       transactionTypes?: string; // 쉼표 구분 복수값. 예: "RECEIVE,SHIP"
+      operationKeys?: string; // 화면 거래 종류. 예: "item_conversion,shipping_prepare"
       referenceNo?: string;
       search?: string;
       department?: string;
@@ -75,6 +76,7 @@ export const productionApi = {
     if (params?.itemId) query.set("item_id", params.itemId);
     if (params?.transactionType) query.set("transaction_type", params.transactionType);
     if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
+    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
     if (params?.referenceNo) query.set("reference_no", params.referenceNo);
     if (params?.search) query.set("search", params.search);
     if (params?.department) query.set("department", params.department);
@@ -95,6 +97,7 @@ export const productionApi = {
   getTransactionsSummary: (
     params?: {
       transactionTypes?: string;
+      operationKeys?: string;
       search?: string;
       department?: string;
       model?: string;
@@ -107,6 +110,7 @@ export const productionApi = {
   ): Promise<TransactionSummary> => {
     const query = new URLSearchParams();
     if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
+    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
     if (params?.search) query.set("search", params.search);
     if (params?.department) query.set("department", params.department);
     if (params?.model) query.set("model", params.model);

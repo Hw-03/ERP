@@ -57,7 +57,7 @@ export function HistoryFilterPanel({
             key={name}
             active={selectedDepts.includes(name)}
             // 표시는 정규화(더티 "DepartmentEnum.X" 방어), 필터 값은 raw 유지 → 매칭 정확
-            label={`${normalizeDepartment(name)} ${count.toLocaleString()}`}
+            label={`${formatDepartmentFilterLabel(name)} · ${count.toLocaleString()}건`}
             onClick={() => toggleDept(name)}
             tone={LEGACY_COLORS.green}
             className="w-full"
@@ -108,6 +108,10 @@ export function HistoryFilterPanel({
       </button>
     </div>
   );
+}
+
+function formatDepartmentFilterLabel(name: string): string {
+  return name === "미상" ? "부서 기록 없음" : normalizeDepartment(name);
 }
 
 function Card({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {

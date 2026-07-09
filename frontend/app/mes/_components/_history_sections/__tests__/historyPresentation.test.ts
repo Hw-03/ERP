@@ -185,6 +185,18 @@ describe("historyPresentation", () => {
     expect(row.people).toEqual({ requester: "김현우", approver: "" });
   });
 
+  it("labels system-generated actors separately from human requesters", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      requester_name: null,
+      approver_name: null,
+      produced_by: "구성품 변경",
+      shipping_phase: "COMPONENT_CHANGE",
+    }));
+
+    expect(row.people).toEqual({ requester: "시스템 처리 · 구성품 변경", approver: "" });
+    expect(row.statusChips.map((chip) => chip.label)).toContain("자동 처리");
+  });
+
   it("keeps single-log stock, actor, and cancel signals visible without reference chips", () => {
     const row = getHistoryRowPresentation(
       makeLog({
@@ -270,11 +282,11 @@ describe("historyPresentation", () => {
     expect(getReferenceBatchLinePresentation(
       makeLog({ transaction_type: "PRODUCE" }),
       "shipment",
-    ).label).toBe("출하 준비");
+    ).label).toBe("출하품 준비");
     expect(getReferenceBatchLinePresentation(
       makeLog({ transaction_type: "BACKFLUSH" }),
       "shipment",
-    ).label).toBe("하위 차감");
+    ).label).toBe("구성품 차감");
   });
 });
 
@@ -364,10 +376,10 @@ describe("shipping phase history presentation", () => {
     ]);
 
     expect(componentChange.operationLabel).toBe("\uD488\uBAA9 \uC804\uD658");
-    expect(componentChange.flowLabel).toBe("\uC0AC\uC591 \uC804\uD658");
+    expect(componentChange.flowLabel).toBe("\uC870\uB9BD");
     expect(componentChange.targetTitle).toBe("\uBCC0\uACBD PA");
     expect(componentChange.targetCode).toBe("3-PA-0002");
-    expect(componentChange.movement.parts[0]?.label).toContain("\uC0AC\uC591 \uC804\uD658");
+    expect(componentChange.movement.parts[0]?.label).toContain("\uBCC0\uACBD");
   });
 
   it("distinguishes BOM item-conversion lines in history batches", () => {
@@ -411,12 +423,12 @@ describe("shipping phase history presentation", () => {
     ];
     const componentChange = getReferenceBatchPresentation(logs);
 
-    expect(componentChange.flowLabel).toBe("\uAD6C\uC131 \uC804\uD658");
-    expect(componentChange.movement.parts[0]?.label).toContain("\uAD6C\uC131 \uC804\uD658");
-    expect(getReferenceBatchLinePresentation(logs[0], "shipment").label).toBe("\uC18C\uC2A4 \uCC28\uAC10");
-    expect(getReferenceBatchLinePresentation(logs[1], "shipment").label).toBe("\uCD94\uAC00 \uCC28\uAC10");
+    expect(componentChange.flowLabel).toBe("\uC870\uB9BD");
+    expect(componentChange.movement.parts[0]?.label).toContain("\uBCC0\uACBD");
+    expect(getReferenceBatchLinePresentation(logs[0], "shipment").label).toBe("\uAE30\uC874\uD488 \uCC28\uAC10");
+    expect(getReferenceBatchLinePresentation(logs[1], "shipment").label).toBe("\uCD94\uAC00 \uAD6C\uC131\uD488 \uCC28\uAC10");
     expect(getReferenceBatchLinePresentation(logs[2], "shipment").label).toBe("\uD68C\uC218 \uC785\uACE0");
-    expect(getReferenceBatchLinePresentation(logs[3], "shipment").label).toBe("\uB300\uC0C1 \uC785\uACE0");
+    expect(getReferenceBatchLinePresentation(logs[3], "shipment").label).toBe("\uBCC0\uACBD\uD488 \uC785\uACE0");
   });
 
   it("labels shipping prepare and pickup batches as separate workflow steps", () => {
@@ -450,12 +462,16 @@ describe("shipping phase history presentation", () => {
       }),
     ]);
 
-    expect(prepare.operationLabel).toBe("\uCD9C\uD558 \uC900\uBE44 \uC644\uB8CC");
+    expect(prepare.operationLabel).toBe("\uCD9C\uD558 \uC900\uBE44");
+    expect(prepare.flowLabel).toBe("\uC870\uB9BD");
     expect(prepare.targetTitle).toBe("\uCD5C\uC885 PF");
     expect(prepare.targetCode).toBe("3-PF-0002");
     expect(prepare.movement.parts[0]?.label).toContain("\uC900\uBE44");
-    expect(pickup.operationLabel).toBe("\uCD9C\uD558 \uD53D\uC5C5 \uC644\uB8CC");
+    expect(getReferenceBatchLinePresentation(makeLog({ transaction_type: "BACKFLUSH", shipping_phase: "PREPARE" }), "shipment").label).toBe("\uAD6C\uC131\uD488 \uCC28\uAC10");
+    expect(getReferenceBatchLinePresentation(makeLog({ transaction_type: "PRODUCE", shipping_phase: "PREPARE" }), "shipment").label).toBe("\uCD9C\uD558\uD488 \uC900\uBE44");
+    expect(pickup.operationLabel).toBe("\uCD9C\uD558");
     expect(pickup.targetTitle).toBe("\uCD5C\uC885 PF");
     expect(pickup.targetCode).toBe("3-PF-0002");
+    expect(getReferenceBatchLinePresentation(makeLog({ transaction_type: "SHIP", shipping_phase: "PICKUP" }), "shipment").label).toBe("\uCD9C\uD558\uD488 \uCD9C\uACE0");
   });
 });

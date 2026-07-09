@@ -189,6 +189,7 @@ def list_transactions(
     item_id: Optional[uuid.UUID] = Query(None),
     transaction_type: Optional[TransactionTypeEnum] = Query(None),
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입. 예: RECEIVE,SHIP"),
+    operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키. 예: item_conversion,shipping_prepare"),
     reference_no: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
@@ -233,6 +234,7 @@ def list_transactions(
         query,
         db,
         transaction_types=transaction_types,
+        operation_keys=operation_keys,
         search=search,
         department=department,
         model=model,
@@ -284,6 +286,7 @@ def list_transactions(
 @router.get("/transactions/summary", response_model=TransactionSummaryResponse)
 def get_transactions_summary(
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
+    operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키"),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
         None, description="부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능"
@@ -313,6 +316,7 @@ def get_transactions_summary(
         query,
         db,
         transaction_types=transaction_types,
+        operation_keys=operation_keys,
         search=search,
         department=department,
         model=model,

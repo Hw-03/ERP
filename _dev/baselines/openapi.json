@@ -12799,6 +12799,24 @@
             }
           },
           {
+            "description": "화면 거래 종류 키. 예: item_conversion,shipping_prepare",
+            "in": "query",
+            "name": "operation_keys",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "화면 거래 종류 키. 예: item_conversion,shipping_prepare",
+              "title": "Operation Keys"
+            }
+          },
+          {
             "in": "query",
             "name": "reference_no",
             "required": false,
@@ -13262,6 +13280,24 @@
               ],
               "description": "쉼표 구분 복수 타입",
               "title": "Transaction Types"
+            }
+          },
+          {
+            "description": "화면 거래 종류 키",
+            "in": "query",
+            "name": "operation_keys",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "화면 거래 종류 키",
+              "title": "Operation Keys"
             }
           },
           {

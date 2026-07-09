@@ -12,11 +12,8 @@ import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_META } from "./historyTheme";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import {
-  getBatchFlowEndpoints,
   getHistoryActor,
-  getHistoryDisplayLabel,
   getHistoryWorkTypeLabel,
-  getSingleLogMovement,
   parseTransactionNotes,
 } from "./historyBatchInterpreter";
 import {
@@ -210,7 +207,10 @@ export function HistoryDetailPanel({
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-            거래 취소 확인
+            취소 범위 확인
+          </div>
+          <div className="rounded-[12px] border px-3 py-2 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}>
+            {selected.operation_batch_id ? "이 작업 묶음에 포함된 재고 변동을 함께 취소합니다." : "선택한 이력 1건의 재고 변동만 취소합니다."}
           </div>
           <textarea
             className="w-full rounded-[12px] border px-3 py-2 text-[13px] resize-none"
@@ -239,7 +239,7 @@ export function HistoryDetailPanel({
               className="flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
               style={{ background: LEGACY_COLORS.red }}
             >
-              {cancelState.step === "submitting" ? "처리 중…" : "취소 확정"}
+              {cancelState.step === "submitting" ? "처리 중…" : "범위 확인 후 취소"}
             </button>
             <button
               type="button"
@@ -296,13 +296,13 @@ function HistoryDetailHero({
   editCount: number;
 }) {
   const tcolor = transactionColor(log.transaction_type);
-  const movement = getSingleLogMovement(log);
+  const batch = flow.status === "available" ? flow.batch : null;
+  const presentation = getHistoryRowPresentation(log, batch ?? undefined);
   const heroStyle = {
     background: `color-mix(in srgb, ${tcolor} 5%, ${LEGACY_COLORS.s2})`,
     borderColor: `color-mix(in srgb, ${tcolor} 22%, ${LEGACY_COLORS.border})`,
   };
 
-  const eps = flow.status === "available" ? getBatchFlowEndpoints(flow.batch) : null;
   const workType = flow.status === "available" ? getHistoryWorkTypeLabel(flow.batch.work_type) : null;
 
   const qBefore = log.quantity_before;
@@ -317,10 +317,10 @@ function HistoryDetailHero({
       <div className="flex flex-wrap items-center gap-2">
         <FlowBadge
           type={log.transaction_type}
-          label={getHistoryDisplayLabel(log)}
+          label={presentation.operation.label}
           color={tcolor}
         />
-        <MovementSummaryCell summary={{ parts: [movement] }} />
+        <MovementSummaryCell summary={presentation.movement} />
         {editCount > 0 && (
           <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
@@ -336,22 +336,22 @@ function HistoryDetailHero({
       </div>
 
       {/* 2줄: 흐름 — available + eps 있을 때만, loading 시 skeleton, unavailable 시 미렌더 */}
-      {flow.status === "available" && eps && (
+      {presentation.flow.label && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
             className="rounded-full border px-2.5 py-0.5 font-bold"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
           >
-            {eps.from}
+            {presentation.flow.from ?? presentation.flow.label}
           </span>
-          {eps.from !== eps.to && (
+          {presentation.flow.from && presentation.flow.to && presentation.flow.from !== presentation.flow.to && (
             <>
               <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
               <span
                 className="rounded-full border px-2.5 py-0.5 font-bold"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
-                {eps.to}
+                {presentation.flow.to}
               </span>
             </>
           )}
@@ -419,6 +419,11 @@ function HistoryDetailHero({
           </span>
         </div>
       )}
+      {presentation.stock && (
+        <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          처리 후 기준 재고 · {presentation.stock.label}
+        </div>
+      )}
     </div>
   );
 }
@@ -434,6 +439,7 @@ function HistoryDetailMetaStrip({
   const reqName = getHistoryActor(log);
   const rawApproverName = (log.approver_name ?? "").trim();
   const approverName = rawApproverName && rawApproverName !== reqName ? rawApproverName : null;
+  const cancelScopeLabel = log.operation_batch_id ? "작업 묶음 전체 취소" : "이 이력 1건 취소";
 
   return (
     <div
@@ -481,7 +487,7 @@ function HistoryDetailMetaStrip({
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}
         >
           <XCircle className="h-3.5 w-3.5" />
-          취소
+          {cancelScopeLabel}
         </button>
       )}
     </div>

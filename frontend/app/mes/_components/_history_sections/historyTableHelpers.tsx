@@ -50,7 +50,7 @@ export function FlowBadge({
   const Icon = type ? TX_ICON[transactionIconName(type)] : null;
   return (
     <span
-      className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+      className="inline-flex h-6 min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none"
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >
       {Icon && <Icon className="h-3.5 w-3.5" />}
@@ -69,13 +69,11 @@ export const TONE_COLOR: Record<MovementTone, string> = {
 };
 
 export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
-  // 셀에 알약 1개(단건/묶음요약) → 큰 패딩·자간·큰 통일 폭으로 강조.
-  // 알약 2개(BOM 상위/하위 짝) → 좁은 패딩·작은 통일 폭(둘이 한 셀에 들어가야 함).
-  // 글자 크기는 모든 알약 동일(text-xs). 3자리 부호 포함 기준 폭, 4자리+ 자연 확장.
+  // 변화량 pill 은 단건/묶음/경고 모두 같은 높이로 고정한다.
   const isSingle = summary.parts.length === 1 && !summary.warning;
   const pillClass = isSingle
-    ? "inline-flex min-w-[10.5rem] justify-center rounded-full px-3 py-1 text-xs font-bold tracking-wide"
-    : "inline-flex min-w-[5rem] justify-center rounded-full px-2 py-0.5 text-xs font-bold";
+    ? "inline-flex h-6 min-w-[9.75rem] items-center justify-center rounded-full px-3 text-xs font-bold leading-none"
+    : "inline-flex h-6 min-w-[5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold leading-none";
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap">
       {summary.parts.map((p, i) => {
@@ -97,7 +95,7 @@ export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
       })}
       {summary.warning && (
         <span
-          className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
+          className="inline-flex h-6 items-center rounded-full px-2.5 text-xs font-bold leading-none"
           style={{
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 20%, transparent)`,
             color: `color-mix(in srgb, ${LEGACY_COLORS.red} 42%, ${LEGACY_COLORS.text})`,
@@ -131,7 +129,7 @@ export function StatusChipStrip({ presentation }: { presentation: HistoryRowPres
           <span
             key={`${chip.label}-${chip.title ?? ""}`}
             title={chip.title}
-            className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
+            className="inline-flex h-5 items-center rounded-full px-2 text-xs font-bold leading-none"
             style={{
               background: `color-mix(in srgb, ${color} 14%, transparent)`,
               color: `color-mix(in srgb, ${color} 48%, ${LEGACY_COLORS.text})`,
@@ -245,10 +243,12 @@ export function QuantityStockCell({
 
 export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPresentation }) {
   const approver = presentation.people.approver?.trim();
+  const requester = presentation.people.requester?.trim() || "-";
+  const systemRequester = requester.startsWith("시스템 처리");
   return (
     <div className="flex min-w-0 flex-col gap-2 leading-tight">
       <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-        요청 {presentation.people.requester}
+        {systemRequester ? requester : `요청 ${requester}`}
       </div>
       {approver && approver !== "-" && (
         <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -492,10 +492,12 @@ export function ReferenceBatchDetail({
   logs,
   compact,
   highlightLogId,
+  onSelectLog,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
   highlightLogId?: string | null;
+  onSelectLog?: (log: TransactionLog) => void;
 }) {
   const presentation = getReferenceBatchPresentation(logs);
 
@@ -510,6 +512,7 @@ export function ReferenceBatchDetail({
           kind={presentation.kind}
           compact={compact}
           highlightLogId={highlightLogId}
+          onSelectLog={onSelectLog}
         />
       ))}
     </>
@@ -521,11 +524,13 @@ function ReferenceBatchLineRow({
   kind,
   compact,
   highlightLogId,
+  onSelectLog,
 }: {
   log: TransactionLog;
   kind: ReturnType<typeof getReferenceBatchPresentation>["kind"];
   compact?: boolean;
   highlightLogId?: string | null;
+  onSelectLog?: (log: TransactionLog) => void;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const presentation = getHistoryRowPresentation(log);
@@ -535,7 +540,18 @@ function ReferenceBatchLineRow({
 
   return (
     <tr
+      role={onSelectLog ? "button" : undefined}
+      tabIndex={onSelectLog ? 0 : undefined}
       data-history-focus-line={highlighted ? "true" : undefined}
+      onClick={() => onSelectLog?.(log)}
+      onKeyDown={(e) => {
+        if (!onSelectLog) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelectLog(log);
+        }
+      }}
+      className={onSelectLog ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : undefined}
       style={{
         background: highlighted
           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`

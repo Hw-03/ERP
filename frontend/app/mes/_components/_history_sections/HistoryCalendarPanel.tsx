@@ -72,6 +72,7 @@ export function HistoryCalendarPanel({
         <span style={{ color: LEGACY_COLORS.green, fontWeight: 700 }}>창고</span> = 창고 거래
         <span style={{ color: LEGACY_COLORS.cyan, fontWeight: 700 }}>부서</span> = 부서 거래
         <span style={{ color: LEGACY_COLORS.yellow, fontWeight: 700 }}>조정</span> = 수량 조정
+        <span style={{ color: LEGACY_COLORS.muted2, fontWeight: 700 }}>기타</span> = 위 분류 외 거래
       </div>
     </section>
   );

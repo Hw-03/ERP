@@ -22,7 +22,7 @@ export interface DesktopHistoryRightPanelProps {
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   onSelectLog: (log: TransactionLog) => void;
-  /** 드릴(BOM 하위) 스택이 있으면 "← 뒤로" 노출. */
+  /** 드릴(BOM 세부) 스택이 있으면 "← 뒤로" 노출. */
   canGoBack: boolean;
   onBack: () => void;
   onLogUpdated: (updated: TransactionLog) => void;

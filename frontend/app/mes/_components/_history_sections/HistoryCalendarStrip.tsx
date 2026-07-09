@@ -222,10 +222,11 @@ export function HistoryCalendarStrip({
                 if (isDepartmentInternalType(l.transaction_type)) deptCount++;
                 if (isAdjustmentLike(l)) adjustCount++;
               }
+              const otherCount = Math.max(dayLogs.length - warehouseCount - deptCount - adjustCount, 0);
               return (
                 <button
                   key={key}
-                  aria-label={`${calendarYear}년 ${calendarMonth + 1}월 ${day}일${isSelected ? " (선택됨)" : ""}`}
+                  aria-label={`${calendarYear}년 ${calendarMonth + 1}월 ${day}일 · 총 ${dayLogs.length}건${isSelected ? " (선택됨)" : ""}`}
                   aria-pressed={isSelected}
                   onClick={() => setSelectedDay(selectedDay === key ? null : key)}
                   className="flex min-h-[92px] flex-col items-center rounded-[14px] border p-1.5 transition-colors hover:brightness-110 lg:min-h-[132px]"
@@ -246,7 +247,7 @@ export function HistoryCalendarStrip({
                       className="mt-1 rounded-full px-1.5 py-0.5 text-xs font-bold"
                       style={{ background: "rgba(101,169,255,.2)", color: LEGACY_COLORS.blue }}
                     >
-                      {dayLogs.length}
+                      총 {dayLogs.length}건
                     </span>
                   )}
                   <div className="mt-1 flex w-full flex-col gap-0.5 px-1">
@@ -263,6 +264,11 @@ export function HistoryCalendarStrip({
                     {adjustCount > 0 && (
                       <span className="whitespace-nowrap text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
                         조정 {adjustCount}건
+                      </span>
+                    )}
+                    {otherCount > 0 && (
+                      <span className="whitespace-nowrap text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
+                        기타 {otherCount}건
                       </span>
                     )}
                   </div>

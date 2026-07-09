@@ -42,6 +42,30 @@ describe("productionApi", () => {
     expect(url).toContain("limit=50");
   });
 
+  it("getTransactions forwards history operation keys", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await productionApi.getTransactions({ operationKeys: "item_conversion,shipping_prepare" });
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("operation_keys=item_conversion%2Cshipping_prepare");
+  });
+
+  it("getTransactionsSummary forwards history operation keys", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({
+        total: 0,
+        warehouse_count: 0,
+        dept_count: 0,
+        adjust_count: 0,
+        department_counts: {},
+      })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await productionApi.getTransactionsSummary({ operationKeys: "shipping" });
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("operation_keys=shipping");
+  });
+
   it("metaEditTransaction POST /transactions/{id}/meta-edit", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

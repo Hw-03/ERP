@@ -590,7 +590,7 @@ export function getHistoryMovementSummary(
 ): MovementSummary {
   if (!batch) {
     return {
-      parts: [{ label: `하위 ${fallbackLogCount ?? 0}건`, tone: "muted" }],
+      parts: [{ label: `세부 ${fallbackLogCount ?? 0}건`, tone: "muted" }],
     };
   }
 
@@ -643,11 +643,11 @@ export function getHistoryMovementSummary(
     const childUnitLabel = childUnit && !childUnitMixed ? ` ${childUnit}` : "";
 
     if (topSum > 0) parts.push({
-      label: `상위 ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
+      label: `완제품 ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
       tone: isRework ? "danger" : "primary",
     });
     if (childSum > 0) parts.push({
-      label: `하위 ${isRework ? "+" : "-"}${_formatNumber(childSum)}${childUnitLabel}`,
+      label: `부품 ${isRework ? "+" : "-"}${_formatNumber(childSum)}${childUnitLabel}`,
       tone: isRework ? "primary" : "danger",
     });
   } else if (sub === "warehouse_to_dept" || sub === "dept_to_warehouse" || sub === "dept_transfer"
@@ -679,7 +679,7 @@ export function getHistoryMovementSummary(
   }
 
   if (parts.length === 0) {
-    parts.push({ label: `하위 ${included.length}건`, tone: "muted" });
+    parts.push({ label: `세부 ${included.length}건`, tone: "muted" });
   }
 
   const summary: MovementSummary = { parts };

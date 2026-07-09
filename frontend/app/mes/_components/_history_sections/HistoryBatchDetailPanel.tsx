@@ -404,7 +404,7 @@ function HistoryBatchHero({
       )}
       {!batch && !loading && (
         <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          하위 거래 {logs.length}건
+          세부 거래 {logs.length}건
         </div>
       )}
 

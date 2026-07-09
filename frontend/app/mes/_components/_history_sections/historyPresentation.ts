@@ -102,8 +102,8 @@ export interface ReferenceBatchLinePresentation {
 
 const SHIPPING_PHASE_OPERATION_LABEL: Record<string, string> = {
   COMPONENT_CHANGE: "품목 전환",
-  PREPARE: "출하 준비 완료",
-  PICKUP: "출하 픽업 완료",
+  PREPARE: "출하 준비",
+  PICKUP: "출하",
 };
 
 const SHIPPING_PHASE_FLOW_LABEL: Record<string, string> = {
@@ -122,25 +122,12 @@ function isComponentChangePhase(phase: string | null | undefined): boolean {
   return phase === "COMPONENT_CHANGE";
 }
 
-function isComponentChangeDetailLog(log: TransactionLog): boolean {
-  const notes = log.notes?.trim() ?? "";
-  return notes.includes("품목 전환 추가 차감") || notes.includes("품목 전환 회수 입고");
-}
-
-function getComponentChangeMode(logs: TransactionLog[]): "SPEC" | "BOM" {
-  return logs.some(isComponentChangeDetailLog) || logs.length > 2 ? "BOM" : "SPEC";
-}
-
-function getComponentChangeFlowLabel(logs: TransactionLog[]): string {
-  return getComponentChangeMode(logs) === "BOM" ? "구성 전환" : "사양 전환";
-}
-
 function getComponentChangeLineLabel(log: TransactionLog): ReferenceBatchLinePresentation | null {
   const notes = log.notes?.trim() ?? "";
-  if (notes.includes("품목 전환 소스")) return { label: "소스 차감", tone: "warning" };
-  if (notes.includes("품목 전환 추가 차감")) return { label: "추가 차감", tone: "warning" };
+  if (notes.includes("품목 전환 소스")) return { label: "기존품 차감", tone: "warning" };
+  if (notes.includes("품목 전환 추가 차감")) return { label: "추가 구성품 차감", tone: "warning" };
   if (notes.includes("품목 전환 회수 입고")) return { label: "회수 입고", tone: "success" };
-  if (notes.includes("품목 전환 대상")) return { label: "대상 입고", tone: "success" };
+  if (notes.includes("품목 전환 대상")) return { label: "변경품 입고", tone: "success" };
   return null;
 }
 
@@ -156,6 +143,17 @@ export function getShippingPhaseFlowLabel(phase: string | null | undefined): str
   return phase ? SHIPPING_PHASE_FLOW_LABEL[phase] ?? null : null;
 }
 
+function getLocationFlowLabel(logs: TransactionLog[], fallback: string | null): string | null {
+  const departments = new Set(
+    logs
+      .map((log) => log.department?.trim())
+      .filter((dept): dept is string => Boolean(dept)),
+  );
+  if (departments.size === 1) return Array.from(departments)[0];
+  if (departments.size > 1) return "여러 위치";
+  return fallback;
+}
+
 export function getReferenceBatchLinePresentation(
   log: TransactionLog,
   kind: ReferenceBatchKind,
@@ -164,22 +162,22 @@ export function getReferenceBatchLinePresentation(
     if (log.shipping_phase === "COMPONENT_CHANGE") {
       const componentLabel = getComponentChangeLineLabel(log);
       if (componentLabel) return componentLabel;
-      if (log.transaction_type === "BACKFLUSH") return { label: "소스/추가 차감", tone: "warning" };
-      if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") return { label: "대상 입고", tone: "success" };
+      if (log.transaction_type === "BACKFLUSH") return { label: "구성품 차감", tone: "warning" };
+      if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") return { label: "변경품 입고", tone: "success" };
       return { label: "품목 전환", tone: "muted" };
     }
     if (log.shipping_phase === "PREPARE") {
-      if (log.transaction_type === "BACKFLUSH") return { label: "final PA 차감", tone: "warning" };
-      if (log.transaction_type === "PRODUCE") return { label: "final PF 준비", tone: "success" };
+      if (log.transaction_type === "BACKFLUSH") return { label: "구성품 차감", tone: "warning" };
+      if (log.transaction_type === "PRODUCE") return { label: "출하품 준비", tone: "success" };
       return { label: "출하 준비", tone: "info" };
     }
     if (log.shipping_phase === "PICKUP") {
-      if (log.transaction_type === "SHIP") return { label: isShippingCompanionLog(log) ? "동반 출하품" : "final PF 출하", tone: "danger" };
+      if (log.transaction_type === "SHIP") return { label: isShippingCompanionLog(log) ? "동반 출하품" : "출하품 출고", tone: "danger" };
       return { label: "출하 픽업", tone: "muted" };
     }
-    if (log.transaction_type === "BACKFLUSH") return { label: "하위 차감", tone: "warning" };
+    if (log.transaction_type === "BACKFLUSH") return { label: "구성품 차감", tone: "warning" };
     if (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE" || log.transaction_type === "TRANSFER_TO_PROD" || log.transaction_type === "TRANSFER_TO_WH" || log.transaction_type === "TRANSFER_DEPT") {
-      return { label: "출하 준비", tone: "info" };
+      return { label: "출하품 준비", tone: "info" };
     }
     if (log.transaction_type === "SHIP") {
       return { label: isShippingCompanionLog(log) ? "동반 출하품" : "출하 대상", tone: "danger" };
@@ -211,12 +209,13 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
   const operationLabel = phaseOperationLabel ?? (shipment ? "출하" : outbound ? "출고 구성" : "묶음");
   const titlePrefix = phaseOperationLabel ?? (shipment ? "출하 구성" : outbound ? "출고 구성" : "묶음");
   const homogeneous = logs.length > 0 && logs.every((log) => log.item_id === first.item_id);
-  const flowLabel = isComponentChangePhase(phase) ? getComponentChangeFlowLabel(logs) : getShippingPhaseFlowLabel(phase);
+  const phaseFlow = isComponentChangePhase(phase) ? "재고 위치" : getShippingPhaseFlowLabel(phase);
+  const flowLabel = getLocationFlowLabel(logs, phaseFlow);
   const movementVerb = isComponentChangePhase(phase)
-    ? flowLabel ?? "변경"
+    ? "변경"
     : phase
       ? SHIPPING_PHASE_MOVEMENT_VERB[phase] ?? "출하"
-      : shipment ? "출하" : outbound ? "출고" : "하위";
+      : shipment ? "출하" : outbound ? "출고" : "세부";
   const movementTone = shipment || outbound ? "danger" : "muted";
   const shipmentTarget = shipment ? getShippingTarget(logs, phase) : null;
 
@@ -343,7 +342,7 @@ export function getHistoryRowPresentation(
     ? getHistoryMovementSummary(log, batch)
     : { parts: [getSingleLogMovement(log)] };
   const stock = getStockPresentation(log);
-  const requester = batch?.requester_name ?? getHistoryActor(log);
+  const requester = getRequesterPresentation(log, batch);
   const rawApprover = (batch?.approver_name ?? log.approver_name ?? "").trim();
   const approver = rawApprover && rawApprover !== requester ? rawApprover : "";
 
@@ -357,6 +356,25 @@ export function getHistoryRowPresentation(
     statusChips: getStatusChips(log, batch, batchStats),
     batchStats,
   };
+}
+
+function isSystemActorName(name: string | null | undefined): boolean {
+  const normalized = name?.trim();
+  if (!normalized || normalized === "-") return false;
+  return ["구성품 변경", "자동 처리", "시스템", "SYSTEM"].includes(normalized.toUpperCase() === "SYSTEM" ? "SYSTEM" : normalized);
+}
+
+function isAutomaticLog(log: TransactionLog, batch?: IoBatch | null): boolean {
+  if (batch?.requires_approval === false && !batch.approver_name) return true;
+  return Boolean(log.shipping_phase && isSystemActorName(log.produced_by));
+}
+
+function getRequesterPresentation(log: TransactionLog, batch?: IoBatch | null): string {
+  const batchRequester = batch?.requester_name?.trim();
+  if (batchRequester) return batchRequester;
+  const actor = getHistoryActor(log).trim();
+  if (isSystemActorName(actor)) return `시스템 처리 · ${actor}`;
+  return actor || "-";
 }
 
 function getTargetPresentation(
@@ -396,7 +414,7 @@ function getFlowPresentation(
 ): HistoryFlowPresentation {
   const phaseFlowLabel = getShippingPhaseFlowLabel(log.shipping_phase);
   if (!batch && phaseFlowLabel) {
-    return { label: phaseFlowLabel };
+    return { label: log.department?.trim() || phaseFlowLabel };
   }
   if (!batch && log.transaction_type === "SHIP" && isShippingReference(log)) {
     return { label: "출하" };
@@ -473,6 +491,7 @@ function getStatusChips(
   const defectReason = formatDefectReason(log);
   if (defectReason) chips.push({ label: "\uC0AC\uC720", tone: "warning", title: defectReason });
 
+  if (isAutomaticLog(log, batch)) chips.push({ label: "자동 처리", tone: "info" });
 
   if (stats && stats.shortageCount > 0) chips.push({ label: `부족 ${stats.shortageCount}`, tone: "danger" });
   if (stats && stats.excludedCount > 0) chips.push({ label: `제외 ${stats.excludedCount}`, tone: "muted" });

@@ -1,32 +1,45 @@
 /**
  * historyQuery.ts — query/필터/기간 조립 심볼.
  * 3차: scope·타입칩 bucket 로직 폐기(KPI 표시전용·필터 패널 단일화).
- * 거래 종류는 OPERATION_OPTIONS(전 11종) 다중. 서버 transaction_types 필터는
- * 백엔드 _operation_filter 가 sub_type 우선 "화면 구분" 기준으로 해석한다.
+ * 거래 종류는 OPERATION_OPTIONS 다중. 서버 operation_keys 필터는
+ * 백엔드가 shipping_phase / sub_type 우선 "화면 구분" 기준으로 해석한다.
  */
-import type { TransactionType } from "@/lib/api/types/shared";
 
 // ──────────────────────────────────────────────────────────────────
-// 거래 종류 옵션 — 전 11종 고정, 다중 선택.
-// 값 = transaction_type 코드. 라벨 = historyBatchInterpreter.ts 의 _TX_OPERATION 과 동일.
-// 프런트는 코드만 전송하고, batch.sub_type 우선 매핑은 백엔드가 담당(목록 구분명과 필터 일치).
+// 거래 종류 옵션 — 목록 작업 배지와 같은 현장 언어를 사용한다.
+// 값 = 서버 operation_keys 코드. 기존 transaction_type 코드는 API 호환용으로만 유지.
 // ──────────────────────────────────────────────────────────────────
-export type OperationOption = { value: TransactionType; label: string };
+export type HistoryOperationKey =
+  | "receive"
+  | "produce"
+  | "disassemble"
+  | "item_conversion"
+  | "shipping_prepare"
+  | "shipping"
+  | "outbound"
+  | "warehouse_to_dept"
+  | "dept_to_warehouse"
+  | "dept_transfer"
+  | "adjust"
+  | "defect"
+  | "supplier_return";
+
+export type OperationOption = { value: HistoryOperationKey; label: string };
 
 export const OPERATION_OPTIONS: OperationOption[] = [
-  { value: "RECEIVE", label: "원자재 입고" },
-  { value: "PRODUCE", label: "생산 | 입고" },
-  { value: "SHIP", label: "출고" },
-  { value: "BACKFLUSH", label: "자동 차감" },
-  { value: "TRANSFER_TO_PROD", label: "창고 반출" },
-  { value: "TRANSFER_TO_WH", label: "창고 반입" },
-  { value: "TRANSFER_DEPT", label: "부서 이동" },
-  { value: "DISASSEMBLE", label: "분해 | 출고" },
-  { value: "ADJUST", label: "수량 조정" },
-  { value: "MARK_DEFECTIVE", label: "새 불량" },
-  { value: "UNMARK_DEFECTIVE", label: "불량 해제" },
-  { value: "DEFECT_SCRAP", label: "불량 처리" },
-  { value: "SUPPLIER_RETURN", label: "원자재 반품" },
+  { value: "receive", label: "원자재 입고" },
+  { value: "produce", label: "생산" },
+  { value: "disassemble", label: "분해" },
+  { value: "item_conversion", label: "품목 전환" },
+  { value: "shipping_prepare", label: "출하 준비" },
+  { value: "shipping", label: "출하" },
+  { value: "outbound", label: "출고" },
+  { value: "warehouse_to_dept", label: "창고 → 부서" },
+  { value: "dept_to_warehouse", label: "부서 → 창고" },
+  { value: "dept_transfer", label: "부서 → 부서" },
+  { value: "adjust", label: "수량 조정" },
+  { value: "defect", label: "불량 처리" },
+  { value: "supplier_return", label: "원자재 반품" },
 ];
 
 export const DATE_OPTIONS = [

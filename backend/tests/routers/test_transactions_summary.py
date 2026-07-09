@@ -45,6 +45,7 @@ def _seed_batch_log(
     batch_created_at: datetime | None = None,
     submitted_at: datetime | None = None,
     log_created_at: datetime | None = None,
+    shipping_phase: str | None = None,
 ) -> None:
     """IoBatch 가 붙은 거래. 부서 라벨은 COALESCE(to, from).
 
@@ -83,6 +84,7 @@ def _seed_batch_log(
             operation_batch_id=batch.batch_id,
             transfer_qty=transfer_qty,
             created_at=log_created_at,
+            shipping_phase=shipping_phase,
         )
     )
 
@@ -417,6 +419,53 @@ def test_operation_filter_plain_receive(client, db_session, make_item):
     res = client.get("/api/inventory/transactions/summary", params={"transaction_types": "RECEIVE"})
     assert res.status_code == 200, res.text
     assert res.json()["total"] == 1
+
+
+def test_operation_keys_filter_shipping_phases(client, db_session, make_item):
+    """operation_keys 는 화면 거래 종류 기준으로 shipping_phase 를 직접 필터한다."""
+    item = make_item(name="출하단계필터품", warehouse_qty=Decimal("0"))
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.BACKFLUSH,
+        Decimal("-1"),
+        sub_type="produce",
+        shipping_phase="COMPONENT_CHANGE",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.PRODUCE,
+        Decimal("1"),
+        sub_type="produce",
+        shipping_phase="PREPARE",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.SHIP,
+        Decimal("-1"),
+        sub_type="produce",
+        shipping_phase="PICKUP",
+    )
+    _seed_log(db_session, item, TransactionTypeEnum.RECEIVE, Decimal("1"))
+    db_session.commit()
+
+    res = client.get("/api/inventory/transactions", params={"operation_keys": "item_conversion"})
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert len(rows) == 1
+    assert rows[0]["shipping_phase"] == "COMPONENT_CHANGE"
+
+    res = client.get("/api/inventory/transactions/summary", params={"operation_keys": "shipping_prepare"})
+    assert res.status_code == 200, res.text
+    assert res.json()["total"] == 1
+
+    res = client.get("/api/inventory/transactions", params={"operation_keys": "shipping"})
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert len(rows) == 1
+    assert rows[0]["shipping_phase"] == "PICKUP"
 
 
 # ──────────────────────────────────────────────────────────────────

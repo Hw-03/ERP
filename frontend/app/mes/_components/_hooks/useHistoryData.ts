@@ -10,7 +10,7 @@ import { HISTORY_PAGE_SIZE } from "../_history_sections/historyConstants";
 import { dateFilterToFrom } from "../_history_sections/historyQuery";
 
 export interface UseHistoryDataArgs {
-  /** 거래 종류(필터 패널) 쉼표 결합. "" = 미적용(전체). 백엔드가 화면-구분 기준으로 해석. */
+  /** 거래 종류(필터 패널) operation_keys 쉼표 결합. "" = 미적용(전체). */
   operations: string;
   dateFilter: string;
   /** 부모(DesktopHistoryView)에서 350ms debounce 후 set 한 값. 목록/달력이 같은 값을 공유. */
@@ -56,7 +56,7 @@ export function useHistoryData({
 }: UseHistoryDataArgs): UseHistoryDataResult {
   const queryClient = useQueryClient();
 
-  const transactionTypes = operations || undefined;
+  const operationKeys = operations || undefined;
   // selectedDateKey 가 있으면 dateFilter 를 무시하고 그날 단일로 좁힌다.
   const dateFrom = selectedDateKey ?? dateFilterToFrom(dateFilter);
   const dateTo = selectedDateKey ?? undefined;
@@ -65,7 +65,7 @@ export function useHistoryData({
   const modelParam = model || undefined;
 
   // queryKey: 조건 변화를 한 문자열로. stale 응답 가드용(React Query 캐시 key 와는 별개).
-  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}|${modelParam ?? ""}`;
+  const queryKey = `${operationKeys ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}|${modelParam ?? ""}`;
   const queryKeyRef = useRef(queryKey);
   const skipRef = useRef(0);
 
@@ -73,7 +73,7 @@ export function useHistoryData({
     return {
       limit: HISTORY_PAGE_SIZE,
       skip,
-      transactionTypes,
+      operationKeys,
       dateFrom,
       dateTo,
       search,
@@ -155,7 +155,7 @@ export function useHistoryData({
       if (queryKeyRef.current === myKey) setLoadingMore(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactionTypes, dateFrom, dateTo, search, departmentParam, modelParam, queryKey, queryClient]);
+  }, [operationKeys, dateFrom, dateTo, search, departmentParam, modelParam, queryKey, queryClient]);
 
   const canLoadMore = lastBatchSize === HISTORY_PAGE_SIZE;
 

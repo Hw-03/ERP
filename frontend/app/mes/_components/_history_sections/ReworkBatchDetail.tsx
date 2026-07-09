@@ -19,7 +19,7 @@ export function ReworkBatchDetail({ logs, colSpan, compact }: Props) {
     return (
       <tr>
         <td colSpan={colSpan} className="py-3 text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          처리할 하위 품목이 없습니다.
+          처리할 세부 품목이 없습니다.
         </td>
       </tr>
     );

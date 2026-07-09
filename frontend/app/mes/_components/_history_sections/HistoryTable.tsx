@@ -242,12 +242,13 @@ export function HistoryTable({
         style={{ background: LEGACY_COLORS.bg, backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}
       >
         <div className="shrink-0 text-base font-bold">입출고 내역</div>
-        <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {filteredLogs.length}{totalCount != null ? ` / ${totalCount}` : ""}건
-        </span>
+        <div className="flex flex-wrap items-baseline gap-1.5 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span>표시 {filteredLogs.length.toLocaleString()}건</span>
+          {totalCount != null && <span>/ 조건 전체 {totalCount.toLocaleString()}건</span>}
+        </div>
         {filteredLogs.length > 0 && (
           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {formatHistoryDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatHistoryDate(filteredLogs[0].created_at)}
+            표시 범위 {formatHistoryDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatHistoryDate(filteredLogs[0].created_at)}
           </span>
         )}
         {batchKeys.length > 0 && expandedGroupKey && (
@@ -256,7 +257,7 @@ export function HistoryTable({
             className="ml-auto rounded-full border px-3 py-1 text-xs font-semibold transition-opacity hover:opacity-80"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
           >
-            펼침 닫기
+            현재 묶음 접기
           </button>
         )}
       </div>
@@ -394,6 +395,7 @@ export function HistoryTable({
                         logs={group.logs}
                         compact={compact}
                         highlightLogId={focusLogId}
+                        onSelectLog={onSelectLog}
                       />
                     )}
                   </Fragment>
@@ -412,7 +414,7 @@ export function HistoryTable({
           style={{ color: LEGACY_COLORS.blue }}
         >
           <ChevronDown className="h-4 w-4" />
-          {loadingMore ? "불러오는 중..." : "100건 더보기"}
+          {loadingMore ? "불러오는 중..." : "다음 100건 불러오기"}
         </button>
       )}
     </section>

@@ -55,7 +55,7 @@ export function DesktopHistoryView() {
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
   const [focusTarget, setFocusTarget] = useState<HistoryTableFocusTarget | null>(null);
-  // 우측 패널 내 드릴(BOM 하위) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.
+  // 우측 패널 내 드릴(BOM 세부) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
 
   // batchCache — HistoryTable 의 visible lazy fetch + 우측 batch 상세 패널이 공유.
@@ -169,27 +169,32 @@ export function DesktopHistoryView() {
 
   const todayKey = toDateKey(new Date().toISOString());
 
+  function pushHistoryStep() {
+    if (typeof window === "undefined") return;
+    window.history.pushState(null, "");
+  }
+
   // X(분자) summary — 현재 필터(거래종류/검색/부서/모델) 전체 카운트. 페이지네이션 무관.
   const [summary, setSummary] = useState<TransactionSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const summaryKeyRef = useRef("");
 
   useEffect(() => {
-    const transactionTypes = opParam || undefined;
+    const operationKeys = opParam || undefined;
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
     const dateTo = selectedDay ?? undefined;
     const searchParam = debouncedSearch.trim() || undefined;
     const department = deptParam || undefined;
     const model = modelParam || undefined;
 
-    const myKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${searchParam ?? ""}|${department ?? ""}|${model ?? ""}`;
+    const myKey = `${operationKeys ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${searchParam ?? ""}|${department ?? ""}|${model ?? ""}`;
     summaryKeyRef.current = myKey;
 
     setSummaryLoading(true);
     const ctrl = new AbortController();
     void productionApi
       .getTransactionsSummary(
-        { transactionTypes, dateFrom, dateTo, search: searchParam, department, model },
+        { operationKeys, dateFrom, dateTo, search: searchParam, department, model },
         { signal: ctrl.signal },
       )
       .then((s) => {
@@ -260,6 +265,8 @@ export function DesktopHistoryView() {
 
   // 표 행 클릭(top-level) — 드릴 스택 초기화.
   function handleSelectLog(log: TransactionLog) {
+    const opening = !(selection?.kind === "log" && selection.log.log_id === log.log_id);
+    if (opening) pushHistoryStep();
     setSelectionStack([]);
     setSelection((c) =>
       c?.kind === "log" && c.log.log_id === log.log_id ? null : { kind: "log", log },
@@ -269,27 +276,31 @@ export function DesktopHistoryView() {
   function handleSelectBatch(batchId: string, logs: TransactionLog[]) {
     // 같은 묶음 재클릭 → 우측 패널 닫기 (단일 행 토글과 일관). HistoryTable 에서
     // 펼침 상태도 collapseGroup 으로 동시에 닫음 (selection 닫힘과 BOM 접힘 동기화).
+    const opening = !(selection?.kind === "batch" && selection.batchId === batchId);
+    if (opening) pushHistoryStep();
     setSelectionStack([]);
     setSelection((c) =>
       c?.kind === "batch" && c.batchId === batchId ? null : { kind: "batch", batchId, logs },
     );
   }
 
-  // 우측 패널 내부 드릴(BOM 하위 라인·이 품목 최근 거래) — 현재 선택을 스택에 쌓고 이동.
+  // 우측 패널 내부 드릴(BOM 세부 라인·이 품목 최근 거래) — 현재 선택을 스택에 쌓고 이동.
   // 13-2번: 클릭한 로그가 다른 날짜에 속하면 selectedDay 를 그 날짜로 자동 조정해서
   // 리스트가 해당 거래를 포함하게 한 뒤, 효과(useEffect 으로 logs 로드 완료 시점에)
   // 로 그 행으로 scrollIntoView.
   function navigateToLog(log: TransactionLog) {
     const logYmd = toDateKey(log.created_at);
-    if (logYmd && logYmd !== selectedDay) {
+    const logAlreadyInList = logs.some((entry) => entry.log_id === log.log_id);
+    if (!logAlreadyInList && logYmd && logYmd !== selectedDay) {
       setSelectedDay(logYmd);
     }
     pendingScrollLogIdRef.current = log.log_id;
+    if (!selection) pushHistoryStep();
     setSelection((cur) => {
       if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
         setSelectionStack((s) => [...s, cur]);
         if (typeof window !== "undefined") {
-          window.history.pushState({ historyDrill: true }, "");
+          window.history.pushState(null, "");
         }
       }
       return { kind: "log", log };
@@ -310,19 +321,40 @@ export function DesktopHistoryView() {
     });
   }
 
-  // 브라우저 뒤로가기 → 드릴 스택이 있으면 그걸 pop (탭 URL 네비 방해 최소화: 스택 있을 때만 관여).
+  function handleCalendarSelectedDay(next: string | null) {
+    if (next && next !== selectedDay) pushHistoryStep();
+    setSelectedDay(next);
+  }
+
+  // 브라우저 뒤로가기 → 화면 단계(드릴/날짜/상세/달력/필터)를 최신 순서로 닫는다.
   useEffect(() => {
     const onPop = () => {
-      setSelectionStack((s) => {
-        if (s.length === 0) return s;
-        const prev = s[s.length - 1];
+      if (selectionStack.length > 0) {
+        const prev = selectionStack[selectionStack.length - 1];
         setSelection(prev);
-        return s.slice(0, -1);
-      });
+        setSelectionStack((stack) => stack.slice(0, -1));
+        return;
+      }
+      if (selection) {
+        setSelectionStack([]);
+        setSelection(null);
+        return;
+      }
+      if (selectedDay) {
+        setSelectedDay(null);
+        return;
+      }
+      if (calendarOpen) {
+        setCalendarOpen(false);
+        return;
+      }
+      if (filterPanelOpen) {
+        setFilterPanelOpen(false);
+      }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [calendarOpen, filterPanelOpen, selectedDay, selection, selectionStack]);
 
   // 기간 칩 변경 시 선택 날짜 해제 — 동시에 두 날짜 필터가 살아있으면 사용자가 혼란.
   function handleDateFilterChange(v: string) {
@@ -359,7 +391,10 @@ export function DesktopHistoryView() {
             onToggleFilterPanel={() => {
               setFilterPanelOpen((open) => {
                 const next = !open;
-                if (next) setCalendarOpen(false);
+                if (next) {
+                  pushHistoryStep();
+                  setCalendarOpen(false);
+                }
                 return next;
               });
             }}
@@ -368,7 +403,10 @@ export function DesktopHistoryView() {
             onToggleCalendar={() => {
               setCalendarOpen((open) => {
                 const next = !open;
-                if (next) setFilterPanelOpen(false);
+                if (next) {
+                  pushHistoryStep();
+                  setFilterPanelOpen(false);
+                }
                 return next;
               });
             }}
@@ -414,7 +452,7 @@ export function DesktopHistoryView() {
             monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
-            setSelectedDay={setSelectedDay}
+            setSelectedDay={handleCalendarSelectedDay}
           />
 
           <HistoryTable

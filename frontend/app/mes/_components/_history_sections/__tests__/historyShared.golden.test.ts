@@ -25,6 +25,7 @@ import {
   isReworkOperation,
 } from "../transactionTaxonomy";
 import {
+  OPERATION_OPTIONS,
   getPeriodStart,
   dateFilterToFrom,
 } from "../historyQuery";
@@ -495,10 +496,10 @@ describe("getHistoryLineSignedQuantity", () => {
 // getHistoryMovementSummary
 // ──────────────────────────────────────────────────────────────────
 describe("getHistoryMovementSummary", () => {
-  it("batch 없음 → '하위 N건' fallback", () => {
+  it("batch 없음 → '세부 N건' fallback", () => {
     const result = getHistoryMovementSummary({ transaction_type: "RECEIVE" }, null, 5);
     expect(result.parts).toHaveLength(1);
-    expect(result.parts[0].label).toBe("하위 5건");
+    expect(result.parts[0].label).toBe("세부 5건");
     expect(result.parts[0].tone).toBe("muted");
   });
 
@@ -511,28 +512,30 @@ describe("getHistoryMovementSummary", () => {
     expect(result.parts[0].tone).toBe("success");
   });
 
-  it("produce → 상위/하위 파트 분리", () => {
+  it("produce → 완제품/부품 파트 분리", () => {
     const parentLine = makeLine({ origin: "direct", quantity: 5, unit: "EA" });
     const childLine = makeLine({ line_id: "l2", item_id: "ITEM-002", origin: "bom_auto", quantity: 10, unit: "EA" });
     const bundle = makeBundle({ source_kind: "bom_parent", lines: [parentLine, childLine] });
     const batch = makeBatch({ sub_type: "produce", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "PRODUCE" }, batch);
     const labels = result.parts.map((p) => p.label);
-    expect(labels.some((l) => l.includes("상위"))).toBe(true);
-    expect(labels.some((l) => l.includes("하위"))).toBe(true);
-    // produce: 상위=primary, 하위=danger
-    expect(result.parts.find((p) => p.label.includes("상위"))?.tone).toBe("primary");
-    expect(result.parts.find((p) => p.label.includes("하위"))?.tone).toBe("danger");
+    expect(labels).toContain("완제품 +5 EA");
+    expect(labels).toContain("부품 -10 EA");
+    // produce: 완제품=primary, 부품=danger
+    expect(result.parts.find((p) => p.label.includes("완제품"))?.tone).toBe("primary");
+    expect(result.parts.find((p) => p.label.includes("부품"))?.tone).toBe("danger");
   });
 
-  it("disassemble → 상위=danger, 하위=primary", () => {
+  it("disassemble → 완제품=danger, 부품=primary", () => {
     const parentLine = makeLine({ origin: "direct", quantity: 5, unit: "EA" });
     const childLine = makeLine({ line_id: "l2", item_id: "ITEM-002", origin: "bom_auto", quantity: 10, unit: "EA" });
     const bundle = makeBundle({ source_kind: "bom_parent", lines: [parentLine, childLine] });
     const batch = makeBatch({ sub_type: "disassemble", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "DISASSEMBLE" }, batch);
-    expect(result.parts.find((p) => p.label.includes("상위"))?.tone).toBe("danger");
-    expect(result.parts.find((p) => p.label.includes("하위"))?.tone).toBe("primary");
+    expect(result.parts.find((p) => p.label.includes("완제품"))?.label).toBe("완제품 -5 EA");
+    expect(result.parts.find((p) => p.label.includes("부품"))?.label).toBe("부품 +10 EA");
+    expect(result.parts.find((p) => p.label.includes("완제품"))?.tone).toBe("danger");
+    expect(result.parts.find((p) => p.label.includes("부품"))?.tone).toBe("primary");
   });
 
   it("warehouse_to_dept → '이동 N품목'", () => {
@@ -544,11 +547,11 @@ describe("getHistoryMovementSummary", () => {
     expect(result.parts[0].tone).toBe("info");
   });
 
-  it("SHIP (batch 없음) → 하위 N건 fallback", () => {
+  it("SHIP (batch 없음) → 세부 N건 fallback", () => {
     // tx=SHIP 에 대응하는 IoBatch sub_type 값이 enum 에 없으므로
     // batch 없는 케이스로 골든 고정 (batch 있으면 sub_type 분기가 먼저 처리됨).
     const result = getHistoryMovementSummary({ transaction_type: "SHIP" }, null, 3);
-    expect(result.parts[0].label).toBe("하위 3건");
+    expect(result.parts[0].label).toBe("세부 3건");
     expect(result.parts[0].tone).toBe("muted");
   });
 
@@ -936,5 +939,18 @@ describe("dateFilterToFrom", () => {
 
   it("ALL → undefined", () => {
     expect(dateFilterToFrom("ALL")).toBeUndefined();
+  });
+});
+
+describe("OPERATION_OPTIONS", () => {
+  it("uses the same field-language labels as the history list", () => {
+    const labels = OPERATION_OPTIONS.map((option) => option.label);
+    expect(labels).toContain("품목 전환");
+    expect(labels).toContain("출하 준비");
+    expect(labels).toContain("출하");
+    expect(labels).toContain("창고 → 부서");
+    expect(labels).not.toContain("생산 | 입고");
+    expect(labels).not.toContain("분해 | 출고");
+    expect(labels).not.toContain("자동 차감");
   });
 });

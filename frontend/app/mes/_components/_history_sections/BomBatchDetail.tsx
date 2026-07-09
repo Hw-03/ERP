@@ -123,7 +123,7 @@ function StatusBadge({ included, shortage }: { included: boolean; shortage: numb
   const label = status.tone === "danger" ? `부족 ${formatQty(shortage)}` : status.label;
   return (
     <span
-      className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
+      className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold leading-none"
       style={{ background: `color-mix(in srgb, ${color} 18%, transparent)`, color }}
     >
       {label}
@@ -182,7 +182,7 @@ function BundleRows({
         <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
         <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
           <span
-            className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+            className="inline-flex h-6 min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none"
             style={{
               background: isBomParent
                 ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
@@ -211,7 +211,7 @@ function BundleRows({
         <ItemCodeCell code={bundle.source_mes_code ?? singleLineCode} compact={compact} dense />
         <SpacerCell compact={compact} dense />
         <td className="whitespace-nowrap border-b px-5 py-2 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-          {isBomParent ? `하위 ${childLines.length}라인` : "단품 라인"}
+          {isBomParent ? `부품 ${childLines.length}라인` : "단품 라인"}
         </td>
         <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
           {headerQtyText}
@@ -299,7 +299,7 @@ function LineKindBadge({ line }: { line: IoLine }) {
   const color = isAuto ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2;
   return (
     <span
-      className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+      className="inline-flex h-6 min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none"
       style={{
         background: `color-mix(in srgb, ${color} 14%, transparent)`,
         color: `color-mix(in srgb, ${color} 48%, ${LEGACY_COLORS.text})`,
@@ -313,7 +313,7 @@ function LineKindBadge({ line }: { line: IoLine }) {
 
 function getLineRoleLabel(line: IoLine, batch: IoBatch): string {
   if (line.origin === "bom_auto" || line.origin === "package_auto") {
-    return batch.sub_type === "disassemble" ? "하위 회수" : "하위 차감";
+    return batch.sub_type === "disassemble" ? "부품 회수" : "부품 차감";
   }
   if (line.direction === "move") return "위치 이동";
   if (line.direction === "adjust") return "수량 조정";

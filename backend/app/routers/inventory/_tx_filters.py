@@ -234,11 +234,97 @@ def _operation_filter(transaction_types: Optional[str]) -> Optional[ColumnElemen
     return or_(*clauses)
 
 
+def _tx_in(*codes: str) -> list[TransactionTypeEnum]:
+    return [
+        TransactionTypeEnum(code)
+        for code in codes
+        if code in TransactionTypeEnum._value2member_map_
+    ]
+
+
+def _plain_tx_clause(*codes: str) -> ColumnElement:
+    """shipping_phase/sub_type 이 화면 구분을 덮어쓰지 않는 단건 tx 매칭."""
+    return and_(
+        TransactionLog.transaction_type.in_(_tx_in(*codes)),
+        TransactionLog.shipping_phase.is_(None),
+        or_(
+            IoBatch.batch_id.is_(None),
+            IoBatch.sub_type.is_(None),
+            IoBatch.sub_type.notin_(list(_DETERMINING_SUBTYPES)),
+        ),
+    )
+
+
+def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElement]:
+    """입출고 내역 화면의 거래 종류 필터.
+
+    transaction_type 보다 사용자가 보는 작업 배지 기준이 우선이다. 특히
+    품목 전환/출하 준비/출하는 shipping_phase 가 정본이고, 일반 생산/입고
+    필터에서는 해당 출하 단계 로그가 섞이지 않게 제외한다.
+    """
+    if not operation_keys:
+        return None
+
+    key_clauses: dict[str, ColumnElement] = {
+        "item_conversion": TransactionLog.shipping_phase == "COMPONENT_CHANGE",
+        "shipping_prepare": TransactionLog.shipping_phase == "PREPARE",
+        "shipping": TransactionLog.shipping_phase == "PICKUP",
+        "receive": or_(
+            IoBatch.sub_type == "receive_supplier",
+            _plain_tx_clause("RECEIVE"),
+        ),
+        "produce": or_(
+            and_(IoBatch.sub_type == "produce", TransactionLog.shipping_phase.is_(None)),
+            _plain_tx_clause("PRODUCE"),
+        ),
+        "disassemble": or_(
+            IoBatch.sub_type == "disassemble",
+            _plain_tx_clause("DISASSEMBLE"),
+        ),
+        "outbound": _plain_tx_clause("SHIP"),
+        "warehouse_to_dept": or_(
+            IoBatch.sub_type == "warehouse_to_dept",
+            _plain_tx_clause("TRANSFER_TO_PROD"),
+        ),
+        "dept_to_warehouse": or_(
+            IoBatch.sub_type == "dept_to_warehouse",
+            _plain_tx_clause("TRANSFER_TO_WH"),
+        ),
+        "dept_transfer": or_(
+            IoBatch.sub_type == "dept_transfer",
+            _plain_tx_clause("TRANSFER_DEPT"),
+        ),
+        "adjust": or_(
+            IoBatch.sub_type.in_(["adjust_in", "adjust_out"]),
+            _plain_tx_clause("ADJUST"),
+        ),
+        "defect": or_(
+            IoBatch.sub_type.in_(["defect_quarantine", "defect_restore", "defect_process"]),
+            _plain_tx_clause("MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP"),
+        ),
+        "supplier_return": or_(
+            IoBatch.sub_type == "supplier_return",
+            _plain_tx_clause("SUPPLIER_RETURN"),
+        ),
+    }
+
+    clauses = []
+    for raw in operation_keys.split(","):
+        key = raw.strip()
+        if key in key_clauses:
+            clauses.append(key_clauses[key])
+
+    if not clauses:
+        return None
+    return or_(*clauses)
+
+
 def _apply_common_filters(
     query: Query,
     db: Session,
     *,
     transaction_types: Optional[str],
+    operation_keys: Optional[str] = None,
     search: Optional[str],
     department: Optional[str],
     model: Optional[str],
@@ -253,7 +339,11 @@ def _apply_common_filters(
     화면 공통 조건(operation 구분·기간·아카이브·검색·부서·공정·모델)을 AND 로 덧붙인다.
     item_id/transaction_type/reference_no 같은 list 전용 필터는 호출부가 직접 처리.
     """
-    if transaction_types:
+    if operation_keys:
+        _key_f = _operation_keys_filter(operation_keys)
+        if _key_f is not None:
+            query = query.filter(_key_f)
+    elif transaction_types:
         _op_f = _operation_filter(transaction_types)
         if _op_f is not None:
             query = query.filter(_op_f)
