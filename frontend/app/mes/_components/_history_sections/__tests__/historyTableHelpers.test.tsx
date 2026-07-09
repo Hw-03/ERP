@@ -1,6 +1,7 @@
 ﻿import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api/types/production";
+import { HistoryTable } from "../HistoryTable";
 import type { HistoryRowPresentation } from "../historyPresentation";
 import {
   HISTORY_MAIN_CELL_CLASS,
@@ -69,6 +70,34 @@ describe("buildGroups shipping phase grouping", () => {
 });
 
 describe("history table helper rendering policies", () => {
+  it("lets the compact table shrink inside the left pane when the right detail panel is open", () => {
+    const log = makeLog();
+    const { container } = render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[log]}
+        totalCount={1}
+        selection={{ kind: "log", log }}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    const tableCard = container.querySelector("section.card");
+    const tableScroller = container.querySelector("section.card > div.overflow-x-auto");
+    const table = tableScroller?.querySelector("table");
+
+    expect(tableCard).toHaveClass("min-w-0");
+    expect(tableScroller).toHaveClass("min-w-0");
+    expect(table).toHaveClass("w-full");
+    expect(table).toHaveClass("table-fixed");
+  });
+
   it("defines a single fixed rhythm for main history rows", () => {
     expect(HISTORY_MAIN_ROW_CLASS).toBe("h-16");
     expect(HISTORY_MAIN_CELL_CLASS).toContain("py-2");

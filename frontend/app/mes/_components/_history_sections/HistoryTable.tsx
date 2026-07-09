@@ -236,7 +236,7 @@ export function HistoryTable({
   const selectedBatchId = selection?.kind === "batch" ? selection.batchId : undefined;
 
   return (
-    <section className="card" style={{ backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}>
+    <section className="card min-w-0" style={{ backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}>
       <div
         className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 flex items-center gap-3 rounded-t-[28px] px-5 pb-3 pt-5"
         style={{ background: LEGACY_COLORS.bg, backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}
@@ -271,8 +271,8 @@ export function HistoryTable({
           description="조건에 맞는 거래가 없거나 아직 기록이 없습니다."
         />
       ) : (
-        <div className="overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-          <table className="min-w-full border-separate border-spacing-0 text-sm">
+        <div className="min-w-0 overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+          <table className={`w-full border-separate border-spacing-0 text-sm${compact ? " table-fixed" : ""}`}>
             <thead className="sticky top-0 z-10">
               <tr style={{ background: LEGACY_COLORS.s2 }}>
                 {COLUMNS.map(({ label, width, minWidth, align, hidden, px }, index) => (
