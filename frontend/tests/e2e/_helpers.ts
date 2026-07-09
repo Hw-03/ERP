@@ -81,7 +81,7 @@ export async function loginAsOperator(
  */
 export async function gotoWarehouseCompose(page: Page): Promise<void> {
   await page.goto("/mes?tab=warehouse");
-  await expect(page.getByText("작업 유형 선택").filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /창고 입출고/ }).filter({ visible: true }).first()).toBeVisible();
 }
 
 /** 작업 유형 카드 클릭(원자재 입고 / 창고 입출고 / 부서 입출고). 반응형 숨김 중복 회피로 visible 필터. */
