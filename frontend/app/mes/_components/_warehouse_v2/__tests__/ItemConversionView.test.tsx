@@ -134,8 +134,31 @@ describe("ItemConversionView", () => {
     ]);
     expect(screen.queryByTestId("item-conversion-mode-selection")).not.toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
-    expect(screen.getByTestId("item-conversion-target-search")).toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-target-guide")).toHaveTextContent("소스 품목을 선택하세요");
     expect(screen.getByTestId("item-conversion-quantity")).toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("소스 품목을 선택하세요");
+  });
+
+  it("turns selected source and target panels into summary cards with change actions", () => {
+    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
+
+    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "Domestic" } });
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+
+    expect(screen.getByTestId("item-conversion-source-selected-card")).toHaveTextContent("Domestic AF");
+    expect(screen.getByTestId("item-conversion-source-change")).toHaveTextContent("변경");
+    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("대상 품목을 선택하세요");
+
+    fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "Export" } });
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+
+    expect(screen.getByTestId("item-conversion-target-selected-card")).toHaveTextContent("Export AF");
+    expect(screen.getByTestId("item-conversion-target-change")).toHaveTextContent("변경");
+    expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("차이 확인으로 이동할 수 있습니다");
+
+    fireEvent.click(screen.getByTestId("item-conversion-target-change"));
+    expect(screen.getByTestId("item-conversion-target-search")).toBeInTheDocument();
   });
 
   it("uses searchable source and target selection before moving to preview", async () => {

@@ -27,7 +27,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { Operator } from "./login/useCurrentOperator";
 
-type SectionTab = "request" | "prep" | "history";
+type SectionTab = "request" | "history";
 type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "historyList" | "historyWork";
 const VIEW_MODE_VALUES: ViewMode[] = ["hub", "requestList", "requestDetail", "requestWork", "prepList", "prepWork", "historyList", "historyWork"];
 function isShippingViewMode(value: string | null): value is ViewMode {
@@ -80,12 +80,28 @@ const PHASE_LABEL: Record<string, string> = {
   PICKUP: "픽업 완료",
 };
 
+const SHIPPING_EVENT_LABEL: Record<string, string> = {
+  REQUEST_CREATED: "출하 요청 생성",
+  REQUEST_UPDATED: "출하 요청 수정",
+  SENT_TO_PREP: "출하 준비 중 전환",
+  PREPARED: "출하 준비 완료",
+  PREPARE_CANCELLED: "출하 준비 취소",
+  PICKED_UP: "픽업 완료 처리",
+};
+
 function txTypeLabel(type: string) {
   return TX_TYPE_LABEL[type] ?? type;
 }
 
 function phaseLabel(phase: string | null) {
   return phase ? PHASE_LABEL[phase] ?? phase : "일반";
+}
+
+function shippingEventMessage(event: ShippingRequest["events"][number]) {
+  const mapped = SHIPPING_EVENT_LABEL[event.event_type];
+  if (!event.message) return mapped ?? event.event_type;
+  if (mapped && !/[가-힣]/.test(event.message)) return mapped;
+  return event.message;
 }
 
 function txTone(type: string, cancelled: boolean) {
@@ -194,7 +210,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const error = mutationError ?? (shippingRequestsQuery.error
     ? shippingRequestsQuery.error instanceof Error
       ? shippingRequestsQuery.error.message
-      : "?? ???? ???? ?????."
+      : "출하 데이터를 불러오지 못했습니다."
     : null);
   const loading = shippingRequestsQuery.isLoading;
   const [itemsLoading, setItemsLoading] = useState(false);
@@ -319,16 +335,15 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     }
   }, [pfItems.length, pfItemsLoaded, pfItemsLoading, onStatusChange]);
 
-  // ?? ???? ? ?? flicker ??: ??? ??? useShippingRequestsQuery
-  // ? ???? ?? ?? fetch(+ React Query ??)??. ? effect? ? ???
-  // ??? ? selectedPrepId/selectedHistoryId ???? ????.
+  // 초기 요청 로드 중 목록 flicker 방지: 실제 목록은 useShippingRequestsQuery가 관리한다.
+  // 이 effect는 첫 데이터가 들어온 뒤 선택 id 기본값만 맞춘다.
   useEffect(() => {
     if (shippingRequestsQuery.isLoading) return;
     const data = shippingRequestsQuery.data ?? [];
     setSelectedPrepId((current) => current ?? data.find((req) => req.status === "PREPARING" || req.status === "PREPARED")?.request_id ?? null);
     setSelectedHistoryId((current) => current ?? data.find((req) => req.status === "PICKED_UP")?.request_id ?? null);
     if (shippingRequestsQuery.error) {
-      const msg = shippingRequestsQuery.error instanceof Error ? shippingRequestsQuery.error.message : "?? ???? ???? ?????.";
+      const msg = shippingRequestsQuery.error instanceof Error ? shippingRequestsQuery.error.message : "출하 데이터를 불러오지 못했습니다.";
       onStatusChange(msg);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -764,13 +779,12 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   }, [basePfId, draftLines, itemById, view]);
 
   function openSection(next: SectionTab) {
-    navigateView(next === "request" ? "requestList" : next === "prep" ? "prepList" : "historyList");
+    navigateView(next === "request" ? "requestList" : "historyList");
   }
 
   function renderActiveView() {
     const counts = {
       request: activeRequests.length,
-      prep: prepRequests.length,
       history: history.length,
     };
 
@@ -798,6 +812,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
           onSendToPrep={(req) => void sendExistingToPrep(req)}
           onDelete={deleteRequest}
           onPrepareCancel={cancelPrepare}
+          onPickup={completePickup}
           pending={pending}
         />
       );
@@ -875,7 +890,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     if (view === "prepWork") {
       return (
         <div className="grid gap-3">
-          <ViewHeader title="준비 체크" subtitle="구성품 체크 후 준비 완료와 픽업을 처리합니다." onBack={() => navigateView("prepList")} />
+          <ViewHeader title="준비 체크" subtitle="구성품 체크 후 준비 완료와 픽업을 처리합니다." onBack={() => navigateView("requestList")} />
           <PrepSection
             showList={false}
             requests={prepRequests}
@@ -971,10 +986,9 @@ function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
 
 function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void }) {
   return (
-    <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-3">
-      <HubCard id="request" icon={ClipboardList} title="출하 요청" detail="요청 목록을 확인하고 BOM을 수정합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
-      <HubCard id="prep" icon={ClipboardCheck} title="출하 준비 중" detail="구성품 체크와 준비 완료를 처리합니다." count={counts.prep} tone={LEGACY_COLORS.green} onClick={() => onOpen("prep")} />
-      <HubCard id="history" icon={History} title="출하 이력" detail="픽업 완료와 재고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
+    <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-2">
+      <HubCard id="request" icon={ClipboardList} title="출하 관리" detail="요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
+      <HubCard id="history" icon={History} title="출하 이력" detail="픽업 완료된 출하와 연결 입출고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
     </div>
   );
 }
@@ -1017,8 +1031,8 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0">
-            <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>요청 목록</div>
-            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>출하 요청 {total}건 · 새 요청을 만들거나 기존 요청의 상태를 확인합니다.</div>
+            <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 관리</div>
+            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행 중 출하 {total}건 · 요청 생성, 준비 체크, 픽업 완료까지 이어서 처리합니다.</div>
           </div>
         </div>
 
@@ -1051,7 +1065,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
 }
 
 
-function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareCancel, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; pending: PendingAction }) {
+function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareCancel, onPickup, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
       <div className={SHIPPING_FLEX_COL_CLASS}>
@@ -1073,6 +1087,12 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
   const canSend = request.status === "REQUESTED";
   const canDelete = request.status === "REQUESTED" || request.status === "PREPARING";
   const canCancelPrepared = request.status === "PREPARED";
+  const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
+  const titleSubtitle = [
+    "요청 상세",
+    request.final_pf_item_name && request.final_pf_item_name !== request.base_pf_item_name ? `기준 ${request.base_pf_item_name}` : null,
+    `생성 ${formatDate(request.created_at)}`,
+  ].filter(Boolean).join(" · ");
   return (
     <div className={SHIPPING_FLEX_COL_CLASS}>
       <Panel dataTestId="shipping-request-detail" className={SHIPPING_FLEX_COL_CLASS}>
@@ -1081,15 +1101,9 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <PanelTitle icon={PackageCheck} title="요청 상세" subtitle={`${request.base_pf_item_name} · 생성 ${formatDate(request.created_at)}`} />
+            <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
           </div>
           <StatusBadge status={request.status} />
-        </div>
-
-        <div data-testid="shipping-request-detail-summary" className="mt-3 grid gap-2 rounded-[16px] border px-3 py-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          <CompactSummary label="기준 PF" value={request.base_pf_item_name} />
-          <CompactSummary label="최종 PA" value={request.final_pa_item_name ?? "준비 전"} />
-          <CompactSummary label="최종 PF" value={request.final_pf_item_name ?? "준비 전"} />
         </div>
 
         {request.notes && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
@@ -1101,6 +1115,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
           {canSend && <ActionButton icon={Send} label={pending === "send" ? "요청 중" : "출하 요청"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
           {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
           {canDelete && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
+          {canCancelPrepared && <ActionButton icon={Truck} label={pending === "pickup" ? "처리 중" : "픽업 완료"} tone={LEGACY_COLORS.purple} onClick={() => onPickup(request)} disabled={pending !== null} dataTestId="shipping-pickup-from-detail" />}
           {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
         </div>
       </Panel>
@@ -1277,7 +1292,13 @@ function RequestSection(props: {
   );
   const footerHint = props.wizardStep === 1 && !props.basePfId
     ? "기준 PF를 먼저 선택하세요."
-    : `출하 수량 ${requestQty}대`;
+    : !validRequestQuantity
+      ? "출하 수량을 1대 이상으로 입력하세요."
+      : missingNewBomNames
+        ? `새 PA/PF 이름을 입력하세요. · 현재 출하 수량 ${requestQty}대 · 변경은 상단 수량 변경`
+        : props.wizardStep >= 3
+          ? `현재 출하 수량 ${requestQty}대 · 변경은 상단 수량 변경`
+          : `현재 출하 수량 ${requestQty}대`;
   const goPrev = () => props.onWizardStep(Math.max(1, props.wizardStep - 1) as RequestWizardStep);
   const goNext = () => {
     if (!canGoNext) return;
@@ -1340,6 +1361,12 @@ function RequestSection(props: {
         {locked && (
           <div className="mt-3">
             <Notice tone={LEGACY_COLORS.yellow} title="수정 잠금" body="준비 완료 상태입니다." />
+          </div>
+        )}
+
+        {props.selectedRequest?.status === "PREPARING" && !locked && (
+          <div className="mt-3" data-testid="shipping-edit-scope-notice">
+            <Notice tone={LEGACY_COLORS.blue} title="준비 중 요청" body="수량/BOM/요청 정보 수정 가능 · 변경 시 준비 목록을 다시 계산합니다." />
           </div>
         )}
 
@@ -1439,8 +1466,8 @@ function RequestSection(props: {
                   body={matchConclusionBody}
                   metrics={[
                     { label: "BOM 상태", value: bomChangedSummary },
-                    { label: "PA", value: `${finalPaSummary.label} · ${finalPaSummary.name}` },
-                    { label: "PF", value: `${finalPfSummary.label} · ${finalPfSummary.name}` },
+                    { label: "PA", value: finalPaSummary.label, body: `${finalPaSummary.name} · ${finalPaSummary.code}`, testId: "shipping-final-pa-summary" },
+                    { label: "PF", value: finalPfSummary.label, body: `${finalPfSummary.name} · ${finalPfSummary.code}`, testId: "shipping-final-pf-summary" },
                   ]}
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border px-4 py-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
@@ -1539,6 +1566,26 @@ function RequestSection(props: {
   );
 }
 
+type ShippingShortageKind = "출하품" | "PA 구성품" | "PF 구성품" | "동반 출하품" | "준비 품목";
+
+function buildShippingShortageKindMap(request: ShippingRequest | null): Map<string, ShippingShortageKind> {
+  const kinds = new Map<string, ShippingShortageKind>();
+  if (!request) return kinds;
+
+  const setIfEmpty = (itemId: string | null | undefined, kind: ShippingShortageKind): void => {
+    if (!itemId || kinds.has(itemId)) return;
+    kinds.set(itemId, kind);
+  };
+
+  setIfEmpty(request.final_pf_item_id ?? request.base_pf_item_id, "출하품");
+  request.bom_lines.forEach((line) => {
+    if (!line.included) return;
+    setIfEmpty(line.child_item_id, line.parent_stage === "PA" ? "PA 구성품" : "PF 구성품");
+  });
+  request.companion_lines.forEach((line) => setIfEmpty(line.item_id, "동반 출하품"));
+  return kinds;
+}
+
 function PrepSection({
   showList = true,
   requests,
@@ -1563,6 +1610,7 @@ function PrepSection({
   const pfLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PF") ?? [];
   const stockShortages = selected?.stock_shortages ?? EMPTY_STOCK_SHORTAGES;
   const shortageByItemId = useMemo(() => new Map(stockShortages.map((line) => [line.item_id, line])), [stockShortages]);
+  const shortageKindByItemId = useMemo(() => buildShippingShortageKindMap(selected), [selected]);
 
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[360px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
@@ -1593,7 +1641,7 @@ function PrepSection({
 
             {selected.notes && <Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={selected.notes} />}
 
-            {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} />}
+            {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} kindByItemId={shortageKindByItemId} />}
 
             <div className="grid gap-3 md:grid-cols-3">
               <Metric label="출하 수량" value={`${requestQty}대`} />
@@ -1602,9 +1650,9 @@ function PrepSection({
             </div>
 
             <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
-              <PrepRequirementList title="PA 구성품" lines={paLines} requestQuantity={requestQty} tone={LEGACY_COLORS.green} shortageByItemId={shortageByItemId} />
-              <PrepRequirementList title="PF 구성품" lines={pfLines} requestQuantity={requestQty} tone={LEGACY_COLORS.blue} shortageByItemId={shortageByItemId} />
-              <CompanionPrepList lines={selected.companion_lines} shortageByItemId={shortageByItemId} />
+              <PrepRequirementList title="PA 구성품" lines={paLines} requestQuantity={requestQty} tone={LEGACY_COLORS.green} shortageByItemId={shortageByItemId} shortageKindByItemId={shortageKindByItemId} />
+              <PrepRequirementList title="PF 구성품" lines={pfLines} requestQuantity={requestQty} tone={LEGACY_COLORS.blue} shortageByItemId={shortageByItemId} shortageKindByItemId={shortageKindByItemId} />
+              <CompanionPrepList lines={selected.companion_lines} shortageByItemId={shortageByItemId} shortageKindByItemId={shortageKindByItemId} />
             </div>
 
             <div className="flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
@@ -1629,7 +1677,13 @@ function PrepSection({
   );
 }
 
-function StockShortageNotice({ shortages }: { shortages: ShippingRequest["stock_shortages"] }) {
+function StockShortageNotice({
+  shortages,
+  kindByItemId,
+}: {
+  shortages: ShippingRequest["stock_shortages"];
+  kindByItemId: Map<string, ShippingShortageKind>;
+}) {
   return (
     <div
       data-testid="shipping-stock-shortages"
@@ -1644,13 +1698,17 @@ function StockShortageNotice({ shortages }: { shortages: ShippingRequest["stock_
         재고 부족
       </div>
       <div className="mt-2 grid gap-2">
-        {shortages.map((line) => (
+        {shortages.map((line) => {
+          const kind = kindByItemId.get(line.item_id) ?? "준비 품목";
+          return (
           <div
             key={`${line.phase}-${line.item_id}`}
+            data-testid={`shipping-shortage-summary-${line.item_id}`}
             className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] px-3 py-2"
             style={{ background: LEGACY_COLORS.bg }}
           >
             <span className="min-w-0">
+              <span className="mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-black" style={{ background: tint(LEGACY_COLORS.red, 14), color: LEGACY_COLORS.red }}>{kind}</span>
               <span className="block line-clamp-2 text-sm font-black leading-snug">{line.item_name}</span>
               <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 {line.mes_code ?? "-"} · {line.department ?? "-"}
@@ -1660,7 +1718,8 @@ function StockShortageNotice({ shortages }: { shortages: ShippingRequest["stock_
               {line.shortage_quantity}개 부족
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1672,12 +1731,14 @@ function PrepRequirementList({
   requestQuantity,
   tone,
   shortageByItemId,
+  shortageKindByItemId,
 }: {
   title: string;
   lines: ShippingRequest["bom_lines"];
   requestQuantity: number;
   tone: string;
   shortageByItemId: Map<string, ShippingRequest["stock_shortages"][number]>;
+  shortageKindByItemId: Map<string, ShippingShortageKind>;
 }) {
   return (
     <div className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
@@ -1688,6 +1749,7 @@ function PrepRequirementList({
         ) : (
           lines.map((line) => {
             const shortage = shortageByItemId.get(line.child_item_id);
+            const shortageKind = shortage ? shortageKindByItemId.get(line.child_item_id) ?? "준비 품목" : null;
             const unit = line.unit || "EA";
             return (
               <div
@@ -1698,7 +1760,14 @@ function PrepRequirementList({
                 style={{ background: shortage ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.bg, borderColor: shortage ? tint(LEGACY_COLORS.red, 42) : LEGACY_COLORS.border }}
               >
                 <div className="flex min-w-0 items-start justify-between gap-2">
-                  <div className="min-w-0 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+                  <div className="min-w-0">
+                    {shortageKind && (
+                      <span data-testid={`shipping-shortage-kind-${line.child_item_id}`} className="mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-black" style={{ background: tint(LEGACY_COLORS.red, 14), color: LEGACY_COLORS.red }}>
+                        {shortageKind}
+                      </span>
+                    )}
+                    <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+                  </div>
                   {shortage && (
                     <span data-testid={`shipping-shortage-badge-${line.child_item_id}`} className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black tabular-nums" style={{ background: tint(LEGACY_COLORS.red, 14), color: LEGACY_COLORS.red }}>
                       {shortage.shortage_quantity} {unit} 부족
@@ -1719,7 +1788,15 @@ function PrepRequirementList({
   );
 }
 
-function CompanionPrepList({ lines, shortageByItemId }: { lines: ShippingRequest["companion_lines"]; shortageByItemId: Map<string, ShippingRequest["stock_shortages"][number]> }) {
+function CompanionPrepList({
+  lines,
+  shortageByItemId,
+  shortageKindByItemId,
+}: {
+  lines: ShippingRequest["companion_lines"];
+  shortageByItemId: Map<string, ShippingRequest["stock_shortages"][number]>;
+  shortageKindByItemId: Map<string, ShippingShortageKind>;
+}) {
   return (
     <div className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.purple }}>카톤·동반 출하품</div>
@@ -1729,6 +1806,7 @@ function CompanionPrepList({ lines, shortageByItemId }: { lines: ShippingRequest
         ) : (
           lines.map((line) => {
             const shortage = shortageByItemId.get(line.item_id);
+            const shortageKind = shortage ? shortageKindByItemId.get(line.item_id) ?? "준비 품목" : null;
             const unit = line.unit || "EA";
             return (
               <div
@@ -1739,7 +1817,14 @@ function CompanionPrepList({ lines, shortageByItemId }: { lines: ShippingRequest
                 style={{ background: shortage ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.bg, borderColor: shortage ? tint(LEGACY_COLORS.red, 42) : LEGACY_COLORS.border }}
               >
                 <div className="flex min-w-0 items-start justify-between gap-2">
-                  <div className="min-w-0 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+                  <div className="min-w-0">
+                    {shortageKind && (
+                      <span data-testid={`shipping-shortage-kind-${line.item_id}`} className="mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-black" style={{ background: tint(LEGACY_COLORS.red, 14), color: LEGACY_COLORS.red }}>
+                        {shortageKind}
+                      </span>
+                    )}
+                    <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+                  </div>
                   {shortage && (
                     <span data-testid={`shipping-shortage-badge-${line.item_id}`} className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black tabular-nums" style={{ background: tint(LEGACY_COLORS.red, 14), color: LEGACY_COLORS.red }}>
                       {shortage.shortage_quantity} {unit} 부족
@@ -1796,7 +1881,7 @@ function HistorySection({ showList = true, rows, selected, onSelect }: { showLis
               ) : (
                 selected.events.map((event) => (
                   <div key={event.event_id} className="flex items-center justify-between gap-3 rounded-[10px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{event.message ?? event.event_type}</span>
+                    <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{shippingEventMessage(event)}</span>
                     <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{formatDate(event.created_at)}</span>
                   </div>
                 ))
@@ -2034,6 +2119,8 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
         <div className="grid gap-2">
           {logs.map((log) => {
             const tone = txTone(log.transaction_type, log.cancelled);
+            const showReference = log.reference_no && !log.reference_no.startsWith("SHIP-");
+            const referenceLabel = showReference ? log.reference_no : `${phaseLabel(log.shipping_phase)} 작업`;
             return (
               <div
                 key={log.log_id}
@@ -2053,7 +2140,7 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
                   <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{log.quantity_before ?? "-"}{" -> "}{log.quantity_after ?? "-"}</div>
                 </div>
                 <div className="min-w-0 text-xs font-bold md:text-right" style={{ color: LEGACY_COLORS.muted2 }}>
-                  <div className="truncate">{log.reference_no ?? "참조 없음"}</div>
+                  <div className="truncate">{referenceLabel}</div>
                   <div>{log.cancelled ? "취소됨" : formatDate(log.created_at)}</div>
                 </div>
               </div>
@@ -2067,15 +2154,13 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
 type SummaryDisplayLine = { key: string; title: string; meta: string; tone?: string };
 
 function LineSummary({ request }: { request: ShippingRequest }) {
-  const paLines = request.bom_lines.filter((line) => line.parent_stage === "PA");
-  const pfLines = request.bom_lines.filter((line) => line.parent_stage === "PF");
+  const paLines = request.bom_lines.filter((line) => line.parent_stage === "PA" && line.included);
+  const pfLines = request.bom_lines.filter((line) => line.parent_stage === "PF" && line.included);
   const formatLine = (line: ShippingRequest["bom_lines"][number]): SummaryDisplayLine => {
-    const flags = [!line.included ? "제외됨" : null, line.origin === "CUSTOM" ? "추가됨" : null].filter(Boolean).join(" · ");
     return {
       key: `${line.line_id ?? line.child_item_id}-${line.parent_stage}`,
       title: line.item_name,
-      meta: `${flags ? flags + " · " : ""}${line.mes_code ?? "코드 없음"} · ${line.quantity}${line.unit ? " " + line.unit : ""}`,
-      tone: !line.included ? LEGACY_COLORS.red : line.origin === "CUSTOM" ? LEGACY_COLORS.cyan : undefined,
+      meta: `${line.mes_code ?? "코드 없음"} · ${line.quantity}${line.unit ? " " + line.unit : ""}`,
     };
   };
   const companionLines = request.companion_lines.map((line) => ({
@@ -2192,6 +2277,10 @@ function ShippingActionConfirmModal({
 }
 
 function RequestRow({ request, active, onClick }: { request: ShippingRequest; active: boolean; onClick: () => void }) {
+  const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
+  const baseLabel = request.final_pf_item_name && request.final_pf_item_name !== request.base_pf_item_name
+    ? ` · 기준 ${request.base_pf_item_name}`
+    : "";
   return (
     <button
       type="button"
@@ -2206,7 +2295,7 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-sm font-black">{request.base_pf_item_name}</div>
+          <div className="truncate text-sm font-black">{finalPfName}</div>
           <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             {request.base_pf_mes_code ?? "-"} · {request.requested_by_name ?? "요청자 없음"}
           </div>
@@ -2214,7 +2303,7 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
         <StatusBadge status={request.status} compact />
       </div>
       <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        생성 {formatDate(request.created_at)} {request.final_pf_item_name ? `· 최종 ${request.final_pf_item_name}` : ""}
+        생성 {formatDate(request.created_at)}{baseLabel}
       </div>
     </button>
   );
@@ -2269,7 +2358,7 @@ function ShippingConclusionCard({
   tone: string;
   title: string;
   body: string;
-  metrics: { label: string; value: string }[];
+  metrics: { label: string; value: string; body?: string; testId?: string }[];
 }) {
   return (
     <section className="rounded-[16px] border px-4 py-3" style={{ background: tint(tone, 9), borderColor: tint(tone, 42) }}>
@@ -2280,9 +2369,10 @@ function ShippingConclusionCard({
         </div>
         <div className="grid min-w-[360px] flex-1 gap-2 sm:grid-cols-3">
           {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: tint(tone, 20) }}>
+            <div key={metric.label} data-testid={metric.testId} className="rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: tint(tone, 20) }}>
               <div className="text-[11px] font-black" style={{ color: LEGACY_COLORS.muted2 }}>{metric.label}</div>
               <div className="mt-0.5 line-clamp-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{metric.value}</div>
+              {metric.body && <div className="mt-1 line-clamp-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{metric.body}</div>}
             </div>
           ))}
         </div>

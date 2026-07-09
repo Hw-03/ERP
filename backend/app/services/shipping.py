@@ -47,14 +47,14 @@ class ShippingError(ValueError):
 def _get_request(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = db.query(ShippingRequest).filter(ShippingRequest.request_id == request_id).first()
     if req is None:
-        raise ShippingError("異쒗븯 ?붿껌??李얠쓣 ???놁뒿?덈떎.")
+        raise ShippingError("출하 요청을 찾을 수 없습니다.")
     return req
 
 
 def _get_item(db: Session, item_id: uuid.UUID) -> Item:
     item = item_repository.get(db, item_id)
     if item is None:
-        raise ShippingError("?덈ぉ??李얠쓣 ???놁뒿?덈떎.")
+        raise ShippingError("품목을 찾을 수 없습니다.")
     return item
 
 
@@ -172,10 +172,10 @@ def _normalize_bom_lines(db: Session, base_pf: Item, payload_lines: list[dict] |
     for idx, raw in enumerate(payload_lines):
         stage = str(raw.get("parent_stage") or "PA").upper()
         if stage not in {"PA", "PF"}:
-            raise ShippingError("BOM ?쇱씤??parent_stage??PA ?먮뒗 PF?ъ빞 ?⑸땲??")
+            raise ShippingError("BOM 라인의 parent_stage는 PA 또는 PF여야 합니다.")
         qty = int(raw.get("quantity") or 0)
         if qty <= 0:
-            raise ShippingError("BOM ?섎웾? 1 ?댁긽?댁뼱???⑸땲??")
+            raise ShippingError("BOM 수량은 1 이상이어야 합니다.")
         child_id = raw.get("child_item_id")
         _get_item(db, child_id)
         normalized.append(
@@ -203,7 +203,7 @@ def _replace_bom_lines(db: Session, req: ShippingRequest, lines: list[dict]) -> 
     for idx, raw in enumerate(lines):
         key = (raw["parent_stage"], raw["child_item_id"])
         if key in seen:
-            raise ShippingError("媛숈? ?④퀎 ?덉뿉 ?숈씪 ?덈ぉ??以묐났?섏뼱 ?덉뒿?덈떎.")
+            raise ShippingError("같은 단계 안에 동일 품목이 중복되어 있습니다.")
         seen.add(key)
         db.add(
             ShippingRequestBomLine(
@@ -256,7 +256,7 @@ def _sync_checklist(db: Session, req: ShippingRequest) -> None:
 def create_request(db: Session, payload: dict) -> ShippingRequest:
     base_pf = _get_item(db, payload["base_pf_item_id"])
     if base_pf.process_type_code != "PF":
-        raise ShippingError("湲곗? ?덈ぉ? PF?ъ빞 ?⑸땲??")
+        raise ShippingError("기준 품목은 PF여야 합니다.")
     req = ShippingRequest(
         base_pf_item_id=base_pf.item_id,
         request_quantity=_payload_request_quantity(payload),
@@ -274,7 +274,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     _resolve_final_items(db, req)
     db.refresh(req)
     _sync_checklist(db, req)
-    _record_event(db, req, "REQUEST_CREATED", "異쒗븯 ?붿껌 ?앹꽦")
+    _record_event(db, req, "REQUEST_CREATED", "출하 요청 생성")
     db.flush()
     return req
 
@@ -282,7 +282,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
 def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
-        raise ShippingError("以鍮??꾨즺???붿껌? 癒쇱? 以鍮??꾨즺 痍⑥냼 ???섏젙?????덉뒿?덈떎.")
+        raise ShippingError("준비 완료된 요청은 먼저 준비 완료 취소 후 수정할 수 있습니다.")
     if "request_quantity" in payload:
         req.request_quantity = _payload_request_quantity(payload)
     if "requested_by_name" in payload:
@@ -302,7 +302,7 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
     db.refresh(req)
     _resolve_final_items(db, req)
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "REQUEST_UPDATED", "異쒗븯 ?붿껌 ?섏젙")
+    _record_event(db, req, "REQUEST_UPDATED", "출하 요청 수정")
     db.flush()
     return req
 
@@ -311,18 +311,18 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
 def delete_request(db: Session, request_id: uuid.UUID) -> None:
     req = _get_request(db, request_id)
     if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
-        raise ShippingError("?붿껌 ?먮뒗 以鍮?以??곹깭?먯꽌留?異쒗븯 ?붿껌??痍⑥냼?????덉뒿?덈떎.")
+        raise ShippingError("요청 또는 준비 중 상태에서만 출하 요청을 취소할 수 있습니다.")
     db.delete(req)
     db.flush()
 
 def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.REQUESTED:
-        raise ShippingError("?붿껌 ?곹깭?먯꽌留?以鍮?以묒쑝濡??꾪솚?????덉뒿?덈떎.")
+        raise ShippingError("요청 상태에서만 준비 중으로 전환할 수 있습니다.")
     req.status = ShippingRequestStatusEnum.PREPARING
     req.updated_at = datetime.utcnow()
     _sync_checklist(db, req)
-    _record_event(db, req, "SENT_TO_PREP", "異쒗븯 以鍮?以??꾪솚")
+    _record_event(db, req, "SENT_TO_PREP", "출하 준비 중 전환")
     db.flush()
     return req
 
@@ -330,7 +330,7 @@ def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
 def update_checklist(db: Session, request_id: uuid.UUID, checks: dict[uuid.UUID, bool]) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
-        raise ShippingError("以鍮?以??곹깭?먯꽌留?泥댄겕由ъ뒪?몃? ?섏젙?????덉뒿?덈떎. 以鍮??꾨즺 ?꾩뿉??癒쇱? 以鍮??꾨즺 痍⑥냼媛 ?꾩슂?⑸땲??")
+        raise ShippingError("준비 중 상태에서만 체크리스트를 수정할 수 있습니다. 준비 완료 후에는 먼저 준비 완료 취소가 필요합니다.")
     rows = (
         db.query(ShippingRequestChecklistLine)
         .filter(ShippingRequestChecklistLine.request_id == req.request_id)
@@ -347,7 +347,7 @@ def update_checklist(db: Session, request_id: uuid.UUID, checks: dict[uuid.UUID,
 def clear_checklist(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
-        raise ShippingError("以鍮?以??곹깭?먯꽌留?泥댄겕由ъ뒪?몃? ?꾩껜 ?댁젣?????덉뒿?덈떎. 以鍮??꾨즺 ?꾩뿉??癒쇱? 以鍮??꾨즺 痍⑥냼媛 ?꾩슂?⑸땲??")
+        raise ShippingError("준비 중 상태에서만 체크리스트를 전체 해제할 수 있습니다. 준비 완료 후에는 먼저 준비 완료 취소가 필요합니다.")
     db.query(ShippingRequestChecklistLine).filter(
         ShippingRequestChecklistLine.request_id == req.request_id
     ).update({"checked": False}, synchronize_session=False)
@@ -366,7 +366,7 @@ def _create_item(db: Session, *, name: str, process_type_code: str, model_symbol
         .first()
     )
     if duplicate is not None:
-        raise ShippingError(f"媛숈? ?대쫫??{process_type_code} ?덈ぉ???대? ?덉뒿?덈떎: {name}")
+        raise ShippingError(f"같은 이름의 {process_type_code} 품목이 이미 있습니다: {name}")
     next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
     item = Item(
         item_name=name,
@@ -389,6 +389,28 @@ def _replace_item_bom(db: Session, parent: Item, lines: list[tuple[uuid.UUID, in
         db.add(BOM(parent_item_id=parent.item_id, child_item_id=child_id, quantity=qty, unit=unit))
     parent.bom_completed_at = datetime.utcnow()
     db.flush()
+
+
+def _request_owned_final_item(db: Session, req: ShippingRequest, *, process_type_code: str, name: str) -> Item | None:
+    current_id = req.final_pa_item_id if process_type_code == "PA" else req.final_pf_item_id
+    if current_id is None:
+        return None
+    current = _get_item(db, current_id)
+    if current.process_type_code != process_type_code or current.item_name != name:
+        return None
+    if req.created_at is not None and current.created_at is not None and current.created_at < req.created_at:
+        return None
+
+    field = ShippingRequest.final_pa_item_id if process_type_code == "PA" else ShippingRequest.final_pf_item_id
+    other_request_count = (
+        db.query(func.count(ShippingRequest.request_id))
+        .filter(field == current.item_id, ShippingRequest.request_id != req.request_id)
+        .scalar()
+        or 0
+    )
+    if int(other_request_count) > 0:
+        return None
+    return current
 
 
 def _pf_lines_with_final_pa(req: ShippingRequest, final_pa: Item) -> list[tuple[uuid.UUID, int, str]]:
@@ -453,14 +475,18 @@ def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) ->
 def _resolve_or_create_pa(db: Session, req: ShippingRequest) -> Item:
     pa_lines = [(line.child_item_id, int(line.quantity), line.unit or "EA") for line in _request_stage_lines(req, "PA")]
     if not pa_lines:
-        raise ShippingError("PA 援ъ꽦 BOM??鍮꾩뼱 ?덉뒿?덈떎.")
+        raise ShippingError("PA 구성 BOM이 비어 있습니다.")
     sig = _signature((child_id, qty) for child_id, qty, _ in pa_lines)
     found = _find_item_by_signature(db, process_type_code="PA", signature=sig)
     if found is not None:
         return found
     if not (req.custom_pa_name and req.custom_pa_name.strip()):
-        raise ShippingError("?숈씪 BOM???놁쑝誘濡???PA/PF ?대쫫???낅젰?댁빞 ?⑸땲??")
-    name = req.custom_pa_name
+        raise ShippingError("동일 BOM이 없으므로 새 PA/PF 이름을 입력해야 합니다.")
+    name = req.custom_pa_name.strip()
+    existing_final = _request_owned_final_item(db, req, process_type_code="PA", name=name)
+    if existing_final is not None:
+        _replace_item_bom(db, existing_final, pa_lines)
+        return existing_final
     pa = _create_item(db, name=name, process_type_code="PA", model_symbol=req.base_pf_item.model_symbol)
     _replace_item_bom(db, pa, pa_lines)
     return pa
@@ -473,8 +499,12 @@ def _resolve_or_create_pf(db: Session, req: ShippingRequest, final_pa: Item) -> 
     if found is not None:
         return found
     if not (req.custom_pf_name and req.custom_pf_name.strip()):
-        raise ShippingError("?숈씪 BOM???놁쑝誘濡???PA/PF ?대쫫???낅젰?댁빞 ?⑸땲??")
-    name = req.custom_pf_name
+        raise ShippingError("동일 BOM이 없으므로 새 PA/PF 이름을 입력해야 합니다.")
+    name = req.custom_pf_name.strip()
+    existing_final = _request_owned_final_item(db, req, process_type_code="PF", name=name)
+    if existing_final is not None:
+        _replace_item_bom(db, existing_final, pf_lines)
+        return existing_final
     pf = _create_item(db, name=name, process_type_code="PF", model_symbol=req.base_pf_item.model_symbol)
     _replace_item_bom(db, pf, pf_lines)
     return pf
@@ -530,8 +560,8 @@ def _require_item_location_available(db: Session, item: Item, required: int) -> 
     if available < required:
         code = item.mes_code or str(item.item_id)
         raise ShippingError(
-            f"?? ?? ?? ??: {code} / {item.item_name} / ?? {dept.value} / "
-            f"?? {current} / ?? {_active_allocation_quantity(db, item.item_id)} / ?? {available} / ?? {required}"
+            f"출하 준비 재고 부족: {code} / {item.item_name} / 부서 {dept.value} / "
+            f"현재 {current} / 예약 {_active_allocation_quantity(db, item.item_id)} / 가용 {available} / 필요 {required}"
         )
     return dept
 
@@ -693,7 +723,7 @@ def _consume_pa_from_item_location(db: Session, req: ShippingRequest, item: Item
         quantity_before=int(qty_before),
         reference_no=reference_no,
         produced_by=req.requested_by_name,
-        notes=f"異쒗븯 以鍮?PF ?앹궛 ?ъ엯: {item.item_name} x {qty}",
+        notes=f"출하 준비 PF 생산 입고: {item.item_name} x {qty}",
         before_cells=before,
         request_id=req.request_id,
         phase=PREPARE_PHASE,
@@ -1100,7 +1130,7 @@ def _release_companion_allocations(db: Session, req: ShippingRequest, reason: st
     for allocation in _active_allocations_for_request(db, req):
         allocation.status = ALLOCATION_RELEASED
         allocation.released_at = now
-        allocation.released_reason = reason or "?? ?? ?? ??"
+        allocation.released_reason = reason or "출하 준비 취소"
     db.flush()
 
 
@@ -1108,13 +1138,13 @@ def _consume_companion_allocations(db: Session, req: ShippingRequest) -> None:
     allocations = _active_allocations_for_request(db, req)
     if not allocations:
         for line in req.companion_lines:
-            _ship_from_item_location(db, req, line.item, int(line.quantity), f"?? ?? ??: {line.item.item_name}")
+            _ship_from_item_location(db, req, line.item, int(line.quantity), f"동반 출하: {line.item.item_name}")
         return
     now = datetime.utcnow()
     for allocation in allocations:
         item = allocation.item
         qty = int(allocation.quantity or 0)
-        _ship_from_item_location(db, req, item, qty, f"?? ?? ??: {item.item_name}")
+        _ship_from_item_location(db, req, item, qty, f"동반 출하: {item.item_name}")
         allocation.status = ALLOCATION_CONSUMED
         allocation.consumed_at = now
     db.flush()
@@ -1124,7 +1154,7 @@ def _consume_companion_allocations(db: Session, req: ShippingRequest) -> None:
 def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
-        raise ShippingError("?? ? ????? ?? ??? ? ????.")
+        raise ShippingError("준비 중 요청에서만 준비 완료할 수 있습니다.")
     request_qty = _request_quantity(req)
     final_pa, final_pf = _require_final_items(db, req)
     _require_item_location_available(db, final_pa, request_qty)
@@ -1136,7 +1166,7 @@ def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
         final_pa,
         request_qty,
         reference_no,
-        f"?? ?? final PA ??: {final_pa.item_name} x {request_qty}",
+        f"출하 준비 final PA 차감: {final_pa.item_name} x {request_qty}",
     )
     _produce_pf_to_item_location(db, req, final_pf, request_qty, reference_no)
     _reserve_companions(db, req, reference_no)
@@ -1144,7 +1174,7 @@ def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req.status = ShippingRequestStatusEnum.PREPARED
     req.prepared_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "PREPARED", "?? ?? ??")
+    _record_event(db, req, "PREPARED", "출하 준비 완료")
     db.flush()
     return req
 
@@ -1152,7 +1182,7 @@ def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
 def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
-        raise ShippingError("?? ?? ????? ??? ? ????.")
+        raise ShippingError("준비 완료 요청에서만 취소할 수 있습니다.")
     logs = (
         db.query(TransactionLog)
         .filter(
@@ -1164,20 +1194,20 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
         .all()
     )
     if not logs:
-        raise ShippingError("??? ?? ?? ??? ??? ????.")
+        raise ShippingError("취소할 준비 완료 로그가 없습니다.")
     for log in logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
         inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
         if inv is not None:
             _sync_total(db, inv)
         log.cancelled = True
-        log.cancel_reason = reason or "?? ?? ?? ??"
+        log.cancel_reason = reason or "출하 준비 취소"
         log.cancelled_at = datetime.utcnow()
     _release_companion_allocations(db, req, reason)
     req.status = ShippingRequestStatusEnum.PREPARING
     req.prepared_at = None
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "PREPARE_CANCELLED", reason or "?? ?? ?? ??")
+    _record_event(db, req, "PREPARE_CANCELLED", reason or "출하 준비 취소")
     db.flush()
     return req
 
@@ -1205,15 +1235,15 @@ def _ship_from_item_location(db: Session, req: ShippingRequest, item: Item, qty:
 def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
-        raise ShippingError("?? ?? ????? ?? ??? ? ????.")
+        raise ShippingError("준비 완료 요청에서만 픽업 완료할 수 있습니다.")
     if req.final_pf_item is None:
-        raise ShippingError("?? PF? ???? ?????.")
+        raise ShippingError("최종 PF가 생성되지 않았습니다.")
     request_qty = _request_quantity(req)
-    _ship_from_item_location(db, req, req.final_pf_item, request_qty, f"?? ?? ??: {req.final_pf_item.item_name} x {request_qty}")
+    _ship_from_item_location(db, req, req.final_pf_item, request_qty, f"출하 픽업: {req.final_pf_item.item_name} x {request_qty}")
     _consume_companion_allocations(db, req)
     req.status = ShippingRequestStatusEnum.PICKED_UP
     req.picked_up_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
-    _record_event(db, req, "PICKED_UP", "???? ?? ??")
+    _record_event(db, req, "PICKED_UP", "픽업 완료 처리")
     db.flush()
     return req

@@ -3,9 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api/types/production";
 import type { HistoryRowPresentation } from "../historyPresentation";
 import {
+  HISTORY_MAIN_CELL_CLASS,
+  HISTORY_MAIN_ROW_CLASS,
   MovementSummaryCell,
   PeopleStatusCell,
   ReferenceBatchDetail,
+  TargetSummaryBlock,
   buildGroups,
 } from "../historyTableHelpers";
 
@@ -66,6 +69,12 @@ describe("buildGroups shipping phase grouping", () => {
 });
 
 describe("history table helper rendering policies", () => {
+  it("defines a single fixed rhythm for main history rows", () => {
+    expect(HISTORY_MAIN_ROW_CLASS).toBe("h-16");
+    expect(HISTORY_MAIN_CELL_CLASS).toContain("py-2");
+    expect(HISTORY_MAIN_CELL_CLASS).toContain("align-middle");
+  });
+
   it("uses the same thin pill height for single and paired movement summaries", () => {
     render(
       <div>
@@ -82,8 +91,11 @@ describe("history table helper rendering policies", () => {
     );
 
     expect(screen.getByText("이동 2품목 · 22 EA")).toHaveClass("h-6");
+    expect(screen.getByText("이동 2품목 · 22 EA")).toHaveClass("min-w-[10.25rem]");
     expect(screen.getByText("완제품 +5 EA")).toHaveClass("h-6");
+    expect(screen.getByText("완제품 +5 EA")).toHaveClass("min-w-[5rem]");
     expect(screen.getByText("부품 -10 EA")).toHaveClass("h-6");
+    expect(screen.getByText("부품 -10 EA")).toHaveClass("min-w-[5rem]");
   });
 
   it("does not prefix system actors with human requester wording", () => {
@@ -97,6 +109,27 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("시스템 처리 · 구성품 변경")).toBeInTheDocument();
     expect(screen.queryByText("요청 시스템 처리 · 구성품 변경")).not.toBeInTheDocument();
     expect(screen.getByText("자동 처리")).toBeInTheDocument();
+    expect(screen.getByText("자동 처리").parentElement).toHaveClass("flex-nowrap");
+  });
+
+  it("keeps target title and meta in one-line slots so row height stays uniform", () => {
+    const presentation = {
+      target: {
+        title: "발생부 고압B/D+튜브 최종 작업판 [COCOON] 매우 긴 품목명",
+        code: "7-HF-0007",
+        meta: ["7종 처리", "긴 보조 설명"],
+      },
+    } as HistoryRowPresentation;
+
+    render(
+      <TargetSummaryBlock
+        presentation={presentation}
+        icon={<span aria-hidden />}
+      />,
+    );
+
+    expect(screen.getByText(presentation.target.title)).toHaveClass("truncate");
+    expect(screen.getByText("7종 처리")).toHaveClass("truncate");
   });
 
   it("lets expanded reference child rows select their own log", () => {

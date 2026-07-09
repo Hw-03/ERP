@@ -294,13 +294,17 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
-  async function openHubCard(container: HTMLElement, id: "request" | "prep" | "history") {
+  async function openHubCard(container: HTMLElement, id: "request" | "history") {
     let button: Element | null = null;
     await waitFor(() => {
       button = container.querySelector(`[data-shipping-hub-card="${id}"]`);
       expect(button).toBeTruthy();
     });
     fireEvent.click(button as HTMLElement);
+  }
+
+  async function openShippingManagement(container: HTMLElement) {
+    await openHubCard(container, "request");
   }
 
   async function openNewRequest(container: HTMLElement) {
@@ -411,7 +415,7 @@ describe("DesktopShippingView", () => {
     expect(requestCard.className).toContain("min-h-[360px]");
     expect(screen.queryByText("작업 선택")).not.toBeInTheDocument();
     expect(container.querySelector('[data-testid="shipping-hub-accent"]')).not.toBeInTheDocument();
-    expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy();
+    expect(container.querySelector('[data-shipping-hub-card="prep"]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-shipping-hub-card="history"]')).toBeTruthy();
   });
 
@@ -431,7 +435,7 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
     expect(container.querySelectorAll('[data-primary-action="new-shipping-request"]')).toHaveLength(1);
-    expect(screen.getAllByText("요청 목록")).toHaveLength(1);
+    expect(screen.getAllByText("출하 관리")).toHaveLength(1);
     expect(screen.queryByTestId("shipping-request-empty-action")).not.toBeInTheDocument();
   });
 
@@ -510,6 +514,20 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
   });
 
+  it("explains the editable scope when a preparing request is edited", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openRequestById(container, "req-1");
+    fireEvent.click(await screen.findByTestId("shipping-edit-request"));
+
+    const notice = await screen.findByTestId("shipping-edit-scope-notice");
+    expect(notice).toHaveTextContent("준비 중 요청");
+    expect(notice).toHaveTextContent("수량/BOM/요청 정보 수정 가능");
+    expect(notice).toHaveTextContent("준비 목록을 다시 계산");
+  });
+
   it("shows PF and PA BOM groups, then carries excluded lines into send-to-prep save", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -549,15 +567,11 @@ describe("DesktopShippingView", () => {
   });
 
   it("opens prep detail as a desktop summary without checklist controls", async () => {
+    navigationMock.search = "tab=shipping&shippingView=prepWork&shippingRequestId=req-1";
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy());
-    await openHubCard(container, "prep");
-    expect(await screen.findByTestId("shipping-prep-list")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("button", { name: /Standard PF/ })[0]);
-
     const detail = await screen.findByTestId("shipping-prep-detail");
-    expect(detail).toHaveTextContent("출하 수량");
+    await waitFor(() => expect(detail).toHaveTextContent("출하 수량"));
     expect(detail).toHaveTextContent("총 1대 출하");
     expect(detail).toHaveTextContent("1대 기준 2 EA");
     expect(detail).toHaveTextContent("총 필요 2 EA");
@@ -565,6 +579,7 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByTestId("shipping-clear-checklist")).not.toBeInTheDocument();
     expect(api.updateShippingChecklist).not.toHaveBeenCalled();
     expect(api.clearShippingChecklist).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-shipping-hub-card="prep"]')).not.toBeInTheDocument();
   });
 
   it("shows stock shortages in prep detail without hiding prep actions", async () => {
@@ -572,7 +587,31 @@ describe("DesktopShippingView", () => {
       request({
         request_id: "prep-short-1",
         status: "PREPARING",
+        companion_lines: [
+          {
+            line_id: "companion-1",
+            item_id: "carton-1",
+            item_name: "Carton Box",
+            mes_code: "R-BOX",
+            process_type_code: "R",
+            quantity: 1,
+            unit: "EA",
+          },
+        ],
         stock_shortages: [
+          {
+            item_id: "pf-1",
+            item_name: "Standard PF",
+            mes_code: "PF-001",
+            process_type_code: "PF",
+            department: "출하",
+            required_quantity: 1,
+            current_quantity: 0,
+            allocated_quantity: 0,
+            available_quantity: 0,
+            shortage_quantity: 1,
+            phase: "PREPARE",
+          },
           {
             item_id: "pa-1",
             item_name: "Short PA",
@@ -586,18 +625,46 @@ describe("DesktopShippingView", () => {
             shortage_quantity: 2,
             phase: "PREPARE",
           },
+          {
+            item_id: "acc-1",
+            item_name: "Cable Set",
+            mes_code: "R-001",
+            process_type_code: "R",
+            department: "출하",
+            required_quantity: 2,
+            current_quantity: 0,
+            allocated_quantity: 0,
+            available_quantity: 0,
+            shortage_quantity: 2,
+            phase: "PREPARE",
+          },
+          {
+            item_id: "carton-1",
+            item_name: "Carton Box",
+            mes_code: "R-BOX",
+            process_type_code: "R",
+            department: "출하",
+            required_quantity: 1,
+            current_quantity: 0,
+            allocated_quantity: 0,
+            available_quantity: 0,
+            shortage_quantity: 1,
+            phase: "PREPARE",
+          },
         ],
       }),
     ]);
-    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
-
-    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy());
-    await openHubCard(container, "prep");
-    fireEvent.click(await screen.findByRole("button", { name: /Standard PF/ }));
+    navigationMock.search = "tab=shipping&shippingView=prepWork&shippingRequestId=prep-short-1";
+    render(<DesktopShippingView onStatusChange={() => {}} />);
 
     const warning = await screen.findByTestId("shipping-stock-shortages");
     expect(warning).toHaveTextContent("Short PA");
+    expect(screen.getByTestId("shipping-shortage-summary-pf-1")).toHaveTextContent("출하품");
+    expect(screen.getByTestId("shipping-shortage-summary-pa-1")).toHaveTextContent("PF 구성품");
+    expect(screen.getByTestId("shipping-shortage-summary-acc-1")).toHaveTextContent("PA 구성품");
+    expect(screen.getByTestId("shipping-shortage-summary-carton-1")).toHaveTextContent("동반 출하품");
     expect(screen.getByTestId("shipping-prep-line-pa-1")).toHaveAttribute("data-shortage", "true");
+    expect(screen.getByTestId("shipping-shortage-kind-pa-1")).toHaveTextContent("PF 구성품");
     expect(screen.getByTestId("shipping-shortage-badge-pa-1")).toHaveTextContent("2 EA 부족");
     expect(warning).not.toHaveTextContent("필요 2");
     expect(warning).not.toHaveTextContent("가용 0");
@@ -613,7 +680,18 @@ describe("DesktopShippingView", () => {
     fireEvent.click(screen.getByRole("button", { name: /Standard PF/ }));
 
     expect(await screen.findByTestId("shipping-history-detail")).toBeInTheDocument();
-    expect(screen.getAllByText("SHIP-req").length).toBeGreaterThan(0);
+    expect(screen.queryByText("SHIP-req")).not.toBeInTheDocument();
+    expect(screen.getAllByText("픽업 완료").length).toBeGreaterThan(0);
+  });
+
+  it("shows shipping management and history as the only shipping hub choices", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+
+    expect(container.querySelector('[data-shipping-hub-card="request"]')).toHaveTextContent("출하 관리");
+    expect(container.querySelector('[data-shipping-hub-card="history"]')).toHaveTextContent("출하 이력");
+    expect(container.querySelector('[data-shipping-hub-card="prep"]')).not.toBeInTheDocument();
   });
 
   it("does not expose request ids in request list or detail text", async () => {
@@ -764,22 +842,62 @@ describe("DesktopShippingView", () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-1";
     render(<DesktopShippingView onStatusChange={() => {}} />);
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-pickup-from-detail")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-prepare-cancel-from-detail")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-delete-request")).not.toBeInTheDocument();
   });
 
-  it("uses compact request detail summary instead of large metric cards", async () => {
+  it("uses the final PF as the request detail title and hides change-only BOM decoration", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({
+        request_id: "prepared-final",
+        status: "PREPARED",
+        base_pf_item_name: "Standard PF",
+        final_pf_item_name: "Custom PF",
+        final_pf_item_id: "pf-custom",
+        final_pa_item_name: "Custom PA",
+        bom_lines: [
+          ...request().bom_lines,
+          {
+            line_id: "excluded-1",
+            parent_stage: "PA",
+            child_item_id: "bracket-1",
+            item_name: "Bracket Kit",
+            mes_code: "R-BR",
+            process_type_code: "R",
+            quantity: 1,
+            unit: "EA",
+            included: false,
+            origin: "DEFAULT",
+          },
+          {
+            line_id: "custom-1",
+            parent_stage: "PA",
+            child_item_id: "carton-1",
+            item_name: "Carton Box",
+            mes_code: "R-BOX",
+            process_type_code: "R",
+            quantity: 1,
+            unit: "EA",
+            included: true,
+            origin: "CUSTOM",
+          },
+        ],
+      }),
+    ]);
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
-    await openRequestById(container, "req-1");
+    await openRequestById(container, "prepared-final");
 
-    const summary = await screen.findByTestId("shipping-request-detail-summary");
-    expect(summary).toHaveTextContent("기준 PF");
-    expect(summary).toHaveTextContent("최종 PA");
-    expect(summary).toHaveTextContent("최종 PF");
-    expect(screen.getByTestId("shipping-detail-actions")).toBeInTheDocument();
+    const detail = await screen.findByTestId("shipping-request-detail");
+    expect(detail).toHaveTextContent("Custom PF");
+    expect(screen.queryByTestId("shipping-request-detail-summary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bracket Kit")).not.toBeInTheDocument();
+    expect(screen.getByText("Carton Box")).toBeInTheDocument();
+    expect(screen.queryByText("추가됨")).not.toBeInTheDocument();
+    expect(screen.queryByText("제외됨")).not.toBeInTheDocument();
   });
 
   it("keeps request wizard tabs in the same header row and removes manual BOM buttons", async () => {
@@ -830,7 +948,7 @@ describe("DesktopShippingView", () => {
     const badge = screen.getByTestId("shipping-hub-count-request");
     expect(badge).toHaveTextContent(/\d+/);
     expect(badge.className).toContain("min-h-12");
-    expect(screen.getByText("요청 목록을 확인하고 BOM을 수정합니다.")).toBeInTheDocument();
+    expect(screen.getByText("요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다.")).toBeInTheDocument();
   });
 
   it("keeps wizard step labels on one line and blocks invalid next navigation", async () => {
@@ -891,6 +1009,27 @@ describe("DesktopShippingView", () => {
     fireEvent.click(screen.getByTestId("shipping-quantity-change"));
     expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("shipping-request-quantity")).toHaveFocus());
+  });
+
+  it("separates PA/PF match state labels from names and keeps footer quantity read-only", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+
+    const paSummary = await screen.findByTestId("shipping-final-pa-summary");
+    const pfSummary = await screen.findByTestId("shipping-final-pf-summary");
+    await waitFor(() => expect(paSummary).toHaveTextContent("기존 PA 재사용"));
+    expect(paSummary).toHaveTextContent("Standard PA");
+    expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
+    expect(pfSummary).toHaveTextContent("새 PF 이름 미입력");
+    expect(screen.getByTestId("shipping-wizard-action-bar")).toHaveTextContent("현재 출하 수량 1대");
+    expect(screen.getByTestId("shipping-wizard-action-bar")).toHaveTextContent("변경은 상단 수량 변경");
   });
 
   it("summarizes new or reused PA/PF names and item codes on the final step", async () => {

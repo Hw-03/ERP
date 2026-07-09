@@ -132,6 +132,75 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     assert clear_after_pickup.status_code == 422, clear_after_pickup.text
 
 
+def test_shipping_request_duplicate_custom_pa_name_returns_readable_korean_error(client, db_session, make_item, make_bom):
+    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    base_pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    duplicate_pa = make_item(name="UI TEST", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    base_pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    make_bom(base_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(duplicate_pa.item_id, pouch.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={
+            "base_pf_item_id": str(base_pf.item_id),
+            "requested_by_name": "shipping-user",
+            "custom_pa_name": "UI TEST",
+            "custom_pf_name": "UI TEST PF",
+            "bom_lines": [_line(af), _line(pouch)],
+        },
+    )
+
+    assert create.status_code == 422, create.text
+    assert create.json()["detail"]["message"] == "같은 이름의 PA 품목이 이미 있습니다: UI TEST"
+
+
+def test_shipping_request_update_can_reuse_its_generated_pa_pf_names(client, db_session, make_item, make_bom):
+    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    bracket = make_item(name="Bracket", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    base_pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    base_pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    make_bom(base_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={
+            "base_pf_item_id": str(base_pf.item_id),
+            "requested_by_name": "shipping-user",
+            "custom_pa_name": "UI TEST",
+            "custom_pf_name": "UI TEST",
+            "bom_lines": [_line(af), _line(pouch)],
+        },
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+    final_pa_id = create.json()["final_pa_item_id"]
+    final_pf_id = create.json()["final_pf_item_id"]
+
+    update = client.patch(
+        f"/api/shipping/requests/{request_id}",
+        json={
+            "custom_pa_name": "UI TEST",
+            "custom_pf_name": "UI TEST",
+            "bom_lines": [_line(af), _line(bracket)],
+        },
+    )
+
+    assert update.status_code == 200, update.text
+    assert update.json()["final_pa_item_id"] == final_pa_id
+    assert update.json()["final_pf_item_id"] == final_pf_id
+    assert {line["item_name"] for line in update.json()["bom_lines"] if line["parent_stage"] == "PA"} == {
+        "AF Main",
+        "Bracket",
+    }
+
+
 def test_component_change_api_runs_without_shipping_request(client, db_session, make_item, make_bom, make_location):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     cable = make_item(name="Cable", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)

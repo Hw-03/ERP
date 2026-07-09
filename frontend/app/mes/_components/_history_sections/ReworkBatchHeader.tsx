@@ -10,6 +10,8 @@ import {
   FlowBadge,
   FlowSummaryCell,
   HISTORY_CELL_TRANSITION,
+  HISTORY_MAIN_CELL_CLASS,
+  HISTORY_MAIN_ROW_CLASS,
   ItemCodeCell,
   SpacerCell,
   PeopleStatusCell,
@@ -75,7 +77,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       aria-pressed={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.red}` : "none",
@@ -83,7 +85,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       }}
     >
       <td
-        className={`whitespace-nowrap border-b ${padX} py-3 text-xs`}
+        className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-xs`}
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}
       >
         <div className="flex items-center justify-center gap-1.5">
@@ -92,12 +94,12 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         </div>
       </td>
       <td
-        className={`whitespace-nowrap border-b ${padX} py-3 text-center`}
+        className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`}
         style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
       >
         <FlowBadge type={parentLog.transaction_type} label={REWORK_LABEL} color={LEGACY_COLORS.red} />
       </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
@@ -105,13 +107,13 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <SpacerCell compact={compact} />
-      <td className="whitespace-nowrap border-b px-5 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-5 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-4 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <QuantityStockCell presentation={presentation} />
       </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>

@@ -37,6 +37,8 @@ const TX_ICON = {
  */
 export const HISTORY_CELL_TRANSITION =
   "padding 160ms cubic-bezier(0.4, 0, 0.2, 1), width 160ms cubic-bezier(0.4, 0, 0.2, 1)";
+export const HISTORY_MAIN_ROW_CLASS = "h-16";
+export const HISTORY_MAIN_CELL_CLASS = "border-b py-2 align-middle";
 
 export function FlowBadge({
   type,
@@ -70,9 +72,10 @@ export const TONE_COLOR: Record<MovementTone, string> = {
 
 export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
   // 변화량 pill 은 단건/묶음/경고 모두 같은 높이로 고정한다.
+  // 단일 pill 폭은 2개 pill(5rem + gap-1 + 5rem)과 맞춰 열의 리듬을 통일한다.
   const isSingle = summary.parts.length === 1 && !summary.warning;
   const pillClass = isSingle
-    ? "inline-flex h-6 min-w-[9.75rem] items-center justify-center rounded-full px-3 text-xs font-bold leading-none"
+    ? "inline-flex h-6 min-w-[10.25rem] items-center justify-center rounded-full px-3 text-xs font-bold leading-none"
     : "inline-flex h-6 min-w-[5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold leading-none";
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap">
@@ -119,17 +122,17 @@ const PRESENTATION_TONE_COLOR: Record<HistoryPresentationTone, string> = {
 
 export function StatusChipStrip({ presentation }: { presentation: HistoryRowPresentation }) {
   if (presentation.statusChips.length === 0) {
-    return <span className="min-h-4" aria-label="상태 없음" />;
+    return null;
   }
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex max-w-full flex-nowrap gap-1 overflow-hidden">
       {presentation.statusChips.map((chip) => {
         const color = PRESENTATION_TONE_COLOR[chip.tone];
         return (
           <span
             key={`${chip.label}-${chip.title ?? ""}`}
             title={chip.title}
-            className="inline-flex h-5 items-center rounded-full px-2 text-xs font-bold leading-none"
+            className="inline-flex h-5 min-w-0 shrink-0 items-center rounded-full px-2 text-xs font-bold leading-none"
             style={{
               background: `color-mix(in srgb, ${color} 14%, transparent)`,
               color: `color-mix(in srgb, ${color} 48%, ${LEGACY_COLORS.text})`,
@@ -159,14 +162,14 @@ export function TargetSummaryBlock({
     <div className="min-w-0">
       <div className="flex min-w-0 items-center gap-1.5">
         {icon}
-        <span className="line-clamp-2 min-w-0 break-words text-sm font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>
+        <span className="min-w-0 truncate text-sm font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>
           {titleOverride ?? presentation.target.title}
         </span>
       </div>
       {meta.length > 0 && (
-        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
           {meta.map((part) => (
-            <span key={part} className="font-semibold">
+            <span key={part} className="min-w-0 shrink truncate font-semibold">
               {part}
             </span>
           ))}
@@ -186,10 +189,10 @@ export function ItemCodeCell({
   dense?: boolean;
 }) {
   const padX = compact ? "px-2" : "px-3";
-  const py = dense ? "py-1.5" : "py-3";
+  const py = dense ? "py-1.5" : "py-2";
   return (
     <td
-      className={`whitespace-nowrap border-b ${padX} ${py} text-center text-xs font-semibold`}
+      className={`whitespace-nowrap ${dense ? `border-b ${py}` : HISTORY_MAIN_CELL_CLASS} ${padX} text-center text-xs font-semibold`}
       style={{ borderColor: LEGACY_COLORS.border, color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted, transition: HISTORY_CELL_TRANSITION }}
     >
       {code || "-"}
@@ -198,11 +201,11 @@ export function ItemCodeCell({
 }
 
 export function SpacerCell({ compact, dense = false }: { compact?: boolean; dense?: boolean }) {
-  const py = dense ? "py-1.5" : "py-3";
+  const py = dense ? "py-1.5" : "py-2";
   return (
     <td
       aria-hidden
-      className={`${compact ? "px-1" : "px-2"} ${py} border-b`}
+      className={`${compact ? "px-1" : "px-2"} ${dense ? `border-b ${py}` : HISTORY_MAIN_CELL_CLASS}`}
       style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
     />
   );
@@ -210,8 +213,8 @@ export function SpacerCell({ compact, dense = false }: { compact?: boolean; dens
 
 export function FlowSummaryCell({ presentation }: { presentation: HistoryRowPresentation }) {
   return (
-    <div className="flex flex-col items-center gap-1 text-xs leading-tight">
-      <span className="rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+    <div className="flex min-h-11 flex-col items-center justify-center gap-1 text-xs leading-tight">
+      <span className="max-w-[8.5rem] truncate rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
         {presentation.flow.label}
       </span>
       {presentation.flow.hint && (
@@ -230,10 +233,10 @@ export function QuantityStockCell({
   summary?: MovementSummary;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 leading-tight">
+    <div className="flex min-h-11 flex-col items-center justify-center gap-1 leading-tight">
       <MovementSummaryCell summary={summary ?? presentation.movement} />
       {presentation.stock && (
-        <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="max-w-full truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
           {presentation.stock.label}
         </span>
       )}
@@ -246,7 +249,7 @@ export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPre
   const requester = presentation.people.requester?.trim() || "-";
   const systemRequester = requester.startsWith("시스템 처리");
   return (
-    <div className="flex min-w-0 flex-col gap-2 leading-tight">
+    <div className="flex min-h-11 min-w-0 flex-col justify-center gap-1 leading-tight">
       <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
         {systemRequester ? requester : `요청 ${requester}`}
       </div>
@@ -451,23 +454,23 @@ export function BatchHeader({
       aria-pressed={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
         transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
-      <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.requested_at ?? first.created_at)}
         </div>
       </td>
-      <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
       </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
@@ -475,13 +478,13 @@ export function BatchHeader({
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <SpacerCell compact={compact} />
-      <td className="whitespace-nowrap border-b px-5 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-5 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-4 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <QuantityStockCell presentation={presentation} summary={summary} />
       </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
@@ -691,23 +694,23 @@ export function OpBatchHeader({
       aria-pressed={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
         transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
-      <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.requested_at ?? first.created_at)}
         </div>
       </td>
-      <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
       </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
@@ -715,13 +718,13 @@ export function OpBatchHeader({
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <SpacerCell compact={compact} />
-      <td className="whitespace-nowrap border-b px-5 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-5 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-4 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <QuantityStockCell presentation={presentation} summary={summary} />
       </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>

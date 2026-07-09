@@ -69,4 +69,54 @@ describe("IoBundleCart layout", () => {
     expect(container.querySelector("[data-keep-scroll].overflow-y-auto")).toBeInTheDocument();
     expect(container.querySelector("[data-keep-scroll].sg")).toBeInTheDocument();
   });
+
+  it("names the warehouse pull scope before the user clicks", () => {
+    const shortageBundle = {
+      ...bundle,
+      lines: [{ ...line, shortage: 2 }],
+    } satisfies IoBundle;
+
+    const { rerender } = render(
+      <IoBundleCart
+        bundles={[shortageBundle]}
+        subType="warehouse_to_dept"
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 0}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        canAdvance={false}
+        hasShortage
+        pullEnabled
+        pullCount={1}
+        onPullFromWarehouse={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "부족 1개 전체 가져오기" })).toBeInTheDocument();
+
+    rerender(
+      <IoBundleCart
+        bundles={[shortageBundle]}
+        subType="warehouse_to_dept"
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 0}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        canAdvance={false}
+        hasShortage
+        pullEnabled
+        pullSelected={new Set(["line-1"])}
+        pullCount={1}
+        onPullFromWarehouse={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "선택한 1개 가져오기" })).toBeInTheDocument();
+  });
 });

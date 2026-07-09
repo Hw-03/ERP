@@ -51,6 +51,14 @@ export function IoBundleCart({
   onPullFromWarehouse,
   pullCount,
 }: Props) {
+  const pullSelectedCount = pullSelected?.size ?? 0;
+  const pullButtonLabel =
+    pullSelectedCount > 0
+      ? `선택한 ${pullSelectedCount}개 가져오기`
+      : pullCount && pullCount > 0
+        ? `부족 ${pullCount}개 전체 가져오기`
+        : "부족 품목 가져오기";
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       {bundles.length === 0 ? (
@@ -112,7 +120,7 @@ export function IoBundleCart({
                 color: LEGACY_COLORS.red,
               }}
             >
-              창고에서 가져오기{pullCount && pullCount > 0 ? ` (${pullCount}개)` : ""}
+              {pullButtonLabel}
             </button>
           )}
           {onSaveDraft ? (

@@ -245,6 +245,18 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
           }}
           onSourceSelect={selectSource}
           onTargetSelect={selectTarget}
+          onSourceChange={() => {
+            setSourceId("");
+            setTargetId("");
+            setSourceQuery("");
+            setTargetQuery("");
+            clearPreviewState();
+          }}
+          onTargetChange={() => {
+            setTargetId("");
+            setTargetQuery("");
+            clearPreviewState();
+          }}
           onQuantity={(value) => {
             setQuantity(positiveInt(value));
             clearPreviewState();
@@ -355,6 +367,8 @@ function SelectionStep({
   onTargetQuery,
   onSourceSelect,
   onTargetSelect,
+  onSourceChange,
+  onTargetChange,
   onQuantity,
   onReset,
   onNext,
@@ -374,15 +388,21 @@ function SelectionStep({
   onTargetQuery: (value: string) => void;
   onSourceSelect: (item: Item) => void;
   onTargetSelect: (item: Item) => void;
+  onSourceChange: () => void;
+  onTargetChange: () => void;
   onQuantity: (value: string | number) => void;
   onReset: () => void;
   onNext: () => void;
 }) {
   const selectionHint = sourceOver
-    ? "소스 재고 초과"
-    : sourceItem && targetItem
-      ? "BOM 차이 자동 판정"
-      : "품목·수량 선택";
+    ? "소스 품목 재고가 부족합니다"
+    : !sourceItem
+      ? "소스 품목을 선택하세요"
+      : !targetItem
+        ? "대상 품목을 선택하세요"
+        : quantity < 1
+          ? "전환 수량을 확인하세요"
+          : "차이 확인으로 이동할 수 있습니다";
   const selectionHintClass = sourceOver ? "ic-red" : "icm";
 
   return (
@@ -412,6 +432,7 @@ function SelectionStep({
           placeholder="품명 · 품목 코드 검색"
           onQuery={onSourceQuery}
           onSelect={onSourceSelect}
+          onChangeSelected={onSourceChange}
         />
         <CandidatePanel
           kind="target"
@@ -421,9 +442,10 @@ function SelectionStep({
           candidates={targetCandidates}
           placeholder={sourceItem ? "품명 · 품목 코드 검색" : "소스 품목을 먼저 선택"}
           disabled={!sourceItem}
-          emptyText={sourceItem ? "대상 후보가 없습니다." : "소스 품목을 먼저 선택하세요."}
+          emptyText={sourceItem ? "대상 후보가 없습니다." : "소스 품목을 선택하세요"}
           onQuery={onTargetQuery}
           onSelect={onTargetSelect}
+          onChangeSelected={onTargetChange}
         />
       </div>
       <div className="grid shrink-0 gap-2 lg:grid-cols-[auto_minmax(0,1fr)_150px]">
@@ -431,7 +453,7 @@ function SelectionStep({
           선택 초기화
         </button>
         <div className="icf flex min-h-12 items-center rounded-[14px] border px-4 text-sm font-bold">
-          <span className={selectionHintClass}>{selectionHint}</span>
+          <span data-testid="item-conversion-selection-hint" className={selectionHintClass}>{selectionHint}</span>
         </div>
         <button
           type="button"
@@ -479,6 +501,7 @@ function CandidatePanel({
   emptyText = "검색 결과가 없습니다.",
   onQuery,
   onSelect,
+  onChangeSelected,
 }: {
   kind: PickerKind;
   title: string;
@@ -490,7 +513,52 @@ function CandidatePanel({
   emptyText?: string;
   onQuery: (value: string) => void;
   onSelect: (item: Item) => void;
+  onChangeSelected: () => void;
 }) {
+  if (selected) {
+    return (
+      <section className="icf flex min-h-0 flex-col gap-3 rounded-[18px] border p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="ict text-base font-black">{title}</div>
+          </div>
+          <button
+            type="button"
+            data-testid={`item-conversion-${kind}-change`}
+            onClick={onChangeSelected}
+            className="rounded-[10px] border px-3 py-1.5 text-xs font-black"
+          >
+            변경
+          </button>
+        </div>
+        <div data-testid={`item-conversion-${kind}-selected-card`} className="icpnl flex min-h-[220px] flex-1 flex-col justify-center rounded-[14px] border px-5 py-4">
+          <div className="ict text-lg font-black">{selected.item_name}</div>
+          <div className="icm mt-2 text-sm font-bold">
+            {selected.mes_code ?? "-"} · {formatQty(itemStock(selected), selected.unit)}
+          </div>
+          <div className="icm mt-1 text-xs font-bold">
+            {selected.process_type_code ?? "-"} · {selected.bom_completed_at ? "BOM" : "확인 필요"}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (disabled) {
+    return (
+      <section className="icf flex min-h-0 flex-col gap-3 rounded-[18px] border p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="ict text-base font-black">{title}</div>
+          </div>
+        </div>
+        <div data-testid={`item-conversion-${kind}-guide`} className="icpnl flex min-h-[160px] flex-1 items-center justify-center rounded-[14px] border px-5 py-4 text-center text-sm font-bold">
+          {emptyText}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="icf flex min-h-0 flex-col gap-3 rounded-[18px] border p-4">
       <div className="flex items-start justify-between gap-3">
@@ -516,14 +584,13 @@ function CandidatePanel({
         ) : (
           <div className="grid gap-2">
             {candidates.map((item) => {
-              const active = selected?.item_id === item.item_id;
               return (
                 <button
                   key={item.item_id}
                   type="button"
                   data-testid={`item-conversion-${kind}-option-${item.item_id}`}
                   onClick={() => onSelect(item)}
-                  className={`ico${active ? " ico-active" : ""}`}
+                  className="ico"
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-black">{item.item_name}</span>
