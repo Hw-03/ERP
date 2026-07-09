@@ -125,6 +125,7 @@ describe("fetcher / write helpers", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    window.localStorage.clear();
     vi.useRealTimers();
   });
 
@@ -206,6 +207,36 @@ describe("fetcher / write helpers", () => {
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("POST");
     expect(init.body).toBeUndefined();
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("fetcher attaches the current operator code as a log-only header", async () => {
+    window.localStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({ employee_id: "emp-1", name: "Kim", employee_code: "E22" }),
+    );
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await fetcher("/api/items");
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers["X-MES-Employee-Code"]).toBe("E22");
+    expect(headers["X-Employee-Code"]).toBeUndefined();
+  });
+
+  it("fetcher skips the log-only employee header before login", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await fetcher("/api/items");
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.headers).toBeUndefined();
   });
 

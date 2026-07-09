@@ -10,6 +10,8 @@
  *   - 새로 작성하는 코드는 `@/lib/api-core` 직접 사용을 권장.
  */
 
+import { readCurrentEmployeeCodeForLog } from "./operator-log-context";
+
 const SERVER_API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}`
   : "";
@@ -141,9 +143,14 @@ function operatorCredsHeaders(): Record<string, string> {
   return creds ? { "X-Employee-Code": creds.code, "X-Operator-Pin": creds.pin } : {};
 }
 
+function logActorHeaders(): Record<string, string> {
+  const code = readCurrentEmployeeCodeForLog();
+  return code ? { "X-MES-Employee-Code": code } : {};
+}
+
 /** admin PIN + operator 자격증명을 합친 인증 헤더. 둘 다 있으면 둘 다 주입. */
 function authHeaders(): Record<string, string> {
-  return { ...adminPinHeaders(), ...operatorCredsHeaders() };
+  return { ...adminPinHeaders(), ...operatorCredsHeaders(), ...logActorHeaders() };
 }
 
 /**

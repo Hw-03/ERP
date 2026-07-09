@@ -7,6 +7,8 @@
 
 import { useEffect, useState } from "react";
 import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import { sendClientEvent } from "@/lib/client-events";
+import { getClientEventSource } from "@/lib/operator-log-context";
 
 export interface Operator {
   employee_id: string;
@@ -92,11 +94,13 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
   if (bootId) window.localStorage.setItem(BOOT_KEY, bootId);
+  sendClientEvent({ event: "ui_login", source: getClientEventSource() });
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
 export function clearCurrentOperator(): void {
   if (typeof window === "undefined") return;
+  sendClientEvent({ event: "ui_logout", source: getClientEventSource() });
   window.localStorage.removeItem(OPERATOR_KEY);
   window.localStorage.removeItem(BOOT_KEY);
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));

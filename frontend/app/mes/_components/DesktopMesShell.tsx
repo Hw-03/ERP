@@ -27,6 +27,7 @@ import type { Item, ProductionCapacity } from "@/lib/api";
 import { warehouseMapApi } from "@/lib/api/warehouse-map";
 import { queryKeys } from "@/lib/queries/keys";
 import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
+import { sendClientEvent } from "@/lib/client-events";
 import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
@@ -132,6 +133,15 @@ function DesktopMesShellInner() {
     const closeWarehouseMapFullscreen = options?.closeWarehouseMapFullscreen ?? true;
     const updateTabState = () => {
       if (closeWarehouseMapFullscreen) setWarehouseMapFullscreen(false);
+      if (activeTab !== tab) {
+        sendClientEvent({
+          event: "ui_nav",
+          from: activeTab,
+          to: tab,
+          path: "/mes",
+          source: "desktop",
+        });
+      }
       setActiveTab(tab);
     };
 

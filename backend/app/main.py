@@ -36,6 +36,7 @@ from app.routers import (
     admin_audit,
     admin_audit_csv,
     bom,
+    client_events,
     codes,
     defects,
     departments,
@@ -274,6 +275,7 @@ app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
+app.include_router(client_events.router, prefix="/api", tags=["Client Events"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(shipping.router, prefix="/api/shipping", tags=["Shipping"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])

@@ -10608,6 +10608,42 @@
         ]
       }
     },
+    "/api/client-events": {
+      "post": {
+        "operationId": "client_event_api_client_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Payload",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Client Event",
+        "tags": [
+          "Client Events"
+        ]
+      }
+    },
     "/api/codes/generate": {
       "post": {
         "operationId": "generate_code_api_codes_generate_post",

@@ -1,11 +1,17 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clearCurrentOperator,
   consumeLoginNotificationPopupPending,
   markLoginNotificationPopupPending,
   readCurrentOperator,
   setCurrentOperator,
   type Operator,
 } from "../useCurrentOperator";
+import { sendClientEvent } from "@/lib/client-events";
+
+vi.mock("@/lib/client-events", () => ({
+  sendClientEvent: vi.fn(),
+}));
 
 const baseOperator: Operator = {
   employee_id: "emp-1",
@@ -26,6 +32,7 @@ describe("useCurrentOperator storage", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    vi.mocked(sendClientEvent).mockClear();
   });
 
   it("round-trips hidden sidebar tabs", () => {
@@ -50,5 +57,19 @@ describe("useCurrentOperator storage", () => {
     expect(consumeLoginNotificationPopupPending("emp-2")).toBe(false);
     expect(consumeLoginNotificationPopupPending("emp-1")).toBe(true);
     expect(consumeLoginNotificationPopupPending("emp-1")).toBe(false);
+  });
+
+  it("logs successful login and logout as best-effort client events", () => {
+    setCurrentOperator(baseOperator);
+    expect(sendClientEvent).toHaveBeenCalledWith({
+      event: "ui_login",
+      source: "desktop",
+    });
+
+    clearCurrentOperator();
+    expect(sendClientEvent).toHaveBeenLastCalledWith({
+      event: "ui_logout",
+      source: "desktop",
+    });
   });
 });

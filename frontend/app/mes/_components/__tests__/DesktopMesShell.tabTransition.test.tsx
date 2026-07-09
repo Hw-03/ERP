@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
 import type { DesktopTabId } from "../tabAccess";
+import { sendClientEvent } from "@/lib/client-events";
 
 const routerPush = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
@@ -13,6 +14,10 @@ const queryClientMock = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientMock,
+}));
+
+vi.mock("@/lib/client-events", () => ({
+  sendClientEvent: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -94,6 +99,7 @@ describe("DesktopMesShell tab transition", () => {
     routerPush.mockClear();
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
+    vi.mocked(sendClientEvent).mockClear();
     window.matchMedia = vi.fn().mockReturnValue({ matches: false });
   });
 
@@ -120,6 +126,13 @@ describe("DesktopMesShell tab transition", () => {
     expect(callbacks).toHaveLength(1);
     expect(screen.getByText("weekly content")).toBeInTheDocument();
     expect(routerPush).toHaveBeenCalledWith("?tab=weekly", { scroll: false });
+    expect(sendClientEvent).toHaveBeenCalledWith({
+      event: "ui_nav",
+      from: "history",
+      to: "weekly",
+      path: "/mes",
+      source: "desktop",
+    });
   });
 
   it("falls back to an immediate tab commit when motion is reduced", () => {

@@ -18,6 +18,39 @@ function errorToJson(error) {
   return { message: String(error) };
 }
 
+function stripAnsi(value) {
+  return String(value || "").replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function basenameFromLogPath(value) {
+  if (!value) return null;
+  const normalized = value.replace(/\\/g, "/");
+  return normalized.split("/").filter(Boolean).pop() || null;
+}
+
+function summarizeFrontendCompileError(text) {
+  const clean = stripAnsi(text);
+  if (!/(Failed to compile|Syntax Error|Compile Error|Module parse failed|Unexpected token)/i.test(clean)) {
+    return null;
+  }
+
+  const fileMatch = clean.match(/(?:\.\/|[A-Za-z]:[\\/])?[\w./\\-]+\.(?:tsx|ts|jsx|js)/);
+  const messageMatch =
+    clean.match(/(Syntax Error:[^\r\n]+)/i) ||
+    clean.match(/(Module parse failed[^\r\n]*)/i) ||
+    clean.match(/(Unexpected token[^\r\n]*)/i) ||
+    clean.match(/(Failed to compile[^\r\n.]*)/i);
+
+  return {
+    file: basenameFromLogPath(fileMatch?.[0]) || "-",
+    message: (messageMatch?.[1] || "Frontend compile error").trim(),
+  };
+}
+
+function quoteLogValue(value) {
+  return String(value || "-").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 function classifyExitReason({
   reason,
   code,
@@ -102,6 +135,16 @@ function createDiagnostics(rootDir) {
     fs.appendFileSync(logPath, `[${date.toISOString()}] ${message}${suffix}\n`, "utf8");
   }
 
+  function logFrontendCompileError(summary, date = new Date()) {
+    if (!summary) return;
+    ensureDirs();
+    fs.appendFileSync(
+      logPath,
+      `[${date.toISOString()}] FRONTEND_COMPILE_ERROR file=${quoteLogValue(summary.file)} message="${quoteLogValue(summary.message)}"\n`,
+      "utf8",
+    );
+  }
+
   function writeExitDump(input, date = new Date()) {
     ensureDirs();
     const dump = buildExitDump({ ...input, endTime: input.endTime || date });
@@ -113,6 +156,7 @@ function createDiagnostics(rootDir) {
 
   return {
     log,
+    logFrontendCompileError,
     writeExitDump,
     paths: {
       logsDir,
@@ -126,5 +170,6 @@ module.exports = {
   buildExitDump,
   classifyExitReason,
   createDiagnostics,
+  summarizeFrontendCompileError,
   timestampForFile,
 };

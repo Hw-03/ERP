@@ -6,7 +6,7 @@
 const { execFileSync, spawn } = require("child_process");
 const os = require("os");
 const path = require("path");
-const { createDiagnostics } = require("./dev-diagnostics");
+const { createDiagnostics, summarizeFrontendCompileError } = require("./dev-diagnostics");
 
 const C = {
   reset: "\x1b[0m",
@@ -48,6 +48,7 @@ const receivedSignals = [];
 const pipeErrors = [];
 let dumpWritten = false;
 let child = null;
+let lastCompileErrorKey = null;
 
 function recordPipeError(streamName, error) {
   const entry = {
@@ -141,7 +142,18 @@ function shouldSuppress(line) {
 function createLineFilter(stream) {
   let buf = "";
   return (chunk) => {
-    buf += chunk.toString();
+    const text = chunk.toString();
+    if (stream === process.stderr) {
+      const summary = summarizeFrontendCompileError(text);
+      if (summary) {
+        const key = `${summary.file}:${summary.message}`;
+        if (key !== lastCompileErrorKey) {
+          lastCompileErrorKey = key;
+          diagnostics.logFrontendCompileError(summary);
+        }
+      }
+    }
+    buf += text;
     const parts = buf.split("\n");
     buf = parts.pop();
     for (const line of parts) {

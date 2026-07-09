@@ -33,6 +33,10 @@ vi.mock("@/lib/queries/useNotificationsQuery", () => ({
   useNotificationsQuery: () => ({ data: state.notifications }),
 }));
 
+vi.mock("@/lib/client-events", () => ({
+  sendClientEvent: vi.fn(),
+}));
+
 vi.mock("../../login/useCurrentOperator", () => ({
   useCurrentOperator: () => state.operator,
 }));
@@ -53,11 +57,13 @@ vi.mock("../screens", () => ({
 }));
 
 import { MobileShell } from "../MobileShell";
+import { sendClientEvent } from "@/lib/client-events";
 
 describe("MobileShell layout", () => {
   beforeEach(() => {
     window.history.pushState({}, "", "/mes");
     state.notifications = { items: [], unread_count: 0 };
+    vi.mocked(sendClientEvent).mockClear();
   });
 
   it("does not render the old mobile top header controls", () => {
@@ -86,5 +92,20 @@ describe("MobileShell layout", () => {
     fireEvent.click(screen.getByRole("button", { name: "dashboard screen" }));
 
     expect(screen.queryByText("item added")).not.toBeInTheDocument();
+  });
+
+  it("logs top-level mobile tab changes once", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+
+    expect(sendClientEvent).toHaveBeenCalledWith({
+      event: "ui_nav",
+      from: "dashboard",
+      to: "warehouse",
+      path: "/mes",
+      source: "mobile",
+    });
+    expect(sendClientEvent).toHaveBeenCalledTimes(1);
   });
 });

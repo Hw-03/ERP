@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const {
   buildExitDump,
   createDiagnostics,
+  summarizeFrontendCompileError,
   timestampForFile,
 } = require("../../scripts/dev-diagnostics.js");
 
@@ -81,5 +82,27 @@ describe("dev server diagnostics", () => {
     expect(timestampForFile(new Date("2026-07-03T01:02:03.000Z"))).toBe(
       "20260703-010203",
     );
+  });
+
+  it("summarizes Next compile errors into dev-server.log events", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "mes-dev-diagnostics-"));
+    const diagnostics = createDiagnostics(root);
+    const summary = summarizeFrontendCompileError(`
+      Failed to compile.
+      ./app/mes/_components/DesktopHistoryView.tsx
+      Syntax Error: Unexpected token
+    `);
+
+    expect(summary).toEqual({
+      file: "DesktopHistoryView.tsx",
+      message: "Syntax Error: Unexpected token",
+    });
+
+    diagnostics.logFrontendCompileError(summary!, new Date("2026-07-03T01:02:03.000Z"));
+
+    const logText = fs.readFileSync(path.join(root, "logs", "dev-server.log"), "utf8");
+    expect(logText).toContain("FRONTEND_COMPILE_ERROR");
+    expect(logText).toContain("file=DesktopHistoryView.tsx");
+    expect(logText).toContain('message="Syntax Error: Unexpected token"');
   });
 });

@@ -26,6 +26,7 @@ import {
 import { getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
+import { sendClientEvent } from "@/lib/client-events";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { useNotificationsQuery } from "@/lib/queries/useNotificationsQuery";
@@ -170,6 +171,19 @@ export function MobileShell() {
 
   const handleStatusChange = useCallback((_msg: string) => {}, []);
 
+  const commitMobileTab = useCallback((target: MobileTabId) => {
+    if (target !== activeTab) {
+      sendClientEvent({
+        event: "ui_nav",
+        from: activeTab,
+        to: target,
+        path: "/mes",
+        source: "mobile",
+      });
+    }
+    setActiveTab(target);
+  }, [activeTab]);
+
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
     if (tab === "more") return mobileMoreHasVisibleEntries(operator);
@@ -189,10 +203,10 @@ export function MobileShell() {
   useEffect(() => {
     if (!operator) return;
     if (!canOpenMobileTab(activeTab)) {
-      setActiveTab(fallbackTab);
+      commitMobileTab(fallbackTab);
       if (activeTab === "defect") setDefectDeptFilter(null);
     }
-  }, [activeTab, canOpenMobileTab, fallbackTab, operator]);
+  }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, operator]);
 
   const handleTabChange = useCallback((tab: MobileTabId) => {
     const target = canOpenMobileTab(tab) ? tab : fallbackTab;
@@ -206,8 +220,8 @@ export function MobileShell() {
       setPendingNavTab(target);
       return;
     }
-    setActiveTab(target);
-  }, [activeTab, canOpenMobileTab, fallbackTab, warehouseDirty]);
+    commitMobileTab(target);
+  }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, warehouseDirty]);
 
   const handleNotificationNavigate = useCallback((tab: string, section: string | null) => {
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
@@ -223,8 +237,8 @@ export function MobileShell() {
     if (!canOpenMobileTab("warehouse")) return;
     setWarehousePreselected(item);
     setWarehouseIntent(intent ?? null);
-    setActiveTab("warehouse");
-  }, [canOpenMobileTab]);
+    commitMobileTab("warehouse");
+  }, [canOpenMobileTab, commitMobileTab]);
 
   const loadCapacity = useCallback(() => {
     void api.getProductionCapacity().then(setCapacityData).catch(() => {});
@@ -442,14 +456,14 @@ export function MobileShell() {
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
-          if (next) setActiveTab(canOpenMobileTab(next) ? next : fallbackTab);
+          if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
-          if (next) setActiveTab(canOpenMobileTab(next) ? next : fallbackTab);
+          if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
         }}
       />
 
