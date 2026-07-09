@@ -45,6 +45,8 @@ export function ReasonFormFields({
           placeholder="카테고리 선택"
           options={REASON_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
           size="md"
+          mobileSheet
+          sheetTitle="사유 카테고리"
           triggerStyle={{
             borderColor: categoryMissing ? LEGACY_COLORS.red : undefined,
           }}

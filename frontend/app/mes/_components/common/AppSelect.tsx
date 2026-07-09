@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 
 export interface AppSelectOption {
@@ -21,6 +22,8 @@ export interface AppSelectProps {
   triggerStyle?: React.CSSProperties;
   triggerAriaLabel?: string;
   name?: string;
+  mobileSheet?: boolean;
+  sheetTitle?: string;
 }
 
 const SIZE_TRIGGER: Record<NonNullable<AppSelectProps["size"]>, string> = {
@@ -39,10 +42,12 @@ function firstEnabledIndex(opts: AppSelectOption[]): number {
   for (let i = 0; i < opts.length; i++) if (!opts[i].disabled) return i;
   return -1;
 }
+
 function lastEnabledIndex(opts: AppSelectOption[]): number {
   for (let i = opts.length - 1; i >= 0; i--) if (!opts[i].disabled) return i;
   return -1;
 }
+
 function nextEnabledIndex(opts: AppSelectOption[], from: number, dir: 1 | -1): number {
   if (opts.length === 0) return -1;
   let i = from < 0 ? (dir === 1 ? -1 : opts.length) : from;
@@ -65,10 +70,14 @@ export function AppSelect({
   triggerStyle,
   triggerAriaLabel,
   name,
+  mobileSheet = false,
+  sheetTitle,
 }: AppSelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [useMobileSheet, setUseMobileSheet] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const reactId = useId();
@@ -83,13 +92,42 @@ export function AppSelect({
   useEffect(() => {
     if (!open) return;
     function onDocMouseDown(event: MouseEvent) {
-      if (!rootRef.current) return;
-      if (!rootRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !sheetRef.current?.contains(target) &&
+        !listRef.current?.contains(target)
+      ) {
         setOpen(false);
       }
     }
     window.addEventListener("mousedown", onDocMouseDown);
     return () => window.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!mobileSheet) {
+      setUseMobileSheet(false);
+      return;
+    }
+    function syncViewport() {
+      setUseMobileSheet(window.innerWidth <= 767);
+    }
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, [mobileSheet]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onWindowKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onWindowKeyDown);
+    return () => window.removeEventListener("keydown", onWindowKeyDown);
   }, [open]);
 
   useEffect(() => {
@@ -171,6 +209,114 @@ export function AppSelect({
 
   const triggerLabel = selected?.label ?? placeholder ?? "";
   const isPlaceholder = !selected && !!placeholder;
+  const accessibleLabel = triggerAriaLabel ?? sheetTitle;
+
+  const renderOptionItems = (commitOnMouseDown: boolean) => options.length === 0 ? (
+    <li className="px-3 py-2 text-xs" style={{ color: "var(--c-muted2)" }}>
+      옵션 없음
+    </li>
+  ) : (
+    options.map((opt, idx) => {
+      const isSelected = idx === selectedIndex;
+      const isActive = idx === activeIndex;
+      return (
+        <li
+          key={opt.value}
+          id={`${listId}-opt-${idx}`}
+          data-idx={idx}
+          role="option"
+          aria-selected={isSelected}
+          aria-disabled={opt.disabled || undefined}
+          onMouseEnter={() => !opt.disabled && setActiveIndex(idx)}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            if (commitOnMouseDown) commit(idx);
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            if (!commitOnMouseDown) commit(idx);
+          }}
+          className="mx-1 flex min-h-11 items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-bold transition-colors"
+          style={{
+            background: opt.disabled
+              ? "transparent"
+              : isActive
+                ? "color-mix(in srgb, var(--c-blue) 10%, transparent)"
+                : isSelected
+                  ? "color-mix(in srgb, var(--c-blue) 14%, transparent)"
+                  : "transparent",
+            color: opt.disabled
+              ? "var(--c-muted2)"
+              : isSelected
+                ? "var(--c-blue)"
+                : "var(--c-text)",
+            cursor: opt.disabled ? "not-allowed" : "pointer",
+          }}
+        >
+          <span className="min-w-0 flex-1 break-words">{opt.label}</span>
+          {isSelected && <Check className={`${SIZE_CHEVRON[size]} shrink-0`} />}
+        </li>
+      );
+    })
+  );
+
+  const sheetListbox = open && useMobileSheet && typeof document !== "undefined"
+    ? createPortal(
+      <div
+        data-testid="app-select-mobile-sheet"
+        className="fixed inset-0 z-[260] flex items-end px-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]"
+      >
+        <button
+          type="button"
+          aria-label="선택 닫기"
+          className="absolute inset-0 cursor-default"
+          style={{ background: "color-mix(in srgb, var(--c-text) 22%, transparent)" }}
+          onClick={() => setOpen(false)}
+        />
+        <div
+          ref={sheetRef}
+          className="relative z-[1] w-full rounded-[24px] border p-3"
+          style={{
+            background: "var(--c-popup-bg)",
+            borderColor: "var(--c-border)",
+            boxShadow: "var(--c-popup-shadow)",
+          }}
+        >
+          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full" style={{ background: "var(--c-border-strong)" }} />
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <h3 className="text-sm font-black" style={{ color: "var(--c-text)" }}>
+              {sheetTitle ?? "선택"}
+            </h3>
+            <button
+              type="button"
+              className="min-h-11 rounded-[12px] px-3 text-sm font-bold"
+              style={{ color: "var(--c-blue)" }}
+              onClick={() => setOpen(false)}
+            >
+              닫기
+            </button>
+          </div>
+          <ul
+            ref={listRef}
+            id={listId}
+            role="listbox"
+            aria-activedescendant={
+              activeIndex >= 0 ? `${listId}-opt-${activeIndex}` : undefined
+            }
+            className="scrollbar-hide max-h-[min(62dvh,420px)] overflow-y-auto rounded-[16px] border py-1.5"
+            style={{
+              background: "var(--c-s2)",
+              borderColor: "var(--c-border)",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            {renderOptionItems(false)}
+          </ul>
+        </div>
+      </div>,
+      document.body,
+    )
+    : null;
 
   return (
     <div ref={rootRef} className={`relative ${className ?? ""}`}>
@@ -185,7 +331,7 @@ export function AppSelect({
         aria-expanded={open}
         aria-controls={listId}
         aria-disabled={disabled || undefined}
-        aria-label={triggerAriaLabel}
+        aria-label={accessibleLabel}
         className={`flex w-full items-center justify-between gap-2 border font-semibold outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus-visible:border-[var(--c-blue)] ${SIZE_TRIGGER[size]} ${triggerClassName ?? ""}`}
         style={{
           background: "var(--c-s2)",
@@ -194,7 +340,7 @@ export function AppSelect({
           ...triggerStyle,
         }}
       >
-        <span className="truncate text-left">{triggerLabel || " "}</span>
+        <span className="truncate text-left">{triggerLabel || " "}</span>
         <ChevronDown
           className={`${SIZE_CHEVRON[size]} shrink-0 transition-transform duration-150`}
           style={{
@@ -206,7 +352,9 @@ export function AppSelect({
 
       {name && <input type="hidden" name={name} value={value} />}
 
-      {open && (
+      {sheetListbox}
+
+      {open && !useMobileSheet && (
         <ul
           ref={listRef}
           id={listId}
@@ -221,50 +369,7 @@ export function AppSelect({
             boxShadow: "var(--c-popup-shadow)",
           }}
         >
-          {options.length === 0 ? (
-            <li className="px-3 py-2 text-xs" style={{ color: "var(--c-muted2)" }}>
-              옵션 없음
-            </li>
-          ) : (
-            options.map((opt, idx) => {
-              const isSelected = idx === selectedIndex;
-              const isActive = idx === activeIndex;
-              return (
-                <li
-                  key={opt.value}
-                  id={`${listId}-opt-${idx}`}
-                  data-idx={idx}
-                  role="option"
-                  aria-selected={isSelected}
-                  aria-disabled={opt.disabled || undefined}
-                  onMouseEnter={() => !opt.disabled && setActiveIndex(idx)}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    commit(idx);
-                  }}
-                  className="mx-1 flex items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-bold transition-colors"
-                  style={{
-                    background: opt.disabled
-                      ? "transparent"
-                      : isActive
-                        ? "color-mix(in srgb, var(--c-blue) 10%, transparent)"
-                        : isSelected
-                          ? "color-mix(in srgb, var(--c-blue) 14%, transparent)"
-                          : "transparent",
-                    color: opt.disabled
-                      ? "var(--c-muted2)"
-                      : isSelected
-                        ? "var(--c-blue)"
-                        : "var(--c-text)",
-                    cursor: opt.disabled ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <span className="truncate">{opt.label}</span>
-                  {isSelected && <Check className={`${SIZE_CHEVRON[size]} shrink-0`} />}
-                </li>
-              );
-            })
-          )}
+          {renderOptionItems(true)}
         </ul>
       )}
     </div>

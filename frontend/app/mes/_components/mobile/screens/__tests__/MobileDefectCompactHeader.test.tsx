@@ -11,7 +11,24 @@ vi.mock("../../../_defect_hub/DisassembleTree", () => ({
 }));
 
 vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
-  DefectItemPicker: () => <div data-testid="defect-item-picker" />,
+  DefectItemPicker: ({ onAdd }: { onAdd?: (item: unknown) => void }) => (
+    <div data-testid="defect-item-picker">
+      <button
+        type="button"
+        onClick={() =>
+          onAdd?.({
+            item_id: "mock-item-1",
+            item_name: "Mock item",
+            mes_code: "MOCK-001",
+            quantity: 10,
+            has_bom: true,
+          })
+        }
+      >
+        mock add
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../../../_defect_hub/ReasonFormFields", () => ({
@@ -87,5 +104,24 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
     expect(screen.getByText("STEP 2 / 2")).toBeInTheDocument();
+  });
+
+  it("keeps the item picker usable after a cart item is added", () => {
+    render(
+      <MobileDefectCartFlow
+        mode="add"
+        items={[item]}
+        productModels={[]}
+        currentEmployee={employee}
+        onDone={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음|Next/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+
+    expect(screen.getByTestId("mobile-defect-picker-pane")).toHaveClass("min-h-[300px]", "flex-[1_1_300px]");
+    expect(screen.getByTestId("mobile-defect-cart-scroll")).toHaveClass("max-h-[min(26dvh,220px)]", "overflow-y-auto");
   });
 });
