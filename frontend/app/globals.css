@@ -469,12 +469,14 @@
 }
 
 .ic-conversion-progress {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.6rem;
+  padding-block: 0.48rem;
 }
 
 .ic-conversion-progress .iwpb {
   min-height: 52px;
-  padding: 0.58rem 0.8rem;
+  padding: 0.52rem 0.8rem;
 }
 
 .ic-conversion-progress .iwpl {
@@ -517,6 +519,10 @@
 
 .ic-blue-text {
   color: var(--c-blue);
+}
+
+.ic-green-text {
+  color: var(--c-green);
 }
 
 .ic-yellow-text {

@@ -3727,10 +3727,16 @@
             "type": "integer"
           },
           "requested_mode": {
-            "default": "BOM",
-            "pattern": "^(SPEC|BOM)$",
-            "title": "Requested Mode",
-            "type": "string"
+            "anyOf": [
+              {
+                "pattern": "^(SPEC|BOM)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Mode"
           },
           "source_item_id": {
             "format": "uuid",
@@ -14023,10 +14029,16 @@
             "name": "requested_mode",
             "required": false,
             "schema": {
-              "default": "BOM",
-              "pattern": "^(SPEC|BOM)$",
-              "title": "Requested Mode",
-              "type": "string"
+              "anyOf": [
+                {
+                  "pattern": "^(SPEC|BOM)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requested Mode"
             }
           }
         ],

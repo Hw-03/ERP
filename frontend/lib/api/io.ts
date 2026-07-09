@@ -23,7 +23,7 @@ export const ioApi = {
     qs.set("source_item_id", params.source_item_id);
     qs.set("target_item_id", params.target_item_id);
     qs.set("quantity", String(params.quantity));
-    qs.set("requested_mode", params.requested_mode);
+    if (params.requested_mode) qs.set("requested_mode", params.requested_mode);
     return fetcher<ItemConversionPreview>(
       toApiUrl(`/api/io/item-conversion-preview?${qs.toString()}`),
       opts?.signal,

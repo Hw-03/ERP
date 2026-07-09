@@ -54,6 +54,8 @@ type ConfirmAction =
   | { kind: "cancel"; request: ShippingRequest }
   | { kind: "delete"; request: ShippingRequest }
   | { kind: "pickup"; request: ShippingRequest };
+
+const EMPTY_STOCK_SHORTAGES: ShippingRequest["stock_shortages"] = [];
 const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
   REQUESTED: "요청",
   PREPARING: "준비 중",
@@ -397,6 +399,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
         setMatchResult(null);
         setRequestWizardStep(2);
         setView("requestWork");
+        void ensureItemsLoaded();
+        void ensurePfItemsLoaded();
       } else if (!loading) setView("requestList");
       return;
     }
@@ -1205,6 +1209,8 @@ function RequestSection(props: {
     PF: props.draftLines.filter((line) => line.parent_stage === "PF"),
   };
   const [pfQuery, setPfQuery] = useState("");
+  const requestQuantityRef = useRef<HTMLInputElement | null>(null);
+  const [focusRequestQuantity, setFocusRequestQuantity] = useState(false);
   const filteredPfItems = useMemo(() => filterItems(props.pfItems, pfQuery), [props.pfItems, pfQuery]);
   const locked = !props.canEditDraft;
   const requiresPaName = Boolean(props.matchResult?.requires_pa_name);
@@ -1212,12 +1218,6 @@ function RequestSection(props: {
   const reusingExistingPa = Boolean(props.matchResult?.matched_pa_item_id);
   const reusingExistingPf = Boolean(props.matchResult?.matched_pf_item_id);
   const missingNewBomNames = Boolean(props.matchResult && ((requiresPaName && !props.customPaName.trim()) || (requiresPfName && !props.customPfName.trim())));
-  const matchNoticeBody = props.matchResult
-    ? [
-        reusingExistingPa ? `기존 PA 재사용: ${props.matchResult.matched_pa_item_name ?? "-"}` : requiresPaName ? "새 PA 이름 필요" : null,
-        reusingExistingPf ? `기존 PF 재사용: ${props.matchResult.matched_pf_item_name ?? "-"}` : requiresPfName ? "새 PF 이름 필요" : null,
-      ].filter(Boolean).join(" / ")
-    : "BOM 변경 시 자동으로 동일 후보를 확인합니다.";
   const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
   const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
   const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || props.selectedRequest?.status === "PREPARED";
@@ -1239,17 +1239,13 @@ function RequestSection(props: {
       ? { label: "새 PF 생성 예정", name: props.customPfName.trim() || "새 PF 이름 미입력", code: generatedCodeNotice }
       : { label: "PF 변경 없음", name: "요청 BOM 기준", code: "-" };
   const bomChangedLines = props.draftLines.filter((line) => line.origin === "CUSTOM" || !line.included);
-  const bomSummaryRows = (bomChangedLines.length > 0 ? bomChangedLines : props.draftLines.filter((line) => line.included)).slice(0, 6);
-  const bomSummaryBody = bomSummaryRows.length > 0
-    ? bomSummaryRows.map((line) => {
-      const item = props.itemById.get(line.child_item_id);
-      const label = !line.included ? "제외" : line.origin === "CUSTOM" ? "추가" : "포함";
-      return `${label} ${item?.mes_code ?? "코드 없음"} ${item?.item_name ?? "품목 없음"} ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`;
-    }).join(" / ")
-    : "표시할 BOM 구성이 없습니다.";
   const requestQty = toPositiveInt(props.requestQuantity);
-  const shipmentName = basePfItem?.item_name ?? finalPfSummary.name ?? "출하 품목 미선택";
-  const shipmentCode = basePfItem ? itemCodeText(basePfItem) : finalPfSummary.code;
+  const shipmentName = reusingExistingPf || requiresPfName
+    ? finalPfSummary.name
+    : basePfItem?.item_name ?? finalPfSummary.name ?? "출하 품목 미선택";
+  const shipmentCode = reusingExistingPf || requiresPfName
+    ? finalPfSummary.code
+    : basePfItem ? itemCodeText(basePfItem) : finalPfSummary.code;
   const matchReady = Boolean(props.matchResult);
   const canFinalizeMatch = matchReady && !missingNewBomNames;
   const matchConclusionTitle = !matchReady
@@ -1258,10 +1254,10 @@ function RequestSection(props: {
       ? "출하 요청 가능"
       : "새 PA/PF 이름 필요";
   const matchConclusionBody = !matchReady
-    ? "변경된 BOM 기준으로 PA/PF 재사용 여부를 먼저 확인하세요."
+    ? "BOM 매칭을 확인하세요."
     : canFinalizeMatch
-      ? "현재 구성으로 다음 단계에서 요청 정보를 입력할 수 있습니다."
-      : "새로 생성될 PA/PF 품목명을 입력해야 다음 단계로 이동할 수 있습니다.";
+      ? "요청 정보 입력 가능"
+      : "새 PA/PF 이름 필요";
   const matchConclusionTone = !matchReady ? LEGACY_COLORS.yellow : canFinalizeMatch ? LEGACY_COLORS.green : LEGACY_COLORS.red;
   const bomChangedSummary = bomChangedLines.length > 0
     ? `${bomChangedLines.length}개 변경`
@@ -1287,6 +1283,18 @@ function RequestSection(props: {
     if (!canGoNext) return;
     props.onWizardStep(Math.min(5, props.wizardStep + 1) as RequestWizardStep);
   };
+  const goEditQuantity = () => {
+    if (props.pending !== null) return;
+    setFocusRequestQuantity(true);
+    props.onWizardStep(1);
+  };
+
+  useEffect(() => {
+    if (!focusRequestQuantity || props.wizardStep !== 1) return;
+    requestQuantityRef.current?.focus();
+    requestQuantityRef.current?.select();
+    setFocusRequestQuantity(false);
+  }, [focusRequestQuantity, props.wizardStep]);
 
   return (
     <div data-testid="shipping-request-work-shell" className={SHIPPING_FLEX_COL_CLASS}>
@@ -1300,7 +1308,7 @@ function RequestSection(props: {
               <PanelTitle
                 icon={PackageCheck}
                 title={props.editingId ? "출하 요청 수정" : "출하 요청 작성"}
-                subtitle="한 화면에 하나의 작업만 처리합니다."
+                subtitle="출하 요청"
               />
             </div>
           </div>
@@ -1331,13 +1339,13 @@ function RequestSection(props: {
 
         {locked && (
           <div className="mt-3">
-            <Notice tone={LEGACY_COLORS.yellow} title="수정 잠금" body="준비 완료 상태입니다. 준비 화면에서 준비 완료 취소 후 다시 수정할 수 있습니다." />
+            <Notice tone={LEGACY_COLORS.yellow} title="수정 잠금" body="준비 완료 상태입니다." />
           </div>
         )}
 
-        <div data-testid="shipping-work-area" className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {props.wizardStep === 1 && (
-            <WorkStep number={1} title="기준 PF 선택" body="출하할 최종 PF와 수량을 지정합니다." dataTestId="shipping-wizard-step-1" showHeader={false}>
+            <WorkStep number={1} title="기준 PF 선택" body="PF·수량" dataTestId="shipping-wizard-step-1" showHeader={false}>
               <div className="flex h-full min-h-0 flex-col gap-3">
                 <Field label="PF 검색">
                   <input
@@ -1351,9 +1359,10 @@ function RequestSection(props: {
                     placeholder="PF 코드/품명 검색"
                   />
                 </Field>
-                <div className="mx-auto w-full max-w-[220px]" data-testid="shipping-request-quantity-center">
+                <div className="mx-auto w-full max-w-[220px]">
                   <Field label="출하 수량">
                     <input
+                      ref={requestQuantityRef}
                       data-testid="shipping-request-quantity"
                       aria-label="출하 수량"
                       type="number"
@@ -1408,7 +1417,7 @@ function RequestSection(props: {
           )}
 
           {props.wizardStep === 2 && (
-            <WorkStep number={2} title="BOM 구성 조정" body="기본 구성은 제외하고, 필요한 품목과 동반 출하품은 검색해서 추가합니다." dataTestId="shipping-wizard-step-2">
+            <WorkStep number={2} title="BOM 구성 조정" body="BOM·동반품" dataTestId="shipping-wizard-step-2">
               {!props.basePfId ? (
                 <EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 PA 구성품과 PF 구성품을 나눠 보여줍니다." />
               ) : (
@@ -1422,7 +1431,7 @@ function RequestSection(props: {
           )}
 
           {props.wizardStep === 3 && (
-            <WorkStep number={3} title="BOM 매칭" body="변경된 구성과 PA/PF 재사용 여부를 확인합니다." dataTestId="shipping-wizard-step-3">
+            <WorkStep number={3} title="BOM 매칭" body="재사용 확인" dataTestId="shipping-wizard-step-3">
               <div className="grid min-h-0 content-start gap-3 overflow-y-auto pr-1">
                 <ShippingConclusionCard
                   tone={matchConclusionTone}
@@ -1430,19 +1439,25 @@ function RequestSection(props: {
                   body={matchConclusionBody}
                   metrics={[
                     { label: "BOM 상태", value: bomChangedSummary },
-                    { label: "PA", value: finalPaSummary.label },
-                    { label: "PF", value: finalPfSummary.label },
+                    { label: "PA", value: `${finalPaSummary.label} · ${finalPaSummary.name}` },
+                    { label: "PF", value: `${finalPfSummary.label} · ${finalPfSummary.name}` },
                   ]}
                 />
-                <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <div data-testid="shipping-bom-change-table">
-                    <BomChangeSummaryCard lines={bomChangedLines} itemById={props.itemById} fallbackBody={bomSummaryBody} />
-                  </div>
-                  <div className="grid content-start gap-3">
-                    <FinalItemCard label={finalPaSummary.label} name={finalPaSummary.name} code={finalPaSummary.code} tone={reusingExistingPa ? LEGACY_COLORS.green : requiresPaName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
-                    <FinalItemCard label={finalPfSummary.label} name={finalPfSummary.name} code={finalPfSummary.code} tone={reusingExistingPf ? LEGACY_COLORS.green : requiresPfName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
-                    <Notice tone={!props.matchResult ? LEGACY_COLORS.yellow : !requiresPaName && !requiresPfName ? LEGACY_COLORS.green : LEGACY_COLORS.yellow} title={!props.matchResult ? "재사용 확인 전" : "PA/PF 재사용 판단"} body={matchNoticeBody} />
-                  </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border px-4 py-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                  <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>출하 수량 {requestQty}대</span>
+                  <button
+                    type="button"
+                    data-testid="shipping-quantity-change"
+                    onClick={goEditQuantity}
+                    disabled={props.pending !== null}
+                    className="inline-flex min-h-9 items-center justify-center rounded-[10px] border px-3 py-1.5 text-xs font-black disabled:cursor-not-allowed disabled:opacity-45"
+                    style={{ background: tint(LEGACY_COLORS.blue, 12), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}
+                  >
+                    수량 변경
+                  </button>
+                </div>
+                <div data-testid="shipping-bom-change-table">
+                  <BomChangeSummaryCard lines={bomChangedLines} itemById={props.itemById} />
                 </div>
                 {(requiresPaName || requiresPfName) && (
                   <div className="grid gap-3 md:grid-cols-2">
@@ -1481,25 +1496,18 @@ function RequestSection(props: {
           )}
 
           {props.wizardStep === 5 && (
-            <WorkStep number={5} title="저장 및 전환" body="요청 내용을 확인한 뒤 출하 요청을 등록합니다." dataTestId="shipping-wizard-step-5">
+            <WorkStep number={5} title="저장 및 전환" body="최종 확인" dataTestId="shipping-wizard-step-5">
               <div data-testid="shipping-final-summary" className="grid min-h-0 content-start gap-3 overflow-y-auto pr-1">
                 <ShippingShipmentHero name={shipmentName} code={shipmentCode} quantity={requestQty} />
-                <div className="grid gap-3 md:grid-cols-3">
-                  <Metric label="PA 구성" value={grouped.PA.filter((line) => line.included).length + "개 포함"} />
-                  <Metric label="PF 구성" value={grouped.PF.filter((line) => line.included).length + "개 포함"} />
-                  <Metric label="동반 출하품" value={`${props.companionDraft.length}개`} />
-                </div>
+                <FinalRequirementReview
+                  paLines={grouped.PA.filter((line) => line.included)}
+                  pfLines={grouped.PF.filter((line) => line.included)}
+                  companionLines={props.companionDraft}
+                  itemById={props.itemById}
+                  requestQuantity={requestQty}
+                />
                 <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <div className="grid content-start gap-3">
-                    <FinalItemCard label={finalPaSummary.label} name={finalPaSummary.name} code={finalPaSummary.code} tone={reusingExistingPa ? LEGACY_COLORS.green : requiresPaName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
-                    <FinalItemCard label={finalPfSummary.label} name={finalPfSummary.name} code={finalPfSummary.code} tone={reusingExistingPf ? LEGACY_COLORS.green : requiresPfName ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2} />
-                  </div>
-                  <div data-testid="shipping-bom-change-table">
-                    <BomChangeSummaryCard lines={bomChangedLines} itemById={props.itemById} fallbackBody={bomSummaryBody} />
-                  </div>
-                </div>
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <CompanionFinalSummary lines={props.companionDraft} itemById={props.itemById} />
+                  <BomChangeSummaryCard lines={bomChangedLines} itemById={props.itemById} />
                   <ShippingRequestMemoCard requester={props.requestedBy || "로그인 사용자 없음"} notes={props.notes} finalActionIsUpdateOnly={finalActionIsUpdateOnly} />
                 </div>
               </div>
@@ -1553,7 +1561,8 @@ function PrepSection({
   const requestQty = selected?.request_quantity ?? 1;
   const paLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PA") ?? [];
   const pfLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PF") ?? [];
-  const stockShortages = selected?.stock_shortages ?? [];
+  const stockShortages = selected?.stock_shortages ?? EMPTY_STOCK_SHORTAGES;
+  const shortageByItemId = useMemo(() => new Map(stockShortages.map((line) => [line.item_id, line])), [stockShortages]);
 
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[360px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
@@ -1593,9 +1602,9 @@ function PrepSection({
             </div>
 
             <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
-              <PrepRequirementList title="PA 구성품" lines={paLines} requestQuantity={requestQty} tone={LEGACY_COLORS.green} />
-              <PrepRequirementList title="PF 구성품" lines={pfLines} requestQuantity={requestQty} tone={LEGACY_COLORS.blue} />
-              <CompanionPrepList lines={selected.companion_lines} />
+              <PrepRequirementList title="PA 구성품" lines={paLines} requestQuantity={requestQty} tone={LEGACY_COLORS.green} shortageByItemId={shortageByItemId} />
+              <PrepRequirementList title="PF 구성품" lines={pfLines} requestQuantity={requestQty} tone={LEGACY_COLORS.blue} shortageByItemId={shortageByItemId} />
+              <CompanionPrepList lines={selected.companion_lines} shortageByItemId={shortageByItemId} />
             </div>
 
             <div className="flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
@@ -1648,7 +1657,7 @@ function StockShortageNotice({ shortages }: { shortages: ShippingRequest["stock_
               </span>
             </span>
             <span className="shrink-0 text-xs font-black tabular-nums" style={{ color: LEGACY_COLORS.red }}>
-              필요 {line.required_quantity} · 가용 {line.available_quantity} · 부족 {line.shortage_quantity}
+              {line.shortage_quantity}개 부족
             </span>
           </div>
         ))}
@@ -1657,7 +1666,19 @@ function StockShortageNotice({ shortages }: { shortages: ShippingRequest["stock_
   );
 }
 
-function PrepRequirementList({ title, lines, requestQuantity, tone }: { title: string; lines: ShippingRequest["bom_lines"]; requestQuantity: number; tone: string }) {
+function PrepRequirementList({
+  title,
+  lines,
+  requestQuantity,
+  tone,
+  shortageByItemId,
+}: {
+  title: string;
+  lines: ShippingRequest["bom_lines"];
+  requestQuantity: number;
+  tone: string;
+  shortageByItemId: Map<string, ShippingRequest["stock_shortages"][number]>;
+}) {
   return (
     <div className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 text-sm font-black" style={{ color: tone }}>{title}</div>
@@ -1665,23 +1686,40 @@ function PrepRequirementList({ title, lines, requestQuantity, tone }: { title: s
         {lines.length === 0 ? (
           <div className={SHIPPING_EMPTY_BOX_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>구성품 없음</div>
         ) : (
-          lines.map((line) => (
-            <div key={line.line_id ?? `${line.parent_stage}-${line.child_item_id}`} className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                <span>{line.mes_code ?? "코드 없음"}</span>
-                <span>1대 기준 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</span>
-                <span>총 필요 {line.quantity * requestQuantity}{line.unit ? ` ${line.unit}` : ""}</span>
+          lines.map((line) => {
+            const shortage = shortageByItemId.get(line.child_item_id);
+            const unit = line.unit || "EA";
+            return (
+              <div
+                key={line.line_id ?? `${line.parent_stage}-${line.child_item_id}`}
+                data-testid={`shipping-prep-line-${line.child_item_id}`}
+                data-shortage={shortage ? "true" : "false"}
+                className={SHIPPING_CELL_CLASS}
+                style={{ background: shortage ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.bg, borderColor: shortage ? tint(LEGACY_COLORS.red, 42) : LEGACY_COLORS.border }}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-2">
+                  <div className="min-w-0 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+                  {shortage && (
+                    <span data-testid={`shipping-shortage-badge-${line.child_item_id}`} className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black tabular-nums" style={{ background: tint(LEGACY_COLORS.red, 14), color: LEGACY_COLORS.red }}>
+                      {shortage.shortage_quantity} {unit} 부족
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span>{line.mes_code ?? "코드 없음"}</span>
+                  <span>1대 기준 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</span>
+                  <span>총 필요 {line.quantity * requestQuantity}{line.unit ? ` ${line.unit}` : ""}</span>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
   );
 }
 
-function CompanionPrepList({ lines }: { lines: ShippingRequest["companion_lines"] }) {
+function CompanionPrepList({ lines, shortageByItemId }: { lines: ShippingRequest["companion_lines"]; shortageByItemId: Map<string, ShippingRequest["stock_shortages"][number]> }) {
   return (
     <div className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.purple }}>카톤·동반 출하품</div>
@@ -1689,12 +1727,29 @@ function CompanionPrepList({ lines }: { lines: ShippingRequest["companion_lines"
         {lines.length === 0 ? (
           <div className={SHIPPING_EMPTY_BOX_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>입력 없음</div>
         ) : (
-          lines.map((line) => (
-            <div key={line.line_id ?? line.item_id} className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
-              <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "코드 없음"} · 총 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</div>
-            </div>
-          ))
+          lines.map((line) => {
+            const shortage = shortageByItemId.get(line.item_id);
+            const unit = line.unit || "EA";
+            return (
+              <div
+                key={line.line_id ?? line.item_id}
+                data-testid={`shipping-prep-line-${line.item_id}`}
+                data-shortage={shortage ? "true" : "false"}
+                className={SHIPPING_CELL_CLASS}
+                style={{ background: shortage ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.bg, borderColor: shortage ? tint(LEGACY_COLORS.red, 42) : LEGACY_COLORS.border }}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-2">
+                  <div className="min-w-0 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</div>
+                  {shortage && (
+                    <span data-testid={`shipping-shortage-badge-${line.item_id}`} className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black tabular-nums" style={{ background: tint(LEGACY_COLORS.red, 14), color: LEGACY_COLORS.red }}>
+                      {shortage.shortage_quantity} {unit} 부족
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "코드 없음"} · 총 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</div>
+              </div>
+            );
+          })
         )}
       </div>
     </div>
@@ -1867,26 +1922,6 @@ function CompanionEditor({
             );
           })
         )}
-      </div>
-    </div>
-  );
-}
-
-function CompanionFinalSummary({ lines, itemById }: { lines: CompanionDraftLine[]; itemById: Map<string, Item> }) {
-  if (lines.length === 0) return <EmptyState title="동반 출하품 없음" body="카톤이나 추가 출하품이 필요하면 2단계에서 추가하세요." />;
-  return (
-    <div className="grid gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>카톤·동반 출하품</div>
-      <div className="grid gap-2 md:grid-cols-2">
-        {lines.map((line) => {
-          const item = itemById.get(line.item_id);
-          return (
-            <div key={line.key} className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
-              <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "코드 없음"} · 총 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -2259,11 +2294,9 @@ function ShippingConclusionCard({
 function BomChangeSummaryCard({
   lines,
   itemById,
-  fallbackBody,
 }: {
   lines: DraftLine[];
   itemById: Map<string, Item>;
-  fallbackBody: string;
 }) {
   if (lines.length === 0) {
     return <Notice tone={LEGACY_COLORS.green} title="BOM 변경 없음" body="기본 BOM 구성을 그대로 사용합니다." />;
@@ -2274,8 +2307,8 @@ function BomChangeSummaryCard({
         <div className="text-sm font-black" style={{ color: LEGACY_COLORS.yellow }}>변경된 구성품 {lines.length}개</div>
         <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>세부 목록</div>
       </div>
-      <div className="mt-2 grid gap-1.5">
-        {lines.slice(0, 6).map((line) => {
+      <div className="mt-2 grid max-h-[360px] gap-1.5 overflow-y-auto pr-1 xl:grid-cols-2">
+        {lines.map((line) => {
           const item = itemById.get(line.child_item_id);
           const label = !line.included ? "제외" : line.origin === "CUSTOM" ? "추가" : "포함";
           const tone = !line.included ? LEGACY_COLORS.red : line.origin === "CUSTOM" ? LEGACY_COLORS.cyan : LEGACY_COLORS.green;
@@ -2291,15 +2324,58 @@ function BomChangeSummaryCard({
           );
         })}
       </div>
-      {lines.length > 6 && <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>외 {lines.length - 6}개는 저장 후 상세에서 확인합니다.</div>}
-      <div className="sr-only">{fallbackBody}</div>
+    </section>
+  );
+}
+
+function FinalRequirementReview({
+  paLines,
+  pfLines,
+  companionLines,
+  itemById,
+  requestQuantity,
+}: {
+  paLines: DraftLine[];
+  pfLines: DraftLine[];
+  companionLines: CompanionDraftLine[];
+  itemById: Map<string, Item>;
+  requestQuantity: number;
+}) {
+  const rows = [
+    ...paLines.map((line) => ({ id: `pa-${line.child_item_id}`, testId: `shipping-final-line-pa-${line.child_item_id}`, label: "PA", tone: LEGACY_COLORS.green, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
+    ...pfLines.map((line) => ({ id: `pf-${line.child_item_id}`, testId: `shipping-final-line-pf-${line.child_item_id}`, label: "PF", tone: LEGACY_COLORS.blue, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
+    ...companionLines.map((line) => ({ id: `companion-${line.item_id}`, testId: `shipping-final-line-companion-${line.item_id}`, label: "동반", tone: LEGACY_COLORS.purple, itemId: line.item_id, quantity: line.quantity, unit: line.unit || "EA" })),
+  ];
+  return (
+    <section className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>BOM·동반 출하품</div>
+      <div className="grid max-h-[380px] content-start gap-2 overflow-y-auto pr-1 xl:grid-cols-2">
+        {rows.length === 0 ? (
+          <div className={SHIPPING_EMPTY_BOX_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>표시할 품목 없음</div>
+        ) : rows.map((row) => {
+          const item = itemById.get(row.itemId);
+          const companion = row.label === "동반";
+          return (
+            <div key={row.id} data-testid={row.testId} className={SHIPPING_CELL_CLASS} style={{ background: companion ? tint(LEGACY_COLORS.purple, 8) : LEGACY_COLORS.bg, borderColor: companion ? tint(LEGACY_COLORS.purple, 30) : LEGACY_COLORS.border }}>
+              <div className="flex min-w-0 items-start justify-between gap-2">
+                <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
+                <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(row.tone, 14), color: row.tone }}>{row.label}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <span>{item?.mes_code ?? "코드 없음"}</span>
+                <span>총 {row.quantity} {row.unit}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
 
 function ShippingShipmentHero({ name, code, quantity }: { name: string; code: string; quantity: number }) {
   return (
-    <section className="rounded-[16px] border px-4 py-3" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 34) }}>
+    <section data-testid="shipping-shipment-hero" className="rounded-[16px] border px-4 py-3" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 34) }}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>출하 품목</div>
@@ -2355,16 +2431,6 @@ function WorkStep({ number, title, body, children, dataTestId, showHeader = true
       )}
       <div className={SHIPPING_FLEX_COL_CLASS}>{children}</div>
     </section>
-  );
-}
-
-function FinalItemCard({ label, name, code, tone }: { label: string; name: string; code: string; tone: string }) {
-  return (
-    <div className="rounded-[14px] border px-4 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <div className="text-xs font-black" style={{ color: tone }}>{label}</div>
-      <div className="mt-1 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{name}</div>
-      <div className="mt-0.5 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{code}</div>
-    </div>
   );
 }
 

@@ -545,14 +545,28 @@ def prepare_stock_shortages(db: Session, req: ShippingRequest) -> list[dict]:
     except ShippingError:
         return []
 
-    checks: list[tuple[Item, int, str]] = [(final_pa, request_qty, PREPARE_PHASE)]
+    checks_by_item: dict[uuid.UUID, tuple[Item, int, str]] = {}
+
+    def add_check(item: Item, required: int, phase: str = PREPARE_PHASE) -> None:
+        if required <= 0:
+            return
+        existing = checks_by_item.get(item.item_id)
+        if existing is None:
+            checks_by_item[item.item_id] = (item, required, phase)
+        else:
+            checks_by_item[item.item_id] = (item, existing[1] + required, phase)
+
+    add_check(final_pa, request_qty)
+    for line in req.bom_lines:
+        if not line.included or line.child_item_id == final_pa.item_id:
+            continue
+        add_check(line.child_item, int(line.quantity or 0) * request_qty)
     for line in req.companion_lines:
         qty = int(line.quantity or 0)
-        if qty > 0:
-            checks.append((line.item, qty, PREPARE_PHASE))
+        add_check(line.item, qty)
 
     shortages: list[dict] = []
-    for item, required, phase in checks:
+    for item, required, phase in checks_by_item.values():
         dept, current, available = _item_location_available_after_shipping_allocations(db, item)
         allocated = max(current - available, 0)
         shortage = max(required - available, 0)
@@ -797,10 +811,11 @@ def _component_change_preview_core(
     target_pa_item_id: uuid.UUID,
     quantity: int,
     request_id: uuid.UUID | None = None,
-    requested_mode: str = "BOM",
+    requested_mode: str | None = "BOM",
 ) -> dict:
-    requested_mode = (requested_mode or "BOM").upper()
-    if requested_mode not in {"SPEC", "BOM"}:
+    explicit_requested_mode = requested_mode is not None and str(requested_mode).strip() != ""
+    normalized_requested_mode = str(requested_mode).upper() if explicit_requested_mode else None
+    if normalized_requested_mode is not None and normalized_requested_mode not in {"SPEC", "BOM"}:
         raise ShippingError("품목 전환 방식은 SPEC 또는 BOM이어야 합니다.")
     if quantity <= 0:
         raise ShippingError("변경 수량은 1 이상이어야 합니다.")
@@ -819,10 +834,11 @@ def _component_change_preview_core(
     source_dept, source_current, source_available = _item_location_available_after_shipping_allocations(db, source_pa)
     lines = _component_change_lines(db, source_pa, target_pa, quantity)
     resolved_mode = "BOM" if lines else "SPEC"
+    response_requested_mode = normalized_requested_mode or resolved_mode
     source_shortage = max(quantity - source_available, 0)
     line_shortages = [line for line in lines if line["shortage_quantity"] > 0]
     blocking_reason = None
-    if requested_mode == "SPEC" and resolved_mode == "BOM":
+    if normalized_requested_mode == "SPEC" and resolved_mode == "BOM":
         blocking_reason = "BOM 차이가 있어 사양 전환으로 처리할 수 없습니다. 구성 전환으로 진행하세요."
     elif source_shortage > 0:
         blocking_reason = "소스 품목 재고가 부족합니다."
@@ -830,7 +846,7 @@ def _component_change_preview_core(
         blocking_reason = "추가 구성품 재고가 부족합니다."
     return {
         "request_id": request_id,
-        "requested_mode": requested_mode,
+        "requested_mode": response_requested_mode,
         "resolved_mode": resolved_mode,
         "executable": blocking_reason is None,
         "blocking_reason": blocking_reason,
@@ -854,7 +870,7 @@ def component_change_preview(
     request_id: uuid.UUID,
     source_pa_item_id: uuid.UUID,
     quantity: int,
-    requested_mode: str = "BOM",
+    requested_mode: str | None = "BOM",
 ) -> dict:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
@@ -868,7 +884,7 @@ def component_change_preview_independent(
     source_pa_item_id: uuid.UUID,
     target_pa_item_id: uuid.UUID,
     quantity: int,
-    requested_mode: str = "BOM",
+    requested_mode: str | None = "BOM",
 ) -> dict:
     return _component_change_preview_core(db, source_pa_item_id, target_pa_item_id, quantity, requested_mode=requested_mode)
 
@@ -933,7 +949,7 @@ def _execute_component_change_core(
     quantity: int,
     memo: str | None = None,
     request_id: uuid.UUID | None = None,
-    requested_mode: str = "BOM",
+    requested_mode: str | None = "BOM",
 ) -> dict:
     preview = _component_change_preview_core(
         db,
@@ -1027,7 +1043,7 @@ def execute_component_change_independent(
     target_pa_item_id: uuid.UUID,
     quantity: int,
     memo: str | None = None,
-    requested_mode: str = "BOM",
+    requested_mode: str | None = "BOM",
 ) -> dict:
     return _execute_component_change_core(db, source_pa_item_id, target_pa_item_id, quantity, memo, requested_mode=requested_mode)
 
@@ -1037,7 +1053,7 @@ def execute_component_change(
     request_id: uuid.UUID,
     source_pa_item_id: uuid.UUID,
     quantity: int,
-    requested_mode: str = "BOM",
+    requested_mode: str | None = "BOM",
     memo: str | None = None,
 ) -> ShippingRequest:
     req = _get_request(db, request_id)

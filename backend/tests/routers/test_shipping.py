@@ -256,6 +256,68 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
     assert bom_body["lines"][0]["total_delta"] == 1
 
 
+def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
+    client, db_session, make_item, make_bom, make_location
+):
+    shared_leaf = make_item(name="Shared leaf", process_type_code="TR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    source_aa = make_item(name="Domestic AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    target_aa = make_item(name="Export AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    source_af = make_item(name="Domestic AF", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
+    target_af = make_item(name="Export AF", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    extra_leaf = make_item(name="Export-only leaf", process_type_code="TR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=6)
+    source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=7)
+    target_pa = make_item(name="Target PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=8)
+    make_bom(source_aa.item_id, shared_leaf.item_id, Decimal("2"))
+    make_bom(target_aa.item_id, shared_leaf.item_id, Decimal("2"))
+    make_bom(source_af.item_id, source_aa.item_id, Decimal("1"))
+    make_bom(target_af.item_id, target_aa.item_id, Decimal("1"))
+    make_bom(source_pa.item_id, source_af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, source_af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, extra_leaf.item_id, Decimal("1"))
+    make_location(source_af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(extra_leaf.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("1"))
+    db_session.commit()
+
+    spec_preview = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "source_item_id": str(source_af.item_id),
+            "target_item_id": str(target_af.item_id),
+            "quantity": 1,
+        },
+    )
+    assert spec_preview.status_code == 200, spec_preview.text
+    assert spec_preview.json()["requested_mode"] == "SPEC"
+    assert spec_preview.json()["resolved_mode"] == "SPEC"
+
+    bom_preview = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "source_item_id": str(source_pa.item_id),
+            "target_item_id": str(target_pa.item_id),
+            "quantity": 1,
+        },
+    )
+    assert bom_preview.status_code == 200, bom_preview.text
+    assert bom_preview.json()["requested_mode"] == "BOM"
+    assert bom_preview.json()["resolved_mode"] == "BOM"
+    assert [line["item_name"] for line in bom_preview.json()["lines"]] == ["Export-only leaf"]
+
+    executed = client.post(
+        "/api/io/item-conversion",
+        json={
+            "source_item_id": str(source_pa.item_id),
+            "target_item_id": str(target_pa.item_id),
+            "quantity": 1,
+            "memo": "auto BOM conversion",
+        },
+    )
+    assert executed.status_code == 200, executed.text
+    assert executed.json()["requested_mode"] == "BOM"
+    assert executed.json()["resolved_mode"] == "BOM"
+
+
 def test_item_conversion_api_blocks_wrong_level_and_spec_with_bom_difference(
     client, db_session, make_item, make_bom, make_location
 ):
@@ -487,13 +549,18 @@ def test_shipping_preparing_response_includes_stock_shortages(client, db_session
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     pa = make_item(name="Short PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    companion = make_item(name="Companion Box", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     db_session.commit()
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
+        json={
+            "base_pf_item_id": str(pf.item_id),
+            "requested_by_name": "shipping-user",
+            "companion_lines": [{"item_id": str(companion.item_id), "quantity": 2, "unit": "EA"}],
+        },
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -502,18 +569,10 @@ def test_shipping_preparing_response_includes_stock_shortages(client, db_session
 
     assert prep.status_code == 200, prep.text
     shortages = prep.json()["stock_shortages"]
-    assert shortages == [
-        {
-            "item_id": str(pa.item_id),
-            "item_name": "Short PA",
-            "mes_code": pa.mes_code,
-            "process_type_code": "PA",
-            "department": DepartmentEnum.SHIPPING.value,
-            "required_quantity": 1,
-            "current_quantity": 0,
-            "allocated_quantity": 0,
-            "available_quantity": 0,
-            "shortage_quantity": 1,
-            "phase": "PREPARE",
-        }
-    ]
+    assert {line["item_name"] for line in shortages} == {"Short PA", "AF Main", "Companion Box"}
+    assert {line["item_name"]: line["shortage_quantity"] for line in shortages} == {
+        "Short PA": 1,
+        "AF Main": 1,
+        "Companion Box": 2,
+    }
+    assert all(line["phase"] == "PREPARE" for line in shortages)

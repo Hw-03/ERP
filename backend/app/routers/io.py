@@ -66,7 +66,7 @@ def item_conversion_preview(
     source_item_id: uuid.UUID = Query(...),
     target_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
-    requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
+    requested_mode: Optional[str] = Query(None, pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
     try:

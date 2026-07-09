@@ -597,9 +597,10 @@ describe("DesktopShippingView", () => {
 
     const warning = await screen.findByTestId("shipping-stock-shortages");
     expect(warning).toHaveTextContent("Short PA");
-    expect(warning).toHaveTextContent("필요 2");
-    expect(warning).toHaveTextContent("가용 0");
-    expect(warning).toHaveTextContent("부족 2");
+    expect(screen.getByTestId("shipping-prep-line-pa-1")).toHaveAttribute("data-shortage", "true");
+    expect(screen.getByTestId("shipping-shortage-badge-pa-1")).toHaveTextContent("2 EA 부족");
+    expect(warning).not.toHaveTextContent("필요 2");
+    expect(warning).not.toHaveTextContent("가용 0");
   });
 
 
@@ -874,6 +875,24 @@ describe("DesktopShippingView", () => {
     expect(screen.getByLabelText("요청 메모")).toHaveClass("flex-1");
   });
 
+  it("moves quantity changes from later steps back to step one and focuses the quantity field", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    await addCompanionItem();
+    nextStep(container);
+
+    expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("shipping-quantity-change"));
+    expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("shipping-request-quantity")).toHaveFocus());
+  });
+
   it("summarizes new or reused PA/PF names and item codes on the final step", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -890,13 +909,14 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveTextContent("PF-001");
-    expect(finalSummary).toHaveTextContent("Standard PF");
-    expect(finalSummary).toHaveTextContent("기존 PA 재사용");
+    const hero = await screen.findByTestId("shipping-shipment-hero");
+    expect(hero).toHaveTextContent("Custom PF");
+    expect(hero).not.toHaveTextContent("Standard PF");
     expect(finalSummary).toHaveTextContent("Standard PA");
-    expect(finalSummary).toHaveTextContent("새 PF 생성 예정");
     expect(finalSummary).toHaveTextContent("Custom PF");
     expect(finalSummary).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
+    expect(screen.getByTestId("shipping-final-line-pa-acc-1")).toHaveTextContent("Cable Set");
+    expect(screen.getByTestId("shipping-final-line-companion-carton-1")).toHaveTextContent("Carton Box");
   });
 
   it("moves final save and send actions into the bottom action bar", async () => {
