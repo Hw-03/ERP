@@ -39,6 +39,20 @@ function Test-LineMatchesAny {
     return $false
 }
 
+function Write-WatchLine {
+    param(
+        [string] $Line,
+        [string[]] $ErrorPatterns
+    )
+
+    if (Test-LineMatchesAny -Line $Line -Patterns $ErrorPatterns) {
+        Write-Host "[FRONTEND ERROR] $Line" -ForegroundColor Red
+        return
+    }
+
+    Write-Host $Line
+}
+
 function Wait-LogPaths {
     param([string[]] $Paths)
 
@@ -57,7 +71,8 @@ function Watch-LogFiles {
     param(
         [string] $Title,
         [string[]] $Paths,
-        [string[]] $NoisePatterns
+        [string[]] $NoisePatterns,
+        [string[]] $ErrorPatterns = @()
     )
 
     $existingPaths = Wait-LogPaths $Paths
@@ -68,7 +83,8 @@ function Watch-LogFiles {
     Write-Host ""
 
     Get-Content -Path $existingPaths -Tail 80 -Wait -ErrorAction SilentlyContinue |
-        Where-Object { $_ -and -not (Test-LineMatchesAny -Line $_ -Patterns $NoisePatterns) }
+        Where-Object { $_ -and -not (Test-LineMatchesAny -Line $_ -Patterns $NoisePatterns) } |
+        ForEach-Object { Write-WatchLine -Line $_ -ErrorPatterns $ErrorPatterns }
 }
 
 $FrontendStdoutNoise = @()
@@ -78,9 +94,19 @@ $FrontendStderrNoise = @(
     "Use ``node --trace-warnings"
 )
 
+$FrontendErrorPatterns = @(
+    "Failed to compile",
+    "Syntax Error",
+    "Import trace for requested module",
+    "^\s*Error:",
+    "Unexpected eof",
+    "Expected a semicolon",
+    "declarations must be initialized"
+)
+
 if ($Service -eq "backend") {
     Watch-LogFiles "Backend logs" @($BackendOut, $BackendErr) @()
 }
 else {
-    Watch-LogFiles "Frontend logs" @($FrontendOut, $FrontendErr) ($FrontendStdoutNoise + $FrontendStderrNoise)
+    Watch-LogFiles "Frontend logs" @($FrontendOut, $FrontendErr) ($FrontendStdoutNoise + $FrontendStderrNoise) $FrontendErrorPatterns
 }

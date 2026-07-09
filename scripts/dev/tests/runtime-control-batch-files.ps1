@@ -85,6 +85,10 @@ Assert-ContentMatch $WatchServiceScript 'NO_COLOR' "watch-service.ps1 must filte
 Assert-ContentNotMatch $WatchServiceScript 'GET\s+/mes\s+200|GET /mes 200' "watch-service.ps1 must keep frontend success logs visible so the monitor resembles the old frontend log view."
 Assert-ContentMatch $WatchServiceScript 'FrontendStdoutNoise' "watch-service.ps1 must keep frontend stdout filtering separate from stderr filtering."
 Assert-ContentMatch $WatchServiceScript 'FrontendStderrNoise' "watch-service.ps1 must keep frontend stderr noise filtering separate from stdout logs."
+Assert-ContentMatch $WatchServiceScript 'FrontendErrorPatterns' "watch-service.ps1 must define frontend compile/error patterns for prominent monitor output."
+Assert-ContentMatch $WatchServiceScript 'FRONTEND ERROR' "watch-service.ps1 must visibly label frontend compile/error lines."
+Assert-ContentMatch $WatchServiceScript 'ForegroundColor\s+Red' "watch-service.ps1 must color frontend compile/error lines red when the host supports it."
+Assert-ContentMatch $WatchServiceScript 'Syntax Error|Failed to compile' "watch-service.ps1 must recognize common Next.js compile errors."
 Assert-ContentNotMatch $WatchServiceScript 'Clear-Host|SetCursorPosition|LastRender|Render-MonitorScreen' "watch-service.ps1 must not redraw a synthetic screen."
 Assert-ContentNotMatch $WatchServiceScript 'taskkill|Stop-Process|stop-backend|stop-frontend|stop-servers|start-backend|start-frontend' "watch-service.ps1 must not start or stop servers."
 
