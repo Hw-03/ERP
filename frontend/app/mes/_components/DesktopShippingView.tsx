@@ -1553,6 +1553,7 @@ function PrepSection({
   const requestQty = selected?.request_quantity ?? 1;
   const paLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PA") ?? [];
   const pfLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PF") ?? [];
+  const stockShortages = selected?.stock_shortages ?? [];
 
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[360px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
@@ -1582,6 +1583,8 @@ function PrepSection({
             </div>
 
             {selected.notes && <Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={selected.notes} />}
+
+            {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} />}
 
             <div className="grid gap-3 md:grid-cols-3">
               <Metric label="출하 수량" value={`${requestQty}대`} />
@@ -1613,6 +1616,43 @@ function PrepSection({
           </div>
         )}
       </Panel>
+    </div>
+  );
+}
+
+function StockShortageNotice({ shortages }: { shortages: ShippingRequest["stock_shortages"] }) {
+  return (
+    <div
+      data-testid="shipping-stock-shortages"
+      className="rounded-[14px] border p-3"
+      style={{
+        background: tint(LEGACY_COLORS.red, 10),
+        borderColor: tint(LEGACY_COLORS.red, 35),
+        color: LEGACY_COLORS.text,
+      }}
+    >
+      <div className="text-sm font-black" style={{ color: LEGACY_COLORS.red }}>
+        재고 부족
+      </div>
+      <div className="mt-2 grid gap-2">
+        {shortages.map((line) => (
+          <div
+            key={`${line.phase}-${line.item_id}`}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] px-3 py-2"
+            style={{ background: LEGACY_COLORS.bg }}
+          >
+            <span className="min-w-0">
+              <span className="block line-clamp-2 text-sm font-black leading-snug">{line.item_name}</span>
+              <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {line.mes_code ?? "-"} · {line.department ?? "-"}
+              </span>
+            </span>
+            <span className="shrink-0 text-xs font-black tabular-nums" style={{ color: LEGACY_COLORS.red }}>
+              필요 {line.required_quantity} · 가용 {line.available_quantity} · 부족 {line.shortage_quantity}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -658,6 +658,83 @@ def test_submit_dept_only_without_authority_waits(make_item, make_location, db_s
 # ──────────────────── execute_batch_after_dept_approval ────────────────────
 
 
+def test_mixed_process_manual_waits_for_department_approval_then_applies_all_lines(
+    make_item, make_location, db_session
+):
+    component = make_item(name="Mixed Component")
+    result_item = make_item(name="Mixed Result", process_type_code="AF")
+    manual_item = make_item(name="Mixed Manual")
+    make_location(component.item_id, department=ASSEMBLY, quantity=D("10"))
+    make_location(result_item.item_id, department=ASSEMBLY, quantity=D("0"))
+    make_location(manual_item.item_id, department=ASSEMBLY, quantity=D("0"))
+    requester = _make_employee(db_session, department_role="none")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        to_department=ASSEMBLY.value,
+        lines=[
+            {
+                "item_id": component.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY.value,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "bom_auto",
+            },
+            {
+                "item_id": result_item.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY.value,
+                "quantity": D("1"),
+                "origin": "direct",
+            },
+            {
+                "item_id": manual_item.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY.value,
+                "quantity": D("3"),
+                "origin": "manual",
+            },
+        ],
+    )
+
+    result = svc._execute_submission(db_session, requester=requester, batch=batch)
+
+    request = db_session.query(StockRequest).one()
+    assert result["stock_request_id"] == request.request_id
+    assert request.requires_department_approval is True
+    assert request.requires_warehouse_approval is False
+    assert len(request.lines) == 3
+    assert batch.status != "completed"
+    assert _prod_qty(db_session, component.item_id) == D("10")
+    assert _prod_qty(db_session, result_item.item_id) == D("0")
+    assert _prod_qty(db_session, manual_item.item_id) == D("0")
+    assert db_session.query(TransactionLog).count() == 0
+
+    approver = _make_employee(
+        db_session,
+        code="DISP02",
+        name="Approver",
+        department_role="primary",
+    )
+    request.department_approved_by_employee_id = approver.employee_id
+    request.department_approved_by_name = approver.name
+
+    svc.execute_batch_after_dept_approval(db_session, request=request, approver=approver)
+
+    assert batch.status == "completed"
+    assert _prod_qty(db_session, component.item_id) == D("8")
+    assert _prod_qty(db_session, result_item.item_id) == D("1")
+    assert _prod_qty(db_session, manual_item.item_id) == D("3")
+    assert db_session.query(TransactionLog).count() == 3
+
+
 def test_execute_batch_after_dept_approval_applies_inventory(
     make_item, make_location, db_session
 ):

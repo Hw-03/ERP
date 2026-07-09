@@ -162,6 +162,7 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
     events: [],
     transactions: [],
     allocations: [],
+    stock_shortages: [],
     transaction_count: 0,
     ...overrides,
   };
@@ -564,6 +565,41 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByTestId("shipping-clear-checklist")).not.toBeInTheDocument();
     expect(api.updateShippingChecklist).not.toHaveBeenCalled();
     expect(api.clearShippingChecklist).not.toHaveBeenCalled();
+  });
+
+  it("shows stock shortages in prep detail without hiding prep actions", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({
+        request_id: "prep-short-1",
+        status: "PREPARING",
+        stock_shortages: [
+          {
+            item_id: "pa-1",
+            item_name: "Short PA",
+            mes_code: "PA-001",
+            process_type_code: "PA",
+            department: "출하",
+            required_quantity: 2,
+            current_quantity: 0,
+            allocated_quantity: 0,
+            available_quantity: 0,
+            shortage_quantity: 2,
+            phase: "PREPARE",
+          },
+        ],
+      }),
+    ]);
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="prep"]')).toBeTruthy());
+    await openHubCard(container, "prep");
+    fireEvent.click(await screen.findByRole("button", { name: /Standard PF/ }));
+
+    const warning = await screen.findByTestId("shipping-stock-shortages");
+    expect(warning).toHaveTextContent("Short PA");
+    expect(warning).toHaveTextContent("필요 2");
+    expect(warning).toHaveTextContent("가용 0");
+    expect(warning).toHaveTextContent("부족 2");
   });
 
 

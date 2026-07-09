@@ -155,6 +155,20 @@ export interface ShippingAllocation {
   released_reason: string | null;
 }
 
+export interface ShippingStockShortage {
+  item_id: string;
+  item_name: string;
+  mes_code: string | null;
+  process_type_code: string | null;
+  department: string | null;
+  required_quantity: number;
+  current_quantity: number;
+  allocated_quantity: number;
+  available_quantity: number;
+  shortage_quantity: number;
+  phase: "PREPARE" | "PICKUP" | string;
+}
+
 export interface ShippingTransactionLog {
   log_id: string;
   item_id: string;
@@ -202,6 +216,7 @@ export interface ShippingRequest {
   events: ShippingEvent[];
   transactions: ShippingTransactionLog[];
   allocations: ShippingAllocation[];
+  stock_shortages: ShippingStockShortage[];
   transaction_count: number;
 }
 

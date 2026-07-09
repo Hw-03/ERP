@@ -32,6 +32,7 @@ from app.schemas.shipping import (
     ShippingRequestCreate,
     ShippingRequestResponse,
     ShippingRequestUpdate,
+    ShippingStockShortageResponse,
     ShippingTransactionLogResponse,
 )
 from app.services import shipping as shipping_svc
@@ -164,6 +165,10 @@ def _to_response(db: Session, req: ShippingRequest) -> ShippingRequestResponse:
                 released_reason=allocation.released_reason,
             )
             for allocation in req.allocations
+        ],
+        stock_shortages=[
+            ShippingStockShortageResponse(**shortage)
+            for shortage in shipping_svc.prepare_stock_shortages(db, req)
         ],
         transaction_count=len(tx_rows),
     )

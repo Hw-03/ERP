@@ -14,7 +14,7 @@ vi.mock("@/lib/api", () => ({
 
 import { api } from "@/lib/api";
 
-function request(): ShippingRequest {
+function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
   return {
     request_id: "req-1",
     status: "PREPARING",
@@ -49,6 +49,8 @@ function request(): ShippingRequest {
     ],
     events: [],
     transaction_count: 0,
+    stock_shortages: [],
+    ...overrides,
   };
 }
 
@@ -83,5 +85,28 @@ describe("MobileShippingScreen", () => {
     await waitFor(() => {
       expect(api.clearShippingChecklist).toHaveBeenCalledWith("req-1");
     });
+  });
+
+  it("uses the expandable two-line item name pattern for long shipping names", async () => {
+    const longName = "ADX6000FB 80kV 5mA 러시아 납품용 긴 품목명 옵션 포함";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({
+        base_pf_item_name: longName,
+        final_pa_item_id: "pa-1",
+        final_pa_item_name: `${longName} 최종 PA`,
+        final_pf_item_id: "pf-1",
+        final_pf_item_name: `${longName} 최종 PF`,
+      }),
+    ]);
+
+    render(<MobileShippingScreen />);
+
+    const nameButton = await screen.findByRole("button", { name: longName });
+    expect(nameButton).toHaveClass("line-clamp-2");
+
+    fireEvent.click(nameButton);
+
+    expect(nameButton).toHaveClass("whitespace-normal");
+    expect(nameButton).toHaveClass("break-words");
   });
 });

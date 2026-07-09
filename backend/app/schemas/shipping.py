@@ -197,6 +197,20 @@ class ShippingAllocationResponse(BaseModel):
     released_reason: Optional[str] = None
 
 
+class ShippingStockShortageResponse(BaseModel):
+    item_id: uuid.UUID
+    item_name: str
+    mes_code: Optional[str] = None
+    process_type_code: Optional[str] = None
+    department: Optional[str] = None
+    required_quantity: int
+    current_quantity: int
+    allocated_quantity: int
+    available_quantity: int
+    shortage_quantity: int
+    phase: str
+
+
 class ShippingTransactionLogResponse(BaseModel):
     log_id: uuid.UUID
     item_id: uuid.UUID
@@ -251,4 +265,5 @@ class ShippingRequestResponse(BaseModel):
     events: list[ShippingEventResponse] = []
     transactions: list[ShippingTransactionLogResponse] = []
     allocations: list[ShippingAllocationResponse] = []
+    stock_shortages: list[ShippingStockShortageResponse] = []
     transaction_count: int = 0

@@ -6817,6 +6817,14 @@
           "status": {
             "$ref": "#/components/schemas/ShippingRequestStatusEnum"
           },
+          "stock_shortages": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingStockShortageResponse"
+            },
+            "title": "Stock Shortages",
+            "type": "array"
+          },
           "transaction_count": {
             "default": 0,
             "title": "Transaction Count",
@@ -6948,6 +6956,88 @@
           }
         },
         "title": "ShippingRequestUpdate",
+        "type": "object"
+      },
+      "ShippingStockShortageResponse": {
+        "properties": {
+          "allocated_quantity": {
+            "title": "Allocated Quantity",
+            "type": "integer"
+          },
+          "available_quantity": {
+            "title": "Available Quantity",
+            "type": "integer"
+          },
+          "current_quantity": {
+            "title": "Current Quantity",
+            "type": "integer"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
+          "required_quantity": {
+            "title": "Required Quantity",
+            "type": "integer"
+          },
+          "shortage_quantity": {
+            "title": "Shortage Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "required_quantity",
+          "current_quantity",
+          "allocated_quantity",
+          "available_quantity",
+          "shortage_quantity",
+          "phase"
+        ],
+        "title": "ShippingStockShortageResponse",
         "type": "object"
       },
       "ShippingTransactionLogResponse": {

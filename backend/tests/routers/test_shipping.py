@@ -481,3 +481,39 @@ def test_shipping_prepare_complete_requires_process_department_stock(client, db_
     assert DepartmentEnum.SHIPPING.value in body
     assert "0" in body
     assert "1" in body
+
+
+def test_shipping_preparing_response_includes_stock_shortages(client, db_session, make_item, make_bom):
+    af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
+    pa = make_item(name="Short PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
+    pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+
+    prep = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
+
+    assert prep.status_code == 200, prep.text
+    shortages = prep.json()["stock_shortages"]
+    assert shortages == [
+        {
+            "item_id": str(pa.item_id),
+            "item_name": "Short PA",
+            "mes_code": pa.mes_code,
+            "process_type_code": "PA",
+            "department": DepartmentEnum.SHIPPING.value,
+            "required_quantity": 1,
+            "current_quantity": 0,
+            "allocated_quantity": 0,
+            "available_quantity": 0,
+            "shortage_quantity": 1,
+            "phase": "PREPARE",
+        }
+    ]

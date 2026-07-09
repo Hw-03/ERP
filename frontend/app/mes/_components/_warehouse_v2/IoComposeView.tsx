@@ -295,7 +295,11 @@ export function IoComposeView({
     }
     try {
       // 이미 같은 품목이 카트에 있으면 수량 합산, 없으면 append.
-      const existingIdx = state.bundles.findIndex((b) => b.source_item_id === item.item_id);
+      const existingIdx = state.bundles.findIndex(
+        (b) =>
+          b.source_item_id === item.item_id &&
+          (sourceKind === "manual" ? b.source_kind === "manual" : b.source_kind !== "manual"),
+      );
       const prevQty = existingIdx !== -1 ? state.bundles[existingIdx].quantity : 0;
       const response = await previewTarget({
         employeeId,

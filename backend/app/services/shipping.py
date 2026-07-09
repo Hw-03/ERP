@@ -536,6 +536,46 @@ def _require_item_location_available(db: Session, item: Item, required: int) -> 
     return dept
 
 
+def prepare_stock_shortages(db: Session, req: ShippingRequest) -> list[dict]:
+    if req.status != ShippingRequestStatusEnum.PREPARING:
+        return []
+    try:
+        request_qty = _request_quantity(req)
+        final_pa, _final_pf = _require_final_items(db, req)
+    except ShippingError:
+        return []
+
+    checks: list[tuple[Item, int, str]] = [(final_pa, request_qty, PREPARE_PHASE)]
+    for line in req.companion_lines:
+        qty = int(line.quantity or 0)
+        if qty > 0:
+            checks.append((line.item, qty, PREPARE_PHASE))
+
+    shortages: list[dict] = []
+    for item, required, phase in checks:
+        dept, current, available = _item_location_available_after_shipping_allocations(db, item)
+        allocated = max(current - available, 0)
+        shortage = max(required - available, 0)
+        if shortage <= 0:
+            continue
+        shortages.append(
+            {
+                "item_id": item.item_id,
+                "item_name": item.item_name,
+                "mes_code": item.mes_code,
+                "process_type_code": item.process_type_code,
+                "department": dept.value,
+                "required_quantity": required,
+                "current_quantity": current,
+                "allocated_quantity": allocated,
+                "available_quantity": available,
+                "shortage_quantity": shortage,
+                "phase": phase,
+            }
+        )
+    return shortages
+
+
 def _log_inventory_change(
     db: Session,
     *,

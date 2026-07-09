@@ -438,7 +438,7 @@ function ItemTable({
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
   const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
-  const singleTarget = isProcess ? deptIoSubType(deptIoDirection!, "single") : null;
+  const singleTarget = bomTarget;
   return (
     <>
       <table className="w-full border-collapse text-sm">
@@ -578,8 +578,8 @@ function ItemTable({
                   <span className="inline-flex gap-1">
                     {isProcess ? (() => {
                       const hasBom = bomParents.has(item.item_id);
-                      const bomLockedByMode = bundleSubType != null && bundleSubType !== bomTarget;
-                      const singleLockedByMode = bundleSubType != null && bundleSubType !== singleTarget;
+                      const bomLockedByMode = false;
+                      const singleLockedByMode = false;
                       const bomDisabled = busy || bomLockedByMode || !hasBom;
                       const singleDisabled = busy || singleLockedByMode;
                       const bomTitle = !hasBom

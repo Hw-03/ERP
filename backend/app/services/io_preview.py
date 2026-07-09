@@ -384,6 +384,7 @@ def _single_line(
     source_kind: str,
 ) -> list[dict]:
     """전개 없는 낱개 라인 하나(수동이면 origin=manual, 그 외 direct)."""
+    role = "result" if source_kind == MANUAL_SOURCE_KIND and sub_type in {"produce", "disassemble"} else "component"
     return [
         _routed_line(
             db,
@@ -393,6 +394,7 @@ def _single_line(
             from_department=from_department,
             to_department=to_department,
             origin="manual" if source_kind == MANUAL_SOURCE_KIND else "direct",
+            role=role,
         )
     ]
 
@@ -425,7 +427,17 @@ def _direct_item_bundle(
         "lines": [],
     }
 
-    if sub_type == "produce":
+    if source_kind == MANUAL_SOURCE_KIND:
+        bundle["lines"] = _single_line(
+            db,
+            item=item,
+            quantity=quantity,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+            source_kind=source_kind,
+        )
+    elif sub_type == "produce":
         bundle["lines"] = _produce_lines(
             db,
             item=item,

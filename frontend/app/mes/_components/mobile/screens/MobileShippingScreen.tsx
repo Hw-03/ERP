@@ -5,6 +5,7 @@ import { CheckCircle2, ClipboardList, History, PackageCheck, RotateCcw, Truck, X
 import { api, type ShippingRequest, type ShippingRequestStatus } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { ExpandableItemName } from "../../_warehouse_v2/ExpandableItemName";
 
 type MobileShippingTab = "requests" | "prep" | "history";
 
@@ -223,7 +224,12 @@ function CardHeader({ request }: { request: ShippingRequest }) {
   return (
     <div className="mw0 flex items-start justify-between gap-3">
       <div className="mw0 flex-1">
-        <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>{request.base_pf_item_name}</div>
+        <ExpandableItemName
+          name={request.base_pf_item_name}
+          className="block text-base font-black leading-tight"
+          collapsedClassName="line-clamp-2 whitespace-normal"
+          style={{ color: LEGACY_COLORS.text }}
+        />
         <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{request.base_pf_mes_code ?? "-"} · {request.requested_by_name ?? "요청자 없음"}</div>
       </div>
       <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(STATUS_TONE[request.status], 20), color: STATUS_TONE[request.status] }}>
@@ -237,7 +243,16 @@ function InfoPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="mw0 rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="text-[11px] font-black" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
-      <div className="truncate text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{value}</div>
+      {value === "-" ? (
+        <div className="text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{value}</div>
+      ) : (
+        <ExpandableItemName
+          name={value}
+          className="block text-xs font-black leading-tight"
+          collapsedClassName="line-clamp-2 whitespace-normal"
+          style={{ color: LEGACY_COLORS.text }}
+        />
+      )}
     </div>
   );
 }
