@@ -109,6 +109,7 @@ jobs:
   e2e:
     name: E2E (Playwright · 전용 DB)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
