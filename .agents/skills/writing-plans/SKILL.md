@@ -18,6 +18,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
 - (User preferences for plan location override this default)
 
+## GOAL Integration
+
+Every plan MUST include a single `**GOAL:**` line in the plan header. Write it as a concrete objective suitable for Codex `create_goal.objective`: outcome-focused, specific, and short enough to track until completion.
+
+Do not create a Codex goal while only drafting the plan. When the user approves the plan for execution (for example: "approve", "execute", "go", "do it", or choosing an execution option), create a Codex goal with the exact `GOAL` text before starting implementation if the environment supports goal tools. If goal tools are not available, explicitly carry the `GOAL` text into the execution handoff and progress updates.
+
 ## Scope Check
 
 If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
@@ -92,6 +98,8 @@ Write the assessment into the plan header (see below).
 # [Feature Name] Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**GOAL:** [Concrete Codex goal objective to create when the user approves execution]
 
 **Goal:** [One sentence describing what this builds]
 
@@ -196,6 +204,11 @@ After saving the plan, offer execution choice:
 **2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
 
 **Which approach?"**
+
+**If the user approves execution:**
+- Create a Codex goal first with the exact `GOAL` header text when goal tools are available.
+- Keep the goal active through implementation and verification.
+- Mark the goal complete only after the plan is implemented, verified, and no required work remains.
 
 **If Subagent-Driven chosen:**
 - **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development

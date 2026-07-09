@@ -91,6 +91,13 @@ For Codex plans, also include the recommended execution shape when useful: solo 
   - **Multi-line message safety:** Do not use the PowerShell here-string `@'...'@` when running `git commit` from a bash/sh shell — it corrupts the subject line. For multi-line messages use `git commit -F <file>` or multiple `-m` flags. In PowerShell, `@'...'@` is fine. **After every commit, verify the subject with `git log -1 --format=%s`.**
   - A local hook `.git/hooks/commit-msg` (not version-controlled; shared across sessions on this clone) enforces the `YYYY-MM-DD area: summary` format and rejects `@`-corrupted subjects. If it goes missing, recreate it.
 
+## Automations / Scheduling
+
+- Interpret all user-requested automation, reminder, follow-up, monitor, and scheduled task times in the user's local timezone: `Asia/Seoul` (`KST`, `UTC+09:00`), unless the user explicitly specifies another timezone.
+- Before creating or updating an automation, restate the exact scheduled time in absolute KST form, e.g. `2026-07-10 09:00 KST`.
+- When converting to RRULE or any scheduler format, preserve the intended KST wall-clock time. Do not silently convert relative times using UTC or the model/session timezone.
+- If the requested time is ambiguous, ask for clarification before creating or updating the automation.
+
 ## DB / Run / Verify
 
 - Starting the server must not change the DB.
