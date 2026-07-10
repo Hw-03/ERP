@@ -16,8 +16,18 @@ const isDevServer = process.env.NEXT_PUBLIC_MES_ENV === "dev";
 export const metadata: Metadata = {
   title: isDevServer ? "MES 개발" : "DEXCOWIN MES",
   description: "DEXCOWIN 재고 및 입출고 관리 시스템",
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>X</text></svg>",
+    icon: [
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icon-192x192.png", sizes: "192x192", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "DEXCOWIN MES",
+    statusBarStyle: "default",
   },
 };
 
@@ -29,6 +39,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
