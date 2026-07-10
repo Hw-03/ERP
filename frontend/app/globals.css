@@ -360,10 +360,6 @@
   width: 100%;
 }
 
-.ict::before {
-  content: "← ";
-}
-
 .ict {
   overflow: hidden;
   text-overflow: ellipsis;

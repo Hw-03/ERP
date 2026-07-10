@@ -1,4 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
@@ -104,6 +106,12 @@ beforeEach(() => {
 });
 
 describe("ItemConversionView", () => {
+  it("does not inject decorative arrows into conversion text", () => {
+    const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
+
+    expect(css).not.toMatch(/\.ict::before\s*\{[^}]*content:\s*["']\u2190/);
+  });
+
   it("shows item conversion as a warehouse work-type action", () => {
     const onItemConversion = vi.fn();
 
