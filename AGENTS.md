@@ -22,6 +22,7 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
   - Use `subagent-driven-development` when executing a plan with independent implementation tasks in the current session.
   - Keep final integration, verification, commit, push, and deployment decisions in the parent session.
   - Do not dispatch multiple implementation subagents to edit the same files or tightly coupled behavior at the same time.
+  - When spawning a subagent, select its GPT-5.6 model and reasoning level for the delegated task's complexity, risk, and expected depth. For all new parent and subagent work, use only GPT-5.6 Sol, Terra, or Luna; do not select any other model family.
 - Keep `.agents/skills/` aligned with the user's Claude/Codex skill set when intentionally updating shared workflows.
 
 ## Project Rules
@@ -55,14 +56,13 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
 
 After completing a plan, always place the recommended Codex model and reasoning level at the very top of the plan shown to the user. The model must be one of the Codex UI model choices, and the reasoning level must be written in Korean exactly as shown in the UI:
 
-> **추천 모델: GPT-5.5** - [한 줄 이유]
+> **추천 모델: GPT-5.6 Terra** - [한 줄 이유]
 > **추천 추론 수준: 높음** - [한 줄 이유]
 
 Available model choices:
-- **GPT-5.5**: Default for most DEXCOWIN MES development plans, especially when quality and broad context matter.
-- **GPT-5.4**: Use for normal development plans where speed matters more than maximum judgment.
-- **GPT-5.4-Mini**: Use for narrow, repetitive, or low-risk edits such as renames, search tasks, and minor text changes.
-- **GPT-5.3-Codex-Spark**: Use for very quick lightweight coding tasks or first-pass exploration when cost/speed matters most.
+- **GPT-5.6 Sol**: Use for the hardest plans: broad architecture, security/permission changes, state machines, risky data-flow changes, or complex cross-file judgment.
+- **GPT-5.6 Terra**: Default for most DEXCOWIN MES development plans: normal feature work, backend+frontend integration, bug fixes, moderate refactors, and test planning.
+- **GPT-5.6 Luna**: Use for narrow, quick, low-risk plans: document edits, file searches, simple renames, small UI text/style tweaks, and mechanical cleanup.
 
 Reasoning level choices:
 - **낮음**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
