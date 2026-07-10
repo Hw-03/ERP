@@ -7,7 +7,7 @@ import { Tooltip } from "./Tooltip";
  * TruncatedText — `@/lib/ui/TruncatedText`.
  *
  * Tailwind `truncate` 로 끝이 `…` 처리된 텍스트에 즉시(0ms) hover 툴팁 표시.
- * 실제로 잘렸을 때(`scrollWidth > clientWidth`)만 툴팁 노출 — 짧은 텍스트엔 노이즈 없음.
+ * 실제로 가로/세로가 잘렸을 때만 툴팁 노출 — 짧은 텍스트엔 노이즈 없음.
  *
  * 사용:
  *   <TruncatedText className="truncate text-sm font-semibold" style={{ color }}>
@@ -18,6 +18,7 @@ import { Tooltip } from "./Tooltip";
  * 보여주고 싶으면 `tooltipContent` 로 override.
  */
 interface Props {
+  id?: string;
   className?: string;
   style?: CSSProperties;
   /** 화면에 표시되는 내용 (truncate 됨). 단순 문자열 또는 ReactNode. */
@@ -27,15 +28,19 @@ interface Props {
   /** 기본 true — BOM 품목명은 길어 nowrap 시 화면 밖으로 나감. */
   multiline?: boolean;
   side?: "top" | "bottom";
+  /** 잘린 텍스트 trigger의 접근성 이름. 문자열 children이면 자동 추론한다. */
+  accessibilityLabel?: string;
 }
 
 export function TruncatedText({
+  id,
   className,
   style,
   children,
   tooltipContent,
   multiline = true,
   side = "top",
+  accessibilityLabel,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflow, setIsOverflow] = useState(false);
@@ -44,7 +49,7 @@ export function TruncatedText({
     const el = ref.current;
     if (!el) return;
     const check = () => {
-      setIsOverflow(el.scrollWidth > el.clientWidth);
+      setIsOverflow(el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight);
     };
     check();
     // ResizeObserver — 부모 폭 변경/창 리사이즈 시 재측정.
@@ -61,7 +66,11 @@ export function TruncatedText({
     return () => {
       ro?.disconnect();
     };
-  }, []);
+  }, [children]);
+
+  const inferredLabel = typeof children === "string" || typeof children === "number"
+    ? String(children)
+    : undefined;
 
   return (
     <Tooltip
@@ -70,6 +79,9 @@ export function TruncatedText({
       multiline={multiline}
       side={side}
       triggerClassName="relative block min-w-0 w-full"
+      triggerId={id}
+      triggerTabIndex={isOverflow ? 0 : undefined}
+      triggerAriaLabel={accessibilityLabel ?? inferredLabel}
     >
       <div ref={ref} className={className} style={style}>
         {children}

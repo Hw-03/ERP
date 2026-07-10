@@ -30,10 +30,15 @@ type Props = {
   selected: boolean;
   onSelect: () => void;
   compact?: boolean;
+  controlsId?: string;
 };
 
-export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelect, compact }: Props) {
+export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelect, compact, controlsId }: Props) {
   const padX = compact ? "px-2" : "px-4";
+  const targetPadX = compact ? "px-2" : "px-4";
+  const flowPadX = compact ? "px-2" : "px-5";
+  const quantityPadX = compact ? "px-2" : "px-4";
+  const statusPadX = compact ? "px-2" : "px-4";
   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
   const childCount = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE").length;
   const qty = Math.abs(parentLog.quantity_change);
@@ -68,13 +73,16 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
 
   return (
     <tr
+      data-history-main-row="true"
       onClick={onSelect}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); }
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
       }}
       tabIndex={0}
-      role="button"
-      aria-pressed={selected}
+      aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
@@ -89,7 +97,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}
       >
         <div className="flex items-center justify-center gap-1.5">
-          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
+          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} controlsId={controlsId} />
           {formatHistoryDate(parentLog.created_at)}
         </div>
       </td>
@@ -97,9 +105,9 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`}
         style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
       >
-        <FlowBadge type={parentLog.transaction_type} label={REWORK_LABEL} color={LEGACY_COLORS.red} />
+        <FlowBadge type={parentLog.transaction_type} label={REWORK_LABEL} color={LEGACY_COLORS.red} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
@@ -107,13 +115,13 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <SpacerCell compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-5 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-4 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} />
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>

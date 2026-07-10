@@ -29,22 +29,31 @@ export function HistoryStatsBar({
   loading,
   periodLabel,
 }: HistoryStatsBarProps) {
+  const countsMatch = currentCount != null && baseline?.total != null && currentCount === baseline.total;
   return (
     <section className="card" style={{ paddingTop: 16, paddingBottom: 16 }}>
       {/* 정직 카운트 */}
       <div className="mb-3 flex flex-wrap items-baseline gap-2">
-        <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {periodLabel}
-        </span>
-        <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>
-          목록 조건
-        </span>
-        <span className="text-3xl font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
-          {NUM(loading, currentCount)}건
-        </span>
-        <span className="text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          기간 전체 {NUM(loading, baseline?.total)}건
-        </span>
+        {countsMatch ? (
+          <span className="text-3xl font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
+            {periodLabel} {NUM(loading, currentCount)}건
+          </span>
+        ) : (
+          <>
+            <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+              {periodLabel}
+            </span>
+            <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>
+              목록 조건
+            </span>
+            <span className="text-3xl font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
+              {NUM(loading, currentCount)}건
+            </span>
+            <span className="text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              전체 {NUM(loading, baseline?.total)}건
+            </span>
+          </>
+        )}
       </div>
 
       {/* 3박스 — 건수 표시 전용 */}

@@ -36,6 +36,8 @@ export interface HistoryTargetPresentation {
   title: string;
   code: string | null;
   meta: string[];
+  sourceTitle?: string;
+  sourceCode?: string | null;
 }
 
 export interface HistoryFlowPresentation {
@@ -93,6 +95,12 @@ export interface ReferenceBatchPresentation {
   targetCode: string | null;
   targetMeta: string[];
   movement: MovementSummary;
+  sourceTarget?: {
+    sourceTitle: string;
+    sourceCode: string | null;
+    targetTitle: string;
+    targetCode: string | null;
+  };
 }
 
 export interface ReferenceBatchLinePresentation {
@@ -150,7 +158,7 @@ function getLocationFlowLabel(logs: TransactionLog[], fallback: string | null): 
       .filter((dept): dept is string => Boolean(dept)),
   );
   if (departments.size === 1) return Array.from(departments)[0];
-  if (departments.size > 1) return "여러 위치";
+  if (departments.size > 1) return fallback;
   return fallback;
 }
 
@@ -218,17 +226,45 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
       : shipment ? "출하" : outbound ? "출고" : "세부";
   const movementTone = shipment || outbound ? "danger" : "muted";
   const shipmentTarget = shipment ? getShippingTarget(logs, phase) : null;
+  const sourceTarget = isComponentChangePhase(phase)
+    ? getComponentChangeSourceTarget(logs)
+    : undefined;
 
   return {
     kind,
     phase,
     operationLabel,
-    flowLabel,
+    flowLabel: sourceTarget ? getComponentChangeFlowLabel(logs) : flowLabel,
     targetTitle: shipmentTarget?.title ?? `${titlePrefix} ${logs.length}건`,
     targetCode: shipmentTarget?.code ?? (homogeneous ? first.mes_code : null),
     targetMeta: [],
     movement: summarizeReferenceLogs(logs, movementVerb, movementTone),
+    sourceTarget,
   };
+}
+
+function getComponentChangeSourceTarget(logs: TransactionLog[]): ReferenceBatchPresentation["sourceTarget"] {
+  const source = logs.find((log) => getComponentChangeLineLabel(log)?.label === "기존품 차감")
+    ?? logs.find((log) => log.transaction_type === "BACKFLUSH" && log.quantity_change < 0);
+  const target = logs.find((log) => getComponentChangeLineLabel(log)?.label === "변경품 입고")
+    ?? logs.find((log) => (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") && log.quantity_change > 0);
+
+  if (!source || !target) return undefined;
+  return {
+    sourceTitle: source.item_name,
+    sourceCode: source.mes_code,
+    targetTitle: target.item_name,
+    targetCode: target.mes_code,
+  };
+}
+
+function getComponentChangeFlowLabel(logs: TransactionLog[]): string {
+  const hasInbound = logs.some((log) => log.quantity_change > 0);
+  const hasOutbound = logs.some((log) => log.quantity_change < 0);
+  if (hasInbound && hasOutbound) return "완제품 입고 · 부품 차감";
+  if (hasInbound) return "완제품 입고";
+  if (hasOutbound) return "부품 차감";
+  return "품목 전환";
 }
 
 function getShippingTarget(logs: TransactionLog[], phase?: string | null): { title: string; code: string | null } | null {
@@ -364,8 +400,13 @@ function isSystemActorName(name: string | null | undefined): boolean {
   return ["구성품 변경", "자동 처리", "시스템", "SYSTEM"].includes(normalized.toUpperCase() === "SYSTEM" ? "SYSTEM" : normalized);
 }
 
+function isItemConversionLog(log: TransactionLog): boolean {
+  return Boolean(log.reference_no?.startsWith("ITEM-CONV-"));
+}
+
 function isAutomaticLog(log: TransactionLog, batch?: IoBatch | null): boolean {
   if (batch?.requires_approval === false && !batch.approver_name) return true;
+  if (isItemConversionLog(log)) return true;
   return Boolean(log.shipping_phase && isSystemActorName(log.produced_by));
 }
 
@@ -373,6 +414,9 @@ function getRequesterPresentation(log: TransactionLog, batch?: IoBatch | null): 
   const batchRequester = batch?.requester_name?.trim();
   if (batchRequester) return batchRequester;
   const actor = getHistoryActor(log).trim();
+  if (isItemConversionLog(log) && (actor === "-" || isSystemActorName(actor))) {
+    return "요청자 미기록";
+  }
   if (isSystemActorName(actor)) return `시스템 처리 · ${actor}`;
   return actor || "-";
 }
@@ -465,8 +509,14 @@ function getStockScopeLabel(log: TransactionLog): string {
     case "TRANSFER_TO_PROD":
     case "SHIP":
     case "RECEIVE":
-    case "BACKFLUSH":
       return "창고";
+    case "BACKFLUSH": {
+      const location = log.inventory_effect
+        ?.map((cell) => cell.department?.trim())
+        .find((department): department is string => Boolean(department))
+        ?? log.department?.trim();
+      return location ? `${location} 재고` : "조립 재고";
+    }
     case "TRANSFER_DEPT":
     case "PRODUCE":
     case "DISASSEMBLE":

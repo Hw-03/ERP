@@ -1,34 +1,88 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { toInventoryEffectRows } from "../historyInventoryEffect";
 
 describe("toInventoryEffectRows", () => {
-  it("formats warehouse, production, and defective cell deltas", () => {
-    const rows = toInventoryEffectRows([
-      { scope: "warehouse", delta: -3 },
-      { scope: "location", department: "조립", status: "PRODUCTION", delta: 3 },
-      { scope: "location", department: "조립", status: "DEFECTIVE", delta: 1 },
-    ]);
+  it("keeps item, unit, and location identity on canonical non-zero effects", () => {
+    const rows = toInventoryEffectRows(
+      [
+        { scope: "warehouse", delta: -3 },
+        {
+          scope: "location",
+          location_id: "location-assembly-production",
+          department: "조립",
+          status: "PRODUCTION",
+          delta: 3,
+        },
+      ],
+      { itemId: "item-a", itemName: "완제품 A", unit: "EA" },
+    );
 
     expect(rows).toEqual([
-      { key: "warehouse::", label: "창고", delta: -3, deltaLabel: "-3" },
-      { key: "location:조립:PRODUCTION", label: "조립 생산", delta: 3, deltaLabel: "+3" },
-      { key: "location:조립:DEFECTIVE", label: "조립 불량", delta: 1, deltaLabel: "+1" },
+      {
+        key: "item-a:EA:warehouse::::",
+        scope: "warehouse",
+        itemId: "item-a",
+        itemName: "완제품 A",
+        unit: "EA",
+        locationId: null,
+        boxId: null,
+        department: null,
+        status: null,
+        label: "창고",
+        delta: -3,
+        deltaLabel: "-3",
+      },
+      {
+        key: "item-a:EA:location:location-assembly-production:조립:PRODUCTION:",
+        scope: "location",
+        itemId: "item-a",
+        itemName: "완제품 A",
+        unit: "EA",
+        locationId: "location-assembly-production",
+        boxId: null,
+        department: "조립",
+        status: "PRODUCTION",
+        label: "조립 생산",
+        delta: 3,
+        deltaLabel: "+3",
+      },
     ]);
   });
 
-  it("formats box-tracking inventory effects with an operator-facing label", () => {
-    const rows = toInventoryEffectRows([
-      { scope: "warehouse_box", box_id: "box-1", delta: -2 },
-    ]);
+  it("keeps warehouse box ids distinct", () => {
+    const rows = toInventoryEffectRows(
+      [
+        { scope: "warehouse_box", box_id: "box-1", delta: -2 },
+        { scope: "warehouse_box", box_id: "box-2", delta: -1 },
+      ],
+      { itemId: "item-a", itemName: "부품 A", unit: "EA" },
+    );
 
-    expect(rows).toEqual([
-      { key: "warehouse_box::", label: "박스 재고", delta: -2, deltaLabel: "-2" },
+    expect(rows.map((row) => ({ key: row.key, boxId: row.boxId, label: row.label }))).toEqual([
+      {
+        key: "item-a:EA:warehouse_box::::box-1",
+        boxId: "box-1",
+        label: "박스 box-1",
+      },
+      {
+        key: "item-a:EA:warehouse_box::::box-2",
+        boxId: "box-2",
+        label: "박스 box-2",
+      },
     ]);
   });
 
-  it("returns an empty list for null, empty, or zero-delta effects", () => {
-    expect(toInventoryEffectRows(null)).toEqual([]);
-    expect(toInventoryEffectRows([])).toEqual([]);
-    expect(toInventoryEffectRows([{ scope: "warehouse", delta: 0 }])).toEqual([]);
+  it("accepts only non-zero warehouse, location, and warehouse_box effects", () => {
+    const rows = toInventoryEffectRows(
+      [
+        { scope: "warehouse", delta: 0 },
+        { scope: "box", box_id: "legacy-box", delta: 4 },
+        { scope: "unknown", delta: 5 },
+      ],
+      { itemId: "item-a", itemName: "부품 A", unit: "EA" },
+    );
+
+    expect(rows).toEqual([]);
+    expect(toInventoryEffectRows(null, { itemId: "item-a", itemName: "부품 A", unit: "EA" })).toEqual([]);
   });
 });

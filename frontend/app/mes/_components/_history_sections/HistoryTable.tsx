@@ -6,11 +6,10 @@ import type { TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { EmptyState, LoadingSkeleton } from "../common";
-import { formatHistoryDate } from "./historyFormat";
+import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
-import { BatchHeader, OpBatchHeader, ReferenceBatchDetail, buildGroups, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
+import { BatchHeader, OpBatchHeader, ReferenceBatchDetail, buildGroups, getHistorySeparationHint, type LogGroup, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
 import { ReworkBatchHeader } from "./ReworkBatchHeader";
 import { ReworkBatchDetail } from "./ReworkBatchDetail";
@@ -24,6 +23,8 @@ export type HistoryTableFocusTarget = {
 
 type Props = {
   loading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   filteredLogs: TransactionLog[];
   /** 조건 전체 카운트(서버 summary). 헤더 진행률(`100/342건`) 표시용. */
   totalCount?: number;
@@ -35,6 +36,7 @@ type Props = {
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   canLoadMore: boolean;
   loadingMore: boolean;
+  loadMoreError?: string | null;
   onLoadMore: () => void;
   focusTarget?: HistoryTableFocusTarget | null;
 };
@@ -45,7 +47,7 @@ type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left
 const COLUMNS_DEFAULT: ColSpec[] = [
   { label: "일시", width: "118px", align: "center" },
   { label: "작업", width: "128px", align: "center" },
-  { label: "대상", minWidth: "360px" },
+  { label: "대상" },
   { label: "품목코드", width: "124px", align: "center" },
   { label: "", width: "52px", align: "center", px: "px-1" },
   { label: "흐름", width: "148px", align: "center" },
@@ -53,21 +55,33 @@ const COLUMNS_DEFAULT: ColSpec[] = [
   { label: "상태 · 처리", width: "196px" },
 ];
 
-// 우측 패널 열림 — 대상과 품목코드는 유지하고 판단 영역만 살짝 압축한다.
+// 우측 패널 열림 — 판단 열은 명시 폭을 보존하고 대상 열이 남은 폭을 흡수한다.
 const COLUMNS_COMPACT: ColSpec[] = [
-  { label: "일시", width: "96px", align: "center", px: "px-2" },
-  { label: "작업", width: "104px", align: "center", px: "px-2" },
-  { label: "대상", minWidth: "220px" },
-  { label: "품목코드", width: "96px", align: "center", px: "px-2" },
+  { label: "일시", width: "88px", align: "center", px: "px-2" },
+  { label: "작업", width: "96px", align: "center", px: "px-2" },
+  { label: "대상", px: "px-2" },
+  { label: "품목코드", width: "84px", align: "center", px: "px-1" },
   { label: "", width: "12px", align: "center", px: "px-0" },
-  { label: "흐름", width: "116px", align: "center", px: "px-2" },
+  { label: "흐름", width: "152px", align: "center", px: "px-2" },
   { label: "수량 · 재고", width: "152px", align: "center", px: "px-2" },
   { label: "상태 · 처리", width: "148px", px: "px-2" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
 
+function historyGroupPanelId(groupKey: string): string {
+  return `history-group-${encodeURIComponent(groupKey).replaceAll("%", "_")}`;
+}
+
+function getGroupPrimaryLog(group: LogGroup): TransactionLog {
+  if (group.type === "solo") return group.log;
+  if (group.type === "defect_lifecycle") return group.parent;
+  return group.logs[0];
+}
+
 export function HistoryTable({
   loading,
+  error,
+  onRetry,
   filteredLogs,
   totalCount,
   selection,
@@ -77,6 +91,7 @@ export function HistoryTable({
   setBatchCache,
   canLoadMore,
   loadingMore,
+  loadMoreError,
   onLoadMore,
   focusTarget,
 }: Props) {
@@ -223,7 +238,7 @@ export function HistoryTable({
     });
   }
 
-  // 우측 패널이 열리면 가로 공간이 좁아져 일시/구분 컬럼을 압축, 품목명에 더 많은 폭을 줌.
+  // 우측 패널이 열리면 고정 판단 열을 먼저 보존하고 대상명만 남은 폭에서 truncate한다.
   const compact = selection != null;
   const COLUMNS = compact ? COLUMNS_COMPACT : COLUMNS_DEFAULT;
 
@@ -246,13 +261,9 @@ export function HistoryTable({
           <span>표시 {filteredLogs.length.toLocaleString()}건</span>
           {totalCount != null && <span>/ 조건 전체 {totalCount.toLocaleString()}건</span>}
         </div>
-        {filteredLogs.length > 0 && (
-          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            표시 범위 {formatHistoryDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatHistoryDate(filteredLogs[0].created_at)}
-          </span>
-        )}
         {batchKeys.length > 0 && expandedGroupKey && (
           <button
+            type="button"
             onClick={collapseExpandedGroup}
             className="ml-auto rounded-full border px-3 py-1 text-xs font-semibold transition-opacity hover:opacity-80"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
@@ -264,6 +275,13 @@ export function HistoryTable({
 
       {loading ? (
         <LoadingSkeleton variant="list" rows={8} />
+      ) : error ? (
+        <LoadFailureCard
+          message={error}
+          onRetry={onRetry}
+          retryLabel="다시 시도"
+          prefix="입출고 내역을 불러오지 못했습니다"
+        />
       ) : filteredLogs.length === 0 ? (
         <EmptyState
           variant="no-data"
@@ -271,8 +289,14 @@ export function HistoryTable({
           description="조건에 맞는 거래가 없거나 아직 기록이 없습니다."
         />
       ) : (
-        <div className="min-w-0 overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-          <table className={`w-full border-separate border-spacing-0 text-sm${compact ? " table-fixed" : ""}`}>
+        <div className="-mr-5 min-w-0 overflow-x-hidden rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+          <table
+            className={`w-full table-fixed border-separate border-spacing-0 text-sm${
+              compact
+                ? " [&_tbody_td:nth-child(2)]:px-2 [&_tbody_td:nth-child(3)]:px-2 [&_tbody_td:nth-child(4)]:px-1 [&_tbody_td:nth-child(5)]:px-0 [&_tbody_td:nth-child(6)]:px-2 [&_tbody_td:nth-child(7)]:px-2 [&_tbody_td:nth-child(8)]:px-2"
+                : ""
+            }`}
+          >
             <thead className="sticky top-0 z-10">
               <tr style={{ background: LEGACY_COLORS.s2 }}>
                 {COLUMNS.map(({ label, width, minWidth, align, hidden, px }, index) => (
@@ -289,7 +313,11 @@ export function HistoryTable({
               </tr>
             </thead>
             <tbody>
-              {groups.map((group) => {
+              {groups.map((group, index) => {
+                const separationHint = getHistorySeparationHint(
+                  index > 0 ? getGroupPrimaryLog(groups[index - 1]) : null,
+                  getGroupPrimaryLog(group),
+                );
                 if (group.type === "solo") {
                   return (
                     <HistoryLogRow
@@ -298,12 +326,43 @@ export function HistoryTable({
                       selected={selectedLogId === group.log.log_id}
                       onSelect={onSelectLog}
                       compact={compact}
+                      separationHint={separationHint}
                     />
+                  );
+                }
+
+                if (group.type === "defect_lifecycle") {
+                  const expanded = expandedGroupKey === group.key;
+                  const controlsId = historyGroupPanelId(group.key);
+                  const selected = selectedLogId === group.parent.log_id || selectedLogId === group.child.log_id;
+                  return (
+                    <Fragment key={group.key}>
+                      <HistoryLogRow
+                        log={group.parent}
+                        selected={selected}
+                        onSelect={onSelectLog}
+                        compact={compact}
+                        expanded={expanded}
+                        onToggle={() => toggleGroup(group.key)}
+                        controlsId={controlsId}
+                        separationHint={separationHint}
+                      />
+                      {expanded && (
+                        <ReferenceBatchDetail
+                          logs={[group.child]}
+                          compact={compact}
+                          highlightLogId={selectedLogId}
+                          onSelectLog={onSelectLog}
+                          controlsId={controlsId}
+                        />
+                      )}
+                    </Fragment>
                   );
                 }
 
                 if (group.type === "op_batch") {
                   const expanded = expandedGroupKey === group.batchId;
+                  const controlsId = historyGroupPanelId(group.batchId);
                   const batch = batchCache.get(group.batchId) ?? null;
                   const isSelected = selectedBatchId === group.batchId;
                   const focusItemId = focusTarget?.groupKey === group.batchId ? focusTarget.itemId ?? null : null;
@@ -323,6 +382,8 @@ export function HistoryTable({
                         batch={batch}
                         rowRef={opBatchRowRef}
                         compact={compact}
+                        controlsId={controlsId}
+                        separationHint={separationHint}
                       />
                       {expanded && (
                         <BomBatchDetail
@@ -332,6 +393,7 @@ export function HistoryTable({
                           onCached={handleCacheBatch}
                           compact={compact}
                           highlightItemId={focusItemId}
+                          controlsId={controlsId}
                         />
                       )}
                     </Fragment>
@@ -343,6 +405,7 @@ export function HistoryTable({
                 const groupKey = group.refKey;
                 if (group.refNo.startsWith("defect-disassemble:")) {
                   const expanded = expandedGroupKey === groupKey;
+                  const controlsId = historyGroupPanelId(groupKey);
                   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
                   const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
                   const isSelected = selectedLogId === group.logs[0]?.log_id;
@@ -359,6 +422,7 @@ export function HistoryTable({
                           else expandGroup(groupKey);
                         }}
                         compact={compact}
+                        controlsId={controlsId}
                       />
                       {expanded && (
                         <ReworkBatchDetail
@@ -366,6 +430,7 @@ export function HistoryTable({
                           parentItemId={parentLog.item_id}
                           colSpan={COLUMNS.length}
                           compact={compact}
+                          controlsId={controlsId}
                         />
                       )}
                     </Fragment>
@@ -374,6 +439,7 @@ export function HistoryTable({
 
                 // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
                 const expanded = expandedGroupKey === groupKey;
+                const controlsId = historyGroupPanelId(groupKey);
                 const isSelected = selectedLogId === group.logs[0]?.log_id;
                 const focusLogId = focusTarget?.groupKey === groupKey ? focusTarget.logId ?? null : null;
                 return (
@@ -389,6 +455,8 @@ export function HistoryTable({
                         else expandGroup(groupKey);
                       }}
                       compact={compact}
+                      controlsId={controlsId}
+                      separationHint={separationHint}
                     />
                     {expanded && (
                       <ReferenceBatchDetail
@@ -396,6 +464,7 @@ export function HistoryTable({
                         compact={compact}
                         highlightLogId={focusLogId}
                         onSelectLog={onSelectLog}
+                        controlsId={controlsId}
                       />
                     )}
                   </Fragment>
@@ -406,8 +475,20 @@ export function HistoryTable({
         </div>
       )}
 
-      {canLoadMore && (
+      {!loading && !error && filteredLogs.length > 0 && loadMoreError && (
+        <div className="mt-4">
+          <LoadFailureCard
+            message={loadMoreError}
+            onRetry={onLoadMore}
+            retryLabel="다시 시도"
+            prefix="다음 내역을 불러오지 못했습니다"
+          />
+        </div>
+      )}
+
+      {!error && !loadMoreError && canLoadMore && (
         <button
+          type="button"
           onClick={onLoadMore}
           disabled={loadingMore}
           className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-base font-bold disabled:opacity-50"

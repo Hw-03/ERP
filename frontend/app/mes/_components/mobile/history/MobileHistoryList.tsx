@@ -4,7 +4,7 @@ import { Layers, Loader2, Package } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
-import { EmptyState, LoadingSkeleton } from "../../common";
+import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../../common";
 import { formatHistoryDate } from "../../_history_sections/historyFormat";
 import { rowTint } from "../../_history_sections/historyTheme";
 import {
@@ -23,19 +23,23 @@ import { MovementSummaryCell, buildGroups } from "../../_history_sections/histor
  */
 export function MobileHistoryList({
   loading,
+  error,
   filteredLogs,
   selectedKey,
   onSelectLog,
   onSelectBatch,
+  onRetry,
   canLoadMore,
   loadingMore,
   onLoadMore,
 }: {
   loading: boolean;
+  error: string | null;
   filteredLogs: TransactionLog[];
   selectedKey: string | null;
   onSelectLog: (log: TransactionLog) => void;
   onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
+  onRetry: () => void;
   canLoadMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -44,6 +48,18 @@ export function MobileHistoryList({
     return (
       <div className="py-2">
         <LoadingSkeleton variant="list" rows={8} />
+      </div>
+    );
+  }
+  if (error && filteredLogs.length === 0) {
+    return (
+      <div className="py-2">
+        <LoadFailureCard
+          message={error}
+          onRetry={onRetry}
+          retryLabel="다시 시도"
+          prefix="입출고 내역을 불러오지 못했습니다"
+        />
       </div>
     );
   }
@@ -114,6 +130,53 @@ export function MobileHistoryList({
         }
 
         // batch | op_batch — 묶음 카드
+        if (g.type === "defect_lifecycle") {
+          const parent = g.parent;
+          const tcolor = transactionColor(parent.transaction_type);
+          const active = selectedKey === `log:${parent.log_id}`;
+          return (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => onSelectLog(parent)}
+              aria-pressed={active}
+              className="w-full min-h-[60px] rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
+              style={{
+                background: active ? "rgba(101,169,255,.12)" : rowTint(parent.transaction_type),
+                borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+              }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${tcolor} 16%, transparent)`,
+                    color: LEGACY_COLORS.text,
+                  }}
+                >
+                  <Layers className="h-3.5 w-3.5" style={{ color: tcolor }} />
+                  {getHistoryDisplayLabel(parent)}
+                </span>
+                <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {formatHistoryDate(parent.requested_at ?? parent.created_at)}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <Package className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+                <span className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  {parent.item_name}
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {getHistoryActor(parent)}
+                </span>
+                <MovementSummaryCell summary={{ parts: [getSingleLogMovement(g.child)] }} />
+              </div>
+            </button>
+          );
+        }
+
         const logs = g.logs;
         const first = logs[0];
         const key = g.type === "op_batch" ? g.batchId : g.refKey;

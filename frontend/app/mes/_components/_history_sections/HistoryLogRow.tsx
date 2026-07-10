@@ -19,6 +19,7 @@ import {
   PeopleStatusCell,
   QuantityStockCell,
   TargetSummaryBlock,
+  ChevronToggleBtn,
 } from "./historyTableHelpers";
 import { isReworkOperation } from "./transactionTaxonomy";
 
@@ -28,12 +29,23 @@ type Props = {
   onSelect: (log: TransactionLog) => void;
   /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
   compact?: boolean;
+  expanded?: boolean;
+  onToggle?: () => void;
+  controlsId?: string;
+  separationHint?: string | null;
 };
 
-function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
+function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggle, controlsId, separationHint }: Props) {
   const [hovered, setHovered] = useState(false);
   const padX = compact ? "px-2" : "px-4";
-  const presentation = getHistoryRowPresentation(log);
+  const targetPadX = compact ? "px-2" : "px-4";
+  const flowPadX = compact ? "px-2" : "px-5";
+  const quantityPadX = compact ? "px-2" : "px-4";
+  const statusPadX = compact ? "px-2" : "px-4";
+  const basePresentation = getHistoryRowPresentation(log);
+  const presentation = separationHint
+    ? { ...basePresentation, statusChips: [...basePresentation.statusChips, { label: separationHint, tone: "muted" as const }] }
+    : basePresentation;
   const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(log.transaction_type);
 
   const rowBackground = selected
@@ -47,6 +59,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
   return (
     <tr
       data-log-id={log.log_id}
+      data-history-main-row="true"
       onClick={handleSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -59,7 +72,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
       aria-pressed={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${log.cancelled ? " opacity-60" : ""}`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
@@ -71,14 +84,18 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}
       >
         <div className="flex items-center justify-center gap-1.5">
-          <span aria-hidden className="inline-block h-5 w-5 shrink-0" />
+          {onToggle ? (
+            <ChevronToggleBtn expanded={Boolean(expanded)} onToggle={onToggle} controlsId={controlsId} />
+          ) : (
+            <span aria-hidden className="inline-block h-5 w-5 shrink-0" />
+          )}
           {formatHistoryDate(log.requested_at ?? log.created_at)}
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={log.transaction_type} label={presentation.operation.label} color={tcolor} />
+        <FlowBadge type={log.transaction_type} label={presentation.operation.label} color={tcolor} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
@@ -86,13 +103,13 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <SpacerCell compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-5 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-4 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} />
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>

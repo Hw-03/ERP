@@ -197,6 +197,32 @@ describe("historyPresentation", () => {
     expect(row.statusChips.map((chip) => chip.label)).toContain("자동 처리");
   });
 
+  it("shows the item-conversion requester separately from automatic processing", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      requester_name: null,
+      approver_name: null,
+      produced_by: "김전환",
+      reference_no: "ITEM-CONV-1",
+      shipping_phase: "COMPONENT_CHANGE",
+    }));
+
+    expect(row.people).toEqual({ requester: "김전환", approver: "" });
+    expect(row.statusChips.map((chip) => chip.label)).toContain("자동 처리");
+  });
+
+  it("labels legacy item conversions without requester evidence as unrecorded", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      requester_name: null,
+      approver_name: null,
+      produced_by: "구성품 변경",
+      reference_no: "ITEM-CONV-legacy",
+      shipping_phase: "COMPONENT_CHANGE",
+    }));
+
+    expect(row.people).toEqual({ requester: "요청자 미기록", approver: "" });
+    expect(row.statusChips.map((chip) => chip.label)).toContain("자동 처리");
+  });
+
   it("keeps single-log stock, actor, and cancel signals visible without reference chips", () => {
     const row = getHistoryRowPresentation(
       makeLog({
@@ -423,7 +449,7 @@ describe("shipping phase history presentation", () => {
     ];
     const componentChange = getReferenceBatchPresentation(logs);
 
-    expect(componentChange.flowLabel).toBe("\uC870\uB9BD");
+    expect(componentChange.flowLabel).toBe("\uC644\uC81C\uD488 \uC785\uACE0");
     expect(componentChange.movement.parts[0]?.label).toContain("\uBCC0\uACBD");
     expect(getReferenceBatchLinePresentation(logs[0], "shipment").label).toBe("\uAE30\uC874\uD488 \uCC28\uAC10");
     expect(getReferenceBatchLinePresentation(logs[1], "shipment").label).toBe("\uCD94\uAC00 \uAD6C\uC131\uD488 \uCC28\uAC10");

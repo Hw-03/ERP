@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, ArrowRightLeft, ArrowUpFromLine,
   BookmarkMinus, BookmarkPlus, ChevronDown, ChevronRight, Hammer, Layers,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
+import { TruncatedText } from "@/lib/ui/TruncatedText";
 import type { HistoryPresentationTone, HistoryRowPresentation } from "./historyPresentation";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -37,26 +38,35 @@ const TX_ICON = {
  */
 export const HISTORY_CELL_TRANSITION =
   "padding 160ms cubic-bezier(0.4, 0, 0.2, 1), width 160ms cubic-bezier(0.4, 0, 0.2, 1)";
-export const HISTORY_MAIN_ROW_CLASS = "h-16";
+export const HISTORY_MAIN_ROW_CLASS = "h-[64px]";
 export const HISTORY_MAIN_CELL_CLASS = "border-b py-2 align-middle";
+export const HISTORY_CHILD_ROW_CLASS = "h-[40px]";
+export const HISTORY_CHILD_CELL_CLASS = "h-[40px] overflow-hidden border-b py-0 align-middle";
 
 export function FlowBadge({
   type,
   label,
   color,
+  compact = false,
+  accessibleLabel,
 }: {
   type: TransactionLog["transaction_type"] | null;
   label: string;
   color: string;
+  compact?: boolean;
+  accessibleLabel?: string;
 }) {
   const Icon = type ? TX_ICON[transactionIconName(type)] : null;
+  const fullLabel = accessibleLabel ?? label;
   return (
     <span
-      className="inline-flex h-6 min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none"
+      aria-label={accessibleLabel}
+      title={fullLabel !== label ? fullLabel : undefined}
+      className={`inline-flex h-6 w-full max-w-full min-w-0 items-center justify-center gap-1 rounded-full text-xs font-bold leading-none ${compact ? "px-2" : "px-3"}`}
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >
-      {Icon && <Icon className="h-3.5 w-3.5" />}
-      {label}
+      {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+      <span className="min-w-0 truncate">{label}</span>
     </span>
   );
 }
@@ -70,21 +80,45 @@ export const TONE_COLOR: Record<MovementTone, string> = {
   muted: LEGACY_COLORS.muted2,
 };
 
-export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
+function getPillDisplayLabel(label: string): { label: string; title?: string } {
+  const match = label.match(/([+-])(\d[\d,]*(?:\.\d+)?)\s*([A-Za-z]+)$/);
+  if (!match) return { label };
+
+  const quantity = Number(match[2].replaceAll(",", ""));
+  if (!Number.isFinite(quantity) || quantity <= 999) return { label };
+
+  const abbreviated = `${(quantity / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return {
+    label: `${label.slice(0, match.index)}${match[1]}${abbreviated} ${match[3]}`,
+    title: label,
+  };
+}
+
+export function MovementSummaryCell({
+  summary,
+  compact = false,
+}: {
+  summary: MovementSummary;
+  compact?: boolean;
+}) {
   // 변화량 pill 은 단건/묶음/경고 모두 같은 높이로 고정한다.
   // 단일 pill 폭은 2개 pill(5rem + gap-1 + 5rem)과 맞춰 열의 리듬을 통일한다.
   const isSingle = summary.parts.length === 1 && !summary.warning;
-  const pillClass = isSingle
-    ? "inline-flex h-6 min-w-[10.25rem] items-center justify-center rounded-full px-3 text-xs font-bold leading-none"
-    : "inline-flex h-6 min-w-[5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold leading-none";
+  const pillClass = compact
+    ? "inline-flex h-6 max-w-full min-w-0 flex-1 items-center justify-center truncate rounded-full px-2 text-xs font-bold leading-none"
+    : isSingle
+      ? "inline-flex h-6 min-w-[10.25rem] items-center justify-center rounded-full px-3 text-xs font-bold leading-none"
+      : "inline-flex h-6 min-w-[5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold leading-none";
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap ${compact ? "w-full min-w-0 max-w-full" : ""}`}>
       {summary.parts.map((p, i) => {
         const color = TONE_COLOR[p.tone];
+        const display = getPillDisplayLabel(p.label);
         return (
           <span
             key={i}
             className={pillClass}
+            title={display.title}
             style={{
               // WCAG AA: 연한 틴트 위 brand 컬러 텍스트는 4.5:1 미달 →
               // 같은 색조를 text 색과 섞어 어둡게(색 코딩 유지 + 대비 확보).
@@ -92,7 +126,7 @@ export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
               color: `color-mix(in srgb, ${color} 42%, ${LEGACY_COLORS.text})`,
             }}
           >
-            {p.label}
+            {display.label}
           </span>
         );
       })}
@@ -158,13 +192,21 @@ export function TargetSummaryBlock({
   metaOverride?: string[];
 }) {
   const meta = metaOverride ?? presentation.target.meta;
+  const title = titleOverride ?? presentation.target.title;
+  const displayTitle = presentation.target.sourceTitle
+    ? `${presentation.target.sourceTitle} → ${title}`
+    : title;
   return (
-    <div className="min-w-0">
+    <div className="max-h-12 min-w-0 overflow-hidden">
       <div className="flex min-w-0 items-center gap-1.5">
         {icon}
-        <span className="min-w-0 truncate text-sm font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>
-          {titleOverride ?? presentation.target.title}
-        </span>
+        <TruncatedText
+          accessibilityLabel={displayTitle}
+          className="min-w-0 line-clamp-2 text-sm font-bold leading-snug"
+          style={{ color: LEGACY_COLORS.text }}
+        >
+          {displayTitle}
+        </TruncatedText>
       </div>
       {meta.length > 0 && (
         <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -181,39 +223,50 @@ export function TargetSummaryBlock({
 
 export function ItemCodeCell({
   code,
+  sourceCode,
   compact,
   dense = false,
 }: {
   code?: string | null;
+  sourceCode?: string | null;
   compact?: boolean;
   dense?: boolean;
 }) {
-  const padX = compact ? "px-2" : "px-3";
-  const py = dense ? "py-1.5" : "py-2";
+  const padX = compact ? "px-1" : "px-3";
   return (
     <td
-      className={`whitespace-nowrap ${dense ? `border-b ${py}` : HISTORY_MAIN_CELL_CLASS} ${padX} text-center text-xs font-semibold`}
+      className={`whitespace-nowrap ${dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS} ${padX} text-center text-xs font-semibold`}
       style={{ borderColor: LEGACY_COLORS.border, color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted, transition: HISTORY_CELL_TRANSITION }}
     >
-      {code || "-"}
+      {sourceCode ? (
+        <div className="flex min-w-0 flex-col items-center leading-tight">
+          <span className="max-w-full truncate">{sourceCode}</span>
+          <span className="max-w-full truncate">{`↓ ${code ?? "-"}`}</span>
+        </div>
+      ) : (code || "-")}
     </td>
   );
 }
 
 export function SpacerCell({ compact, dense = false }: { compact?: boolean; dense?: boolean }) {
-  const py = dense ? "py-1.5" : "py-2";
   return (
     <td
       aria-hidden
-      className={`${compact ? "px-1" : "px-2"} ${dense ? `border-b ${py}` : HISTORY_MAIN_CELL_CLASS}`}
+      className={`${compact ? "px-0" : "px-2"} ${dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS}`}
       style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
     />
   );
 }
 
-export function FlowSummaryCell({ presentation }: { presentation: HistoryRowPresentation }) {
+export function FlowSummaryCell({
+  presentation,
+  dense = false,
+}: {
+  presentation: HistoryRowPresentation;
+  dense?: boolean;
+}) {
   return (
-    <div className="flex min-h-11 flex-col items-center justify-center gap-1 text-xs leading-tight">
+    <div className={`flex flex-col items-center justify-center overflow-hidden text-xs leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
       <span className="max-w-[8.5rem] truncate rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
         {presentation.flow.label}
       </span>
@@ -228,13 +281,17 @@ export function FlowSummaryCell({ presentation }: { presentation: HistoryRowPres
 export function QuantityStockCell({
   presentation,
   summary,
+  dense = false,
+  compact = false,
 }: {
   presentation: HistoryRowPresentation;
   summary?: MovementSummary;
+  dense?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex min-h-11 flex-col items-center justify-center gap-1 leading-tight">
-      <MovementSummaryCell summary={summary ?? presentation.movement} />
+    <div className={`flex flex-col items-center justify-center overflow-hidden leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
+      <MovementSummaryCell summary={summary ?? presentation.movement} compact={compact} />
       {presentation.stock && (
         <span className="max-w-full truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
           {presentation.stock.label}
@@ -244,12 +301,18 @@ export function QuantityStockCell({
   );
 }
 
-export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPresentation }) {
+export function PeopleStatusCell({
+  presentation,
+  dense = false,
+}: {
+  presentation: HistoryRowPresentation;
+  dense?: boolean;
+}) {
   const approver = presentation.people.approver?.trim();
   const requester = presentation.people.requester?.trim() || "-";
   const systemRequester = requester.startsWith("시스템 처리");
   return (
-    <div className="flex min-h-11 min-w-0 flex-col justify-center gap-1 leading-tight">
+    <div className={`flex min-w-0 flex-col justify-center overflow-hidden leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
       <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
         {systemRequester ? requester : `요청 ${requester}`}
       </div>
@@ -265,7 +328,8 @@ export function PeopleStatusCell({ presentation }: { presentation: HistoryRowPre
 export type LogGroup =
   | { type: "solo"; log: TransactionLog }
   | { type: "batch"; refKey: string; refNo: string; logs: TransactionLog[] }
-  | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] };
+  | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] }
+  | { type: "defect_lifecycle"; key: string; parent: TransactionLog; child: TransactionLog };
 
 function referenceGroupKey(log: TransactionLog): string {
   return `${log.reference_no ?? ""}::${log.shipping_phase ?? ""}`;
@@ -274,6 +338,15 @@ function referenceGroupKey(log: TransactionLog): string {
 export function buildGroups(logs: TransactionLog[]): LogGroup[] {
   const opBatches = new Map<string, TransactionLog[]>();
   const refBatches = new Map<string, TransactionLog[]>();
+  const defectPairs = findDefectLifecyclePairs(logs);
+  const defectPairByLogId = new Map<string, { pair: DefectLifecyclePair; anchorLogId: string }>();
+  for (const pair of defectPairs) {
+    const parentIndex = logs.findIndex((log) => log.log_id === pair.parent.log_id);
+    const childIndex = logs.findIndex((log) => log.log_id === pair.child.log_id);
+    const anchorLogId = (parentIndex <= childIndex ? pair.parent : pair.child).log_id;
+    defectPairByLogId.set(pair.parent.log_id, { pair, anchorLogId });
+    defectPairByLogId.set(pair.child.log_id, { pair, anchorLogId });
+  }
 
   for (const log of logs) {
     if (log.operation_batch_id) {
@@ -293,6 +366,18 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
   const seenRef = new Set<string>();
 
   for (const log of logs) {
+    const defectPair = defectPairByLogId.get(log.log_id);
+    if (defectPair) {
+      if (defectPair.anchorLogId === log.log_id) {
+        groups.push({
+          type: "defect_lifecycle",
+          key: `defect-lifecycle:${defectPair.pair.parent.log_id}:${defectPair.pair.child.log_id}`,
+          parent: defectPair.pair.parent,
+          child: defectPair.pair.child,
+        });
+      }
+      continue;
+    }
     if (log.operation_batch_id) {
       if (seenOp.has(log.operation_batch_id)) continue;
       seenOp.add(log.operation_batch_id);
@@ -322,6 +407,82 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
     }
   }
   return groups;
+}
+
+export function getHistorySeparationHint(
+  previous: TransactionLog | null | undefined,
+  current: TransactionLog,
+): string | null {
+  if (!previous || previous.item_id !== current.item_id) return null;
+  if (current.cancelled) return "취소 이력";
+
+  const previousReference = previous.reference_no?.trim();
+  const currentReference = current.reference_no?.trim();
+  if (previousReference && currentReference && previousReference !== currentReference) return "다른 요청";
+
+  const previousActor = getHistoryActor(previous).trim();
+  const currentActor = getHistoryActor(current).trim();
+  if (previousActor && currentActor && previousActor !== currentActor) return "다른 요청";
+
+  return previous.created_at !== current.created_at ? "별도 시각" : null;
+}
+
+type DefectLifecyclePair = {
+  parent: TransactionLog;
+  child: TransactionLog;
+};
+
+function findDefectLifecyclePairs(logs: TransactionLog[]): DefectLifecyclePair[] {
+  const chronological = [...logs].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const used = new Set<string>();
+  const pairs: DefectLifecyclePair[] = [];
+
+  for (let index = 0; index < chronological.length; index += 1) {
+    const parent = chronological[index];
+    if (parent.transaction_type !== "MARK_DEFECTIVE" || used.has(parent.log_id)) continue;
+
+    const child = chronological.slice(index + 1).find((candidate) =>
+      !used.has(candidate.log_id) && isMatchingDefectLifecycle(parent, candidate),
+    );
+    if (!child) continue;
+
+    used.add(parent.log_id);
+    used.add(child.log_id);
+    pairs.push({ parent, child });
+  }
+
+  return pairs;
+}
+
+function isMatchingDefectLifecycle(parent: TransactionLog, child: TransactionLog): boolean {
+  if (!isDefectFollowup(child.transaction_type)) return false;
+  if (parent.item_id !== child.item_id) return false;
+  if (Math.abs(parent.quantity_change) !== Math.abs(child.quantity_change)) return false;
+  if (!sameRequiredText(getDefectActor(parent), getDefectActor(child))) return false;
+  if (!sameRequiredText(parent.department, child.department)) return false;
+  if (!sameRequiredText(getDefectReasonKey(parent), getDefectReasonKey(child))) return false;
+
+  const elapsed = Date.parse(child.created_at) - Date.parse(parent.created_at);
+  return Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= 60_000;
+}
+
+function isDefectFollowup(type: TransactionLog["transaction_type"]): boolean {
+  return type === "DEFECT_SCRAP" || type === "SUPPLIER_RETURN" || type === "DISASSEMBLE";
+}
+
+function getDefectActor(log: TransactionLog): string | null {
+  return log.requester_name?.trim() || log.produced_by?.trim() || null;
+}
+
+function getDefectReasonKey(log: TransactionLog): string | null {
+  const category = log.reason_category?.trim() ?? "";
+  const memo = log.reason_memo?.trim() ?? "";
+  const key = `${category}::${memo}`;
+  return category || memo ? key : null;
+}
+
+function sameRequiredText(left: string | null | undefined, right: string | null | undefined): boolean {
+  return Boolean(left && right && left === right);
 }
 
 /** 묶음 안 모든 로그가 같은 item_id 인지. 합산 수량 표시 안전 가드. */
@@ -368,17 +529,29 @@ export function MemoCell({ notes }: { notes?: string | null }) {
 export function ChevronToggleBtn({
   expanded,
   onToggle,
-}: { expanded: boolean; onToggle: () => void }) {
+  controlsId,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  controlsId?: string;
+}) {
   return (
     <button
       type="button"
       aria-label={expanded ? "묶음 접기" : "묶음 펼치기"}
       aria-expanded={expanded}
+      aria-controls={controlsId}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();
       }}
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] hover:brightness-125"
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onToggle();
+      }}
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] hover:brightness-125"
       style={{ background: "rgba(101,169,255,.10)" }}
     >
       {expanded
@@ -400,6 +573,8 @@ export function BatchHeader({
   selected,
   onSelect,
   compact,
+  controlsId,
+  separationHint,
 }: {
   group: Extract<LogGroup, { type: "batch" }>;
   expanded: boolean;
@@ -408,8 +583,14 @@ export function BatchHeader({
   onSelect: () => void;
   /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
   compact?: boolean;
+  controlsId?: string;
+  separationHint?: string | null;
 }) {
   const padX = compact ? "px-2" : "px-4";
+  const targetPadX = compact ? "px-2" : "px-4";
+  const flowPadX = compact ? "px-2" : "px-5";
+  const quantityPadX = compact ? "px-2" : "px-4";
+  const statusPadX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
   const referencePresentation = getReferenceBatchPresentation(group.logs);
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
@@ -430,9 +611,15 @@ export function BatchHeader({
       title: referencePresentation.targetTitle,
       code: referencePresentation.targetCode,
       meta: referencePresentation.targetMeta,
+      sourceTitle: referencePresentation.sourceTarget?.sourceTitle,
+      sourceCode: referencePresentation.sourceTarget?.sourceCode,
     },
+    statusChips: separationHint
+      ? [...basePresentation.statusChips, { label: separationHint, tone: "muted" }]
+      : basePresentation.statusChips,
   };
   const [hovered, setHovered] = useState(false);
+  const cancelled = group.logs.some((log) => log.cancelled);
 
   const rowBackground = selected
     ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
@@ -442,6 +629,7 @@ export function BatchHeader({
 
   return (
     <tr
+      data-history-main-row="true"
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -450,11 +638,10 @@ export function BatchHeader({
         }
       }}
       tabIndex={0}
-      role="button"
-      aria-pressed={selected}
+      aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
@@ -463,28 +650,28 @@ export function BatchHeader({
     >
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
-          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
+          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} controlsId={controlsId} />
           {formatHistoryDate(first.requested_at ?? first.created_at)}
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
+        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
         />
       </td>
-      <ItemCodeCell code={presentation.target.code} compact={compact} />
+      <ItemCodeCell code={presentation.target.code} sourceCode={presentation.target.sourceCode} compact={compact} />
       <SpacerCell compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-5 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-4 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} />
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} summary={summary} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
@@ -496,19 +683,33 @@ export function ReferenceBatchDetail({
   compact,
   highlightLogId,
   onSelectLog,
+  controlsId,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
   highlightLogId?: string | null;
   onSelectLog?: (log: TransactionLog) => void;
+  controlsId?: string;
 }) {
   const presentation = getReferenceBatchPresentation(logs);
 
   const sortedLogs = [...logs].sort((a, b) => getReferenceBatchLineOrder(a, presentation.kind) - getReferenceBatchLineOrder(b, presentation.kind));
 
+  if (presentation.phase === "COMPONENT_CHANGE") {
+    return (
+      <ComponentChangeDetail
+        logs={sortedLogs}
+        compact={compact}
+        highlightLogId={highlightLogId}
+        onSelectLog={onSelectLog}
+        controlsId={controlsId}
+      />
+    );
+  }
+
   return (
     <>
-      {sortedLogs.map((log) => (
+      {sortedLogs.map((log, index) => (
         <ReferenceBatchLineRow
           key={log.log_id}
           log={log}
@@ -516,10 +717,112 @@ export function ReferenceBatchDetail({
           compact={compact}
           highlightLogId={highlightLogId}
           onSelectLog={onSelectLog}
+          rowId={index === 0 ? controlsId : undefined}
         />
       ))}
     </>
   );
+}
+
+function ComponentChangeDetail({
+  logs,
+  compact,
+  highlightLogId,
+  onSelectLog,
+  controlsId,
+}: {
+  logs: TransactionLog[];
+  compact?: boolean;
+  highlightLogId?: string | null;
+  onSelectLog?: (log: TransactionLog) => void;
+  controlsId?: string;
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ source: true, target: true });
+  const sections = [
+    {
+      key: "source" as const,
+      label: "기존품 차감",
+      logs: logs.filter((log) => log.quantity_change < 0),
+      tone: "warning" as const,
+    },
+    {
+      key: "target" as const,
+      label: "변경품 입고",
+      logs: logs.filter((log) => log.quantity_change >= 0),
+      tone: "success" as const,
+    },
+  ].filter((section) => section.logs.length > 0);
+
+  return (
+    <>
+      {sections.map((section) => {
+        const sectionId = `${controlsId ?? "history-component-change"}-${section.key}`;
+        const parent = getComponentChangeSectionParent(section.key, section.logs);
+        if (!parent) {
+          return section.logs.map((log, index) => (
+            <ReferenceBatchLineRow
+              key={log.log_id}
+              log={log}
+              kind="shipment"
+              compact={compact}
+              highlightLogId={highlightLogId}
+              onSelectLog={onSelectLog}
+              rowId={index === 0 ? sectionId : undefined}
+            />
+          ));
+        }
+        const children = section.logs.filter((log) => log.log_id !== parent.log_id);
+        if (children.length === 0) {
+          return (
+            <ReferenceBatchLineRow
+              key={parent.log_id}
+              log={parent}
+              kind="shipment"
+              compact={compact}
+              highlightLogId={highlightLogId}
+              onSelectLog={onSelectLog}
+              rowId={sectionId}
+            />
+          );
+        }
+        const sectionExpanded = expanded[section.key] !== false;
+        return (
+          <Fragment key={section.key}>
+            <ReferenceBatchLineRow
+              log={parent}
+              kind="shipment"
+              compact={compact}
+              highlightLogId={highlightLogId}
+              onSelectLog={onSelectLog}
+              sectionLabel={section.label}
+              expanded={sectionExpanded}
+              onToggle={() => setExpanded((previous) => ({ ...previous, [section.key]: previous[section.key] === false }))}
+              controlsId={sectionId}
+            />
+            {sectionExpanded && children.map((log, index) => (
+              <ReferenceBatchLineRow
+                key={log.log_id}
+                log={log}
+                kind="shipment"
+                compact={compact}
+                highlightLogId={highlightLogId}
+                onSelectLog={onSelectLog}
+                rowId={index === 0 ? sectionId : undefined}
+              />
+            ))}
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
+function getComponentChangeSectionParent(
+  section: "source" | "target",
+  logs: TransactionLog[],
+): TransactionLog | null {
+  const marker = section === "source" ? "품목 전환 소스" : "품목 전환 대상";
+  return logs.find((log) => log.notes?.includes(marker)) ?? null;
 }
 
 function ReferenceBatchLineRow({
@@ -528,21 +831,38 @@ function ReferenceBatchLineRow({
   compact,
   highlightLogId,
   onSelectLog,
+  rowId,
+  sectionLabel,
+  expanded,
+  onToggle,
+  controlsId,
 }: {
   log: TransactionLog;
   kind: ReturnType<typeof getReferenceBatchPresentation>["kind"];
   compact?: boolean;
   highlightLogId?: string | null;
   onSelectLog?: (log: TransactionLog) => void;
+  rowId?: string;
+  sectionLabel?: string;
+  expanded?: boolean;
+  onToggle?: () => void;
+  controlsId?: string;
 }) {
   const padX = compact ? "px-2" : "px-4";
+  const targetPadX = compact ? "px-2" : "px-4";
+  const flowPadX = compact ? "px-2" : "px-5";
+  const quantityPadX = compact ? "px-2" : "px-4";
+  const statusPadX = compact ? "px-2" : "px-4";
   const presentation = getHistoryRowPresentation(log);
   const linePresentation = getReferenceBatchLinePresentation(log, kind);
+  const fullLineLabel = linePresentation.label;
+  const lineLabel = compact && fullLineLabel === "추가 구성품 차감" ? "추가 차감" : fullLineLabel;
   const lineColor = PRESENTATION_TONE_COLOR[linePresentation.tone];
   const highlighted = highlightLogId === log.log_id;
 
   return (
     <tr
+      id={rowId}
       role={onSelectLog ? "button" : undefined}
       tabIndex={onSelectLog ? 0 : undefined}
       data-history-focus-line={highlighted ? "true" : undefined}
@@ -554,7 +874,7 @@ function ReferenceBatchLineRow({
           onSelectLog(log);
         }
       }}
-      className={onSelectLog ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : undefined}
+      className={`${HISTORY_CHILD_ROW_CLASS}${onSelectLog ? " cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : ""}`}
       style={{
         background: highlighted
           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
@@ -564,32 +884,46 @@ function ReferenceBatchLineRow({
         boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
       }}
     >
-      <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
-      <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={log.transaction_type} label={linePresentation.label} color={lineColor} />
-      </td>
-      <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex min-w-0 items-start gap-2">
-          <span className="mt-0.5 shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
-          <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-              {log.item_name}
-            </div>
+      <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
+        {onToggle && (
+          <div className="flex justify-center">
+            <ChevronToggleBtn expanded={expanded ?? true} onToggle={onToggle} controlsId={controlsId} />
           </div>
+        )}
+      </td>
+      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
+        <FlowBadge
+          type={log.transaction_type}
+          label={sectionLabel ?? lineLabel}
+          color={lineColor}
+          compact={compact}
+          accessibleLabel={sectionLabel ? undefined : fullLineLabel !== lineLabel ? fullLineLabel : undefined}
+        />
+      </td>
+      <td className={`${HISTORY_CHILD_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="flex min-w-0 items-center gap-2">
+          {!sectionLabel && <span className="mt-0.5 shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>└</span>}
+          <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+          <TruncatedText
+            accessibilityLabel={log.item_name}
+            className="truncate text-xs font-semibold"
+            style={{ color: LEGACY_COLORS.text }}
+          >
+            {log.item_name}
+          </TruncatedText>
         </div>
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} dense />
       <SpacerCell compact={compact} dense />
-      <td className="whitespace-nowrap border-b px-5 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowSummaryCell presentation={presentation} />
+      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <FlowSummaryCell presentation={presentation} dense />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} />
+      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="flex h-10 items-center justify-center overflow-hidden">
+          <MovementSummaryCell summary={presentation.movement} compact={compact} />
+        </div>
       </td>
-      <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} />
-      </td>
+      <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }} />
     </tr>
   );
 }
@@ -634,6 +968,8 @@ export function OpBatchHeader({
   batch,
   rowRef,
   compact,
+  controlsId,
+  separationHint,
 }: {
   group: Extract<LogGroup, { type: "op_batch" }>;
   expanded: boolean;
@@ -645,12 +981,19 @@ export function OpBatchHeader({
   rowRef?: (el: HTMLTableRowElement | null) => void;
   /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
   compact?: boolean;
+  controlsId?: string;
+  separationHint?: string | null;
 }) {
   const padX = compact ? "px-2" : "px-4";
+  const targetPadX = compact ? "px-2" : "px-4";
+  const flowPadX = compact ? "px-2" : "px-5";
+  const quantityPadX = compact ? "px-2" : "px-4";
+  const statusPadX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const basePresentation = getHistoryRowPresentation(first, batch ?? undefined);
   const flowColor = isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType);
+  const cancelled = group.logs.some((log) => log.cancelled);
 
   let titleText: string;
   if (batch && batch.bundles.length > 0) {
@@ -669,6 +1012,9 @@ export function OpBatchHeader({
       title: titleText,
       meta: [],
     },
+    statusChips: separationHint
+      ? [...basePresentation.statusChips, { label: separationHint, tone: "muted" }]
+      : basePresentation.statusChips,
   };
   const [hovered, setHovered] = useState(false);
 
@@ -682,6 +1028,7 @@ export function OpBatchHeader({
     <tr
       ref={rowRef}
       data-batch-id={group.batchId}
+      data-history-main-row="true"
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -690,11 +1037,10 @@ export function OpBatchHeader({
         }
       }}
       tabIndex={0}
-      role="button"
-      aria-pressed={selected}
+      aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
@@ -703,14 +1049,14 @@ export function OpBatchHeader({
     >
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
-          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
+          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} controlsId={controlsId} />
           {formatHistoryDate(first.requested_at ?? first.created_at)}
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
+        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
@@ -718,13 +1064,13 @@ export function OpBatchHeader({
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <SpacerCell compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-5 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} px-4 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} />
+      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <QuantityStockCell presentation={presentation} summary={summary} compact={compact} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} px-4`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
