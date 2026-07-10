@@ -258,7 +258,7 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
       <ConfirmModal
         open={executeConfirmOpen}
         title="품목 전환을 실행할까요?"
-        tone="caution"
+        tone="normal"
         cautionMessage="소스 품목 재고가 차감되고 대상 품목 재고가 즉시 입고됩니다."
         confirmLabel="전환 실행"
         busy={busy}
@@ -599,28 +599,54 @@ function ExecuteStep({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-execute-step">
-      <PreviewSummary preview={preview} />
       <PreviewDifferencePanels preview={preview} />
-      <div data-testid="item-conversion-final-confirmation" className="mt-auto shrink-0 border-t pt-3">
-        <div className="ict text-sm font-black">최종 실행 확인</div>
-        <div className="mt-2 grid gap-2 text-sm font-bold lg:grid-cols-3">
-          <div><span className="icm text-xs">소스 품목</span><div>{preview.source_item_name} · {formatQty(preview.quantity)}</div></div>
-          <div><span className="icm text-xs">대상 품목</span><div>{preview.target_item_name} · {formatQty(preview.quantity)}</div></div>
-          <div><span className="icm text-xs">메모</span><div>{memo.trim() || "-"}</div></div>
+      {error && <ErrorNotice message={error} />}
+      <FinalExecutionBar
+        preview={preview}
+        memo={memo}
+        busy={busy}
+        onExecute={onExecute}
+      />
+    </div>
+  );
+}
+
+function FinalExecutionBar({
+  preview,
+  memo,
+  busy,
+  onExecute,
+}: {
+  preview: ItemConversionPreview;
+  memo: string;
+  busy: boolean;
+  onExecute: () => void;
+}) {
+  return (
+    <div data-testid="item-conversion-final-confirmation" className="ic-execution-bar mt-auto shrink-0">
+      <div className="ic-execution-details">
+        <div className="ic-execution-detail">
+          <span className="icm text-xs font-black">소스 품목</span>
+          <div className="ic-execution-value">{preview.source_item_name} · {formatQty(preview.quantity)}</div>
         </div>
-        <div className="mt-3 flex justify-end">
-          <button
-            type="button"
-            className={buttonPrimary}
-            data-testid="item-conversion-confirm-button"
-            disabled={busy}
-            onClick={onExecute}
-          >
-            {busy ? "실행 중" : "전환 실행"}
-          </button>
+        <div className="ic-execution-detail">
+          <span className="icm text-xs font-black">대상 품목</span>
+          <div className="ic-execution-value">{preview.target_item_name} · {formatQty(preview.quantity)}</div>
+        </div>
+        <div className="ic-execution-detail">
+          <span className="icm text-xs font-black">메모</span>
+          <div className="ic-execution-value">{memo.trim() || "-"}</div>
         </div>
       </div>
-      {error && <ErrorNotice message={error} />}
+      <button
+        type="button"
+        className={buttonPrimary}
+        data-testid="item-conversion-confirm-button"
+        disabled={busy}
+        onClick={onExecute}
+      >
+        {busy ? "실행 중" : "전환 실행"}
+      </button>
     </div>
   );
 }

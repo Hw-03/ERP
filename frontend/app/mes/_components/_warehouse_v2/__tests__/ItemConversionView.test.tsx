@@ -222,7 +222,11 @@ describe("ItemConversionView", () => {
     ]);
     expect(screen.getByTestId("item-conversion-execute-step")).toHaveTextContent("Domestic AF");
     expect(screen.getByTestId("item-conversion-execute-step")).toHaveTextContent("Cable Set");
-    expect(screen.getByTestId("item-conversion-final-confirmation")).toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-mode-badge")).not.toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-final-confirmation")).toHaveClass("ic-execution-bar");
+    expect(screen.getByTestId("item-conversion-final-confirmation")).toHaveTextContent("Domestic AF");
+    expect(screen.getByTestId("item-conversion-final-confirmation")).toHaveTextContent("Export AF");
+    expect(screen.getByTestId("item-conversion-final-confirmation")).toHaveTextContent("BOM conversion");
     expect(screen.queryByText("차이 다시 보기")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("item-conversion-confirm-button"));
@@ -268,6 +272,8 @@ describe("ItemConversionView", () => {
     expect(await screen.findByTestId("item-conversion-mode-badge")).toHaveTextContent("SPEC");
     fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
     expect(screen.getByTestId("item-conversion-execute-step")).toHaveTextContent("변경되는 구성품이 없습니다");
+    expect(screen.queryByTestId("item-conversion-mode-badge")).not.toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-final-confirmation")).toHaveClass("ic-execution-bar");
     expect(screen.queryByText("차이 다시 보기")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("item-conversion-confirm-button"));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "전환 실행" }));
