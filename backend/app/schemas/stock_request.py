@@ -30,7 +30,7 @@ class StockRequestCreate(BaseModel):
     notes: Optional[str] = None
     lines: List[StockRequestLineCreate] = Field(..., min_length=1)
     client_request_id: Optional[str] = Field(None, max_length=64)
-    reason_category: Optional[str] = Field(None, max_length=50)
+    reason_category: Optional[str] = Field(None, max_length=32)
     reason_memo: Optional[str] = None
 
 
@@ -41,7 +41,7 @@ class StockRequestDraftUpsert(BaseModel):
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     lines: List[StockRequestLineCreate] = Field(default_factory=list)
-    reason_category: Optional[str] = Field(None, max_length=50)
+    reason_category: Optional[str] = Field(None, max_length=32)
     reason_memo: Optional[str] = None
 
 

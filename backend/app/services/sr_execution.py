@@ -359,6 +359,8 @@ def _execute_line(
             produced_by=approver.name,
             producer_employee_id=approver.employee_id,
             notes=note,
+            reason_category=request.reason_category,
+            reason_memo=request.reason_memo,
             operation_batch_id=getattr(request, "operation_batch_id", None),
             department=str(line.from_department) if line.from_department else None,
             inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),

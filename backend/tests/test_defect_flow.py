@@ -184,6 +184,137 @@ def test_unquarantine_clears_defective_at_and_logs(db_session, client, make_item
 # ---------------------------------------------------------------------------
 
 
+def test_transaction_log_reason_category_uses_32_char_storage_limit():
+    """최종 로그의 사유 저장 한도는 32자다."""
+    log_limit = TransactionLog.__table__.c.reason_category.type.length
+
+    assert log_limit == 32
+
+
+def test_stock_request_rejects_reason_category_over_transaction_log_limit(
+    db_session, client, make_item
+):
+    """33자 사유는 최종 로그 저장 전에 요청 스키마에서 거절한다."""
+    item = make_item(name="LONG-REASON", process_type_code="TR", warehouse_qty=Decimal("5"))
+    requester = _make_employee(db_session, code="LR01", name="long reason actor")
+    db_session.commit()
+
+    res = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "scrap_normal",
+        "reason_category": "R" * 33,
+        "lines": [{
+            "item_id": str(item.item_id),
+            "quantity": "2",
+            "from_bucket": "warehouse",
+            "to_bucket": "none",
+        }],
+    })
+
+    assert res.status_code == 422
+    assert (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.item_id == item.item_id)
+        .count()
+    ) == 0
+
+
+@pytest.mark.parametrize(
+    ("request_type", "final_type"),
+    [
+        ("scrap_normal", TransactionTypeEnum.DEFECT_SCRAP),
+        ("return_normal", TransactionTypeEnum.SUPPLIER_RETURN),
+    ],
+)
+def test_normal_direct_processing_creates_one_final_log_without_quarantine(
+    db_session, client, make_item, request_type, final_type
+):
+    """정상 재고 즉시 처리는 격리 로그 없이 최종 처리 로그 한 건만 남긴다."""
+    item = make_item(name="DIRECT-SCRAP", process_type_code="TR", warehouse_qty=Decimal("5"))
+    requester = _make_employee(db_session, code="DN01", name="direct actor")
+    reason_category = "R" * 32
+    db_session.commit()
+
+    res = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": request_type,
+        "reason_category": reason_category,
+        "reason_memo": "격리 없이 바로 폐기",
+        "lines": [{
+            "item_id": str(item.item_id),
+            "quantity": "2",
+            "from_bucket": "warehouse",
+            "to_bucket": "none",
+        }],
+    })
+
+    assert res.status_code == 201, res.json()
+    assert res.json()["status"] == "completed"
+
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.item_id == item.item_id)
+        .order_by(TransactionLog.created_at)
+        .all()
+    )
+    assert [log.transaction_type for log in logs] == [final_type]
+    assert logs[0].reason_category == reason_category
+    assert logs[0].reason_memo == "격리 없이 바로 폐기"
+    assert logs[0].produced_by == requester.name
+    assert logs[0].inventory_effect is not None
+
+
+def test_quarantine_then_scrap_preserves_two_audit_logs(
+    db_session, client, make_item
+):
+    """격리 후 폐기는 격리와 최종 처리의 감사 로그를 각각 남긴다."""
+    item = make_item(name="QUARANTINE-SCRAP", process_type_code="TR", warehouse_qty=Decimal("5"))
+    requester = _make_employee(db_session, code="QS01", name="quarantine actor")
+    db_session.commit()
+
+    quarantine_res = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "2",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "reason_category": "외관불량",
+        "reason_memo": "격리 사유",
+        "actor_employee_id": str(requester.employee_id),
+    })
+    assert quarantine_res.status_code == 200, quarantine_res.json()
+
+    scrap_res = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "defect_scrap",
+        "reason_category": "폐기",
+        "reason_memo": "격리 후 폐기",
+        "lines": [{
+            "item_id": str(item.item_id),
+            "quantity": "2",
+            "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "to_bucket": "none",
+        }],
+    })
+    assert scrap_res.status_code == 201, scrap_res.json()
+    assert scrap_res.json()["status"] == "completed"
+
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.item_id == item.item_id)
+        .order_by(TransactionLog.created_at)
+        .all()
+    )
+    assert [log.transaction_type for log in logs] == [
+        TransactionTypeEnum.MARK_DEFECTIVE,
+        TransactionTypeEnum.DEFECT_SCRAP,
+    ]
+    assert [(log.reason_category, log.reason_memo) for log in logs] == [
+        ("외관불량", "격리 사유"),
+        ("폐기", "격리 후 폐기"),
+    ]
+
+
 def test_defect_scrap_via_stock_request(db_session, client, make_item):
     item = make_item(name="R003", process_type_code="TR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="E03", name="발의자C")

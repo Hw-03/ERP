@@ -488,6 +488,9 @@ def test_execute_line_rework_normal_splits_children_by_item_department(
     parent_logs = _logs(db_session, parent.item_id)
     assert [log.transaction_type for log in parent_logs] == [TransactionTypeEnum.DISASSEMBLE]
     assert parent_logs[0].quantity_change == D("-2")
+    assert parent_logs[0].reason_category == "기타"
+    assert parent_logs[0].reason_memo == "바로 재작업"
+    assert parent_logs[0].notes.startswith("[rework:normal]")
 
     normal_log = db_session.query(TransactionLog).filter(
         TransactionLog.item_id == normal_child.item_id,

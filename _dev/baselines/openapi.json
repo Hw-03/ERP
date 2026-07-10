@@ -7314,7 +7314,7 @@
           "reason_category": {
             "anyOf": [
               {
-                "maxLength": 50,
+                "maxLength": 32,
                 "type": "string"
               },
               {
@@ -7387,7 +7387,7 @@
           "reason_category": {
             "anyOf": [
               {
-                "maxLength": 50,
+                "maxLength": 32,
                 "type": "string"
               },
               {
