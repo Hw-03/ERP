@@ -82,6 +82,7 @@ class ShippingComponentChangeExecuteRequest(BaseModel):
 class ItemConversionExecuteRequest(BaseModel):
     source_item_id: uuid.UUID
     target_item_id: uuid.UUID
+    requester_employee_id: uuid.UUID
     quantity: int = Field(..., gt=0)
     requested_mode: Optional[str] = Field(None, pattern="^(SPEC|BOM)$")
     memo: Optional[str] = Field(None, max_length=300)

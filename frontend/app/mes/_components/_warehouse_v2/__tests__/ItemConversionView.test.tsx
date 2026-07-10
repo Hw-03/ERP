@@ -57,6 +57,7 @@ const items = [
   item("af-2", "Export AF", "AF", "3-AF-0002", 0),
   item("pr-1", "Raw Part", "PR", "3-PR-0001", 20),
 ];
+const requesterEmployeeId = "op-1";
 
 const result: ItemConversionResult = {
   request_id: null,
@@ -130,7 +131,14 @@ describe("ItemConversionView", () => {
   });
 
   it("starts item conversion at item and quantity selection without mode cards", () => {
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={() => {}}
+      />,
+    );
 
     const navItems = screen.getAllByTestId("item-conversion-step-nav-item");
     expect(navItems).toHaveLength(4);
@@ -150,7 +158,14 @@ describe("ItemConversionView", () => {
   });
 
   it("keeps source and target lists visible with selected row markers", () => {
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={() => {}}
+      />,
+    );
 
     fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
 
@@ -176,7 +191,14 @@ describe("ItemConversionView", () => {
   });
 
   it("uses searchable source and target selection before moving to preview", async () => {
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={() => {}}
+      />,
+    );
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByTestId("item-conversion-memo")).not.toBeInTheDocument();
@@ -193,6 +215,7 @@ describe("ItemConversionView", () => {
         source_item_id: "af-1",
         target_item_id: "af-2",
         quantity: 1,
+        requester_employee_id: requesterEmployeeId,
       });
     });
 
@@ -209,7 +232,14 @@ describe("ItemConversionView", () => {
 
   it("previews and executes an automatically resolved BOM item conversion", async () => {
     const onComplete = vi.fn();
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={onComplete}
+      />,
+    );
 
     fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
     fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
@@ -255,9 +285,38 @@ describe("ItemConversionView", () => {
         target_item_id: "af-2",
         quantity: 1,
         memo: "BOM conversion",
+        requester_employee_id: requesterEmployeeId,
       });
     });
     expect(onComplete).toHaveBeenCalledWith(result);
+  });
+
+  it("blocks execution locally when the requester employee id is missing", async () => {
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId=""
+        onComplete={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    fireEvent.click(screen.getByTestId("item-conversion-next-button"));
+    await screen.findByTestId("item-conversion-preview");
+    fireEvent.change(screen.getByTestId("item-conversion-memo"), {
+      target: { value: "BOM conversion" },
+    });
+    fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
+
+    const executeButton = screen.getByTestId("item-conversion-confirm-button");
+    expect(executeButton).toBeDisabled();
+    expect(screen.getByText("로그인 작업자 정보를 확인할 수 없습니다. 다시 로그인해 주세요.")).toBeInTheDocument();
+    fireEvent.click(executeButton);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(apiMock.executeItemConversion).not.toHaveBeenCalled();
   });
 
   it("does not require memo for an automatically resolved SPEC conversion", async () => {
@@ -271,7 +330,14 @@ describe("ItemConversionView", () => {
     apiMock.getItemConversionPreview.mockResolvedValue(specResult);
     apiMock.executeItemConversion.mockResolvedValue(specResult);
     const onComplete = vi.fn();
-    render(<ItemConversionWorkView items={items} loading={false} onComplete={onComplete} />);
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={onComplete}
+      />,
+    );
 
     fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
     fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
@@ -292,6 +358,7 @@ describe("ItemConversionView", () => {
         target_item_id: "af-2",
         quantity: 1,
         memo: null,
+        requester_employee_id: requesterEmployeeId,
       });
     });
     expect(onComplete).toHaveBeenCalledWith(specResult);

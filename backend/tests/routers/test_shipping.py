@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
+from typing import Any, Callable
 
-from app.models import DepartmentEnum, ShippingRequestStatusEnum
+from sqlalchemy.orm import Session
+
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    ShippingRequestStatusEnum,
+    TransactionLog,
+)
 
 
 def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
@@ -16,8 +26,139 @@ def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
     }
 
 
+def _employee(db_session, *, code: str, name: str, is_active: bool = True) -> Employee:
+    employee = Employee(
+        employee_code=code,
+        name=name,
+        role="worker",
+        department=DepartmentEnum.ASSEMBLY.value,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active=is_active,
+    )
+    db_session.add(employee)
+    db_session.flush()
+    return employee
+
+
+def _component_change_payload(
+    db_session: Session,
+    make_item: Callable[..., Any],
+    make_bom: Callable[..., Any],
+    make_location: Callable[..., Any],
+) -> dict[str, object]:
+    af = make_item(
+        name="AF Main",
+        process_type_code="AF",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=1,
+    )
+    cable = make_item(
+        name="Cable",
+        process_type_code="PR",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=2,
+    )
+    source_pa = make_item(
+        name="Source PA",
+        process_type_code="PA",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=3,
+    )
+    target_pa = make_item(
+        name="Target PA",
+        process_type_code="PA",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=4,
+    )
+    make_bom(source_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, cable.item_id, Decimal("1"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(cable.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+    return {
+        "source_pa_item_id": str(source_pa.item_id),
+        "target_pa_item_id": str(target_pa.item_id),
+        "quantity": 1,
+        "memo": "actor guard",
+    }
+
+
+def _prepared_shipping_component_change(
+    client: Any,
+    db_session: Session,
+    make_item: Callable[..., Any],
+    make_bom: Callable[..., Any],
+    make_location: Callable[..., Any],
+) -> tuple[str, dict[str, object]]:
+    af = make_item(
+        name="Request AF",
+        process_type_code="AF",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=1,
+    )
+    pouch = make_item(
+        name="Request Pouch",
+        process_type_code="PR",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=2,
+    )
+    base_pa = make_item(
+        name="Request Base PA",
+        process_type_code="PA",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=3,
+    )
+    base_pf = make_item(
+        name="Request Base PF",
+        process_type_code="PF",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=4,
+    )
+    make_bom(base_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    make_location(base_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(pouch.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+
+    created = client.post(
+        "/api/shipping/requests",
+        json={
+            "base_pf_item_id": str(base_pf.item_id),
+            "requested_by_name": "출하 요청 생성자",
+            "custom_pa_name": "Request Changed PA",
+            "custom_pf_name": "Request Changed PF",
+            "request_quantity": 1,
+            "bom_lines": [_line(af), _line(pouch)],
+        },
+    )
+    assert created.status_code == 201, created.text
+    request_id = created.json()["request_id"]
+    prepared = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
+    assert prepared.status_code == 200, prepared.text
+    return request_id, {
+        "source_pa_item_id": str(base_pa.item_id),
+        "quantity": 1,
+        "memo": "request actor guard",
+    }
+
+
 
 def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, make_bom, make_location):
+    component_change_actor = _employee(
+        db_session,
+        code="shipping-request-workflow-actor",
+        name="출하 워크플로 실행자",
+    )
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -69,6 +210,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     component_change = client.post(
         f"/api/shipping/requests/{request_id}/component-change",
+        headers={"X-MES-Employee-Code": component_change_actor.employee_code},
         json={"source_pa_item_id": str(base_pa.item_id), "quantity": 2, "memo": "출하 구성 전환"},
     )
     assert component_change.status_code == 200, component_change.text
@@ -130,6 +272,116 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     clear_after_pickup = client.post(f"/api/shipping/requests/{request_id}/checklist/clear")
     assert clear_after_pickup.status_code == 422, clear_after_pickup.text
+
+
+def test_shipping_request_component_change_attributes_all_logs_to_executor(
+    client, db_session, make_item, make_bom, make_location
+):
+    executor = _employee(
+        db_session,
+        code="shipping-request-component-executor",
+        name="실제 전환 실행자",
+    )
+    request_id, payload = _prepared_shipping_component_change(
+        client,
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+
+    response = client.post(
+        f"/api/shipping/requests/{request_id}/component-change",
+        headers={"X-MES-Employee-Code": executor.employee_code},
+        json=payload,
+    )
+
+    assert response.status_code == 200, response.text
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(
+            TransactionLog.shipping_request_id == uuid.UUID(request_id),
+            TransactionLog.shipping_phase == "COMPONENT_CHANGE",
+        )
+        .all()
+    )
+    assert len(logs) == 3
+    assert {log.produced_by for log in logs} == {executor.name}
+    assert {log.producer_employee_id for log in logs} == {executor.employee_id}
+
+
+def test_shipping_request_component_change_requires_employee_header(
+    client, db_session, make_item, make_bom, make_location
+):
+    request_id, payload = _prepared_shipping_component_change(
+        client,
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+
+    response = client.post(f"/api/shipping/requests/{request_id}/component-change", json=payload)
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == {
+        "code": "BAD_REQUEST",
+        "message": "작업자 사번 헤더가 필요합니다.",
+    }
+
+
+def test_shipping_request_component_change_returns_404_for_unknown_header_employee(
+    client, db_session, make_item, make_bom, make_location
+):
+    request_id, payload = _prepared_shipping_component_change(
+        client,
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+
+    response = client.post(
+        f"/api/shipping/requests/{request_id}/component-change",
+        headers={"X-MES-Employee-Code": "missing-request-executor"},
+        json=payload,
+    )
+
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"] == {
+        "code": "NOT_FOUND",
+        "message": "작업자(직원)를 찾을 수 없습니다.",
+    }
+
+
+def test_shipping_request_component_change_returns_403_for_inactive_header_employee(
+    client, db_session, make_item, make_bom, make_location
+):
+    executor = _employee(
+        db_session,
+        code="inactive-shipping-request-component",
+        name="비활성 출하 요청 전환자",
+        is_active=False,
+    )
+    request_id, payload = _prepared_shipping_component_change(
+        client,
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+
+    response = client.post(
+        f"/api/shipping/requests/{request_id}/component-change",
+        headers={"X-MES-Employee-Code": executor.employee_code},
+        json=payload,
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == {
+        "code": "FORBIDDEN",
+        "message": "비활성 직원은 품목 전환을 실행할 수 없습니다.",
+    }
 
 
 def test_shipping_request_duplicate_custom_pa_name_returns_readable_korean_error(client, db_session, make_item, make_bom):
@@ -202,6 +454,7 @@ def test_shipping_request_update_can_reuse_its_generated_pa_pf_names(client, db_
 
 
 def test_component_change_api_runs_without_shipping_request(client, db_session, make_item, make_bom, make_location):
+    requester = _employee(db_session, code="shipping-component-actor", name="출하 전환 요청자")
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     cable = make_item(name="Cable", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -232,6 +485,7 @@ def test_component_change_api_runs_without_shipping_request(client, db_session, 
 
     executed = client.post(
         "/api/shipping/component-change",
+        headers={"X-MES-Employee-Code": requester.employee_code},
         json={
             "source_pa_item_id": str(source_pa.item_id),
             "target_pa_item_id": str(target_pa.item_id),
@@ -250,9 +504,67 @@ def test_component_change_api_runs_without_shipping_request(client, db_session, 
     assert len(done["transactions"]) == 3
     assert {log["shipping_phase"] for log in done["transactions"]} == {"COMPONENT_CHANGE"}
     assert {log["reference_no"] for log in done["transactions"]} == {done["reference_no"]}
+    assert {log["produced_by"] for log in done["transactions"]} == {requester.name}
+    logs = db_session.query(TransactionLog).filter(TransactionLog.reference_no == done["reference_no"]).all()
+    assert {log.producer_employee_id for log in logs} == {requester.employee_id}
+
+
+def test_component_change_api_requires_employee_header(client, db_session, make_item, make_bom, make_location):
+    payload = _component_change_payload(db_session, make_item, make_bom, make_location)
+
+    response = client.post("/api/shipping/component-change", json=payload)
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == {
+        "code": "BAD_REQUEST",
+        "message": "작업자 사번 헤더가 필요합니다.",
+    }
+
+
+def test_component_change_api_returns_404_for_unknown_header_employee(
+    client, db_session, make_item, make_bom, make_location
+):
+    payload = _component_change_payload(db_session, make_item, make_bom, make_location)
+
+    response = client.post(
+        "/api/shipping/component-change",
+        headers={"X-MES-Employee-Code": "missing-employee"},
+        json=payload,
+    )
+
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"] == {
+        "code": "NOT_FOUND",
+        "message": "작업자(직원)를 찾을 수 없습니다.",
+    }
+
+
+def test_component_change_api_returns_403_for_inactive_header_employee(
+    client, db_session, make_item, make_bom, make_location
+):
+    requester = _employee(
+        db_session,
+        code="inactive-shipping-component",
+        name="비활성 출하 전환 요청자",
+        is_active=False,
+    )
+    payload = _component_change_payload(db_session, make_item, make_bom, make_location)
+
+    response = client.post(
+        "/api/shipping/component-change",
+        headers={"X-MES-Employee-Code": requester.employee_code},
+        json=payload,
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == {
+        "code": "FORBIDDEN",
+        "message": "비활성 직원은 품목 전환을 실행할 수 없습니다.",
+    }
 
 
 def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, make_item, make_bom, make_location):
+    requester = _employee(db_session, code="item-conversion-spec", name="전환 요청자")
     source_leaf = make_item(name="Shared leaf", process_type_code="TR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     source_aa = make_item(name="Domestic AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     target_aa = make_item(name="Export AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -289,6 +601,7 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
             "target_item_id": str(target_af.item_id),
             "quantity": 2,
             "requested_mode": "SPEC",
+            "requester_employee_id": str(requester.employee_id),
         },
     )
 
@@ -328,6 +641,7 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
 def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
     client, db_session, make_item, make_bom, make_location
 ):
+    requester = _employee(db_session, code="item-conversion-auto", name="자동 판정 요청자")
     shared_leaf = make_item(name="Shared leaf", process_type_code="TR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     source_aa = make_item(name="Domestic AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     target_aa = make_item(name="Export AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -380,11 +694,123 @@ def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
             "target_item_id": str(target_pa.item_id),
             "quantity": 1,
             "memo": "auto BOM conversion",
+            "requester_employee_id": str(requester.employee_id),
         },
     )
     assert executed.status_code == 200, executed.text
     assert executed.json()["requested_mode"] == "BOM"
     assert executed.json()["resolved_mode"] == "BOM"
+
+
+def test_item_conversion_api_requires_requester_employee_id(client):
+    response = client.post(
+        "/api/io/item-conversion",
+        json={
+            "source_item_id": str(uuid.uuid4()),
+            "target_item_id": str(uuid.uuid4()),
+            "quantity": 1,
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert isinstance(detail, list)
+    assert any(error["loc"][-1] == "requester_employee_id" for error in detail)
+
+
+def test_item_conversion_api_returns_404_for_unknown_requester(client):
+    response = client.post(
+        "/api/io/item-conversion",
+        json={
+            "source_item_id": str(uuid.uuid4()),
+            "target_item_id": str(uuid.uuid4()),
+            "quantity": 1,
+            "requester_employee_id": str(uuid.uuid4()),
+        },
+    )
+
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"]["code"] == "NOT_FOUND"
+
+
+def test_item_conversion_api_returns_403_for_inactive_requester(client, db_session):
+    requester = _employee(
+        db_session,
+        code="inactive-item-conversion",
+        name="비활성 전환 요청자",
+        is_active=False,
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/io/item-conversion",
+        json={
+            "source_item_id": str(uuid.uuid4()),
+            "target_item_id": str(uuid.uuid4()),
+            "quantity": 1,
+            "requester_employee_id": str(requester.employee_id),
+        },
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"]["code"] == "FORBIDDEN"
+
+
+def test_item_conversion_api_attributes_every_log_to_requester(
+    client, db_session, make_item, make_bom, make_location
+):
+    requester = _employee(db_session, code="item-conversion-owner", name="김전환")
+    recovered_part = make_item(
+        name="Recovered part",
+        process_type_code="TR",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=1,
+    )
+    consumed_part = make_item(
+        name="Consumed part",
+        process_type_code="TR",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=2,
+    )
+    source_pa = make_item(
+        name="Source PA",
+        process_type_code="PA",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=3,
+    )
+    target_pa = make_item(
+        name="Target PA",
+        process_type_code="PA",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=4,
+    )
+    make_bom(source_pa.item_id, recovered_part.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, consumed_part.item_id, Decimal("1"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(consumed_part.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("1"))
+    db_session.commit()
+
+    response = client.post(
+        "/api/io/item-conversion",
+        json={
+            "source_item_id": str(source_pa.item_id),
+            "target_item_id": str(target_pa.item_id),
+            "quantity": 1,
+            "memo": "요청자 귀속 확인",
+            "requester_employee_id": str(requester.employee_id),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    reference_no = response.json()["reference_no"]
+    logs = db_session.query(TransactionLog).filter(TransactionLog.reference_no == reference_no).all()
+    assert len(logs) == 4
+    assert {log.produced_by for log in logs} == {requester.name}
+    assert {log.producer_employee_id for log in logs} == {requester.employee_id}
 
 
 def test_item_conversion_api_blocks_wrong_level_and_spec_with_bom_difference(

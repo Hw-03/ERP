@@ -216,6 +216,9 @@ describe("IoComposeView navigation chrome", () => {
     await waitFor(() => {
       expect(api.executeItemConversion).toHaveBeenCalledTimes(1);
     });
+    expect(api.executeItemConversion).toHaveBeenCalledWith(
+      expect.objectContaining({ requester_employee_id: operator.employee_id }),
+    );
     await waitFor(() => {
       expect(screen.getByTestId("warehouse-item-conversion-card")).toBeInTheDocument();
     });

@@ -13,6 +13,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 interface WorkProps {
   items: Item[];
   loading?: boolean;
+  requesterEmployeeId: string;
   onBack?: () => void;
   onComplete: (result: ItemConversionResult) => void;
 }
@@ -30,6 +31,7 @@ const CONVERSION_STEPS: Array<{ id: ConversionStepId; title: string }> = [
 
 const buttonPrimary = "icb icb-primary";
 const buttonSecondary = "icb icb-secondary";
+const MISSING_REQUESTER_ERROR = "로그인 작업자 정보를 확인할 수 없습니다. 다시 로그인해 주세요.";
 
 function positiveInt(value: string | number): number {
   const n = Math.floor(Number(value));
@@ -75,7 +77,13 @@ function filterCandidates(candidates: Item[], query: string): Item[] {
   });
 }
 
-export function ItemConversionWorkView({ items, loading = false, onBack, onComplete }: WorkProps) {
+export function ItemConversionWorkView({
+  items,
+  loading = false,
+  requesterEmployeeId,
+  onBack,
+  onComplete,
+}: WorkProps) {
   const [sourceId, setSourceId] = useState("");
   const [targetId, setTargetId] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -110,6 +118,9 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
   const memoRequired = resolvedMode === "BOM";
   const memoReady = !memoRequired || memo.trim().length > 0;
   const canGoExecute = Boolean(preview?.executable && memoReady);
+  const normalizedRequesterEmployeeId = requesterEmployeeId.trim();
+  const requesterReady = normalizedRequesterEmployeeId.length > 0;
+  const requesterError = requesterReady ? null : MISSING_REQUESTER_ERROR;
 
   const clearPreviewState = useCallback((): void => {
     setPreview(null);
@@ -138,6 +149,7 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
         source_item_id: sourceItem.item_id,
         target_item_id: targetItem.item_id,
         quantity,
+        requester_employee_id: normalizedRequesterEmployeeId,
       });
       setPreview(next);
       setReady(false);
@@ -152,6 +164,11 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
 
   async function execute(): Promise<void> {
     if (!sourceItem || !targetItem || !preview || !canGoExecute) return;
+    if (!requesterReady) {
+      setExecuteConfirmOpen(false);
+      setError(MISSING_REQUESTER_ERROR);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -160,6 +177,7 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
         target_item_id: targetItem.item_id,
         quantity,
         memo: memo.trim() || null,
+        requester_employee_id: normalizedRequesterEmployeeId,
       });
       setExecuteConfirmOpen(false);
       onComplete(result);
@@ -251,7 +269,8 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
           preview={preview}
           memo={memo}
           busy={busy}
-          error={error}
+          error={error ?? requesterError}
+          canExecute={requesterReady}
           onExecute={() => setExecuteConfirmOpen(true)}
         />
       ) : null}
@@ -589,12 +608,14 @@ function ExecuteStep({
   memo,
   busy,
   error,
+  canExecute,
   onExecute,
 }: {
   preview: ItemConversionPreview;
   memo: string;
   busy: boolean;
   error: string | null;
+  canExecute: boolean;
   onExecute: () => void;
 }) {
   return (
@@ -605,6 +626,7 @@ function ExecuteStep({
         preview={preview}
         memo={memo}
         busy={busy}
+        canExecute={canExecute}
         onExecute={onExecute}
       />
     </div>
@@ -615,11 +637,13 @@ function FinalExecutionBar({
   preview,
   memo,
   busy,
+  canExecute,
   onExecute,
 }: {
   preview: ItemConversionPreview;
   memo: string;
   busy: boolean;
+  canExecute: boolean;
   onExecute: () => void;
 }) {
   return (
@@ -642,7 +666,7 @@ function FinalExecutionBar({
         type="button"
         className={buttonPrimary}
         data-testid="item-conversion-confirm-button"
-        disabled={busy}
+        disabled={busy || !canExecute}
         onClick={onExecute}
       >
         {busy ? "실행 중" : "전환 실행"}

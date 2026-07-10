@@ -164,6 +164,7 @@ export interface ItemConversionPreview {
 export interface ItemConversionPayload {
   source_item_id: string;
   target_item_id: string;
+  requester_employee_id: string;
   quantity: number;
   requested_mode?: ItemConversionMode | null;
   memo?: string | null;

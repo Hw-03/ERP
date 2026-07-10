@@ -5,11 +5,13 @@ from __future__ import annotations
 import uuid
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app._actor import get_actor_emp, set_actor
 from app.database import get_db
 from app.models import (
+    Employee,
     ShippingRequest,
     ShippingRequestStatusEnum,
     TransactionLog,
@@ -189,6 +191,23 @@ def _commit_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: 
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 
+def _load_component_change_actor(http_request: Request, db: Session) -> Employee:
+    employee_code = get_actor_emp(http_request)
+    if employee_code == "-":
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "작업자 사번 헤더가 필요합니다.")
+    requester = db.query(Employee).filter(Employee.employee_code == employee_code).first()
+    if requester is None:
+        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자(직원)를 찾을 수 없습니다.")
+    if not bool(requester.is_active):
+        raise http_error(
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.FORBIDDEN,
+            "비활성 직원은 품목 전환을 실행할 수 없습니다.",
+        )
+    set_actor(http_request, requester)
+    return requester
+
+
 @router.get("/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
 def component_change_preview_independent(
     source_pa_item_id: uuid.UUID = Query(...),
@@ -213,8 +232,11 @@ def component_change_preview_independent(
 @router.post("/component-change", response_model=ShippingComponentChangeResultResponse)
 def component_change_independent(
     payload: ShippingComponentChangeExecuteRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
+    requester = _load_component_change_actor(http_request, db)
+
     if payload.target_pa_item_id is None:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, "대상 PA를 선택해야 합니다.")
     try:
@@ -225,6 +247,8 @@ def component_change_independent(
             payload.quantity,
             payload.memo,
             payload.requested_mode,
+            requester_name=requester.name,
+            requester_employee_id=requester.employee_id,
         )
         db.commit()
         return ShippingComponentChangeResultResponse(
@@ -323,8 +347,10 @@ def component_change_preview(
 def component_change(
     request_id: uuid.UUID,
     payload: ShippingComponentChangeExecuteRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
+    requester = _load_component_change_actor(http_request, db)
     req = _commit_or_422(
         db,
         shipping_svc.execute_component_change,
@@ -333,6 +359,8 @@ def component_change(
         payload.quantity,
         payload.requested_mode,
         payload.memo,
+        requester_name=requester.name,
+        requester_employee_id=requester.employee_id,
     )
     return _to_response(db, req)
 

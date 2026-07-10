@@ -30,7 +30,7 @@ from app.services import io as io_svc
 from app.services import shipping as shipping_svc
 from app.services.shipping import ShippingError
 from app.services._tx import commit_only
-from app.models import TransactionLog
+from app.models import Employee, TransactionLog
 
 
 router = APIRouter()
@@ -84,6 +84,16 @@ def item_conversion_preview(
 
 @router.post("/item-conversion", response_model=ShippingComponentChangeResultResponse)
 def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session = Depends(get_db)):
+    requester = (
+        db.query(Employee)
+        .filter(Employee.employee_id == payload.requester_employee_id)
+        .first()
+    )
+    if requester is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
+    if not bool(requester.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+
     try:
         result = shipping_svc.execute_component_change_independent(
             db,
@@ -92,6 +102,8 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
             payload.quantity,
             payload.memo,
             payload.requested_mode,
+            requester_name=requester.name,
+            requester_employee_id=requester.employee_id,
         )
         db.commit()
         return ShippingComponentChangeResultResponse(

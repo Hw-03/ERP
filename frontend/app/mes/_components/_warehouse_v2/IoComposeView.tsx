@@ -877,6 +877,7 @@ export function IoComposeView({
       <div className="flex h-full min-h-0 flex-col gap-3">
         <ItemConversionWorkView
           items={items}
+          requesterEmployeeId={operator?.employee_id ?? ""}
           onBack={backFromItemConversion}
           onComplete={() => {
             void api

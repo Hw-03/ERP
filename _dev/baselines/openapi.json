@@ -3738,6 +3738,11 @@
             ],
             "title": "Requested Mode"
           },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          },
           "source_item_id": {
             "format": "uuid",
             "title": "Source Item Id",
@@ -3752,6 +3757,7 @@
         "required": [
           "source_item_id",
           "target_item_id",
+          "requester_employee_id",
           "quantity"
         ],
         "title": "ItemConversionExecuteRequest",

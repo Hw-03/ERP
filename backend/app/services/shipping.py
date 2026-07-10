@@ -634,6 +634,7 @@ def _log_inventory_change(
     request_id: uuid.UUID,
     phase: str,
     department: DepartmentEnum | None = None,
+    producer_employee_id: uuid.UUID | None = None,
 ) -> TransactionLog:
     inv = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     log = TransactionLog(
@@ -646,6 +647,7 @@ def _log_inventory_change(
         warehouse_qty_after=int(inv.warehouse_qty or 0) if inv else None,
         reference_no=reference_no,
         produced_by=produced_by,
+        producer_employee_id=producer_employee_id,
         notes=notes,
         inventory_effect=inv_effect.capture_effect(db, item.item_id, before_cells),
         shipping_request_id=request_id,
@@ -926,6 +928,8 @@ def _backflush_component_location(
     reference_no: str,
     notes: str,
     request_id: uuid.UUID | None,
+    produced_by: str = "구성품 변경",
+    producer_employee_id: uuid.UUID | None = None,
 ) -> TransactionLog:
     before = inv_effect.snapshot_cells(db, item.item_id)
     inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
@@ -936,12 +940,13 @@ def _backflush_component_location(
         quantity_change=-qty,
         quantity_before=int(qty_before),
         reference_no=reference_no,
-        produced_by="구성품 변경",
+        produced_by=produced_by,
         notes=notes,
         before_cells=before,
         request_id=request_id,
         phase=COMPONENT_CHANGE_PHASE,
         department=dept,
+        producer_employee_id=producer_employee_id,
     )
 
 
@@ -953,6 +958,8 @@ def _receive_component_location(
     notes: str,
     request_id: uuid.UUID | None,
     tx_type: TransactionTypeEnum = TransactionTypeEnum.PRODUCE,
+    produced_by: str = "구성품 변경",
+    producer_employee_id: uuid.UUID | None = None,
 ) -> TransactionLog:
     before = inv_effect.snapshot_cells(db, item.item_id)
     inv, qty_before, dept = inventory_svc.receive_to_item_department(db, item, Decimal(qty))
@@ -963,12 +970,13 @@ def _receive_component_location(
         quantity_change=qty,
         quantity_before=int(qty_before),
         reference_no=reference_no,
-        produced_by="구성품 변경",
+        produced_by=produced_by,
         notes=notes,
         before_cells=before,
         request_id=request_id,
         phase=COMPONENT_CHANGE_PHASE,
         department=dept,
+        producer_employee_id=producer_employee_id,
     )
 
 
@@ -980,6 +988,8 @@ def _execute_component_change_core(
     memo: str | None = None,
     request_id: uuid.UUID | None = None,
     requested_mode: str | None = "BOM",
+    requester_name: str | None = None,
+    requester_employee_id: uuid.UUID | None = None,
 ) -> dict:
     preview = _component_change_preview_core(
         db,
@@ -1009,6 +1019,7 @@ def _execute_component_change_core(
     )
     notes_suffix = f" / {memo}" if memo else ""
     logs: list[TransactionLog] = []
+    produced_by = requester_name or "구성품 변경"
     source_label = source_pa.process_type_code or "품목"
     target_label = target_pa.process_type_code or "품목"
 
@@ -1019,6 +1030,8 @@ def _execute_component_change_core(
         reference_no,
         f"품목 전환 소스 {source_label} 사용: {source_pa.item_name} x {quantity}{notes_suffix}",
         request_id,
+        produced_by=produced_by,
+        producer_employee_id=requester_employee_id,
     ))
     for line in preview["lines"]:
         delta = int(line["total_delta"])
@@ -1031,6 +1044,8 @@ def _execute_component_change_core(
                 reference_no,
                 f"품목 전환 추가 차감: {item.item_name} x {delta}{notes_suffix}",
                 request_id,
+                produced_by=produced_by,
+                producer_employee_id=requester_employee_id,
             ))
 
     logs.append(_receive_component_location(
@@ -1040,6 +1055,8 @@ def _execute_component_change_core(
         reference_no,
         f"품목 전환 대상 {target_label} 입고: {target_pa.item_name} x {quantity}{notes_suffix}",
         request_id,
+        produced_by=produced_by,
+        producer_employee_id=requester_employee_id,
     ))
     for line in preview["lines"]:
         delta = int(line["total_delta"])
@@ -1053,7 +1070,9 @@ def _execute_component_change_core(
                 reference_no,
                 f"품목 전환 회수 입고: {item.item_name} x {recovered}{notes_suffix}",
                 request_id,
-                TransactionTypeEnum.RECEIVE,
+                tx_type=TransactionTypeEnum.RECEIVE,
+                produced_by=produced_by,
+                producer_employee_id=requester_employee_id,
             ))
 
     completed_at = datetime.utcnow()
@@ -1074,8 +1093,19 @@ def execute_component_change_independent(
     quantity: int,
     memo: str | None = None,
     requested_mode: str | None = "BOM",
+    requester_name: str | None = None,
+    requester_employee_id: uuid.UUID | None = None,
 ) -> dict:
-    return _execute_component_change_core(db, source_pa_item_id, target_pa_item_id, quantity, memo, requested_mode=requested_mode)
+    return _execute_component_change_core(
+        db,
+        source_pa_item_id,
+        target_pa_item_id,
+        quantity,
+        memo,
+        requested_mode=requested_mode,
+        requester_name=requester_name,
+        requester_employee_id=requester_employee_id,
+    )
 
 
 def execute_component_change(
@@ -1085,6 +1115,8 @@ def execute_component_change(
     quantity: int,
     requested_mode: str | None = "BOM",
     memo: str | None = None,
+    requester_name: str | None = None,
+    requester_employee_id: uuid.UUID | None = None,
 ) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
@@ -1098,6 +1130,8 @@ def execute_component_change(
         memo,
         request_id=req.request_id,
         requested_mode=requested_mode,
+        requester_name=requester_name,
+        requester_employee_id=requester_employee_id,
     )
     req.updated_at = datetime.utcnow()
     _record_event(db, req, "COMPONENT_CHANGED", f"품목 전환 {quantity} EA")
