@@ -98,10 +98,7 @@ function phaseLabel(phase: string | null) {
 }
 
 function shippingEventMessage(event: ShippingRequest["events"][number]) {
-  const mapped = SHIPPING_EVENT_LABEL[event.event_type];
-  if (!event.message) return mapped ?? event.event_type;
-  if (mapped && !/[가-힣]/.test(event.message)) return mapped;
-  return event.message;
+  return SHIPPING_EVENT_LABEL[event.event_type] ?? event.message ?? event.event_type;
 }
 
 function txTone(type: string, cancelled: boolean) {
@@ -1320,7 +1317,7 @@ function RequestSection(props: {
   return (
     <div data-testid="shipping-request-work-shell" className={SHIPPING_FLEX_COL_CLASS}>
       <Panel className={SHIPPING_FLEX_COL_CLASS}>
-        <div data-testid="shipping-work-header" className="grid min-w-0 gap-3 xl:grid-cols-[minmax(300px,420px)_minmax(0,1fr)_auto] xl:items-center">
+        <div data-testid="shipping-work-header" className="grid min-w-0 gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
           <div className={SHIPPING_ROW_CLASS}>
             <button type="button" aria-label="이전 화면" onClick={props.onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
@@ -1333,7 +1330,7 @@ function RequestSection(props: {
               />
             </div>
           </div>
-          <div data-testid="shipping-step-tabs" className="grid min-w-0 gap-2 md:grid-cols-5">
+          <div data-testid="shipping-step-tabs" className="grid min-w-0 gap-1 md:grid-cols-5">
             {stepTitles.map((title, index) => {
               const step = (index + 1) as RequestWizardStep;
               const active = props.wizardStep === step;
@@ -1370,7 +1367,13 @@ function RequestSection(props: {
           </div>
         )}
 
-        <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div
+          data-testid="shipping-wizard-content-frame"
+          className={props.wizardStep === 1
+            ? "mt-3 flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border p-3"}
+          style={props.wizardStep === 1 ? undefined : { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        >
           {props.wizardStep === 1 && (
             <WorkStep number={1} title="기준 PF 선택" body="PF·수량" dataTestId="shipping-wizard-step-1" showHeader={false}>
               <div className="flex h-full min-h-0 flex-col gap-3">
@@ -1386,29 +1389,6 @@ function RequestSection(props: {
                     placeholder="PF 코드/품명 검색"
                   />
                 </Field>
-                <div className="mx-auto w-full max-w-[220px]">
-                  <Field label="출하 수량">
-                    <input
-                      ref={requestQuantityRef}
-                      data-testid="shipping-request-quantity"
-                      aria-label="출하 수량"
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={props.requestQuantity}
-                      disabled={locked || props.pending !== null}
-                      onFocus={() => {
-                        if (Number(props.requestQuantity) < 1) props.onRequestQuantity("");
-                      }}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        props.onRequestQuantity(value === "" ? "" : Number(value));
-                      }}
-                      className="h-12 w-full min-w-0 rounded-[12px] border px-3 text-center text-sm font-black outline-none focus-visible:ring-2"
-                      style={{ background: LEGACY_COLORS.bg, borderColor: validRequestQuantity ? LEGACY_COLORS.border : LEGACY_COLORS.red, color: LEGACY_COLORS.text }}
-                    />
-                  </Field>
-                </div>
                 <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto rounded-[14px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   {props.pfItemsLoading ? (
                     <EmptyState title="PF 후보를 불러오는 중입니다." body="잠시만 기다려주세요." />
@@ -1545,7 +1525,32 @@ function RequestSection(props: {
 
         <div data-testid="shipping-wizard-action-bar" className="mt-3 grid items-center gap-2 rounded-[14px] border p-3 md:grid-cols-[auto_minmax(0,1fr)_auto]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           <button type="button" onClick={goPrev} disabled={props.wizardStep === 1 || props.pending !== null} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-4 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>이전</button>
-          <div className="min-w-0 text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{footerHint}</div>
+          {props.wizardStep === 1 ? (
+            <label data-testid="shipping-request-quantity-field" className="mx-auto flex min-h-11 w-full max-w-[280px] items-center gap-3">
+              <span className="shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</span>
+              <input
+                ref={requestQuantityRef}
+                data-testid="shipping-request-quantity"
+                aria-label="출하 수량"
+                type="number"
+                min={1}
+                step={1}
+                value={props.requestQuantity}
+                disabled={locked || props.pending !== null}
+                onFocus={() => {
+                  if (Number(props.requestQuantity) < 1) props.onRequestQuantity("");
+                }}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  props.onRequestQuantity(value === "" ? "" : Number(value));
+                }}
+                className="h-11 min-w-0 flex-1 rounded-[12px] border px-3 text-center text-sm font-black outline-none focus-visible:ring-2"
+                style={{ background: LEGACY_COLORS.bg, borderColor: validRequestQuantity ? LEGACY_COLORS.border : LEGACY_COLORS.red, color: LEGACY_COLORS.text }}
+              />
+            </label>
+          ) : (
+            <div className="min-w-0 text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{footerHint}</div>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
             {props.wizardStep < 5 ? (
               <button type="button" data-testid="shipping-wizard-next" onClick={goNext} disabled={!canGoNext} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-5 py-2 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: tint(LEGACY_COLORS.blue, 16), borderColor: tint(LEGACY_COLORS.blue, 48), color: LEGACY_COLORS.blue }}>다음</button>

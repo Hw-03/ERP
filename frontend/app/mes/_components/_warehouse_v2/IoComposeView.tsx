@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { tint } from "@/lib/mes/colorUtils";
-import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item, type ItemConversionResult } from "@/lib/api";
+import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
@@ -26,7 +26,7 @@ import { useIoUrlSync } from "./useIoUrlSync";
 import { useIoPreselect } from "./useIoPreselect";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { IoComposeViewProps } from "./types";
-import { ItemConversionCompleteView, ItemConversionWorkView } from "./ItemConversionView";
+import { ItemConversionWorkView } from "./ItemConversionView";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -54,7 +54,7 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-type ItemConversionHistoryView = "work" | "complete";
+type ItemConversionHistoryView = "work";
 
 function pushItemConversionHistory(view: ItemConversionHistoryView): void {
   window.history.pushState(
@@ -132,8 +132,7 @@ export function IoComposeView({
   const absorbedRestoreRef = useRef<string | null>(null);
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
   const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
-  const [itemConversionView, setItemConversionView] = useState<"compose" | "work" | "complete">("compose");
-  const [itemConversionResult, setItemConversionResult] = useState<ItemConversionResult | null>(null);
+  const [itemConversionView, setItemConversionView] = useState<"compose" | "work">("compose");
   const itemConversionViewRef = useRef(itemConversionView);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
@@ -178,12 +177,11 @@ export function IoComposeView({
   useEffect(() => {
     function handleItemConversionPop(event: PopStateEvent) {
       const next = (event.state as { wic?: unknown } | null)?.wic;
-      if (next === "work" || next === "complete") {
+      if (next === "work") {
         setItemConversionView(next);
         return;
       }
       if (itemConversionViewRef.current !== "compose") {
-        setItemConversionResult(null);
         setItemConversionView("compose");
         state.goTo(1);
         clearItemConversionHistoryState();
@@ -466,7 +464,6 @@ export function IoComposeView({
   }
 
   function closeItemConversion() {
-    setItemConversionResult(null);
     setItemConversionView("compose");
     state.goTo(1);
     clearItemConversionHistoryState();
@@ -881,32 +878,14 @@ export function IoComposeView({
         <ItemConversionWorkView
           items={items}
           onBack={backFromItemConversion}
-          onComplete={(nextResult) => {
-            setItemConversionResult(nextResult);
-            pushItemConversionHistory("complete");
-            setItemConversionView("complete");
+          onComplete={() => {
             void api
               .getItems({ limit: 2000, search: globalSearch.trim() || undefined })
               .then(setItems)
               .catch(() => {});
+            closeItemConversion();
             onSubmitSuccess?.();
           }}
-        />
-      </div>
-    );
-  }
-
-  if (itemConversionView === "complete") {
-    return (
-      <div className="flex h-full min-h-0 flex-col gap-3">
-        <ItemConversionCompleteView
-          result={itemConversionResult}
-          onNew={() => {
-            setItemConversionResult(null);
-            setItemConversionView("work");
-          }}
-          onHistory={() => router.push("?tab=history", { scroll: false })}
-          onWarehouse={closeItemConversion}
         />
       </div>
     );

@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
 import { IoWorkTypeStep } from "../IoWorkTypeStep";
-import { ItemConversionCompleteView, ItemConversionWorkView } from "../ItemConversionView";
+import { ItemConversionWorkView } from "../ItemConversionView";
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -133,32 +133,38 @@ describe("ItemConversionView", () => {
       "locked",
     ]);
     expect(screen.queryByTestId("item-conversion-mode-selection")).not.toBeInTheDocument();
+    expect(screen.queryByText("미선택")).not.toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-target-guide")).toHaveTextContent("소스 품목을 선택하세요");
     expect(screen.getByTestId("item-conversion-quantity")).toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("소스 품목을 선택하세요");
+    expect(screen.queryByText("선택 초기화")).not.toBeInTheDocument();
   });
 
-  it("turns selected source and target panels into summary cards with change actions", () => {
+  it("keeps source and target lists visible with selected row markers", () => {
     render(<ItemConversionWorkView items={items} loading={false} onComplete={() => {}} />);
 
-    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "Domestic" } });
     fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
 
-    expect(screen.getByTestId("item-conversion-source-selected-card")).toHaveTextContent("Domestic AF");
-    expect(screen.getByTestId("item-conversion-source-change")).toHaveTextContent("변경");
+    expect(screen.queryByTestId("item-conversion-source-selected-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-source-change")).not.toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-source-option-af-1")).toHaveTextContent("선택됨");
     expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("대상 품목을 선택하세요");
 
     fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "Export" } });
     fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
 
-    expect(screen.getByTestId("item-conversion-target-selected-card")).toHaveTextContent("Export AF");
-    expect(screen.getByTestId("item-conversion-target-change")).toHaveTextContent("변경");
+    expect(screen.queryByTestId("item-conversion-target-selected-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-target-change")).not.toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-target-search")).toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-target-option-af-2")).toHaveTextContent("선택됨");
     expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("차이 확인으로 이동할 수 있습니다");
 
-    fireEvent.click(screen.getByTestId("item-conversion-target-change"));
-    expect(screen.getByTestId("item-conversion-target-search")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-pa-1"));
+    expect(screen.getByTestId("item-conversion-source-option-pa-1")).toHaveTextContent("선택됨");
+    expect(screen.queryByTestId("item-conversion-target-option-af-2")).not.toBeInTheDocument();
   });
 
   it("uses searchable source and target selection before moving to preview", async () => {
@@ -185,6 +191,12 @@ describe("ItemConversionView", () => {
     expect(await screen.findByTestId("item-conversion-preview")).toHaveTextContent("Cable Set");
     expect(screen.getByTestId("item-conversion-mode-badge")).toHaveTextContent("BOM");
     expect(screen.getByTestId("item-conversion-memo")).toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-memo-field")).toHaveClass("flex");
+    expect(screen.getByTestId("item-conversion-execute-next-button")).toHaveTextContent("다음");
+    expect(screen.getByTestId("item-conversion-preview")).toHaveTextContent("소스 품목");
+    expect(screen.getByTestId("item-conversion-preview")).toHaveTextContent("대상 품목");
+    expect(screen.getByTestId("item-conversion-preview")).not.toHaveTextContent(/[←→]/);
+    expect(screen.queryByText("소스·대상 다시 선택")).not.toBeInTheDocument();
   });
 
   it("previews and executes an automatically resolved BOM item conversion", async () => {
@@ -209,8 +221,21 @@ describe("ItemConversionView", () => {
       "active",
     ]);
     expect(screen.getByTestId("item-conversion-execute-step")).toHaveTextContent("Domestic AF");
+    expect(screen.getByTestId("item-conversion-execute-step")).toHaveTextContent("Cable Set");
+    expect(screen.getByTestId("item-conversion-final-confirmation")).toBeInTheDocument();
+    expect(screen.queryByText("차이 다시 보기")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("item-conversion-confirm-button"));
+    expect(apiMock.executeItemConversion).not.toHaveBeenCalled();
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("품목 전환을 실행할까요?");
+    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect(apiMock.executeItemConversion).not.toHaveBeenCalled();
+    expect(screen.getByTestId("item-conversion-execute-step")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("item-conversion-confirm-button"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "전환 실행" }));
 
     await waitFor(() => {
       expect(apiMock.executeItemConversion).toHaveBeenCalledWith({
@@ -242,7 +267,10 @@ describe("ItemConversionView", () => {
 
     expect(await screen.findByTestId("item-conversion-mode-badge")).toHaveTextContent("SPEC");
     fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
+    expect(screen.getByTestId("item-conversion-execute-step")).toHaveTextContent("변경되는 구성품이 없습니다");
+    expect(screen.queryByText("차이 다시 보기")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("item-conversion-confirm-button"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "전환 실행" }));
 
     await waitFor(() => {
       expect(apiMock.executeItemConversion).toHaveBeenCalledWith({
@@ -255,18 +283,4 @@ describe("ItemConversionView", () => {
     expect(onComplete).toHaveBeenCalledWith(specResult);
   });
 
-  it("renders the item conversion completion actions", () => {
-    render(
-      <ItemConversionCompleteView
-        result={result}
-        onNew={() => {}}
-        onHistory={() => {}}
-        onWarehouse={() => {}}
-      />,
-    );
-
-    expect(screen.getByTestId("item-conversion-complete")).toHaveTextContent("Domestic AF");
-    expect(screen.getByTestId("item-conversion-complete")).toHaveTextContent("Export AF");
-    expect(screen.getAllByRole("button")).toHaveLength(3);
-  });
 });

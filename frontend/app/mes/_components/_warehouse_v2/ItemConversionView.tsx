@@ -8,19 +8,13 @@ import {
   type ItemConversionPreview,
   type ItemConversionResult,
 } from "@/lib/api";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 interface WorkProps {
   items: Item[];
   loading?: boolean;
   onBack?: () => void;
   onComplete: (result: ItemConversionResult) => void;
-}
-
-interface CompleteProps {
-  result: ItemConversionResult | null;
-  onNew: () => void;
-  onHistory: () => void;
-  onWarehouse: () => void;
 }
 
 type ConversionStepId = 1 | 2 | 3;
@@ -92,6 +86,7 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [executeConfirmOpen, setExecuteConfirmOpen] = useState(false);
 
   const candidates = useMemo(
     () => items.filter(isConvertibleItem).sort((a, b) => (a.mes_code ?? "").localeCompare(b.mes_code ?? "")),
@@ -122,19 +117,8 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
     setError(null);
   }, []);
 
-  function resetSelection(): void {
-    setSourceId("");
-    setTargetId("");
-    setQuantity(1);
-    setMemo("");
-    setSourceQuery("");
-    setTargetQuery("");
-    clearPreviewState();
-  }
-
   function selectSource(item: Item): void {
     setSourceId(item.item_id);
-    setSourceQuery(itemLabel(item));
     setTargetId("");
     setTargetQuery("");
     clearPreviewState();
@@ -142,7 +126,6 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
 
   function selectTarget(item: Item): void {
     setTargetId(item.item_id);
-    setTargetQuery(itemLabel(item));
     clearPreviewState();
   }
 
@@ -178,6 +161,7 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
         quantity,
         memo: memo.trim() || null,
       });
+      setExecuteConfirmOpen(false);
       onComplete(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "전환 실행에 실패했습니다.");
@@ -245,23 +229,10 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
           }}
           onSourceSelect={selectSource}
           onTargetSelect={selectTarget}
-          onSourceChange={() => {
-            setSourceId("");
-            setTargetId("");
-            setSourceQuery("");
-            setTargetQuery("");
-            clearPreviewState();
-          }}
-          onTargetChange={() => {
-            setTargetId("");
-            setTargetQuery("");
-            clearPreviewState();
-          }}
           onQuantity={(value) => {
             setQuantity(positiveInt(value));
             clearPreviewState();
           }}
-          onReset={resetSelection}
           onNext={() => void loadPreview()}
         />
       ) : currentStep === 2 && preview ? (
@@ -273,7 +244,6 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
           error={error}
           canNext={canGoExecute}
           onMemo={setMemo}
-          onBack={() => clearPreviewState()}
           onNext={() => setReady(true)}
         />
       ) : preview ? (
@@ -282,10 +252,27 @@ export function ItemConversionWorkView({ items, loading = false, onBack, onCompl
           memo={memo}
           busy={busy}
           error={error}
-          onBack={() => setReady(false)}
-          onExecute={() => void execute()}
+          onExecute={() => setExecuteConfirmOpen(true)}
         />
       ) : null}
+      <ConfirmModal
+        open={executeConfirmOpen}
+        title="품목 전환을 실행할까요?"
+        tone="caution"
+        cautionMessage="소스 품목 재고가 차감되고 대상 품목 재고가 즉시 입고됩니다."
+        confirmLabel="전환 실행"
+        busy={busy}
+        busyLabel="실행 중"
+        onClose={() => setExecuteConfirmOpen(false)}
+        onConfirm={() => void execute()}
+      >
+        {sourceItem && targetItem && (
+          <div className="grid gap-2 text-sm font-bold">
+            <div>소스 품목: {sourceItem.item_name} · {formatQty(quantity, sourceItem.unit)}</div>
+            <div>대상 품목: {targetItem.item_name} · {formatQty(quantity, targetItem.unit)}</div>
+          </div>
+        )}
+      </ConfirmModal>
     </section>
   );
 }
@@ -311,7 +298,7 @@ function ItemConversionStepChrome({
       step.id < currentStep ? "done" : step.id === currentStep ? "active" : "locked";
     const summary =
       step.id === 1 && sourceItem && targetItem
-        ? `${sourceItem.mes_code ?? sourceItem.item_name} → ${targetItem.mes_code ?? targetItem.item_name}`
+        ? `소스 ${sourceItem.mes_code ?? sourceItem.item_name} · 대상 ${targetItem.mes_code ?? targetItem.item_name}`
         : step.id === 2 && preview
         ? `${preview.resolved_mode} · ${preview.lines.length}개 차이`
         : step.id === 3 && ready
@@ -367,10 +354,7 @@ function SelectionStep({
   onTargetQuery,
   onSourceSelect,
   onTargetSelect,
-  onSourceChange,
-  onTargetChange,
   onQuantity,
-  onReset,
   onNext,
 }: {
   sourceItem: Item | null;
@@ -388,10 +372,7 @@ function SelectionStep({
   onTargetQuery: (value: string) => void;
   onSourceSelect: (item: Item) => void;
   onTargetSelect: (item: Item) => void;
-  onSourceChange: () => void;
-  onTargetChange: () => void;
   onQuantity: (value: string | number) => void;
-  onReset: () => void;
   onNext: () => void;
 }) {
   const selectionHint = sourceOver
@@ -407,21 +388,6 @@ function SelectionStep({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="grid shrink-0 gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_170px]">
-        <SelectedSummary title="소스 품목" item={sourceItem} tone="blue" />
-        <SelectedSummary title="대상 품목" item={targetItem} tone="green" />
-        <label className="icf grid min-h-16 gap-1 rounded-[14px] border px-4 py-3">
-          <span className="icm text-xs font-black">전환 수량</span>
-          <input
-            data-testid="item-conversion-quantity"
-            type="number"
-            min={1}
-            value={quantity}
-            onChange={(event) => onQuantity(event.target.value)}
-            className="ict h-8 w-full min-w-0 bg-transparent text-2xl font-black outline-none focus-visible:ring-2"
-          />
-        </label>
-      </div>
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
         <CandidatePanel
           kind="source"
@@ -432,7 +398,6 @@ function SelectionStep({
           placeholder="품명 · 품목 코드 검색"
           onQuery={onSourceQuery}
           onSelect={onSourceSelect}
-          onChangeSelected={onSourceChange}
         />
         <CandidatePanel
           kind="target"
@@ -445,16 +410,23 @@ function SelectionStep({
           emptyText={sourceItem ? "대상 후보가 없습니다." : "소스 품목을 선택하세요"}
           onQuery={onTargetQuery}
           onSelect={onTargetSelect}
-          onChangeSelected={onTargetChange}
         />
       </div>
-      <div className="grid shrink-0 gap-2 lg:grid-cols-[auto_minmax(0,1fr)_150px]">
-        <button type="button" className={buttonSecondary} onClick={onReset}>
-          선택 초기화
-        </button>
+      <div className="grid shrink-0 gap-2 lg:grid-cols-[minmax(0,1fr)_220px_150px]">
         <div className="icf flex min-h-12 items-center rounded-[14px] border px-4 text-sm font-bold">
           <span data-testid="item-conversion-selection-hint" className={selectionHintClass}>{selectionHint}</span>
         </div>
+        <label className="icf flex min-h-12 items-center gap-3 rounded-[14px] border px-4">
+          <span className="icm shrink-0 text-xs font-black">전환 수량</span>
+          <input
+            data-testid="item-conversion-quantity"
+            type="number"
+            min={1}
+            value={quantity}
+            onChange={(event) => onQuantity(event.target.value)}
+            className="ict h-full min-w-0 flex-1 bg-transparent text-base font-black outline-none focus-visible:ring-2"
+          />
+        </label>
         <button
           type="button"
           data-testid="item-conversion-next-button"
@@ -470,26 +442,6 @@ function SelectionStep({
   );
 }
 
-function SelectedSummary({ title, item, tone }: { title: string; item: Item | null; tone: "blue" | "green" }) {
-  const colorClass = tone === "blue" ? "ic-blue-text" : "ic-green-text";
-  return (
-    <div className="icf flex min-h-16 items-center justify-between gap-3 rounded-[14px] border px-4 py-3">
-      <div className="min-w-0">
-        <div className="icm text-xs font-black">{title}</div>
-        <div className={`mt-1 truncate text-base font-black ${item ? "ict" : colorClass}`}>
-          {item ? item.item_name : "미선택"}
-        </div>
-        {item && (
-          <div className="icm mt-0.5 truncate text-xs font-bold">
-            {item.mes_code ?? "-"} · {formatQty(itemStock(item), item.unit)}
-          </div>
-        )}
-      </div>
-      {item && <span className={`rounded-full px-3 py-1 text-xs font-black ${colorClass}`}>선택됨</span>}
-    </div>
-  );
-}
-
 function CandidatePanel({
   kind,
   title,
@@ -501,7 +453,6 @@ function CandidatePanel({
   emptyText = "검색 결과가 없습니다.",
   onQuery,
   onSelect,
-  onChangeSelected,
 }: {
   kind: PickerKind;
   title: string;
@@ -513,37 +464,7 @@ function CandidatePanel({
   emptyText?: string;
   onQuery: (value: string) => void;
   onSelect: (item: Item) => void;
-  onChangeSelected: () => void;
 }) {
-  if (selected) {
-    return (
-      <section className="icf flex min-h-0 flex-col gap-3 rounded-[18px] border p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="ict text-base font-black">{title}</div>
-          </div>
-          <button
-            type="button"
-            data-testid={`item-conversion-${kind}-change`}
-            onClick={onChangeSelected}
-            className="rounded-[10px] border px-3 py-1.5 text-xs font-black"
-          >
-            변경
-          </button>
-        </div>
-        <div data-testid={`item-conversion-${kind}-selected-card`} className="icpnl flex min-h-[220px] flex-1 flex-col justify-center rounded-[14px] border px-5 py-4">
-          <div className="ict text-lg font-black">{selected.item_name}</div>
-          <div className="icm mt-2 text-sm font-bold">
-            {selected.mes_code ?? "-"} · {formatQty(itemStock(selected), selected.unit)}
-          </div>
-          <div className="icm mt-1 text-xs font-bold">
-            {selected.process_type_code ?? "-"} · {selected.bom_completed_at ? "BOM" : "확인 필요"}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
   if (disabled) {
     return (
       <section className="icf flex min-h-0 flex-col gap-3 rounded-[18px] border p-4">
@@ -584,13 +505,15 @@ function CandidatePanel({
         ) : (
           <div className="grid gap-2">
             {candidates.map((item) => {
+              const isSelected = selected?.item_id === item.item_id;
               return (
                 <button
                   key={item.item_id}
                   type="button"
                   data-testid={`item-conversion-${kind}-option-${item.item_id}`}
+                  aria-pressed={isSelected}
                   onClick={() => onSelect(item)}
-                  className="ico"
+                  className={isSelected ? "ico ico-active" : "ico"}
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-black">{item.item_name}</span>
@@ -598,6 +521,7 @@ function CandidatePanel({
                       {item.mes_code ?? "-"} · {formatQty(itemStock(item), item.unit)} · {item.bom_completed_at ? "BOM" : "확인 필요"}
                     </span>
                   </span>
+                  {isSelected && <span className="ic-selected-mark">선택됨</span>}
                 </button>
               );
             })}
@@ -616,7 +540,6 @@ function ReviewStep({
   error,
   canNext,
   onMemo,
-  onBack,
   onNext,
 }: {
   preview: ItemConversionPreview;
@@ -626,16 +549,15 @@ function ReviewStep({
   error: string | null;
   canNext: boolean;
   onMemo: (value: string) => void;
-  onBack: () => void;
   onNext: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-preview">
       <PreviewSummary preview={preview} />
       <PreviewDifferencePanels preview={preview} />
-      <div className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
-        <label className="grid gap-1.5">
-          <span className="icm text-xs font-black">
+      <div className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,1fr)_150px]">
+        <label data-testid="item-conversion-memo-field" className="icf flex min-h-12 items-center gap-3 rounded-[14px] border px-4">
+          <span className="icm shrink-0 text-xs font-black">
             메모 {memoRequired ? "(필수)" : "(선택)"}
           </span>
           <input
@@ -643,12 +565,9 @@ function ReviewStep({
             value={memo}
             onChange={(event) => onMemo(event.target.value)}
             placeholder={memoRequired ? "사유 입력" : "선택 입력"}
-            className="ici"
+            className="ict min-w-0 flex-1 bg-transparent text-sm font-bold outline-none"
           />
         </label>
-        <button type="button" className={buttonSecondary} onClick={onBack}>
-          소스·대상 다시 선택
-        </button>
         <button
           type="button"
           data-testid="item-conversion-execute-next-button"
@@ -656,7 +575,7 @@ function ReviewStep({
           disabled={!canNext || busy}
           onClick={onNext}
         >
-          실행 단계로
+          다음
         </button>
       </div>
       {!preview.executable && preview.blocking_reason && <ErrorNotice message={preview.blocking_reason} />}
@@ -670,40 +589,36 @@ function ExecuteStep({
   memo,
   busy,
   error,
-  onBack,
   onExecute,
 }: {
   preview: ItemConversionPreview;
   memo: string;
   busy: boolean;
   error: string | null;
-  onBack: () => void;
   onExecute: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-execute-step">
-      <div className="icf rounded-[20px] border p-5">
-        <div className="ict text-xl font-black">최종 실행</div>
-        <div className="ict mt-3 grid gap-2 text-sm font-bold">
-          <div>{preview.source_item_name} -{formatQty(preview.quantity)}</div>
-          <div>{preview.target_item_name} +{formatQty(preview.quantity)}</div>
-          <div>{preview.resolved_mode} · {conversionModeLabel(preview.resolved_mode)} · 구성품 차이 {preview.lines.length}건</div>
-          <div>메모 {memo.trim() || "-"}</div>
+      <PreviewSummary preview={preview} />
+      <PreviewDifferencePanels preview={preview} />
+      <div data-testid="item-conversion-final-confirmation" className="mt-auto shrink-0 border-t pt-3">
+        <div className="ict text-sm font-black">최종 실행 확인</div>
+        <div className="mt-2 grid gap-2 text-sm font-bold lg:grid-cols-3">
+          <div><span className="icm text-xs">소스 품목</span><div>{preview.source_item_name} · {formatQty(preview.quantity)}</div></div>
+          <div><span className="icm text-xs">대상 품목</span><div>{preview.target_item_name} · {formatQty(preview.quantity)}</div></div>
+          <div><span className="icm text-xs">메모</span><div>{memo.trim() || "-"}</div></div>
         </div>
-      </div>
-      <div className="mt-auto flex justify-end gap-2">
-        <button type="button" className={buttonSecondary} onClick={onBack}>
-          차이 다시 보기
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          data-testid="item-conversion-confirm-button"
-          disabled={busy}
-          onClick={onExecute}
-        >
-          {busy ? "실행 중" : "전환 실행"}
-        </button>
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            className={buttonPrimary}
+            data-testid="item-conversion-confirm-button"
+            disabled={busy}
+            onClick={onExecute}
+          >
+            {busy ? "실행 중" : "전환 실행"}
+          </button>
+        </div>
       </div>
       {error && <ErrorNotice message={error} />}
     </div>
@@ -722,12 +637,19 @@ function PreviewSummary({ preview }: { preview: ItemConversionPreview }) {
           </span>
           <span>{preview.lines.length}개 차이 · {status}</span>
         </div>
-        <div className="ict mt-2 truncate text-xl font-black">
-          {preview.source_item_name} → {preview.target_item_name}
+        <div className="mt-2 grid gap-2 text-sm font-bold lg:grid-cols-2">
+          <div className="min-w-0">
+            <div className="icm text-xs">소스 품목</div>
+            <div className="ict truncate text-base font-black">{preview.source_item_name}</div>
+            <div className="icm text-xs">{preview.source_mes_code ?? "-"}</div>
+          </div>
+          <div className="min-w-0">
+            <div className="icm text-xs">대상 품목</div>
+            <div className="ict truncate text-base font-black">{preview.target_item_name}</div>
+            <div className="icm text-xs">{preview.target_mes_code ?? "-"}</div>
+          </div>
         </div>
-        <div className="icm mt-1 text-sm font-bold">
-          {preview.source_mes_code ?? "-"} → {preview.target_mes_code ?? "-"} · {formatQty(preview.quantity)}
-        </div>
+        <div className="icm mt-2 text-sm font-bold">전환 수량 · {formatQty(preview.quantity)}</div>
       </div>
     </div>
   );
@@ -822,36 +744,5 @@ function ErrorNotice({ message }: { message: string }) {
     <div className="ic-error">
       <span>{message}</span>
     </div>
-  );
-}
-
-export function ItemConversionCompleteView({ result, onNew, onHistory, onWarehouse }: CompleteProps) {
-  return (
-    <section
-      className="ic-card flex h-full min-h-0 flex-col rounded-[24px] p-6"
-      data-testid="item-conversion-complete"
-    >
-      <div className="icf rounded-[22px] border p-6">
-        <div className="ict text-2xl font-black">
-          품목 전환 완료
-        </div>
-        <div className="ict mt-3 text-base font-bold leading-relaxed">
-          {result
-            ? `${result.source_item_name} → ${result.target_item_name} · ${formatQty(result.quantity)}`
-            : "전환 결과 없음"}
-        </div>
-      </div>
-      <div className="mt-auto flex flex-wrap justify-end gap-2 pt-5">
-        <button type="button" className={buttonPrimary} onClick={onNew}>
-          새 품목 전환
-        </button>
-        <button type="button" className={buttonSecondary} onClick={onHistory}>
-          입출고 이력
-        </button>
-        <button type="button" className={buttonSecondary} onClick={onWarehouse}>
-          입출고로 돌아가기
-        </button>
-      </div>
-    </section>
   );
 }

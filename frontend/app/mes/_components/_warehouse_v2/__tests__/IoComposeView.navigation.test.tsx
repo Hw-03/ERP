@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Item } from "@/lib/api";
+import type { Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
 
@@ -33,6 +33,66 @@ const operator = {
   warehouse_role: "none",
 };
 
+function conversionItem(id: string, name: string, quantity: number): Item {
+  return {
+    item_id: id,
+    item_name: name,
+    unit: "EA",
+    quantity,
+    warehouse_qty: quantity,
+    production_total: 0,
+    defective_total: 0,
+    pending_quantity: 0,
+    available_quantity: quantity,
+    last_reserver_name: null,
+    location: null,
+    locations: [],
+    legacy_part: null,
+    legacy_item_type: null,
+    supplier: null,
+    min_stock: null,
+    mes_code: id,
+    model_symbol: null,
+    model_slots: [],
+    process_type_code: "AF",
+    serial_no: null,
+    bom_completed_at: "2026-07-10T00:00:00Z",
+    deleted_at: null,
+    created_at: "2026-07-10T00:00:00Z",
+    updated_at: "2026-07-10T00:00:00Z",
+    department: null,
+  };
+}
+
+const conversionItems = [
+  conversionItem("af-1", "소스 AF", 5),
+  conversionItem("af-2", "대상 AF", 0),
+];
+
+const conversionResult: ItemConversionResult = {
+  request_id: null,
+  requested_mode: "BOM",
+  resolved_mode: "BOM",
+  executable: true,
+  blocking_reason: null,
+  source_item_id: "af-1",
+  source_item_name: "소스 AF",
+  source_mes_code: "af-1",
+  target_item_id: "af-2",
+  target_item_name: "대상 AF",
+  target_mes_code: "af-2",
+  quantity: 1,
+  source_department: "assembly",
+  source_current_quantity: 5,
+  source_available_quantity: 5,
+  source_shortage_quantity: 0,
+  reference_no: "ITEM-CONV-1",
+  memo: "전환 사유",
+  completed_at: "2026-07-10T00:00:00Z",
+  lines: [],
+  transactions: [],
+};
+
 function renderCompose(items: Item[] = []) {
   return render(
     <IoComposeView
@@ -55,6 +115,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getAllBOM).mockResolvedValue([]);
   vi.mocked(api.getItems).mockResolvedValue([]);
+  vi.mocked(api.getItemConversionPreview).mockResolvedValue(conversionResult);
+  vi.mocked(api.executeItemConversion).mockResolvedValue(conversionResult);
   routerPush.mockClear();
 });
 
@@ -135,5 +197,29 @@ describe("IoComposeView navigation chrome", () => {
     expect(screen.queryByTestId("item-conversion-source-search")).not.toBeInTheDocument();
 
     pushStateSpy.mockRestore();
+  });
+
+  it("returns to work type selection after a confirmed item conversion", async () => {
+    renderCompose(conversionItems);
+
+    fireEvent.click(screen.getByTestId("warehouse-item-conversion-card"));
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    fireEvent.click(screen.getByTestId("item-conversion-next-button"));
+
+    await screen.findByTestId("item-conversion-preview");
+    fireEvent.change(screen.getByTestId("item-conversion-memo"), { target: { value: "전환 사유" } });
+    fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
+    fireEvent.click(screen.getByTestId("item-conversion-confirm-button"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "전환 실행" }));
+
+    await waitFor(() => {
+      expect(api.executeItemConversion).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("warehouse-item-conversion-card")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("품목 전환 완료")).not.toBeInTheDocument();
+    expect(window.history.state?.wic).toBeUndefined();
   });
 });

@@ -973,6 +973,47 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-wizard-next")).not.toBeDisabled();
   });
 
+  it("uses the step-one action bar for quantity and keeps the PF workspace unframed", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+
+    const header = await screen.findByTestId("shipping-work-header");
+    const tabs = screen.getByTestId("shipping-step-tabs");
+    const actionBar = screen.getByTestId("shipping-wizard-action-bar");
+    expect(header).toHaveClass("xl:grid-cols-[auto_minmax(0,1fr)_auto]");
+    expect(tabs).toHaveClass("gap-1");
+    expect(screen.getByTestId("shipping-wizard-content-frame")).not.toHaveClass("border");
+    expect(actionBar).toContainElement(screen.getByTestId("shipping-request-quantity"));
+    expect(actionBar).not.toHaveTextContent("기준 PF를 먼저 선택하세요.");
+  });
+
+  it("uses event types to repair garbled shipping history messages", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=hist-1";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({
+        request_id: "hist-1",
+        status: "PICKED_UP",
+        events: [
+          {
+            event_id: "event-1",
+            event_type: "REQUEST_CREATED",
+            message: "異쒗븯 ?붿껌 ?앹꽦",
+            created_at: "2026-07-02T02:25:00Z",
+          },
+        ],
+      }),
+    ]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-history-detail");
+    await waitFor(() => expect(detail).toHaveTextContent("출하 요청 생성"));
+    expect(detail).not.toHaveTextContent("異쒗븯 ?붿껌 ?앹꽦");
+  });
+
   it("shows requester as read-only information and gives memo the main request-info space", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} operator={{ name: "김현우", role: "조립" }} />);
 

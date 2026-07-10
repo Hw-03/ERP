@@ -471,7 +471,6 @@
 .ic-conversion-progress {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.6rem;
-  padding-block: 0.48rem;
 }
 
 .ic-conversion-progress .iwpb {
@@ -551,15 +550,18 @@
 
 .icb {
   display: inline-flex;
+  min-width: 150px;
+  height: 3rem;
   min-height: 3rem;
   align-items: center;
   justify-content: center;
   gap: .5rem;
   border: 1px solid var(--c-border);
   border-radius: 14px;
-  padding: .75rem 1.25rem;
+  padding: 0 .95rem;
   font-size: .875rem;
   font-weight: 900;
+  white-space: nowrap;
   transition: filter 160ms ease, opacity 160ms ease;
 }
 
@@ -575,7 +577,7 @@
 .icb-primary {
   background: var(--c-blue);
   border-color: var(--c-blue);
-  color: var(--c-white);
+  color: var(--c-bg);
 }
 
 .icb-secondary {
@@ -605,7 +607,7 @@
 .ico {
   display: grid;
   min-height: 4rem;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: .75rem;
   border: 1px solid var(--c-border);
@@ -624,6 +626,16 @@
 .ico-active {
   border-color: var(--c-blue);
   background: color-mix(in srgb, var(--c-blue) 10%, transparent);
+}
+
+.ic-selected-mark {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--c-blue) 12%, transparent);
+  color: var(--c-blue);
+  padding: .25rem .65rem;
+  font-size: .75rem;
+  font-weight: 900;
 }
 
 .ic-delta {
