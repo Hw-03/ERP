@@ -63,30 +63,29 @@ Otherwise, recommend solo execution.
 
 ### Model Complexity Assessment
 
-Based on task content, select one model for the entire plan:
-- **Haiku** — Variable renames, file searches, text edits, simple documentation changes
-- **Sonnet** — Bug fixes, router additions, API integrations, moderate refactors (most work)
-- **Opus** — State machine redesigns, security-critical auth changes, structural changes spanning many files, complex architectural decisions
+Based on task content, select one Codex model for the entire plan:
+- **GPT-5.6 Luna** — Variable renames, file searches, text edits, simple documentation changes, and small mechanical cleanup
+- **GPT-5.6 Terra** — Bug fixes, router additions, API integrations, backend+frontend feature work, moderate refactors, and most DEXCOWIN MES development plans
+- **GPT-5.6 Sol** — State machine redesigns, security-critical auth changes, structural changes spanning many files, complex architectural decisions, and high-risk data-flow changes
 
 ### Effort Level Assessment
 
-Effort is Claude Code's reasoning-depth slider (`/effort`). It is **model-dependent** — only recommend a level the chosen model actually supports:
+Effort is the reasoning-depth setting. It is **model-dependent** — only recommend a level the chosen model actually supports:
 
 | Recommended model | Selectable Effort levels |
 |---|---|
-| **Haiku** | None — Haiku has no Effort slider. Write **"해당 없음"**. |
-| **Sonnet** | `low` · `medium` · `high` · `max` (no `xhigh`) |
-| **Opus** | `low` · `medium` · `high` · `xhigh` · `max` |
+| **GPT-5.6 Luna** | `낮음` · `중간` |
+| **GPT-5.6 Terra** | `낮음` · `중간` · `높음` |
+| **GPT-5.6 Sol** | `중간` · `높음` · `매우 높음` |
 
 Pick the level by how much reasoning the work genuinely needs:
-- **low / medium** — short, well-scoped, repetitive, or latency-sensitive work
-- **high** — standard development (the default for Opus 4.8 and Sonnet); the safe baseline
-- **xhigh** — deep reasoning: tricky logic, architecture judgment, cross-file changes (**Opus only**)
-- **max** — the most demanding tasks where you want maximum rigor and edge-case coverage (use sparingly — it can overthink)
+- **낮음 / 중간** — short, well-scoped, repetitive, or latency-sensitive work
+- **높음** — standard DEXCOWIN MES development with meaningful regression risk; the safe baseline for Terra
+- **매우 높음** — deep reasoning: tricky logic, architecture judgment, high-risk cross-file changes, and security/state-machine work (**Sol only**)
 
-If you recommend a level the model can't reach (e.g. `xhigh` on Sonnet), Claude Code silently falls back to the highest supported level — so keep recommendations inside the table to avoid surprise.
+If you recommend a level the model can't reach (e.g. `매우 높음` on Terra), the UI may fall back or reject it — keep recommendations inside the table to avoid surprise.
 
-Do **not** recommend `ultracode`. It is `xhigh` plus automatic multi-agent workflows and is a session toggle the user turns on themselves; the plan's separate **팀 구성** field already signals when parallel/team execution helps. Keep the two axes independent — Effort = reasoning depth, 팀 구성 = parallelism.
+Keep model strength, reasoning depth, and team/subagent execution separate: model = capability, reasoning = depth, team configuration = parallelism.
 
 Write the assessment into the plan header (see below).
 
@@ -111,9 +110,9 @@ Write the assessment into the plan header (see below).
 
 ## Execution Strategy
 
-**추천 모델: [Haiku|Sonnet|Opus]** — [One-line reason: complexity, file types affected, judgment required]
+**추천 모델: [GPT-5.6 Luna|GPT-5.6 Terra|GPT-5.6 Sol]** — [One-line reason: complexity, file types affected, judgment required]
 
-**추천 Effort: [해당 없음|low|medium|high|xhigh|max]** — [One-line reason. Must stay within the recommended model's supported range — see the Effort table above. Haiku → "해당 없음".]
+**추천 추론 수준: [낮음|중간|높음|매우 높음]** — [One-line reason. Must stay within the recommended model's supported range — see the Effort table above.]
 
 **팀 구성: [필요|불필요]** — [Reason: e.g., "3 independent tasks can run in parallel" OR "sequential dependencies throughout, solo is efficient"]
 
@@ -125,7 +124,7 @@ Write the assessment into the plan header (see below).
 Each task includes a model tag and parallel-work indicator:
 
 ````markdown
-### Task N: [Component Name] `[Haiku|Sonnet|Opus] [병렬 가능|순차]`
+### Task N: [Component Name] `[GPT-5.6 Luna|GPT-5.6 Terra|GPT-5.6 Sol] [병렬 가능|순차]`
 
 **Files:**
 - Create: `exact/path/to/file.py`
