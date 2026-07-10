@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, History, Package, StickyNote, XCircle } from "lucide-react";
+import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -18,17 +18,24 @@ import {
 } from "./historyBatchInterpreter";
 import {
   FlowBadge,
-  FlowSummaryCell,
   MovementSummaryCell,
-  PeopleStatusCell,
-  QuantityStockCell,
-  TargetSummaryBlock,
 } from "./historyTableHelpers";
 import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
-import { toInventoryEffectRows, type InventoryEffectCell } from "./historyInventoryEffect";
+import { toInventoryEffectRows } from "./historyInventoryEffect";
 import { formatDefectReason, getHistoryRowPresentation } from "./historyPresentation";
+import { buildHistoryDetailSummary } from "./historyDetailSummary";
+import { HistoryKeyPointSummary } from "./HistoryKeyPointSummary";
+import {
+  HistoryCancelAction,
+  HistoryMobileCancelConfirmation,
+  type HistoryCancelCredentials,
+  type HistoryCancelScopeStatus,
+  useHistoryCancellationScopeLogs,
+} from "./HistoryCancelAction";
+import { getHistoryCancelScope } from "./historyCancellation";
 
 type Props = {
+  panelOpen: boolean;
   selected: TransactionLog | null;
   onSelectLog: (log: TransactionLog) => void;
   onLogUpdated: (updated: TransactionLog) => void;
@@ -41,25 +48,26 @@ type FlowState =
   | { status: "available"; batch: IoBatch }
   | { status: "unavailable" };
 
-type CancelState =
-  | { step: "idle" }
-  | { step: "confirm" }
-  | { step: "submitting" }
-  | { step: "error"; message: string };
-
 export function HistoryDetailPanel({
+  panelOpen,
   selected,
   onSelectLog,
   onLogUpdated,
   variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
-  const [cancelState, setCancelState] = useState<CancelState>({ step: "idle" });
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelPin, setCancelPin] = useState("");
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
   const [flow, setFlow] = useState<FlowState>({ status: "idle" });
+  const cancelScope = selected ? getHistoryCancelScope(selected) : "single";
+  const cancellationScope = useHistoryCancellationScopeLogs({
+    panelOpen: panelOpen && selected !== null,
+    identity: selected ? `log:${selected.log_id}` : "log:none",
+    visibleLogs: selected ? [selected] : [],
+    operationBatchId: cancelScope === "batch" ? selected?.operation_batch_id : null,
+    referenceNo:
+      cancelScope === "batch" && !selected?.operation_batch_id ? selected?.reference_no : null,
+  });
 
   useEffect(() => {
     if (!selected) {
@@ -130,43 +138,50 @@ export function HistoryDetailPanel({
   }
 
   const editCount = selected.edit_count ?? edits.length;
-  const isCancelled = selected.cancelled;
+  const batch = flow.status === "available" ? flow.batch : null;
+  const cancellationLogs = cancellationScope.status === "ready" ? cancellationScope.logs : [selected];
+  const cancellationSummary = buildHistoryDetailSummary(cancellationLogs, batch);
+  const visibleSummary = buildHistoryDetailSummary([selected], batch);
+  const summary = cancellationScope.status === "ready"
+    ? { ...visibleSummary, status: cancellationSummary.status }
+    : visibleSummary;
+  const isCancelled = cancellationScope.status === "ready"
+    ? cancellationLogs.length > 0 && cancellationLogs.every((log) => log.cancelled)
+    : selected.cancelled;
+  const cancelReason = cancellationLogs.find((log) => log.cancel_reason?.trim())?.cancel_reason
+    ?? selected.cancel_reason;
+  const effects = cancellationScope.status === "ready"
+    ? cancellationSummary.impactGroups.flatMap((group) => group.effects)
+    : [];
 
-  const handleCancelSubmit = async () => {
-    if (!cancelReason.trim() || !cancelPin) return;
+  const handleCancelSubmit = async ({ reason, pin }: HistoryCancelCredentials) => {
     if (!operator?.employee_code) {
-      setCancelState({ step: "error", message: "로그인 정보가 없습니다. 다시 로그인해 주세요." });
-      return;
+      throw new Error("로그인 정보가 없습니다. 다시 로그인해 주세요.");
     }
-    setCancelState({ step: "submitting" });
-    try {
-      const updated = await api.cancelTransaction(selected.log_id, {
-        reason: cancelReason.trim(),
-        employee_code: operator.employee_code,
-        pin: cancelPin,
-      });
-      setCancelState({ step: "idle" });
-      setCancelReason("");
-      setCancelPin("");
-      onLogUpdated(updated);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "취소 처리 중 오류가 발생했습니다.";
-      setCancelState({ step: "error", message: msg });
+    if (cancellationScope.status !== "ready") {
+      throw new Error("취소 범위를 확인한 뒤 다시 시도해 주세요.");
     }
+    const target = cancellationScope.logs.find((log) => !log.cancelled);
+    if (!target) {
+      throw new Error("이미 취소된 작업입니다.");
+    }
+    const updated = await api.cancelTransaction(target.log_id, {
+      reason,
+      employee_code: operator.employee_code,
+      pin,
+    });
+    onLogUpdated(updated);
   };
 
   return (
     <div className="space-y-4">
-      <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
-
-      {variant === "desktop" && (
-        <HistoryDetailDecisionSummary
-          log={selected}
-          batch={flow.status === "available" ? flow.batch : null}
-        />
+      {variant === "desktop" ? (
+        <HistoryKeyPointSummary summary={summary} />
+      ) : (
+        <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
       )}
 
-      {isCancelled && (
+      {variant !== "desktop" && isCancelled && (
         <div
           className="rounded-[16px] border px-4 py-3 text-sm font-bold"
           style={{
@@ -176,7 +191,7 @@ export function HistoryDetailPanel({
           }}
         >
           <XCircle className="mr-1.5 inline h-4 w-4" />
-          취소된 거래 — {selected.cancel_reason}
+          취소된 거래 — {cancelReason}
         </div>
       )}
 
@@ -184,105 +199,77 @@ export function HistoryDetailPanel({
 
       <HistoryDetailMemo notes={selected.notes} />
 
-      <HistoryInventoryEffectPanel effect={selected.inventory_effect} />
-
-      <HistoryDetailMetaStrip
-        log={selected}
-        onCancelClick={() => setCancelState({ step: "confirm" })}
-      />
-
-      {editsLoaded && edits.length > 0 && (
-        <Collapsible
-          icon={<History className="h-3.5 w-3.5" />}
-          title="수정 이력"
-          count={edits.length}
-        >
-          <HistoryDetailEditHistory edits={edits} />
-        </Collapsible>
+      {variant !== "desktop" && (
+        <HistoryInventoryEffectPanel log={selected} />
       )}
 
-      {cancelState.step !== "idle" && !isCancelled && (
-        <div
-          className="rounded-[20px] border p-4 space-y-3"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-            취소 범위 확인
-          </div>
-          <div className="rounded-[12px] border px-3 py-2 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}>
-            {selected.operation_batch_id ? "이 작업 묶음에 포함된 재고 변동을 함께 취소합니다." : "선택한 이력 1건의 재고 변동만 취소합니다."}
-          </div>
-          <textarea
-            className="w-full rounded-[12px] border px-3 py-2 text-[13px] resize-none"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            rows={2}
-            placeholder="취소 사유를 입력하세요 (필수)"
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-          />
-          <input
-            type="password"
-            className="w-full rounded-[12px] border px-3 py-2 text-[13px]"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            placeholder="PIN 입력"
-            value={cancelPin}
-            onChange={(e) => setCancelPin(e.target.value)}
-          />
-          {cancelState.step === "error" && (
-            <div className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>{cancelState.message}</div>
+      {variant === "desktop" ? (
+        <>
+          {editsLoaded && edits.length > 0 && (
+            <Collapsible
+              icon={<History className="h-3.5 w-3.5" />}
+              title="수정 이력"
+              count={edits.length}
+            >
+              <HistoryDetailEditHistory edits={edits} />
+            </Collapsible>
           )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleCancelSubmit}
-              disabled={cancelState.step === "submitting" || !cancelReason.trim() || !cancelPin}
-              className="flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.red }}
-            >
-              {cancelState.step === "submitting" ? "처리 중…" : "범위 확인 후 취소"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setCancelState({ step: "idle" }); setCancelReason(""); setCancelPin(""); }}
-              className="rounded-[12px] border px-3 py-2 text-[13px] font-bold"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-            >
-              닫기
-            </button>
-          </div>
-        </div>
+          <HistoryCancelAction
+            panelOpen={panelOpen}
+            identity={`log:${selected.log_id}`}
+            scope={cancelScope}
+            effects={effects}
+            cancelled={isCancelled}
+            scopeStatus={cancellationScope.status}
+            onRetryScope={cancellationScope.retry}
+            onSubmit={handleCancelSubmit}
+            triggerLabel="이 내역 취소"
+            scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
+          />
+        </>
+      ) : (
+        <HistoryCancelAction
+          panelOpen={panelOpen}
+          identity={`log:${selected.log_id}`}
+          scope={cancelScope}
+          effects={effects}
+          cancelled={isCancelled}
+          scopeStatus={cancellationScope.status}
+          onRetryScope={cancellationScope.retry}
+          onSubmit={handleCancelSubmit}
+          triggerLabel="이 내역 취소"
+          scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
+        >
+          {(controller) => (
+            <>
+              <HistoryDetailMetaStrip
+                log={selected}
+                scope={cancelScope}
+                canCancel={controller.available}
+                scopeStatus={isCancelled ? "ready" : controller.scopeStatus}
+                onRetryScope={controller.retryScope}
+                onCancelClick={controller.openConfirmation}
+              />
+              {editsLoaded && edits.length > 0 && (
+                <Collapsible
+                  icon={<History className="h-3.5 w-3.5" />}
+                  title="수정 이력"
+                  count={edits.length}
+                >
+                  <HistoryDetailEditHistory edits={edits} />
+                </Collapsible>
+              )}
+              <HistoryMobileCancelConfirmation
+                controller={controller}
+                scope={cancelScope}
+                variant="single"
+                effects={effects}
+                scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
+              />
+            </>
+          )}
+        </HistoryCancelAction>
       )}
-    </div>
-  );
-}
-
-function HistoryDetailDecisionSummary({
-  log,
-  batch,
-}: {
-  log: TransactionLog;
-  batch: IoBatch | null;
-}) {
-  const presentation = getHistoryRowPresentation(log, batch ?? undefined);
-  return (
-    <div className="grid gap-2 rounded-[20px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <TargetSummaryBlock
-        presentation={presentation}
-        icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-      />
-      <div className="grid gap-2 xl:grid-cols-2">
-        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>흐름</div>
-          <FlowSummaryCell presentation={presentation} />
-        </div>
-        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>수량 · 재고</div>
-          <QuantityStockCell presentation={presentation} />
-        </div>
-      </div>
-      <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} />
-      </div>
     </div>
   );
 }
@@ -430,16 +417,24 @@ function HistoryDetailHero({
 
 function HistoryDetailMetaStrip({
   log,
+  scope,
+  canCancel,
+  scopeStatus,
+  onRetryScope,
   onCancelClick,
 }: {
   log: TransactionLog;
+  scope: "single" | "batch";
+  canCancel: boolean;
+  scopeStatus: HistoryCancelScopeStatus;
+  onRetryScope: () => void;
   onCancelClick: () => void;
 }) {
   const processMeta = PROCESS_TYPE_META[log.item_process_type_code ?? ""];
   const reqName = getHistoryActor(log);
   const rawApproverName = (log.approver_name ?? "").trim();
   const approverName = rawApproverName && rawApproverName !== reqName ? rawApproverName : null;
-  const cancelScopeLabel = log.operation_batch_id ? "작업 묶음 전체 취소" : "이 이력 1건 취소";
+  const cancelScopeLabel = "이 내역 취소";
 
   return (
     <div
@@ -480,8 +475,24 @@ function HistoryDetailMetaStrip({
           )}
         </div>
       </div>
-      {!log.cancelled && (
+      {scopeStatus === "loading" && (
+        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          취소 범위 확인 중...
+        </span>
+      )}
+      {scopeStatus === "error" && (
         <button
+          type="button"
+          onClick={onRetryScope}
+          className="rounded-[12px] border px-3 py-1.5 text-xs font-bold"
+          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        >
+          취소 범위 다시 불러오기
+        </button>
+      )}
+      {canCancel && (
+        <button
+          type="button"
           onClick={onCancelClick}
           className="inline-flex items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}
@@ -540,12 +551,12 @@ export function HistoryDetailMemo({ notes }: { notes: string | null | undefined 
   );
 }
 
-function HistoryInventoryEffectPanel({
-  effect,
-}: {
-  effect: InventoryEffectCell[] | null | undefined;
-}) {
-  const rows = toInventoryEffectRows(effect);
+function HistoryInventoryEffectPanel({ log }: { log: TransactionLog }) {
+  const rows = toInventoryEffectRows(log.inventory_effect, {
+    itemId: log.item_id,
+    itemName: log.item_name,
+    unit: log.item_unit,
+  });
   if (rows.length === 0) return null;
 
   return (
@@ -557,8 +568,7 @@ function HistoryInventoryEffectPanel({
     >
       <div className="grid gap-2 sm:grid-cols-2">
         {rows.map((row) => {
-          const isIncrease = row.delta > 0;
-          const color = isIncrease ? LEGACY_COLORS.green : LEGACY_COLORS.red;
+          const color = row.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
           return (
             <div
               key={row.key}

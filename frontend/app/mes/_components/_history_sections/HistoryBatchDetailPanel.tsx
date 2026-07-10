@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GitBranch, Package, XCircle } from "lucide-react";
+import { ChevronDown, GitBranch, Package, XCircle } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
@@ -9,6 +9,7 @@ import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
+import { TruncatedText } from "@/lib/ui/TruncatedText";
 import {
   describeBatchFlow,
   getBatchFlowEndpoints,
@@ -23,15 +24,20 @@ import {
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import {
   FlowBadge,
-  FlowSummaryCell,
   MovementSummaryCell,
-  PeopleStatusCell,
-  QuantityStockCell,
-  TargetSummaryBlock,
 } from "./historyTableHelpers";
 import { HistoryDetailMemo } from "./HistoryDetailPanel";
-import { getHistoryRowPresentation } from "./historyPresentation";
 import type { HistoryTableFocusTarget } from "./HistoryTable";
+import { buildHistoryDetailSummary } from "./historyDetailSummary";
+import { HistoryKeyPointSummary } from "./HistoryKeyPointSummary";
+import {
+  HistoryCancelAction,
+  HistoryMobileCancelConfirmation,
+  type HistoryCancelCredentials,
+  type HistoryCancelScopeStatus,
+  useHistoryCancellationScopeLogs,
+} from "./HistoryCancelAction";
+import { getHistoryCancelScope, type HistoryCancelScope } from "./historyCancellation";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,
@@ -40,18 +46,13 @@ const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   muted: LEGACY_COLORS.muted2,
 };
 
-type CancelState =
-  | { step: "idle" }
-  | { step: "confirm" }
-  | { step: "submitting" }
-  | { step: "error"; message: string };
-
 type Props = {
+  panelOpen: boolean;
   batchId: string;
   logs: TransactionLog[];
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
-  onBatchCancelled: (batchId: string) => void;
+  onBatchCancelled: (batchId: string, updated: TransactionLog) => void;
   onFocusLineInList?: (target: Omit<HistoryTableFocusTarget, "nonce">) => void;
   onSelectLog?: (log: TransactionLog) => void;
   variant?: "default" | "desktop";
@@ -67,6 +68,7 @@ type FetchState =
  * 정정/수량 보정 액션 없음 (조회 전용 — kind="log" 분기에서만 노출).
  */
 export function HistoryBatchDetailPanel({
+  panelOpen,
   batchId,
   logs,
   batchCache,
@@ -77,23 +79,28 @@ export function HistoryBatchDetailPanel({
   variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
-  const [cancelState, setCancelState] = useState<CancelState>({ step: "idle" });
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelPin, setCancelPin] = useState("");
+  const [compositionOpen, setCompositionOpen] = useState(false);
 
-  const cached = batchCache.get(batchId) ?? null;
+  const operationBatchId = logs[0]?.operation_batch_id ?? null;
+  const cached = operationBatchId ? batchCache.get(operationBatchId) ?? null : null;
   const [state, setState] = useState<FetchState>(
-    cached ? { status: "available", batch: cached } : { status: "loading" },
+    cached
+      ? { status: "available", batch: cached }
+      : operationBatchId
+        ? { status: "loading" }
+        : { status: "unavailable" },
   );
 
   useEffect(() => {
-    setCancelState({ step: "idle" });
-    setCancelReason("");
-    setCancelPin("");
-  }, [batchId]);
+    setCompositionOpen(false);
+  }, [batchId, panelOpen]);
 
   useEffect(() => {
-    const hit = batchCache.get(batchId);
+    if (!operationBatchId) {
+      setState({ status: "unavailable" });
+      return;
+    }
+    const hit = batchCache.get(operationBatchId);
     if (hit) {
       setState({ status: "available", batch: hit });
       return;
@@ -101,13 +108,13 @@ export function HistoryBatchDetailPanel({
     setState({ status: "loading" });
     let cancelled = false;
     const controller = new AbortController();
-    void ioApi.getBatch(batchId, { signal: controller.signal })
+    void ioApi.getBatch(operationBatchId, { signal: controller.signal })
       .then((b) => {
         if (cancelled) return;
         setBatchCache((prev) => {
-          if (prev.has(batchId)) return prev;
+          if (prev.has(operationBatchId)) return prev;
           const m = new Map(prev);
-          m.set(batchId, b);
+          m.set(operationBatchId, b);
           return m;
         });
         setState({ status: "available", batch: b });
@@ -120,35 +127,60 @@ export function HistoryBatchDetailPanel({
       cancelled = true;
       controller.abort();
     };
-  }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const isBatchCancelled = logs.every((l) => l.cancelled);
-
-  const handleCancelSubmit = async () => {
-    if (!cancelReason.trim() || !cancelPin) return;
-    if (!operator?.employee_code) {
-      setCancelState({ step: "error", message: "로그인 정보가 없습니다. 다시 로그인해 주세요." });
-      return;
-    }
-    setCancelState({ step: "submitting" });
-    try {
-      await api.cancelTransaction(logs[0].log_id, {
-        reason: cancelReason.trim(),
-        employee_code: operator.employee_code,
-        pin: cancelPin,
-      });
-      setCancelState({ step: "idle" });
-      setCancelReason("");
-      setCancelPin("");
-      onBatchCancelled(batchId);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "취소 처리 중 오류가 발생했습니다.";
-      setCancelState({ step: "error", message: msg });
-    }
-  };
+  }, [operationBatchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const first = logs[0];
+  const cancelScope = getHistoryCancelScope(first);
+  const canCancelAsBatch = cancelScope === "batch";
+  const cancellationScope = useHistoryCancellationScopeLogs({
+    panelOpen: panelOpen && canCancelAsBatch,
+    identity: `batch:${batchId}`,
+    visibleLogs: logs,
+    operationBatchId: canCancelAsBatch ? first.operation_batch_id : null,
+    referenceNo: canCancelAsBatch && !first.operation_batch_id ? first.reference_no : null,
+  });
+
+  const handleCancelSubmit = async ({ reason, pin }: HistoryCancelCredentials) => {
+    if (!operator?.employee_code) {
+      throw new Error("로그인 정보가 없습니다. 다시 로그인해 주세요.");
+    }
+    if (canCancelAsBatch && cancellationScope.status !== "ready") {
+      throw new Error("취소 범위를 확인한 뒤 다시 시도해 주세요.");
+    }
+    const targetLogs = canCancelAsBatch ? cancellationScope.logs : [first];
+    const target = targetLogs.find((log) => !log.cancelled);
+    if (!target) {
+      throw new Error("이미 취소된 작업입니다.");
+    }
+    const updated = await api.cancelTransaction(target.log_id, {
+      reason,
+      employee_code: operator.employee_code,
+      pin,
+    });
+    onBatchCancelled(batchId, updated);
+  };
+
   const batch = state.status === "available" ? state.batch : null;
+  const cancellationScopeStatus: HistoryCancelScopeStatus = canCancelAsBatch
+    ? cancellationScope.status
+    : "ready";
+  const cancellationLogs = canCancelAsBatch && cancellationScope.status === "ready"
+    ? cancellationScope.logs
+    : [first];
+  const cancellationSummary = buildHistoryDetailSummary(
+    cancellationLogs,
+    canCancelAsBatch ? batch : null,
+  );
+  const visibleSummary = buildHistoryDetailSummary(logs, batch);
+  const summary = canCancelAsBatch && cancellationScope.status === "ready"
+    ? { ...visibleSummary, status: cancellationSummary.status }
+    : visibleSummary;
+  const isBatchCancelled = cancellationLogs.every((log) => log.cancelled);
+  const effects = cancellationScopeStatus === "ready"
+    ? cancellationSummary.impactGroups.flatMap((group) => group.effects)
+    : [];
+  const cancellationIdentity = canCancelAsBatch ? `batch:${batchId}` : `log:${first.log_id}`;
+  const cancellationActionScope = canCancelAsBatch ? cancelScope : "single";
 
   const logByItemId = new Map<string, TransactionLog>();
   for (const l of logs) logByItemId.set(l.item_id, l);
@@ -168,154 +200,161 @@ export function HistoryBatchDetailPanel({
     }
   }
 
-  return (
-    <div className="space-y-4">
-      <HistoryBatchHero
-        first={first}
-        logs={logs}
-        batch={batch}
-        loading={state.status === "loading"}
-        isBatchCancelled={isBatchCancelled}
-        onCancelClick={() => setCancelState({ step: "confirm" })}
-      />
+  if (variant === "desktop") {
+    return (
+      <div className="space-y-4">
+        <HistoryKeyPointSummary summary={summary} />
+        <HistoryDetailMemo notes={first.notes} />
 
-      {variant === "desktop" && batch && (
-        <HistoryBatchDecisionSummary first={first} batch={batch} />
-      )}
-      {isBatchCancelled && (
-        <div
-          className="rounded-[16px] border px-4 py-3 text-sm font-bold"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
-            color: LEGACY_COLORS.red,
-          }}
-        >
-          <XCircle className="mr-1.5 inline h-4 w-4" />
-          취소된 거래
-        </div>
-      )}
-
-      <HistoryDetailMemo notes={first.notes} />
-
-      {cancelState.step !== "idle" && !isBatchCancelled && (
-        <div
-          className="rounded-[20px] border p-4 space-y-3"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-            배치 전체 취소 확인
-          </div>
-          <textarea
-            className="w-full rounded-[12px] border px-3 py-2 text-[13px] resize-none"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            rows={2}
-            placeholder="취소 사유를 입력하세요 (필수)"
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-          />
-          <input
-            type="password"
-            className="w-full rounded-[12px] border px-3 py-2 text-[13px]"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            placeholder="PIN 입력"
-            value={cancelPin}
-            onChange={(e) => setCancelPin(e.target.value)}
-          />
-          {cancelState.step === "error" && (
-            <div className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>{cancelState.message}</div>
-          )}
-          <div className="flex gap-2">
+        {batch && batch.bundles.length > 0 && (
+          <section
+            className="overflow-hidden rounded-[20px] border"
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          >
             <button
               type="button"
-              onClick={handleCancelSubmit}
-              disabled={cancelState.step === "submitting" || !cancelReason.trim() || !cancelPin}
-              className="flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.red }}
+              aria-expanded={compositionOpen}
+              onClick={() => setCompositionOpen((open) => !open)}
+              className="flex min-h-11 w-full items-center justify-between gap-3 border-0 bg-transparent px-4 py-3 text-left shadow-none"
             >
-              {cancelState.step === "submitting" ? "처리 중…" : "취소 확정"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setCancelState({ step: "idle" }); setCancelReason(""); setCancelPin(""); }}
-              className="rounded-[12px] border px-3 py-2 text-[13px] font-bold"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-            >
-              닫기
-            </button>
-          </div>
-        </div>
-      )}
-
-      {batch && batch.bundles.length > 0 && (
-        <div
-          className="rounded-[20px] border p-4"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
-            <GitBranch className="h-3.5 w-3.5" />
-            구성 라인
-          </div>
-          <div className="flex flex-col gap-3">
-            {batch.bundles.map((bundle) => (
-              <BundleBlock
-                key={bundle.bundle_id}
-                bundle={bundle}
-                batch={batch}
-                onLineClick={handleLineClick}
-                isLineClickable={(line) => logByItemId.has(line.item_id)}
+              <span className="flex items-center gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <GitBranch className="h-4 w-4" />
+                구성 {summary.composition?.bundleCount ?? batch.bundles.length}묶음 · {summary.composition?.lineCount ?? 0}라인
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${compositionOpen ? "rotate-180" : ""}`}
+                style={{ color: LEGACY_COLORS.muted2 }}
               />
-            ))}
-          </div>
+            </button>
+            {compositionOpen && (
+              <div className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
+                {batch.bundles.map((bundle) => (
+                  <BundleBlock
+                    key={bundle.bundle_id}
+                    bundle={bundle}
+                    batch={batch}
+                    onLineClick={handleLineClick}
+                    isLineClickable={(line) => logByItemId.has(line.item_id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        <HistoryCancelAction
+          panelOpen={panelOpen}
+          identity={cancellationIdentity}
+          scope={cancellationActionScope}
+          effects={effects}
+          cancelled={isBatchCancelled}
+          scopeStatus={cancellationScopeStatus}
+          onRetryScope={cancellationScope.retry}
+          onSubmit={handleCancelSubmit}
+          triggerLabel="이 내역 취소"
+          scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <HistoryCancelAction
+      panelOpen={panelOpen}
+      identity={cancellationIdentity}
+      scope={cancellationActionScope}
+      effects={effects}
+      cancelled={isBatchCancelled}
+      scopeStatus={cancellationScopeStatus}
+      onRetryScope={cancellationScope.retry}
+      onSubmit={handleCancelSubmit}
+      triggerLabel="이 내역 취소"
+      scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
+    >
+      {(controller) => (
+        <div className="space-y-4">
+          <HistoryBatchHero
+            first={first}
+            logs={logs}
+            batch={batch}
+            loading={state.status === "loading"}
+            canCancel={controller.available}
+            scopeStatus={isBatchCancelled ? "ready" : controller.scopeStatus}
+            onRetryScope={controller.retryScope}
+            onCancelClick={controller.openConfirmation}
+          />
+          {isBatchCancelled && (
+            <div
+              className="rounded-[16px] border px-4 py-3 text-sm font-bold"
+              style={{
+                background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+                color: LEGACY_COLORS.red,
+              }}
+            >
+              <XCircle className="mr-1.5 inline h-4 w-4" />
+              취소된 거래
+            </div>
+          )}
+
+          <HistoryDetailMemo notes={first.notes} />
+          <HistoryMobileCancelConfirmation
+            controller={controller}
+            scope={cancellationActionScope}
+            variant="batch"
+            effects={effects}
+            scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
+          />
+
+          {batch && batch.bundles.length > 0 && (
+            <div
+              className="rounded-[20px] border p-4"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              <div
+                className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                구성 라인
+              </div>
+              <div className="flex flex-col gap-3">
+                {batch.bundles.map((bundle) => (
+                  <BundleBlock
+                    key={bundle.bundle_id}
+                    bundle={bundle}
+                    batch={batch}
+                    onLineClick={handleLineClick}
+                    isLineClickable={(line) => logByItemId.has(line.item_id)}
+                    framed
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </HistoryCancelAction>
   );
 }
 
-function HistoryBatchDecisionSummary({
-  first,
-  batch,
-}: {
-  first: TransactionLog;
-  batch: IoBatch;
-}) {
-  const presentation = getHistoryRowPresentation(first, batch);
-  return (
-    <div className="grid gap-2 rounded-[20px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <TargetSummaryBlock
-        presentation={presentation}
-        icon={<GitBranch className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-      />
-      <div className="grid gap-2 xl:grid-cols-2">
-        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>흐름</div>
-          <FlowSummaryCell presentation={presentation} />
-        </div>
-        <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>수량 · 재고</div>
-          <QuantityStockCell presentation={presentation} />
-        </div>
-      </div>
-      <div className="rounded-[14px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} />
-      </div>
-    </div>
-  );
-}
 function HistoryBatchHero({
   first,
   logs,
   batch,
   loading,
-  isBatchCancelled,
+  canCancel,
+  scopeStatus,
+  onRetryScope,
   onCancelClick,
 }: {
   first: TransactionLog;
   logs: TransactionLog[];
   batch: IoBatch | null;
   loading: boolean;
-  isBatchCancelled: boolean;
+  canCancel: boolean;
+  scopeStatus: HistoryCancelScopeStatus;
+  onRetryScope: () => void;
   onCancelClick: () => void;
 }) {
   const tcolor = transactionColor(first.transaction_type);
@@ -430,7 +469,22 @@ function HistoryBatchHero({
         )}
       </div>
 
-      {!isBatchCancelled && (
+      {scopeStatus === "loading" && (
+        <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          취소 범위 확인 중...
+        </div>
+      )}
+      {scopeStatus === "error" && (
+        <button
+          type="button"
+          onClick={onRetryScope}
+          className="mt-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold"
+          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        >
+          취소 범위 다시 불러오기
+        </button>
+      )}
+      {canCancel && (
         <button
           type="button"
           onClick={onCancelClick}
@@ -441,7 +495,7 @@ function HistoryBatchHero({
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
           }}
         >
-          배치 취소
+          이 내역 취소
         </button>
       )}
     </div>
@@ -453,11 +507,13 @@ function BundleBlock({
   batch,
   onLineClick,
   isLineClickable,
+  framed = false,
 }: {
   bundle: IoBundle;
   batch: IoBatch;
   onLineClick: (line: IoLine) => void;
   isLineClickable: (line: IoLine) => boolean;
+  framed?: boolean;
 }) {
   const isBomParent = bundle.source_kind === "bom_parent";
   const parentLine = getHistoryBomParentLine(bundle);
@@ -477,8 +533,18 @@ function BundleBlock({
   const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
 
   return (
-    <div className="rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-      <div className="flex items-center gap-2 px-3 py-2" style={{ background: "rgba(101,169,255,.05)" }}>
+    <div
+      className={framed ? "rounded-[16px] border" : "border-b last:border-b-0"}
+      style={{ borderColor: LEGACY_COLORS.border }}
+    >
+      <div
+        className="flex items-center gap-2 px-3 py-2"
+        style={{
+          background: framed
+            ? "rgba(101,169,255,.05)"
+            : `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, transparent)`,
+        }}
+      >
         <span
           className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
           style={{
@@ -491,9 +557,11 @@ function BundleBlock({
           {isBomParent ? <GitBranch className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
           {isBomParent ? "BOM" : "단품"}
         </span>
-        <span className="flex-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
-          {bundle.title}
-        </span>
+        <div className="min-w-0 flex-1">
+          <TruncatedText className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+            {bundle.title}
+          </TruncatedText>
+        </div>
         <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: headerQtyColor }}>
           {headerQtyText}
         </span>
@@ -516,14 +584,18 @@ function BundleBlock({
                 borderColor: LEGACY_COLORS.border,
                 background: line.included
                   ? "transparent"
-                  : "rgba(255,100,100,.04)",
+                  : framed
+                    ? "rgba(255,100,100,.04)"
+                    : `color-mix(in srgb, ${LEGACY_COLORS.red} 4%, transparent)`,
                 opacity: dim ? 0.6 : 1,
               }}
             >
               <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
-              <span className="flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-                {line.item_name}
-              </span>
+              <div className="min-w-0 flex-1">
+                <TruncatedText className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                  {line.item_name}
+                </TruncatedText>
+              </div>
               {line.mes_code && (
                 <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {line.mes_code}

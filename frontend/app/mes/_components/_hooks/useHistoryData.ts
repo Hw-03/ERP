@@ -21,21 +21,47 @@ export interface UseHistoryDataArgs {
   department: string;
   /** 필터 패널 — 제품 모델명 쉼표 결합. "" / 미지정 = 미적용. */
   model?: string;
+  /** 현재 조건의 서버 summary total. 없으면 마지막 페이지 크기로 더보기를 판단한다. */
+  totalCount?: number | null;
 }
 
 export interface UseHistoryDataResult {
   logs: TransactionLog[];
   setLogs: React.Dispatch<React.SetStateAction<TransactionLog[]>>;
   loading: boolean;
+  error: string | null;
+  retry: () => void;
   loadingMore: boolean;
+  loadMoreError: string | null;
   canLoadMore: boolean;
   loadMore: () => Promise<void>;
+}
+
+interface CanLoadMoreArgs {
+  loadedCount: number;
+  totalCount?: number | null;
+  lastBatchSize: number | null;
+  pageSize?: number;
+}
+
+export function getCanLoadMore({
+  loadedCount,
+  totalCount,
+  lastBatchSize,
+  pageSize = HISTORY_PAGE_SIZE,
+}: CanLoadMoreArgs): boolean {
+  if (totalCount != null) return loadedCount < totalCount;
+  return lastBatchSize === pageSize;
+}
+
+function historyLoadError(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 /**
  * 서버사이드 필터로 입출고 내역을 페이지네이션 조회.
  * - operations/dateFilter/debouncedSearch/department/model 변경 시 logs 초기화 + 재조회.
- * - canLoadMore = 마지막 응답 길이 === HISTORY_PAGE_SIZE.
+ * - canLoadMore = totalCount가 있으면 로드 수와 비교하고, 없을 때만 마지막 페이지 크기로 판단.
  * - loadMore 중 조건이 바뀌면 stale 응답을 logs 에 append 하지 않음 (queryKey ref 가드).
  *
  * 좌측 사이드바 탭 전환 flicker 수정: 각 페이지(skip 단위) 조회를
@@ -53,6 +79,7 @@ export function useHistoryData({
   selectedDateKey,
   department,
   model = "",
+  totalCount,
 }: UseHistoryDataArgs): UseHistoryDataResult {
   const queryClient = useQueryClient();
 
@@ -64,8 +91,15 @@ export function useHistoryData({
   const departmentParam = department || undefined;
   const modelParam = model || undefined;
 
-  // queryKey: 조건 변화를 한 문자열로. stale 응답 가드용(React Query 캐시 key 와는 별개).
-  const queryKey = `${operationKeys ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}|${modelParam ?? ""}`;
+  // 고정 순서 tuple 직렬화로 필드 값에 구분자가 포함돼도 세대 key가 충돌하지 않는다.
+  const queryKey = JSON.stringify([
+    operationKeys ?? null,
+    dateFrom ?? null,
+    dateTo ?? null,
+    search ?? null,
+    departmentParam ?? null,
+    modelParam ?? null,
+  ]);
   const queryKeyRef = useRef(queryKey);
   const skipRef = useRef(0);
 
@@ -91,24 +125,40 @@ export function useHistoryData({
   );
   const [logs, setLogs] = useState<TransactionLog[]>(() => initialCached ?? []);
   const [loading, setLoading] = useState(() => initialCached === undefined);
+  const loadingRef = useRef(initialCached === undefined);
+  const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const retryQueryKeyRef = useRef<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [lastBatchSize, setLastBatchSize] = useState<number | null>(() => initialCached?.length ?? null);
   const isFirstRunRef = useRef(true);
+  const generationRef = useRef(0);
 
   // 조건 변화 → 초기화 + 재조회. 첫 페이지(skip=0)는 React Query 캐시를 경유해서
   // 같은 조합을 다시 볼 때(탭 재방문) 재요청 없이 즉시 채운다.
   useEffect(() => {
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    loadingRef.current = true;
+    const isRetry = retryQueryKeyRef.current === queryKey;
+    retryQueryKeyRef.current = null;
     queryKeyRef.current = queryKey;
-    skipRef.current = 0;
     const myKey = queryKey;
     const params = pageParams(0);
 
     // 첫 실행(마운트)이고 위 lazy init 에서 이미 캐시를 반영했다면 logs/loading
     // 을 다시 초기화하지 않는다 — 화면은 그대로 두고 아래에서 백그라운드
     // 재검증(staleTime 경과 시)만 한다.
-    const skipReset = isFirstRunRef.current && initialCached !== undefined;
+    const skipReset = isRetry || (isFirstRunRef.current && initialCached !== undefined);
     isFirstRunRef.current = false;
+    setError(null);
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+    setLoadMoreError(null);
     if (!skipReset) {
+      skipRef.current = 0;
       setLogs([]);
       setLastBatchSize(null);
       setLoading(true);
@@ -121,22 +171,40 @@ export function useHistoryData({
         staleTime: STALE_TIME.VOLATILE,
       })
       .then((data) => {
-        if (queryKeyRef.current !== myKey) return; // stale
+        if (generationRef.current !== generation || queryKeyRef.current !== myKey) return; // stale
+        skipRef.current = 0;
         setLogs(data);
         setLastBatchSize(data.length);
+        setError(null);
+        setLoadMoreError(null);
+        loadingRef.current = false;
         setLoading(false);
       })
-      .catch(() => {
-        if (queryKeyRef.current !== myKey) return;
+      .catch((caught: unknown) => {
+        if (generationRef.current !== generation || queryKeyRef.current !== myKey) return;
+        setError(historyLoadError(caught, "입출고 내역을 불러오지 못했습니다."));
+        loadingRef.current = false;
         setLoading(false);
       });
     // primitive 분해된 query string 으로 비교하므로 안전.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, queryClient]);
+  }, [queryKey, queryClient, retryNonce]);
+
+  const retry = useCallback(() => {
+    retryQueryKeyRef.current = queryKey;
+    setError(null);
+    loadingRef.current = true;
+    setLoading(true);
+    setRetryNonce((value) => value + 1);
+  }, [queryKey]);
 
   const loadMore = useCallback(async () => {
+    if (loadingRef.current || loadingMoreRef.current) return;
+    const generation = generationRef.current;
     const myKey = queryKey;
     const nextSkip = skipRef.current + HISTORY_PAGE_SIZE;
+    setLoadMoreError(null);
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
       const params = pageParams(nextSkip);
@@ -145,19 +213,25 @@ export function useHistoryData({
         queryFn: ({ signal }) => productionApi.getTransactions(params, { signal }),
         staleTime: STALE_TIME.VOLATILE,
       });
-      if (queryKeyRef.current !== myKey) return; // stale — append 금지
+      if (generationRef.current !== generation || queryKeyRef.current !== myKey) return; // stale — append 금지
       skipRef.current = nextSkip;
       setLogs((prev) => [...prev, ...more]);
       setLastBatchSize(more.length);
-    } catch {
-      // 에러는 무시 — 다음 시도에서 재요청 가능.
+      setLoadMoreError(null);
+    } catch (caught: unknown) {
+      if (generationRef.current === generation && queryKeyRef.current === myKey) {
+        setLoadMoreError(historyLoadError(caught, "추가 내역을 불러오지 못했습니다."));
+      }
     } finally {
-      if (queryKeyRef.current === myKey) setLoadingMore(false);
+      if (generationRef.current === generation && queryKeyRef.current === myKey) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operationKeys, dateFrom, dateTo, search, departmentParam, modelParam, queryKey, queryClient]);
 
-  const canLoadMore = lastBatchSize === HISTORY_PAGE_SIZE;
+  const canLoadMore = !loading && getCanLoadMore({ loadedCount: logs.length, totalCount, lastBatchSize });
 
-  return { logs, setLogs, loading, loadingMore, canLoadMore, loadMore };
+  return { logs, setLogs, loading, error, retry, loadingMore, loadMoreError, canLoadMore, loadMore };
 }

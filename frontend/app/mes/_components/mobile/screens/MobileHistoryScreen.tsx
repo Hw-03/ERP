@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api, type TransactionLog } from "@/lib/api";
 import { productionApi, type TransactionSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -16,6 +17,7 @@ import { useHistoryData } from "../../_hooks/useHistoryData";
 import { useToggleSet } from "../../_hooks/useToggleSet";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+import { queryKeys } from "@/lib/queries/keys";
 import { parseUtc, toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
@@ -24,6 +26,12 @@ import {
 import { type HistorySelection } from "../../_history_sections/historyConstants";
 import { DATE_OPTIONS, dateFilterToFrom } from "../../_history_sections/historyQuery";
 import { MobileHistoryList } from "../history/MobileHistoryList";
+import {
+  advanceHistoryLoadReconcileState,
+  applyHistoryCancellation,
+  reconcileHistorySelection,
+  type HistoryLoadReconcileState,
+} from "../../_history_sections/historyCancellation";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -36,6 +44,7 @@ const SEARCH_DEBOUNCE_MS = 350;
  * golden)는 호출만.
  */
 export function MobileHistoryScreen() {
+  const queryClient = useQueryClient();
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const { data: productModels } = useModelsQuery();
   const { selected: selectedModels, toggle: toggleModel, setSelected: setSelectedModels } = useToggleSet();
@@ -78,13 +87,32 @@ export function MobileHistoryScreen() {
     ? selectedDay
     : DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "전체";
 
-  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData({
+  const [summary, setSummary] = useState<TransactionSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const summaryKeyRef = useRef("");
+
+  const historyData = useHistoryData({
     operations: opParam,
     dateFilter,
     debouncedSearch,
     selectedDateKey: selectedDay,
     department: deptParam,
     model: modelParam,
+    totalCount: summary?.total ?? null,
+  });
+  const {
+    logs,
+    setLogs,
+    loading,
+    error: historyError,
+    retry,
+    loadingMore,
+    canLoadMore,
+    loadMore,
+  } = historyData;
+  const loadReconcileRef = useRef<HistoryLoadReconcileState>({
+    wasLoading: loading,
+    loadingLogs: loading ? logs : null,
   });
 
   useEffect(() => {
@@ -162,10 +190,6 @@ export function MobileHistoryScreen() {
 
   const todayKey = toDateKey(new Date().toISOString());
 
-  const [summary, setSummary] = useState<TransactionSummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const summaryKeyRef = useRef("");
-
   useEffect(() => {
     const transactionTypes = opParam || undefined;
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
@@ -173,8 +197,16 @@ export function MobileHistoryScreen() {
     const searchParam = debouncedSearch.trim() || undefined;
     const department = deptParam || undefined;
     const model = modelParam || undefined;
-    const myKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${searchParam ?? ""}|${department ?? ""}|${model ?? ""}`;
+    const myKey = JSON.stringify([
+      transactionTypes ?? null,
+      dateFrom ?? null,
+      dateTo ?? null,
+      searchParam ?? null,
+      department ?? null,
+      model ?? null,
+    ]);
     summaryKeyRef.current = myKey;
+    setSummary(null);
     setSummaryLoading(true);
     const ctrl = new AbortController();
     void productionApi
@@ -190,6 +222,7 @@ export function MobileHistoryScreen() {
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (summaryKeyRef.current !== myKey) return;
+        setSummary(null);
         setSummaryLoading(false);
       });
     return () => ctrl.abort();
@@ -202,8 +235,9 @@ export function MobileHistoryScreen() {
   useEffect(() => {
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
     const dateTo = selectedDay ?? undefined;
-    const myKey = `${dateFrom ?? ""}|${dateTo ?? ""}`;
+    const myKey = JSON.stringify([dateFrom ?? null, dateTo ?? null]);
     baselineKeyRef.current = myKey;
+    setBaselineSummary(null);
     setBaselineLoading(true);
     const ctrl = new AbortController();
     void productionApi
@@ -216,20 +250,66 @@ export function MobileHistoryScreen() {
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (baselineKeyRef.current !== myKey) return;
+        setBaselineSummary(null);
         setBaselineLoading(false);
       });
     return () => ctrl.abort();
   }, [dateFilter, selectedDay]);
 
+  useEffect(() => {
+    const decision = advanceHistoryLoadReconcileState(loadReconcileRef.current, {
+      loading,
+      error: historyError,
+      logs,
+    });
+    loadReconcileRef.current = decision.state;
+    if (!decision.shouldReconcile || !selection) return;
+
+    const nextSelection = reconcileHistorySelection(selection, logs);
+    setSelection(nextSelection);
+    if (!nextSelection) setSelectionStack([]);
+  }, [historyError, loading, logs, selection]);
+
+  function applyCancellationUpdate(updated: TransactionLog, batchId?: string | null) {
+    setLogs((currentLogs) => applyHistoryCancellation(
+      { logs: currentLogs, selection: null, batchCache: new Map() },
+      updated,
+      batchId,
+    ).logs);
+    setSelection((currentSelection) => applyHistoryCancellation(
+      { logs: [], selection: currentSelection, batchCache: new Map() },
+      updated,
+      batchId,
+    ).selection);
+    setBatchCache((currentBatchCache) => applyHistoryCancellation(
+      { logs: [], selection: null, batchCache: currentBatchCache },
+      updated,
+      batchId,
+    ).batchCache);
+    setSelectionStack((stack) =>
+      stack.flatMap((entry) => {
+        const patched = applyHistoryCancellation(
+          { logs: [], selection: entry, batchCache: new Map() },
+          updated,
+          batchId,
+        ).selection;
+        return patched ? [patched] : [];
+      }),
+    );
+    void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+  }
+
   function handleLogUpdated(updated: TransactionLog) {
+    if (updated.cancelled) {
+      applyCancellationUpdate(updated, updated.operation_batch_id);
+      return;
+    }
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
     setSelection({ kind: "log", log: updated });
   }
 
-  function handleBatchCancelled(batchId: string) {
-    setLogs((prev) =>
-      prev.map((l) => (l.operation_batch_id === batchId ? { ...l, cancelled: true } : l)),
-    );
+  function handleBatchCancelled(batchId: string, updated: TransactionLog) {
+    applyCancellationUpdate(updated, batchId);
   }
 
   function handleSelectLog(log: TransactionLog) {
@@ -398,10 +478,12 @@ export function MobileHistoryScreen() {
 
           <MobileHistoryList
             loading={loading}
+            error={historyError}
             filteredLogs={logs}
             selectedKey={selectedKey}
             onSelectLog={handleSelectLog}
             onSelectBatch={handleSelectBatch}
+            onRetry={() => void retry()}
             canLoadMore={canLoadMore}
             loadingMore={loadingMore}
             onLoadMore={() => void loadMore()}
@@ -436,6 +518,7 @@ export function MobileHistoryScreen() {
 
             {displaySelection.kind === "log" && (
               <HistoryDetailPanel
+                panelOpen={!!selection}
                 selected={displaySelection.log}
                 onSelectLog={navigateToLog}
                 onLogUpdated={handleLogUpdated}
@@ -443,6 +526,7 @@ export function MobileHistoryScreen() {
             )}
             {displaySelection.kind === "batch" && (
               <HistoryBatchDetailPanel
+                panelOpen={!!selection}
                 batchId={displaySelection.batchId}
                 logs={displaySelection.logs}
                 batchCache={batchCache}

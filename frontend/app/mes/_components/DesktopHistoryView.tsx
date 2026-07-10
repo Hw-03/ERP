@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api, type TransactionLog } from "@/lib/api";
 import { productionApi, type TransactionSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -16,13 +17,21 @@ import { useHistoryData } from "./_hooks/useHistoryData";
 import { useToggleSet } from "./_hooks/useToggleSet";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+import { queryKeys } from "@/lib/queries/keys";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
 import { type HistorySelection } from "./_history_sections/historyConstants";
 import { DATE_OPTIONS, dateFilterToFrom } from "./_history_sections/historyQuery";
+import {
+  advanceHistoryLoadReconcileState,
+  applyHistoryCancellation,
+  reconcileHistorySelection,
+  type HistoryLoadReconcileState,
+} from "./_history_sections/historyCancellation";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
 export function DesktopHistoryView() {
+  const queryClient = useQueryClient();
   // 3차: 상단 KPI 박스는 표시 전용(클릭 필터 폐기). 필터는 "필터" 패널 단일.
   // scope/typeFilter/activeBucket·부서 전개 상태 없음 — 항상 "전체"로 시작.
   // 대시보드식 독립 필터 패널 (부서·모델·거래종류 다중 선택).
@@ -77,13 +86,34 @@ export function DesktopHistoryView() {
     ? selectedDay
     : (DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "전체");
 
-  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData({
+  const [summary, setSummary] = useState<TransactionSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryRetryNonce, setSummaryRetryNonce] = useState(0);
+  const summaryKeyRef = useRef("");
+
+  const historyData = useHistoryData({
     operations: opParam,
     dateFilter,
     debouncedSearch,
     selectedDateKey: selectedDay,
     department: deptParam,
     model: modelParam,
+    totalCount: summary?.total,
+  });
+  const {
+    logs,
+    setLogs,
+    loading,
+    error: historyError,
+    retry,
+    loadingMore,
+    loadMoreError,
+    canLoadMore,
+    loadMore,
+  } = historyData;
+  const loadReconcileRef = useRef<HistoryLoadReconcileState>({
+    wasLoading: loading,
+    loadingLogs: loading ? logs : null,
   });
 
   // 달력 fetch — 패널이 펼쳐진 동안에만. 위 필터(거래종류·부서·모델·검색)와
@@ -175,10 +205,6 @@ export function DesktopHistoryView() {
   }
 
   // X(분자) summary — 현재 필터(거래종류/검색/부서/모델) 전체 카운트. 페이지네이션 무관.
-  const [summary, setSummary] = useState<TransactionSummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const summaryKeyRef = useRef("");
-
   useEffect(() => {
     const operationKeys = opParam || undefined;
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
@@ -190,6 +216,7 @@ export function DesktopHistoryView() {
     const myKey = `${operationKeys ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${searchParam ?? ""}|${department ?? ""}|${model ?? ""}`;
     summaryKeyRef.current = myKey;
 
+    setSummary(null);
     setSummaryLoading(true);
     const ctrl = new AbortController();
     void productionApi
@@ -205,10 +232,17 @@ export function DesktopHistoryView() {
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (summaryKeyRef.current !== myKey) return;
+        setSummary(null);
         setSummaryLoading(false);
       });
     return () => ctrl.abort();
-  }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam]);
+  }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam, summaryRetryNonce]);
+
+  function retryHistoryResults() {
+    setSummary(null);
+    retry();
+    setSummaryRetryNonce((nonce) => nonce + 1);
+  }
 
   // Y(분모) baseline summary — 선택한 기간만 필터. 거래종류/검색/부서/모델 무시.
   // 상단 박스 숫자·부서칩·"{기간} Y건 중 X건"의 Y 를 고정 제공.
@@ -222,6 +256,7 @@ export function DesktopHistoryView() {
     const myKey = `${dateFrom ?? ""}|${dateTo ?? ""}`;
     baselineKeyRef.current = myKey;
 
+    setBaselineSummary(null);
     setBaselineLoading(true);
     const ctrl = new AbortController();
     void productionApi
@@ -234,6 +269,7 @@ export function DesktopHistoryView() {
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (baselineKeyRef.current !== myKey) return;
+        setBaselineSummary(null);
         setBaselineLoading(false);
       });
     return () => ctrl.abort();
@@ -252,15 +288,64 @@ export function DesktopHistoryView() {
     }
   }, [logs, loading]);
 
+  useEffect(() => {
+    const decision = advanceHistoryLoadReconcileState(loadReconcileRef.current, {
+      loading,
+      error: historyError,
+      logs,
+    });
+    loadReconcileRef.current = decision.state;
+    if (!decision.shouldReconcile || !selection) return;
+
+    const nextSelection = reconcileHistorySelection(selection, logs);
+    setSelection(nextSelection);
+    if (!nextSelection) {
+      setSelectionStack([]);
+      setFocusTarget(null);
+      pendingScrollLogIdRef.current = null;
+    }
+  }, [historyError, loading, logs, selection]);
+
+  function applyCancellationUpdate(updated: TransactionLog, batchId?: string | null) {
+    setLogs((currentLogs) => applyHistoryCancellation(
+      { logs: currentLogs, selection: null, batchCache: new Map() },
+      updated,
+      batchId,
+    ).logs);
+    setSelection((currentSelection) => applyHistoryCancellation(
+      { logs: [], selection: currentSelection, batchCache: new Map() },
+      updated,
+      batchId,
+    ).selection);
+    setBatchCache((currentBatchCache) => applyHistoryCancellation(
+      { logs: [], selection: null, batchCache: currentBatchCache },
+      updated,
+      batchId,
+    ).batchCache);
+    setSelectionStack((stack) =>
+      stack.flatMap((entry) => {
+        const patched = applyHistoryCancellation(
+          { logs: [], selection: entry, batchCache: new Map() },
+          updated,
+          batchId,
+        ).selection;
+        return patched ? [patched] : [];
+      }),
+    );
+    void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+  }
+
   function handleLogUpdated(updated: TransactionLog) {
+    if (updated.cancelled) {
+      applyCancellationUpdate(updated, updated.operation_batch_id);
+      return;
+    }
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
     setSelection({ kind: "log", log: updated });
   }
 
-  function handleBatchCancelled(batchId: string) {
-    setLogs((prev) =>
-      prev.map((l) => (l.operation_batch_id === batchId ? { ...l, cancelled: true } : l)),
-    );
+  function handleBatchCancelled(batchId: string, updated: TransactionLog) {
+    applyCancellationUpdate(updated, batchId);
   }
 
   // 표 행 클릭(top-level) — 드릴 스택 초기화.
@@ -457,6 +542,8 @@ export function DesktopHistoryView() {
 
           <HistoryTable
             loading={loading}
+            error={historyError}
+            onRetry={retryHistoryResults}
             filteredLogs={logs}
             totalCount={summary?.total}
             selection={selection}
@@ -466,6 +553,7 @@ export function DesktopHistoryView() {
             setBatchCache={setBatchCache}
             canLoadMore={canLoadMore}
             loadingMore={loadingMore}
+            loadMoreError={loadMoreError}
             onLoadMore={() => void loadMore()}
             focusTarget={focusTarget}
           />

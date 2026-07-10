@@ -12808,6 +12808,23 @@
           },
           {
             "in": "query",
+            "name": "operation_batch_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Operation Batch Id"
+            }
+          },
+          {
+            "in": "query",
             "name": "transaction_type",
             "required": false,
             "schema": {

@@ -59,6 +59,7 @@ export const productionApi = {
       transactionType?: TransactionType;
       transactionTypes?: string; // 쉼표 구분 복수값. 예: "RECEIVE,SHIP"
       operationKeys?: string; // 화면 거래 종류. 예: "item_conversion,shipping_prepare"
+      operationBatchId?: string;
       referenceNo?: string;
       search?: string;
       department?: string;
@@ -77,6 +78,7 @@ export const productionApi = {
     if (params?.transactionType) query.set("transaction_type", params.transactionType);
     if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
     if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
+    if (params?.operationBatchId) query.set("operation_batch_id", params.operationBatchId);
     if (params?.referenceNo) query.set("reference_no", params.referenceNo);
     if (params?.search) query.set("search", params.search);
     if (params?.department) query.set("department", params.department);

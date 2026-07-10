@@ -187,6 +187,7 @@ def monthly_counts(
 @router.get("/transactions", response_model=List[TransactionLogResponse])
 def list_transactions(
     item_id: Optional[uuid.UUID] = Query(None),
+    operation_batch_id: Optional[uuid.UUID] = Query(None),
     transaction_type: Optional[TransactionTypeEnum] = Query(None),
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입. 예: RECEIVE,SHIP"),
     operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키. 예: item_conversion,shipping_prepare"),
@@ -223,6 +224,9 @@ def list_transactions(
 
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
+
+    if operation_batch_id:
+        query = query.filter(TransactionLog.operation_batch_id == operation_batch_id)
 
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)

@@ -50,6 +50,15 @@ describe("productionApi", () => {
     expect(url).toContain("operation_keys=item_conversion%2Cshipping_prepare");
   });
 
+  it("getTransactions forwards an exact operation batch id", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await productionApi.getTransactions({ operationBatchId: "batch-1" });
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("operation_batch_id=batch-1");
+  });
+
   it("getTransactionsSummary forwards history operation keys", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({

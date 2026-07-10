@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
@@ -11,17 +11,33 @@ interface Props {
   onClose?: () => void;
   /** true 면 X 버튼을 렌더하지 않음 (카드 내부에서 직접 닫기 버튼을 제공할 때). ESC 처리는 유지. */
   hideCloseButton?: boolean;
+  /** false면 목록과 나란히 탐색 가능한 complementary 영역으로 렌더한다. */
+  modal?: boolean;
+  /** 패널 제목 요소의 id. */
+  labelledBy?: string;
   children: React.ReactNode;
 }
 
 /**
  * 우측 슬라이딩 패널 — width 애니메이션(160ms) + 콘텐츠 페이드+슬라이드(260ms).
  * open=false 일 때 width:0 으로 접힌다.
- * onClose 제공 시: X 버튼 표시 + ESC 키로 닫힘 + focus trap + aria.
+ * onClose 제공 시 X 버튼과 ESC 닫기를 제공한다. modal=true(기본)에서만 focus trap을 적용한다.
  */
-function SlidePanelImpl({ open, width = 436, onClose, hideCloseButton, children }: Props) {
-  const panelRef = useFocusTrap<HTMLDivElement>(open && !!onClose);
-  const titleId = "slide-panel-title";
+function SlidePanelImpl({
+  open,
+  width = 436,
+  onClose,
+  hideCloseButton,
+  modal = true,
+  labelledBy,
+  children,
+}: Props) {
+  const panelRef = useFocusTrap<HTMLDivElement>(open && !!onClose && modal);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    wrapperRef.current?.toggleAttribute("inert", !open);
+  }, [open]);
 
   // ESC 닫기 (onClose 있을 때만)
   useEffect(() => {
@@ -33,13 +49,16 @@ function SlidePanelImpl({ open, width = 436, onClose, hideCloseButton, children 
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // aria props — onClose 없으면 일반 region
-  const dialogProps = onClose
-    ? { role: "dialog" as const, "aria-modal": true, "aria-labelledby": titleId }
-    : {};
+  const panelProps = modal
+    ? onClose
+      ? { role: "dialog" as const, "aria-modal": true, "aria-labelledby": labelledBy }
+      : { "aria-labelledby": labelledBy }
+    : { role: "complementary" as const, "aria-labelledby": labelledBy };
 
   return (
     <div
+      ref={wrapperRef}
+      aria-hidden={open ? undefined : true}
       className="shrink-0 overflow-hidden"
       style={{
         width: open ? width : 0,
@@ -55,7 +74,7 @@ function SlidePanelImpl({ open, width = 436, onClose, hideCloseButton, children 
           transition: "opacity 260ms ease, transform 260ms ease",
           willChange: "transform, opacity",
         }}
-        {...dialogProps}
+        {...panelProps}
       >
         {/* 닫기 ✕ — 콘텐츠 우상단 모서리에 겹침. hideCloseButton=true 면 카드 내부 버튼이 대신함. */}
         {!hideCloseButton && onClose && open && (

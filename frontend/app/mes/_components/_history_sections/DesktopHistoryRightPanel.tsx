@@ -11,6 +11,8 @@ import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
 import type { HistorySelection } from "./historyConstants";
 import type { HistoryTableFocusTarget } from "./HistoryTable";
 
+const HISTORY_DETAIL_TITLE_ID = "desktop-history-detail-title";
+
 /**
  * Round-13 (#15) 추출 — DesktopHistoryView 우측 슬라이딩 상세 패널.
  * history-batch-detail-2026-05-15: selection union 분기 (kind="log" | "batch").
@@ -26,7 +28,7 @@ export interface DesktopHistoryRightPanelProps {
   canGoBack: boolean;
   onBack: () => void;
   onLogUpdated: (updated: TransactionLog) => void;
-  onBatchCancelled: (batchId: string) => void;
+  onBatchCancelled: (batchId: string, updated: TransactionLog) => void;
   onFocusLineInList: (target: Omit<HistoryTableFocusTarget, "nonce">) => void;
   /** 패널 닫기 (선택 해제). */
   onClose: () => void;
@@ -60,15 +62,24 @@ export function DesktopHistoryRightPanel({
   ) : undefined;
 
   return (
-    <SlidePanel open={!!selection} onClose={onClose} hideCloseButton>
+    <SlidePanel
+      open={!!selection}
+      onClose={onClose}
+      hideCloseButton
+      modal={false}
+      labelledBy={HISTORY_DETAIL_TITLE_ID}
+    >
       {displaySelection?.kind === "log" && (
         <DesktopRightPanel
           title={displaySelection.log.item_name}
+          titleId={HISTORY_DETAIL_TITLE_ID}
+          subtitle={displaySelection.log.mes_code ?? undefined}
           backButton={backButtonNode}
           onClose={onClose}
         >
           <HistoryDetailPanel
             key={displaySelection.log.log_id}
+            panelOpen={!!selection}
             selected={displaySelection.log}
             onSelectLog={onSelectLog}
             onLogUpdated={onLogUpdated}
@@ -90,14 +101,21 @@ export function DesktopHistoryRightPanel({
               ? `${batch.bundles[0].title} 외 ${batch.bundles.length - 1}건`
               : batch.bundles[0].title)
           : `${first.item_name} 외 ${displaySelection.logs.length - 1}건`;
+        const subtitleText = disassembleLog?.mes_code
+          ?? batch?.bundles[0]?.source_mes_code
+          ?? first.mes_code
+          ?? undefined;
         return (
           <DesktopRightPanel
             title={titleText}
+            titleId={HISTORY_DETAIL_TITLE_ID}
+            subtitle={subtitleText}
             backButton={backButtonNode}
             onClose={onClose}
           >
             <HistoryBatchDetailPanel
               key={displaySelection.batchId}
+              panelOpen={!!selection}
               batchId={displaySelection.batchId}
               logs={displaySelection.logs}
               batchCache={batchCache}
