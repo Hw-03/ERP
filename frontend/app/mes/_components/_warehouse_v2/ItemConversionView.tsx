@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type Item,
@@ -14,6 +14,9 @@ interface WorkProps {
   items: Item[];
   loading?: boolean;
   requesterEmployeeId: string;
+  historyStep?: ConversionStepId;
+  onHistoryStepChange?: (step: ConversionStepId) => void;
+  onHistoryStepBack?: (step: ConversionStepId) => void;
   onBack?: () => void;
   onComplete: (result: ItemConversionResult) => void;
 }
@@ -24,7 +27,7 @@ type PickerKind = "source" | "target";
 
 const ALLOWED_PROCESS_TYPES = ["PA", "AF", "AA"];
 const CONVERSION_STEPS: Array<{ id: ConversionStepId; title: string }> = [
-  { id: 1, title: "소스·대상 선택" },
+  { id: 1, title: "기존·대상 선택" },
   { id: 2, title: "차이 확인" },
   { id: 3, title: "실행" },
 ];
@@ -60,12 +63,6 @@ function conversionModeLabel(mode: ItemConversionMode | null): string {
   return "자동 판정";
 }
 
-function conversionStep(preview: ItemConversionPreview | null, ready: boolean): ConversionStepId {
-  if (ready) return 3;
-  if (preview) return 2;
-  return 1;
-}
-
 function filterCandidates(candidates: Item[], query: string): Item[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return candidates;
@@ -81,6 +78,9 @@ export function ItemConversionWorkView({
   items,
   loading = false,
   requesterEmployeeId,
+  historyStep,
+  onHistoryStepChange,
+  onHistoryStepBack,
   onBack,
   onComplete,
 }: WorkProps) {
@@ -90,8 +90,9 @@ export function ItemConversionWorkView({
   const [memo, setMemo] = useState("");
   const [sourceQuery, setSourceQuery] = useState("");
   const [targetQuery, setTargetQuery] = useState("");
+  const [pendingCandidatePosition, setPendingCandidatePosition] = useState<PickerKind | null>(null);
   const [preview, setPreview] = useState<ItemConversionPreview | null>(null);
-  const [ready, setReady] = useState(false);
+  const [localStep, setLocalStep] = useState<ConversionStepId>(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [executeConfirmOpen, setExecuteConfirmOpen] = useState(false);
@@ -111,7 +112,11 @@ export function ItemConversionWorkView({
     : [];
   const filteredSources = filterCandidates(candidates, sourceQuery).slice(0, 80);
   const filteredTargets = filterCandidates(targetCandidates, targetQuery).slice(0, 80);
-  const currentStep = conversionStep(preview, ready);
+  const currentStep = historyStep
+    ? historyStep === 1 || preview
+      ? historyStep
+      : 1
+    : localStep;
   const sourceOver = sourceItem ? quantity > itemStock(sourceItem) : false;
   const canPreview = Boolean(sourceItem && targetItem && !sourceOver && quantity >= 1);
   const resolvedMode = preview?.resolved_mode ?? null;
@@ -124,19 +129,27 @@ export function ItemConversionWorkView({
 
   const clearPreviewState = useCallback((): void => {
     setPreview(null);
-    setReady(false);
     setError(null);
   }, []);
 
-  function selectSource(item: Item): void {
+  function moveForward(step: ConversionStepId): void {
+    setLocalStep(step);
+    onHistoryStepChange?.(step);
+  }
+
+  function selectSource(item: Item, shouldPosition: boolean): void {
     setSourceId(item.item_id);
+    setSourceQuery("");
     setTargetId("");
     setTargetQuery("");
+    setPendingCandidatePosition(shouldPosition ? "source" : null);
     clearPreviewState();
   }
 
-  function selectTarget(item: Item): void {
+  function selectTarget(item: Item, shouldPosition: boolean): void {
     setTargetId(item.item_id);
+    setTargetQuery("");
+    setPendingCandidatePosition(shouldPosition ? "target" : null);
     clearPreviewState();
   }
 
@@ -152,10 +165,9 @@ export function ItemConversionWorkView({
         requester_employee_id: normalizedRequesterEmployeeId,
       });
       setPreview(next);
-      setReady(false);
+      moveForward(2);
     } catch (err) {
       setPreview(null);
-      setReady(false);
       setError(err instanceof Error ? err.message : "품목 전환 차이 확인에 실패했습니다.");
     } finally {
       setBusy(false);
@@ -189,13 +201,12 @@ export function ItemConversionWorkView({
   }
 
   function handleStepClick(step: ConversionStepId): void {
-    if (step === 1 && preview) {
-      clearPreviewState();
+    if (step >= currentStep) return;
+    if (onHistoryStepBack) {
+      onHistoryStepBack(step);
       return;
     }
-    if (step === 2 && ready) {
-      setReady(false);
-    }
+    setLocalStep(step);
   }
 
   return (
@@ -207,7 +218,7 @@ export function ItemConversionWorkView({
         sourceItem={sourceItem}
         targetItem={targetItem}
         preview={preview}
-        ready={ready}
+        currentStep={currentStep}
         onBack={onBack}
         onStepClick={handleStepClick}
       />
@@ -224,6 +235,7 @@ export function ItemConversionWorkView({
           targetQuery={targetQuery}
           sourceCandidates={filteredSources}
           targetCandidates={filteredTargets}
+          pendingCandidatePosition={pendingCandidatePosition}
           quantity={quantity}
           sourceOver={sourceOver}
           busy={busy}
@@ -247,6 +259,7 @@ export function ItemConversionWorkView({
           }}
           onSourceSelect={selectSource}
           onTargetSelect={selectTarget}
+          onCandidatePositioned={() => setPendingCandidatePosition(null)}
           onQuantity={(value) => {
             setQuantity(positiveInt(value));
             clearPreviewState();
@@ -262,7 +275,7 @@ export function ItemConversionWorkView({
           error={error}
           canNext={canGoExecute}
           onMemo={setMemo}
-          onNext={() => setReady(true)}
+          onNext={() => moveForward(3)}
         />
       ) : preview ? (
         <ExecuteStep
@@ -278,7 +291,7 @@ export function ItemConversionWorkView({
         open={executeConfirmOpen}
         title="품목 전환을 실행할까요?"
         tone="normal"
-        cautionMessage="소스 품목 재고가 차감되고 대상 품목 재고가 즉시 입고됩니다."
+        cautionMessage="기존 품목 재고가 차감되고 대상 품목 재고가 즉시 입고됩니다."
         confirmLabel="전환 실행"
         busy={busy}
         busyLabel="실행 중"
@@ -287,7 +300,7 @@ export function ItemConversionWorkView({
       >
         {sourceItem && targetItem && (
           <div className="grid gap-2 text-sm font-bold">
-            <div>소스 품목: {sourceItem.item_name} · {formatQty(quantity, sourceItem.unit)}</div>
+            <div>기존 품목: {sourceItem.item_name} · {formatQty(quantity, sourceItem.unit)}</div>
             <div>대상 품목: {targetItem.item_name} · {formatQty(quantity, targetItem.unit)}</div>
           </div>
         )}
@@ -300,27 +313,26 @@ function ItemConversionStepChrome({
   sourceItem,
   targetItem,
   preview,
-  ready,
+  currentStep,
   onBack,
   onStepClick,
 }: {
   sourceItem: Item | null;
   targetItem: Item | null;
   preview: ItemConversionPreview | null;
-  ready: boolean;
+  currentStep: ConversionStepId;
   onBack?: () => void;
   onStepClick: (step: ConversionStepId) => void;
 }) {
-  const currentStep = conversionStep(preview, ready);
   const conversionNav = CONVERSION_STEPS.map((step) => {
     const state: ConversionStepState =
       step.id < currentStep ? "done" : step.id === currentStep ? "active" : "locked";
     const summary =
       step.id === 1 && sourceItem && targetItem
-        ? `소스 ${sourceItem.mes_code ?? sourceItem.item_name} · 대상 ${targetItem.mes_code ?? targetItem.item_name}`
+        ? `기존 ${sourceItem.mes_code ?? sourceItem.item_name} · 대상 ${targetItem.mes_code ?? targetItem.item_name}`
         : step.id === 2 && preview
         ? `${preview.resolved_mode} · ${preview.lines.length}개 차이`
-        : step.id === 3 && ready
+        : step.id === 3 && currentStep === 3
         ? "최종 확인"
         : "";
     return { ...step, state, summary };
@@ -364,6 +376,7 @@ function SelectionStep({
   targetQuery,
   sourceCandidates,
   targetCandidates,
+  pendingCandidatePosition,
   quantity,
   sourceOver,
   busy,
@@ -373,6 +386,7 @@ function SelectionStep({
   onTargetQuery,
   onSourceSelect,
   onTargetSelect,
+  onCandidatePositioned,
   onQuantity,
   onNext,
 }: {
@@ -382,6 +396,7 @@ function SelectionStep({
   targetQuery: string;
   sourceCandidates: Item[];
   targetCandidates: Item[];
+  pendingCandidatePosition: PickerKind | null;
   quantity: number;
   sourceOver: boolean;
   busy: boolean;
@@ -389,15 +404,16 @@ function SelectionStep({
   error: string | null;
   onSourceQuery: (value: string) => void;
   onTargetQuery: (value: string) => void;
-  onSourceSelect: (item: Item) => void;
-  onTargetSelect: (item: Item) => void;
+  onSourceSelect: (item: Item, shouldPosition: boolean) => void;
+  onTargetSelect: (item: Item, shouldPosition: boolean) => void;
+  onCandidatePositioned: () => void;
   onQuantity: (value: string | number) => void;
   onNext: () => void;
 }) {
   const selectionHint = sourceOver
-    ? "소스 품목 재고가 부족합니다"
+    ? "기존 품목 재고가 부족합니다"
     : !sourceItem
-      ? "소스 품목을 선택하세요"
+      ? "기존 품목을 선택하세요"
       : !targetItem
         ? "대상 품목을 선택하세요"
         : quantity < 1
@@ -410,11 +426,13 @@ function SelectionStep({
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
         <CandidatePanel
           kind="source"
-          title="소스 품목"
+          title="기존 품목"
           query={sourceQuery}
           selected={sourceItem}
           candidates={sourceCandidates}
           placeholder="품명 · 품목 코드 검색"
+          repositionSelected={pendingCandidatePosition === "source"}
+          onSelectedPositioned={onCandidatePositioned}
           onQuery={onSourceQuery}
           onSelect={onSourceSelect}
         />
@@ -424,9 +442,11 @@ function SelectionStep({
           query={targetQuery}
           selected={targetItem}
           candidates={targetCandidates}
-          placeholder={sourceItem ? "품명 · 품목 코드 검색" : "소스 품목을 먼저 선택"}
+          placeholder={sourceItem ? "품명 · 품목 코드 검색" : "기존 품목을 먼저 선택"}
           disabled={!sourceItem}
-          emptyText={sourceItem ? "대상 후보가 없습니다." : "소스 품목을 선택하세요"}
+          emptyText={sourceItem ? "대상 후보가 없습니다." : "기존 품목을 선택하세요"}
+          repositionSelected={pendingCandidatePosition === "target"}
+          onSelectedPositioned={onCandidatePositioned}
           onQuery={onTargetQuery}
           onSelect={onTargetSelect}
         />
@@ -470,6 +490,8 @@ function CandidatePanel({
   placeholder,
   disabled = false,
   emptyText = "검색 결과가 없습니다.",
+  repositionSelected,
+  onSelectedPositioned,
   onQuery,
   onSelect,
 }: {
@@ -481,9 +503,23 @@ function CandidatePanel({
   placeholder: string;
   disabled?: boolean;
   emptyText?: string;
+  repositionSelected: boolean;
+  onSelectedPositioned: () => void;
   onQuery: (value: string) => void;
-  onSelect: (item: Item) => void;
+  onSelect: (item: Item, shouldPosition: boolean) => void;
 }) {
+  const candidateListRef = useRef<HTMLDivElement>(null);
+  const selectedRowRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (!repositionSelected || !candidateListRef.current || !selectedRowRef.current) return;
+
+    const rows = Array.from(selectedRowRef.current.parentElement?.children ?? []) as HTMLElement[];
+    const fourthRowOffset = rows[3]?.offsetTop ?? 0;
+    candidateListRef.current.scrollTop = Math.max(0, selectedRowRef.current.offsetTop - fourthRowOffset);
+    onSelectedPositioned();
+  }, [onSelectedPositioned, repositionSelected, selected?.item_id]);
+
   if (disabled) {
     return (
       <section className="icf flex min-h-0 flex-col gap-3 rounded-[18px] border p-4">
@@ -516,7 +552,11 @@ function CandidatePanel({
           className="ict h-full min-w-0 flex-1 bg-transparent text-sm font-bold outline-none disabled:cursor-not-allowed"
         />
       </label>
-      <div className="icpnl sg min-h-0 flex-1 overflow-y-auto rounded-[14px] border p-2">
+      <div
+        ref={candidateListRef}
+        data-testid={`item-conversion-${kind}-candidate-list`}
+        className="icpnl sg min-h-0 flex-1 overflow-y-auto rounded-[14px] border p-2"
+      >
         {disabled || candidates.length === 0 ? (
           <div className="icm flex h-full min-h-[180px] items-center justify-center text-sm font-bold">
             {emptyText}
@@ -531,7 +571,8 @@ function CandidatePanel({
                   type="button"
                   data-testid={`item-conversion-${kind}-option-${item.item_id}`}
                   aria-pressed={isSelected}
-                  onClick={() => onSelect(item)}
+                  ref={isSelected ? selectedRowRef : null}
+                  onClick={() => onSelect(item, query.trim().length > 0)}
                   className={isSelected ? "ico ico-active" : "ico"}
                 >
                   <span className="min-w-0">
@@ -576,7 +617,7 @@ function ReviewStep({
       <PreviewDifferencePanels preview={preview} />
       <div className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,1fr)_150px]">
         <label data-testid="item-conversion-memo-field" className="icf flex min-h-12 items-center gap-3 rounded-[14px] border px-4">
-          <span className="icm shrink-0 text-xs font-black">
+          <span className="icm shrink-0 text-sm font-black">
             메모 {memoRequired ? "(필수)" : "(선택)"}
           </span>
           <input
@@ -620,7 +661,7 @@ function ExecuteStep({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-execute-step">
-      <PreviewDifferencePanels preview={preview} />
+      <PreviewDifferencePanels preview={preview} showItemContext />
       {error && <ErrorNotice message={error} />}
       <FinalExecutionBar
         preview={preview}
@@ -648,19 +689,9 @@ function FinalExecutionBar({
 }) {
   return (
     <div data-testid="item-conversion-final-confirmation" className="ic-execution-bar mt-auto shrink-0">
-      <div className="ic-execution-details">
-        <div className="ic-execution-detail">
-          <span className="icm text-xs font-black">소스 품목</span>
-          <div className="ic-execution-value">{preview.source_item_name} · {formatQty(preview.quantity)}</div>
-        </div>
-        <div className="ic-execution-detail">
-          <span className="icm text-xs font-black">대상 품목</span>
-          <div className="ic-execution-value">{preview.target_item_name} · {formatQty(preview.quantity)}</div>
-        </div>
-        <div className="ic-execution-detail">
-          <span className="icm text-xs font-black">메모</span>
-          <div className="ic-execution-value">{memo.trim() || "-"}</div>
-        </div>
+      <div className="ic-execution-memo">
+        <span className="icm text-sm font-black">메모</span>
+        <div className="ic-execution-memo-value">{memo.trim() || "-"}</div>
       </div>
       <button
         type="button"
@@ -689,7 +720,7 @@ function PreviewSummary({ preview }: { preview: ItemConversionPreview }) {
         </div>
         <div className="mt-2 grid gap-2 text-sm font-bold lg:grid-cols-2">
           <div className="min-w-0">
-            <div className="icm text-xs">소스 품목</div>
+            <div className="icm text-xs">기존 품목</div>
             <div className="ict truncate text-base font-black">{preview.source_item_name}</div>
             <div className="icm text-xs">{preview.source_mes_code ?? "-"}</div>
           </div>
@@ -705,11 +736,17 @@ function PreviewSummary({ preview }: { preview: ItemConversionPreview }) {
   );
 }
 
-function PreviewDifferencePanels({ preview }: { preview: ItemConversionPreview }) {
+function PreviewDifferencePanels({
+  preview,
+  showItemContext = false,
+}: {
+  preview: ItemConversionPreview;
+  showItemContext?: boolean;
+}) {
   if (preview.lines.length === 0) {
     return (
       <div className="icm flex min-h-0 flex-1 items-center justify-center rounded-[18px] border text-sm font-bold">
-        변경되는 구성품이 없습니다. 소스 품목 차감과 대상 품목 입고만 처리합니다.
+        변경되는 구성품이 없습니다. 기존 품목 차감과 대상 품목 입고만 처리합니다.
       </div>
     );
   }
@@ -720,11 +757,15 @@ function PreviewDifferencePanels({ preview }: { preview: ItemConversionPreview }
   return (
     <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-2">
       <DifferencePanel
-        title="소스 BOM에서 빠지는 구성"
+        title="기존 BOM에서 빠지는 구성"
         description="회수 입고"
         emptyText="회수할 구성품 없음"
         lines={recoverLines}
         kind="recover"
+        context={showItemContext ? {
+          label: "기존 품목",
+          value: `${preview.source_item_name} · ${formatQty(preview.quantity)}`,
+        } : undefined}
       />
       <DifferencePanel
         title="대상 BOM 때문에 필요한 구성"
@@ -732,6 +773,10 @@ function PreviewDifferencePanels({ preview }: { preview: ItemConversionPreview }
         emptyText="추가 차감할 구성품 없음"
         lines={consumeLines}
         kind="consume"
+        context={showItemContext ? {
+          label: "대상 품목",
+          value: `${preview.target_item_name} · ${formatQty(preview.quantity)}`,
+        } : undefined}
       />
     </div>
   );
@@ -743,18 +788,29 @@ function DifferencePanel({
   emptyText,
   lines,
   kind,
+  context,
 }: {
   title: string;
   description: string;
   emptyText: string;
   lines: ItemConversionPreview["lines"];
   kind: "consume" | "recover";
+  context?: { label: string; value: string };
 }) {
   return (
     <section className="icf flex min-h-0 flex-col rounded-[18px] border p-4">
       <div className="shrink-0">
-        <div className="ict text-lg font-black">{title}</div>
-        <div className="icm mt-1 text-xs font-bold">{description}</div>
+        {context ? (
+          <>
+            <div className="icm text-xs font-black">{context.label}</div>
+            <div className="ict mt-1 line-clamp-2 text-lg font-black">{context.value}</div>
+          </>
+        ) : (
+          <>
+            <div className="ict text-lg font-black">{title}</div>
+            <div className="icm mt-1 text-xs font-bold">{description}</div>
+          </>
+        )}
       </div>
       <div className="sg mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
         {lines.length === 0 ? (
