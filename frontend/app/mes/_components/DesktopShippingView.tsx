@@ -1021,42 +1021,38 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
   ];
   const total = requests.length;
   return (
-    <div className={SHIPPING_FLEX_COL_CLASS}>
-      <Panel dataTestId="shipping-request-list-panel" className={SHIPPING_FLEX_COL_CLASS}>
-        <div className={SHIPPING_ROW_CLASS}>
-          <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div className="min-w-0">
-            <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 관리</div>
-            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행 중 출하 {total}건 · 요청 생성, 준비 체크, 픽업 완료까지 이어서 처리합니다.</div>
-          </div>
+    <div data-testid="shipping-request-list-panel" className={`${SHIPPING_FLEX_COL_CLASS} gap-3`}>
+      <div className={SHIPPING_ROW_CLASS}>
+        <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div className="min-w-0">
+          <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 관리</div>
+          <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행 중 출하 {total}건 · 요청 생성, 준비 체크, 픽업 완료까지 이어서 처리합니다.</div>
         </div>
+      </div>
 
-        <div className={SHIPPING_MODAL_BODY_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
-            {groups.map((group) => {
-              const rows = requests.filter((request) => request.status === group.status);
-              return (
-                <ListColumn
-                  key={group.status}
-                  icon={ClipboardList}
-                  title={group.label}
-                  subtitle={`${rows.length}건`}
-                  bodyDataTestId={`shipping-request-column-body-${group.status}`}
-                  action={group.status === "REQUESTED" ? <PrimaryActionButton icon={Plus} label="새 요청 만들기" tone={LEGACY_COLORS.blue} onClick={onNew} dataAction="new-shipping-request" /> : null}
-                >
-                  {rows.length === 0 ? (
-                    <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
-                  ) : (
-                    rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)
-                  )}
-                </ListColumn>
-              );
-            })}
-          </div>
-        </div>
-      </Panel>
+      <div data-testid="shipping-request-list-grid" className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
+        {groups.map((group) => {
+          const rows = requests.filter((request) => request.status === group.status);
+          return (
+            <ListColumn
+              key={group.status}
+              icon={ClipboardList}
+              title={group.label}
+              subtitle={`${rows.length}건`}
+              bodyDataTestId={`shipping-request-column-body-${group.status}`}
+              action={group.status === "REQUESTED" ? <PrimaryActionButton icon={Plus} label="새 요청 만들기" tone={LEGACY_COLORS.blue} onClick={onNew} dataAction="new-shipping-request" /> : null}
+            >
+              {rows.length === 0 ? (
+                <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
+              ) : (
+                rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)
+              )}
+            </ListColumn>
+          );
+        })}
+      </div>
     </div>
   );
 }

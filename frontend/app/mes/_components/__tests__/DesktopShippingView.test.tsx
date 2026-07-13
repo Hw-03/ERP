@@ -817,6 +817,20 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("flex-1");
     expect(screen.getByTestId("shipping-request-column-body-PREPARED")).toHaveClass("flex-1");
   });
+
+  it("removes the request list outer frame and lets the three status columns fill the workspace", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+
+    const panel = await screen.findByTestId("shipping-request-list-panel");
+    expect(panel).not.toHaveClass("rounded-[24px]");
+    expect(panel).not.toHaveClass("border");
+    expect(panel).not.toHaveClass("p-4");
+    expect(screen.getByTestId("shipping-request-list-grid")).toHaveClass("flex-1");
+  });
+
   it("puts the new-request action inside the shipping request column", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
