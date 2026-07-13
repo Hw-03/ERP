@@ -86,6 +86,18 @@ function effectsFromLogs(logs: TransactionLog[]): InventoryEffectRow[] {
   );
 }
 
+function withoutDuplicatedWarehouseBoxEffects(effects: InventoryEffectRow[]): InventoryEffectRow[] {
+  const warehouseTotals = new Set(
+    effects
+      .filter((effect) => effect.scope === "warehouse")
+      .map((effect) => `${effect.itemId}:${effect.unit}:${effect.delta}`),
+  );
+  return effects.filter((effect) => (
+    effect.scope !== "warehouse_box"
+    || !warehouseTotals.has(`${effect.itemId}:${effect.unit}:${effect.delta}`)
+  ));
+}
+
 type BomImpactMetadata = {
   itemName: string;
   mesCode: string | null;
@@ -151,7 +163,7 @@ function enrichActualEffects(
 }
 
 function buildImpactGroups(logs: TransactionLog[], batch: IoBatch | null): HistoryImpactGroup[] {
-  const effects = enrichActualEffects(effectsFromLogs(logs), batch);
+  const effects = enrichActualEffects(withoutDuplicatedWarehouseBoxEffects(effectsFromLogs(logs)), batch);
   return effects.length > 0 ? [{ key: "actual", label: null, effects }] : [];
 }
 

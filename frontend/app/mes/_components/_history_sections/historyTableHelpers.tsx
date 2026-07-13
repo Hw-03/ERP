@@ -62,7 +62,7 @@ export function FlowBadge({
     <span
       aria-label={accessibleLabel}
       title={fullLabel !== label ? fullLabel : undefined}
-      className={`inline-flex h-6 w-full max-w-full min-w-0 items-center justify-center gap-1 rounded-full text-xs font-bold leading-none ${compact ? "px-2" : "px-3"}`}
+      className="inline-flex h-6 w-full max-w-full min-w-0 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none"
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
@@ -241,7 +241,8 @@ export function ItemCodeCell({
       {sourceCode ? (
         <div className="flex min-w-0 flex-col items-center leading-tight">
           <span className="max-w-full truncate">{sourceCode}</span>
-          <span className="max-w-full truncate">{`↓ ${code ?? "-"}`}</span>
+          <span aria-hidden className="leading-none">↓</span>
+          <span className="max-w-full truncate">{code ?? "-"}</span>
         </div>
       ) : (code || "-")}
     </td>
@@ -267,11 +268,11 @@ export function FlowSummaryCell({
 }) {
   return (
     <div className={`flex flex-col items-center justify-center overflow-hidden text-xs leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
-      <span className="max-w-[10.25rem] truncate rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+      <span className="max-w-[10.75rem] truncate rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
         {presentation.flow.label}
       </span>
       {presentation.flow.hint && (
-        <span className="max-w-[10.25rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="max-w-[10.75rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
           {presentation.flow.hint}
         </span>
       )}
@@ -741,7 +742,7 @@ function ComponentChangeDetail({
   onSelectLog?: (log: TransactionLog) => void;
   controlsId?: string;
 }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ source: true, target: true });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ source: false, target: false });
   const sections = [
     {
       key: "source" as const,
@@ -789,7 +790,7 @@ function ComponentChangeDetail({
             />
           );
         }
-        const sectionExpanded = expanded[section.key] !== false;
+        const sectionExpanded = expanded[section.key] === true;
         return (
           <Fragment key={section.key}>
             <ReferenceBatchLineRow
@@ -800,7 +801,7 @@ function ComponentChangeDetail({
               onSelectLog={onSelectLog}
               sectionLabel={section.label}
               expanded={sectionExpanded}
-              onToggle={() => setExpanded((previous) => ({ ...previous, [section.key]: previous[section.key] === false }))}
+              onToggle={() => setExpanded((previous) => ({ ...previous, [section.key]: !previous[section.key] }))}
               controlsId={sectionId}
             />
             {sectionExpanded && children.map((log, index) => (

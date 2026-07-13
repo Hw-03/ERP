@@ -94,7 +94,7 @@ function setBoxMetrics(
 }
 
 describe("ReworkBatchHeader", () => {
-  it("uses the compact pill and cell padding contract", () => {
+  it("uses the stable operation badge and compact cell padding contract", () => {
     renderHeader({ compact: true });
 
     const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
@@ -102,7 +102,7 @@ describe("ReworkBatchHeader", () => {
     const cells = within(row).getAllByRole("cell");
     const quantityPill = screen.getByText("재작업 5 EA");
 
-    expect(cells[1].firstElementChild).toHaveClass("px-2");
+    expect(cells[1].firstElementChild).toHaveClass("px-3");
     expect(cells[2]).toHaveClass("px-2");
     expect(cells[4]).toHaveClass("px-2");
     expect(cells[5]).toHaveClass("px-2");

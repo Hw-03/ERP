@@ -95,6 +95,37 @@ describe("buildHistoryDetailSummary", () => {
     expect(summary).not.toHaveProperty("flow");
   });
 
+  it("hides a matching warehouse box effect when the warehouse total already states the same impact", () => {
+    const summary = buildHistoryDetailSummary([
+      makeLog({
+        inventory_effect: [
+          { scope: "warehouse", delta: -1 },
+          { scope: "warehouse_box", box_id: "box-1", delta: -1 },
+        ],
+      }),
+    ], null);
+
+    expect(summary.impactGroups[0].effects).toEqual([
+      expect.objectContaining({ label: "창고", delta: -1 }),
+    ]);
+  });
+
+  it("keeps a box effect when there is no matching warehouse total or its quantity differs", () => {
+    const summary = buildHistoryDetailSummary([
+      makeLog({
+        inventory_effect: [
+          { scope: "warehouse", delta: -2 },
+          { scope: "warehouse_box", box_id: "box-1", delta: -1 },
+        ],
+      }),
+    ], null);
+
+    expect(summary.impactGroups[0].effects).toEqual([
+      expect.objectContaining({ label: "창고", delta: -2 }),
+      expect.objectContaining({ label: "박스 box-1", delta: -1 }),
+    ]);
+  });
+
   it("keeps different component items separate even at the same location", () => {
     const logs = [
       makeLog({

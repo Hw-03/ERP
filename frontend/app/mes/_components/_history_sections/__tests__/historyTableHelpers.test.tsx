@@ -8,7 +8,9 @@ import {
   HISTORY_CHILD_ROW_CLASS,
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
+  FlowBadge,
   FlowSummaryCell,
+  ItemCodeCell,
   MovementSummaryCell,
   PeopleStatusCell,
   ReferenceBatchDetail,
@@ -97,7 +99,7 @@ describe("history table helper rendering policies", () => {
 
     expect(tableCard).toHaveClass("min-w-0");
     expect(tableScroller).toHaveClass("min-w-0");
-    expect(tableScroller).toHaveClass("-mr-5");
+    expect(tableScroller).not.toHaveClass("-mr-5");
     expect(table).toHaveClass("w-full");
     expect(table).toHaveClass("table-fixed");
     expect(table).toHaveClass("[&_tbody_td:nth-child(3)]:px-2");
@@ -160,17 +162,17 @@ describe("history table helper rendering policies", () => {
     const target = screen.getByRole("columnheader", { name: "대상" });
     expect(target.style.width).toBe("");
     expect(target.style.minWidth).toBe("");
-    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("118px");
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("128px");
-    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("124px");
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("180px");
-    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("236px");
+    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("72px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("112px");
+    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("110px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("170px");
+    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("210px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
-    expect(statusHeader.style.width).toBe("132px");
+    expect(statusHeader.style.width).toBe("150px");
     expect(statusHeader).toHaveClass("text-center");
   });
 
-  it("returns the default table's excess status width to the target column", () => {
+  it("widens the default flow, quantity, and status columns while leaving the target flexible", () => {
     const log = makeLog();
     render(
       <HistoryTable
@@ -187,10 +189,11 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("180px");
-    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("236px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("145px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("205px");
+    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
-    expect(statusHeader.style.width).toBe("132px");
+    expect(statusHeader.style.width).toBe("180px");
     expect(statusHeader).toHaveClass("text-center");
   });
 
@@ -224,7 +227,7 @@ describe("history table helper rendering policies", () => {
 
     render(<FlowSummaryCell presentation={presentation} />);
 
-    expect(screen.getByText("완제품 입고 · 부품 차감")).toHaveClass("max-w-[10.25rem]");
+    expect(screen.getByText("완제품 입고 · 부품 차감")).toHaveClass("max-w-[10.75rem]");
   });
 
   it("lets compact movement pills shrink and truncate inside the preserved quantity column", () => {
@@ -270,11 +273,20 @@ describe("history table helper rendering policies", () => {
       shipping_phase: "COMPONENT_CHANGE",
       notes: "품목 전환 대상 PA 입고",
     });
+    const targetAdditional = makeLog({
+      log_id: "conversion-target-additional",
+      item_name: "변경품 구성품",
+      mes_code: "3-AR-0030",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 입고",
+    });
 
     render(
       <table>
         <tbody>
-          <ReferenceBatchDetail logs={[source, additional, target]} />
+          <ReferenceBatchDetail logs={[source, additional, target, targetAdditional]} />
         </tbody>
       </table>,
     );
@@ -283,11 +295,16 @@ describe("history table helper rendering policies", () => {
     expect(sourceRow).toHaveTextContent("기존품 차감");
     expect(sourceRow).toHaveTextContent("3-AA-0001");
     expect(sourceRow).toHaveClass("h-[40px]");
-    expect(screen.getByText("추가 차감품")).toBeInTheDocument();
-
-    fireEvent.click(within(sourceRow!).getByRole("button", { name: "묶음 접기" }));
     expect(screen.queryByText("추가 차감품")).not.toBeInTheDocument();
+    expect(screen.queryByText("변경품 구성품")).not.toBeInTheDocument();
+
+    fireEvent.click(within(sourceRow!).getByRole("button", { name: "묶음 펼치기" }));
+    expect(screen.getByText("추가 차감품")).toBeInTheDocument();
     expect(screen.getByText("기존품")).toBeInTheDocument();
+
+    const targetRow = screen.getByText("변경품").closest("tr");
+    fireEvent.click(within(targetRow!).getByRole("button", { name: "묶음 펼치기" }));
+    expect(screen.getByText("변경품 구성품")).toBeInTheDocument();
   });
 
   it("reserves compact flow width for the full production result label", () => {
@@ -306,7 +323,33 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("180px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("170px");
+  });
+
+  it("keeps the operation badge dimensions stable when the detail panel opens", () => {
+    const { rerender } = render(
+      <FlowBadge type="REWORK" label="재작업" color="#3b82f6" />,
+    );
+    expect(screen.getByText("재작업").parentElement).toHaveClass("px-3");
+
+    rerender(<FlowBadge type="REWORK" label="재작업" color="#3b82f6" compact />);
+    expect(screen.getByText("재작업").parentElement).toHaveClass("px-3");
+  });
+
+  it("renders conversion item codes as source, arrow, and target on separate lines", () => {
+    render(
+      <table>
+        <tbody>
+          <tr>
+            <ItemCodeCell code="46-AR-0093" sourceCode="4-AA-0077" />
+          </tr>
+        </tbody>
+      </table>,
+    );
+
+    const cell = screen.getByText("4-AA-0077").closest("td");
+    expect(cell).toHaveTextContent("4-AA-0077↓46-AR-0093");
+    expect(within(cell!).getByText("↓")).toBeInTheDocument();
   });
 
   it("does not prefix system actors with human requester wording", () => {

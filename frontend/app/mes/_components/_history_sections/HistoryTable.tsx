@@ -47,26 +47,26 @@ type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left
 
 // 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 흐름 → 수량/재고 → 상태.
 const COLUMNS_DEFAULT: ColSpec[] = [
-  { label: "일시", width: "118px", align: "center" },
-  { label: "작업", width: "128px", align: "center" },
+  { label: "일시", width: "80px", align: "center" },
+  { label: "작업", width: "145px", align: "center" },
   { label: "대상" },
-  { label: "품목코드", width: "124px", align: "center" },
-  { label: "", width: "52px", align: "center", px: "px-1" },
-  { label: "흐름", width: "180px", align: "center" },
-  { label: "수량 · 재고", width: "236px", align: "center" },
-  { label: "상태 · 처리", width: "132px", align: "center" },
+  { label: "품목코드", width: "130px", align: "center" },
+  { label: "", width: "0px", align: "center", px: "px-0" },
+  { label: "흐름", width: "205px", align: "center" },
+  { label: "수량 · 재고", width: "270px", align: "center" },
+  { label: "상태 · 처리", width: "180px", align: "center" },
 ];
 
 // 우측 패널 열림 — 판단 열은 명시 폭을 보존하고 대상 열이 남은 폭을 흡수한다.
 const COLUMNS_COMPACT: ColSpec[] = [
-  { label: "일시", width: "118px", align: "center", px: "px-2" },
-  { label: "작업", width: "128px", align: "center", px: "px-2" },
+  { label: "일시", width: "72px", align: "center", px: "px-1" },
+  { label: "작업", width: "112px", align: "center", px: "px-2" },
   { label: "대상", px: "px-2" },
-  { label: "품목코드", width: "124px", align: "center", px: "px-1" },
-  { label: "", width: "52px", align: "center", px: "px-0" },
-  { label: "흐름", width: "180px", align: "center", px: "px-2" },
-  { label: "수량 · 재고", width: "236px", align: "center", px: "px-2" },
-  { label: "상태 · 처리", width: "132px", align: "center", px: "px-1" },
+  { label: "품목코드", width: "110px", align: "center", px: "px-1" },
+  { label: "", width: "0px", align: "center", px: "px-0" },
+  { label: "흐름", width: "170px", align: "center", px: "px-1" },
+  { label: "수량 · 재고", width: "210px", align: "center", px: "px-1" },
+  { label: "상태 · 처리", width: "150px", align: "center", px: "px-1" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
 
@@ -292,7 +292,7 @@ export function HistoryTable({
           description="조건에 맞는 거래가 없거나 아직 기록이 없습니다."
         />
       ) : (
-        <div className="-mr-5 min-w-0 overflow-x-hidden rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="min-w-0 overflow-x-hidden rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
           <table
             className={`w-full table-fixed border-separate border-spacing-0 text-sm${
               compact
