@@ -176,6 +176,21 @@ describe("desktop history detail panels", () => {
     expect(screen.getByRole("button", { name: "이 내역 취소" })).toBeInTheDocument();
   });
 
+  it("does not expose cancellation from a grouped child detail", () => {
+    render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={makeLog()}
+        allowCancellation={false}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
+  });
+
   it("shows the whole-group CTA for a backend reference cancellation group", async () => {
     const selected = makeLog({
       operation_batch_id: null,

@@ -113,7 +113,7 @@ export function applyHistoryCancellation(
 
   let selection = state.selection;
   if (selection?.kind === "log" && matchesCancellation(selection.log, target)) {
-    selection = { kind: "log", log: patchLog(selection.log) };
+    selection = { ...selection, log: patchLog(selection.log) };
   } else if (
     selection?.kind === "batch"
     && selection.logs.some((log) => matchesCancellation(log, target))
@@ -151,7 +151,7 @@ export function reconcileHistorySelection(
   if (!selection) return null;
   if (selection.kind === "log") {
     const fresh = logs.find((log) => log.log_id === selection.log.log_id);
-    return fresh ? { kind: "log", log: fresh } : null;
+    return fresh ? { ...selection, log: fresh } : null;
   }
 
   const freshLogs = logs.filter((log) => getHistoryBatchSelectionKey(log) === selection.batchId);

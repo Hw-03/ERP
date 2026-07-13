@@ -341,7 +341,11 @@ export function DesktopHistoryView() {
       return;
     }
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
-    setSelection({ kind: "log", log: updated });
+    setSelection((current) =>
+      current?.kind === "log" && current.log.log_id === updated.log_id
+        ? { ...current, log: updated }
+        : { kind: "log", log: updated },
+    );
   }
 
   function handleBatchCancelled(batchId: string, updated: TransactionLog) {
@@ -390,6 +394,17 @@ export function DesktopHistoryView() {
       }
       return { kind: "log", log };
     });
+  }
+
+  function handleSelectChildLog(log: TransactionLog) {
+    const opening = !(selection?.kind === "log" && selection.log.log_id === log.log_id && selection.allowCancellation === false);
+    if (opening) pushHistoryStep();
+    setSelectionStack([]);
+    setSelection((current) =>
+      current?.kind === "log" && current.log.log_id === log.log_id && current.allowCancellation === false
+        ? null
+        : { kind: "log", log, allowCancellation: false },
+    );
   }
 
   function focusHistoryLineInList(target: Omit<HistoryTableFocusTarget, "nonce">) {
@@ -548,6 +563,7 @@ export function DesktopHistoryView() {
             totalCount={summary?.total}
             selection={selection}
             onSelectLog={handleSelectLog}
+            onSelectChildLog={handleSelectChildLog}
             onSelectBatch={handleSelectBatch}
             batchCache={batchCache}
             setBatchCache={setBatchCache}

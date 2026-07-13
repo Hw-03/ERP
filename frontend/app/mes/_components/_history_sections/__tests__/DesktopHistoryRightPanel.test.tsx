@@ -24,7 +24,13 @@ vi.mock("../../DesktopRightPanel", () => ({
   ),
 }));
 
-vi.mock("../HistoryDetailPanel", () => ({ HistoryDetailPanel: () => <div>단건 상세</div> }));
+vi.mock("../HistoryDetailPanel", () => ({
+  HistoryDetailPanel: ({ allowCancellation }: any) => (
+    <div data-testid="history-detail-panel" data-allow-cancellation={allowCancellation === false ? "false" : "true"}>
+      단건 상세
+    </div>
+  ),
+}));
 vi.mock("../HistoryBatchDetailPanel", () => ({ HistoryBatchDetailPanel: () => <div>묶음 상세</div> }));
 
 function makeLog(): TransactionLog {
@@ -82,5 +88,30 @@ describe("DesktopHistoryRightPanel", () => {
     expect(panel).toHaveAttribute("data-modal", "false");
     expect(title.id).not.toBe("");
     expect(panel).toHaveAttribute("data-labelled-by", title.id);
+  });
+
+  it("hides cancellation for a detail opened from a grouped child row", () => {
+    const selection = {
+      kind: "log" as const,
+      log: makeLog(),
+      allowCancellation: false,
+    } as any;
+    render(
+      <DesktopHistoryRightPanel
+        selection={selection}
+        displaySelection={selection}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        onSelectLog={() => {}}
+        canGoBack={false}
+        onBack={() => {}}
+        onLogUpdated={() => {}}
+        onBatchCancelled={() => {}}
+        onFocusLineInList={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("history-detail-panel")).toHaveAttribute("data-allow-cancellation", "false");
   });
 });

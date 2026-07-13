@@ -30,6 +30,8 @@ type Props = {
   totalCount?: number;
   selection: HistorySelection | null;
   onSelectLog: (log: TransactionLog) => void;
+  /** 묶음 하위 행은 상세 조회만 허용하고 취소는 부모 행에 남긴다. */
+  onSelectChildLog?: (log: TransactionLog) => void;
   onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
   /** 부모(DesktopHistoryView)가 들고 있는 batchCache — 우측 패널과 공유. */
   batchCache: Map<string, IoBatch>;
@@ -41,7 +43,7 @@ type Props = {
   focusTarget?: HistoryTableFocusTarget | null;
 };
 
-type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean; px?: string };
+type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center" | "right"; hidden?: boolean; px?: string };
 
 // 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 흐름 → 수량/재고 → 상태.
 const COLUMNS_DEFAULT: ColSpec[] = [
@@ -50,21 +52,21 @@ const COLUMNS_DEFAULT: ColSpec[] = [
   { label: "대상" },
   { label: "품목코드", width: "124px", align: "center" },
   { label: "", width: "52px", align: "center", px: "px-1" },
-  { label: "흐름", width: "148px", align: "center" },
-  { label: "수량 · 재고", width: "204px", align: "center" },
-  { label: "상태 · 처리", width: "196px" },
+  { label: "흐름", width: "180px", align: "center" },
+  { label: "수량 · 재고", width: "236px", align: "center" },
+  { label: "상태 · 처리", width: "132px", align: "center" },
 ];
 
 // 우측 패널 열림 — 판단 열은 명시 폭을 보존하고 대상 열이 남은 폭을 흡수한다.
 const COLUMNS_COMPACT: ColSpec[] = [
-  { label: "일시", width: "88px", align: "center", px: "px-2" },
-  { label: "작업", width: "96px", align: "center", px: "px-2" },
+  { label: "일시", width: "118px", align: "center", px: "px-2" },
+  { label: "작업", width: "128px", align: "center", px: "px-2" },
   { label: "대상", px: "px-2" },
-  { label: "품목코드", width: "84px", align: "center", px: "px-1" },
-  { label: "", width: "12px", align: "center", px: "px-0" },
-  { label: "흐름", width: "152px", align: "center", px: "px-2" },
-  { label: "수량 · 재고", width: "152px", align: "center", px: "px-2" },
-  { label: "상태 · 처리", width: "148px", px: "px-2" },
+  { label: "품목코드", width: "124px", align: "center", px: "px-1" },
+  { label: "", width: "52px", align: "center", px: "px-0" },
+  { label: "흐름", width: "180px", align: "center", px: "px-2" },
+  { label: "수량 · 재고", width: "236px", align: "center", px: "px-2" },
+  { label: "상태 · 처리", width: "132px", align: "center", px: "px-1" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
 
@@ -86,6 +88,7 @@ export function HistoryTable({
   totalCount,
   selection,
   onSelectLog,
+  onSelectChildLog,
   onSelectBatch,
   batchCache,
   setBatchCache,
@@ -293,7 +296,7 @@ export function HistoryTable({
           <table
             className={`w-full table-fixed border-separate border-spacing-0 text-sm${
               compact
-                ? " [&_tbody_td:nth-child(2)]:px-2 [&_tbody_td:nth-child(3)]:px-2 [&_tbody_td:nth-child(4)]:px-1 [&_tbody_td:nth-child(5)]:px-0 [&_tbody_td:nth-child(6)]:px-2 [&_tbody_td:nth-child(7)]:px-2 [&_tbody_td:nth-child(8)]:px-2"
+                ? " [&_tbody_td:nth-child(2)]:px-2 [&_tbody_td:nth-child(3)]:px-2 [&_tbody_td:nth-child(4)]:px-1 [&_tbody_td:nth-child(5)]:px-0 [&_tbody_td:nth-child(6)]:px-2 [&_tbody_td:nth-child(7)]:px-2 [&_tbody_td:nth-child(8)]:px-1"
                 : ""
             }`}
           >
@@ -304,7 +307,7 @@ export function HistoryTable({
                     key={label || `spacer-${index}`}
                     scope={label ? "col" : undefined}
                     aria-hidden={label ? undefined : true}
-                    className={`whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : "text-left"}`}
+                    className={`whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"}`}
                     style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
                     {label}
@@ -352,7 +355,7 @@ export function HistoryTable({
                           logs={[group.child]}
                           compact={compact}
                           highlightLogId={selectedLogId}
-                          onSelectLog={onSelectLog}
+                          onSelectLog={onSelectChildLog ?? onSelectLog}
                           controlsId={controlsId}
                         />
                       )}
@@ -463,7 +466,7 @@ export function HistoryTable({
                         logs={group.logs}
                         compact={compact}
                         highlightLogId={focusLogId}
-                        onSelectLog={onSelectLog}
+                        onSelectLog={onSelectChildLog ?? onSelectLog}
                         controlsId={controlsId}
                       />
                     )}

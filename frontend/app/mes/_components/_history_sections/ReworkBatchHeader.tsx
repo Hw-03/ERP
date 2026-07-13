@@ -36,7 +36,7 @@ type Props = {
 export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelect, compact, controlsId }: Props) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = compact ? "px-2" : "px-5";
+  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];

@@ -8,6 +8,7 @@ import {
   HISTORY_CHILD_ROW_CLASS,
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
+  FlowSummaryCell,
   MovementSummaryCell,
   PeopleStatusCell,
   ReferenceBatchDetail,
@@ -103,7 +104,7 @@ describe("history table helper rendering policies", () => {
     expect(table).toHaveClass("[&_tbody_td:nth-child(4)]:px-1");
     expect(table).toHaveClass("[&_tbody_td:nth-child(6)]:px-2");
     expect(table).toHaveClass("[&_tbody_td:nth-child(7)]:px-2");
-    expect(table).toHaveClass("[&_tbody_td:nth-child(8)]:px-2");
+    expect(table).toHaveClass("[&_tbody_td:nth-child(8)]:px-1");
   });
 
   it("defines a single fixed rhythm for main history rows", () => {
@@ -159,9 +160,38 @@ describe("history table helper rendering policies", () => {
     const target = screen.getByRole("columnheader", { name: "대상" });
     expect(target.style.width).toBe("");
     expect(target.style.minWidth).toBe("");
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).not.toBe("");
-    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).not.toBe("");
-    expect(screen.getByRole("columnheader", { name: "상태 · 처리" }).style.width).not.toBe("");
+    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("118px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("128px");
+    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("124px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("180px");
+    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("236px");
+    const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
+    expect(statusHeader.style.width).toBe("132px");
+    expect(statusHeader).toHaveClass("text-center");
+  });
+
+  it("returns the default table's excess status width to the target column", () => {
+    const log = makeLog();
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[log]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("180px");
+    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("236px");
+    const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
+    expect(statusHeader.style.width).toBe("132px");
+    expect(statusHeader).toHaveClass("text-center");
   });
 
   it("uses the same thin pill height for single and paired movement summaries", () => {
@@ -180,11 +210,21 @@ describe("history table helper rendering policies", () => {
     );
 
     expect(screen.getByText("이동 2품목 · 22 EA")).toHaveClass("h-6");
-    expect(screen.getByText("이동 2품목 · 22 EA")).toHaveClass("min-w-[10.25rem]");
+    expect(screen.getByText("이동 2품목 · 22 EA")).toHaveClass("min-w-[12.75rem]");
     expect(screen.getByText("완제품 +5 EA")).toHaveClass("h-6");
-    expect(screen.getByText("완제품 +5 EA")).toHaveClass("min-w-[5rem]");
+    expect(screen.getByText("완제품 +5 EA")).toHaveClass("min-w-[6.25rem]");
     expect(screen.getByText("부품 -10 EA")).toHaveClass("h-6");
-    expect(screen.getByText("부품 -10 EA")).toHaveClass("min-w-[5rem]");
+    expect(screen.getByText("부품 -10 EA")).toHaveClass("min-w-[6.25rem]");
+  });
+
+  it("uses the widened flow space before truncating the production result", () => {
+    const presentation = {
+      flow: { label: "완제품 입고 · 부품 차감" },
+    } as HistoryRowPresentation;
+
+    render(<FlowSummaryCell presentation={presentation} />);
+
+    expect(screen.getByText("완제품 입고 · 부품 차감")).toHaveClass("max-w-[10.25rem]");
   });
 
   it("lets compact movement pills shrink and truncate inside the preserved quantity column", () => {
@@ -266,21 +306,35 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("152px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("180px");
   });
 
   it("does not prefix system actors with human requester wording", () => {
     const presentation = {
-      people: { requester: "시스템 처리 · 구성품 변경", approver: "" },
+      people: { requester: "권동환", approver: "" },
+      statusChips: [{ label: "자동 처리", tone: "info" }],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} compact />);
+
+    expect(screen.getByText("권동환")).toBeInTheDocument();
+    expect(screen.queryByText("요청 권동환")).not.toBeInTheDocument();
+    expect(screen.getByText("권동환")).toHaveAttribute("title", "요청 권동환");
+    expect(screen.getByText("자동 처리")).toBeInTheDocument();
+    expect(screen.getByText("자동 처리").parentElement).toHaveClass("flex-nowrap");
+    expect(screen.getByText("자동 처리").parentElement).toHaveClass("justify-center");
+  });
+
+  it("centers default requester and status chips inside the status column", () => {
+    const presentation = {
+      people: { requester: "권동환", approver: "" },
       statusChips: [{ label: "자동 처리", tone: "info" }],
     } as HistoryRowPresentation;
 
     render(<PeopleStatusCell presentation={presentation} />);
 
-    expect(screen.getByText("시스템 처리 · 구성품 변경")).toBeInTheDocument();
-    expect(screen.queryByText("요청 시스템 처리 · 구성품 변경")).not.toBeInTheDocument();
-    expect(screen.getByText("자동 처리")).toBeInTheDocument();
-    expect(screen.getByText("자동 처리").parentElement).toHaveClass("flex-nowrap");
+    expect(screen.getByText("요청 권동환").parentElement).toHaveClass("items-center");
+    expect(screen.getByText("자동 처리").parentElement).toHaveClass("justify-center");
   });
 
   it("lets a target title use two lines while keeping the main row slot fixed", () => {

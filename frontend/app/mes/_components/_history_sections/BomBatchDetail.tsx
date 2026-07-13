@@ -184,7 +184,7 @@ function BundleRows({
   const excludedCount = childLines.filter((line) => !line.included).length;
   const detailId = `history-bom-${encodeURIComponent(bundle.bundle_id).replaceAll("%", "_")}`;
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = compact ? "px-2" : "px-5";
+  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
 
@@ -295,7 +295,7 @@ function BomLineRow({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = compact ? "px-2" : "px-5";
+  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const dim = !line.included;

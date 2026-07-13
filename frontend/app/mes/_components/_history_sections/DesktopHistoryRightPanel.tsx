@@ -81,6 +81,7 @@ export function DesktopHistoryRightPanel({
             key={displaySelection.log.log_id}
             panelOpen={!!selection}
             selected={displaySelection.log}
+            allowCancellation={displaySelection.allowCancellation}
             onSelectLog={onSelectLog}
             onLogUpdated={onLogUpdated}
             variant="desktop"

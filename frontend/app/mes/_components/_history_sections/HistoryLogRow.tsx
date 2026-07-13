@@ -39,9 +39,9 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggl
   const [hovered, setHovered] = useState(false);
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = compact ? "px-2" : "px-5";
+  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = compact ? "px-1" : "px-4";
   const basePresentation = getHistoryRowPresentation(log);
   const presentation = separationHint
     ? { ...basePresentation, statusChips: [...basePresentation.statusChips, { label: separationHint, tone: "muted" as const }] }
@@ -110,7 +110,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggl
         <QuantityStockCell presentation={presentation} compact={compact} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} />
+        <PeopleStatusCell presentation={presentation} compact={compact} />
       </td>
     </tr>
   );

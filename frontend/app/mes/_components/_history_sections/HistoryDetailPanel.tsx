@@ -37,6 +37,8 @@ import { getHistoryCancelScope } from "./historyCancellation";
 type Props = {
   panelOpen: boolean;
   selected: TransactionLog | null;
+  /** 묶음의 하위 이력은 조회만 허용하고 취소는 부모 이력에서 수행한다. */
+  allowCancellation?: boolean;
   onSelectLog: (log: TransactionLog) => void;
   onLogUpdated: (updated: TransactionLog) => void;
   variant?: "default" | "desktop";
@@ -51,6 +53,7 @@ type FlowState =
 export function HistoryDetailPanel({
   panelOpen,
   selected,
+  allowCancellation = true,
   onSelectLog,
   onLogUpdated,
   variant = "default",
@@ -214,20 +217,22 @@ export function HistoryDetailPanel({
               <HistoryDetailEditHistory edits={edits} />
             </Collapsible>
           )}
-          <HistoryCancelAction
-            panelOpen={panelOpen}
-            identity={`log:${selected.log_id}`}
-            scope={cancelScope}
-            effects={effects}
-            cancelled={isCancelled}
-            scopeStatus={cancellationScope.status}
-            onRetryScope={cancellationScope.retry}
-            onSubmit={handleCancelSubmit}
-            triggerLabel="이 내역 취소"
-            scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
-          />
+          {allowCancellation && (
+            <HistoryCancelAction
+              panelOpen={panelOpen}
+              identity={`log:${selected.log_id}`}
+              scope={cancelScope}
+              effects={effects}
+              cancelled={isCancelled}
+              scopeStatus={cancellationScope.status}
+              onRetryScope={cancellationScope.retry}
+              onSubmit={handleCancelSubmit}
+              triggerLabel="이 내역 취소"
+              scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
+            />
+          )}
         </>
-      ) : (
+      ) : allowCancellation ? (
         <HistoryCancelAction
           panelOpen={panelOpen}
           identity={`log:${selected.log_id}`}
@@ -269,7 +274,7 @@ export function HistoryDetailPanel({
             </>
           )}
         </HistoryCancelAction>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -107,8 +107,8 @@ export function MovementSummaryCell({
   const pillClass = compact
     ? "inline-flex h-6 max-w-full min-w-0 flex-1 items-center justify-center truncate rounded-full px-2 text-xs font-bold leading-none"
     : isSingle
-      ? "inline-flex h-6 min-w-[10.25rem] items-center justify-center rounded-full px-3 text-xs font-bold leading-none"
-      : "inline-flex h-6 min-w-[5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold leading-none";
+      ? "inline-flex h-6 min-w-[12.75rem] items-center justify-center rounded-full px-3 text-xs font-bold leading-none"
+      : "inline-flex h-6 min-w-[6.25rem] items-center justify-center rounded-full px-2.5 text-xs font-bold leading-none";
   return (
     <span className={`inline-flex items-center gap-1 whitespace-nowrap ${compact ? "w-full min-w-0 max-w-full" : ""}`}>
       {summary.parts.map((p, i) => {
@@ -154,12 +154,12 @@ const PRESENTATION_TONE_COLOR: Record<HistoryPresentationTone, string> = {
   muted: LEGACY_COLORS.muted2,
 };
 
-export function StatusChipStrip({ presentation }: { presentation: HistoryRowPresentation }) {
+export function StatusChipStrip({ presentation }: { presentation: HistoryRowPresentation; compact?: boolean }) {
   if (presentation.statusChips.length === 0) {
     return null;
   }
   return (
-    <div className="flex max-w-full flex-nowrap gap-1 overflow-hidden">
+    <div className="flex max-w-full flex-nowrap justify-center gap-1 overflow-hidden">
       {presentation.statusChips.map((chip) => {
         const color = PRESENTATION_TONE_COLOR[chip.tone];
         return (
@@ -267,11 +267,11 @@ export function FlowSummaryCell({
 }) {
   return (
     <div className={`flex flex-col items-center justify-center overflow-hidden text-xs leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
-      <span className="max-w-[8.5rem] truncate rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+      <span className="max-w-[10.25rem] truncate rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
         {presentation.flow.label}
       </span>
       {presentation.flow.hint && (
-        <span className="max-w-[8.5rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="max-w-[10.25rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
           {presentation.flow.hint}
         </span>
       )}
@@ -304,24 +304,28 @@ export function QuantityStockCell({
 export function PeopleStatusCell({
   presentation,
   dense = false,
+  compact = false,
 }: {
   presentation: HistoryRowPresentation;
   dense?: boolean;
+  compact?: boolean;
 }) {
   const approver = presentation.people.approver?.trim();
   const requester = presentation.people.requester?.trim() || "-";
   const systemRequester = requester.startsWith("시스템 처리");
+  const requesterLabel = systemRequester || compact ? requester : `요청 ${requester}`;
+  const requesterTitle = systemRequester ? requester : `요청 ${requester}`;
   return (
-    <div className={`flex min-w-0 flex-col justify-center overflow-hidden leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
-      <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-        {systemRequester ? requester : `요청 ${requester}`}
+    <div className={`flex min-w-0 flex-col items-center justify-center overflow-hidden text-center leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
+      <div title={requesterTitle} className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+        {requesterLabel}
       </div>
       {approver && approver !== "-" && (
         <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
           승인 {approver}
         </div>
       )}
-      <StatusChipStrip presentation={presentation} />
+      <StatusChipStrip presentation={presentation} compact={compact} />
     </div>
   );
 }
@@ -588,7 +592,7 @@ export function BatchHeader({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = compact ? "px-2" : "px-5";
+  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
@@ -672,7 +676,7 @@ export function BatchHeader({
         <QuantityStockCell presentation={presentation} summary={summary} compact={compact} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} />
+        <PeopleStatusCell presentation={presentation} compact={compact} />
       </td>
     </tr>
   );
@@ -850,7 +854,7 @@ function ReferenceBatchLineRow({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = compact ? "px-2" : "px-5";
+  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const presentation = getHistoryRowPresentation(log);
@@ -986,7 +990,7 @@ export function OpBatchHeader({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = compact ? "px-2" : "px-5";
+  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
@@ -1071,7 +1075,7 @@ export function OpBatchHeader({
         <QuantityStockCell presentation={presentation} summary={summary} compact={compact} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} />
+        <PeopleStatusCell presentation={presentation} compact={compact} />
       </td>
     </tr>
   );
