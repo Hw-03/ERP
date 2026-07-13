@@ -54,11 +54,15 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-type ItemConversionHistoryView = "work";
+type ItemConversionHistoryStep = 1 | 2 | 3;
 
-function pushItemConversionHistory(view: ItemConversionHistoryView): void {
+function isItemConversionHistoryStep(value: unknown): value is ItemConversionHistoryStep {
+  return value === 1 || value === 2 || value === 3;
+}
+
+function pushItemConversionHistory(step: ItemConversionHistoryStep): void {
   window.history.pushState(
-    { ...(window.history.state || {}), wic: view },
+    { ...(window.history.state || {}), wic: step },
     "",
     window.location.href,
   );
@@ -133,6 +137,7 @@ export function IoComposeView({
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
   const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
   const [itemConversionView, setItemConversionView] = useState<"compose" | "work">("compose");
+  const [itemConversionHistoryStep, setItemConversionHistoryStep] = useState<ItemConversionHistoryStep>(1);
   const itemConversionViewRef = useRef(itemConversionView);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
@@ -177,12 +182,14 @@ export function IoComposeView({
   useEffect(() => {
     function handleItemConversionPop(event: PopStateEvent) {
       const next = (event.state as { wic?: unknown } | null)?.wic;
-      if (next === "work") {
-        setItemConversionView(next);
+      if (isItemConversionHistoryStep(next)) {
+        setItemConversionView("work");
+        setItemConversionHistoryStep(next);
         return;
       }
       if (itemConversionViewRef.current !== "compose") {
         setItemConversionView("compose");
+        setItemConversionHistoryStep(1);
         state.goTo(1);
         clearItemConversionHistoryState();
       }
@@ -459,22 +466,39 @@ export function IoComposeView({
 
   function openItemConversion() {
     setError(null);
-    pushItemConversionHistory("work");
+    pushItemConversionHistory(1);
+    setItemConversionHistoryStep(1);
     setItemConversionView("work");
   }
 
   function closeItemConversion() {
     setItemConversionView("compose");
+    setItemConversionHistoryStep(1);
     state.goTo(1);
     clearItemConversionHistoryState();
   }
 
   function backFromItemConversion() {
-    if (window.history.state?.wic) {
-      window.history.back();
+    if (isItemConversionHistoryStep(window.history.state?.wic)) {
+      window.history.go(-itemConversionHistoryStep);
+      closeItemConversion();
       return;
     }
     closeItemConversion();
+  }
+
+  function pushItemConversionHistoryStep(step: ItemConversionHistoryStep): void {
+    pushItemConversionHistory(step);
+    setItemConversionHistoryStep(step);
+  }
+
+  function backToItemConversionHistoryStep(step: ItemConversionHistoryStep): void {
+    const offset = step - itemConversionHistoryStep;
+    if (offset < 0 && isItemConversionHistoryStep(window.history.state?.wic)) {
+      window.history.go(offset);
+      return;
+    }
+    setItemConversionHistoryStep(step);
   }
 
   async function handleSaveDraft() {
@@ -878,6 +902,9 @@ export function IoComposeView({
         <ItemConversionWorkView
           items={items}
           requesterEmployeeId={operator?.employee_id ?? ""}
+          historyStep={itemConversionHistoryStep}
+          onHistoryStepChange={pushItemConversionHistoryStep}
+          onHistoryStepBack={backToItemConversionHistoryStep}
           onBack={backFromItemConversion}
           onComplete={() => {
             void api

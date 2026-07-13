@@ -173,19 +173,62 @@ describe("IoComposeView navigation chrome", () => {
     expect(workTypeCards().every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
   });
 
-  it("closes item conversion on browser back like other warehouse work screens", async () => {
+  it("restores item conversion one step at a time from browser history", async () => {
     const pushStateSpy = vi.spyOn(window.history, "pushState");
-    renderCompose();
+    renderCompose(conversionItems);
 
     fireEvent.click(screen.getByTestId("warehouse-item-conversion-card"));
 
     expect(pushStateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ wic: "work" }),
+      expect.objectContaining({ wic: 1 }),
       "",
       expect.any(String),
     );
     expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-quantity")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    fireEvent.click(screen.getByTestId("item-conversion-next-button"));
+    await screen.findByTestId("item-conversion-preview");
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ wic: 2 }),
+      "",
+      expect.any(String),
+    );
+
+    fireEvent.change(screen.getByTestId("item-conversion-memo"), { target: { value: "history memo" } });
+    fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
+    expect(screen.getByTestId("item-conversion-execute-step")).toBeInTheDocument();
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ wic: 3 }),
+      "",
+      expect.any(String),
+    );
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { wic: 2 } }));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("item-conversion-preview")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("item-conversion-memo")).toHaveValue("history memo");
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { wic: 1 } }));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("item-conversion-source-option-af-1")).toHaveTextContent(/./);
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { wic: 2 } }));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("item-conversion-preview")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("item-conversion-memo")).toHaveValue("history memo");
 
     act(() => {
       window.dispatchEvent(new PopStateEvent("popstate", { state: {} }));
@@ -197,6 +240,25 @@ describe("IoComposeView navigation chrome", () => {
     expect(screen.queryByTestId("item-conversion-source-search")).not.toBeInTheDocument();
 
     pushStateSpy.mockRestore();
+  });
+
+  it("returns directly to the work-type selection from the conversion navigation", async () => {
+    const historyGoSpy = vi.spyOn(window.history, "go");
+    renderCompose(conversionItems);
+
+    fireEvent.click(screen.getByTestId("warehouse-item-conversion-card"));
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    fireEvent.click(screen.getByTestId("item-conversion-next-button"));
+    await screen.findByTestId("item-conversion-preview");
+    fireEvent.change(screen.getByTestId("item-conversion-memo"), { target: { value: "history memo" } });
+    fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
+
+    fireEvent.click(screen.getAllByTestId("item-conversion-step-nav-item")[0]);
+
+    expect(historyGoSpy).toHaveBeenCalledWith(-3);
+    expect(screen.getByTestId("warehouse-item-conversion-card")).toBeInTheDocument();
+    historyGoSpy.mockRestore();
   });
 
   it("returns to work type selection after a confirmed item conversion", async () => {
