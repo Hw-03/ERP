@@ -415,8 +415,8 @@ describe("useHistoryData", () => {
 
     act(() => result.current.retry());
 
-    await waitFor(() => expect(result.current.error).toBeNull());
-    expect(result.current.logs).toEqual(page1);
+    await waitFor(() => expect(result.current.logs).toEqual(page1));
+    expect(result.current.error).toBeNull();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
