@@ -1066,7 +1066,84 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(screen.getByTestId("shipping-request-quantity")).toHaveFocus());
   });
 
-  it("separates PA/PF match state labels from names and keeps footer quantity read-only", async () => {
+  it("keeps required PA/PF naming inside the matching action bar only", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-new-pf-name")).not.toBeInTheDocument();
+    expect(screen.getByTestId("shipping-wizard-action-bar")).not.toHaveTextContent("새 PA/PF 이름을 입력하세요.");
+
+    nextStep(container);
+
+    const paSummary = await screen.findByTestId("shipping-final-pa-summary");
+    const pfSummary = await screen.findByTestId("shipping-final-pf-summary");
+    await waitFor(() => expect(paSummary).toHaveTextContent("기존 PA 재사용"));
+    expect(paSummary).toHaveTextContent("Standard PA");
+    expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
+    expect(pfSummary).toHaveTextContent("새 PF 이름 미입력");
+    const actionBar = screen.getByTestId("shipping-wizard-action-bar");
+    expect(actionBar).toContainElement(screen.getByTestId("shipping-new-pf-name"));
+    expect(screen.getByTestId("shipping-wizard-next")).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    expect(screen.getByTestId("shipping-wizard-next")).not.toBeDisabled();
+  });
+
+  it("removes repeated headers from wizard steps two through five", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-2")).not.toHaveTextContent("BOM·동반품");
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-3")).not.toHaveTextContent("재사용 확인");
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-4")).not.toHaveTextContent("요청자와 메모를 확인합니다.");
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-5")).not.toHaveTextContent("최종 확인");
+  });
+
+  it("uses direct workspaces for matching, request information, and final review", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+
+    nextStep(container);
+    nextStep(container);
+
+    const matchStep = await screen.findByTestId("shipping-wizard-step-3");
+    expect(matchStep).not.toHaveClass("border");
+    expect(matchStep).not.toHaveTextContent("BOM 상태");
+    expect(screen.getByTestId("shipping-match-summary")).toHaveClass("md:grid-cols-3");
+    expect(screen.getByTestId("shipping-match-summary").children).toHaveLength(3);
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-4")).not.toHaveClass("border");
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-5")).not.toHaveClass("border");
+  });
+
+  it("moves final request information into the action bar", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1076,15 +1153,20 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
     nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    fireEvent.change(screen.getByRole("textbox", { name: "요청 메모" }), { target: { value: "현장 확인 메모" } });
+    nextStep(container);
 
-    const paSummary = await screen.findByTestId("shipping-final-pa-summary");
-    const pfSummary = await screen.findByTestId("shipping-final-pf-summary");
-    await waitFor(() => expect(paSummary).toHaveTextContent("기존 PA 재사용"));
-    expect(paSummary).toHaveTextContent("Standard PA");
-    expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
-    expect(pfSummary).toHaveTextContent("새 PF 이름 미입력");
-    expect(screen.getByTestId("shipping-wizard-action-bar")).toHaveTextContent("현재 출하 수량 1대");
-    expect(screen.getByTestId("shipping-wizard-action-bar")).toHaveTextContent("변경은 상단 수량 변경");
+    const finalSummary = await screen.findByTestId("shipping-final-summary");
+    const actionBar = screen.getByTestId("shipping-wizard-action-bar");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_488px]");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[488px]", "shrink-0");
+    expect(finalSummary).not.toHaveTextContent("요청 정보");
+    expect(actionBar).toContainElement(screen.getByTestId("shipping-final-request-summary"));
+    expect(screen.getByTestId("shipping-final-request-summary")).toHaveClass("md:grid-cols-[minmax(112px,0.45fr)_minmax(0,1fr)]");
+    expect(actionBar).toHaveTextContent("현장 확인 메모");
+    expect(actionBar).not.toHaveTextContent("현재 출하 수량 1대");
   });
 
   it("summarizes new or reused PA/PF names and item codes on the final step", async () => {
@@ -1104,6 +1186,9 @@ describe("DesktopShippingView", () => {
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
     const hero = await screen.findByTestId("shipping-shipment-hero");
+    expect(hero).toHaveClass("py-2");
+    expect(screen.getByTestId("shipping-shipment-hero-row")).toHaveClass("items-center");
+    expect(screen.getByTestId("shipping-shipment-quantity")).toHaveClass("inline-flex", "items-baseline");
     expect(hero).toHaveTextContent("Custom PF");
     expect(hero).not.toHaveTextContent("Standard PF");
     expect(finalSummary).toHaveTextContent("Standard PA");
@@ -1175,6 +1260,90 @@ describe("DesktopShippingView", () => {
     expect(table).toHaveTextContent("Cable Set");
     expect(table).toHaveTextContent("Bracket Kit");
     expect(table).toHaveTextContent("R-BR");
+  });
+
+  it("keeps BOM and companion line controls aligned without horizontal overflow", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    const paEditor = await screen.findByTestId("shipping-bom-editor-pa");
+    const bomQuantity = paEditor.querySelector('input[type="number"]');
+    expect(bomQuantity).toHaveClass("h-full", "text-center");
+
+    await addCompanionItem();
+    const companionEditor = screen.getByTestId("shipping-companion-editor");
+    expect(companionEditor).toHaveClass("overflow-x-hidden");
+    expect(screen.getByTestId("shipping-companion-line-carton-1")).toBeInTheDocument();
+  });
+
+  it("keeps one-line BOM controls on the item title row and enlarges the matching quantity area", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    const bomLine = screen.getAllByTestId("shipping-bom-readonly-item")[0].closest("[data-bom-line-child]");
+    expect(bomLine).toBeTruthy();
+    expect(bomLine?.querySelector('[data-testid="shipping-bom-line-controls"]')).toHaveClass("self-stretch", "lg:row-start-1");
+    expect(bomLine?.querySelector('[data-testid="shipping-bom-line-meta"]')).toHaveClass("lg:row-start-2");
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-match-quantity")).toHaveClass("min-h-[120px]");
+  });
+
+  it("moves the no-change notice into the matching action bar and leaves request information blank", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+
+    const actionCenter = screen.getByTestId("shipping-wizard-action-center");
+    expect(actionCenter).toHaveTextContent("BOM 변경 없음");
+    expect(actionCenter).not.toHaveTextContent("현재 출하 수량 1대");
+    expect(screen.queryByTestId("shipping-bom-change-table")).not.toBeInTheDocument();
+
+    nextStep(container);
+    expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
+  });
+
+  it("shows one row of changed BOM items and gives remaining height to the final BOM review", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openRequestById(container, "requested-1");
+    fireEvent.click(await screen.findByTestId("shipping-edit-request"));
+    fireEvent.click(await screen.findByRole("button", { name: /Cable Set/ }));
+    fireEvent.change(screen.getByTestId("shipping-bom-search-pa"), { target: { value: "Bracket" } });
+    fireEvent.click(await screen.findByTestId("shipping-bom-add-pa-bracket-1"));
+    nextStep(container);
+    expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    nextStep(container);
+
+    const finalSummary = await screen.findByTestId("shipping-final-summary");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_minmax(0,1fr)_auto]", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-full", "min-h-0");
+    expect(screen.getByTestId("shipping-final-requirements")).not.toHaveClass("h-[328px]");
+    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[112px]", "shrink-0", "self-end");
+    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("h-[62px]", "overflow-y-auto");
+    expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("rounded-[12px]", "border", "px-3", "py-2");
   });
 
   it("탭 재마운트 시(같은 QueryClient) 캐시 히트로 재요청 없음 — flicker 회귀 방지", async () => {
