@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   History,
+  LockKeyhole,
   PackageCheck,
   Pencil,
   Plus,
@@ -1166,18 +1167,34 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
   return (
     <div className={SHIPPING_FLEX_COL_CLASS}>
       <Panel dataTestId="shipping-request-detail" className={SHIPPING_FLEX_COL_CLASS}>
-        <div className={SHIPPING_TOP_ROW_CLASS}>
+        <div data-testid="shipping-request-detail-header" className={SHIPPING_TOP_ROW_CLASS}>
           <div className={SHIPPING_ROW_CLASS}>
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
             </button>
             <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
           </div>
-          <StatusBadge status={request.status} />
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {canCancelPrepared && (
+              <div
+                data-testid="shipping-detail-edit-lock"
+                className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black"
+                style={{
+                  background: tint(LEGACY_COLORS.yellow, 10),
+                  borderColor: tint(LEGACY_COLORS.yellow, 35),
+                  color: LEGACY_COLORS.text,
+                }}
+              >
+                <LockKeyhole className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
+                <span>수정 잠김</span>
+                <span className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>준비 완료 취소 후 수정 가능</span>
+              </div>
+            )}
+            <StatusBadge status={request.status} />
+          </div>
         </div>
 
         {request.notes && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
-        {request.status === "PREPARED" && <div className="mt-3"><Notice tone={LEGACY_COLORS.yellow} title="수정 잠김" body="준비 완료 취소 후 수정 가능합니다." /></div>}
 
         <div className="mt-3 min-h-0 flex-1"><LineSummary request={request} /></div>
 

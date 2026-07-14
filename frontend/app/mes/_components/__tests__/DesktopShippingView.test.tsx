@@ -853,6 +853,12 @@ describe("DesktopShippingView", () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-1";
     render(<DesktopShippingView onStatusChange={() => {}} />);
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
+    const detailHeader = screen.getByTestId("shipping-request-detail-header");
+    const editLock = screen.getByTestId("shipping-detail-edit-lock");
+    expect(detailHeader).toContainElement(editLock);
+    expect(editLock).toHaveTextContent("수정 잠김");
+    expect(editLock).toHaveTextContent("준비 완료 취소 후 수정 가능");
+    expect(screen.getAllByText("수정 잠김")).toHaveLength(1);
     expect(screen.getByTestId("shipping-pickup-from-detail")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-prepare-cancel-from-detail")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-delete-request")).not.toBeInTheDocument();
