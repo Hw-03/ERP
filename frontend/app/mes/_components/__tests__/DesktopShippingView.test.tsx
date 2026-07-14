@@ -1133,6 +1133,7 @@ describe("DesktopShippingView", () => {
     const matchStep = await screen.findByTestId("shipping-wizard-step-3");
     expect(matchStep).not.toHaveClass("border");
     expect(matchStep).not.toHaveTextContent("BOM 상태");
+    expect(screen.getByTestId("shipping-match-summary").parentElement).toHaveClass("gap-4");
     expect(screen.getByTestId("shipping-match-summary")).toHaveClass("md:grid-cols-3");
     expect(screen.getByTestId("shipping-match-summary").children).toHaveLength(3);
 
@@ -1322,7 +1323,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
   });
 
-  it("keeps final BOM and changed-item panels at 364px with independent scrolling", async () => {
+  it("keeps final BOM and changed-item panels at 369px with independent scrolling", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1339,10 +1340,10 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_364px_364px]", "overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[364px]", "shrink-0");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_369px_369px]", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[369px]", "shrink-0");
     expect(screen.getByTestId("shipping-final-requirements-list")).toHaveClass("overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[364px]", "shrink-0");
+    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[369px]", "shrink-0");
     expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
     expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("rounded-[12px]", "border", "px-3", "py-2");
   });

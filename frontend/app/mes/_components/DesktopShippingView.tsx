@@ -1421,7 +1421,7 @@ function RequestSection(props: {
 
           {props.wizardStep === 3 && (
             <section data-testid="shipping-wizard-step-3" className="flex h-full min-h-0 flex-col">
-              <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,7fr)_minmax(120px,3fr)_auto] gap-3 overflow-y-auto pr-1">
+              <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,7fr)_minmax(120px,3fr)_auto] gap-4 overflow-y-auto pr-1">
                 <ShippingConclusionCard
                   metrics={[
                     { value: bomChangedSummary },
@@ -1471,7 +1471,7 @@ function RequestSection(props: {
 
           {props.wizardStep === 5 && (
             <section data-testid="shipping-wizard-step-5" className="flex h-full min-h-0 flex-col">
-              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 ${hasBomChanges ? "grid-rows-[auto_364px_364px]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-y-auto pr-1`}>
+              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 ${hasBomChanges ? "grid-rows-[auto_369px_369px]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-y-auto pr-1`}>
                 <ShippingShipmentHero name={shipmentName} code={shipmentCode} quantity={requestQty} />
                 <FinalRequirementReview
                   paLines={grouped.PA.filter((line) => line.included)}
@@ -2385,7 +2385,7 @@ function BomChangeSummaryCard({
     return <Notice tone={LEGACY_COLORS.green} title="BOM 변경 없음" body="기본 BOM 구성을 그대로 사용합니다." />;
   }
   return (
-    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex h-[364px] shrink-0 flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
+    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex h-[369px] shrink-0 flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.yellow }}>변경된 구성품 {lines.length}개</div>
         <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>세부 목록</div>
@@ -2434,7 +2434,7 @@ function FinalRequirementReview({
     ...companionLines.map((line) => ({ id: `companion-${line.item_id}`, testId: `shipping-final-line-companion-${line.item_id}`, label: "동반", tone: LEGACY_COLORS.purple, itemId: line.item_id, quantity: line.quantity, unit: line.unit || "EA" })),
   ];
   return (
-    <section data-testid="shipping-final-requirements" className={`${SHIPPING_PANEL_CLASS} ${hasBomChanges ? "h-[364px] shrink-0" : "h-full min-h-0"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <section data-testid="shipping-final-requirements" className={`${SHIPPING_PANEL_CLASS} ${hasBomChanges ? "h-[369px] shrink-0" : "h-full min-h-0"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-1.5 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>BOM·동반 출하품</div>
       <div data-testid="shipping-final-requirements-list" className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1 xl:grid-cols-2">
         {rows.length === 0 ? (
