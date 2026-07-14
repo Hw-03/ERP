@@ -36,6 +36,23 @@ from app.models import Employee, TransactionLog
 router = APIRouter()
 
 
+def _load_item_conversion_requester(db: Session, employee_id: uuid.UUID) -> Employee:
+    """활성 조립·출하 직원만 품목 전환 요청자로 반환한다."""
+    requester = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if requester is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
+    if not bool(requester.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+    department = getattr(requester.department, "value", requester.department)
+    if department not in {"조립", "출하"}:
+        raise http_error(
+            403,
+            ErrorCode.FORBIDDEN,
+            "조립 또는 출하 부서 직원만 품목 전환이 가능합니다.",
+        )
+    return requester
+
+
 def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
     return ShippingTransactionLogResponse(
         log_id=log.log_id,
@@ -63,12 +80,14 @@ def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
 
 @router.get("/item-conversion-preview", response_model=ShippingComponentChangePreviewResponse)
 def item_conversion_preview(
+    requester_employee_id: uuid.UUID = Query(...),
     source_item_id: uuid.UUID = Query(...),
     target_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
     requested_mode: Optional[str] = Query(None, pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
+    _load_item_conversion_requester(db, requester_employee_id)
     try:
         return shipping_svc.component_change_preview_independent(
             db,
@@ -84,15 +103,7 @@ def item_conversion_preview(
 
 @router.post("/item-conversion", response_model=ShippingComponentChangeResultResponse)
 def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session = Depends(get_db)):
-    requester = (
-        db.query(Employee)
-        .filter(Employee.employee_id == payload.requester_employee_id)
-        .first()
-    )
-    if requester is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
-    if not bool(requester.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+    requester = _load_item_conversion_requester(db, payload.requester_employee_id)
 
     try:
         result = shipping_svc.execute_component_change_independent(
@@ -121,6 +132,15 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
 @router.post("/preview", response_model=IoPreviewResponse)
 def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
     try:
+        if payload.work_type == "internal_use" or payload.sub_type == "internal_use_out":
+            if payload.requester_employee_id is None:
+                raise ValueError("사내 사용 미리보기에는 requester_employee_id가 필요합니다.")
+            requester = io_svc._load_requester(db, payload.requester_employee_id)
+            io_svc.validate_internal_use_requester(
+                requester,
+                work_type=payload.work_type,
+                sub_type=payload.sub_type,
+            )
         return io_svc.preview(
             db,
             work_type=payload.work_type,
@@ -129,6 +149,8 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
             to_department=payload.to_department,
             targets=payload.targets,
         )
+    except PermissionError as exc:
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 

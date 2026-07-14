@@ -133,7 +133,7 @@ describe("ItemConversionView", () => {
     render(
       <IoWorkTypeStep
         workType="process"
-        operator={{ employee_id: "op-1", name: "operator", department: "assembly" }}
+        operator={{ employee_id: "op-1", name: "operator", department: "조립" }}
         onWorkTypeChange={() => {}}
         onItemConversion={onItemConversion}
       />,
@@ -142,6 +142,28 @@ describe("ItemConversionView", () => {
     fireEvent.click(screen.getByTestId("warehouse-item-conversion-card"));
 
     expect(onItemConversion).toHaveBeenCalledTimes(1);
+  });
+
+  it("품목 전환 카드는 조립·출하 부서에만 표시한다", () => {
+    const { rerender } = render(
+      <IoWorkTypeStep
+        workType="process"
+        operator={{ employee_id: "op-1", name: "operator", department: "AS" }}
+        onWorkTypeChange={() => {}}
+        onItemConversion={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId("warehouse-item-conversion-card")).not.toBeInTheDocument();
+
+    rerender(
+      <IoWorkTypeStep
+        workType="process"
+        operator={{ employee_id: "op-1", name: "operator", department: "출하" }}
+        onWorkTypeChange={() => {}}
+        onItemConversion={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("warehouse-item-conversion-card")).toBeInTheDocument();
   });
 
   it("starts item conversion at item and quantity selection without mode cards", () => {
@@ -390,7 +412,7 @@ describe("ItemConversionView", () => {
     expect(onComplete).toHaveBeenCalledWith(result);
   });
 
-  it("blocks execution locally when the requester employee id is missing", async () => {
+  it("does not request a preview when the requester employee id is missing", () => {
     render(
       <ItemConversionWorkView
         items={items}
@@ -402,20 +424,11 @@ describe("ItemConversionView", () => {
 
     fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
     fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
-    fireEvent.click(screen.getByTestId("item-conversion-next-button"));
-    await screen.findByTestId("item-conversion-preview");
-    fireEvent.change(screen.getByTestId("item-conversion-memo"), {
-      target: { value: "BOM conversion" },
-    });
-    fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
+    const previewButton = screen.getByTestId("item-conversion-next-button");
+    fireEvent.click(previewButton);
 
-    const executeButton = screen.getByTestId("item-conversion-confirm-button");
-    expect(executeButton).toBeDisabled();
-    expect(screen.getByText("로그인 작업자 정보를 확인할 수 없습니다. 다시 로그인해 주세요.")).toBeInTheDocument();
-    fireEvent.click(executeButton);
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(apiMock.executeItemConversion).not.toHaveBeenCalled();
+    expect(previewButton).toBeDisabled();
+    expect(apiMock.getItemConversionPreview).not.toHaveBeenCalled();
   });
 
   it("does not require memo for an automatically resolved SPEC conversion", async () => {

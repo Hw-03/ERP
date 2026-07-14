@@ -15,6 +15,8 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Notification,
+    StockRequest,
+    StockRequestTypeEnum,
 )
 from app.services import notifications as notif_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
@@ -78,6 +80,16 @@ def _w2d_request(client, requester, item, to_dept: str = "조립") -> dict:
 
 def _actor_headers(emp) -> dict[str, str]:
     return {"X-Actor-Employee-Id": str(emp.employee_id)}
+
+
+def test_internal_use_notification_summary_uses_korean_label():
+    request = StockRequest(
+        requester_name="AS requester",
+        request_type=StockRequestTypeEnum.INTERNAL_USE,
+        request_code="SR-IU-1",
+    )
+
+    assert notif_svc._summary(request) == "AS requester · AS·연구 사용출고 · SR-IU-1"
 
 
 def _unread(client, emp) -> int:

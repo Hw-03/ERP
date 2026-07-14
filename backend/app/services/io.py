@@ -24,12 +24,14 @@ from app.services.io_preview import (  # noqa: F401
     MANUAL_LINE_ORIGINS,
     WORK_TYPES,
     preview,
+    validate_internal_use_requester,
 )
 
 # ---------------------------------------------------------------------------
 # re-export: io_persist
 # ---------------------------------------------------------------------------
 from app.services.io_persist import (  # noqa: F401
+    _load_requester,
     get_batch,
     sync_batch_from_stock_request,
 )

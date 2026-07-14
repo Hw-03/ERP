@@ -29,11 +29,14 @@ from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
+    INTERNAL_USE_SUB_TYPE,
     MANUAL_LINE_ORIGINS,
     _bucket_available,
     _d,
     _get_item,
     validate_operation_sources,
+    validate_internal_use_operation,
+    validate_internal_use_requester,
 )
 from app.services.io_persist import (
     _batch_to_payload,
@@ -97,6 +100,8 @@ def _stock_request_type(sub_type: str, *, from_bucket: Optional[str] = None) -> 
         return StockRequestTypeEnum.WAREHOUSE_TO_DEPT
     if sub_type == "dept_to_warehouse":
         return StockRequestTypeEnum.DEPT_TO_WAREHOUSE
+    if sub_type == INTERNAL_USE_SUB_TYPE:
+        return StockRequestTypeEnum.INTERNAL_USE
     if sub_type == "defect_quarantine":
         # _resolve_line_route(defect_quarantine) 가 부서 격리는 PRODUCTION, 창고 격리는 WAREHOUSE 로 분기.
         if from_bucket == "production":
@@ -177,6 +182,7 @@ def _submit_approval(
         reference_no=batch.reference_no,
         notes=batch.notes,
         requires_department_approval=force_dept_approval,
+        allow_internal_use=True,
     )
     _link_stock_request(db, batch=batch, request=request, lines=lines)
     # 창고 결재 대기 요청 도착 → 창고 정/부에게 알림 (io 라우터가 커밋).
@@ -458,6 +464,17 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
 
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
+    validate_internal_use_requester(
+        requester,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+    )
+    validate_internal_use_operation(
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        to_department=batch.to_department,
+        lines=(line for bundle in batch.bundles for line in bundle.lines),
+    )
     validate_operation_sources(
         batch.sub_type,
         (bundle.source_kind for bundle in batch.bundles),

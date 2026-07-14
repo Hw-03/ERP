@@ -9,6 +9,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from io import BytesIO
+
+from openpyxl import load_workbook
 
 from app.models import (
     DepartmentEnum,
@@ -152,3 +155,27 @@ def test_export_xlsx_ok(client, db_session):
     assert resp.headers["content-type"].startswith(
         "application/vnd.openxmlformats"
     )
+
+
+def test_export_xlsx_uses_dynamic_internal_use_label(client, db_session):
+    item = Item(item_name="연구 반출품", process_type_code="TR")
+    db_session.add(item)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.INTERNAL_USE,
+            quantity_change=Decimal("-1"),
+            quantity_before=Decimal("2"),
+            quantity_after=Decimal("1"),
+            department=DepartmentEnum.RESEARCH.value,
+            created_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/transactions/export.xlsx?{_range()}")
+    assert resp.status_code == 200, resp.text
+    workbook = load_workbook(BytesIO(resp.content), read_only=True)
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert any(row[1] == "연구소 반출" for row in rows[1:])

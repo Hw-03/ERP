@@ -20,7 +20,10 @@ interface WorkTypeProps {
  */
 export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeChange, onItemConversion }: WorkTypeProps) {
   const visibleWorkTypes = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
-  const n = visibleWorkTypes.length + (onItemConversion ? 1 : 0);
+  const canItemConversion = Boolean(
+    onItemConversion && (operator?.department === "조립" || operator?.department === "출하"),
+  );
+  const n = visibleWorkTypes.length + (canItemConversion ? 1 : 0);
   const cols = n <= 3 ? n : n === 4 ? 2 : 3;
   const rows = Math.ceil(n / cols);
   return (
@@ -62,7 +65,7 @@ export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeCh
           </button>
         );
       })}
-      {onItemConversion && (
+      {canItemConversion && (
         <button
           type="button"
           data-testid="warehouse-item-conversion-card"
@@ -212,6 +215,8 @@ export function IoSubTypeStep({
           label={
             subType === "warehouse_to_dept"
               ? "도착 부서"
+              : subType === "internal_use_out"
+              ? "사용 부서"
               : subType === "produce" ||
                 subType === "disassemble" ||
                 subType === "adjust_in" ||
@@ -221,6 +226,7 @@ export function IoSubTypeStep({
           }
           value={toDepartment}
           onChange={onToDepartmentChange}
+          options={subType === "internal_use_out" ? ["AS", "연구"] : undefined}
           fill
         />
       )}
@@ -244,8 +250,15 @@ function DeptGrid({
   fill?: boolean;
 }) {
   const items = options ?? PROD_DEPTS;
-  // 7개 옵션(PROD_DEPTS + 창고) 일 때 grid-cols-7 자동. 그 외엔 기존 grid-cols-6 유지.
-  const colsClass = items.length === 1 ? "grid-cols-1" : items.length === 7 ? "grid-cols-7" : "grid-cols-6";
+  // 제한 옵션은 실제 개수만큼 열을 사용해 빈 칸 없이 영역 전체를 채운다.
+  const colsClass =
+    items.length === 1
+      ? "grid-cols-1"
+      : items.length === 2
+        ? "grid-cols-2"
+        : items.length === 7
+          ? "grid-cols-7"
+          : "grid-cols-6";
   return (
     <div className={fill ? "flex h-full min-h-0 flex-col" : undefined}>
       <Step2Label label={label} />

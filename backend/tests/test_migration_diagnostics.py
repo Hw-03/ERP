@@ -31,8 +31,26 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 import bootstrap_db  # noqa: E402  (backend on sys.path per conftest)
+from bootstrap import migrate as migrate_module  # noqa: E402
 from app.database import Base  # noqa: E402
 from app import models  # noqa: F401, E402  (Base.metadata 등록)
+from app.models import StockRequestTypeEnum, TransactionTypeEnum  # noqa: E402
+
+
+def test_postgresql_transaction_enum_migration_matches_model():
+    model_values = {member.value for member in TransactionTypeEnum}
+    assert set(migrate_module._PG_TRANSACTION_TYPE_ENUM_VALUES) == model_values
+    assert set(migrate_module._PG_TRANSACTION_TYPE_ENUM_ADDITIONS) == {
+        "UNMARK_DEFECTIVE",
+        "DEFECT_SCRAP",
+        "INTERNAL_USE",
+    }
+
+
+def test_postgresql_stock_request_enum_migration_includes_internal_use():
+    assert set(migrate_module._PG_STOCK_REQUEST_TYPE_ENUM_ADDITIONS) == {
+        StockRequestTypeEnum.INTERNAL_USE.name,
+    }
 
 
 @pytest.fixture()

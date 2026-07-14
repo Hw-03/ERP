@@ -118,13 +118,13 @@ export function ItemConversionWorkView({
       : 1
     : localStep;
   const sourceOver = sourceItem ? quantity > itemStock(sourceItem) : false;
-  const canPreview = Boolean(sourceItem && targetItem && !sourceOver && quantity >= 1);
+  const normalizedRequesterEmployeeId = requesterEmployeeId.trim();
+  const requesterReady = normalizedRequesterEmployeeId.length > 0;
+  const canPreview = Boolean(sourceItem && targetItem && !sourceOver && quantity >= 1 && requesterReady);
   const resolvedMode = preview?.resolved_mode ?? null;
   const memoRequired = resolvedMode === "BOM";
   const memoReady = !memoRequired || memo.trim().length > 0;
   const canGoExecute = Boolean(preview?.executable && memoReady);
-  const normalizedRequesterEmployeeId = requesterEmployeeId.trim();
-  const requesterReady = normalizedRequesterEmployeeId.length > 0;
   const requesterError = requesterReady ? null : MISSING_REQUESTER_ERROR;
 
   const clearPreviewState = useCallback((): void => {
@@ -154,7 +154,7 @@ export function ItemConversionWorkView({
   }
 
   async function loadPreview(): Promise<void> {
-    if (!sourceItem || !targetItem || sourceOver) return;
+    if (!sourceItem || !targetItem || sourceOver || !requesterReady) return;
     setBusy(true);
     setError(null);
     try {

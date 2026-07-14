@@ -65,8 +65,29 @@ def test_audit_tx_types_includes_material_movement():
         TransactionTypeEnum.SUPPLIER_RETURN,
         TransactionTypeEnum.MARK_DEFECTIVE,
         TransactionTypeEnum.DISASSEMBLE,
+        TransactionTypeEnum.INTERNAL_USE,
     ):
         assert tt in audit_csv.AUDIT_TX_TYPES, f"{tt} 누락"
+
+
+@pytest.mark.parametrize(
+    ("department", "expected"),
+    [
+        ("AS", "AS 반출"),
+        ("연구", "연구소 반출"),
+        (None, "AS·연구 사용출고"),
+    ],
+)
+def test_internal_use_audit_label(make_item, department, expected):
+    item = make_item()
+    log = _mk_log(
+        item.item_id,
+        tx=TransactionTypeEnum.INTERNAL_USE,
+        qty=D("-2"),
+        when=datetime(2026, 7, 14, 9, 0),
+    )
+    log.department = department
+    assert audit_csv.row_from_log(log, item)[1] == expected
 
 
 def test_row_from_log_columns_in_order(make_item, db_session):

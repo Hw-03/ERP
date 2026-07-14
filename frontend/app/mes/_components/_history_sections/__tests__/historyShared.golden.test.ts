@@ -960,6 +960,46 @@ describe("dateFilterToFrom", () => {
   it("ALL → undefined", () => {
     expect(dateFilterToFrom("ALL")).toBeUndefined();
   });
+
+  it("internal use는 batch.to_department 또는 log.department로 동적 라벨을 만든다", () => {
+    expect(getHistoryDisplayLabel({ transaction_type: "INTERNAL_USE", department: "연구" })).toBe("연구소 반출");
+    const batch = makeBatch({
+      work_type: "internal_use",
+      sub_type: "internal_use_out",
+      to_department: "AS",
+    });
+    expect(getHistoryDisplayLabel({ transaction_type: "INTERNAL_USE", department: "연구" }, batch)).toBe("AS 반출");
+  });
+});
+
+describe("internal use history", () => {
+  const log = { transaction_type: "INTERNAL_USE", department: "연구" };
+
+  it("batch가 있으면 창고→AS/연구소 흐름과 반출 movement를 표시한다", () => {
+    const line = makeLine({
+      direction: "out",
+      from_bucket: "warehouse",
+      to_bucket: "none",
+      to_department: null,
+    });
+    const batch = makeBatch({
+      work_type: "internal_use",
+      sub_type: "internal_use_out",
+      to_department: "연구",
+      bundles: [makeBundle({ lines: [line] })],
+    });
+    expect(getHistoryFlowLabel(log, batch)).toBe("창고 → 연구소");
+    expect(getHistoryMovementSummary(log, batch).parts[0]).toEqual({
+      label: "반출 1품목 · 10 EA",
+      tone: "danger",
+    });
+    expect(classifyHistoryScope(log, batch)).toBe("warehouse_involved");
+  });
+
+  it("batch cache가 없어도 log.department로 라벨과 반출 movement를 표시한다", () => {
+    expect(getHistoryDisplayLabel(log)).toBe("연구소 반출");
+    expect(getHistoryFlowLabel(log)).toBe("창고 → 연구소");
+  });
 });
 
 describe("OPERATION_OPTIONS", () => {
@@ -969,6 +1009,7 @@ describe("OPERATION_OPTIONS", () => {
     expect(labels).toContain("출하 준비");
     expect(labels).toContain("출하");
     expect(labels).toContain("창고 → 부서");
+    expect(OPERATION_OPTIONS).toContainEqual({ value: "internal_use", label: "AS·연구 반출" });
     expect(labels).not.toContain("생산 | 입고");
     expect(labels).not.toContain("분해 | 출고");
     expect(labels).not.toContain("자동 차감");

@@ -56,6 +56,7 @@ from app.services.sr_validation import (  # noqa: F401
     line_requires_pending,
     request_requires_approval,
     validate_line_shape_for_request_type,
+    validate_request_entrypoint,
 )
 
 # ---------------------------------------------------------------------------
@@ -186,6 +187,7 @@ def create_request(
     requires_department_approval: bool = False,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
+    allow_internal_use: bool = False,
 ) -> StockRequest:
     """요청 생성. 호출자가 db.commit() 책임.
 
@@ -195,6 +197,12 @@ def create_request(
     - 승인 불필요 → 즉시 실행 후 COMPLETED.
     - requires_department_approval=True 면 부서 결재까지 통과해야 COMPLETED.
     """
+    validate_request_entrypoint(
+        requester,
+        request_type,
+        allow_internal_use=allow_internal_use,
+    )
+
     # 불량 격리/처리 결재 룰: 격리 출처가 "창고" 면 창고 정/부 결재, 그 외 부서면 그 부서 정/부 결재.
     # 정/부 권한자 직접 처리 시 _finalize_submission 이 즉시 완료로 흡수 — 별도 분기 불필요.
     _DEFECT_TYPES = {

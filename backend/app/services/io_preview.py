@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     DepartmentEnum,
+    Employee,
     InventoryLocation,
     Item,
     LocationStatusEnum,
@@ -28,7 +29,58 @@ from app.services import stock_math
 from app.services.approval_rules import APPROVAL_SUB_TYPES, MANUAL_LINE_ORIGINS  # noqa: F401
 
 
-WORK_TYPES = {"receive", "warehouse_io", "process", "defect"}
+WORK_TYPES = {"receive", "warehouse_io", "process", "defect", "internal_use"}
+INTERNAL_USE_WORK_TYPE = "internal_use"
+INTERNAL_USE_SUB_TYPE = "internal_use_out"
+INTERNAL_USE_DEPARTMENTS = frozenset(
+    {DepartmentEnum.AS.value, DepartmentEnum.RESEARCH.value}
+)
+
+
+def validate_internal_use_operation(
+    *,
+    work_type: str,
+    sub_type: str,
+    to_department: Optional[str],
+    lines: Iterable[object] = (),
+) -> None:
+    """사내 사용 작업의 고정 work/sub 조합과 창고 차감 라인을 검증한다."""
+    is_internal = work_type == INTERNAL_USE_WORK_TYPE or sub_type == INTERNAL_USE_SUB_TYPE
+    if not is_internal:
+        return
+    if (work_type, sub_type) != (INTERNAL_USE_WORK_TYPE, INTERNAL_USE_SUB_TYPE):
+        raise ValueError("internal_use 작업은 internal_use_out 세부 작업만 허용됩니다.")
+    if to_department not in INTERNAL_USE_DEPARTMENTS:
+        raise ValueError("사내 사용 반출 부서는 AS 또는 연구만 선택할 수 있습니다.")
+    expected = ("out", "warehouse", None, "none", to_department)
+    for line in lines:
+        actual = (
+            getattr(line, "direction"),
+            getattr(line, "from_bucket"),
+            getattr(line, "from_department"),
+            getattr(line, "to_bucket"),
+            getattr(line, "to_department"),
+        )
+        if actual != expected:
+            raise ValueError("사내 사용 라인 구성이 올바르지 않습니다.")
+
+
+def validate_internal_use_requester(
+    requester: Employee,
+    *,
+    work_type: str,
+    sub_type: str,
+) -> None:
+    """AS·연구 직원 또는 창고 정/부 담당자만 사내 사용 작업을 허용한다."""
+    if (work_type, sub_type) != (INTERNAL_USE_WORK_TYPE, INTERNAL_USE_SUB_TYPE):
+        return
+    department = _enum_value(requester.department)
+    warehouse_role = (requester.warehouse_role or "none").lower()
+    if department not in INTERNAL_USE_DEPARTMENTS and warehouse_role not in {
+        "primary",
+        "deputy",
+    }:
+        raise PermissionError("AS·연구 직원 또는 창고 정/부 담당자만 사내 사용 반출이 가능합니다.")
 
 
 def _d(value) -> Decimal:
@@ -176,6 +228,8 @@ def _route_for_sub_type(
         return ("move", "warehouse", None, "production", to_department)
     if sub_type == "dept_to_warehouse":
         return ("move", "production", from_department, "warehouse", None)
+    if sub_type == INTERNAL_USE_SUB_TYPE:
+        return ("out", "warehouse", None, "none", to_department)
     if sub_type == "produce":
         if role == "result":
             dept = _default_production_dept(item, to_department or from_department)
@@ -496,6 +550,11 @@ def preview(
     from_department: Optional[str] = None,
     to_department: Optional[str] = None,
 ) -> dict:
+    validate_internal_use_operation(
+        work_type=work_type,
+        sub_type=sub_type,
+        to_department=to_department,
+    )
     if work_type not in WORK_TYPES:
         raise ValueError(f"지원하지 않는 작업 유형입니다: {work_type}")
     validate_operation_sources(

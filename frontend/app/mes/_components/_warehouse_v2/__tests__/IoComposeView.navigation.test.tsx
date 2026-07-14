@@ -29,7 +29,7 @@ vi.mock("@/lib/api", () => ({
 const operator = {
   employee_id: "op-1",
   name: "operator",
-  department: "assembly",
+  department: "조립",
   warehouse_role: "none",
 };
 
@@ -93,11 +93,11 @@ const conversionResult: ItemConversionResult = {
   transactions: [],
 };
 
-function renderCompose(items: Item[] = []) {
+function renderCompose(items: Item[] = [], currentOperator = operator) {
   return render(
     <IoComposeView
       globalSearch=""
-      operator={operator}
+      operator={currentOperator}
       employees={[]}
       items={items}
       productModels={[]}
@@ -121,6 +121,13 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("AS 작업자에게 독립 사용출고 카드를 보이고 품목 전환은 숨긴다", async () => {
+    renderCompose([], { ...operator, department: "AS" });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /AS·연구 사용출고/ })).toBeInTheDocument();
+      expect(screen.queryByTestId("warehouse-item-conversion-card")).not.toBeInTheDocument();
+    });
+  });
   it("keeps one five-step navigation row and removes duplicate active headers", async () => {
     renderCompose();
 

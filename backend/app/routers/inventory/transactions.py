@@ -137,6 +137,7 @@ _TX_ROW_COLOR = {
     "TRANSFER_DEPT":    "E0E7FF",
     "MARK_DEFECTIVE":   "FBD9D7",
     "SUPPLIER_RETURN":  "F4C7C3",
+    "INTERNAL_USE":     "FCE8B2",
 }
 
 
@@ -596,6 +597,7 @@ def export_transactions_xlsx(
         "TRANSFER_TO_PROD": "창고→부서", "TRANSFER_TO_WH": "부서→창고",
         "TRANSFER_DEPT": "부서간 이동",
         "MARK_DEFECTIVE": "불량 등록", "SUPPLIER_RETURN": "공급업체 반품",
+        "INTERNAL_USE": "사내 사용",
     }
 
     columns = [
@@ -616,7 +618,13 @@ def export_transactions_xlsx(
         approver = info.approver_name if info else None
         row_data = [
             log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
-            tx_label.get(tx_val, tx_val),
+            (
+                "AS 반출"
+                if tx_val == "INTERNAL_USE" and log.department == "AS"
+                else "연구소 반출"
+                if tx_val == "INTERNAL_USE" and log.department == "연구"
+                else tx_label.get(tx_val, tx_val)
+            ),
             item.mes_code or "",
             item.item_name,
             item.process_type_code or "",

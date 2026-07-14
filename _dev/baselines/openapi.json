@@ -7951,6 +7951,7 @@
           "mark_defective_prod",
           "supplier_return",
           "package_out",
+          "internal_use",
           "manual_adjustment",
           "defect_scrap",
           "defect_return",
@@ -8554,7 +8555,8 @@
           "MARK_DEFECTIVE",
           "UNMARK_DEFECTIVE",
           "DEFECT_SCRAP",
-          "SUPPLIER_RETURN"
+          "SUPPLIER_RETURN",
+          "INTERNAL_USE"
         ],
         "title": "TransactionTypeEnum",
         "type": "string"
@@ -14334,6 +14336,16 @@
         "parameters": [
           {
             "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "source_item_id",
             "required": true,
             "schema": {
@@ -16645,6 +16657,16 @@
         "parameters": [
           {
             "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "source_pa_item_id",
             "required": true,
             "schema": {
@@ -17077,6 +17099,16 @@
             "schema": {
               "format": "uuid",
               "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
               "type": "string"
             }
           },

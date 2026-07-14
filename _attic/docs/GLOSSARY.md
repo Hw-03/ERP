@@ -63,6 +63,7 @@
 |---|---|---|
 | `RECEIVE` | 원자재 입고 | 입고 (창고로) |
 | `SHIP` | 출고 (PF + 창고 out 이면 "출하" — 아래 [출하 규칙](#출하-규칙) 참고) | 출고 |
+| `INTERNAL_USE` | AS·연구 사용출고 | 창고 결재 승인 시 AS·연구 사내 사용으로 차감 |
 | `PRODUCE` | 생산 | 생산 입고 (대상 품목) |
 | `DISASSEMBLE` | 분해 *(이전 "재작업" — P0-1 통일)* | 부서 내 분해/회수 |
 | `BACKFLUSH` | 자동 차감 | 생산에 따른 자동 차감 (자재 품목) |
@@ -79,7 +80,12 @@
 
 **출하(ship)는 별도 work type 이 아니다** (사용자 확인 2026-05-27).
 
-입출고 V2 compose 에는 다음 4 work type 만 존재한다: `receive` / `warehouse_io` / `process` / `defect`.
+입출고 V2 compose 에는 다음 work type 이 존재한다: `receive` / `warehouse_io` / `process` / `defect` / `internal_use`.
+
+`internal_use` 는 AS·연구 부서와 창고 정/부만 접근한다. 사용 부서로 `AS` 또는 `연구`를
+선택하면 창고 정/부 결재를 요청하고, 승인 시 창고 재고만 차감하며 부서 재고는 생성하지
+않는다. 이력은 각각 `AS 반출`, `연구소 반출`로 표시하며 취소하면 해당 작업 배치의 수량을
+창고로 복구한다.
 
 | 조건 | 화면 표시 |
 |---|---|

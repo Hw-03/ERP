@@ -108,6 +108,9 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
         except ValueError as exc:
             db.rollback()
             raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+        except PermissionError as exc:
+            db.rollback()
+            raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +331,9 @@ def upsert_stock_request_draft(
     except ValueError as exc:
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    except PermissionError as exc:
+        db.rollback()
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
 
     commit_and_refresh(db, request)
     return request

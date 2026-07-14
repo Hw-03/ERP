@@ -15,7 +15,7 @@ from __future__ import annotations
 
 # 창고 정/부 승인이 필요한 sub_type(프론트 requiresApproval 과 동일 집합).
 WAREHOUSE_APPROVAL_SUB_TYPES: frozenset[str] = frozenset(
-    {"warehouse_to_dept", "dept_to_warehouse"}
+    {"warehouse_to_dept", "dept_to_warehouse", "internal_use_out"}
 )
 
 # 결재가 필요한 전체 sub_type(창고 승인 + 불량 격리).

@@ -1,7 +1,7 @@
 import type { Department } from "./shared";
 import type { ShippingTransactionLog } from "./shipping";
 
-export type IoWorkType = "receive" | "warehouse_io" | "process" | "defect";
+export type IoWorkType = "receive" | "warehouse_io" | "process" | "defect" | "internal_use";
 
 export type IoSubType =
   | "receive_supplier"
@@ -15,7 +15,8 @@ export type IoSubType =
   | "defect_quarantine"
   | "defect_restore"
   | "defect_process"
-  | "supplier_return";
+  | "supplier_return"
+  | "internal_use_out";
 
 export type IoSourceKind = "direct_item" | "bom_parent" | "manual";
 export type IoLineOrigin = "direct" | "bom_auto" | "package_auto" | "manual";

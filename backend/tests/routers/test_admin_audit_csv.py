@@ -6,10 +6,12 @@ import csv as _csv
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from io import BytesIO
 
 import pytest
+from openpyxl import load_workbook
 
-from app.models import TransactionLog, TransactionTypeEnum
+from app.models import DepartmentEnum, TransactionLog, TransactionTypeEnum
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
 
@@ -75,6 +77,34 @@ def test_backfill_then_list_and_download(client, db_session, make_item, csv_env)
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     assert len(xlsx_resp.content) > 0
+
+
+def test_internal_use_label_is_reused_by_audit_xlsx(
+    client, db_session, make_item, csv_env
+):
+    item = make_item(name="연구 감사 반출품")
+    _add_log(
+        db_session,
+        item.item_id,
+        tx=TransactionTypeEnum.INTERNAL_USE,
+        qty=Decimal("-2"),
+        when=datetime(2026, 7, 14, 9, 0),
+    )
+    db_session.flush()
+    log = db_session.query(TransactionLog).one()
+    log.department = DepartmentEnum.RESEARCH.value
+    db_session.commit()
+
+    backfill = client.post("/api/admin/audit-csv/backfill", headers=ADMIN_HEADERS)
+    assert backfill.status_code == 200, backfill.text
+    csv_resp = client.get("/api/admin/audit-csv/2026-07.csv", headers=ADMIN_HEADERS)
+    assert "연구소 반출" in csv_resp.content.decode("utf-8-sig")
+
+    xlsx_resp = client.get("/api/admin/audit-csv/2026-07.xlsx", headers=ADMIN_HEADERS)
+    assert xlsx_resp.status_code == 200, xlsx_resp.text
+    workbook = load_workbook(BytesIO(xlsx_resp.content), read_only=True)
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert any(row[1] == "연구소 반출" for row in rows[1:])
 
 
 def test_invalid_month_format_rejected(client, csv_env):

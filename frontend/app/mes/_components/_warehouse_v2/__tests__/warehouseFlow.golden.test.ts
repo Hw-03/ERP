@@ -86,7 +86,7 @@ function makeBundle(overrides: Partial<IoBundle> & { lines?: IoLine[] } = {}): I
   };
 }
 
-const ALL_WORK_TYPES: IoWorkType[] = ["receive", "warehouse_io", "process", "defect"];
+const ALL_WORK_TYPES: IoWorkType[] = ["receive", "warehouse_io", "process", "defect", "internal_use"];
 const ALL_SUB_TYPES: IoSubType[] = [
   "receive_supplier",
   "warehouse_to_dept",
@@ -98,6 +98,7 @@ const ALL_SUB_TYPES: IoSubType[] = [
   "adjust_out",
   "defect_quarantine",
   "supplier_return",
+  "internal_use_out",
 ];
 
 // ──────────────────────────────────────────────────────────────────
@@ -109,6 +110,7 @@ describe("ioWorkType 상수", () => {
       ["receive", "원자재 입고", "발주 품목 입고"],
       ["warehouse_io", "창고 입출고", "창고↔부서"],
       ["process", "부서 입출고", "부서 내 작업"],
+      ["internal_use", "AS·연구 사용출고", "창고 재고를 AS·연구 용도로 반출"],
     ]);
   });
 
@@ -121,6 +123,7 @@ describe("ioWorkType 상수", () => {
       warehouse_io: ["warehouse_to_dept", "dept_to_warehouse"],
       process: ["produce", "disassemble", "adjust_in", "adjust_out"],
       defect: ["defect_quarantine", "defect_restore", "defect_process", "supplier_return"],
+      internal_use: ["internal_use_out"],
     });
   });
 
@@ -140,6 +143,7 @@ describe("ioWorkType 상수", () => {
       ["defect_restore", "불량 해제", "격리 재고를 정상 복귀 (즉시)"],
       ["defect_process", "불량 처리", "격리 재고 폐기·재작업"],
       ["supplier_return", "원자재 반품", "격리 재고를 공급처에 반품"],
+      ["internal_use_out", "AS·연구 사용출고", "창고 재고를 AS 또는 연구 용도로 반출"],
     ]);
   });
 
@@ -149,6 +153,7 @@ describe("ioWorkType 상수", () => {
       warehouse_io: "warehouse_to_dept",
       process: "produce",
       defect: "defect_quarantine",
+      internal_use: "internal_use_out",
     });
   });
 
@@ -168,6 +173,15 @@ describe("canSeeWorkType", () => {
     expect(canSeeWorkType("receive", null)).toBe(false);
     expect(canSeeWorkType("receive", undefined)).toBe(false);
     expect(canSeeWorkType("receive", {})).toBe(false);
+  });
+
+  it("internal_use: AS·연구 부서 또는 창고 담당만 true", () => {
+    expect(canSeeWorkType("internal_use", { department: "AS", warehouse_role: "none" })).toBe(true);
+    expect(canSeeWorkType("internal_use", { department: "연구", warehouse_role: "none" })).toBe(true);
+    expect(canSeeWorkType("internal_use", { department: "조립", warehouse_role: "primary" })).toBe(true);
+    expect(canSeeWorkType("internal_use", { department: "출하", warehouse_role: "deputy" })).toBe(true);
+    expect(canSeeWorkType("internal_use", { department: "조립", warehouse_role: "none" })).toBe(false);
+    expect(canSeeWorkType("internal_use", null)).toBe(false);
   });
 
   it("receive 외 workType 은 항상 true", () => {
@@ -195,6 +209,7 @@ describe("subTypeLabel", () => {
       adjust_out: "출고",
       defect_quarantine: "새 불량",
       supplier_return: "원자재 반품",
+      internal_use_out: "AS·연구 사용출고",
     });
   });
 });
@@ -216,6 +231,7 @@ describe("requiresDepartments", () => {
       adjust_out: true,
       defect_quarantine: true,
       supplier_return: true,
+      internal_use_out: true,
     });
   });
 });
@@ -237,6 +253,7 @@ describe("requiresApproval", () => {
       adjust_out: false,
       defect_quarantine: false,
       supplier_return: false,
+      internal_use_out: true,
     });
   });
 });
@@ -288,6 +305,12 @@ describe("approvalKind", () => {
     expect(approvalKind("supplier_return", [])).toBe("none");
   });
 
+  it("internal_use_out은 manual 라인 여부와 무관하게 창고 결재를 요청한다", () => {
+    const withManual = [makeBundle({ lines: [makeLine({ origin: "manual" })] })];
+    expect(approvalKind("internal_use_out", [])).toBe("warehouse");
+    expect(approvalKind("internal_use_out", withManual)).toBe("warehouse");
+  });
+
   it("비결재 subType + manual line → department", () => {
     const withManual = [makeBundle({ lines: [makeLine({ origin: "manual" })] })];
     expect(approvalKind("adjust_in", withManual)).toBe("department");
@@ -318,6 +341,7 @@ describe("isBomForced", () => {
       adjust_out: false,
       defect_quarantine: false,
       supplier_return: false,
+      internal_use_out: false,
     });
   });
 });
@@ -351,6 +375,7 @@ describe("deptIoDirectionOf", () => {
       adjust_out: "out",
       defect_quarantine: null,
       supplier_return: null,
+      internal_use_out: null,
     });
   });
 });
@@ -372,6 +397,7 @@ describe("pickerDirectionLabel", () => {
       adjust_out: "출고",
       defect_quarantine: "출고",
       supplier_return: "출고",
+      internal_use_out: "사용출고",
     });
   });
 });
@@ -393,6 +419,7 @@ describe("deptIoDisplayLabel", () => {
       adjust_out: "출고 · 낱개",
       defect_quarantine: null,
       supplier_return: null,
+      internal_use_out: null,
     });
   });
 });
@@ -414,6 +441,7 @@ describe("getItemActionMode", () => {
       adjust_out: "single_only",
       defect_quarantine: "single_only",
       supplier_return: "single_only",
+      internal_use_out: "single_only",
     });
   });
 });
@@ -435,6 +463,7 @@ describe("allowsMixedBundles", () => {
       adjust_out: false,
       defect_quarantine: false,
       supplier_return: false,
+      internal_use_out: false,
     });
   });
 });
@@ -486,13 +515,32 @@ describe("lineTagLabel", () => {
 // isExitWorkType
 // ──────────────────────────────────────────────────────────────────
 describe("isExitWorkType", () => {
-  it("defect 만 true", () => {
+  it("defect/internal_use만 true", () => {
     const map = Object.fromEntries(ALL_WORK_TYPES.map((w) => [w, isExitWorkType(w)]));
     expect(map).toEqual({
       receive: false,
       warehouse_io: false,
       process: false,
       defect: true,
+      internal_use: true,
+    });
+  });
+
+  it("internal_use는 출고 톤이다", () => {
+    expect(isExitWorkType("internal_use")).toBe(true);
+  });
+});
+
+describe("internal_use_out 흐름", () => {
+  it("전용 부서·피커·라인 정책을 제공한다", () => {
+    expect(requiresDepartments("internal_use_out")).toBe(true);
+    expect(deptVisibility("internal_use_out")).toEqual({ from: false, to: true });
+    expect(targetDepartmentOf("internal_use_out", "출발", "AS")).toBe("AS");
+    expect(pickerDirectionLabel("internal_use_out")).toBe("사용출고");
+    expect(getItemActionMode("internal_use_out")).toBe("single_only");
+    expect(lineTagLabel(makeLine({ origin: "direct" }), "internal_use_out")).toEqual({
+      text: "사용출고",
+      tone: "red",
     });
   });
 });
@@ -557,6 +605,24 @@ describe("useIoWorkState setWorkType", () => {
     expect(result.current.deptIoDirection).toBeNull();
     expect(result.current.bundles).toEqual([]);
     expect(result.current.step).toBe(1);
+  });
+
+  it("internal_use 진입 시 부서를 비우고 선택 전에는 진행할 수 없다", () => {
+    const { result } = renderHook(() => useIoWorkState(undefined, "조립"));
+    act(() => result.current.setWorkType("internal_use"));
+    expect(result.current.subType).toBe("internal_use_out");
+    expect(result.current.toDepartment).toBe("");
+    expect(result.current.canAdvance[2]).toBe(false);
+    act(() => result.current.setToDepartment("연구"));
+    expect(result.current.canAdvance[2]).toBe(true);
+  });
+
+  it("internal_use에서 다른 작업으로 돌아가면 기존 기본 부서를 복원한다", () => {
+    const { result } = renderHook(() => useIoWorkState(undefined, "조립"));
+    act(() => result.current.setWorkType("internal_use"));
+    act(() => result.current.setToDepartment("AS"));
+    act(() => result.current.setWorkType("process"));
+    expect(result.current.toDepartment).toBe("조립");
   });
 
   it("각 workType → DEFAULT_SUB_TYPE 매칭", () => {
@@ -762,6 +828,7 @@ describe("[추출 골든] targetDepartmentOf — Step3 대상 부서", () => {
       adjust_out: "도착",
       defect_quarantine: "출발",
       supplier_return: "출발",
+      internal_use_out: "도착",
     });
   });
 });
@@ -790,6 +857,7 @@ describe("[추출 골든] deptVisibility", () => {
       adjust_out: { from: false, to: true },
       defect_quarantine: { from: true, to: false },
       supplier_return: { from: true, to: false },
+      internal_use_out: { from: false, to: true },
     });
   });
 });

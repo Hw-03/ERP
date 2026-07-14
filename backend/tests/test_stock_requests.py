@@ -85,6 +85,132 @@ def _create_request_via_api(
     return {"status_code": res.status_code, "body": res.json()}
 
 
+def test_internal_use_direct_request_rejects_unauthorized_requester(
+    db_session, client, make_item
+):
+    item = make_item(name="Internal use guarded", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="IU-DIRECT-NO",
+        name="Assembly requester",
+        department=DepartmentEnum.ASSEMBLY,
+    )
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="internal_use",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "none",
+                "to_department": DepartmentEnum.AS.value,
+            }
+        ],
+    )
+
+    assert out["status_code"] == 403, out["body"]
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_internal_use_direct_request_rejects_authorized_requester(
+    db_session, client, make_item
+):
+    item = make_item(name="Internal use IO only", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="IU-DIRECT-AS-VALID",
+        name="AS requester",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="internal_use",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "none",
+                "to_department": DepartmentEnum.AS.value,
+            }
+        ],
+    )
+
+    assert out["status_code"] == 422, out["body"]
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_internal_use_direct_draft_rejects_authorized_requester(
+    db_session, client, make_item
+):
+    item = make_item(name="Internal use draft IO only", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="IU-DRAFT-AS-VALID",
+        name="AS draft requester",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+
+    response = client.put(
+        "/api/stock-requests/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "request_type": "internal_use",
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                    "from_bucket": "warehouse",
+                    "to_bucket": "none",
+                    "to_department": DepartmentEnum.RESEARCH.value,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_internal_use_direct_request_rejects_non_as_research_destination(
+    db_session, client, make_item
+):
+    item = make_item(name="Internal use destination", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="IU-DIRECT-AS",
+        name="AS requester",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="internal_use",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "none",
+                "to_department": DepartmentEnum.ASSEMBLY.value,
+            }
+        ],
+    )
+
+    assert out["status_code"] == 422, out["body"]
+    assert db_session.query(StockRequest).count() == 0
+
+
 # ---------------------------------------------------------------------------
 # 시나리오 1: 창고→부서 요청 생성 → 점유만 발생
 # ---------------------------------------------------------------------------

@@ -68,6 +68,7 @@ function directionAccent(subType: IoSubType): string {
     subType === "defect_restore" ||
     subType === "defect_process" ||
     subType === "warehouse_to_dept" ||
+    subType === "internal_use_out" ||
     subType === "disassemble" ||
     subType === "adjust_out"
   ) {
@@ -97,6 +98,9 @@ function confirmCopy(
   }
   if (subType === "warehouse_to_dept") {
     return { title: `창고 반출을 ${verb}`, tone: "danger", confirmLabel };
+  }
+  if (subType === "internal_use_out") {
+    return { title: `AS·연구 사용출고를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "dept_to_warehouse") {
     return { title: `창고 반입을 ${verb}`, tone: "normal", confirmLabel };
@@ -168,6 +172,9 @@ export function IoConfirmStep({
   const visibleIncludedLines = includedLines.filter(
     (line) => !bomParentLineIds.has(line.line_id),
   );
+  const headerSummary = subType === "internal_use_out"
+    ? `${headerLabel} · 반영 ${visibleIncludedLines.length}건`
+    : `${headerLabel} · BOM · 반영 ${visibleIncludedLines.length}건`;
   const displayBundles = bundles.filter((b) =>
     b.lines.some((l) => l.included && !bomParentLineIds.has(l.line_id)),
   );
@@ -199,7 +206,7 @@ export function IoConfirmStep({
             {meta.summaryLabel}
           </div>
           <div className="text-lg lg:text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
-            {headerLabel} · BOM · 반영 {visibleIncludedLines.length}건
+            {headerSummary}
           </div>
         </div>
         {isApproval ? (
@@ -298,7 +305,7 @@ export function IoConfirmStep({
         }}
       >
         <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-          {headerLabel} · BOM · 반영 {visibleIncludedLines.length}건
+          {headerSummary}
         </div>
       </ConfirmModal>
     </div>

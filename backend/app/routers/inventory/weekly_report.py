@@ -80,6 +80,7 @@ NON_PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
     TransactionTypeEnum.UNMARK_DEFECTIVE,
     TransactionTypeEnum.DEFECT_SCRAP,
     TransactionTypeEnum.SUPPLIER_RETURN,
+    TransactionTypeEnum.INTERNAL_USE,
 })
 
 

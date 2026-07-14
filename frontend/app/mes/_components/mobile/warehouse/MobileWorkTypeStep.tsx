@@ -95,18 +95,21 @@ function DeptGrid({
   value,
   onChange,
   className = "flex flex-1 flex-col",
+  options = PROD_DEPTS,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   className?: string;
+  options?: readonly string[];
 }) {
+  const colsClass = options.length === 2 ? "grid-cols-2" : "grid-cols-3";
   return (
     // 항목 4-4A — 섹션 높이를 채우도록 grid 를 flex-1 + auto-rows-fr 로(버튼 균등 확대).
     <div className={className}>
       <Label text={label} />
-      <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
-        {PROD_DEPTS.map((d) => {
+      <div className={`grid flex-1 auto-rows-fr ${colsClass} gap-2`}>
+        {options.map((d) => {
           const active = d === value;
           const color =
             MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple;
@@ -251,9 +254,16 @@ export function MobileSubTypeStep({
       {showAnyDept && dept.to && (
         <DeptGrid
           className="flex basis-[60%] flex-[6_1_0] flex-col"
-          label={subType === "warehouse_to_dept" ? "도착 부서" : "대상 부서"}
+          label={
+            subType === "warehouse_to_dept"
+              ? "도착 부서"
+              : subType === "internal_use_out"
+              ? "사용 부서"
+              : "대상 부서"
+          }
           value={toDepartment}
           onChange={onToDepartmentChange}
+          options={subType === "internal_use_out" ? ["AS", "연구"] : undefined}
         />
       )}
 

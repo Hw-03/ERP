@@ -22,7 +22,13 @@ from app.models import (
     StockRequestStatusEnum,
 )
 from app.schemas.io import IoBundlePayload
-from app.services.io_preview import APPROVAL_SUB_TYPES, _enum_value, _new_id
+from app.services.io_preview import (
+    APPROVAL_SUB_TYPES,
+    _enum_value,
+    _new_id,
+    validate_internal_use_operation,
+    validate_internal_use_requester,
+)
 
 
 def _line_to_dict(line: IoLine) -> dict:
@@ -172,6 +178,17 @@ def _persist_batch(
     status: str,
     submitted_at: Optional[datetime] = None,
 ) -> IoBatch:
+    validate_internal_use_requester(
+        requester,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+    )
+    validate_internal_use_operation(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        to_department=payload.to_department,
+        lines=(line for bundle in payload.bundles for line in bundle.lines),
+    )
     now = datetime.utcnow()
     batch = IoBatch(
         batch_id=_new_id(),

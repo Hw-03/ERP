@@ -120,6 +120,40 @@ describe("formatDefectReason", () => {
   });
 });
 describe("historyPresentation", () => {
+  it("internal use의 stock 표시는 창고 수량을 우선 사용한다", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "INTERNAL_USE",
+      department: "연구",
+      quantity_change: -2,
+      quantity_before: 10,
+      quantity_after: 8,
+      warehouse_qty_before: 30,
+      warehouse_qty_after: 28,
+    }));
+
+    expect(row.stock?.scopeLabel).toBe("창고");
+    expect(row.stock?.before).toBe(30);
+    expect(row.stock?.after).toBe(28);
+    expect(row.stock?.label).toBe("창고 28 EA");
+  });
+
+  it("internal use의 legacy log는 총재고 수량으로 fallback한다", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "INTERNAL_USE",
+      quantity_before: 10,
+      quantity_after: 8,
+      warehouse_qty_before: null,
+      warehouse_qty_after: null,
+    }));
+
+    expect(row.stock).toMatchObject({
+      scopeLabel: "창고",
+      before: 10,
+      after: 8,
+      label: "창고 8 EA",
+    });
+  });
+
   it("uses the complete reference summary instead of the loaded page subset", () => {
     const presentation = Reflect.apply(getReferenceBatchPresentation, undefined, [
       [makeLog({ transaction_type: "SHIP", reference_no: "REF-ALL", quantity_change: -1, transfer_qty: 1 })],

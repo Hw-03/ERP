@@ -36,6 +36,29 @@ _BENIGN_MIGRATION_PATTERNS: tuple[str, ...] = (
     "no such column",  # DROP COLUMN 멱등: 컬럼이 이미 제거된 경우
 )
 
+_PG_TRANSACTION_TYPE_ENUM_VALUES: tuple[str, ...] = (
+    "RECEIVE",
+    "PRODUCE",
+    "SHIP",
+    "ADJUST",
+    "BACKFLUSH",
+    "DISASSEMBLE",
+    "TRANSFER_TO_PROD",
+    "TRANSFER_TO_WH",
+    "TRANSFER_DEPT",
+    "MARK_DEFECTIVE",
+    "UNMARK_DEFECTIVE",
+    "DEFECT_SCRAP",
+    "SUPPLIER_RETURN",
+    "INTERNAL_USE",
+)
+_PG_TRANSACTION_TYPE_ENUM_ADDITIONS: tuple[str, ...] = (
+    "UNMARK_DEFECTIVE",
+    "DEFECT_SCRAP",
+    "INTERNAL_USE",
+)
+_PG_STOCK_REQUEST_TYPE_ENUM_ADDITIONS: tuple[str, ...] = ("INTERNAL_USE",)
+
 
 def _is_benign_migration_skip(exc: Exception) -> bool:
     """예외가 '이미 적용됨'(멱등 재실행) 인지 판정. 아니면 실제 실패."""
@@ -769,6 +792,9 @@ def _drop_dead_transaction_type_enum_values() -> None:
     if engine.dialect.name != "postgresql":
         return
     dead = ("SCRAP", "LOSS", "RETURN", "RESERVE", "RESERVE_RELEASE")
+    enum_values_sql = ",".join(
+        f"'{value}'" for value in _PG_TRANSACTION_TYPE_ENUM_VALUES
+    )
     with engine.begin() as conn:
         rows = conn.execute(text(
             "SELECT enumlabel FROM pg_enum "
@@ -776,11 +802,9 @@ def _drop_dead_transaction_type_enum_values() -> None:
         )).scalars().all()
         if not any(v in rows for v in dead):
             return
-        conn.execute(text("""
+        conn.execute(text(f"""
             CREATE TYPE transaction_type_enum_new AS ENUM (
-                'RECEIVE','PRODUCE','SHIP','ADJUST','BACKFLUSH','DISASSEMBLE',
-                'TRANSFER_TO_PROD','TRANSFER_TO_WH','TRANSFER_DEPT',
-                'MARK_DEFECTIVE','UNMARK_DEFECTIVE','DEFECT_SCRAP','SUPPLIER_RETURN'
+                {enum_values_sql}
             );
             ALTER TABLE transaction_logs
                 ALTER COLUMN transaction_type
@@ -822,7 +846,7 @@ def _cleanup_production_hierarchy() -> None:
 
 
 def _add_new_transaction_type_values() -> None:
-    """PG only: transaction_type_enum 에 UNMARK_DEFECTIVE, DEFECT_SCRAP 추가.
+    """PG only: transaction_type_enum 에 신규 거래 유형 추가.
 
     2026-05-22 불량 처리 흐름 재설계용 (docs/defect-handling-redesign.md).
     ALTER TYPE ADD VALUE IF NOT EXISTS — 트랜잭션 외부 실행 필수.
@@ -832,9 +856,20 @@ def _add_new_transaction_type_values() -> None:
         return
     # autocommit 모드 (ALTER TYPE ADD VALUE 는 트랜잭션 내 불가)
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        for value in ("UNMARK_DEFECTIVE", "DEFECT_SCRAP"):
+        for value in _PG_TRANSACTION_TYPE_ENUM_ADDITIONS:
             conn.execute(text(
                 f"ALTER TYPE transaction_type_enum ADD VALUE IF NOT EXISTS '{value}'"
+            ))
+
+
+def _add_new_stock_request_type_values() -> None:
+    """PG only: stock_request_type_enum에 신규 결재 요청 유형을 멱등 추가한다."""
+    if engine.dialect.name != "postgresql":
+        return
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        for value in _PG_STOCK_REQUEST_TYPE_ENUM_ADDITIONS:
+            conn.execute(text(
+                f"ALTER TYPE stock_request_type_enum ADD VALUE IF NOT EXISTS '{value}'"
             ))
 
 
@@ -1216,6 +1251,13 @@ def run_migrations() -> dict[str, object]:
         _add_new_transaction_type_values()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] PG enum add (defect handling) failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    try:
+        _add_new_stock_request_type_values()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] PG enum add (internal use request) failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

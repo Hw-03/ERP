@@ -149,6 +149,18 @@ def _handle_package_out(db, request, line, approver, qty, item_id) -> Decimal:
     return -qty
 
 
+def _handle_internal_use(
+    db: Session,
+    request: StockRequest,
+    line: StockRequestLine,
+    approver: Employee,
+    qty: Decimal,
+    item_id: uuid.UUID,
+) -> Decimal:
+    inventory_svc.consume_warehouse(db, item_id, qty)
+    return -qty
+
+
 def _handle_defect_scrap(db, request, line, approver, qty, item_id) -> Decimal:
     # 격리 항목 폐기 — from_department 에서 DEFECTIVE 차감
     if line.from_department is None:
@@ -288,6 +300,7 @@ _LINE_HANDLERS = {
     StockRequestTypeEnum.MARK_DEFECTIVE_PROD: _handle_mark_defective_prod,
     StockRequestTypeEnum.SUPPLIER_RETURN: _handle_supplier_return,
     StockRequestTypeEnum.PACKAGE_OUT: _handle_package_out,
+    StockRequestTypeEnum.INTERNAL_USE: _handle_internal_use,
     StockRequestTypeEnum.DEFECT_SCRAP: _handle_defect_scrap,
     StockRequestTypeEnum.DEFECT_RETURN: _handle_defect_return,
     StockRequestTypeEnum.SCRAP_NORMAL: _handle_scrap_normal,
@@ -320,6 +333,7 @@ def _execute_line(
 
     inv = inventory_svc.get_or_create_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
+    warehouse_qty_before = inv.warehouse_qty or Decimal("0")
     cells_before = inv_effect.snapshot_cells(db, item_id)
 
     handler = _LINE_HANDLERS.get(rt)
@@ -330,6 +344,7 @@ def _execute_line(
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, item_id)
     qty_after = inv.quantity or Decimal("0")
+    warehouse_qty_after = inv.warehouse_qty or Decimal("0")
 
     # TransactionLog 작성 — 결재 흐름 맥락을 notes 에 기록.
     from_label = _bucket_label(line.from_bucket, line.from_department)
@@ -348,6 +363,13 @@ def _execute_line(
     if rt in (StockRequestTypeEnum.DEFECT_DISASSEMBLE, StockRequestTypeEnum.REWORK_NORMAL):
         return
 
+    is_internal_use = rt == StockRequestTypeEnum.INTERNAL_USE
+    producer_name = request.requester_name if is_internal_use else approver.name
+    producer_employee_id = (
+        request.requester_employee_id if is_internal_use else approver.employee_id
+    )
+    department = line.to_department if is_internal_use else line.from_department
+
     db.add(
         TransactionLog(
             item_id=item_id,
@@ -355,14 +377,16 @@ def _execute_line(
             quantity_change=quantity_change,
             quantity_before=qty_before,
             quantity_after=qty_after,
+            warehouse_qty_before=warehouse_qty_before if is_internal_use else None,
+            warehouse_qty_after=warehouse_qty_after if is_internal_use else None,
             reference_no=request.request_code,
-            produced_by=approver.name,
-            producer_employee_id=approver.employee_id,
+            produced_by=producer_name,
+            producer_employee_id=producer_employee_id,
             notes=note,
             reason_category=request.reason_category,
             reason_memo=request.reason_memo,
             operation_batch_id=getattr(request, "operation_batch_id", None),
-            department=str(line.from_department) if line.from_department else None,
+            department=str(department) if department else None,
             inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
         )
     )

@@ -24,6 +24,7 @@ export type StockRequestType =
   | "mark_defective_wh"
   | "mark_defective_prod"
   | "supplier_return"
+  | "internal_use"
   | "manual_adjustment"
   | "defect_scrap"
   | "defect_return"

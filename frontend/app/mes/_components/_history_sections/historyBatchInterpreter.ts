@@ -62,6 +62,25 @@ function _historySubType(batch: IoBatch): string {
   return isManualOnlyProductionBatch(batch) ? "adjust_in" : batch.sub_type;
 }
 
+function _internalUseDepartment(
+  log: { department?: string | null },
+  batch?: IoBatch | null,
+): string | null {
+  return _deptName(batch?.to_department) ?? log.department?.trim() ?? null;
+}
+
+function _internalUseDestination(department: string | null): string {
+  if (department === "연구") return "연구소";
+  return department || "AS·연구";
+}
+
+function _internalUseOperationLabel(
+  log: { department?: string | null },
+  batch?: IoBatch | null,
+): string {
+  return `${_internalUseDestination(_internalUseDepartment(log, batch))} 반출`;
+}
+
 export function getHistoryDisplayTransactionType(
   log: { transaction_type: TransactionType },
   batch?: IoBatch | null,
@@ -127,6 +146,13 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   // 사용자 인지상 "한 부서 안에서 끝나는 작업" — 그 부서로 단일 표기.
   // 단, 창고 관련 sub_type(receive_supplier, warehouse_to_dept 등)은 bucket 분석 필요.
   const subType = _historySubType(batch);
+  if (subType === "internal_use_out") {
+    return {
+      from: "창고",
+      to: _internalUseDestination(_deptName(batch.to_department)),
+      mixed: false,
+    };
+  }
   const sameDeptOnlyTypes = new Set(["produce", "disassemble", "adjust_in", "adjust_out"]);
   const batchFrom = _deptName(batch.from_department);
   const batchTo = _deptName(batch.to_department);
@@ -278,6 +304,7 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   defect_quarantine: _SUB_LABEL.defect_quarantine,
   defect_restore: _SUB_LABEL.defect_restore,
   defect_process: _SUB_LABEL.defect_process,
+  internal_use_out: _SUB_LABEL.internal_use_out,
 };
 
 const _TX_OPERATION: Record<string, string> = _TX_LABEL;
@@ -292,6 +319,7 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   defect_restore: "불량 재고 → 정상 재고",
   defect_process: "불량 재고 폐기",
   supplier_return: "공급사로 돌려보냄",
+  internal_use_out: "창고에서 AS·연구 용도로 반출",
   adjust_in: "재고 수량 직접 수정",
   adjust_out: "재고 수량 직접 수정",
   // transaction_type
@@ -306,6 +334,7 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   UNMARK_DEFECTIVE: "불량 재고 → 정상 재고",
   DEFECT_SCRAP: "불량 재고 폐기",
   SUPPLIER_RETURN: "불량 재고 공급사 반품",
+  INTERNAL_USE: "창고에서 AS·연구 용도로 반출",
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -314,9 +343,12 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
 
 /** 작업 의도 라벨. batch.sub_type 우선, 없으면 transaction_type 기반. */
 export function getHistoryOperationLabel(
-  log: { transaction_type: string },
+  log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): string {
+  if (batch?.sub_type === "internal_use_out" || log.transaction_type === "INTERNAL_USE") {
+    return _internalUseOperationLabel(log, batch);
+  }
   if (batch?.sub_type) {
     const fromSub = _SUB_TYPE_OPERATION[_historySubType(batch)];
     if (fromSub) return fromSub;
@@ -333,7 +365,7 @@ export function getHistoryWorkTypeLabel(workType: string): string {
 
 /** 화면 정본 메인 라벨. 의도 우선. 모든 row/패널이 같은 정책으로 보이도록. */
 export function getHistoryDisplayLabel(
-  log: { transaction_type: string },
+  log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): string {
   return getHistoryOperationLabel(log, batch);
@@ -341,7 +373,7 @@ export function getHistoryDisplayLabel(
 
 /** 화면 정본 보조문구. 의미문구 우선, 없고 단일 명확한 흐름이면 "{from} → {to}". */
 export function getHistoryDisplaySubLabel(
-  log: { transaction_type: string },
+  log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): string | undefined {
   if (batch?.sub_type) {
@@ -359,9 +391,12 @@ export function getHistoryDisplaySubLabel(
 
 /** 작업 흐름 라벨. batch 있고 명확하면 부서/창고/불량/생산 등으로, 그 외 거래 타입 추론. */
 export function getHistoryFlowLabel(
-  log: { transaction_type: string },
+  log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): string {
+  if (batch?.sub_type === "internal_use_out" || log.transaction_type === "INTERNAL_USE") {
+    return `창고 → ${_internalUseDestination(_internalUseDepartment(log, batch))}`;
+  }
   if (batch) {
     const eps = getBatchFlowEndpoints(batch);
     if (eps) return `${eps.from} → ${eps.to}`;
@@ -380,6 +415,7 @@ export function getHistoryFlowLabel(
     case "DEFECT_SCRAP": return _TX_LABEL.DEFECT_SCRAP;
     case "ADJUST": return _TX_LABEL.ADJUST;
     case "SUPPLIER_RETURN": return _TX_LABEL.SUPPLIER_RETURN;
+    case "INTERNAL_USE": return "창고 → AS·연구";
     default: return log.transaction_type;
   }
 }
@@ -544,6 +580,7 @@ export function getHistoryLineSignedQuantity(
       break;
     case "receive_supplier": setIncrease(); break;
     case "supplier_return":
+    case "internal_use_out":
     case "defect_quarantine":
     case "adjust_out": setDecrease(); break;
     case "adjust_in": setIncrease(); break;
@@ -710,6 +747,8 @@ export function getHistoryMovementSummary(
     parts.push(_verbItemPart("입고", "success", included));
   } else if (tx === "SHIP") {
     parts.push(_verbItemPart("출고", "danger", included));
+  } else if (sub === "internal_use_out" || tx === "INTERNAL_USE") {
+    parts.push(_verbItemPart("반출", "danger", included));
   } else if (sub === "supplier_return" || tx === "SUPPLIER_RETURN") {
     parts.push({ label: `반품 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "defect_quarantine" || tx === "MARK_DEFECTIVE") {
@@ -764,6 +803,7 @@ const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: bo
   UNMARK_DEFECTIVE: { verb: _TX_LABEL.UNMARK_DEFECTIVE, tone: "success" },
   DEFECT_SCRAP: { verb: _TX_LABEL.DEFECT_SCRAP, tone: "danger" },
   SUPPLIER_RETURN: { verb: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
+  INTERNAL_USE: { verb: "반출", tone: "danger" },
 };
 
 export function getSingleLogMovement(log: {

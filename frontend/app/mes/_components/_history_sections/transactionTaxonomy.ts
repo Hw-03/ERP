@@ -35,7 +35,7 @@ export function getDefaultHistoryScopeForOperator(
 // ──────────────────────────────────────────────────────────────────
 
 export const WAREHOUSE_INVOLVED_TYPES: readonly TransactionType[] = [
-  "RECEIVE", "SHIP", "TRANSFER_TO_PROD", "TRANSFER_TO_WH",
+  "RECEIVE", "SHIP", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE",
 ] as const;
 
 export const DEPT_INTERNAL_TYPES: readonly TransactionType[] = [

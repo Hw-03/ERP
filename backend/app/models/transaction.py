@@ -41,6 +41,7 @@ class TransactionTypeEnum(str, enum.Enum):
     UNMARK_DEFECTIVE = "UNMARK_DEFECTIVE"
     DEFECT_SCRAP = "DEFECT_SCRAP"
     SUPPLIER_RETURN = "SUPPLIER_RETURN"
+    INTERNAL_USE = "INTERNAL_USE"
 
 
 class TransactionLog(Base):

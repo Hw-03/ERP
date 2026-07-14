@@ -64,6 +64,13 @@ def _cancel(client, log_id, *, code="KW01", pin="0000", reason="취소 테스트
     )
 
 
+def _approve(client, request_id, approver: Employee):
+    return client.post(
+        f"/api/stock-requests/{request_id}/approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+
+
 def _receive_v2(client, item, requester: Employee, quantity: int):
     preview = client.post(
         "/api/io/preview",
@@ -158,6 +165,126 @@ def test_cancel_receive_restores_warehouse(client, db_session, make_item):
 
     wh, _, _ = _cells(db_session, item.item_id)
     assert wh == 0
+
+
+def test_cancel_internal_use_restores_warehouse_total(client, db_session, make_item):
+    item = make_item(name="사내사용 취소품", warehouse_qty=Decimal("12"))
+    actor = _make_employee(
+        db_session,
+        code="IU-CANCEL",
+        department=DepartmentEnum.AS,
+    )
+    approver = _make_employee(
+        db_session,
+        code="IU-CANCEL-WH",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "AS",
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": 4}
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "AS",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    approved = _approve(client, submitted.json()["stock_request_id"], approver)
+    assert approved.status_code == 200, approved.text
+    log = db_session.query(TransactionLog).filter(
+        TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE
+    ).one()
+    assert _cells(db_session, item.item_id)[:2] == (8, 8)
+
+    cancelled = _cancel(client, log.log_id, code=actor.employee_code)
+    assert cancelled.status_code == 200, cancelled.text
+    assert _cells(db_session, item.item_id)[:2] == (12, 12)
+
+
+def test_cancel_internal_use_batch_restores_all_items(
+    client, db_session, make_item
+):
+    first = make_item(name="사내사용 배치품 A", warehouse_qty=Decimal("12"))
+    second = make_item(name="사내사용 배치품 B", warehouse_qty=Decimal("9"))
+    actor = _make_employee(
+        db_session,
+        code="IU-BATCH-CANCEL",
+        department=DepartmentEnum.RESEARCH,
+    )
+    approver = _make_employee(
+        db_session,
+        code="IU-BATCH-WH",
+        warehouse_role="deputy",
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(first.item_id), "quantity": 4},
+                {"source_kind": "direct_item", "item_id": str(second.item_id), "quantity": 5},
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    approved = _approve(client, submitted.json()["stock_request_id"], approver)
+    assert approved.status_code == 200, approved.text
+
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE)
+        .all()
+    )
+    assert len(logs) == 2
+    assert logs[0].operation_batch_id is not None
+    assert {log.operation_batch_id for log in logs} == {logs[0].operation_batch_id}
+    assert _cells(db_session, first.item_id) == (8, 8, {})
+    assert _cells(db_session, second.item_id) == (4, 4, {})
+
+    cancelled = _cancel(client, logs[0].log_id, code=actor.employee_code)
+    assert cancelled.status_code == 200, cancelled.text
+    db_session.expire_all()
+
+    batch_logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.operation_batch_id == logs[0].operation_batch_id)
+        .all()
+    )
+    assert len(batch_logs) == 2
+    assert all(log.cancelled for log in batch_logs)
+    assert _cells(db_session, first.item_id) == (12, 12, {})
+    assert _cells(db_session, second.item_id) == (9, 9, {})
 
 
 def test_effect_helper_roundtrip(db_session, make_item):

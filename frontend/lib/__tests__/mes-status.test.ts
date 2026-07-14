@@ -64,12 +64,12 @@ describe("inferTone", () => {
 });
 
 describe("TRANSACTION_META", () => {
-  it("api.ts TransactionType 13키 모두 정의", () => {
+  it("api.ts TransactionType 14키 모두 정의", () => {
     const required = [
       "RECEIVE", "PRODUCE", "SHIP", "ADJUST", "BACKFLUSH",
       "DISASSEMBLE",
       "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
-      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN",
+      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN", "INTERNAL_USE",
     ];
     for (const key of required) {
       const meta = TRANSACTION_META[key as keyof typeof TRANSACTION_META];
@@ -93,6 +93,8 @@ describe("getTransactionLabel / getTransactionTone", () => {
     expect(getTransactionTone("RECEIVE")).toBe("success");
     expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("새 불량");
     expect(getTransactionTone("MARK_DEFECTIVE")).toBe("danger");
+    expect(getTransactionLabel("INTERNAL_USE")).toBe("사용출고");
+    expect(getTransactionTone("INTERNAL_USE")).toBe("danger");
   });
 
   it("미지 타입 — 라벨은 입력 그대로, 톤은 info", () => {
@@ -115,6 +117,7 @@ describe("transactionColor", () => {
     expect(transactionColor("MARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
     // history-rework-color-2026-05-15: DISASSEMBLE("재작업") 은 되돌림 성격이라 red 로 격상.
     expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("INTERNAL_USE")).toBe(LEGACY_COLORS.red);
   });
 
   it("불량 처리 — 격리/폐기/반품/재작업 red, 격리해제 green", () => {

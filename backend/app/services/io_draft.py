@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.models import IoBatch
-from app.services.io_preview import APPROVAL_SUB_TYPES, validate_operation_sources
+from app.services.io_preview import (
+    APPROVAL_SUB_TYPES,
+    validate_internal_use_operation,
+    validate_internal_use_requester,
+    validate_operation_sources,
+)
 from app.services.io_persist import (
     _add_bundles_and_lines,
     _batch_to_payload,
@@ -33,6 +38,17 @@ def save_draft(db: Session, payload) -> dict:
         (bundle.source_kind for bundle in payload.bundles),
     )
     requester = _load_requester(db, payload.requester_employee_id)
+    validate_internal_use_requester(
+        requester,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+    )
+    validate_internal_use_operation(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        to_department=payload.to_department,
+        lines=(line for bundle in payload.bundles for line in bundle.lines),
+    )
     incoming_batch_id = getattr(payload, "batch_id", None)
 
     if incoming_batch_id is not None:

@@ -31,6 +31,7 @@ _SUMMARY_WAREHOUSE_TYPES = [
     TransactionTypeEnum.SHIP,
     TransactionTypeEnum.TRANSFER_TO_PROD,
     TransactionTypeEnum.TRANSFER_TO_WH,
+    TransactionTypeEnum.INTERNAL_USE,
 ]
 _SUMMARY_DEPT_TYPES = [
     TransactionTypeEnum.TRANSFER_DEPT,
@@ -50,13 +51,18 @@ _SUMMARY_DEFECT_TYPES = [
 def _department_label_expr() -> ColumnElement:
     """거래 한 건의 부서 라벨 식.
 
-    1) 부서계열(PRODUCE/BACKFLUSH/…): IoBatch.to/from_department.
-    2) 창고계열(RECEIVE/SHIP/…): 고정 '창고'.
-    3) 수량조정(ADJUST): IoBatch.to/from_department (io.py 통해 배치 있음).
-    4) 불량계열(MARK_DEFECTIVE/…): IoBatch 우선, 없으면 TransactionLog.department.
-    5) 그 외: '미상'.
+    1) 사내 사용(INTERNAL_USE): TransactionLog.department 또는 IoBatch.to_department.
+    2) 부서계열(PRODUCE/BACKFLUSH/…): IoBatch.to/from_department.
+    3) 창고계열(RECEIVE/SHIP/…): 고정 '창고'.
+    4) 수량조정(ADJUST): IoBatch.to/from_department (io.py 통해 배치 있음).
+    5) 불량계열(MARK_DEFECTIVE/…): IoBatch 우선, 없으면 TransactionLog.department.
+    6) 그 외: '미상'.
     """
     return case(
+        (
+            TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE,
+            func.coalesce(TransactionLog.department, IoBatch.to_department, "미상"),
+        ),
         (
             TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES),
             func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
@@ -157,6 +163,7 @@ _SUBTYPE_OP: dict[str, str] = {
     "receive_supplier": "원자재 입고",
     "supplier_return": "공급사 반품",
     "defect_quarantine": "불량 처리",
+    "internal_use_out": "사내 사용",
 }
 
 # TransactionLog.transaction_type → 화면 표시 라벨 매핑 (프론트 _TX_OPERATION 동일)
@@ -172,6 +179,7 @@ _TX_OP: dict[str, str] = {
     "ADJUST": "수량 조정",
     "MARK_DEFECTIVE": "불량 처리",
     "SUPPLIER_RETURN": "공급사 반품",
+    "INTERNAL_USE": "사내 사용",
 }
 
 # sub_type 이 있으면 라벨을 결정하는 키 집합 (tx 기반 라벨을 덮어쓴다)
@@ -305,6 +313,10 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
         "supplier_return": or_(
             IoBatch.sub_type == "supplier_return",
             _plain_tx_clause("SUPPLIER_RETURN"),
+        ),
+        "internal_use": or_(
+            IoBatch.sub_type == "internal_use_out",
+            _plain_tx_clause("INTERNAL_USE"),
         ),
     }
 

@@ -49,6 +49,7 @@ class StockRequestTypeEnum(str, enum.Enum):
     MARK_DEFECTIVE_PROD = "mark_defective_prod"
     SUPPLIER_RETURN = "supplier_return"
     PACKAGE_OUT = "package_out"
+    INTERNAL_USE = "internal_use"
     # 낱개(manual/adjust_in/adjust_out) 라인 포함 IO — 부서 결재 정/부 승인만 필요.
     # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
     MANUAL_ADJUSTMENT = "manual_adjustment"

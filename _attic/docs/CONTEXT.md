@@ -53,18 +53,23 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 
 현재 활성 입력 UI: `frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx`.
 
-작업 분기는 4 work type:
+작업 분기는 다음 work type으로 구성된다:
 1. **`receive`** — 원자재 입고 (창고 정/부만 가능)
 2. **`warehouse_io`** — 창고 ↔ 부서 (결재 필요한 흐름)
 3. **`process`** — 부서 내 작업 (생산/분해/수량보정)
 4. **`defect`** — 불량 격리/해제/처리/공급사 반품
+5. **`internal_use`** — AS·연구 사용출고 (AS·연구 또는 창고 정/부만 가능)
+
+`internal_use` 는 사용 부서(AS/연구)를 선택한 뒤 창고 정/부 결재를 요청한다. 승인 시 창고
+수량과 전체 재고만 차감하고 부서 재고는 만들지 않으며, 작업 취소 시 같은 작업 배치의 차감
+수량을 창고로 복구한다. 품목 전환 메뉴와 실행 API는 조립·출하 부서만 사용할 수 있다.
 
 **출하(ship)는 별도 work type 이 아니다** — `warehouse_io` 중 PF 품목이 창고에서 외부로
 나가는 케이스를 자동으로 "출하" 로 기록 ([ADR-0001](adr/ADR-0001-io-compose-v2-work-types.md)).
 
 ## 결재 워크플로
 
-- `warehouse_to_dept`, `dept_to_warehouse` 같은 흐름은 즉시 반영되지 않고 `StockRequest`
+- `warehouse_to_dept`, `dept_to_warehouse`, `internal_use_out` 흐름은 즉시 반영되지 않고 `StockRequest`
   로 변환되어 결재 큐에 들어간다.
 - 결재자는 (a) 생산부장 (b) 창고장 둘 중 적절한 쪽.
 - 결재 완료 → 실제 재고 변경 + `TransactionLog` 기록.

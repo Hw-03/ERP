@@ -28,7 +28,7 @@ import type { TransactionType } from "@/lib/api/types/shared";
 
 describe("glossary — 키 완전성", () => {
   it("모든 IoWorkType 키가 WORK_TYPE_LABEL / WORK_TYPE_DESCRIPTION 에 있다", () => {
-    const expected: IoWorkType[] = ["receive", "warehouse_io", "process", "defect"];
+    const expected: IoWorkType[] = ["receive", "warehouse_io", "process", "defect", "internal_use"];
     for (const wt of expected) {
       expect(WORK_TYPE_LABEL[wt]).toBeTruthy();
       expect(WORK_TYPE_DESCRIPTION[wt]).toBeTruthy();
@@ -50,6 +50,7 @@ describe("glossary — 키 완전성", () => {
       "defect_restore",
       "defect_process",
       "supplier_return",
+      "internal_use_out",
     ];
     for (const st of expected) {
       expect(SUB_TYPE_LABEL[st]).toBeTruthy();
@@ -73,6 +74,7 @@ describe("glossary — 키 완전성", () => {
       "UNMARK_DEFECTIVE",
       "DEFECT_SCRAP",
       "SUPPLIER_RETURN",
+      "INTERNAL_USE",
     ];
     for (const tx of expected) {
       expect(TRANSACTION_TYPE_LABEL[tx]).toBeTruthy();
@@ -90,6 +92,7 @@ describe("glossary — 키 완전성", () => {
       "mark_defective_wh",
       "mark_defective_prod",
       "supplier_return",
+      "internal_use",
       "manual_adjustment",
       "defect_scrap",
       "defect_return",
@@ -125,6 +128,12 @@ describe("glossary — 캐노니컬 라벨 고정", () => {
 
   it("work type 'process' 는 '부서 입출고'", () => {
     expect(WORK_TYPE_LABEL.process).toBe("부서 입출고");
+  });
+
+  it("AS·연구 사용출고 용어를 중앙 사전에서 제공한다", () => {
+    expect(WORK_TYPE_LABEL.internal_use).toBe("AS·연구 사용출고");
+    expect(SUB_TYPE_LABEL.internal_use_out).toBe("AS·연구 사용출고");
+    expect(TRANSACTION_TYPE_LABEL.INTERNAL_USE).toBe("사용출고");
   });
 
   it("warehouse_to_dept / dept_to_warehouse 는 방향 화살표 형식", () => {

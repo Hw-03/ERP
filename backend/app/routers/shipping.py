@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app._actor import get_actor_emp, set_actor
 from app.database import get_db
 from app.models import (
+    DepartmentEnum,
     Employee,
     ShippingRequest,
     ShippingRequestStatusEnum,
@@ -42,6 +43,11 @@ from app.services.shipping import ShippingError
 
 
 router = APIRouter()
+
+_COMPONENT_CHANGE_DEPARTMENTS = {
+    DepartmentEnum.ASSEMBLY.value,
+    DepartmentEnum.SHIPPING.value,
+}
 
 
 def _line_payload(lines: list[ShippingBomLineInput] | None) -> list[dict] | None:
@@ -191,6 +197,38 @@ def _commit_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: 
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 
+def _validate_component_change_actor(requester: Employee) -> None:
+    """품목 전환은 활성 조립·출하 직원에게만 허용한다."""
+    if not bool(requester.is_active):
+        raise http_error(
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.FORBIDDEN,
+            "비활성 직원은 품목 전환을 실행할 수 없습니다.",
+        )
+    department = getattr(requester.department, "value", requester.department)
+    if department not in _COMPONENT_CHANGE_DEPARTMENTS:
+        raise http_error(
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.FORBIDDEN,
+            "품목 전환은 조립·출하 부서만 사용할 수 있습니다.",
+        )
+
+
+def _load_component_change_requester(
+    requester_employee_id: uuid.UUID,
+    db: Session,
+) -> Employee:
+    requester = (
+        db.query(Employee)
+        .filter(Employee.employee_id == requester_employee_id)
+        .first()
+    )
+    if requester is None:
+        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자(직원)를 찾을 수 없습니다.")
+    _validate_component_change_actor(requester)
+    return requester
+
+
 def _load_component_change_actor(http_request: Request, db: Session) -> Employee:
     employee_code = get_actor_emp(http_request)
     if employee_code == "-":
@@ -198,24 +236,21 @@ def _load_component_change_actor(http_request: Request, db: Session) -> Employee
     requester = db.query(Employee).filter(Employee.employee_code == employee_code).first()
     if requester is None:
         raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자(직원)를 찾을 수 없습니다.")
-    if not bool(requester.is_active):
-        raise http_error(
-            status.HTTP_403_FORBIDDEN,
-            ErrorCode.FORBIDDEN,
-            "비활성 직원은 품목 전환을 실행할 수 없습니다.",
-        )
+    _validate_component_change_actor(requester)
     set_actor(http_request, requester)
     return requester
 
 
 @router.get("/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
 def component_change_preview_independent(
+    requester_employee_id: uuid.UUID = Query(...),
     source_pa_item_id: uuid.UUID = Query(...),
     target_pa_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
     requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
+    _load_component_change_requester(requester_employee_id, db)
     try:
         return shipping_svc.component_change_preview_independent(
             db,
@@ -331,11 +366,13 @@ def clear_checklist(request_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.get("/requests/{request_id}/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
 def component_change_preview(
     request_id: uuid.UUID,
+    requester_employee_id: uuid.UUID = Query(...),
     source_pa_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
     requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
+    _load_component_change_requester(requester_employee_id, db)
     try:
         return shipping_svc.component_change_preview(db, request_id, source_pa_item_id, quantity, requested_mode)
     except ShippingError as exc:

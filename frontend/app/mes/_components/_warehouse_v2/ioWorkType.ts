@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Boxes,
+  PackageMinus,
   RefreshCcw,
   Wrench,
 } from "lucide-react";
@@ -24,17 +25,24 @@ export const IO_WORK_TYPES: Array<{
   { id: "receive", label: WORK_TYPE_LABEL.receive, description: WORK_TYPE_DESCRIPTION.receive, icon: Boxes },
   { id: "warehouse_io", label: WORK_TYPE_LABEL.warehouse_io, description: WORK_TYPE_DESCRIPTION.warehouse_io, icon: ArrowLeftRight },
   { id: "process", label: WORK_TYPE_LABEL.process, description: WORK_TYPE_DESCRIPTION.process, icon: Wrench },
+  { id: "internal_use", label: WORK_TYPE_LABEL.internal_use, description: WORK_TYPE_DESCRIPTION.internal_use, icon: PackageMinus },
   // 불량(defect) 워크타입은 별도 최상위 "불량" 탭으로 분리됨 — 입출고 메뉴에서 제외.
   // (IoWorkType 유니온과 glossary/helper 의 defect 분기는 입출고 내역·타입 보존 위해 그대로 둔다.)
 ];
 
 export function canSeeWorkType(
   workType: IoWorkType,
-  operator: { warehouse_role?: string | null; name?: string | null } | null | undefined,
+  operator: { warehouse_role?: string | null; name?: string | null; department?: string | null } | null | undefined,
 ): boolean {
   if (workType === "receive") {
     // 원자재 입고는 창고 정/부 만
     return operator?.warehouse_role === "primary" || operator?.warehouse_role === "deputy";
+  }
+  if (workType === "internal_use") {
+    return operator?.department === "AS"
+      || operator?.department === "연구"
+      || operator?.warehouse_role === "primary"
+      || operator?.warehouse_role === "deputy";
   }
   return true;
 }
@@ -58,6 +66,7 @@ export const IO_SUB_TYPES: Record<
     _row("defect_process"),
     _row("supplier_return"),
   ],
+  internal_use: [_row("internal_use_out")],
 };
 
 export const DEFAULT_SUB_TYPE: Record<IoWorkType, IoSubType> = {
@@ -65,6 +74,7 @@ export const DEFAULT_SUB_TYPE: Record<IoWorkType, IoSubType> = {
   warehouse_io: "warehouse_to_dept",
   process: "produce",
   defect: "defect_quarantine",
+  internal_use: "internal_use_out",
 };
 
 export const DEPARTMENT_OPTIONS = ["조립", "고압", "진공", "튜닝", "튜브", "출하", "AS"];
@@ -90,11 +100,12 @@ export function requiresDepartments(subType: IoSubType) {
     "supplier_return",
     "defect_restore",
     "defect_process",
+    "internal_use_out",
   ].includes(subType);
 }
 
 export function requiresApproval(subType: IoSubType) {
-  return ["warehouse_to_dept", "dept_to_warehouse"].includes(subType);
+  return ["warehouse_to_dept", "dept_to_warehouse", "internal_use_out"].includes(subType);
 }
 
 /** 백엔드 MANUAL_LINE_ORIGINS 와 동기 — 1라인이라도 낱개면 부서 결재 필요. */
@@ -112,7 +123,7 @@ export type ApprovalKind = "none" | "warehouse" | "department";
 
 /** subType + 라인 origin 으로 결재 종류 판정.
  *  새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재 (동시 결재 금지).
- *  - warehouse: warehouse_to_dept/dept_to_warehouse/defect_quarantine (manual line 섞여도 창고 승인 1회로만)
+ *  - warehouse: warehouse_to_dept/dept_to_warehouse/internal_use_out (manual line 섞여도 창고 승인 1회로만)
  *  - department: manual_adjustment 등 낱개 라인 단독
  *  - none: 즉시 반영
  */
@@ -156,7 +167,8 @@ export function deptIoDirectionOf(subType: IoSubType): DeptIoDirection | null {
 }
 
 // Step 3 picker 타이틀 접두. 창고 방향이 명확한 sub_type은 "창고 반출/반입", 그 외 "입고/출고".
-export function pickerDirectionLabel(subType: IoSubType): "입고" | "출고" | "창고 반출" | "창고 반입" {
+export function pickerDirectionLabel(subType: IoSubType): "입고" | "출고" | "창고 반출" | "창고 반입" | "사용출고" {
+  if (subType === "internal_use_out") return "사용출고";
   if (subType === "warehouse_to_dept") return "창고 반출";
   if (subType === "dept_to_warehouse") return "창고 반입";
   if (subType === "receive_supplier" || subType === "produce" || subType === "adjust_in") return "입고";
@@ -185,6 +197,7 @@ export function targetDepartmentOf(
   }
   // 부서 무관 작업
   if (subType === "receive_supplier") return null;
+  if (subType === "internal_use_out") return toDepartment;
   // 그 외 (warehouse_to_dept, produce, disassemble, adjust_in/out, dept_transfer) — toDepartment
   return toDepartment;
 }
@@ -196,6 +209,7 @@ export function directionWord(dir: DeptIoDirection | null): "입고" | "출고" 
 
 // sub_type → Step 2 에서 노출할 부서 grid (출발/도착). IoSubTypeStep 단일 소스.
 export function deptVisibility(subType: IoSubType): { from: boolean; to: boolean } {
+  if (subType === "internal_use_out") return { from: false, to: true };
   if (subType === "warehouse_to_dept") return { from: false, to: true };
   if (subType === "dept_to_warehouse") return { from: true, to: false };
   if (subType === "defect_quarantine" || subType === "supplier_return" || subType === "defect_restore" || subType === "defect_process")
@@ -255,6 +269,7 @@ export type LineTagTone = "green" | "red" | "blue" | "purple" | "muted";
 // 라인의 sub_type/origin/direction 조합으로 현장 친화 태그 결정.
 // IoLineRow / IoBundleCard 표시용.
 export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; tone: LineTagTone } {
+  if (subType === "internal_use_out") return { text: "사용출고", tone: "red" };
   if (subType === "adjust_in" && (line.origin === "direct" || line.origin === "manual")) {
     return { text: "단품 입고", tone: "muted" };
   }
@@ -279,7 +294,7 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
 
 /** workType 이 출고/비가역 계열이면 true — Step 1 카드 accent 색 결정에 사용. */
 export function isExitWorkType(workType: IoWorkType): boolean {
-  return workType === "defect";
+  return workType === "defect" || workType === "internal_use";
 }
 
 /** defect workType에서 격리(DEFECTIVE) 재고를 소스로 쓰는 서브타입인지 판별. */

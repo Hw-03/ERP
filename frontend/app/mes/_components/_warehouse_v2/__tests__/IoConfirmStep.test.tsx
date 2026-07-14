@@ -65,6 +65,32 @@ function renderConfirmStep() {
 }
 
 describe("IoConfirmStep", () => {
+  it("internal use는 창고 결재·사용출고 확인 문구를 사용한다", () => {
+    render(
+      <IoConfirmStep
+        workType="internal_use"
+        subType="internal_use_out"
+        bundles={[{ ...bundle, source_kind: "direct_item", lines: [parentLine] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="warehouse"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/AS·연구 사용출고 · 반영 1건/)).toBeInTheDocument();
+    expect(screen.getByText("창고 결재 요청")).toBeInTheDocument();
+    expect(screen.getByText("창고 결재 필요")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "창고 결재 요청 1건" }));
+    expect(screen.getByText("AS·연구 사용출고를 요청하시겠습니까?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "결재 요청" })).toBeInTheDocument();
+  });
+
   it("uses a full-width row button to expand confirmation bundles", () => {
     renderConfirmStep();
 

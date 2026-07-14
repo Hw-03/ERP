@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+import pytest
+
 from app.models import (
     DepartmentEnum,
     Employee,
@@ -15,6 +17,8 @@ from app.models import (
     LocationStatusEnum,
     StockRequest,
     StockRequestLine,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -45,6 +49,392 @@ def _make_employee(
     db_session.add(employee)
     db_session.flush()
     return employee
+
+
+def _preview_internal_use(client, requester: Employee, item, *, to_department: str = "AS"):
+    return client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": to_department,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "3",
+                }
+            ],
+        },
+    )
+
+
+def _internal_use_bundles(
+    item,
+    *,
+    to_department: str = "AS",
+    quantity: int = 1,
+) -> list[dict]:
+    return [
+        {
+            "bundle_id": str(uuid.uuid4()),
+            "source_kind": "direct_item",
+            "title": item.item_name,
+            "source_item_id": str(item.item_id),
+            "source_mes_code": item.mes_code,
+            "quantity": quantity,
+            "expanded_level": 1,
+            "lines": [
+                {
+                    "line_id": str(uuid.uuid4()),
+                    "item_id": str(item.item_id),
+                    "item_name": item.item_name,
+                    "mes_code": item.mes_code,
+                    "unit": item.unit,
+                    "direction": "out",
+                    "from_bucket": "warehouse",
+                    "from_department": None,
+                    "to_bucket": "none",
+                    "to_department": to_department,
+                    "quantity": quantity,
+                    "included": True,
+                    "origin": "direct",
+                }
+            ],
+        }
+    ]
+
+
+def _approve_stock_request(client, request_id, approver: Employee):
+    return client.post(
+        f"/api/stock-requests/{request_id}/approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+
+
+@pytest.mark.parametrize(
+    ("path", "method"),
+    [("/api/io/draft", "put"), ("/api/io/submit", "post")],
+)
+def test_internal_use_unauthorized_write_rejected_without_preview(
+    client, db_session, make_item, path, method
+):
+    item = make_item(name="미리보기 우회품", warehouse_qty=Decimal("5"))
+    requester = _make_employee(db_session, code=f"IU-NO-{method}")
+    db_session.commit()
+    response = getattr(client, method)(
+        path,
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "AS",
+            "bundles": _internal_use_bundles(item),
+        },
+    )
+    assert response.status_code == 403, response.text
+
+
+def test_internal_use_unauthorized_existing_draft_update_rejected(
+    client, db_session, make_item
+):
+    item = make_item(name="권한 회수 임시저장품", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="IU-UPDATE",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "internal_use",
+        "sub_type": "internal_use_out",
+        "to_department": "AS",
+        "bundles": _internal_use_bundles(item),
+    }
+    saved = client.put("/api/io/draft", json=payload)
+    assert saved.status_code == 200, saved.text
+
+    requester.department = DepartmentEnum.ASSEMBLY.value
+    db_session.commit()
+    payload["batch_id"] = saved.json()["batch_id"]
+    updated = client.put("/api/io/draft", json=payload)
+    assert updated.status_code == 403, updated.text
+
+
+@pytest.mark.parametrize(
+    ("work_type", "sub_type"),
+    [("internal_use", "receive_supplier"), ("receive", "internal_use_out")],
+)
+def test_internal_use_fresh_submit_rejects_work_sub_type_tampering(
+    client, db_session, make_item, work_type, sub_type
+):
+    item = make_item(name="작업유형 변조품", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code=f"IU-PAIR-{work_type}",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+    response = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": work_type,
+            "sub_type": sub_type,
+            "to_department": "AS",
+            "bundles": _internal_use_bundles(item),
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_internal_use_fresh_submit_rejects_invalid_destination(
+    client, db_session, make_item
+):
+    item = make_item(name="잘못된 부서 반출품", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="IU-BAD-DEPT",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+    response = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "조립",
+            "bundles": _internal_use_bundles(item, to_department="조립"),
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.parametrize("warehouse_role", ["primary", "deputy"])
+def test_internal_use_warehouse_manager_roles_can_preview_and_submit(
+    client, db_session, make_item, warehouse_role
+):
+    item = make_item(name=f"창고 {warehouse_role} 반출품", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code=f"IU-{warehouse_role}",
+        warehouse_role=warehouse_role,
+    )
+    db_session.commit()
+    preview = _preview_internal_use(client, requester, item, to_department="연구")
+    assert preview.status_code == 200, preview.text
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    assert submitted.json()["requires_approval"] is True
+
+    request = db_session.query(StockRequest).one()
+    assert request.request_type == StockRequestTypeEnum.INTERNAL_USE
+    assert request.status == StockRequestStatusEnum.COMPLETED
+
+
+def test_internal_use_submit_reserves_then_approval_consumes_only_warehouse(
+    client, db_session, make_item
+):
+    item = make_item(name="사내 사용품", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session,
+        code="IU-AS",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+
+    preview = _preview_internal_use(client, requester, item)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["requires_approval"] is True
+    line = preview.json()["bundles"][0]["lines"][0]
+    assert (
+        line["direction"],
+        line["from_bucket"],
+        line["from_department"],
+        line["to_bucket"],
+        line["to_department"],
+    ) == ("out", "warehouse", None, "none", "AS")
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "AS",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "reserved"
+    assert submitted.json()["requires_approval"] is True
+
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inv.warehouse_qty == Decimal("10")
+    assert inv.quantity == Decimal("10")
+    assert inv.pending_quantity == Decimal("3")
+    assert db_session.query(TransactionLog).count() == 0
+
+    request = db_session.query(StockRequest).one()
+    assert request.request_type == StockRequestTypeEnum.INTERNAL_USE
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.requires_warehouse_approval is True
+    assert request.operation_batch_id is not None
+    assert request.lines[0].from_bucket.value == "warehouse"
+    assert request.lines[0].from_department is None
+    assert request.lines[0].to_bucket.value == "none"
+    assert request.lines[0].to_department == "AS"
+
+    approver = _make_employee(
+        db_session,
+        code="IU-WH-APPROVER",
+        name="Warehouse Approver",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+    approved = _approve_stock_request(client, request.request_id, approver)
+    assert approved.status_code == 200, approved.text
+
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inv.warehouse_qty == Decimal("7")
+    assert inv.quantity == Decimal("7")
+    assert inv.pending_quantity == Decimal("0")
+    assert (
+        db_session.query(InventoryLocation)
+        .filter(InventoryLocation.item_id == item.item_id)
+        .count()
+        == 0
+    )
+    log = db_session.query(TransactionLog).one()
+    assert log.transaction_type == TransactionTypeEnum.INTERNAL_USE
+    assert log.department == "AS"
+    assert log.produced_by == requester.name
+    assert log.producer_employee_id == requester.employee_id
+    assert log.warehouse_qty_before == Decimal("10")
+    assert log.warehouse_qty_after == Decimal("7")
+    assert log.inventory_effect == [{"scope": "warehouse", "delta": -3}]
+
+
+def test_internal_use_rejects_unauthorized_requester_and_tampered_line(
+    client, db_session, make_item
+):
+    item = make_item(name="권한 검증품", warehouse_qty=Decimal("10"))
+    unauthorized = _make_employee(db_session, code="IU-NO")
+    manager = _make_employee(
+        db_session,
+        code="IU-WH",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+
+    denied = _preview_internal_use(client, unauthorized, item)
+    assert denied.status_code == 403, denied.text
+
+    preview = _preview_internal_use(client, manager, item, to_department="연구")
+    assert preview.status_code == 200, preview.text
+    bundles = preview.json()["bundles"]
+    bundles[0]["lines"][0]["from_department"] = "조립"
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(manager.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "bundles": bundles,
+        },
+    )
+    assert submitted.status_code == 422, submitted.text
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inv.warehouse_qty == Decimal("10")
+
+
+def test_internal_use_manual_origin_still_requires_warehouse_approval(
+    client, db_session, make_item
+):
+    item = make_item(name="수동 선택 사용품", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="IU-MANUAL",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "AS",
+            "targets": [
+                {"source_kind": "manual", "item_id": str(item.item_id), "quantity": 2}
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "AS",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "reserved"
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inv.warehouse_qty == Decimal("5")
+    assert inv.pending_quantity == Decimal("2")
+
+
+def test_internal_use_saved_draft_rechecks_permission_at_submit(
+    client, db_session, make_item
+):
+    item = make_item(name="임시 저장품", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session,
+        code="IU-DRAFT",
+        department=DepartmentEnum.RESEARCH,
+    )
+    db_session.commit()
+    preview = _preview_internal_use(client, requester, item, to_department="연구")
+    assert preview.status_code == 200, preview.text
+    saved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert saved.status_code == 200, saved.text
+
+    requester.department = DepartmentEnum.ASSEMBLY.value
+    db_session.commit()
+    submitted = client.post(
+        f"/api/io/draft/{saved.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert submitted.status_code == 403, submitted.text
 
 
 def test_io_preview_receive_does_not_expand_bom(client, db_session, make_item, make_bom):

@@ -103,6 +103,29 @@ def test_summary_empty_db(client):
     }
 
 
+def test_internal_use_is_warehouse_kpi_with_destination_department(
+    client, db_session, make_item
+):
+    item = make_item(name="내부 사용 집계품", warehouse_qty=Decimal("0"))
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.INTERNAL_USE,
+        Decimal("-2"),
+        to_department="연구",
+        sub_type="internal_use_out",
+    )
+    db_session.commit()
+
+    summary = client.get(
+        "/api/inventory/transactions/summary",
+        params={"operation_keys": "internal_use"},
+    )
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["warehouse_count"] == 1
+    assert summary.json()["department_counts"] == {"연구": 1}
+
+
 def test_reference_summaries_use_all_matching_logs_and_exclude_operation_batches(
     client, db_session, make_item
 ):

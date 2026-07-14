@@ -487,8 +487,10 @@ function getFlowPresentation(
 }
 
 function getStockPresentation(log: TransactionLog): HistoryStockPresentation | null {
-  const before = log.quantity_before;
-  const after = log.quantity_after;
+  const hasWarehouseSnapshot = log.transaction_type === "INTERNAL_USE"
+    && (log.warehouse_qty_before != null || log.warehouse_qty_after != null);
+  const before = hasWarehouseSnapshot ? log.warehouse_qty_before : log.quantity_before;
+  const after = hasWarehouseSnapshot ? log.warehouse_qty_after : log.quantity_after;
   if (before == null && after == null) return null;
 
   const unit = log.item_unit?.trim() ?? "";
@@ -517,6 +519,7 @@ function getStockScopeLabel(log: TransactionLog): string {
     case "TRANSFER_TO_PROD":
     case "SHIP":
     case "RECEIVE":
+    case "INTERNAL_USE":
       return "창고";
     case "BACKFLUSH": {
       const location = log.inventory_effect

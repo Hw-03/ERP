@@ -39,6 +39,30 @@ def test_route_dept_to_warehouse(make_item):
     assert route == ("move", "production", "조립", "warehouse", None)
 
 
+def test_route_internal_use_out_from_warehouse(make_item):
+    route = iop._route_for_sub_type(
+        "internal_use_out",
+        item=make_item(),
+        from_department=None,
+        to_department="AS",
+    )
+    assert route == ("out", "warehouse", None, "none", "AS")
+
+
+def test_preview_internal_use_requires_warehouse_approval(db_session, make_item):
+    item = make_item()
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[_target(item.item_id)],
+        to_department="AS",
+    )
+
+    assert result["requires_approval"] is True
+
+
 def test_route_defect_quarantine_warehouse_source(make_item):
     route = iop._route_for_sub_type("defect_quarantine", item=make_item(),
                                     from_department="창고", to_department=None)
@@ -63,6 +87,23 @@ def test_preview_invalid_work_type(db_session, make_item):
     with pytest.raises(ValueError):
         iop.preview(db_session, work_type="bogus", sub_type="receive_supplier",
                     targets=[_target(make_item().item_id)])
+
+
+@pytest.mark.parametrize(
+    ("work_type", "sub_type"),
+    [("internal_use", "receive_supplier"), ("receive", "internal_use_out")],
+)
+def test_preview_rejects_internal_use_work_sub_type_mismatch(
+    db_session, make_item, work_type, sub_type
+):
+    with pytest.raises(ValueError, match="internal_use"):
+        iop.preview(
+            db_session,
+            work_type=work_type,
+            sub_type=sub_type,
+            to_department="AS",
+            targets=[_target(make_item().item_id)],
+        )
 
 
 def test_preview_receive_single_line(db_session, make_item):

@@ -2,7 +2,7 @@
 
 DB 의 `TransactionLog` 가 source-of-truth 이고, 이 모듈은 그 미러를 디스크에 떨군다.
 - 자재 이동 거래(RECEIVE/SHIP/TRANSFER_*/ADJUST/SUPPLIER_RETURN/
-  MARK_DEFECTIVE/DISASSEMBLE) 만 기록한다. 생산 내부 소비(PRODUCE/BACKFLUSH)는 제외.
+  MARK_DEFECTIVE/DISASSEMBLE/INTERNAL_USE) 만 기록한다. 생산 내부 소비(PRODUCE/BACKFLUSH)는 제외.
 - 월별 CSV (`inout_YYYY-MM.csv`) 에 거래 1건 = 1줄로 append.
 - `created_at` 기준으로 파일이 결정되므로 월말 자정 경계도 자연스럽게 분기된다.
 - 트랜잭션이 commit 된 직후에만 append (롤백된 거래는 남지 않는다). 파일 IO 실패는
@@ -40,6 +40,7 @@ AUDIT_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
     TransactionTypeEnum.SUPPLIER_RETURN,
     TransactionTypeEnum.MARK_DEFECTIVE,
     TransactionTypeEnum.DISASSEMBLE,
+    TransactionTypeEnum.INTERNAL_USE,
 })
 
 
@@ -55,6 +56,7 @@ TX_TYPE_LABEL_KO: dict[str, str] = {
     "SUPPLIER_RETURN": "공급사 반품",
     "MARK_DEFECTIVE": "불량 처리",
     "DISASSEMBLE": "분해",
+    "INTERNAL_USE": "AS·연구 사용출고",
 }
 
 
@@ -117,9 +119,15 @@ def row_from_log(
     emp_code = ""
     if log.producer_employee_id is not None and emp_code_by_id:
         emp_code = emp_code_by_id.get(log.producer_employee_id, "") or ""
+    tx_label = TX_TYPE_LABEL_KO.get(tx_value, tx_value)
+    if tx_value == TransactionTypeEnum.INTERNAL_USE.value:
+        tx_label = {
+            "AS": "AS 반출",
+            "연구": "연구소 반출",
+        }.get(log.department, "AS·연구 사용출고")
     return [
         log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
-        TX_TYPE_LABEL_KO.get(tx_value, tx_value),
+        tx_label,
         mes_code,
         item_name,
         _fmt_num(log.quantity_change),

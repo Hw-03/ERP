@@ -6,12 +6,12 @@ import {
 } from "../mes/transaction";
 
 describe("mes/transaction barrel", () => {
-  it("re-exports TRANSACTION_META with 13 keys", () => {
+  it("re-exports TRANSACTION_META with 14 keys", () => {
     const required = [
       "RECEIVE", "PRODUCE", "SHIP", "ADJUST", "BACKFLUSH",
       "DISASSEMBLE",
       "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
-      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN",
+      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN", "INTERNAL_USE",
     ];
     expect(Object.keys(TRANSACTION_META).sort()).toEqual(required.sort());
   });

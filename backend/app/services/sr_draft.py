@@ -25,6 +25,7 @@ from app.services.sr_validation import (
     _preflight_inventory_check,
     _preflight_defective_check,
     line_requires_approval,
+    validate_request_entrypoint,
 )
 
 
@@ -49,6 +50,11 @@ def upsert_draft_request(
     - lines_input 이 비어 있지 않으면 1차 shape 검증 통과 필수.
     - 기존 DRAFT 가 있으면 lines 전체 교체 + notes/reference_no 갱신, 신규 row 생성 금지.
     """
+    validate_request_entrypoint(
+        requester,
+        request_type,
+        allow_internal_use=False,
+    )
     _validate_lines(request_type, lines_input, allow_empty=True)
 
     existing = (
@@ -208,6 +214,11 @@ def submit_draft_request(
     if not bool(requester.is_active):
         raise ValueError("비활성 직원의 장바구니는 제출할 수 없습니다.")
 
+    validate_request_entrypoint(
+        requester,
+        request.request_type,
+        allow_internal_use=False,
+    )
     db_lines = list(request.lines)
     if not db_lines:
         raise ValueError("요청 라인이 비어 있습니다.")

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.repositories import item_repository
 from app.models import (
     DepartmentEnum,
+    Employee,
     InventoryLocation,
     Item,
     LocationStatusEnum,
@@ -36,6 +37,7 @@ _TX_TYPE_BY_REQUEST: dict[StockRequestTypeEnum, TransactionTypeEnum] = {
     StockRequestTypeEnum.MARK_DEFECTIVE_PROD: TransactionTypeEnum.MARK_DEFECTIVE,
     StockRequestTypeEnum.SUPPLIER_RETURN: TransactionTypeEnum.SUPPLIER_RETURN,
     StockRequestTypeEnum.PACKAGE_OUT: TransactionTypeEnum.SHIP,
+    StockRequestTypeEnum.INTERNAL_USE: TransactionTypeEnum.INTERNAL_USE,
     # 불량 처리 흐름 — 결재 필요 액션 (세부 로그는 서비스 함수가 직접 생성)
     StockRequestTypeEnum.DEFECT_SCRAP: TransactionTypeEnum.DEFECT_SCRAP,
     StockRequestTypeEnum.DEFECT_RETURN: TransactionTypeEnum.SUPPLIER_RETURN,
@@ -71,6 +73,34 @@ def line_requires_pending(from_bucket: RequestBucketEnum, to_bucket: RequestBuck
 
 def request_requires_approval(lines: Sequence[StockRequestLine]) -> bool:
     return any(line_requires_approval(line.from_bucket, line.to_bucket) for line in lines)
+
+
+def validate_requester_for_request_type(
+    requester: Employee,
+    request_type: StockRequestTypeEnum,
+) -> None:
+    """사내 사용출고 요청은 AS·연구 또는 창고 정/부만 만들 수 있다."""
+    if request_type != StockRequestTypeEnum.INTERNAL_USE:
+        return
+    department = getattr(requester.department, "value", requester.department)
+    warehouse_role = (requester.warehouse_role or "none").lower()
+    if department not in {
+        DepartmentEnum.AS.value,
+        DepartmentEnum.RESEARCH.value,
+    } and warehouse_role not in {"primary", "deputy"}:
+        raise PermissionError("AS·연구 또는 창고 정/부만 사용출고를 요청할 수 있습니다.")
+
+
+def validate_request_entrypoint(
+    requester: Employee,
+    request_type: StockRequestTypeEnum,
+    *,
+    allow_internal_use: bool,
+) -> None:
+    """INTERNAL_USE는 IoBatch를 보장하는 입출고 경로에서만 생성한다."""
+    validate_requester_for_request_type(requester, request_type)
+    if request_type == StockRequestTypeEnum.INTERNAL_USE and not allow_internal_use:
+        raise ValueError("AS·연구 사용출고는 입출고 작업에서만 요청할 수 있습니다.")
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +212,12 @@ _ALLOWED_SHAPES: dict[StockRequestTypeEnum, dict] = {
         "from_dept_required": False,
         "to_dept_required": False,
     },
+    StockRequestTypeEnum.INTERNAL_USE: {
+        "from_bucket": RequestBucketEnum.WAREHOUSE,
+        "to_bucket": RequestBucketEnum.NONE,
+        "from_dept_required": False,
+        "to_dept_required": True,
+    },
     # 낱개(manual/adjust) 라인 — 어떤 bucket/dept 조합이든 허용 (요청 유형 다양).
     # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
     StockRequestTypeEnum.MANUAL_ADJUSTMENT: None,  # 검증 건너뜀
@@ -250,6 +286,13 @@ def validate_line_shape_for_request_type(
     if request_type == StockRequestTypeEnum.DEPT_INTERNAL:
         if line.from_department == line.to_department:
             raise ValueError("부서 내부 이동의 출발/도착 부서가 동일합니다.")
+    if request_type == StockRequestTypeEnum.INTERNAL_USE:
+        destination = getattr(line.to_department, "value", line.to_department)
+        if destination not in {
+            DepartmentEnum.AS.value,
+            DepartmentEnum.RESEARCH.value,
+        }:
+            raise ValueError("사용출고 대상 부서는 AS 또는 연구만 허용합니다.")
 
 
 # ---------------------------------------------------------------------------

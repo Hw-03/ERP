@@ -62,6 +62,7 @@ _REQUEST_TYPE_LABEL: dict[str, str] = {
     "supplier_return": "원자재 반품",
     "package_out": "출하",
     "manual_adjustment": "수동 조정",
+    "internal_use": "AS·연구 사용출고",
     "defect_scrap": "불량 처리",
     "defect_return": "원자재 반품",
     "defect_disassemble": "불량 분해",

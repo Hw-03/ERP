@@ -13,10 +13,11 @@ export const IO_STEP_LABELS: Record<IoStep, string> = {
 };
 
 export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?: string | null) {
+  const defaultDepartment = initialDepartment || "조립";
   const [workType, setWorkTypeBase] = useState<IoWorkType>(initialWorkType ?? "receive");
   const [subType, setSubType] = useState<IoSubType>("receive_supplier");
-  const [fromDepartment, setFromDepartment] = useState<string>(initialDepartment || "조립");
-  const [toDepartment, setToDepartment] = useState<string>(initialDepartment || "조립");
+  const [fromDepartment, setFromDepartment] = useState<string>(defaultDepartment);
+  const [toDepartment, setToDepartment] = useState<string>(defaultDepartment);
   const [bundles, setBundles] = useState<IoBundle[]>([]);
   const [notes, setNotes] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
@@ -27,6 +28,7 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   function setWorkType(next: IoWorkType) {
     setWorkTypeBase(next);
     setSubType(DEFAULT_SUB_TYPE[next]);
+    setToDepartment(next === "internal_use" ? "" : defaultDepartment);
     setDeptIoDirectionBase(null);
     setBundles([]);
     setStep(1);
@@ -58,12 +60,16 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
     return {
       1: true,
-      2: workType !== "process" || deptIoDirection != null,
+      2: workType === "process"
+        ? deptIoDirection != null
+        : workType === "internal_use"
+          ? toDepartment === "AS" || toDepartment === "연구"
+          : true,
       3: bundles.length > 0,
       4: includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
       5: true,
     };
-  }, [workType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity]);
+  }, [workType, deptIoDirection, toDepartment, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));

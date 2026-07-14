@@ -26,6 +26,7 @@ export const WORK_TYPE_LABEL: Record<IoWorkType, string> = {
   warehouse_io: "창고 입출고",
   process: "부서 입출고",
   defect: "불량",
+  internal_use: "AS·연구 사용출고",
 };
 
 export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
@@ -33,6 +34,7 @@ export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
   warehouse_io: "창고↔부서",
   process: "부서 내 작업",
   defect: "불량 재고 격리",
+  internal_use: "창고 재고를 AS·연구 용도로 반출",
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -54,6 +56,7 @@ export const SUB_TYPE_LABEL: Record<IoSubType, string> = {
   defect_restore: "불량 해제",
   defect_process: "불량 처리",
   supplier_return: "원자재 반품",
+  internal_use_out: "AS·연구 사용출고",
 };
 
 export const SUB_TYPE_DESCRIPTION: Record<IoSubType, string> = {
@@ -69,6 +72,7 @@ export const SUB_TYPE_DESCRIPTION: Record<IoSubType, string> = {
   defect_restore: "격리 재고를 정상 복귀 (즉시)",
   defect_process: "격리 재고 폐기·재작업",
   supplier_return: "격리 재고를 공급처에 반품",
+  internal_use_out: "창고 재고를 AS 또는 연구 용도로 반출",
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -92,6 +96,7 @@ export const TRANSACTION_TYPE_LABEL: Record<TransactionType, string> = {
   UNMARK_DEFECTIVE: "불량 해제",
   DEFECT_SCRAP: "불량 처리", // ⚠️ 이전 "폐기" — sub_type defect_process 와 통일
   SUPPLIER_RETURN: "원자재 반품",
+  INTERNAL_USE: "사용출고",
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -107,6 +112,7 @@ export const REQUEST_TYPE_LABEL: Record<string, string> = {
   mark_defective_wh: "창고 불량 등록",
   mark_defective_prod: "생산 불량 등록",
   supplier_return: "원자재 반품",
+  internal_use: "AS·연구 사용출고",
   manual_adjustment: "수동 조정",
   package_out: "출하",
   defect_scrap: "불량 처리",

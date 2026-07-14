@@ -82,6 +82,7 @@ export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
   UNMARK_DEFECTIVE: { label: _TX_LABEL.UNMARK_DEFECTIVE, tone: "success" },
   DEFECT_SCRAP: { label: _TX_LABEL.DEFECT_SCRAP, tone: "danger" },
   SUPPLIER_RETURN: { label: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
+  INTERNAL_USE: { label: _TX_LABEL.INTERNAL_USE, tone: "danger" },
 };
 
 /**
@@ -144,6 +145,7 @@ export function transactionColor(type: TransactionType | string): string {
     case "MARK_DEFECTIVE":
     case "DEFECT_SCRAP":
     case "SUPPLIER_RETURN":
+    case "INTERNAL_USE":
       return LEGACY_COLORS.red;
     case "TRANSFER_TO_PROD":
     case "TRANSFER_TO_WH":
@@ -182,6 +184,8 @@ export function transactionIconName(type: TransactionType | string): Transaction
       return "Trash2";
     case "SUPPLIER_RETURN":
       return "PackageX";
+    case "INTERNAL_USE":
+      return "ArrowUpFromLine";
     default:
       return "Activity";
   }

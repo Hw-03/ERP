@@ -22,7 +22,8 @@ export type HistoryOperationKey =
   | "dept_transfer"
   | "adjust"
   | "defect"
-  | "supplier_return";
+  | "supplier_return"
+  | "internal_use";
 
 export type OperationOption = { value: HistoryOperationKey; label: string };
 
@@ -40,6 +41,7 @@ export const OPERATION_OPTIONS: OperationOption[] = [
   { value: "adjust", label: "수량 조정" },
   { value: "defect", label: "불량 처리" },
   { value: "supplier_return", label: "원자재 반품" },
+  { value: "internal_use", label: "AS·연구 반출" },
 ];
 
 export const DATE_OPTIONS = [

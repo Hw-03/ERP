@@ -4,6 +4,7 @@ import uuid
 from decimal import Decimal
 from typing import Any, Callable
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -26,12 +27,19 @@ def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
     }
 
 
-def _employee(db_session, *, code: str, name: str, is_active: bool = True) -> Employee:
+def _employee(
+    db_session,
+    *,
+    code: str,
+    name: str,
+    is_active: bool = True,
+    department: DepartmentEnum = DepartmentEnum.ASSEMBLY,
+) -> Employee:
     employee = Employee(
         employee_code=code,
         name=name,
         role="worker",
-        department=DepartmentEnum.ASSEMBLY.value,
+        department=department.value,
         level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active=is_active,
@@ -158,6 +166,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
         db_session,
         code="shipping-request-workflow-actor",
         name="출하 워크플로 실행자",
+        department=DepartmentEnum.SHIPPING,
     )
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
@@ -201,7 +210,11 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     preview = client.get(
         f"/api/shipping/requests/{request_id}/component-change-preview",
-        params={"source_pa_item_id": str(base_pa.item_id), "quantity": 2},
+        params={
+            "requester_employee_id": str(component_change_actor.employee_id),
+            "source_pa_item_id": str(base_pa.item_id),
+            "quantity": 2,
+        },
     )
     assert preview.status_code == 200, preview.text
     pouch_line = [line for line in preview.json()["lines"] if line["item_name"] == "Pouch"][0]
@@ -453,8 +466,19 @@ def test_shipping_request_update_can_reuse_its_generated_pa_pf_names(client, db_
     }
 
 
-def test_component_change_api_runs_without_shipping_request(client, db_session, make_item, make_bom, make_location):
-    requester = _employee(db_session, code="shipping-component-actor", name="출하 전환 요청자")
+@pytest.mark.parametrize(
+    "department",
+    [DepartmentEnum.ASSEMBLY, DepartmentEnum.SHIPPING],
+)
+def test_component_change_api_runs_without_shipping_request(
+    client, db_session, make_item, make_bom, make_location, department
+):
+    requester = _employee(
+        db_session,
+        code=f"shipping-component-actor-{department.name.lower()}",
+        name="출하 전환 요청자",
+        department=department,
+    )
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     cable = make_item(name="Cable", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -469,6 +493,7 @@ def test_component_change_api_runs_without_shipping_request(client, db_session, 
     preview = client.get(
         "/api/shipping/component-change-preview",
         params={
+            "requester_employee_id": str(requester.employee_id),
             "source_pa_item_id": str(source_pa.item_id),
             "target_pa_item_id": str(target_pa.item_id),
             "quantity": 2,
@@ -507,6 +532,97 @@ def test_component_change_api_runs_without_shipping_request(client, db_session, 
     assert {log["produced_by"] for log in done["transactions"]} == {requester.name}
     logs = db_session.query(TransactionLog).filter(TransactionLog.reference_no == done["reference_no"]).all()
     assert {log.producer_employee_id for log in logs} == {requester.employee_id}
+
+
+def test_component_change_api_rejects_other_department_preview_and_execute(
+    client, db_session, make_item, make_bom, make_location
+):
+    requester = _employee(
+        db_session,
+        code="shipping-component-as",
+        name="AS 전환 시도자",
+        department=DepartmentEnum.AS,
+    )
+    payload = _component_change_payload(db_session, make_item, make_bom, make_location)
+
+    preview = client.get(
+        "/api/shipping/component-change-preview",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "source_pa_item_id": payload["source_pa_item_id"],
+            "target_pa_item_id": payload["target_pa_item_id"],
+            "quantity": payload["quantity"],
+        },
+    )
+    assert preview.status_code == 403, preview.text
+
+    executed = client.post(
+        "/api/shipping/component-change",
+        headers={"X-MES-Employee-Code": requester.employee_code},
+        json=payload,
+    )
+    assert executed.status_code == 403, executed.text
+
+
+def test_shipping_request_component_change_rejects_other_department_preview_and_execute(
+    client, db_session, make_item, make_bom, make_location
+):
+    requester = _employee(
+        db_session,
+        code="shipping-request-component-as",
+        name="AS 요청 전환 시도자",
+        department=DepartmentEnum.AS,
+    )
+    request_id, payload = _prepared_shipping_component_change(
+        client,
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+
+    preview = client.get(
+        f"/api/shipping/requests/{request_id}/component-change-preview",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "source_pa_item_id": payload["source_pa_item_id"],
+            "quantity": payload["quantity"],
+        },
+    )
+    assert preview.status_code == 403, preview.text
+
+    executed = client.post(
+        f"/api/shipping/requests/{request_id}/component-change",
+        headers={"X-MES-Employee-Code": requester.employee_code},
+        json=payload,
+    )
+    assert executed.status_code == 403, executed.text
+
+
+@pytest.mark.parametrize(
+    ("path", "params"),
+    [
+        (
+            "/api/shipping/component-change-preview",
+            {
+                "source_pa_item_id": str(uuid.uuid4()),
+                "target_pa_item_id": str(uuid.uuid4()),
+                "quantity": 1,
+            },
+        ),
+        (
+            f"/api/shipping/requests/{uuid.uuid4()}/component-change-preview",
+            {"source_pa_item_id": str(uuid.uuid4()), "quantity": 1},
+        ),
+    ],
+)
+def test_component_change_preview_requires_requester_employee_id(client, path, params):
+    response = client.get(path, params=params)
+
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert isinstance(detail, list)
+    assert any(row["loc"][-1] == "requester_employee_id" for row in detail)
 
 
 def test_component_change_api_requires_employee_header(client, db_session, make_item, make_bom, make_location):
@@ -580,6 +696,7 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
     spec_preview = client.get(
         "/api/io/item-conversion-preview",
         params={
+            "requester_employee_id": str(requester.employee_id),
             "source_item_id": str(source_af.item_id),
             "target_item_id": str(target_af.item_id),
             "quantity": 2,
@@ -624,6 +741,7 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
     bom_preview = client.get(
         "/api/io/item-conversion-preview",
         params={
+            "requester_employee_id": str(requester.employee_id),
             "source_item_id": str(source_pa.item_id),
             "target_item_id": str(target_pa.item_id),
             "quantity": 1,
@@ -665,6 +783,7 @@ def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
     spec_preview = client.get(
         "/api/io/item-conversion-preview",
         params={
+            "requester_employee_id": str(requester.employee_id),
             "source_item_id": str(source_af.item_id),
             "target_item_id": str(target_af.item_id),
             "quantity": 1,
@@ -677,6 +796,7 @@ def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
     bom_preview = client.get(
         "/api/io/item-conversion-preview",
         params={
+            "requester_employee_id": str(requester.employee_id),
             "source_item_id": str(source_pa.item_id),
             "target_item_id": str(target_pa.item_id),
             "quantity": 1,
@@ -717,6 +837,20 @@ def test_item_conversion_api_requires_requester_employee_id(client):
     assert isinstance(detail, list)
     assert any(error["loc"][-1] == "requester_employee_id" for error in detail)
 
+    preview = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "source_item_id": str(uuid.uuid4()),
+            "target_item_id": str(uuid.uuid4()),
+            "quantity": 1,
+        },
+    )
+    assert preview.status_code == 422, preview.text
+    assert any(
+        error["loc"][-1] == "requester_employee_id"
+        for error in preview.json()["detail"]
+    )
+
 
 def test_item_conversion_api_returns_404_for_unknown_requester(client):
     response = client.post(
@@ -754,6 +888,71 @@ def test_item_conversion_api_returns_403_for_inactive_requester(client, db_sessi
 
     assert response.status_code == 403, response.text
     assert response.json()["detail"]["code"] == "FORBIDDEN"
+
+
+def test_item_conversion_api_allows_only_assembly_or_shipping_department(
+    client, db_session
+):
+    requester = _employee(
+        db_session,
+        code="item-conversion-as",
+        name="AS 전환 요청자",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+    params = {
+        "requester_employee_id": str(requester.employee_id),
+        "source_item_id": str(uuid.uuid4()),
+        "target_item_id": str(uuid.uuid4()),
+        "quantity": 1,
+    }
+
+    preview = client.get("/api/io/item-conversion-preview", params=params)
+    assert preview.status_code == 403, preview.text
+    executed = client.post(
+        "/api/io/item-conversion",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "source_item_id": params["source_item_id"],
+            "target_item_id": params["target_item_id"],
+            "quantity": 1,
+        },
+    )
+    assert executed.status_code == 403, executed.text
+
+
+def test_item_conversion_shipping_department_can_preview_and_execute(
+    client, db_session, make_item, make_bom, make_location
+):
+    requester = _employee(
+        db_session,
+        code="item-conversion-shipping",
+        name="출하 전환 요청자",
+        department=DepartmentEnum.SHIPPING,
+    )
+    payload = _component_change_payload(db_session, make_item, make_bom, make_location)
+    preview = client.get(
+        "/api/io/item-conversion-preview",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "source_item_id": payload["source_pa_item_id"],
+            "target_item_id": payload["target_pa_item_id"],
+            "quantity": payload["quantity"],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+
+    executed = client.post(
+        "/api/io/item-conversion",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "source_item_id": payload["source_pa_item_id"],
+            "target_item_id": payload["target_pa_item_id"],
+            "quantity": payload["quantity"],
+            "memo": payload["memo"],
+        },
+    )
+    assert executed.status_code == 200, executed.text
 
 
 def test_item_conversion_api_attributes_every_log_to_requester(
@@ -816,6 +1015,7 @@ def test_item_conversion_api_attributes_every_log_to_requester(
 def test_item_conversion_api_blocks_wrong_level_and_spec_with_bom_difference(
     client, db_session, make_item, make_bom, make_location
 ):
+    requester = _employee(db_session, code="item-conversion-block", name="차단 검증자")
     leaf_a = make_item(name="Leaf A", process_type_code="TR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
     leaf_b = make_item(name="Leaf B", process_type_code="TR", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=2)
     source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -830,6 +1030,7 @@ def test_item_conversion_api_blocks_wrong_level_and_spec_with_bom_difference(
     wrong_level = client.get(
         "/api/io/item-conversion-preview",
         params={
+            "requester_employee_id": str(requester.employee_id),
             "source_item_id": str(source_pa.item_id),
             "target_item_id": str(source_af.item_id),
             "quantity": 1,
@@ -841,6 +1042,7 @@ def test_item_conversion_api_blocks_wrong_level_and_spec_with_bom_difference(
     spec_with_diff = client.get(
         "/api/io/item-conversion-preview",
         params={
+            "requester_employee_id": str(requester.employee_id),
             "source_item_id": str(source_pa.item_id),
             "target_item_id": str(target_pa.item_id),
             "quantity": 1,

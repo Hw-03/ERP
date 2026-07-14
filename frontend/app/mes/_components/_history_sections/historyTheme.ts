@@ -12,6 +12,7 @@ export function rowTint(type: string): string {
       return "rgba(67,211,157,.05)";
     case "SHIP":
     case "BACKFLUSH":
+    case "INTERNAL_USE":
       return "rgba(255,123,123,.05)";
     case "ADJUST":
       return "rgba(101,169,255,.05)";
