@@ -1160,8 +1160,9 @@ describe("DesktopShippingView", () => {
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
     const actionBar = screen.getByTestId("shipping-wizard-action-bar");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_488px]");
-    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[488px]", "shrink-0");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_minmax(0,1fr)]");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-full", "min-h-0");
+    expect(screen.getByTestId("shipping-final-requirements")).not.toHaveClass("h-[364px]");
     expect(finalSummary).not.toHaveTextContent("요청 정보");
     expect(actionBar).toContainElement(screen.getByTestId("shipping-final-request-summary"));
     expect(screen.getByTestId("shipping-final-request-summary")).toHaveClass("md:grid-cols-[minmax(112px,0.45fr)_minmax(0,1fr)]");
@@ -1321,7 +1322,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
   });
 
-  it("shows one row of changed BOM items and gives remaining height to the final BOM review", async () => {
+  it("keeps final BOM and changed-item panels at 364px with independent scrolling", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1338,11 +1339,11 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_minmax(0,1fr)_auto]", "overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-full", "min-h-0");
-    expect(screen.getByTestId("shipping-final-requirements")).not.toHaveClass("h-[328px]");
-    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[112px]", "shrink-0", "self-end");
-    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("h-[62px]", "overflow-y-auto");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_364px_364px]", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[364px]", "shrink-0");
+    expect(screen.getByTestId("shipping-final-requirements-list")).toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[364px]", "shrink-0");
+    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
     expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("rounded-[12px]", "border", "px-3", "py-2");
   });
 
