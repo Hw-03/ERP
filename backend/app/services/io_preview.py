@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import Optional, Sequence
+from typing import Iterable, Optional, Sequence
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -214,6 +214,14 @@ def _route_for_sub_type(
 
 # source_kind == "manual" 은 BOM 전개를 건너뛰고 낱개 라인으로 처리한다.
 MANUAL_SOURCE_KIND = "manual"
+
+
+def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> None:
+    """낱개 증가는 생산이 아닌 수량보정으로만 기록되도록 강제한다."""
+    if sub_type == "produce" and MANUAL_SOURCE_KIND in source_kinds:
+        raise ValueError("낱개 품목 입고는 생산이 아니라 수량보정 입고로 처리하세요.")
+
+
 # BOM 전개 대상 세부 작업 — 결과/부품을 함께 펼친다.
 EXPAND_SUB_TYPES = frozenset(
     {"warehouse_to_dept", "dept_to_warehouse", "dept_transfer", "produce", "disassemble"}
@@ -490,6 +498,10 @@ def preview(
 ) -> dict:
     if work_type not in WORK_TYPES:
         raise ValueError(f"지원하지 않는 작업 유형입니다: {work_type}")
+    validate_operation_sources(
+        sub_type,
+        (getattr(target, "source_kind", "direct_item") for target in targets),
+    )
     bundles: list[dict] = []
     for target in targets:
         source_kind = getattr(target, "source_kind", "direct_item")

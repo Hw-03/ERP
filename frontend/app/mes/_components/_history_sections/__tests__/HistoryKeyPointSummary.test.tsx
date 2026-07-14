@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { InventoryEffectRow } from "../historyInventoryEffect";
 import type { HistoryDetailSummary } from "../historyDetailSummary";
 import { HistoryKeyPointSummary } from "../HistoryKeyPointSummary";
@@ -139,5 +139,47 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.getByText((_, element) => (
       element?.textContent === "R-001 · 조립 생산 · BOM 4 EA"
     ))).toBeInTheDocument();
+  });
+
+  it("keeps partial impacts hidden while the complete scope is loading or failed", () => {
+    const onRetryImpact = vi.fn();
+    const { rerender } = render(
+      <HistoryKeyPointSummary
+        summary={summary({ impactGroups: [] })}
+        impactStatus="loading"
+      />,
+    );
+
+    expect(screen.getByText("실제 영향 불러오는 중")).toBeInTheDocument();
+
+    rerender(
+      <HistoryKeyPointSummary
+        summary={summary({ impactGroups: [] })}
+        impactStatus="error"
+        onRetryImpact={onRetryImpact}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "실제 영향 다시 불러오기" }));
+    expect(onRetryImpact).toHaveBeenCalledOnce();
+  });
+
+  it("makes a BOM-backed actual impact focusable from the summary", () => {
+    const onImpactClick = vi.fn();
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          impactGroups: [{
+            key: "actual",
+            label: null,
+            effects: [effect({ role: "부품", delta: -2, deltaLabel: "-2" })],
+          }],
+        })}
+        onImpactClick={onImpactClick}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /완제품 A.*-2 EA/ }));
+    expect(onImpactClick).toHaveBeenCalledWith(expect.objectContaining({ itemId: "item-finished" }));
   });
 });

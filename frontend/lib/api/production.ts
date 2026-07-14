@@ -27,6 +27,15 @@ export interface TransactionSummary {
   departmentCounts: Record<string, number>;
 }
 
+export interface TransactionReferenceSummary {
+  referenceNo: string;
+  shippingPhase: string | null;
+  logCount: number;
+  itemCount: number;
+  totalQuantity: number;
+  unit: string | null;
+}
+
 export const productionApi = {
   productionReceipt: (payload: {
     item_id: string;
@@ -137,6 +146,52 @@ export const productionApi = {
       adjustCount: res.adjust_count,
       departmentCounts: res.department_counts ?? {},
     }));
+  },
+
+  /** 페이지네이션과 무관한 참조번호 묶음별 전체 요약. */
+  getTransactionReferenceSummaries: (
+    params?: {
+      transactionTypes?: string;
+      operationKeys?: string;
+      search?: string;
+      department?: string;
+      model?: string;
+      processStep?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      includeArchived?: boolean;
+    },
+    opts?: { signal?: AbortSignal },
+  ): Promise<TransactionReferenceSummary[]> => {
+    const query = new URLSearchParams();
+    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
+    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
+    if (params?.search) query.set("search", params.search);
+    if (params?.department) query.set("department", params.department);
+    if (params?.model) query.set("model", params.model);
+    if (params?.processStep) query.set("process_step", params.processStep);
+    if (params?.dateFrom) query.set("date_from", params.dateFrom);
+    if (params?.dateTo) query.set("date_to", params.dateTo);
+    if (params?.includeArchived) query.set("include_archived", "true");
+    const qs = query.toString();
+    return fetcher<Array<{
+      reference_no: string;
+      shipping_phase: string | null;
+      log_count: number;
+      item_count: number;
+      total_quantity: number;
+      unit: string | null;
+    }>>(
+      toApiUrl(`/api/inventory/transactions/reference-summaries${qs ? `?${qs}` : ""}`),
+      opts?.signal,
+    ).then((rows) => rows.map((row) => ({
+      referenceNo: row.reference_no,
+      shippingPhase: row.shipping_phase,
+      logCount: row.log_count,
+      itemCount: row.item_count,
+      totalQuantity: row.total_quantity,
+      unit: row.unit,
+    })));
   },
 
   /** 거래 메타데이터(notes/reference_no/produced_by) 수정. reason + PIN 필수. */

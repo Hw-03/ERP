@@ -438,7 +438,7 @@ function ItemTable({
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
   const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
-  const singleTarget = bomTarget;
+  const singleTarget = isProcess ? deptIoSubType(deptIoDirection!, "single") : null;
   return (
     <>
       <table className="w-full border-collapse text-sm">

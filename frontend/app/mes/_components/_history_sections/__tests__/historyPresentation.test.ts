@@ -120,6 +120,23 @@ describe("formatDefectReason", () => {
   });
 });
 describe("historyPresentation", () => {
+  it("uses the complete reference summary instead of the loaded page subset", () => {
+    const presentation = Reflect.apply(getReferenceBatchPresentation, undefined, [
+      [makeLog({ transaction_type: "SHIP", reference_no: "REF-ALL", quantity_change: -1, transfer_qty: 1 })],
+      {
+        referenceNo: "REF-ALL",
+        shippingPhase: null,
+        logCount: 62,
+        itemCount: 20,
+        totalQuantity: 108,
+        unit: "EA",
+      },
+    ]);
+
+    expect(presentation.targetTitle).toBe("출고 구성 62건");
+    expect(presentation.movement.parts[0]?.label).toBe("출고 20품목 · 108 EA");
+  });
+
   it("summarizes a production BOM batch as one field operation", () => {
     const parent = makeLine({ line_id: "parent", origin: "direct", quantity: 2 });
     const child = makeLine({

@@ -210,6 +210,38 @@ describe("desktop history detail panels", () => {
     expect(await screen.findByRole("button", { name: "이 내역 취소" })).toBeInTheDocument();
   });
 
+  it("uses the complete reference scope for a single-log desktop actual impact", async () => {
+    const selected = makeLog({
+      log_id: "conversion-output",
+      reference_no: "conversion-1",
+      operation_batch_id: null,
+      quantity_change: 1,
+    });
+    const component = makeLog({
+      log_id: "conversion-component",
+      reference_no: "conversion-1",
+      operation_batch_id: null,
+      item_id: "conversion-component",
+      item_name: "scope-component",
+      quantity_change: -2,
+      inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -2 }],
+    });
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected, component]);
+
+    render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={selected}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    expect(await screen.findByText("scope-component")).toBeInTheDocument();
+    expect(screen.getByText("-2 EA")).toBeInTheDocument();
+  });
+
   it("shows the cancellation target count and inventory effects only after confirmation opens", () => {
     render(
       <HistoryDetailPanel
@@ -227,7 +259,7 @@ describe("desktop history detail panels", () => {
     expect(screen.getAllByText("조립 생산")).toHaveLength(2);
   });
 
-  it("uses the shared summary, keeps composition closed, and puts batch cancel last", async () => {
+  it("uses the shared summary without a duplicate desktop composition card", async () => {
     const output = makeLog({ operation_batch_id: "batch-1" });
     const component = makeLog({
       log_id: "component",
@@ -242,6 +274,8 @@ describe("desktop history detail panels", () => {
       ],
     });
     const batch = makeBatch();
+    batch.bundles[0].lines[1].item_id = "component-a";
+    const onFocusLineInList = vi.fn();
     vi.mocked(productionApi.getTransactions).mockResolvedValue([output, component]);
     render(
       <HistoryBatchDetailPanel
@@ -251,24 +285,19 @@ describe("desktop history detail panels", () => {
         batchCache={new Map([["batch-1", batch]])}
         setBatchCache={() => {}}
         onBatchCancelled={() => {}}
+        onFocusLineInList={onFocusLineInList}
         variant="desktop"
       />,
     );
 
     expect(screen.getByTestId("history-key-point-summary")).toBeInTheDocument();
-    expect(screen.getByText("완제품")).toBeInTheDocument();
-    expect(screen.getByText("부품 A")).toBeInTheDocument();
-    const composition = screen.getByRole("button", { name: /구성/ });
-    expect(composition).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("구성 검산 라인")).not.toBeInTheDocument();
-
-    fireEvent.click(composition);
-    const compositionItemName = screen.getByText("구성 검산 라인");
-    expect(compositionItemName).toBeInTheDocument();
-    expect(compositionItemName.closest('[data-testid="composition-truncated-text"]')).toBeInTheDocument();
+    expect(await screen.findByText("완제품")).toBeInTheDocument();
+    expect(screen.getByText("구성 검산 라인")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /구성 검산 라인/ }));
+    expect(onFocusLineInList).toHaveBeenCalledWith({ groupKey: "batch-1", itemId: "component-a" });
 
     const cancel = await screen.findByRole("button", { name: "이 내역 취소" });
-    expect(composition.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("history-key-point-summary").compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("loads the complete operation batch before exposing cancellation effects", async () => {
@@ -308,13 +337,15 @@ describe("desktop history detail panels", () => {
       { operationBatchId: "batch-1", limit: 2000, skip: 0 },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+    expect(screen.getByText("실제 영향 불러오는 중")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
     expect(screen.getByText("취소 범위 확인 중...")).toBeInTheDocument();
 
     await act(async () => resolveScope([visible, hidden]));
+    expect(await screen.findByText("hidden-component")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
 
-    expect(screen.getByText("hidden-component")).toBeInTheDocument();
+    expect(screen.getAllByText("hidden-component")).toHaveLength(2);
   });
 
   it("blocks cancellation after a scope load failure and retries the whole group", async () => {
@@ -377,7 +408,7 @@ describe("desktop history detail panels", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getByText("reference-sibling")).toBeInTheDocument();
+    expect(screen.getAllByText("reference-sibling")).toHaveLength(2);
   });
 
   it("hides single cancellation when the fresh full scope is already cancelled", async () => {

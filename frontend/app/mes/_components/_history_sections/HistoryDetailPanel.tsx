@@ -63,13 +63,13 @@ export function HistoryDetailPanel({
   const [editsLoaded, setEditsLoaded] = useState(false);
   const [flow, setFlow] = useState<FlowState>({ status: "idle" });
   const cancelScope = selected ? getHistoryCancelScope(selected) : "single";
+  const canCancelAsBatch = cancelScope === "batch";
   const cancellationScope = useHistoryCancellationScopeLogs({
     panelOpen: panelOpen && selected !== null,
     identity: selected ? `log:${selected.log_id}` : "log:none",
     visibleLogs: selected ? [selected] : [],
-    operationBatchId: cancelScope === "batch" ? selected?.operation_batch_id : null,
-    referenceNo:
-      cancelScope === "batch" && !selected?.operation_batch_id ? selected?.reference_no : null,
+    operationBatchId: selected?.operation_batch_id ?? null,
+    referenceNo: selected?.operation_batch_id ? null : selected?.reference_no ?? null,
   });
 
   useEffect(() => {
@@ -142,18 +142,21 @@ export function HistoryDetailPanel({
 
   const editCount = selected.edit_count ?? edits.length;
   const batch = flow.status === "available" ? flow.batch : null;
-  const cancellationLogs = cancellationScope.status === "ready" ? cancellationScope.logs : [selected];
+  const cancellationScopeStatus: HistoryCancelScopeStatus = canCancelAsBatch
+    ? cancellationScope.status
+    : "ready";
+  const cancellationLogs = canCancelAsBatch && cancellationScope.status === "ready"
+    ? cancellationScope.logs
+    : [selected];
   const cancellationSummary = buildHistoryDetailSummary(cancellationLogs, batch);
   const visibleSummary = buildHistoryDetailSummary([selected], batch);
   const summary = cancellationScope.status === "ready"
-    ? { ...visibleSummary, status: cancellationSummary.status }
-    : visibleSummary;
-  const isCancelled = cancellationScope.status === "ready"
-    ? cancellationLogs.length > 0 && cancellationLogs.every((log) => log.cancelled)
-    : selected.cancelled;
+    ? buildHistoryDetailSummary(cancellationScope.logs, batch)
+    : { ...visibleSummary, impactGroups: [] };
+  const isCancelled = cancellationLogs.length > 0 && cancellationLogs.every((log) => log.cancelled);
   const cancelReason = cancellationLogs.find((log) => log.cancel_reason?.trim())?.cancel_reason
     ?? selected.cancel_reason;
-  const effects = cancellationScope.status === "ready"
+  const effects = cancellationScopeStatus === "ready"
     ? cancellationSummary.impactGroups.flatMap((group) => group.effects)
     : [];
 
@@ -161,10 +164,10 @@ export function HistoryDetailPanel({
     if (!operator?.employee_code) {
       throw new Error("로그인 정보가 없습니다. 다시 로그인해 주세요.");
     }
-    if (cancellationScope.status !== "ready") {
+    if (canCancelAsBatch && cancellationScope.status !== "ready") {
       throw new Error("취소 범위를 확인한 뒤 다시 시도해 주세요.");
     }
-    const target = cancellationScope.logs.find((log) => !log.cancelled);
+    const target = cancellationLogs.find((log) => !log.cancelled);
     if (!target) {
       throw new Error("이미 취소된 작업입니다.");
     }
@@ -179,7 +182,11 @@ export function HistoryDetailPanel({
   return (
     <div className="space-y-4">
       {variant === "desktop" ? (
-        <HistoryKeyPointSummary summary={summary} />
+        <HistoryKeyPointSummary
+          summary={summary}
+          impactStatus={cancellationScope.status}
+          onRetryImpact={cancellationScope.retry}
+        />
       ) : (
         <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
       )}
@@ -224,11 +231,11 @@ export function HistoryDetailPanel({
               scope={cancelScope}
               effects={effects}
               cancelled={isCancelled}
-              scopeStatus={cancellationScope.status}
+              scopeStatus={cancellationScopeStatus}
               onRetryScope={cancellationScope.retry}
               onSubmit={handleCancelSubmit}
               triggerLabel="이 내역 취소"
-              scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
+              scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
             />
           )}
         </>
@@ -239,11 +246,11 @@ export function HistoryDetailPanel({
           scope={cancelScope}
           effects={effects}
           cancelled={isCancelled}
-          scopeStatus={cancellationScope.status}
+          scopeStatus={cancellationScopeStatus}
           onRetryScope={cancellationScope.retry}
           onSubmit={handleCancelSubmit}
           triggerLabel="이 내역 취소"
-          scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
+          scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
         >
           {(controller) => (
             <>
@@ -269,7 +276,7 @@ export function HistoryDetailPanel({
                 scope={cancelScope}
                 variant="single"
                 effects={effects}
-                scopeCount={cancellationScope.status === "ready" ? cancellationLogs.length : undefined}
+                scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
               />
             </>
           )}

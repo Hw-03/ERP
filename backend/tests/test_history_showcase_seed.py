@@ -144,3 +144,69 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
     assert logs
     assert all(log.inventory_effect is not None for log in logs)
     assert all(result.marker in (log.reference_no or "") for log in logs)
+
+
+def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_session, make_item, make_location, make_bom):
+    module = _load_showcase_module()
+    actor = Employee(
+        employee_code="REMOVE-SHOWCASE-ADMIN",
+        name="쇼케이스 정리 관리자",
+        role="관리자",
+        department=DepartmentEnum.ASSEMBLY,
+        level=EmployeeLevelEnum.ADMIN,
+        is_active=True,
+    )
+    db_session.add(actor)
+    raw = make_item(name="정리 일반 자재", process_type_code="AR", warehouse_qty=Decimal("30"))
+    component_a = make_item(name="정리 구성품 A", process_type_code="AR", warehouse_qty=Decimal("30"))
+    component_b = make_item(name="정리 구성품 B", process_type_code="AR", warehouse_qty=Decimal("30"))
+    source_pa = make_item(name="정리 기존 PA", process_type_code="PA", warehouse_qty=Decimal("0"))
+    target_pa = make_item(name="정리 변경 PA", process_type_code="PA", warehouse_qty=Decimal("0"))
+    shipping_pf = make_item(name="정리 출하 PF", process_type_code="PF", warehouse_qty=Decimal("0"))
+    make_bom(source_pa.item_id, component_a.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, component_b.item_id, Decimal("1"))
+    make_bom(shipping_pf.item_id, target_pa.item_id, Decimal("1"))
+    for item in (component_a, component_b):
+        make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("20"))
+    for item in (source_pa, target_pa, shipping_pf):
+        make_location(item.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("20"))
+    db_session.commit()
+
+    before_cells = {
+        item.item_id: module.inv_effect.snapshot_cells(db_session, item.item_id)
+        for item in db_session.query(module.Item).all()
+    }
+    marker = "[HISTORY-DEMO][REMOVE-TEST]"
+    module.apply_showcase(db_session, marker=marker)
+
+    reason_only_log = (
+        db_session.query(module.TransactionLog)
+        .filter(
+            module.TransactionLog.reference_no.contains(marker),
+            module.TransactionLog.operation_batch_id.is_(None),
+            module.TransactionLog.shipping_request_id.is_(None),
+        )
+        .first()
+    )
+    assert reason_only_log is not None
+    reason_only_log.reference_no = "reason-only-showcase-log"
+    reason_only_log.notes = "[rework:normal_child]"
+    reason_only_log.reason_memo = marker
+    db_session.flush()
+
+    removed = module.remove_showcase(db_session, marker)
+
+    assert removed.log_count > 0
+    assert db_session.query(module.TransactionLog).filter(
+        module.TransactionLog.reference_no.contains(marker)
+        | module.TransactionLog.notes.contains(marker)
+        | module.TransactionLog.reason_memo.contains(marker)
+        | module.TransactionLog.reason_category.contains(marker)
+    ).count() == 0
+    assert db_session.query(module.IoBatch).filter(module.IoBatch.reference_no.contains(marker)).count() == 0
+    assert db_session.query(module.StockRequest).filter(module.StockRequest.reference_no.contains(marker)).count() == 0
+    assert db_session.query(module.ShippingRequest).filter(module.ShippingRequest.notes.contains(marker)).count() == 0
+    assert {
+        item_id: module.inv_effect.snapshot_cells(db_session, item_id)
+        for item_id in before_cells
+    } == before_cells

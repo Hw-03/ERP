@@ -15,7 +15,7 @@ import type { HistoryTableFocusTarget } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
 import { useToggleSet } from "./_hooks/useToggleSet";
-import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
+import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
@@ -90,6 +90,27 @@ export function DesktopHistoryView() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryRetryNonce, setSummaryRetryNonce] = useState(0);
   const summaryKeyRef = useRef("");
+
+  const historyFilterParams = useMemo(() => ({
+    operationKeys: opParam || undefined,
+    dateFrom: selectedDay ?? dateFilterToFrom(dateFilter),
+    dateTo: selectedDay ?? undefined,
+    search: debouncedSearch.trim() || undefined,
+    department: deptParam || undefined,
+    model: modelParam || undefined,
+  }), [dateFilter, debouncedSearch, deptParam, modelParam, opParam, selectedDay]);
+  const {
+    data: referenceSummaryRows,
+    isLoading: referenceSummariesLoading,
+    refetch: refetchReferenceSummaries,
+  } = useTransactionReferenceSummariesQuery(historyFilterParams);
+  const referenceSummaries = useMemo(
+    () => new Map((referenceSummaryRows ?? []).map((row) => [
+      `${row.referenceNo}::${row.shippingPhase ?? ""}`,
+      row,
+    ])),
+    [referenceSummaryRows],
+  );
 
   const historyData = useHistoryData({
     operations: opParam,
@@ -242,6 +263,7 @@ export function DesktopHistoryView() {
     setSummary(null);
     retry();
     setSummaryRetryNonce((nonce) => nonce + 1);
+    void refetchReferenceSummaries();
   }
 
   // Y(분모) baseline summary — 선택한 기간만 필터. 거래종류/검색/부서/모델 무시.
@@ -346,6 +368,7 @@ export function DesktopHistoryView() {
         ? { ...current, log: updated }
         : { kind: "log", log: updated },
     );
+    void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
   }
 
   function handleBatchCancelled(batchId: string, updated: TransactionLog) {
@@ -560,7 +583,6 @@ export function DesktopHistoryView() {
             error={historyError}
             onRetry={retryHistoryResults}
             filteredLogs={logs}
-            totalCount={summary?.total}
             selection={selection}
             onSelectLog={handleSelectLog}
             onSelectChildLog={handleSelectChildLog}
@@ -572,6 +594,8 @@ export function DesktopHistoryView() {
             loadMoreError={loadMoreError}
             onLoadMore={() => void loadMore()}
             focusTarget={focusTarget}
+            referenceSummaries={referenceSummaries}
+            referenceSummariesLoading={referenceSummariesLoading}
           />
         </div>
       </div>

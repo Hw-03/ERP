@@ -14,6 +14,7 @@ const testState = vi.hoisted(() => ({
   drillTarget: null as any,
   capturedLogUpdated: null as null | ((updated: TransactionLog) => void),
   summaryMock: vi.fn(),
+  referenceSummaryQuery: { data: [], isLoading: false, refetch: vi.fn() },
   queryClient: null as QueryClient | null,
 }));
 
@@ -50,6 +51,7 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useMonthlyCountsQuery: () => ({ data: {} }),
+  useTransactionReferenceSummariesQuery: () => testState.referenceSummaryQuery,
 }));
 
 vi.mock("../_history_sections/HistoryStatsBar", () => ({ HistoryStatsBar: () => null }));
@@ -68,13 +70,11 @@ vi.mock("../_history_sections/HistoryTable", () => ({
     onSelectLog,
     onSelectBatch,
     setBatchCache,
-    totalCount,
     onRetry,
   }: any) => (
     <div
       data-testid="history-table-state"
       data-selection={selection?.kind ?? "none"}
-      data-total={totalCount ?? "none"}
       data-list-cancelled={filteredLogs.length > 0 && filteredLogs.every((log: TransactionLog) => log.cancelled) ? "yes" : "no"}
     >
       <button type="button" onClick={() => filteredLogs[0] && onSelectLog(filteredLogs[0])}>
@@ -249,13 +249,11 @@ describe("DesktopHistoryView history state", () => {
 
     await waitFor(() => {
       expect(testState.historyArgs).toMatchObject({ totalCount: 42 });
-      expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-total", "42");
     });
 
     testState.summaryMock.mockImplementation(() => new Promise(() => {}));
     fireEvent.click(screen.getByRole("button", { name: "기간 변경" }));
     await waitFor(() => {
-      expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-total", "none");
       expect(testState.historyArgs).toHaveProperty("totalCount", undefined);
     });
   });
@@ -269,7 +267,7 @@ describe("DesktopHistoryView history state", () => {
       departmentCounts: {},
     });
     render(<DesktopHistoryView />);
-    await waitFor(() => expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-total", "42"));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({ totalCount: 42 }));
     const callsBeforeRetry = testState.summaryMock.mock.calls.length;
     const retry = testState.historyResult.retry;
     testState.summaryMock.mockRejectedValue(new Error("summary 실패"));
@@ -279,7 +277,7 @@ describe("DesktopHistoryView history state", () => {
     expect(retry).toHaveBeenCalledTimes(1);
     await waitFor(() => {
       expect(testState.summaryMock.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
-      expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-total", "none");
+      expect(testState.historyArgs).toHaveProperty("totalCount", undefined);
     });
   });
 

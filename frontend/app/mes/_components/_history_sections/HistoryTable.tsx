@@ -3,6 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TransactionLog } from "@/lib/api";
+import type { TransactionReferenceSummary } from "@/lib/api/production";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -26,8 +27,6 @@ type Props = {
   error?: string | null;
   onRetry?: () => void;
   filteredLogs: TransactionLog[];
-  /** 조건 전체 카운트(서버 summary). 헤더 진행률(`100/342건`) 표시용. */
-  totalCount?: number;
   selection: HistorySelection | null;
   onSelectLog: (log: TransactionLog) => void;
   /** 묶음 하위 행은 상세 조회만 허용하고 취소는 부모 행에 남긴다. */
@@ -41,32 +40,22 @@ type Props = {
   loadMoreError?: string | null;
   onLoadMore: () => void;
   focusTarget?: HistoryTableFocusTarget | null;
+  referenceSummaries?: Map<string, TransactionReferenceSummary>;
+  referenceSummariesLoading?: boolean;
 };
 
 type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center" | "right"; hidden?: boolean; px?: string };
 
 // 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 흐름 → 수량/재고 → 상태.
-const COLUMNS_DEFAULT: ColSpec[] = [
-  { label: "일시", width: "80px", align: "center" },
-  { label: "작업", width: "145px", align: "center" },
+const COLUMNS: ColSpec[] = [
+  { label: "일시", width: "104px", align: "center" },
+  { label: "작업", width: "168px", align: "center" },
   { label: "대상" },
-  { label: "품목코드", width: "130px", align: "center" },
+  { label: "품목코드", width: "118px", align: "center" },
   { label: "", width: "0px", align: "center", px: "px-0" },
-  { label: "흐름", width: "205px", align: "center" },
-  { label: "수량 · 재고", width: "270px", align: "center" },
+  { label: "흐름", width: "190px", align: "center" },
+  { label: "수량", width: "270px", align: "center" },
   { label: "상태 · 처리", width: "180px", align: "center" },
-];
-
-// 우측 패널 열림 — 판단 열은 명시 폭을 보존하고 대상 열이 남은 폭을 흡수한다.
-const COLUMNS_COMPACT: ColSpec[] = [
-  { label: "일시", width: "72px", align: "center", px: "px-1" },
-  { label: "작업", width: "112px", align: "center", px: "px-2" },
-  { label: "대상", px: "px-2" },
-  { label: "품목코드", width: "110px", align: "center", px: "px-1" },
-  { label: "", width: "0px", align: "center", px: "px-0" },
-  { label: "흐름", width: "170px", align: "center", px: "px-1" },
-  { label: "수량 · 재고", width: "210px", align: "center", px: "px-1" },
-  { label: "상태 · 처리", width: "150px", align: "center", px: "px-1" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
 
@@ -85,7 +74,6 @@ export function HistoryTable({
   error,
   onRetry,
   filteredLogs,
-  totalCount,
   selection,
   onSelectLog,
   onSelectChildLog,
@@ -97,6 +85,8 @@ export function HistoryTable({
   loadMoreError,
   onLoadMore,
   focusTarget,
+  referenceSummaries,
+  referenceSummariesLoading = false,
 }: Props) {
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
 
@@ -127,13 +117,6 @@ export function HistoryTable({
   }, [focusTarget]);
 
   const groups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
-
-  const batchKeys = useMemo(
-    () => groups.flatMap((g) =>
-      g.type === "batch" ? [g.refKey] : g.type === "op_batch" ? [g.batchId] : []
-    ),
-    [groups],
-  );
 
   // ── visible op_batch lazy fetch ──
   // observer 는 마운트 시 한 번만. batchCache 변경마다 재생성하지 않게 ref 만 본다.
@@ -241,41 +224,12 @@ export function HistoryTable({
     });
   }
 
-  // 우측 패널이 열리면 고정 판단 열을 먼저 보존하고 대상명만 남은 폭에서 truncate한다.
-  const compact = selection != null;
-  const COLUMNS = compact ? COLUMNS_COMPACT : COLUMNS_DEFAULT;
-
-  function collapseExpandedGroup() {
-    setExpandedGroupKey(null);
-  }
-
   // selection helpers
   const selectedLogId = selection?.kind === "log" ? selection.log.log_id : undefined;
   const selectedBatchId = selection?.kind === "batch" ? selection.batchId : undefined;
 
   return (
-    <section className="card min-w-0" style={{ backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}>
-      <div
-        className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 flex items-center gap-3 rounded-t-[28px] px-5 pb-3 pt-5"
-        style={{ background: LEGACY_COLORS.bg, backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}
-      >
-        <div className="shrink-0 text-base font-bold">입출고 내역</div>
-        <div className="flex flex-wrap items-baseline gap-1.5 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          <span>표시 {filteredLogs.length.toLocaleString()}건</span>
-          {totalCount != null && <span>/ 조건 전체 {totalCount.toLocaleString()}건</span>}
-        </div>
-        {batchKeys.length > 0 && expandedGroupKey && (
-          <button
-            type="button"
-            onClick={collapseExpandedGroup}
-            className="ml-auto rounded-full border px-3 py-1 text-xs font-semibold transition-opacity hover:opacity-80"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-          >
-            현재 묶음 접기
-          </button>
-        )}
-      </div>
-
+    <div className="min-w-0">
       {loading ? (
         <LoadingSkeleton variant="list" rows={8} />
       ) : error ? (
@@ -293,22 +247,16 @@ export function HistoryTable({
         />
       ) : (
         <div className="min-w-0 overflow-x-hidden rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-          <table
-            className={`w-full table-fixed border-separate border-spacing-0 text-sm${
-              compact
-                ? " [&_tbody_td:nth-child(2)]:px-2 [&_tbody_td:nth-child(3)]:px-2 [&_tbody_td:nth-child(4)]:px-1 [&_tbody_td:nth-child(5)]:px-0 [&_tbody_td:nth-child(6)]:px-2 [&_tbody_td:nth-child(7)]:px-2 [&_tbody_td:nth-child(8)]:px-1"
-                : ""
-            }`}
-          >
-            <thead className="sticky top-0 z-10">
+          <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+            <thead>
               <tr style={{ background: LEGACY_COLORS.s2 }}>
                 {COLUMNS.map(({ label, width, minWidth, align, hidden, px }, index) => (
                   <th
                     key={label || `spacer-${index}`}
                     scope={label ? "col" : undefined}
                     aria-hidden={label ? undefined : true}
-                    className={`whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"}`}
-                    style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
+                    className={`sticky top-0 z-10 whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"}`}
+                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
                     {label}
                   </th>
@@ -317,10 +265,13 @@ export function HistoryTable({
             </thead>
             <tbody>
               {groups.map((group, index) => {
-                const separationHint = getHistorySeparationHint(
+                const rawSeparationHint = getHistorySeparationHint(
                   index > 0 ? getGroupPrimaryLog(groups[index - 1]) : null,
                   getGroupPrimaryLog(group),
                 );
+                const separationHint = rawSeparationHint === "다른 요청" || rawSeparationHint === "별도 시각"
+                  ? null
+                  : rawSeparationHint;
                 if (group.type === "solo") {
                   return (
                     <HistoryLogRow
@@ -328,7 +279,6 @@ export function HistoryTable({
                       log={group.log}
                       selected={selectedLogId === group.log.log_id}
                       onSelect={onSelectLog}
-                      compact={compact}
                       separationHint={separationHint}
                     />
                   );
@@ -344,7 +294,6 @@ export function HistoryTable({
                         log={group.parent}
                         selected={selected}
                         onSelect={onSelectLog}
-                        compact={compact}
                         expanded={expanded}
                         onToggle={() => toggleGroup(group.key)}
                         controlsId={controlsId}
@@ -353,7 +302,6 @@ export function HistoryTable({
                       {expanded && (
                         <ReferenceBatchDetail
                           logs={[group.child]}
-                          compact={compact}
                           highlightLogId={selectedLogId}
                           onSelectLog={onSelectChildLog ?? onSelectLog}
                           controlsId={controlsId}
@@ -384,7 +332,6 @@ export function HistoryTable({
                         }}
                         batch={batch}
                         rowRef={opBatchRowRef}
-                        compact={compact}
                         controlsId={controlsId}
                         separationHint={separationHint}
                       />
@@ -394,7 +341,6 @@ export function HistoryTable({
                           colSpan={COLUMNS.length}
                           cache={batchCache}
                           onCached={handleCacheBatch}
-                          compact={compact}
                           highlightItemId={focusItemId}
                           controlsId={controlsId}
                         />
@@ -424,7 +370,6 @@ export function HistoryTable({
                           if (isSelected && expanded) collapseGroup(groupKey);
                           else expandGroup(groupKey);
                         }}
-                        compact={compact}
                         controlsId={controlsId}
                       />
                       {expanded && (
@@ -432,7 +377,6 @@ export function HistoryTable({
                           logs={childLogs}
                           parentItemId={parentLog.item_id}
                           colSpan={COLUMNS.length}
-                          compact={compact}
                           controlsId={controlsId}
                         />
                       )}
@@ -457,14 +401,14 @@ export function HistoryTable({
                         if (isSelected && expanded) collapseGroup(groupKey);
                         else expandGroup(groupKey);
                       }}
-                      compact={compact}
                       controlsId={controlsId}
                       separationHint={separationHint}
+                      referenceSummary={referenceSummaries?.get(group.refKey) ?? null}
+                      referenceSummaryLoading={referenceSummariesLoading}
                     />
                     {expanded && (
                       <ReferenceBatchDetail
                         logs={group.logs}
-                        compact={compact}
                         highlightLogId={focusLogId}
                         onSelectLog={onSelectChildLog ?? onSelectLog}
                         controlsId={controlsId}
@@ -501,6 +445,6 @@ export function HistoryTable({
           {loadingMore ? "불러오는 중..." : "다음 100건 불러오기"}
         </button>
       )}
-    </section>
+    </div>
   );
 }

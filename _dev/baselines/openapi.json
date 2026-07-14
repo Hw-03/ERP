@@ -5444,6 +5444,57 @@
         "title": "ReconcileRow",
         "type": "object"
       },
+      "ReferenceSummaryResponse": {
+        "description": "참조번호 기반 목록 묶음의 전체 요약.",
+        "properties": {
+          "item_count": {
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "log_count": {
+            "title": "Log Count",
+            "type": "integer"
+          },
+          "reference_no": {
+            "title": "Reference No",
+            "type": "string"
+          },
+          "shipping_phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Phase"
+          },
+          "total_quantity": {
+            "title": "Total Quantity",
+            "type": "number"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "reference_no",
+          "log_count",
+          "item_count",
+          "total_quantity"
+        ],
+        "title": "ReferenceSummaryResponse",
+        "type": "object"
+      },
       "RequestBucketEnum": {
         "enum": [
           "warehouse",
@@ -13313,6 +13364,198 @@
           }
         },
         "summary": "연도별 월별 거래 카운트",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/transactions/reference-summaries": {
+      "get": {
+        "description": "페이지네이션과 무관하게 참조번호 묶음의 전체 수량을 반환한다.",
+        "operationId": "list_reference_summaries_api_inventory_transactions_reference_summaries_get",
+        "parameters": [
+          {
+            "description": "쉼표 구분 복수 타입",
+            "in": "query",
+            "name": "transaction_types",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "쉼표 구분 복수 타입",
+              "title": "Transaction Types"
+            }
+          },
+          {
+            "description": "화면 거래 종류 키",
+            "in": "query",
+            "name": "operation_keys",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "화면 거래 종류 키",
+              "title": "Operation Keys"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "description": "부서 라벨 필터",
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "부서 라벨 필터",
+              "title": "Department"
+            }
+          },
+          {
+            "description": "제품 모델명 필터",
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "제품 모델명 필터",
+              "title": "Model"
+            }
+          },
+          {
+            "description": "공정 구분 필터",
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "공정 구분 필터",
+              "title": "Process Step"
+            }
+          },
+          {
+            "description": "포함 시작일 YYYY-MM-DD",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "포함 시작일 YYYY-MM-DD",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "포함 종료일 YYYY-MM-DD",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "포함 종료일 YYYY-MM-DD",
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReferenceSummaryResponse"
+                  },
+                  "title": "Response List Reference Summaries Api Inventory Transactions Reference Summaries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reference Summaries",
         "tags": [
           "Inventory"
         ]

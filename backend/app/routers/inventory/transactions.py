@@ -93,6 +93,17 @@ class TransactionSummaryResponse(BaseModel):
     department_counts: dict[str, int] = {}
 
 
+class ReferenceSummaryResponse(BaseModel):
+    """참조번호 기반 목록 묶음의 전체 요약."""
+
+    reference_no: str
+    shipping_phase: Optional[str] = None
+    log_count: int
+    item_count: int
+    total_quantity: float
+    unit: Optional[str] = None
+
+
 def _require_export_range(start_date: Optional[date], end_date: Optional[date]) -> tuple[datetime, datetime]:
     """export 는 start_date / end_date 모두 필수. 없으면 400."""
     if start_date is None or end_date is None:
@@ -285,6 +296,74 @@ def list_transactions(
             )
         )
     return result
+
+
+@router.get(
+    "/transactions/reference-summaries",
+    response_model=List[ReferenceSummaryResponse],
+)
+def list_reference_summaries(
+    transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
+    operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키"),
+    search: Optional[str] = Query(None),
+    department: Optional[str] = Query(None, description="부서 라벨 필터"),
+    model: Optional[str] = Query(None, description="제품 모델명 필터"),
+    process_step: Optional[str] = Query(None, description="공정 구분 필터"),
+    date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
+    date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
+    include_archived: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """페이지네이션과 무관하게 참조번호 묶음의 전체 수량을 반환한다."""
+    query = (
+        db.query(TransactionLog)
+        .join(Item, TransactionLog.item_id == Item.item_id)
+        .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
+    )
+    query = _apply_common_filters(
+        query,
+        db,
+        transaction_types=transaction_types,
+        operation_keys=operation_keys,
+        search=search,
+        department=department,
+        model=model,
+        process_step=process_step,
+        date_from=date_from,
+        date_to=date_to,
+        include_archived=include_archived,
+    ).filter(
+        TransactionLog.operation_batch_id.is_(None),
+        TransactionLog.reference_no.isnot(None),
+        TransactionLog.reference_no != "",
+    )
+
+    quantity = func.abs(func.coalesce(TransactionLog.transfer_qty, TransactionLog.quantity_change))
+    unit_count = func.count(func.distinct(Item.unit))
+    rows = (
+        query.with_entities(
+            TransactionLog.reference_no.label("reference_no"),
+            TransactionLog.shipping_phase.label("shipping_phase"),
+            func.count(TransactionLog.log_id).label("log_count"),
+            func.count(func.distinct(TransactionLog.item_id)).label("item_count"),
+            func.coalesce(func.sum(quantity), 0).label("total_quantity"),
+            case((unit_count == 1, func.min(Item.unit)), else_=None).label("unit"),
+        )
+        .group_by(TransactionLog.reference_no, TransactionLog.shipping_phase)
+        .order_by(TransactionLog.reference_no, TransactionLog.shipping_phase)
+        .all()
+    )
+    return [
+        ReferenceSummaryResponse(
+            reference_no=row.reference_no,
+            shipping_phase=row.shipping_phase,
+            log_count=int(row.log_count or 0),
+            item_count=int(row.item_count or 0),
+            total_quantity=float(row.total_quantity or 0),
+            unit=row.unit,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/transactions/summary", response_model=TransactionSummaryResponse)

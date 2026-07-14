@@ -60,7 +60,7 @@ describe("IoTargetPicker row click", () => {
     expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual");
   });
 
-  it("allows adding a manual line to an existing process BOM batch", () => {
+  it("adds a process single item as quantity adjustment instead of production", () => {
     const onAddItem = vi.fn();
     render(
       <IoTargetPicker
@@ -82,6 +82,6 @@ describe("IoTargetPicker row click", () => {
     expect(singleButton).not.toBeDisabled();
     fireEvent.click(singleButton);
 
-    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual", "produce");
+    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual", "adjust_in");
   });
 });

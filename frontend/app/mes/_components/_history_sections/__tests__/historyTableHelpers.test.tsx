@@ -2,6 +2,8 @@
 import { within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api/types/production";
+import { tint } from "@/lib/mes/colorUtils";
+import { transactionColor } from "@/lib/mes-status";
 import { HistoryTable } from "../HistoryTable";
 import type { HistoryRowPresentation } from "../historyPresentation";
 import {
@@ -75,7 +77,7 @@ describe("buildGroups shipping phase grouping", () => {
 });
 
 describe("history table helper rendering policies", () => {
-  it("lets the compact table shrink inside the left pane when the right detail panel is open", () => {
+  it("keeps non-target table cells unchanged when the right detail panel is open", () => {
     const log = makeLog();
     const { container } = render(
       <HistoryTable
@@ -94,19 +96,22 @@ describe("history table helper rendering policies", () => {
     );
 
     const tableCard = container.querySelector("section.card");
-    const tableScroller = container.querySelector("section.card > div.overflow-x-hidden");
+    const tableScroller = container.querySelector("div.overflow-x-hidden");
     const table = tableScroller?.querySelector("table");
 
-    expect(tableCard).toHaveClass("min-w-0");
+    expect(tableCard).not.toBeInTheDocument();
     expect(tableScroller).toHaveClass("min-w-0");
     expect(tableScroller).not.toHaveClass("-mr-5");
     expect(table).toHaveClass("w-full");
     expect(table).toHaveClass("table-fixed");
-    expect(table).toHaveClass("[&_tbody_td:nth-child(3)]:px-2");
-    expect(table).toHaveClass("[&_tbody_td:nth-child(4)]:px-1");
-    expect(table).toHaveClass("[&_tbody_td:nth-child(6)]:px-2");
-    expect(table).toHaveClass("[&_tbody_td:nth-child(7)]:px-2");
-    expect(table).toHaveClass("[&_tbody_td:nth-child(8)]:px-1");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(3)]:px-2");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(4)]:px-1");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(6)]:px-2");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(7)]:px-2");
+    expect(table).not.toHaveClass("[&_tbody_td:nth-child(8)]:px-1");
+    expect(screen.queryByText(/표시 .*건/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "현재 묶음 접기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "top-0", "z-10");
   });
 
   it("defines a single fixed rhythm for main history rows", () => {
@@ -142,7 +147,7 @@ describe("history table helper rendering policies", () => {
     rows.forEach((row) => expect(row).toHaveClass("h-[64px]"));
   });
 
-  it("lets the compact target column absorb remaining width while preserving judgment columns", () => {
+  it("keeps the selected row in its transaction color while only the target column stays flexible", () => {
     const log = makeLog();
     render(
       <HistoryTable
@@ -162,14 +167,92 @@ describe("history table helper rendering policies", () => {
     const target = screen.getByRole("columnheader", { name: "대상" });
     expect(target.style.width).toBe("");
     expect(target.style.minWidth).toBe("");
-    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("72px");
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("112px");
-    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("110px");
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("170px");
-    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("210px");
+    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("104px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("168px");
+    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("118px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("190px");
+    expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
-    expect(statusHeader.style.width).toBe("150px");
+    expect(statusHeader.style.width).toBe("180px");
     expect(statusHeader).toHaveClass("text-center");
+
+    const row = screen.getByRole("button");
+    const color = transactionColor(log.transaction_type);
+    expect(row).toHaveStyle({
+      background: tint(color, 10),
+      outline: `1.5px solid ${color}`,
+    });
+    fireEvent.mouseEnter(row);
+    expect(row).toHaveStyle({ background: tint(color, 18) });
+  });
+
+  it("keeps a reference batch summary fixed while more logs join the loaded page", () => {
+    const first = makeLog({ log_id: "ref-1", reference_no: "REF-ALL", item_id: "ITEM-1", transfer_qty: 1 });
+    const second = makeLog({ log_id: "ref-2", reference_no: "REF-ALL", item_id: "ITEM-2", transfer_qty: 2 });
+    const props = {
+      loading: false,
+      selection: null,
+      onSelectLog: () => {},
+      onSelectBatch: () => {},
+      batchCache: new Map(),
+      setBatchCache: () => {},
+      canLoadMore: false,
+      loadingMore: false,
+      onLoadMore: () => {},
+      referenceSummaries: new Map([["REF-ALL::", {
+        referenceNo: "REF-ALL",
+        shippingPhase: null,
+        logCount: 62,
+        itemCount: 20,
+        totalQuantity: 108,
+        unit: "EA",
+      }]]),
+    };
+    const { rerender } = render(<HistoryTable {...props} filteredLogs={[first, second]} />);
+
+    expect(screen.getByText("출고 구성 62건")).toBeInTheDocument();
+    expect(screen.getByText("출고 20품목 · 108 EA")).toBeInTheDocument();
+
+    rerender(<HistoryTable {...props} filteredLogs={[first, second, makeLog({
+      log_id: "ref-3", reference_no: "REF-ALL", item_id: "ITEM-3", transfer_qty: 50,
+    })]} />);
+    expect(screen.getByText("출고 구성 62건")).toBeInTheDocument();
+    expect(screen.getByText("출고 20품목 · 108 EA")).toBeInTheDocument();
+  });
+
+  it("hides stock totals and internal separation hints from the list", () => {
+    const first = makeLog({
+      log_id: "separation-first",
+      reference_no: null,
+      requester_name: "Requester A",
+      quantity_after: 2198,
+    });
+    const second = makeLog({
+      log_id: "separation-second",
+      reference_no: null,
+      requester_name: "Requester B",
+      created_at: "2026-07-02T01:01:00Z",
+      quantity_after: 2199,
+    });
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[first, second]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText(/재고 2,198 EA/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/재고 2,199 EA/)).not.toBeInTheDocument();
+    expect(screen.queryByText("다른 요청")).not.toBeInTheDocument();
+    expect(screen.queryByText("별도 시각")).not.toBeInTheDocument();
   });
 
   it("widens the default flow, quantity, and status columns while leaving the target flexible", () => {
@@ -189,9 +272,9 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("145px");
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("205px");
-    expect(screen.getByRole("columnheader", { name: "수량 · 재고" }).style.width).toBe("270px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("168px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("190px");
+    expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
     expect(statusHeader.style.width).toBe("180px");
     expect(statusHeader).toHaveClass("text-center");
@@ -293,6 +376,8 @@ describe("history table helper rendering policies", () => {
 
     const sourceRow = screen.getByText("기존품").closest("tr");
     expect(sourceRow).toHaveTextContent("기존품 차감");
+    expect(sourceRow).toHaveTextContent("-1 EA");
+    expect(sourceRow).not.toHaveTextContent("자동 차감 1 EA");
     expect(sourceRow).toHaveTextContent("3-AA-0001");
     expect(sourceRow).toHaveClass("h-[40px]");
     expect(screen.queryByText("추가 차감품")).not.toBeInTheDocument();
@@ -307,7 +392,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("변경품 구성품")).toBeInTheDocument();
   });
 
-  it("reserves compact flow width for the full production result label", () => {
+  it("keeps the full flow width when the detail panel opens", () => {
     render(
       <HistoryTable
         loading={false}
@@ -323,7 +408,7 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("170px");
+    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("190px");
   });
 
   it("keeps the operation badge dimensions stable when the detail panel opens", () => {
@@ -473,6 +558,7 @@ describe("history table helper rendering policies", () => {
 
     const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
     const parentRow = toggle.closest("tr");
+    expect(toggle.closest("td")?.cellIndex).toBe(0);
     const controlsId = toggle.getAttribute("aria-controls");
     expect(controlsId).toBeTruthy();
     expect(parentRow).not.toHaveAttribute("role", "button");

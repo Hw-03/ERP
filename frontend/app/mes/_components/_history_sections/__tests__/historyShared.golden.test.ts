@@ -112,6 +112,15 @@ describe("getHistoryDisplayLabel", () => {
     expect(getHistoryDisplayLabel({ transaction_type: "PRODUCE" }, batch)).toBe("생산");
   });
 
+  it("manual 라인만 있는 과거 produce batch → 수량보정 입고", () => {
+    const line = makeLine({ origin: "manual", direction: "in", from_bucket: "none", to_bucket: "production" });
+    const bundle = makeBundle({ source_kind: "manual", lines: [line] });
+    const batch = makeBatch({ sub_type: "produce", bundles: [bundle] });
+
+    expect(getHistoryDisplayLabel({ transaction_type: "PRODUCE" }, batch)).toBe("수량보정 입고");
+    expect(getHistoryDisplaySubLabel({ transaction_type: "PRODUCE" }, batch)).toBe("재고 수량 직접 수정");
+  });
+
   it("batch sub_type=disassemble → 분해", () => {
     const batch = makeBatch({ sub_type: "disassemble" });
     expect(getHistoryDisplayLabel({ transaction_type: "DISASSEMBLE" }, batch)).toBe("분해");
@@ -579,6 +588,17 @@ describe("getHistoryMovementSummary", () => {
     const batch = makeBatch({ sub_type: "adjust_in", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "ADJUST" }, batch);
     expect(result.parts.some((p) => p.label.includes("증가"))).toBe(true);
+  });
+
+  it("manual 라인만 있는 과거 produce batch → 증가 요약", () => {
+    const line = makeLine({ origin: "manual", direction: "in", from_bucket: "none", to_bucket: "production", quantity: 5 });
+    const bundle = makeBundle({ source_kind: "manual", lines: [line] });
+    const batch = makeBatch({ sub_type: "produce", bundles: [bundle] });
+
+    const result = getHistoryMovementSummary({ transaction_type: "PRODUCE" }, batch);
+
+    expect(result.parts.some((part) => part.label.includes("증가"))).toBe(true);
+    expect(result.parts[0].tone).toBe("success");
   });
 
   it("adjust_out + negative qty → '감소 N' danger", () => {

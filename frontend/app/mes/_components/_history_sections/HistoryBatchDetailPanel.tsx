@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, GitBranch, Package, XCircle } from "lucide-react";
+import { GitBranch, Package, XCircle } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
@@ -16,6 +16,7 @@ import {
   getHistoryActor,
   getHistoryBomParentLine,
   getHistoryDisplayLabel,
+  getHistoryDisplayTransactionType,
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
   getHistoryMovementSummary,
@@ -79,8 +80,6 @@ export function HistoryBatchDetailPanel({
   variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
-  const [compositionOpen, setCompositionOpen] = useState(false);
-
   const operationBatchId = logs[0]?.operation_batch_id ?? null;
   const cached = operationBatchId ? batchCache.get(operationBatchId) ?? null : null;
   const [state, setState] = useState<FetchState>(
@@ -90,10 +89,6 @@ export function HistoryBatchDetailPanel({
         ? { status: "loading" }
         : { status: "unavailable" },
   );
-
-  useEffect(() => {
-    setCompositionOpen(false);
-  }, [batchId, panelOpen]);
 
   useEffect(() => {
     if (!operationBatchId) {
@@ -133,10 +128,10 @@ export function HistoryBatchDetailPanel({
   const cancelScope = getHistoryCancelScope(first);
   const canCancelAsBatch = cancelScope === "batch";
   const cancellationScope = useHistoryCancellationScopeLogs({
-    panelOpen: panelOpen && canCancelAsBatch,
+    panelOpen: panelOpen && (Boolean(first.operation_batch_id) || canCancelAsBatch),
     identity: `batch:${batchId}`,
     visibleLogs: logs,
-    operationBatchId: canCancelAsBatch ? first.operation_batch_id : null,
+    operationBatchId: first.operation_batch_id,
     referenceNo: canCancelAsBatch && !first.operation_batch_id ? first.reference_no : null,
   });
 
@@ -167,14 +162,11 @@ export function HistoryBatchDetailPanel({
   const cancellationLogs = canCancelAsBatch && cancellationScope.status === "ready"
     ? cancellationScope.logs
     : [first];
-  const cancellationSummary = buildHistoryDetailSummary(
-    cancellationLogs,
-    canCancelAsBatch ? batch : null,
-  );
+  const cancellationSummary = buildHistoryDetailSummary(cancellationLogs, canCancelAsBatch ? batch : null);
   const visibleSummary = buildHistoryDetailSummary(logs, batch);
-  const summary = canCancelAsBatch && cancellationScope.status === "ready"
-    ? { ...visibleSummary, status: cancellationSummary.status }
-    : visibleSummary;
+  const summary = cancellationScope.status === "ready"
+    ? buildHistoryDetailSummary(cancellationScope.logs, batch)
+    : { ...visibleSummary, impactGroups: [] };
   const isBatchCancelled = cancellationLogs.every((log) => log.cancelled);
   const effects = cancellationScopeStatus === "ready"
     ? cancellationSummary.impactGroups.flatMap((group) => group.effects)
@@ -200,47 +192,20 @@ export function HistoryBatchDetailPanel({
     }
   }
 
+  function handleImpactClick(itemId: string) {
+    onFocusLineInList?.({ groupKey: batchId, itemId });
+  }
+
   if (variant === "desktop") {
     return (
       <div className="space-y-4">
-        <HistoryKeyPointSummary summary={summary} />
+        <HistoryKeyPointSummary
+          summary={summary}
+          impactStatus={cancellationScope.status}
+          onRetryImpact={cancellationScope.retry}
+          onImpactClick={batch && onFocusLineInList ? (impact) => handleImpactClick(impact.itemId) : undefined}
+        />
         <HistoryDetailMemo notes={first.notes} />
-
-        {batch && batch.bundles.length > 0 && (
-          <section
-            className="overflow-hidden rounded-[20px] border"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-          >
-            <button
-              type="button"
-              aria-expanded={compositionOpen}
-              onClick={() => setCompositionOpen((open) => !open)}
-              className="flex min-h-11 w-full items-center justify-between gap-3 border-0 bg-transparent px-4 py-3 text-left shadow-none"
-            >
-              <span className="flex items-center gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                <GitBranch className="h-4 w-4" />
-                구성 {summary.composition?.bundleCount ?? batch.bundles.length}묶음 · {summary.composition?.lineCount ?? 0}라인
-              </span>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${compositionOpen ? "rotate-180" : ""}`}
-                style={{ color: LEGACY_COLORS.muted2 }}
-              />
-            </button>
-            {compositionOpen && (
-              <div className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
-                {batch.bundles.map((bundle) => (
-                  <BundleBlock
-                    key={bundle.bundle_id}
-                    bundle={bundle}
-                    batch={batch}
-                    onLineClick={handleLineClick}
-                    isLineClickable={(line) => logByItemId.has(line.item_id)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
 
         <HistoryCancelAction
           panelOpen={panelOpen}
@@ -357,7 +322,8 @@ function HistoryBatchHero({
   onRetryScope: () => void;
   onCancelClick: () => void;
 }) {
-  const tcolor = transactionColor(first.transaction_type);
+  const displayType = getHistoryDisplayTransactionType(first, batch);
+  const tcolor = transactionColor(displayType);
   const heroStyle = {
     background: `color-mix(in srgb, ${tcolor} 5%, ${LEGACY_COLORS.s2})`,
     borderColor: `color-mix(in srgb, ${tcolor} 22%, ${LEGACY_COLORS.border})`,
@@ -394,7 +360,7 @@ function HistoryBatchHero({
       {/* 1줄: 정체 + 변동요약 + work_type */}
       <div className="flex flex-wrap items-center gap-2">
         <FlowBadge
-          type={first.transaction_type}
+          type={displayType}
           label={getHistoryDisplayLabel(first, batch ?? undefined)}
           color={tcolor}
         />

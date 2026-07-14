@@ -33,6 +33,7 @@ from app.services.io_preview import (
     _bucket_available,
     _d,
     _get_item,
+    validate_operation_sources,
 )
 from app.services.io_persist import (
     _batch_to_payload,
@@ -457,6 +458,10 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
 
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
+    validate_operation_sources(
+        batch.sub_type,
+        (bundle.source_kind for bundle in batch.bundles),
+    )
     try:
         included_lines = _included_lines(batch)
         if batch.sub_type in APPROVAL_SUB_TYPES:

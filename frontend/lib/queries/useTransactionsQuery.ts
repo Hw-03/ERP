@@ -21,6 +21,7 @@ import { queryKeys } from "./keys";
 
 type TransactionParams = Parameters<typeof productionApi.getTransactions>[0];
 type SummaryParams = Parameters<typeof productionApi.getTransactionsSummary>[0];
+type ReferenceSummaryParams = Parameters<typeof productionApi.getTransactionReferenceSummaries>[0];
 
 export function useTransactionsQuery(
   params?: TransactionParams,
@@ -40,6 +41,14 @@ export function useTransactionsSummaryQuery(params?: SummaryParams) {
     queryKey: queryKeys.transactions.summary(params),
     queryFn: () => productionApi.getTransactionsSummary(params),
     // KPI 집계도 내역과 함께 변동 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
+  });
+}
+
+export function useTransactionReferenceSummariesQuery(params?: ReferenceSummaryParams) {
+  return useQuery({
+    queryKey: queryKeys.transactions.referenceSummaries(params),
+    queryFn: () => productionApi.getTransactionReferenceSummaries(params),
     staleTime: STALE_TIME.VOLATILE,
   });
 }

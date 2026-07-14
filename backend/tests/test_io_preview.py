@@ -125,23 +125,17 @@ def test_preview_manual_skips_bom_expansion(db_session, make_item, make_bom):
     assert bundle["lines"][0]["origin"] == "manual"
 
 
-def test_preview_process_manual_skips_bom_expansion(db_session, make_item, make_bom):
+def test_preview_process_manual_requires_adjustment_instead_of_produce(db_session, make_item, make_bom):
     parent = make_item(name="Manual Process Parent", process_type_code="AF")
     child = make_item(name="Manual Process Child", process_type_code="AR")
     make_bom(parent.item_id, child.item_id, D("2"))
     db_session.commit()
 
-    out = iop.preview(
-        db_session,
-        work_type="process",
-        sub_type="produce",
-        targets=[_target(parent.item_id, "1", source_kind="manual")],
-        to_department="조립",
-    )
-
-    bundle = out["bundles"][0]
-    assert bundle["source_kind"] == "manual"
-    assert len(bundle["lines"]) == 1
-    assert bundle["lines"][0]["item_id"] == parent.item_id
-    assert bundle["lines"][0]["origin"] == "manual"
-    assert bundle["lines"][0]["direction"] == "in"
+    with pytest.raises(ValueError, match="수량보정 입고"):
+        iop.preview(
+            db_session,
+            work_type="process",
+            sub_type="produce",
+            targets=[_target(parent.item_id, "1", source_kind="manual")],
+            to_department="조립",
+        )

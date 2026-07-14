@@ -3,6 +3,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import type {
   HistoryDetailSummary,
+  HistoryDetailImpact,
   HistoryDetailSummaryTone,
 } from "./historyDetailSummary";
 
@@ -15,8 +16,14 @@ const STATUS_COLORS: Record<HistoryDetailSummaryTone, string> = {
 
 export function HistoryKeyPointSummary({
   summary,
+  impactStatus = "ready",
+  onRetryImpact,
+  onImpactClick,
 }: {
   summary: HistoryDetailSummary;
+  impactStatus?: "ready" | "loading" | "error";
+  onRetryImpact?: () => void;
+  onImpactClick?: (impact: HistoryDetailImpact) => void;
 }) {
   const statusColor = STATUS_COLORS[summary.status.tone];
 
@@ -59,7 +66,7 @@ export function HistoryKeyPointSummary({
         </div>
       )}
 
-      {summary.impactGroups.length > 0 && (
+      {(impactStatus !== "ready" || summary.impactGroups.length > 0) && (
         <div className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
           <div
             className="flex items-center gap-1.5 px-4 pb-1 pt-3 text-xs font-bold"
@@ -68,7 +75,27 @@ export function HistoryKeyPointSummary({
             <Activity className="h-4 w-4" />
             실제 영향
           </div>
-          {summary.impactGroups.map((group) => (
+          {impactStatus === "loading" && (
+            <div className="px-4 pb-3 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              실제 영향 불러오는 중
+            </div>
+          )}
+          {impactStatus === "error" && (
+            <div className="flex items-center justify-between gap-3 px-4 pb-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              <span>실제 영향을 불러오지 못했습니다.</span>
+              {onRetryImpact && (
+                <button
+                  type="button"
+                  onClick={onRetryImpact}
+                  className="rounded-full border px-2.5 py-1 font-bold"
+                  style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+                >
+                  실제 영향 다시 불러오기
+                </button>
+              )}
+            </div>
+          )}
+          {impactStatus === "ready" && summary.impactGroups.map((group) => (
             <div key={group.key} className="px-4 pb-3">
               {group.label && (
                 <div className="pb-1 pt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
@@ -78,14 +105,10 @@ export function HistoryKeyPointSummary({
               <div>
                 {group.effects.map((effect, index) => {
                   const color = effect.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
-                  return (
-                    <div
-                      key={effect.key}
-                      className={`flex min-h-11 items-center justify-between gap-3 py-2 ${
-                        index > 0 ? "border-t" : ""
-                      }`}
-                      style={{ borderColor: LEGACY_COLORS.border }}
-                    >
+                  const rowClass = `flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left ${
+                    index > 0 ? "border-t" : ""
+                  }`;
+                  const contents = <>
                       <div className="min-w-0">
                         <div className="flex min-w-0 items-center gap-1.5">
                           {effect.role && (
@@ -107,6 +130,20 @@ export function HistoryKeyPointSummary({
                       <div className="shrink-0 text-sm font-black" style={{ color }}>
                         {effect.deltaLabel}{effect.unit ? ` ${effect.unit}` : ""}
                       </div>
+                    </>;
+                  return onImpactClick && effect.role ? (
+                    <button
+                      key={effect.key}
+                      type="button"
+                      onClick={() => onImpactClick(effect)}
+                      className={`${rowClass} hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
+                      style={{ borderColor: LEGACY_COLORS.border }}
+                    >
+                      {contents}
+                    </button>
+                  ) : (
+                    <div key={effect.key} className={rowClass} style={{ borderColor: LEGACY_COLORS.border }}>
+                      {contents}
                     </div>
                   );
                 })}

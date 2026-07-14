@@ -477,6 +477,63 @@ def test_io_immediate_adjust_in_increases_production_quantity(
     assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
 
 
+def _manual_produce_payload(requester: Employee, item) -> dict:
+    return {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": "produce",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+        "bundles": [
+            {
+                "bundle_id": str(uuid.uuid4()),
+                "source_kind": "manual",
+                "title": item.item_name,
+                "source_item_id": str(item.item_id),
+                "quantity": 1,
+                "lines": [
+                    {
+                        "line_id": str(uuid.uuid4()),
+                        "item_id": str(item.item_id),
+                        "item_name": item.item_name,
+                        "unit": "EA",
+                        "direction": "in",
+                        "from_bucket": "none",
+                        "to_bucket": "production",
+                        "to_department": DepartmentEnum.ASSEMBLY.value,
+                        "quantity": 1,
+                        "origin": "manual",
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_io_submit_rejects_manual_produce_payload(client, db_session, make_item):
+    item = make_item(name="Manual Produce Submit", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    response = client.post("/api/io/submit", json=_manual_produce_payload(requester, item))
+
+    assert response.status_code == 422, response.json()
+    assert "수량보정 입고" in str(response.json())
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+
+def test_io_draft_rejects_manual_produce_payload(client, db_session, make_item):
+    item = make_item(name="Manual Produce Draft", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    response = client.put("/api/io/draft", json=_manual_produce_payload(requester, item))
+
+    assert response.status_code == 422, response.json()
+    assert "수량보정 입고" in str(response.json())
+    assert db_session.query(IoBatch).count() == 0
+
+
 def test_io_immediate_adjust_out_decreases_production_quantity(
     client, db_session, make_item, make_location
 ):

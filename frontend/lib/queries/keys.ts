@@ -56,6 +56,7 @@ export const queryKeys = {
     all: ["transactions"] as const,
     list: (params?: object) => ["transactions", "list", params ?? {}] as const,
     summary: (params?: object) => ["transactions", "summary", params ?? {}] as const,
+    referenceSummaries: (params?: object) => ["transactions", "referenceSummaries", params ?? {}] as const,
     edits: (logId: string) => ["transactions", "edits", logId] as const,
     monthlyCounts: (year: number) => ["transactions", "monthlyCounts", year] as const,
   },

@@ -32,6 +32,8 @@ from app.models import (
     Item,
     LocationStatusEnum,
     RequestBucketEnum,
+    ShippingRequest,
+    StockRequest,
     StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
@@ -41,6 +43,7 @@ from app.services import inv_effect, inventory as inventory_svc, shipping as shi
 from app.services import io_dispatch
 from app.services.bom import explode_bom, merge_requirements
 from app.services.dept_adjustment import submit_normal_disassemble
+from app.services.inv_calc import _sync_total
 from app.services.production_receipt import execute_production_receipt
 
 
@@ -64,6 +67,15 @@ class ShowcaseResult:
     marker: str
     log_ids: list[uuid.UUID]
     transaction_types: list[str]
+
+
+@dataclass(frozen=True)
+class ShowcaseCleanupResult:
+    marker: str
+    log_count: int
+    batch_count: int
+    stock_request_count: int
+    shipping_request_count: int
 
 
 def _location_qty(db, item_id: uuid.UUID, department: DepartmentEnum, status: LocationStatusEnum) -> Decimal:
@@ -447,6 +459,132 @@ def apply_showcase(db, marker: str | None = None) -> ShowcaseResult:
     except Exception:
         db.rollback()
         raise
+
+
+def _marker_logs(db, marker: str) -> list[TransactionLog]:
+    return (
+        db.query(TransactionLog)
+        .filter(
+            TransactionLog.reference_no.contains(marker)
+            | TransactionLog.notes.contains(marker)
+            | TransactionLog.reason_memo.contains(marker)
+            | TransactionLog.reason_category.contains(marker)
+        )
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.log_id.desc())
+        .all()
+    )
+
+
+def _combined_effects(logs: list[TransactionLog]) -> tuple[dict[uuid.UUID, list[dict]], set[tuple[uuid.UUID, str, str]]]:
+    cells_by_item: dict[uuid.UUID, dict[tuple[str, str, str], int]] = {}
+    location_cells: set[tuple[uuid.UUID, str, str]] = set()
+    for log in logs:
+        cells = cells_by_item.setdefault(log.item_id, {})
+        for effect in log.inventory_effect or []:
+            scope = effect.get("scope")
+            if scope == "location":
+                value = str(effect["department"])
+                status = str(effect["status"])
+                location_cells.add((log.item_id, value, status))
+            elif scope == "warehouse_box":
+                value = str(effect["box_id"])
+                status = ""
+            else:
+                scope, value, status = "warehouse", "", ""
+            key = (scope, value, status)
+            cells[key] = cells.get(key, 0) + int(effect["delta"])
+
+    combined: dict[uuid.UUID, list[dict]] = {}
+    for item_id, cells in cells_by_item.items():
+        entries: list[dict] = []
+        for (scope, value, status), delta in cells.items():
+            if delta == 0:
+                continue
+            entry: dict = {"scope": scope, "delta": delta}
+            if scope == "location":
+                entry.update(department=value, status=status)
+            elif scope == "warehouse_box":
+                entry["box_id"] = value
+            entries.append(entry)
+        combined[item_id] = entries
+    return combined, location_cells
+
+
+def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
+    """Remove one marked showcase run and reverse only its recorded inventory effects."""
+    if not marker.startswith(DEMO_TAG):
+        raise ValueError(f"{DEMO_TAG} marker is required for cleanup.")
+
+    logs = _marker_logs(db, marker)
+    if not logs:
+        raise ValueError(f"No showcase logs found for marker: {marker}")
+
+    batches = (
+        db.query(IoBatch)
+        .filter(IoBatch.reference_no.contains(marker) | IoBatch.notes.contains(marker))
+        .all()
+    )
+    stock_requests = (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.reference_no.contains(marker)
+            | StockRequest.notes.contains(marker)
+            | StockRequest.reason_memo.contains(marker)
+        )
+        .all()
+    )
+    shipping_requests = db.query(ShippingRequest).filter(ShippingRequest.notes.contains(marker)).all()
+    marked_ids = {log.log_id for log in logs}
+    for batch in batches:
+        attached = db.query(TransactionLog.log_id).filter(TransactionLog.operation_batch_id == batch.batch_id).all()
+        if any(log_id not in marked_ids for (log_id,) in attached):
+            raise ValueError(f"Unmarked transaction is attached to showcase batch: {batch.batch_id}")
+    for request in shipping_requests:
+        attached = db.query(TransactionLog.log_id).filter(TransactionLog.shipping_request_id == request.request_id).all()
+        if any(log_id not in marked_ids for (log_id,) in attached):
+            raise ValueError(f"Unmarked transaction is attached to showcase shipping request: {request.request_id}")
+
+    effects, location_cells = _combined_effects(logs)
+    for item_id, effect in effects.items():
+        inv_effect.apply_effect_reverse(db, item_id, effect)
+    db.flush()
+    for item_id, department, status in location_cells:
+        location = (
+            db.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == item_id,
+                InventoryLocation.department == department,
+                InventoryLocation.status == LocationStatusEnum(status),
+                InventoryLocation.quantity == 0,
+            )
+            .first()
+        )
+        if location is not None:
+            db.delete(location)
+    db.flush()
+    for item_id in effects:
+        inventory = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        if inventory is not None:
+            _sync_total(db, inventory)
+
+    for log in logs:
+        db.delete(log)
+    db.flush()
+    for batch in batches:
+        db.delete(batch)
+    for request in stock_requests:
+        db.delete(request)
+    for request in shipping_requests:
+        db.delete(request)
+    db.flush()
+
+    return ShowcaseCleanupResult(
+        marker=marker,
+        log_count=len(logs),
+        batch_count=len(batches),
+        stock_request_count=len(stock_requests),
+        shipping_request_count=len(shipping_requests),
+    )
 
 
 def main() -> int:

@@ -18,6 +18,7 @@ import {
   HISTORY_CHILD_CELL_CLASS,
   HISTORY_CHILD_ROW_CLASS,
   ItemCodeCell,
+  MovementSummaryCell,
   SpacerCell,
 } from "./historyTableHelpers";
 
@@ -39,6 +40,13 @@ type Props = {
   highlightItemId?: string | null;
   controlsId?: string;
 };
+
+const SIGN_TONE_MOVEMENT = {
+  increase: "primary",
+  decrease: "danger",
+  move: "info",
+  muted: "muted",
+} as const;
 
 export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId }: Props) {
   const [batch, setBatch] = useState<IoBatch | null>(cache.get(batchId) ?? null);
@@ -227,14 +235,17 @@ function BundleRows({
                   event.preventDefault();
                   onToggle();
                 }}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] hover:brightness-125"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] hover:brightness-125"
                 style={{ background: "color-mix(in srgb, var(--c-blue) 10%, transparent)" }}
               >
                 {expanded
                   ? <ChevronDown className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.blue }} />
                   : <ChevronRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />}
               </button>
-            ) : null}
+            ) : <span aria-hidden className="h-5 w-5 shrink-0" />}
+            {isBomParent
+              ? <GitBranch className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+              : <Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
             <TruncatedText
               accessibilityLabel={bundle.title}
               className="line-clamp-2 min-w-0 break-words text-xs font-bold leading-snug"
@@ -250,7 +261,12 @@ function BundleRows({
           {isBomParent ? `부품 ${childLines.length}라인` : "단품 라인"}
         </td>
         <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
-          {headerQtyText}
+          {headerSigned ? (
+            <MovementSummaryCell
+              summary={{ parts: [{ label: headerSigned.label, tone: SIGN_TONE_MOVEMENT[headerSigned.tone] }] }}
+              compact={compact}
+            />
+          ) : headerQtyText}
         </td>
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap gap-1">
@@ -323,7 +339,8 @@ function BomLineRow({
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-2">
-          <span className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
+          <span aria-hidden className="h-5 w-5 shrink-0" />
+          <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={line.item_name}
             className="truncate text-xs font-semibold leading-snug"
@@ -339,7 +356,10 @@ function BomLineRow({
         {getLineRoleLabel(line, batch)}
       </td>
       <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: qtyColor }}>
-        {signed.label}
+        <MovementSummaryCell
+          summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
+          compact={compact}
+        />
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <StatusBadge included={line.included} shortage={line.shortage} />

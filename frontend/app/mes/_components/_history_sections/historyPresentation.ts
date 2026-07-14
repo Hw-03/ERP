@@ -1,4 +1,5 @@
 import type { TransactionLog } from "@/lib/api/types/production";
+import type { TransactionReferenceSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
 import {
@@ -206,7 +207,10 @@ export function isShippingReference(input: {
   return /^출하\s/.test(notes);
 }
 
-export function getReferenceBatchPresentation(logs: TransactionLog[]): ReferenceBatchPresentation {
+export function getReferenceBatchPresentation(
+  logs: TransactionLog[],
+  summary?: TransactionReferenceSummary | null,
+): ReferenceBatchPresentation {
   const first = logs[0];
   const phase = getShippingPhase(logs);
   const phaseOperationLabel = getShippingPhaseOperationLabel(phase);
@@ -235,10 +239,10 @@ export function getReferenceBatchPresentation(logs: TransactionLog[]): Reference
     phase,
     operationLabel,
     flowLabel: sourceTarget ? getComponentChangeFlowLabel(logs) : flowLabel,
-    targetTitle: shipmentTarget?.title ?? `${titlePrefix} ${logs.length}건`,
+    targetTitle: shipmentTarget?.title ?? (summary === null ? titlePrefix : `${titlePrefix} ${summary?.logCount ?? logs.length}건`),
     targetCode: shipmentTarget?.code ?? (homogeneous ? first.mes_code : null),
     targetMeta: [],
-    movement: summarizeReferenceLogs(logs, movementVerb, movementTone),
+    movement: summarizeReferenceLogs(logs, movementVerb, movementTone, summary),
     sourceTarget,
   };
 }
@@ -303,18 +307,22 @@ function summarizeReferenceLogs(
   logs: TransactionLog[],
   verb: string,
   tone: MovementSummary["parts"][number]["tone"],
+  summary?: TransactionReferenceSummary | null,
 ): MovementSummary {
+  if (summary === null) return { parts: [{ label: "세부 —", tone: "muted" }] };
   if (logs.length === 0) return { parts: [{ label: `${verb} 0건`, tone }] };
-  const itemCount = new Set(logs.map((log) => log.item_id)).size;
-  let total = 0;
+  const itemCount = summary?.itemCount ?? new Set(logs.map((log) => log.item_id)).size;
+  let total = summary?.totalQuantity ?? 0;
   const units = new Set<string>();
-  for (const log of logs) {
-    const moved = log.transfer_qty != null ? Number(log.transfer_qty) : Math.abs(Number(log.quantity_change));
-    if (Number.isFinite(moved)) total += Math.abs(moved);
-    const unit = log.item_unit?.trim();
-    if (unit) units.add(unit);
+  if (!summary) {
+    for (const log of logs) {
+      const moved = log.transfer_qty != null ? Number(log.transfer_qty) : Math.abs(Number(log.quantity_change));
+      if (Number.isFinite(moved)) total += Math.abs(moved);
+      const unit = log.item_unit?.trim();
+      if (unit) units.add(unit);
+    }
   }
-  const unit = units.size === 1 ? Array.from(units)[0] : null;
+  const unit = summary?.unit ?? (units.size === 1 ? Array.from(units)[0] : null);
   const qtyLabel = total > 0
     ? unit
       ? ` · ${formatQty(total)} ${unit}`

@@ -27,21 +27,19 @@ type Props = {
   log: TransactionLog;
   selected: boolean;
   onSelect: (log: TransactionLog) => void;
-  /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
-  compact?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
   controlsId?: string;
   separationHint?: string | null;
 };
 
-function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggle, controlsId, separationHint }: Props) {
+function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint }: Props) {
   const [hovered, setHovered] = useState(false);
-  const padX = compact ? "px-2" : "px-4";
-  const targetPadX = compact ? "px-2" : "px-4";
+  const padX = "px-4";
+  const targetPadX = "px-4";
   const flowPadX = "px-2";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-1" : "px-4";
+  const quantityPadX = "px-4";
+  const statusPadX = "px-4";
   const basePresentation = getHistoryRowPresentation(log);
   const presentation = separationHint
     ? { ...basePresentation, statusChips: [...basePresentation.statusChips, { label: separationHint, tone: "muted" as const }] }
@@ -49,7 +47,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggl
   const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(log.transaction_type);
 
   const rowBackground = selected
-    ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+    ? tint(tcolor, hovered ? 18 : 10)
     : hovered
       ? tint(tcolor, 14)
       : undefined;
@@ -75,7 +73,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggl
       className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${log.cancelled ? " opacity-60" : ""}`}
       style={{
         background: rowBackground,
-        outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+        outline: selected ? `1.5px solid ${tcolor}` : "none",
         transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
@@ -93,7 +91,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggl
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={log.transaction_type} label={presentation.operation.label} color={tcolor} compact={compact} />
+        <FlowBadge type={log.transaction_type} label={presentation.operation.label} color={tcolor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock
@@ -101,16 +99,16 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact, expanded, onToggl
           icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
         />
       </td>
-      <ItemCodeCell code={presentation.target.code} compact={compact} />
-      <SpacerCell compact={compact} />
+      <ItemCodeCell code={presentation.target.code} />
+      <SpacerCell />
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} compact={compact} />
+        <QuantityStockCell presentation={presentation} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} compact={compact} />
+        <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
   );

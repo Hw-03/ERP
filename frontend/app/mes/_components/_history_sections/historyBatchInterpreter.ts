@@ -4,7 +4,7 @@
  * 내부 bucket→라벨 규칙, sub_type/tx 우선순위를 이 모듈에 은닉.
  * 소비자는 historyShared 재export 또는 직접 import.
  */
-import type { Department } from "@/lib/api/types/shared";
+import type { Department, TransactionType } from "@/lib/api/types/shared";
 import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
 import {
@@ -23,6 +23,41 @@ function _deptName(dept: Department | string | null | undefined): string | null 
 }
 
 type BucketSlot = { bucket: string; dept: string | null };
+
+/** 과거에 produce로 저장됐지만 실제로는 수동 단품 증가뿐인 배치인지 판별한다. */
+export function isManualOnlyProductionBatch(batch: IoBatch | null | undefined): boolean {
+  if (batch?.sub_type !== "produce" || batch.bundles.length === 0) return false;
+  return batch.bundles.every((bundle) => {
+    const included = bundle.lines.filter((line) => line.included);
+    return bundle.source_kind === "manual"
+      && included.length > 0
+      && included.every((line) =>
+        line.origin === "manual"
+        && line.direction === "in"
+        && line.from_bucket === "none"
+        && line.to_bucket === "production",
+      );
+  });
+}
+
+function _historySubType(batch: IoBatch): string {
+  return isManualOnlyProductionBatch(batch) ? "adjust_in" : batch.sub_type;
+}
+
+export function getHistoryDisplayTransactionType(
+  log: { transaction_type: TransactionType },
+  batch?: IoBatch | null,
+): TransactionType;
+export function getHistoryDisplayTransactionType(
+  log: { transaction_type: string },
+  batch?: IoBatch | null,
+): string;
+export function getHistoryDisplayTransactionType(
+  log: { transaction_type: string },
+  batch?: IoBatch | null,
+): string {
+  return isManualOnlyProductionBatch(batch) ? "ADJUST" : log.transaction_type;
+}
 
 function _bucketSlotKey(s: BucketSlot): string {
   return `${s.bucket}|${s.dept ?? ""}`;
@@ -73,7 +108,7 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   // 부모(out)/자식(in) 라인이 반대 방향이라 _bucketSlot mix 가 발생하지만,
   // 사용자 인지상 "한 부서 안에서 끝나는 작업" — 그 부서로 단일 표기.
   // 단, 창고 관련 sub_type(receive_supplier, warehouse_to_dept 등)은 bucket 분석 필요.
-  const subType = batch.sub_type ?? null;
+  const subType = _historySubType(batch);
   const sameDeptOnlyTypes = new Set(["produce", "disassemble", "adjust_in", "adjust_out"]);
   const batchFrom = _deptName(batch.from_department);
   const batchTo = _deptName(batch.to_department);
@@ -265,7 +300,7 @@ export function getHistoryOperationLabel(
   batch?: IoBatch | null,
 ): string {
   if (batch?.sub_type) {
-    const fromSub = _SUB_TYPE_OPERATION[batch.sub_type];
+    const fromSub = _SUB_TYPE_OPERATION[_historySubType(batch)];
     if (fromSub) return fromSub;
   }
   return _TX_OPERATION[log.transaction_type] ?? log.transaction_type;
@@ -292,7 +327,7 @@ export function getHistoryDisplaySubLabel(
   batch?: IoBatch | null,
 ): string | undefined {
   if (batch?.sub_type) {
-    const fromSub = _DISPLAY_SUB_LABEL[batch.sub_type];
+    const fromSub = _DISPLAY_SUB_LABEL[_historySubType(batch)];
     if (fromSub) return fromSub;
   }
   const fromTx = _DISPLAY_SUB_LABEL[log.transaction_type];
@@ -603,8 +638,8 @@ export function getHistoryMovementSummary(
     }
   }
 
-  const sub = batch.sub_type;
-  const tx = log.transaction_type;
+  const sub = _historySubType(batch);
+  const tx = getHistoryDisplayTransactionType(log, batch);
   const parts: MovementSummaryPart[] = [];
 
   if (sub === "produce" || tx === "PRODUCE" || sub === "disassemble" || tx === "DISASSEMBLE") {

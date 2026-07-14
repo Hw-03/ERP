@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.models import IoBatch
-from app.services.io_preview import APPROVAL_SUB_TYPES
+from app.services.io_preview import APPROVAL_SUB_TYPES, validate_operation_sources
 from app.services.io_persist import (
     _add_bundles_and_lines,
     _batch_to_payload,
@@ -28,6 +28,10 @@ def save_draft(db: Session, payload) -> dict:
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
+    validate_operation_sources(
+        payload.sub_type,
+        (bundle.source_kind for bundle in payload.bundles),
+    )
     requester = _load_requester(db, payload.requester_employee_id)
     incoming_batch_id = getattr(payload, "batch_id", None)
 

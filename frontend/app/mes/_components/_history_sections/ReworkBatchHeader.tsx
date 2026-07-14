@@ -119,7 +119,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} compact={compact} />
+        <QuantityStockCell presentation={presentation} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />

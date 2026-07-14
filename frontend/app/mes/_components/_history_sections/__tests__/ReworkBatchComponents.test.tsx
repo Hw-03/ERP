@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api/types/production";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { ReworkBatchDetail } from "../ReworkBatchDetail";
 import { ReworkBatchHeader } from "../ReworkBatchHeader";
 import type { LogGroup } from "../historyTableHelpers";
@@ -59,10 +61,12 @@ function makeGroup(): Extract<LogGroup, { type: "batch" }> {
 
 function renderHeader({
   compact = false,
+  selected = false,
   onSelect = vi.fn(),
   onToggle = vi.fn(),
 }: {
   compact?: boolean;
+  selected?: boolean;
   onSelect?: ReturnType<typeof vi.fn>;
   onToggle?: ReturnType<typeof vi.fn>;
 } = {}) {
@@ -73,7 +77,7 @@ function renderHeader({
           group={makeGroup()}
           expanded={false}
           onToggle={onToggle}
-          selected={false}
+          selected={selected}
           onSelect={onSelect}
           compact={compact}
           controlsId="rework-detail"
@@ -94,7 +98,19 @@ function setBoxMetrics(
 }
 
 describe("ReworkBatchHeader", () => {
-  it("uses the stable operation badge and compact cell padding contract", () => {
+  it("keeps the rework color when selected", () => {
+    renderHeader({ selected: true });
+
+    const row = screen.getByRole("button", { name: "묶음 펼치기" }).closest("tr")!;
+    expect(row).toHaveStyle({
+      background: tint(LEGACY_COLORS.red, 12),
+      outline: `1.5px solid ${LEGACY_COLORS.red}`,
+    });
+    fireEvent.mouseEnter(row);
+    expect(row).toHaveStyle({ background: tint(LEGACY_COLORS.red, 18) });
+  });
+
+  it("keeps the operation badge width when the table is constrained", () => {
     renderHeader({ compact: true });
 
     const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
@@ -107,8 +123,8 @@ describe("ReworkBatchHeader", () => {
     expect(cells[4]).toHaveClass("px-2");
     expect(cells[5]).toHaveClass("px-2");
     expect(cells[6]).toHaveClass("px-2");
-    expect(quantityPill).toHaveClass("min-w-0", "flex-1");
-    expect(quantityPill).not.toHaveClass("min-w-[10.25rem]");
+    expect(quantityPill).toHaveClass("min-w-[12.75rem]");
+    expect(quantityPill).not.toHaveClass("min-w-0", "flex-1");
   });
 
   it.each(["Enter", " "])("keeps row selection separate from chevron toggle with %s", (key) => {

@@ -103,6 +103,112 @@ def test_summary_empty_db(client):
     }
 
 
+def test_reference_summaries_use_all_matching_logs_and_exclude_operation_batches(
+    client, db_session, make_item
+):
+    """Reference summaries are complete, phase-scoped, and independent of list pages."""
+    first = make_item(name="reference-summary-first", warehouse_qty=Decimal("0"))
+    second = make_item(name="reference-summary-second", warehouse_qty=Decimal("0"))
+    second.unit = "BOX"
+
+    db_session.add_all(
+        [
+            TransactionLog(
+                item_id=first.item_id,
+                transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=Decimal("-4"),
+                quantity_before=Decimal("4"),
+                quantity_after=Decimal("0"),
+                reference_no="REF-ALL",
+                shipping_phase="PREPARE",
+            ),
+            TransactionLog(
+                item_id=first.item_id,
+                transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=Decimal("-99"),
+                quantity_before=Decimal("99"),
+                quantity_after=Decimal("0"),
+                transfer_qty=Decimal("3"),
+                reference_no="REF-ALL",
+                shipping_phase="PREPARE",
+            ),
+            TransactionLog(
+                item_id=second.item_id,
+                transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=Decimal("5"),
+                quantity_before=Decimal("0"),
+                quantity_after=Decimal("5"),
+                reference_no="REF-ALL",
+                shipping_phase="PREPARE",
+            ),
+            TransactionLog(
+                item_id=first.item_id,
+                transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=Decimal("-7"),
+                quantity_before=Decimal("7"),
+                quantity_after=Decimal("0"),
+                reference_no="REF-ALL",
+                shipping_phase="PICKUP",
+            ),
+        ]
+    )
+    employee = Employee(
+        employee_code="REFERENCE-SUMMARY",
+        name="Reference Summary",
+        role="operator",
+        department="assembly",
+    )
+    db_session.add(employee)
+    db_session.flush()
+    batch = IoBatch(
+        work_type="process",
+        sub_type="produce",
+        requester_employee_id=employee.employee_id,
+        requester_name=employee.name,
+        requester_department=employee.department,
+    )
+    db_session.add(batch)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=first.item_id,
+            transaction_type=TransactionTypeEnum.SHIP,
+            quantity_change=Decimal("-50"),
+            quantity_before=Decimal("50"),
+            quantity_after=Decimal("0"),
+            operation_batch_id=batch.batch_id,
+            reference_no="REF-ALL",
+            shipping_phase="PREPARE",
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/reference-summaries",
+        params={"transaction_types": "SHIP"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == [
+        {
+            "reference_no": "REF-ALL",
+            "shipping_phase": "PICKUP",
+            "log_count": 1,
+            "item_count": 1,
+            "total_quantity": 7,
+            "unit": "EA",
+        },
+        {
+            "reference_no": "REF-ALL",
+            "shipping_phase": "PREPARE",
+            "log_count": 3,
+            "item_count": 2,
+            "total_quantity": 12,
+            "unit": None,
+        },
+    ]
+
+
 def test_summary_categorizes_by_transaction_type(client, db_session, make_item):
     """RECEIVE/SHIP/TRANSFER_TO_PROD/PRODUCE/BACKFLUSH/ADJUST 시드 → 카테고리별 카운트."""
     item = make_item(name="요약테스트품", warehouse_qty=Decimal("0"))

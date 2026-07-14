@@ -7,16 +7,19 @@ import {
   Package, PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench,
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
+import type { TransactionReferenceSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import type { HistoryPresentationTone, HistoryRowPresentation } from "./historyPresentation";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { formatQty } from "@/lib/mes/format";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import {
   describeBatchFlow,
   getHistoryActor,
   getHistoryDisplayLabel,
+  getHistoryDisplayTransactionType,
   getHistoryMovementSummary,
   parseTransactionNotes,
   type MovementSummary,
@@ -79,6 +82,26 @@ export const TONE_COLOR: Record<MovementTone, string> = {
   danger: LEGACY_COLORS.red,
   muted: LEGACY_COLORS.muted2,
 };
+
+/** 펼침 하위 거래 행은 역할 대신 실제 증감량만 같은 pill 형식으로 표시한다. */
+export function getHistoryLogSignedQuantity(log: TransactionLog): MovementSummary {
+  const delta = Number(log.quantity_change);
+  const transferred = log.transfer_qty == null ? null : Math.abs(Number(log.transfer_qty));
+  const quantity = Number.isFinite(transferred) ? transferred : Math.abs(delta);
+  const unit = log.item_unit?.trim() ?? "";
+  const suffix = unit ? ` ${unit}` : "";
+  const label = delta > 0
+    ? `+${formatQty(quantity)}${suffix}`
+    : delta < 0
+      ? `-${formatQty(quantity)}${suffix}`
+      : `0${suffix}`;
+  return {
+    parts: [{
+      label,
+      tone: delta > 0 ? "primary" : delta < 0 ? "danger" : "muted",
+    }],
+  };
+}
 
 function getPillDisplayLabel(label: string): { label: string; title?: string } {
   const match = label.match(/([+-])(\d[\d,]*(?:\.\d+)?)\s*([A-Za-z]+)$/);
@@ -283,21 +306,14 @@ export function QuantityStockCell({
   presentation,
   summary,
   dense = false,
-  compact = false,
 }: {
   presentation: HistoryRowPresentation;
   summary?: MovementSummary;
   dense?: boolean;
-  compact?: boolean;
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center overflow-hidden leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
-      <MovementSummaryCell summary={summary ?? presentation.movement} compact={compact} />
-      {presentation.stock && (
-        <span className="max-w-full truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {presentation.stock.label}
-        </span>
-      )}
+    <div className={`flex items-center justify-center overflow-hidden ${dense ? "h-10" : "h-11"}`}>
+      <MovementSummaryCell summary={summary ?? presentation.movement} />
     </div>
   );
 }
@@ -577,30 +593,33 @@ export function BatchHeader({
   onToggle,
   selected,
   onSelect,
-  compact,
   controlsId,
   separationHint,
+  referenceSummary,
+  referenceSummaryLoading = false,
 }: {
   group: Extract<LogGroup, { type: "batch" }>;
   expanded: boolean;
   onToggle: () => void;
   selected: boolean;
   onSelect: () => void;
-  /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
-  compact?: boolean;
   controlsId?: string;
   separationHint?: string | null;
+  referenceSummary?: TransactionReferenceSummary | null;
+  referenceSummaryLoading?: boolean;
 }) {
-  const padX = compact ? "px-2" : "px-4";
-  const targetPadX = compact ? "px-2" : "px-4";
+  const padX = "px-4";
+  const targetPadX = "px-4";
   const flowPadX = "px-2";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const quantityPadX = "px-4";
+  const statusPadX = "px-4";
   const first = group.logs[0];
-  const referencePresentation = getReferenceBatchPresentation(group.logs);
+  const referencePresentation = getReferenceBatchPresentation(group.logs, referenceSummary);
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
-  const summary = referencePresentation.movement;
+  const summary = referenceSummary === null
+    ? { parts: [{ label: referenceSummaryLoading ? "세부 확인 중" : "세부 —", tone: "muted" as const }] }
+    : referencePresentation.movement;
   const basePresentation = getHistoryRowPresentation(first);
   const presentation: HistoryRowPresentation = {
     ...basePresentation,
@@ -627,7 +646,7 @@ export function BatchHeader({
   const cancelled = group.logs.some((log) => log.cancelled);
 
   const rowBackground = selected
-    ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+    ? tint(flowColor, hovered ? 18 : 10)
     : hovered
       ? tint(flowColor, 14)
       : undefined;
@@ -649,7 +668,7 @@ export function BatchHeader({
       className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
       style={{
         background: rowBackground,
-        outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+        outline: selected ? `1.5px solid ${flowColor}` : "none",
         transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
@@ -660,24 +679,26 @@ export function BatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} compact={compact} />
+        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <TargetSummaryBlock
-          presentation={presentation}
-          icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-        />
+        <div className="flex min-w-0 items-center gap-1.5">
+          <TargetSummaryBlock
+            presentation={presentation}
+            icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+          />
+        </div>
       </td>
-      <ItemCodeCell code={presentation.target.code} sourceCode={presentation.target.sourceCode} compact={compact} />
-      <SpacerCell compact={compact} />
+      <ItemCodeCell code={presentation.target.code} sourceCode={presentation.target.sourceCode} />
+      <SpacerCell />
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} compact={compact} />
+        <QuantityStockCell presentation={presentation} summary={summary} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <PeopleStatusCell presentation={presentation} compact={compact} />
+        <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
   );
@@ -889,13 +910,7 @@ function ReferenceBatchLineRow({
         boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
       }}
     >
-      <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        {onToggle && (
-          <div className="flex justify-center">
-            <ChevronToggleBtn expanded={expanded ?? true} onToggle={onToggle} controlsId={controlsId} />
-          </div>
-        )}
-      </td>
+      <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
       <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <FlowBadge
           type={log.transaction_type}
@@ -907,7 +922,9 @@ function ReferenceBatchLineRow({
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-2">
-          {!sectionLabel && <span className="mt-0.5 shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>└</span>}
+          {onToggle
+            ? <ChevronToggleBtn expanded={expanded ?? true} onToggle={onToggle} controlsId={controlsId} />
+            : <span aria-hidden className="h-5 w-5 shrink-0" />}
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={log.item_name}
@@ -925,7 +942,7 @@ function ReferenceBatchLineRow({
       </td>
       <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex h-10 items-center justify-center overflow-hidden">
-          <MovementSummaryCell summary={presentation.movement} compact={compact} />
+          <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} />
         </div>
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }} />
@@ -995,7 +1012,8 @@ export function OpBatchHeader({
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
-  const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
+  const rawPrimaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
+  const primaryType = getHistoryDisplayTransactionType({ transaction_type: rawPrimaryType }, batch);
   const basePresentation = getHistoryRowPresentation(first, batch ?? undefined);
   const flowColor = isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType);
   const cancelled = group.logs.some((log) => log.cancelled);
@@ -1024,7 +1042,7 @@ export function OpBatchHeader({
   const [hovered, setHovered] = useState(false);
 
   const rowBackground = selected
-    ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+    ? tint(flowColor, hovered ? 18 : 10)
     : hovered
       ? tint(flowColor, 14)
       : undefined;
@@ -1048,7 +1066,7 @@ export function OpBatchHeader({
       className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
       style={{
         background: rowBackground,
-        outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+        outline: selected ? `1.5px solid ${flowColor}` : "none",
         transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
@@ -1062,10 +1080,12 @@ export function OpBatchHeader({
         <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} compact={compact} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <TargetSummaryBlock
-          presentation={presentation}
-          icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-        />
+        <div className="flex min-w-0 items-center gap-1.5">
+          <TargetSummaryBlock
+            presentation={presentation}
+            icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+          />
+        </div>
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <SpacerCell compact={compact} />
@@ -1073,7 +1093,7 @@ export function OpBatchHeader({
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} compact={compact} />
+        <QuantityStockCell presentation={presentation} summary={summary} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} compact={compact} />
