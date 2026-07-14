@@ -82,6 +82,39 @@ function makeBatch(): IoBatch {
   };
 }
 
+function makeDuplicateManualBatch(): IoBatch {
+  const batch = makeBatch();
+  const makeBundle = (bundleId: string, lineId: string) => ({
+    bundle_id: bundleId,
+    source_kind: "manual" as const,
+    title: "알루미늄 필터 (2T * Φ24)",
+    source_item_id: "item",
+    source_mes_code: "69-VR-0001",
+    quantity: 1,
+    expanded_level: 1,
+    lines: [makeLine({
+      line_id: lineId,
+      item_id: "item",
+      item_name: "알루미늄 필터 (2T * Φ24)",
+      mes_code: "69-VR-0001",
+      direction: "adjust",
+      from_bucket: "none",
+      from_department: null,
+      to_bucket: "production",
+      to_department: "조립",
+      quantity: 1,
+      bom_expected: null,
+      origin: "manual",
+    })],
+  });
+
+  return {
+    ...batch,
+    sub_type: "adjust_in",
+    bundles: [makeBundle("bundle-1", "line-1"), makeBundle("bundle-2", "line-2")],
+  };
+}
+
 describe("BomBatchDetail", () => {
   it.each(["Enter", " "])("uses a real button for BOM expansion with %s", (key) => {
     const batch = makeBatch();
@@ -111,5 +144,24 @@ describe("BomBatchDetail", () => {
     const child = screen.getByText("아주 긴 구성품 라인 이름");
     expect(child.closest("tr")).toHaveClass("h-[40px]");
     expect(document.getElementById(controlsId!)).toBe(child.closest("tr"));
+  });
+
+  it("merges duplicate manual item bundles into one displayed quantity", () => {
+    const batch = makeDuplicateManualBatch();
+    const { container } = render(
+      <table>
+        <tbody>
+          <BomBatchDetail
+            batchId={batch.batch_id}
+            colSpan={8}
+            cache={new Map([[batch.batch_id, batch]])}
+            onCached={vi.fn()}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(container.querySelectorAll("tbody > tr")).toHaveLength(1);
+    expect(screen.getByText("+2 EA")).toBeInTheDocument();
   });
 });

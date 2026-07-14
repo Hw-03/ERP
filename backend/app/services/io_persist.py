@@ -21,6 +21,7 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
 )
+from app.schemas.io import IoBundlePayload
 from app.services.io_preview import APPROVAL_SUB_TYPES, _enum_value, _new_id
 
 
@@ -198,10 +199,78 @@ def _persist_batch(
     return batch
 
 
+def _manual_single_bundle_key(bundle: IoBundlePayload) -> tuple | None:
+    """동일 클릭으로 중복 생성된 수동 단품 묶음만 병합할 수 있게 식별한다."""
+    if bundle.source_kind != "manual" or len(bundle.lines) != 1:
+        return None
+    line = bundle.lines[0]
+    if line.origin != "manual":
+        return None
+    return (
+        bundle.title,
+        bundle.source_item_id,
+        bundle.source_mes_code,
+        bundle.expanded_level,
+        line.item_id,
+        line.item_name,
+        line.mes_code,
+        line.unit,
+        line.direction,
+        line.from_bucket,
+        line.from_department,
+        line.to_bucket,
+        line.to_department,
+        line.included,
+        line.origin,
+        line.edited,
+        line.has_children,
+        line.exclusion_note,
+    )
+
+
+def _merge_duplicate_manual_bundles(
+    bundles: list[IoBundlePayload],
+) -> list[IoBundlePayload]:
+    """중복 수동 단품 묶음의 의도한 수량은 보존하고 저장 행만 하나로 합친다."""
+    merged: list[IoBundlePayload] = []
+    index_by_key: dict[tuple, int] = {}
+    for bundle in bundles:
+        key = _manual_single_bundle_key(bundle)
+        existing_index = index_by_key.get(key) if key is not None else None
+        if key is None or existing_index is None:
+            if key is not None:
+                index_by_key[key] = len(merged)
+            merged.append(bundle)
+            continue
+
+        existing = merged[existing_index]
+        existing_line = existing.lines[0]
+        incoming_line = bundle.lines[0]
+        merged_line = existing_line.model_copy(
+            update={
+                "quantity": existing_line.quantity + incoming_line.quantity,
+                "bom_expected": (
+                    existing_line.bom_expected + incoming_line.bom_expected
+                    if existing_line.bom_expected is not None
+                    and incoming_line.bom_expected is not None
+                    else None
+                ),
+                "shortage": existing_line.shortage + incoming_line.shortage,
+            }
+        )
+        merged[existing_index] = existing.model_copy(
+            update={
+                "quantity": existing.quantity + bundle.quantity,
+                "lines": [merged_line],
+            }
+        )
+    return merged
+
+
 def _add_bundles_and_lines(db: Session, batch: IoBatch, payload) -> None:
     """payload.bundles → IoBundle/IoLine 적재. 신규 생성(_persist_batch)과
     draft in-place 갱신(io_draft.save_draft)이 공유하는 단일 적재 루프."""
-    for incoming_bundle in payload.bundles:
+    for incoming_bundle in _merge_duplicate_manual_bundles(payload.bundles):
         bundle = IoBundle(
             bundle_id=incoming_bundle.bundle_id,
             batch_id=batch.batch_id,

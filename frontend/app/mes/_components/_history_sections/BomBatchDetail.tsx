@@ -9,6 +9,7 @@ import { formatQty } from "@/lib/mes/format";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import {
   getHistoryBomParentLine,
+  getDisplayBundles,
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
   type LineSignTone,
@@ -112,10 +113,11 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
   }
 
   if (!batch || batch.bundles.length === 0) return null;
+  const displayBundles = getDisplayBundles(batch);
 
   return (
     <>
-      {batch.bundles.map((bundle, index) => (
+      {displayBundles.map((bundle, index) => (
         <BundleRows
           key={bundle.bundle_id}
           bundle={bundle}

@@ -10,6 +10,7 @@ import { HistoryDetailPanel } from "./HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
 import type { HistorySelection } from "./historyConstants";
 import type { HistoryTableFocusTarget } from "./HistoryTable";
+import { getDisplayBundles } from "./historyBatchInterpreter";
 
 const HISTORY_DETAIL_TITLE_ID = "desktop-history-detail-title";
 
@@ -95,15 +96,16 @@ export function DesktopHistoryRightPanel({
         // 재작업(DISASSEMBLE 포함) batch 는 헤더 행과 동일하게 부모 품목명으로 표기.
         // bundles[0].title 은 created_at 정렬에 따라 자식 부품명이 올 수 있어 헷갈림.
         const disassembleLog = displaySelection.logs.find((l) => l.transaction_type === "DISASSEMBLE");
+        const displayBundles = batch ? getDisplayBundles(batch) : [];
         const titleText = disassembleLog
           ? `${disassembleLog.item_name} 재작업`
-          : batch && batch.bundles.length > 0
-          ? (batch.bundles.length > 1
-              ? `${batch.bundles[0].title} 외 ${batch.bundles.length - 1}건`
-              : batch.bundles[0].title)
+          : displayBundles.length > 0
+          ? (displayBundles.length > 1
+              ? `${displayBundles[0].title} 외 ${displayBundles.length - 1}건`
+              : displayBundles[0].title)
           : `${first.item_name} 외 ${displaySelection.logs.length - 1}건`;
         const subtitleText = disassembleLog?.mes_code
-          ?? batch?.bundles[0]?.source_mes_code
+          ?? displayBundles[0]?.source_mes_code
           ?? first.mes_code
           ?? undefined;
         return (

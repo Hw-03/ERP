@@ -19,6 +19,7 @@ import {
   describeBatchFlow,
   getHistoryActor,
   getHistoryDisplayLabel,
+  getDisplayBundles,
   getHistoryDisplayTransactionType,
   getHistoryMovementSummary,
   parseTransactionNotes,
@@ -1020,8 +1021,9 @@ export function OpBatchHeader({
 
   let titleText: string;
   if (batch && batch.bundles.length > 0) {
-    const head = batch.bundles[0].title;
-    titleText = batch.bundles.length > 1 ? `${head} 외 ${batch.bundles.length - 1}건` : head;
+    const displayBundles = getDisplayBundles(batch);
+    const head = displayBundles[0].title;
+    titleText = displayBundles.length > 1 ? `${head} 외 ${displayBundles.length - 1}건` : head;
   } else {
     titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
   }

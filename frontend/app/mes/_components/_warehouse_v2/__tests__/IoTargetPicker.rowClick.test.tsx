@@ -84,4 +84,25 @@ describe("IoTargetPicker row click", () => {
 
     expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual", "adjust_in");
   });
+
+  it("does not add a single-only process item twice when its nested button is clicked", () => {
+    const onAddItem = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="process"
+        subType="adjust_in"
+        deptIoDirection="in"
+        bundleSubType="adjust_in"
+        bomParents={new Set(["item-1"])}
+        onAddItem={onAddItem}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    fireEvent.click(within(row).getByRole("button", { name: "낱개" }));
+
+    expect(onAddItem).toHaveBeenCalledTimes(1);
+    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual", "adjust_in");
+  });
 });

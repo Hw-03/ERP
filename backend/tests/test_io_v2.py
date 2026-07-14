@@ -10,6 +10,7 @@ from app.models import (
     Inventory,
     InventoryLocation,
     IoBatch,
+    IoBundle,
     IoLine,
     LocationStatusEnum,
     StockRequest,
@@ -475,6 +476,66 @@ def test_io_immediate_adjust_in_increases_production_quantity(
     tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
     assert len(tx) == 1
     assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
+
+
+def test_io_submit_merges_duplicate_manual_single_item_bundles(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Duplicate Adj In", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("0"))
+    requester = _make_employee(db_session, department_role="primary")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "manual",
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    first_bundle = preview.json()["bundles"][0]
+    duplicate_bundle = {
+        **first_bundle,
+        "bundle_id": str(uuid.uuid4()),
+        "lines": [
+            {
+                **first_bundle["lines"][0],
+                "line_id": str(uuid.uuid4()),
+            }
+        ],
+    }
+
+    response = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": [first_bundle, duplicate_bundle],
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+    assert db_session.query(IoBundle).count() == 1
+    assert db_session.query(IoLine).count() == 1
+    persisted_bundle = db_session.query(IoBundle).one()
+    persisted_line = db_session.query(IoLine).one()
+    assert persisted_bundle.quantity == Decimal("2")
+    assert persisted_line.quantity == Decimal("2")
+    tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
+    assert len(tx) == 1
+    assert tx[0].quantity_change == Decimal("2")
 
 
 def _manual_produce_payload(requester: Employee, item) -> dict:

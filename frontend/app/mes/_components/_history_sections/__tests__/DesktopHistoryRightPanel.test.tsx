@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
+import type { IoBatch } from "@/lib/api/types/io";
 import { DesktopHistoryRightPanel } from "../DesktopHistoryRightPanel";
 
 vi.mock("../../common", () => ({
@@ -64,6 +65,60 @@ function makeLog(): TransactionLog {
   };
 }
 
+function makeDuplicateManualBatch(): IoBatch {
+  const makeBundle = (bundleId: string, lineId: string) => ({
+    bundle_id: bundleId,
+    source_kind: "manual" as const,
+    title: "알루미늄 필터",
+    source_item_id: "item-1",
+    source_mes_code: "R-001",
+    quantity: 1,
+    expanded_level: 1,
+    lines: [{
+      line_id: lineId,
+      item_id: "item-1",
+      item_name: "알루미늄 필터",
+      mes_code: "R-001",
+      unit: "EA",
+      direction: "adjust" as const,
+      from_bucket: "none" as const,
+      from_department: null,
+      to_bucket: "production" as const,
+      to_department: "진공",
+      quantity: 1,
+      bom_expected: null,
+      included: true,
+      origin: "manual" as const,
+      edited: false,
+      has_children: false,
+      shortage: 0,
+      exclusion_note: null,
+    }],
+  });
+  return {
+    batch_id: "batch-1",
+    work_type: "process",
+    sub_type: "adjust_in",
+    status: "completed",
+    requester_employee_id: "employee-1",
+    requester_name: "요청자 A",
+    requester_department: "진공",
+    approver_employee_id: "employee-1",
+    approver_name: "요청자 A",
+    from_department: null,
+    to_department: "진공",
+    requires_approval: false,
+    stock_request_id: null,
+    reference_no: null,
+    notes: null,
+    created_at: "2026-07-10T01:00:00Z",
+    updated_at: "2026-07-10T01:00:00Z",
+    submitted_at: "2026-07-10T01:00:00Z",
+    completed_at: "2026-07-10T01:00:00Z",
+    bundles: [makeBundle("bundle-1", "line-1"), makeBundle("bundle-2", "line-2")],
+  };
+}
+
 describe("DesktopHistoryRightPanel", () => {
   it("uses a non-modal complementary panel labelled by the stable title id", () => {
     const selection = { kind: "log" as const, log: makeLog() };
@@ -113,5 +168,28 @@ describe("DesktopHistoryRightPanel", () => {
     );
 
     expect(screen.getByTestId("history-detail-panel")).toHaveAttribute("data-allow-cancellation", "false");
+  });
+
+  it("uses the merged manual bundle count in the detail title", () => {
+    const log = { ...makeLog(), operation_batch_id: "batch-1" };
+    const selection = { kind: "batch" as const, batchId: "batch-1", logs: [log] };
+    render(
+      <DesktopHistoryRightPanel
+        selection={selection}
+        displaySelection={selection}
+        batchCache={new Map([["batch-1", makeDuplicateManualBatch()]])}
+        setBatchCache={() => {}}
+        onSelectLog={() => {}}
+        canGoBack={false}
+        onBack={() => {}}
+        onLogUpdated={() => {}}
+        onBatchCancelled={() => {}}
+        onFocusLineInList={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "알루미늄 필터" })).toBeInTheDocument();
+    expect(screen.queryByText("알루미늄 필터 외 1건")).not.toBeInTheDocument();
   });
 });

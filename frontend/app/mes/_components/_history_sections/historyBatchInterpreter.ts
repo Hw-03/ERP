@@ -5,7 +5,7 @@
  * 소비자는 historyShared 재export 또는 직접 import.
  */
 import type { Department, TransactionType } from "@/lib/api/types/shared";
-import type { IoBatch } from "@/lib/api/types/io";
+import type { IoBatch, IoBundle } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
 import {
   SUB_TYPE_LABEL as _SUB_LABEL,
@@ -23,6 +23,24 @@ function _deptName(dept: Department | string | null | undefined): string | null 
 }
 
 type BucketSlot = { bucket: string; dept: string | null };
+
+/** 과거 중복 클릭으로 생긴 동일 수동 단품 묶음을 표시 단계에서만 합친다. */
+export function getDisplayBundles(batch: IoBatch): IoBundle[] {
+  const merged = new Map<string, IoBundle>();
+
+  for (const bundle of batch.bundles) {
+    const line = bundle.lines[0];
+    const manual = bundle.source_kind === "manual" && bundle.lines.length < 2;
+    const key = manual ? line.item_id : bundle.bundle_id;
+    const existing = merged.get(key);
+    if (existing) {
+      existing.lines[0].quantity += line.quantity;
+    } else {
+      merged.set(key, manual ? { ...bundle, lines: [{ ...line }] } : bundle);
+    }
+  }
+  return Array.from(merged.values());
+}
 
 /** 과거에 produce로 저장됐지만 실제로는 수동 단품 증가뿐인 배치인지 판별한다. */
 export function isManualOnlyProductionBatch(batch: IoBatch | null | undefined): boolean {

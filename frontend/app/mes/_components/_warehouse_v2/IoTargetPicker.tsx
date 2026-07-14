@@ -596,7 +596,10 @@ function ItemTable({
                             <button
                               type="button"
                               disabled={bomDisabled}
-                              onClick={() => onAdd(item, "direct_item", bomTarget!)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onAdd(item, "direct_item", bomTarget!);
+                              }}
                               className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
                               style={{
                                 background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
@@ -613,7 +616,10 @@ function ItemTable({
                             <button
                               type="button"
                               disabled={singleDisabled}
-                              onClick={() => onAdd(item, "manual", singleTarget!)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onAdd(item, "manual", singleTarget!);
+                              }}
                               className="rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
                               style={{
                                 background: LEGACY_COLORS.s2,
