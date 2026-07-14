@@ -98,7 +98,7 @@ export function DesktopTopbar({
         </div>
 
         {status && (
-          <span key={statusNonce} style={{ animation: "statusFlash 0.35s ease-out" }}>
+          <span data-testid="desktop-status-target" key={statusNonce} style={{ animation: "statusFlash 0.35s ease-out" }}>
             {(() => {
               const isBrand = status === DEFAULT_STATUS;
               const tone = isBrand ? "brand" : inferToneFromStatus(status);

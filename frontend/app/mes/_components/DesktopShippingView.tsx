@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -54,6 +54,13 @@ type ConfirmAction =
   | { kind: "cancel"; request: ShippingRequest }
   | { kind: "delete"; request: ShippingRequest }
   | { kind: "pickup"; request: ShippingRequest };
+
+type NameValidationNotice = {
+  id: number;
+  message: string;
+  offsetX: number;
+  offsetY: number;
+};
 
 const EMPTY_STOCK_SHORTAGES: ShippingRequest["stock_shortages"] = [];
 const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
@@ -230,6 +237,20 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [matchResult, setMatchResult] = useState<ShippingBomMatchResponse | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [companionDraft, setCompanionDraft] = useState<CompanionDraftLine[]>([]);
+  const [nameValidationNotice, setNameValidationNotice] = useState<NameValidationNotice | null>(null);
+  const nameValidationNoticeIdRef = useRef(0);
+
+  const showNameValidationNotice = useCallback((message: string) => {
+    const target = document.querySelector<HTMLElement>('[data-testid="desktop-status-target"]');
+    const targetRect = target?.getBoundingClientRect();
+    nameValidationNoticeIdRef.current += 1;
+    setNameValidationNotice({
+      id: nameValidationNoticeIdRef.current,
+      message,
+      offsetX: targetRect ? targetRect.left + targetRect.width / 2 - window.innerWidth / 2 : 0,
+      offsetY: targetRect ? targetRect.top + targetRect.height / 2 - window.innerHeight / 2 : 0,
+    });
+  }, []);
 
   const displayItems = useMemo(() => {
     const byId = new Map<string, Item>();
@@ -775,6 +796,24 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     return () => window.clearTimeout(timer);
   }, [basePfId, draftLines, itemById, view]);
 
+  useEffect(() => {
+    if (!matchResult) return;
+
+    const basePfName = itemById.get(basePfId)?.item_name?.trim();
+    const basePaLine = draftLines.find((line) => (
+      line.parent_stage === "PF"
+      && itemById.get(line.child_item_id)?.process_type_code === "PA"
+    ));
+    const basePaName = basePaLine ? itemById.get(basePaLine.child_item_id)?.item_name?.trim() : undefined;
+
+    if (matchResult.requires_pa_name && basePaName) {
+      setCustomPaName((current) => current.trim() || basePaName);
+    }
+    if (matchResult.requires_pf_name && basePfName) {
+      setCustomPfName((current) => current.trim() || basePfName);
+    }
+  }, [basePfId, draftLines, itemById, matchResult]);
+
   function openSection(next: SectionTab) {
     navigateView(next === "request" ? "requestList" : "historyList");
   }
@@ -848,6 +887,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             onRequestQuantity={setRequestQuantity}
             onCustomPaName={setCustomPaName}
             onCustomPfName={setCustomPfName}
+            onStatusChange={onStatusChange}
+            onNameValidationNotice={showNameValidationNotice}
             onNotes={setNotes}
             onUpdateLine={updateDraftLine}
             onAddLine={addDraftLine}
@@ -954,6 +995,42 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
           onConfirm={() => void executeConfirmedAction()}
         />
       )}
+
+      {nameValidationNotice && (
+        <ShippingNameValidationNotice
+          key={nameValidationNotice.id}
+          notice={nameValidationNotice}
+          onArrive={() => {
+            onStatusChange(nameValidationNotice.message);
+            setNameValidationNotice((current) => current?.id === nameValidationNotice.id ? null : current);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ShippingNameValidationNotice({ notice, onArrive }: { notice: NameValidationNotice; onArrive: () => void }) {
+  const style = {
+    "--shipping-notice-x": `${notice.offsetX}px`,
+    "--shipping-notice-y": `${notice.offsetY}px`,
+    background: "var(--c-popup-bg)",
+    borderColor: tint(LEGACY_COLORS.blue, 45),
+    color: LEGACY_COLORS.blue,
+    boxShadow: "var(--c-popup-shadow)",
+  } as CSSProperties;
+
+  return (
+    <div
+      data-testid="shipping-name-validation-notice"
+      role="status"
+      aria-live="polite"
+      className="shipping-name-validation-notice pointer-events-none fixed left-1/2 top-1/2 z-[80] flex min-h-11 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-[16px] border px-5 py-3 text-sm font-black"
+      style={style}
+      onAnimationEnd={onArrive}
+    >
+      <Pencil className="h-5 w-5 shrink-0" aria-hidden="true" />
+      <span>{notice.message}</span>
     </div>
   );
 }
@@ -1201,6 +1278,8 @@ function RequestSection(props: {
   onRequestQuantity: (value: number | "") => void;
   onCustomPaName: (value: string) => void;
   onCustomPfName: (value: string) => void;
+  onStatusChange: (status: string) => void;
+  onNameValidationNotice: (message: string) => void;
   onNotes: (value: string) => void;
   onUpdateLine: (key: string, patch: Partial<DraftLine>) => void;
   onAddLine: (stage: "PA" | "PF", itemId: string) => void;
@@ -1225,12 +1304,21 @@ function RequestSection(props: {
   const requiresPfName = Boolean(props.matchResult?.requires_pf_name);
   const reusingExistingPa = Boolean(props.matchResult?.matched_pa_item_id);
   const reusingExistingPf = Boolean(props.matchResult?.matched_pf_item_id);
-  const missingNewBomNames = Boolean(props.matchResult && ((requiresPaName && !props.customPaName.trim()) || (requiresPfName && !props.customPfName.trim())));
+  const basePfItem = props.pfItems.find((item) => item.item_id === props.basePfId) ?? props.itemById.get(props.basePfId);
+  const basePaLine = props.draftLines.find((line) => (
+    line.parent_stage === "PF"
+    && props.itemById.get(line.child_item_id)?.process_type_code === "PA"
+  ));
+  const basePaItem = basePaLine ? props.itemById.get(basePaLine.child_item_id) : undefined;
+  const basePaName = basePaItem?.item_name.trim() ?? "";
+  const basePfName = basePfItem?.item_name.trim() ?? "";
+  const paNameNeedsChange = requiresPaName && (!props.customPaName.trim() || props.customPaName.trim() === basePaName);
+  const pfNameNeedsChange = requiresPfName && (!props.customPfName.trim() || props.customPfName.trim() === basePfName);
+  const missingNewBomNames = Boolean(props.matchResult && (paNameNeedsChange || pfNameNeedsChange));
   const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
   const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
   const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || props.selectedRequest?.status === "PREPARED";
   const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "저장 및 전환"];
-  const basePfItem = props.pfItems.find((item) => item.item_id === props.basePfId) ?? props.itemById.get(props.basePfId);
   const matchedPaItem = props.matchResult?.matched_pa_item_id ? props.itemById.get(props.matchResult.matched_pa_item_id) : undefined;
   const matchedPfItem = props.matchResult?.matched_pf_item_id ? props.itemById.get(props.matchResult.matched_pf_item_id) : undefined;
   const itemCodeText = (item?: Item | null) => item?.mes_code ?? item?.process_type_code ?? "-";
@@ -1271,6 +1359,7 @@ function RequestSection(props: {
     props.wizardStep === 3 ? !missingNewBomNames :
     props.wizardStep < 5
   );
+  const nameChangePromptActive = props.wizardStep === 3 && missingNewBomNames && props.pending === null && !locked;
   const footerHint = props.wizardStep === 1 && !props.basePfId
     ? "기준 PF를 먼저 선택하세요."
     : !validRequestQuantity
@@ -1280,6 +1369,11 @@ function RequestSection(props: {
         : `현재 출하 수량 ${requestQty}대`;
   const goPrev = () => props.onWizardStep(Math.max(1, props.wizardStep - 1) as RequestWizardStep);
   const goNext = () => {
+    if (nameChangePromptActive) {
+      const required = [paNameNeedsChange ? "PA" : null, pfNameNeedsChange ? "PF" : null].filter(Boolean).join("/");
+      props.onNameValidationNotice(`새 ${required} 품명을 수정하세요.`);
+      return;
+    }
     if (!canGoNext) return;
     props.onWizardStep(Math.min(5, props.wizardStep + 1) as RequestWizardStep);
   };
@@ -1340,12 +1434,6 @@ function RequestSection(props: {
         {locked && (
           <div className="mt-3">
             <Notice tone={LEGACY_COLORS.yellow} title="수정 잠금" body="준비 완료 상태입니다." />
-          </div>
-        )}
-
-        {props.selectedRequest?.status === "PREPARING" && !locked && (
-          <div className="mt-3" data-testid="shipping-edit-scope-notice">
-            <Notice tone={LEGACY_COLORS.blue} title="준비 중 요청" body="수량/BOM/요청 정보 수정 가능 · 변경 시 준비 목록을 다시 계산합니다." />
           </div>
         )}
 
@@ -1520,12 +1608,32 @@ function RequestSection(props: {
               <div data-testid="shipping-match-name-inputs" className={`grid min-w-0 gap-2 ${requiresPaName && requiresPfName ? "md:grid-cols-2" : ""}`}>
               {requiresPaName && (
                 <Field label="새 PA 이름">
-                  <input data-testid="shipping-new-pa-name" aria-label="새 PA 이름" value={props.customPaName} disabled={locked} onChange={(event) => props.onCustomPaName(event.target.value)} className={SHIPPING_TEXT_INPUT_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="새 PA 품목명" />
+                  <input
+                    data-testid="shipping-new-pa-name"
+                    data-name-state={paNameNeedsChange ? "reference" : "edited"}
+                    aria-label="새 PA 이름"
+                    value={props.customPaName}
+                    disabled={locked}
+                    onChange={(event) => props.onCustomPaName(event.target.value)}
+                    className={SHIPPING_TEXT_INPUT_CLASS}
+                    style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: paNameNeedsChange ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
+                    placeholder="새 PA 품목명"
+                  />
                 </Field>
               )}
               {requiresPfName && (
                 <Field label="새 PF 이름">
-                  <input data-testid="shipping-new-pf-name" aria-label="새 PF 이름" value={props.customPfName} disabled={locked} onChange={(event) => props.onCustomPfName(event.target.value)} className={SHIPPING_TEXT_INPUT_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} placeholder="새 PF 품목명" />
+                  <input
+                    data-testid="shipping-new-pf-name"
+                    data-name-state={pfNameNeedsChange ? "reference" : "edited"}
+                    aria-label="새 PF 이름"
+                    value={props.customPfName}
+                    disabled={locked}
+                    onChange={(event) => props.onCustomPfName(event.target.value)}
+                    className={SHIPPING_TEXT_INPUT_CLASS}
+                    style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: pfNameNeedsChange ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
+                    placeholder="새 PF 품목명"
+                  />
                 </Field>
               )}
               </div>
@@ -1544,7 +1652,16 @@ function RequestSection(props: {
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             {props.wizardStep < 5 ? (
-              <button type="button" data-testid="shipping-wizard-next" onClick={goNext} disabled={!canGoNext} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-5 py-2 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: tint(LEGACY_COLORS.blue, 16), borderColor: tint(LEGACY_COLORS.blue, 48), color: LEGACY_COLORS.blue }}>다음</button>
+              <button
+                type="button"
+                data-testid="shipping-wizard-next"
+                data-name-validation={nameChangePromptActive ? "pending" : "ready"}
+                aria-disabled={!canGoNext && !nameChangePromptActive}
+                onClick={goNext}
+                disabled={!canGoNext && !nameChangePromptActive}
+                className={`inline-flex min-h-11 items-center justify-center rounded-[12px] border px-5 py-2 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 ${nameChangePromptActive ? "opacity-40" : ""}`}
+                style={{ background: tint(LEGACY_COLORS.blue, 16), borderColor: tint(LEGACY_COLORS.blue, 48), color: LEGACY_COLORS.blue }}
+              >다음</button>
             ) : (
               <PrimaryActionButton
                 icon={finalActionIsUpdateOnly ? CheckCircle2 : Send}

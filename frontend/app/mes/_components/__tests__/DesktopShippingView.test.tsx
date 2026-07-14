@@ -514,7 +514,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
   });
 
-  it("explains the editable scope when a preparing request is edited", async () => {
+  it("does not show a duplicate preparing notice while a request is edited", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -522,10 +522,7 @@ describe("DesktopShippingView", () => {
     await openRequestById(container, "req-1");
     fireEvent.click(await screen.findByTestId("shipping-edit-request"));
 
-    const notice = await screen.findByTestId("shipping-edit-scope-notice");
-    expect(notice).toHaveTextContent("준비 중 요청");
-    expect(notice).toHaveTextContent("수량/BOM/요청 정보 수정 가능");
-    expect(notice).toHaveTextContent("준비 목록을 다시 계산");
+    expect(screen.queryByTestId("shipping-edit-scope-notice")).not.toBeInTheDocument();
   });
 
   it("shows PF and PA BOM groups, then carries excluded lines into send-to-prep save", async () => {
@@ -1066,8 +1063,17 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(screen.getByTestId("shipping-request-quantity")).toHaveFocus());
   });
 
-  it("keeps required PA/PF naming inside the matching action bar only", async () => {
-    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+  it("prefills required PA/PF naming from the base items in the matching action bar", async () => {
+    vi.mocked(api.matchShippingBom).mockResolvedValue({
+      matched_pa_item_id: null,
+      matched_pf_item_id: null,
+      matched_pa_item_name: null,
+      matched_pf_item_name: null,
+      requires_pa_name: true,
+      requires_pf_name: true,
+    });
+    const onStatusChange = vi.fn();
+    const { container } = render(<DesktopShippingView onStatusChange={onStatusChange} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
@@ -1084,16 +1090,46 @@ describe("DesktopShippingView", () => {
 
     const paSummary = await screen.findByTestId("shipping-final-pa-summary");
     const pfSummary = await screen.findByTestId("shipping-final-pf-summary");
-    await waitFor(() => expect(paSummary).toHaveTextContent("기존 PA 재사용"));
+    await waitFor(() => expect(paSummary).toHaveTextContent("새 PA 생성 예정"));
     expect(paSummary).toHaveTextContent("Standard PA");
     expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
-    expect(pfSummary).toHaveTextContent("새 PF 이름 미입력");
+    expect(pfSummary).toHaveTextContent("Standard PF");
     const actionBar = screen.getByTestId("shipping-wizard-action-bar");
-    expect(actionBar).toContainElement(screen.getByTestId("shipping-new-pf-name"));
-    expect(screen.getByTestId("shipping-wizard-next")).toBeDisabled();
+    const paNameInput = screen.getByTestId("shipping-new-pa-name");
+    const pfNameInput = screen.getByTestId("shipping-new-pf-name");
+    expect(actionBar).toContainElement(paNameInput);
+    expect(actionBar).toContainElement(pfNameInput);
+    expect(paNameInput).toHaveValue("Standard PA");
+    expect(pfNameInput).toHaveValue("Standard PF");
+    expect(paNameInput).toHaveAttribute("data-name-state", "reference");
+    expect(pfNameInput).toHaveAttribute("data-name-state", "reference");
+    const nextButton = screen.getByTestId("shipping-wizard-next");
+    expect(nextButton).not.toBeDisabled();
+    expect(nextButton).toHaveAttribute("aria-disabled", "false");
+    expect(nextButton).toHaveAttribute("data-name-validation", "pending");
 
-    fireEvent.change(screen.getByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
-    expect(screen.getByTestId("shipping-wizard-next")).not.toBeDisabled();
+    onStatusChange.mockClear();
+    fireEvent.click(nextButton);
+    const validationNotice = screen.getByTestId("shipping-name-validation-notice");
+    expect(validationNotice).toHaveTextContent("새 PA/PF 품명을 수정하세요.");
+    expect(onStatusChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId("shipping-wizard-step-3")).toBeInTheDocument();
+
+    fireEvent.animationEnd(validationNotice);
+    expect(onStatusChange).toHaveBeenCalledWith("새 PA/PF 품명을 수정하세요.");
+    expect(screen.queryByTestId("shipping-name-validation-notice")).not.toBeInTheDocument();
+
+    fireEvent.change(paNameInput, { target: { value: "Custom PA" } });
+    fireEvent.change(pfNameInput, { target: { value: "Custom PF" } });
+    expect(paNameInput).toHaveValue("Custom PA");
+    expect(pfNameInput).toHaveValue("Custom PF");
+    expect(paNameInput).toHaveAttribute("data-name-state", "edited");
+    expect(pfNameInput).toHaveAttribute("data-name-state", "edited");
+    expect(nextButton).toHaveAttribute("aria-disabled", "false");
+    expect(nextButton).toHaveAttribute("data-name-validation", "ready");
+
+    fireEvent.click(nextButton);
+    expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
   });
 
   it("removes repeated headers from wizard steps two through five", async () => {

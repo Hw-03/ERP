@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopTopbar } from "../DesktopTopbar";
@@ -30,5 +30,19 @@ describe("DesktopTopbar", () => {
       color: LEGACY_COLORS.red,
       background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`,
     });
+  });
+
+  it("exposes the status pill as the destination for transient notices", () => {
+    render(
+      <DesktopTopbar
+        title="출하"
+        icon={AlertTriangle}
+        iconColor={LEGACY_COLORS.blue}
+        status="DEXCOWIN MES System"
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-status-target")).toHaveTextContent("DEXCOWIN MES System");
   });
 });
