@@ -16,6 +16,8 @@ $BackendOut = Join-Path $BackendLogDir "backend-dev.out.log"
 $BackendErr = Join-Path $BackendLogDir "backend-dev.err.log"
 $FrontendOut = Join-Path $FrontendLogDir "frontend-dev.out.log"
 $FrontendErr = Join-Path $FrontendLogDir "frontend-dev.err.log"
+$BackendEvents = Join-Path $BackendLogDir "backend-runtime-events.jsonl"
+$FrontendEvents = Join-Path $FrontendLogDir "frontend-runtime-events.jsonl"
 
 $ServiceTitle = if ($Service -eq "backend") { "Backend" } else { "Frontend" }
 try {
@@ -44,6 +46,16 @@ function Write-WatchLine {
         [string] $Line,
         [string[]] $ErrorPatterns
     )
+
+    if ($Line -match '"event"\s*:\s*"(unexpected_exit|unexpected_exit_zero|service_start_failed|port_unavailable|crash_loop|stale_supervisor|port_conflict|supervisor_error|supervisor_start_timeout|supervisor_force_stop_after_timeout|stop_port_still_listening|stale_pid_reused)"') {
+        Write-Host "[RUNTIME ERROR] $Line" -ForegroundColor Red
+        return
+    }
+
+    if ($Line -match '"event"\s*:\s*"(service_started|manual_restart_reset)"') {
+        Write-Host "[RUNTIME OK] $Line" -ForegroundColor Green
+        return
+    }
 
     if (Test-LineMatchesAny -Line $Line -Patterns $ErrorPatterns) {
         Write-Host "[FRONTEND ERROR] $Line" -ForegroundColor Red
@@ -82,9 +94,29 @@ function Watch-LogFiles {
     }
     Write-Host ""
 
-    Get-Content -Path $existingPaths -Tail 80 -Wait -ErrorAction SilentlyContinue |
-        Where-Object { $_ -and -not (Test-LineMatchesAny -Line $_ -Patterns $NoisePatterns) } |
-        ForEach-Object { Write-WatchLine -Line $_ -ErrorPatterns $ErrorPatterns }
+    $tailJobs = @($existingPaths | ForEach-Object {
+        Start-Job -ArgumentList $_ -ScriptBlock {
+            param([string] $LogPath)
+            Get-Content -LiteralPath $LogPath -Tail 80 -Wait -ErrorAction SilentlyContinue
+        }
+    })
+    try {
+        while ($true) {
+            foreach ($job in $tailJobs) {
+                foreach ($line in @(Receive-Job -Job $job -ErrorAction SilentlyContinue)) {
+                    $text = [string] $line
+                    if ($text -and -not (Test-LineMatchesAny -Line $text -Patterns $NoisePatterns)) {
+                        Write-WatchLine -Line $text -ErrorPatterns $ErrorPatterns
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    finally {
+        $tailJobs | Stop-Job -ErrorAction SilentlyContinue
+        $tailJobs | Remove-Job -Force -ErrorAction SilentlyContinue
+    }
 }
 
 $FrontendStdoutNoise = @()
@@ -105,8 +137,8 @@ $FrontendErrorPatterns = @(
 )
 
 if ($Service -eq "backend") {
-    Watch-LogFiles "Backend logs" @($BackendOut, $BackendErr) @()
+    Watch-LogFiles "Backend logs" @($BackendOut, $BackendErr, $BackendEvents) @()
 }
 else {
-    Watch-LogFiles "Frontend logs" @($FrontendOut, $FrontendErr) ($FrontendStdoutNoise + $FrontendStderrNoise) $FrontendErrorPatterns
+    Watch-LogFiles "Frontend logs" @($FrontendOut, $FrontendErr, $FrontendEvents) ($FrontendStdoutNoise + $FrontendStderrNoise) $FrontendErrorPatterns
 }

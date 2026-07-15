@@ -124,6 +124,8 @@ $EmpScriptDir = Join-Path $EmpRoot "scripts\dev"
 New-Item -ItemType Directory -Force -Path $EmpScriptDir | Out-Null
 $runtimeScripts = @(
     "resolve-server-profile.ps1",
+    "runtime-control.ps1",
+    "service_supervisor.py",
     "start-backend.ps1",
     "stop-backend.ps1",
     "start-frontend.ps1",
@@ -131,7 +133,8 @@ $runtimeScripts = @(
     "stop-servers.ps1",
     "open-watch.ps1",
     "watch-service.ps1",
-    "watch-servers.ps1"
+    "watch-servers.ps1",
+    "status-servers.ps1"
 )
 foreach ($scriptName in $runtimeScripts) {
     $sourceScript = Join-Path $DevRoot "scripts\dev\$scriptName"
@@ -145,7 +148,7 @@ $targetStartBat = Join-Path $EmpRoot "start.bat"
 Copy-Item $sourceStartBat $targetStartBat -Force
 Write-Host "[sync] script: start.bat"
 
-foreach ($batName in @("watch.bat", "stop.bat")) {
+foreach ($batName in @("watch.bat", "stop.bat", "status.bat")) {
     $sourceBat = Join-Path $DevRoot $batName
     $targetBat = Join-Path $EmpRoot $batName
     Copy-Item $sourceBat $targetBat -Force
