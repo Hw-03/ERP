@@ -11,6 +11,8 @@ $OpenWatchScript = Join-Path $RepoRoot "scripts\dev\open-watch.ps1"
 $WatchServiceScript = Join-Path $RepoRoot "scripts\dev\watch-service.ps1"
 $SupervisorScript = Join-Path $RepoRoot "scripts\dev\service_supervisor.py"
 $RuntimeControlScript = Join-Path $RepoRoot "scripts\dev\runtime-control.ps1"
+$RuntimePathsScript = Join-Path $RepoRoot "scripts\dev\runtime-paths.ps1"
+$CheckedCommandScript = Join-Path $RepoRoot "scripts\dev\checked-command.ps1"
 $StatusScript = Join-Path $RepoRoot "scripts\dev\status-servers.ps1"
 $StopServersScript = Join-Path $RepoRoot "scripts\dev\stop-servers.ps1"
 $StartFrontendScript = Join-Path $RepoRoot "scripts\dev\start-frontend.ps1"
@@ -18,6 +20,8 @@ $StartBackendScript = Join-Path $RepoRoot "scripts\dev\start-backend.ps1"
 $StopFrontendScript = Join-Path $RepoRoot "scripts\dev\stop-frontend.ps1"
 $StopBackendScript = Join-Path $RepoRoot "scripts\dev\stop-backend.ps1"
 $SyncToEmployeeScript = Join-Path $RepoRoot "scripts\dev\sync-to-employee.ps1"
+$BackupBat = Join-Path $RepoRoot "scripts\ops\backup_db.bat"
+$RestoreBat = Join-Path $RepoRoot "scripts\ops\restore_db.bat"
 
 function Assert-FileExists {
     param([string] $Path)
@@ -58,8 +62,11 @@ Assert-FileExists $OpenWatchScript
 Assert-FileExists $WatchServiceScript
 Assert-FileExists $SupervisorScript
 Assert-FileExists $RuntimeControlScript
+Assert-FileExists $RuntimePathsScript
 Assert-FileExists $StatusScript
 Assert-FileExists $StopServersScript
+Assert-FileExists $BackupBat
+Assert-FileExists $RestoreBat
 
 Assert-ContentNotMatch $StartBat 'cmd\s*/k.*(uvicorn|npm\s+run\s+dev)' "start.bat must not attach server processes to cmd /k."
 Assert-ContentMatch $StartBat 'start-backend\.ps1' "start.bat must call start-backend.ps1."
@@ -67,6 +74,9 @@ Assert-ContentMatch $StartBat 'start-frontend\.ps1' "start.bat must call start-f
 Assert-ContentMatch $StartBat 'watch\.bat' "start.bat must mention watch.bat for manual monitoring."
 Assert-ContentNotMatch $StartBat 'start\s+"[^"]*"\s+"%~dp0watch\.bat"|Start-Process\s+.*watch\.bat' "start.bat must not open the monitor automatically."
 Assert-ContentMatch $StartBat 'stop\.bat' "start.bat must mention stop.bat for full shutdown."
+Assert-ContentMatch $StartBat '(?m)^\s*py\s+bootstrap_db\.py\s+--check\s*$' "start.bat must run the read-only Alembic head guard."
+Assert-ContentNotMatch $StartBat '(?m)^\s*py\s+bootstrap_db\.py[^\r\n]*--(schema|migrate|all)' "start.bat must never mutate the database during server startup."
+Assert-ContentMatch $StartBat '(?s)py\s+bootstrap_db\.py\s+--check.*?if\s+errorlevel\s+1.*?py\s+bootstrap_db\.py\s+--all.*?exit\s+/b\s+1' "start.bat must abort a failed read-only guard and print explicit bootstrap guidance."
 
 Assert-ContentMatch $WatchBat 'open-watch\.ps1' "watch.bat must open the split monitoring launcher."
 Assert-ContentNotMatch $WatchBat 'start-(backend|frontend)|stop-(backend|frontend)|stop-servers|taskkill|Stop-Process' "watch.bat must not start or stop servers."
@@ -108,6 +118,41 @@ Assert-ContentNotMatch $WatchServiceScript 'taskkill|Stop-Process|stop-backend|s
 
 Assert-ContentMatch $SyncToEmployeeScript 'open-watch\.ps1' "sync-to-employee.ps1 must copy open-watch.ps1 to the employee server."
 Assert-ContentMatch $SyncToEmployeeScript 'watch-service\.ps1' "sync-to-employee.ps1 must copy watch-service.ps1 to the employee server."
+Assert-ContentMatch $SyncToEmployeeScript 'runtime-paths\.ps1' "sync-to-employee.ps1 must copy the shared runtime path resolver."
+Assert-ContentMatch $SyncToEmployeeScript 'checked-command\.ps1' "sync-to-employee.ps1 must use and copy the checked external-command helper."
+Assert-ContentMatch $CheckedCommandScript 'Invoke-CheckedExternalCommand' "checked-command.ps1 must expose checked external command execution."
+
+Assert-ContentMatch $RuntimePathsScript 'MES_RUNTIME_ROOT' "runtime-paths.ps1 must support the single runtime root override."
+Assert-ContentMatch $RuntimePathsScript '_attic[\\/]runtime' "runtime-paths.ps1 must default permanent artifacts to _attic/runtime."
+Assert-ContentMatch $RuntimePathsScript 'outside MES_RUNTIME_ROOT' "runtime-paths.ps1 must reject paths outside the runtime root."
+foreach ($runtimeScript in @($StartBackendScript, $StartFrontendScript, $StopBackendScript, $StopFrontendScript, $StatusScript, $WatchServiceScript)) {
+    Assert-ContentMatch $runtimeScript 'runtime-paths\.ps1' "$runtimeScript must use the shared runtime path resolver."
+    Assert-ContentNotMatch $runtimeScript '(backend|frontend)[\\/]logs' "$runtimeScript must not use legacy service-local log directories."
+}
+
+Assert-ContentMatch $BackupBat 'backup_db\.py' "backup_db.bat must delegate to backup_db.py."
+Assert-ContentNotMatch $BackupBat 'sqlite3|copy\s+/Y|_verify_backup' "backup_db.bat must stay a thin Python wrapper."
+Assert-ContentMatch $RestoreBat 'restore_db\.py' "restore_db.bat must delegate to restore_db.py."
+Assert-ContentNotMatch $RestoreBat 'copy\s+/Y|_verify_backup' "restore_db.bat must stay a thin Python wrapper."
+
+Assert-ContentMatch $SyncToEmployeeScript 'Join-Path\s+\$EmpRoot\s+"_attic\\runtime\\backups\\sqlite"' "employee backups must live under the employee runtime root."
+Assert-ContentMatch $SyncToEmployeeScript 'backup_db\.py' "employee deployment must use sqlite3.backup through backup_db.py."
+Assert-ContentNotMatch $SyncToEmployeeScript 'Copy-Item\s+\$EmpDb\s+\$backupPath' "employee deployment must not raw-copy the live SQLite DB."
+Assert-ContentMatch $SyncToEmployeeScript 'BACKUP_PATH=' "employee deployment must parse the exact verified backup path."
+Assert-ContentNotMatch $SyncToEmployeeScript 'Get-ChildItem[^\r\n]+mes_\*\.db' "employee deployment must not guess the new backup from a directory scan."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)\[guard\].*\[schema\].*\[stop\].*\[backup\].*\[sync\].*\[migrate\].*\[post-verify\].*\[start\].*\[health\]' "employee deployment stages must follow the guarded stop/backup/sync/migrate/verify/start/health order."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)function\s+Restart-EmployeeServices.*start-backend\.ps1.*start-frontend\.ps1.*Success' "the checked restart helper must report both employee service results."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)if\s*\(-not\s+\$backupResult\.Success\).*Restart-EmployeeServices.*exit\s+7' "backup failure must restart the existing employee servers and abort deployment."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)\$backendStop.*Invoke-EmployeeServiceScript.*\$frontendStop.*Invoke-EmployeeServiceScript.*Test-TcpPortFree\s+-Port\s+8010.*Test-TcpPortFree\s+-Port\s+3000' "employee deployment must check stop exits and actual ports before backup."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)Invoke-CheckedExternalCommand.*bootstrap_db\.py.*--migrate.*WorkingDirectory\s+\$EmpBackend' "employee deployment must run Alembic migration through the checked command helper in the employee backend."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)bootstrap_db\.py.*--migrate.*bootstrap_db\.py.*--check.*_verify_backup\.py.*check_inventory_integrity\.py.*\[start\]' "employee deployment must check Alembic head and database integrity before restarting services."
+Assert-ContentNotMatch $SyncToEmployeeScript 'failed=\(\\d\+\)|\$failedCount' "employee deployment must decide migration success only from the checked process result."
+Assert-ContentMatch $SyncToEmployeeScript '\\\\alembic\\\\' "schema guard must detect Alembic revision changes."
+Assert-ContentMatch $SyncToEmployeeScript 'alembic\\\.ini' "schema guard must detect alembic.ini changes."
+Assert-ContentMatch $SyncToEmployeeScript 'migration_type_compare\\\.py' "schema guard must detect migration type comparison changes."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)_verify_backup\.py.*check_inventory_integrity\.py.*--db-url.*Write-RecoveryInstructions.*exit\s+8' "post-verification must run schema and inventory checks and leave recovery guidance on failure."
+Assert-ContentMatch $SyncToEmployeeScript 'restore_db\.py.*--sqlite.*--target.*--check' "migration or post-verification failure must print the exact restore_db.py command."
+Assert-ContentNotMatch $SyncToEmployeeScript '&\s+.*restore_db\.py' "employee deployment must never auto-restore the database."
 
 Assert-ContentMatch $StartBackendScript 'Start-ServiceSupervisor' "start-backend.ps1 must launch the shared supervisor."
 Assert-ContentMatch $StartBackendScript 'backend-runtime\.json' "start-backend.ps1 must write backend runtime metadata."
@@ -150,23 +195,23 @@ $otherBackendCommand = 'C:\Other\python.exe -m uvicorn other.app:app --port 8011
 if (Test-ServiceProcessOwned -Service "backend" -Port 8011 -RepoRoot "C:\ERP" -CommandLine $otherBackendCommand) {
     throw "runtime-control.ps1 must not identify an unrelated uvicorn process by port alone."
 }
-$devSupervisorCommand = 'C:\Python\python.exe C:\ERP\scripts\dev\service_supervisor.py --profile development --service frontend --state-path C:\ERP\frontend\logs\frontend-runtime.json'
-$employeeSupervisorCommand = 'C:\Python\python.exe C:\ERP-dev\scripts\dev\service_supervisor.py --profile employee --service frontend --state-path C:\ERP-dev\frontend\logs\frontend-runtime.json'
-if (-not (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $currentStartedAt -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\frontend\logs\frontend-runtime.json" -CommandLine $devSupervisorCommand)) {
+$devSupervisorCommand = 'C:\Python\python.exe C:\ERP\scripts\dev\service_supervisor.py --profile development --service frontend --state-path C:\ERP\_attic\runtime\logs\frontend\frontend-runtime.json'
+$employeeSupervisorCommand = 'C:\Python\python.exe C:\ERP-dev\scripts\dev\service_supervisor.py --profile employee --service frontend --state-path C:\ERP-dev\_attic\runtime\logs\frontend\frontend-runtime.json'
+if (-not (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $currentStartedAt -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\_attic\runtime\logs\frontend\frontend-runtime.json" -CommandLine $devSupervisorCommand)) {
     throw "runtime-control.ps1 must recognize the current profile's supervisor command."
 }
-if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $currentStartedAt -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\frontend\logs\frontend-runtime.json" -CommandLine $employeeSupervisorCommand) {
+if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $currentStartedAt -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\_attic\runtime\logs\frontend\frontend-runtime.json" -CommandLine $employeeSupervisorCommand) {
     throw "runtime-control.ps1 must reject another profile's supervisor command."
 }
-if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt "2000-01-01T00:00:00+09:00" -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\frontend\logs\frontend-runtime.json" -CommandLine $devSupervisorCommand) {
+if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt "2000-01-01T00:00:00+09:00" -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\_attic\runtime\logs\frontend\frontend-runtime.json" -CommandLine $devSupervisorCommand) {
     throw "runtime-control.ps1 must reject a reused supervisor PID with a different creation time."
 }
 $oneSecondBeforeCurrent = ([DateTimeOffset]::Parse($currentStartedAt).AddSeconds(-1)).ToString("o")
-if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $oneSecondBeforeCurrent -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\frontend\logs\frontend-runtime.json" -CommandLine $devSupervisorCommand) {
+if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $oneSecondBeforeCurrent -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\_attic\runtime\logs\frontend\frontend-runtime.json" -CommandLine $devSupervisorCommand) {
     throw "runtime-control.ps1 must not use a wide creation-time tolerance for supervisor ownership."
 }
 $oneHundredMillisecondsBeforeCurrent = ([DateTimeOffset]::Parse($currentStartedAt).AddMilliseconds(-100)).ToString("o")
-if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $oneHundredMillisecondsBeforeCurrent -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\frontend\logs\frontend-runtime.json" -CommandLine $devSupervisorCommand) {
+if (Test-SupervisorProcessOwned -ProcessId $PID -ExpectedStartedAt $oneHundredMillisecondsBeforeCurrent -RepoRoot "C:\ERP" -Service "frontend" -StatePath "C:\ERP\_attic\runtime\logs\frontend\frontend-runtime.json" -CommandLine $devSupervisorCommand) {
     throw "runtime-control.ps1 must use kernel-time precision for supervisor ownership."
 }
 $legacyFrontendWrapper = '"C:\Program Files\nodejs\node.exe" scripts/dev.js'
