@@ -1167,7 +1167,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
   });
 
-  it("shows the new PA inside the final shipment BOM when both new item names are entered", async () => {
+  it("shows a new PF first inside the final PF list when both new item names are entered", async () => {
     vi.mocked(api.matchShippingBom).mockResolvedValue({
       matched_pa_item_id: null,
       matched_pf_item_id: null,
@@ -1197,10 +1197,13 @@ describe("DesktopShippingView", () => {
     nextStep(container);
     await screen.findByTestId("shipping-wizard-step-5");
 
-    const newPa = screen.getByTestId("shipping-final-new-pa-link");
-    expect(screen.getByTestId("shipping-final-requirements-list")).toContainElement(newPa);
-    expect(newPa).toHaveTextContent("새 PA");
-    expect(newPa).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
+    const newPf = screen.getByTestId("shipping-final-new-pf-link");
+    const pfGroup = screen.getByTestId("shipping-final-group-pf");
+    expect(pfGroup).toContainElement(newPf);
+    expect(screen.getByTestId("shipping-final-group-list-pf").firstElementChild).toBe(newPf);
+    expect(newPf).toHaveTextContent("새 PF");
+    expect(newPf).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
+    expect(screen.getByTestId("shipping-final-group-pa").firstElementChild).toHaveTextContent("새 PA");
   });
 
   it("hides the new PF-to-PA relationship when either item is reused", async () => {
@@ -1477,6 +1480,58 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-match-quantity")).toHaveClass("min-h-[120px]");
   });
 
+  it("keeps typed MES code emphasis consistent from PF selection through BOM editing", async () => {
+    vi.mocked(api.getItems).mockResolvedValue(items.map((current) => {
+      const mesCode = current.item_id === "pf-1"
+        ? "3-PF-0001"
+        : current.item_id === "pa-1"
+          ? "3-PA-0002"
+          : current.item_id === "af-1"
+            ? "3-AF-0003"
+            : current.item_id === "acc-1"
+              ? "3-PR-0004"
+              : current.mes_code;
+      return { ...current, mes_code: mesCode };
+    }));
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    const search = await screen.findByTestId("shipping-pf-search");
+    fireEvent.change(search, { target: { value: "Standard" } });
+    expect(screen.getByTestId("shipping-pf-option-code-pf-1-kind")).toHaveTextContent("PF");
+    expect(screen.getByTestId("shipping-pf-option-code-pf-1-kind")).toHaveStyle({ color: LEGACY_COLORS.blue });
+
+    fireEvent.click(screen.getByTestId("shipping-pf-option-pf-1"));
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    expect(await screen.findByTestId("shipping-bom-code-af-1-kind")).toHaveStyle({ color: LEGACY_COLORS.green });
+    expect(screen.getByTestId("shipping-bom-code-pa-1-kind")).toHaveStyle({ color: LEGACY_COLORS.blue });
+    expect(screen.getByTestId("shipping-bom-code-acc-1-kind")).toHaveStyle({ color: LEGACY_COLORS.purple });
+  });
+
+  it("reorders a newly added AF BOM item before later BOM stages", async () => {
+    vi.mocked(api.getItems).mockResolvedValue([
+      ...items,
+      item("af-new", "Added AF", "AF", "3-AF-0000"),
+    ]);
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    fireEvent.change(await screen.findByTestId("shipping-bom-search-pa"), { target: { value: "Added AF" } });
+    fireEvent.click(await screen.findByTestId("shipping-bom-add-pa-af-new"));
+
+    const paLineIds = Array.from(screen.getByTestId("shipping-bom-editor-pa").querySelectorAll("[data-bom-line-child]"))
+      .map((line) => line.getAttribute("data-bom-line-child"));
+    expect(paLineIds).toEqual(["af-new", "af-1", "acc-1"]);
+  });
+
   it("moves the no-change notice into the matching action bar and leaves request information blank", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -1497,7 +1552,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
   });
 
-  it("limits the final changed-item preview to one row and gives the BOM panel the remaining height", async () => {
+  it("gives final BOM and changed-item cards a clean fixed height", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1514,11 +1569,11 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_minmax(0,1fr)_auto]", "overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-full", "min-h-0");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_432px_432px]", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[432px]", "shrink-0");
     expect(screen.getByTestId("shipping-final-requirements-list")).toHaveClass("overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[112px]", "shrink-0", "self-end");
-    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("h-[62px]", "shrink-0", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[432px]", "shrink-0");
+    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("flex-1", "overflow-y-auto");
     expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("rounded-[12px]", "border", "px-3", "py-2");
   });
 
