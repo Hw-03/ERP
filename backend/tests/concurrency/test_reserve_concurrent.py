@@ -25,7 +25,10 @@ from app.models import Inventory, Item
 def _setup_item_with_inventory(make_session, warehouse_qty: Decimal):
     """테스트용 품목 + 재고 생성."""
     session = make_session()
-    item = Item(item_name="동시성테스트품목", process_type_code="TR", unit="EA")
+    item = Item(
+        item_name="동시성테스트품목", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
     session.add(item)
     session.flush()
     inv = Inventory(

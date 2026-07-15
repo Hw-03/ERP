@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from app.models import Item
 from app.services.production_capacity import compute_capacity
 
 
@@ -28,6 +29,10 @@ def _variants_for(result: dict, af_item_id) -> list[dict]:
     return [
         v for v in result["af"]["pf_variants"] if v["af_item_id"] == str(af_item_id)
     ]
+
+
+def _item_label(item: Item) -> str:
+    return f"{item.item_name} ({item.mes_code})"
 
 
 def test_af_without_children_included_as_incomplete(
@@ -68,7 +73,7 @@ def test_fast_production_limited_by_direct_nf_shortage(db_session, make_item, ma
 
     # AF재고(0) + min(NF=2, AA=10) = 2 → PF 환산 /1 = 2
     assert row["fast_production"] == 2
-    assert row["fast_production_limiting_item"] == "튜닝완료품"
+    assert row["fast_production_limiting_item"] == _item_label(nf)
     assert row["total_production"] == 2  # NF=2 가 여전히 제한
     assert row["bom_status"] == "complete"
     assert result["af"]["status"] == "producible"
@@ -131,13 +136,13 @@ def test_fast_production_is_max_over_variants_with_packaging(db_session, make_it
     v2 = variants[str(pf2.item_id)]
     assert v1["ship_ready"] == 0  # PF 재고 없음
     assert v1["fast_production"] == 2
-    assert v1["fast_production_limiting_item"] == "포장재1"
+    assert v1["fast_production_limiting_item"] == _item_label(pr1)
     assert v2["ship_ready"] == 0  # PF 재고 없음
     assert v2["fast_production"] == 8
 
     row = _af_row(result, af.item_id)
     assert row["fast_production"] == 8  # 변형 중 최대
-    assert row["fast_production_limiting_item"] == "포장재2"
+    assert row["fast_production_limiting_item"] == _item_label(pr2)
 
 
 def test_fast_production_capped_by_af_stock(db_session, make_item, make_bom):
@@ -154,7 +159,7 @@ def test_fast_production_capped_by_af_stock(db_session, make_item, make_bom):
 
     assert row["ship_ready"] == 0  # PF 재고 없음
     assert row["fast_production"] == 3  # AF 재고가 cap
-    assert row["fast_production_limiting_item"] == "조립완제품"
+    assert row["fast_production_limiting_item"] == _item_label(af)
 
 
 def test_fast_production_ignores_sibling_af_materials(db_session, make_item, make_bom):
@@ -177,7 +182,7 @@ def test_fast_production_ignores_sibling_af_materials(db_session, make_item, mak
 
     # AF1 fast_production = AF1재고(5) + X(10) = 15. 형제 AF2의 자재Y(0)가 throttle하면 안 됨.
     assert row1["fast_production"] == 15
-    assert row1["fast_production_limiting_item"] != "자재Y"
+    assert row1["fast_production_limiting_item"] != _item_label(y)
 
 
 def test_total_production_shared_subcomponent_no_overcount(
@@ -201,7 +206,7 @@ def test_total_production_shared_subcomponent_no_overcount(
 
     # PF당 AF 1개 필요. AF 1개당 Z 를 양쪽 가지에서 2개 소비 → Z=10 → 최대 5 (과대계산 방지)
     assert row["total_production"] == 5
-    assert row["total_production_limiting_item"] == "공유자재Z"
+    assert row["total_production_limiting_item"] == _item_label(shared)
 
 
 def test_total_production_shared_asymmetric_per_unit(db_session, make_item, make_bom):
@@ -260,7 +265,7 @@ def test_fast_production_floor_and_per_unit(db_session, make_item, make_bom):
     # _fast_assembly(af): own(0) + min(floor(100/1)=100, floor(7/3)=2) = 2 → PF 환산 /1 = 2
     # AF 내부 병목(빠듯자재)이 fast_production_limiting_item 으로 전파됨
     assert row["fast_production"] == 2
-    assert row["fast_production_limiting_item"] == "빠듯자재"
+    assert row["fast_production_limiting_item"] == _item_label(tight)
 
 
 def test_legacy_fields_preserved(db_session, make_item, make_bom):

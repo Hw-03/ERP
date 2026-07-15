@@ -116,6 +116,8 @@ def make_item(db_session):
     """간단한 Item 생성 헬퍼. inventory 까지 함께 만들어준다."""
     from app.models import Item, Inventory
 
+    next_serial = 1
+
     def _make(*, name: str = "테스트품목", process_type_code: str = "TR",
               warehouse_qty: Decimal = Decimal("0"),
               pending: Decimal = Decimal("0"),
@@ -123,12 +125,16 @@ def make_item(db_session):
               serial_no: int | None = None) -> Item:
         # mes_code 는 생성열 — 직접 설정 불가. 분해필드(model_symbol/process_type/serial)를
         # 주면 SQLite 가 자동 계산한다. 셋 다 채워야 mes_code 가 NULL 이 아니다.
+        nonlocal next_serial
+        resolved_model_symbol = model_symbol or "9"
+        resolved_serial_no = serial_no if serial_no is not None else next_serial
+        next_serial = max(next_serial + 1, resolved_serial_no + 1)
         item = Item(
             item_name=name,
             process_type_code=process_type_code,
             unit="EA",
-            model_symbol=model_symbol,
-            serial_no=serial_no,
+            model_symbol=resolved_model_symbol,
+            serial_no=resolved_serial_no,
         )
         db_session.add(item)
         db_session.flush()

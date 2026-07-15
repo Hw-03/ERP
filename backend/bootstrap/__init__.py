@@ -1,15 +1,12 @@
 """bootstrap — DB 부트스트랩 책임 분리 패키지.
 
-`bootstrap_db.py` 단일 스크립트(865줄)가 짊어졌던 4단계 책임을 모듈로 분리한다.
-
-- bootstrap.init    — `Base.metadata.create_all` (스키마)
-- bootstrap.migrate — 멱등 ALTER TABLE / 보조 마이그레이션 헬퍼
-- bootstrap.seed    — 참조 데이터 시드 + mes_code 백필
+스키마 변경은 `bootstrap.schema.ensure_schema`의 Alembic 단일 경로로만 수행한다.
+`bootstrap.migrate`는 과거 진단 상수와 코드 이력의 import 호환만 유지한다.
+참조 데이터 시드와 mes_code 호환 no-op은 스키마 처리 뒤 별도 실행한다.
 
 `backend/bootstrap_db.py` 는 얇은 CLI wrapper 로 남아 기존 명령
 (`python bootstrap_db.py --all` 등)을 그대로 지원한다. 외부 호출자
-(`tests/test_migration_diagnostics.py`)가 의존하는 모듈 속성도
-`bootstrap_db` 가 re-export 하므로 import 호환 보존.
+과거 호출자가 사용하던 공개 함수 이름은 Alembic 경로로 연결한다.
 """
 from __future__ import annotations
 
@@ -18,7 +15,14 @@ from .migrate import (
     _BENIGN_MIGRATION_PATTERNS,
     _MIGRATION_DDL,
     _is_benign_migration_skip,
-    run_migrations,
+)
+from .schema import (
+    SchemaBootstrapError,
+    SchemaCheckResult,
+    SchemaEnsureResult,
+    check_schema,
+    ensure_schema,
+    readonly_connection,
 )
 from .seed import (
     backfill_mes_codes,
@@ -27,14 +31,18 @@ from .seed import (
 )
 
 
+def run_migrations() -> SchemaEnsureResult:
+    """기존 공개 이름을 유지하면서 Alembic 단일 경로를 사용한다."""
+    return ensure_schema()
+
+
 def bootstrap_all() -> dict:
-    """전체 부트스트랩: create_all → migrate → seed → 품목코드 백필."""
-    run_schema_create_all()
-    migrations = run_migrations()
+    """스키마를 한 번 보장한 뒤 시드와 호환 no-op을 실행한다."""
+    schema = ensure_schema()
     seeded = seed_reference_data()
     backfilled = backfill_mes_codes()
     return {
-        "migrations": migrations,
+        "schema": schema,
         "seeded": seeded,
         "mes_code_backfilled": backfilled,
     }
@@ -42,8 +50,14 @@ def bootstrap_all() -> dict:
 
 __all__ = [
     "bootstrap_all",
+    "ensure_schema",
+    "check_schema",
+    "readonly_connection",
     "run_schema_create_all",
     "run_migrations",
+    "SchemaBootstrapError",
+    "SchemaCheckResult",
+    "SchemaEnsureResult",
     "seed_reference_data",
     "backfill_mes_codes",
     "check_db",

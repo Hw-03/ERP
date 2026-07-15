@@ -184,9 +184,11 @@ def test_backfill_employee_io_enabled_copies_department(db_session, client):
     assert bool(emp_closed.io_enabled) is False, "폐쇄부서 직원은 io_enabled False 로 복사"
 
 
-def test_repeated_migration_does_not_overwrite_saved_employee_io_enabled(db_session, monkeypatch):
-    """Existing employees.io_enabled values must survive repeated migrations."""
-    from bootstrap import migrate
+def test_repeated_migration_does_not_overwrite_saved_employee_io_enabled(
+    db_session, tmp_path
+):
+    """Alembic onboarding and reruns preserve a saved employee setting."""
+    from bootstrap.schema import BackupReceipt, ensure_schema
 
     dept = Department(name="NO_IO_DEPT", display_order=10, is_active=True, io_enabled=False)
     emp = Employee(
@@ -202,18 +204,22 @@ def test_repeated_migration_does_not_overwrite_saved_employee_io_enabled(db_sess
     db_session.add_all([dept, emp])
     db_session.commit()
 
-    monkeypatch.setattr(migrate, "engine", db_session.bind)
-    result = migrate.run_migrations()
-    assert result["errors"] == []
+    receipt_path = tmp_path / "verified.db"
+    receipt_path.touch()
+    provider = lambda _connection: BackupReceipt(receipt_path, verified=True)
+    ensure_schema(connection=db_session.connection(), backup_provider=provider)
+    ensure_schema(connection=db_session.connection())
 
     db_session.expire_all()
     saved = db_session.query(Employee).filter(Employee.employee_code == "KEEP_IO").one()
     assert bool(saved.io_enabled) is True
 
 
-def test_migration_enables_existing_employee_login_popup_once(db_session, monkeypatch):
-    """Existing employees are flipped on once, but later user opt-out survives reruns."""
-    from bootstrap import migrate
+def test_migration_preserves_existing_employee_login_popup_setting(
+    db_session, tmp_path
+):
+    """Alembic onboarding does not rewrite an existing popup opt-out."""
+    from bootstrap.schema import BackupReceipt, ensure_schema
 
     emp = Employee(
         employee_code="POPUP_ONCE",
@@ -228,23 +234,22 @@ def test_migration_enables_existing_employee_login_popup_once(db_session, monkey
     db_session.add(emp)
     db_session.commit()
 
-    monkeypatch.setattr(migrate, "engine", db_session.bind)
-    result = migrate.run_migrations()
-    assert result["errors"] == []
-
-    db_session.expire_all()
-    saved = db_session.query(Employee).filter(Employee.employee_code == "POPUP_ONCE").one()
-    assert bool(saved.login_notification_popup_enabled) is True
-
-    saved.login_notification_popup_enabled = False
-    db_session.commit()
-
-    result = migrate.run_migrations()
-    assert result["errors"] == []
+    receipt_path = tmp_path / "verified.db"
+    receipt_path.touch()
+    provider = lambda _connection: BackupReceipt(receipt_path, verified=True)
+    ensure_schema(connection=db_session.connection(), backup_provider=provider)
 
     db_session.expire_all()
     saved = db_session.query(Employee).filter(Employee.employee_code == "POPUP_ONCE").one()
     assert bool(saved.login_notification_popup_enabled) is False
+
+    ensure_schema(connection=db_session.connection())
+
+    db_session.expire_all()
+    saved = db_session.query(Employee).filter(Employee.employee_code == "POPUP_ONCE").one()
+    assert bool(saved.login_notification_popup_enabled) is False
+
+
 def test_create_employee_defaults_hidden_sidebar_tabs_empty(db_session, client):
     """New employees can see every sidebar tab unless explicitly restricted."""
     resp = client.post(

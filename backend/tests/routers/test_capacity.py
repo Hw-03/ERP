@@ -169,11 +169,11 @@ def test_capacity_representative_items_by_model(
     assert pf3_b_in_top["is_representative"] is False
 
 
-def test_capacity_representative_items_skips_pf_without_model_symbol(
+def test_capacity_representative_items_includes_pf_with_required_model_symbol(
     client, db_session, make_item, make_bom
 ):
-    """model_symbol 이 None 인 PF 는 representative_items 에 포함되지 않음."""
-    pf = make_item(name="모델없음", process_type_code="PF", warehouse_qty=Decimal("0"))
+    """3분해 필드 NOT NULL 계약상 저장된 PF는 대표 항목 후보가 된다."""
+    pf = make_item(name="기본모델", process_type_code="PF", warehouse_qty=Decimal("0"))
     part = make_item(name="자재", process_type_code="AA", warehouse_qty=Decimal("3"))
     make_bom(pf.item_id, part.item_id, Decimal("1"))
     db_session.commit()
@@ -183,7 +183,12 @@ def test_capacity_representative_items_skips_pf_without_model_symbol(
     data = resp.json()
 
     assert len(data["top_items"]) == 1
-    assert data["representative_items"] == []
+    representatives = data["representative_items"]
+    assert len(representatives) == 1
+    assert representatives[0]["item_id"] == str(pf.item_id)
+    assert representatives[0]["is_representative"] is True
+    assert representatives[0]["model_symbol"] == pf.model_symbol == "9"
+    assert representatives[0]["mes_code"] == pf.mes_code
 
 
 def test_capacity_response_has_legacy_and_af_block(

@@ -16,6 +16,48 @@ def test_mes_code_auto_computed(db_session):
     assert item.mes_code == make_mes_code("346", "AR", 1)
 
 
+@pytest.mark.parametrize(
+    ("serial_no", "expected"),
+    [
+        (1, "3-AR-0001"),
+        (9999, "3-AR-9999"),
+        (10000, "3-AR-10000"),
+    ],
+)
+def test_mes_code_portable_padding_boundaries(db_session, serial_no, expected):
+    item = Item(
+        item_name=f"경계-{serial_no}",
+        process_type_code="AR",
+        model_symbol="3",
+        serial_no=serial_no,
+    )
+    db_session.add(item)
+    db_session.commit()
+    db_session.refresh(item)
+
+    assert item.mes_code == expected
+
+
+@pytest.mark.parametrize(
+    ("serial_no", "expected"),
+    [(-1, "3-AR--001"), (0, "3-AR-0000")],
+)
+def test_serial_no_legacy_sqlite_formatting_is_preserved(
+    db_session, serial_no, expected
+):
+    item = Item(
+        item_name=f"거부-{serial_no}",
+        process_type_code="AR",
+        model_symbol="3",
+        serial_no=serial_no,
+    )
+    db_session.add(item)
+
+    db_session.commit()
+    db_session.refresh(item)
+    assert item.mes_code == expected
+
+
 def test_mes_code_recomputed_on_serial_change(db_session):
     item = Item(item_name="재계산", process_type_code="AR", model_symbol="3", serial_no=1)
     db_session.add(item)

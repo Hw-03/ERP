@@ -62,7 +62,10 @@ def _setup(make_session):
     session.add_all([requester, approver])
     session.flush()
 
-    item = Item(item_name="승인반려충돌테스트", process_type_code="TR", unit="EA")
+    item = Item(
+        item_name="승인반려충돌테스트", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
     session.add(item)
     session.flush()
 

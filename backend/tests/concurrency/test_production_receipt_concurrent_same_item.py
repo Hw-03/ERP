@@ -53,8 +53,14 @@ def _setup(make_session, component_wh_qty: Decimal):
     """완제품 P + 부품 C (BOM: P 1개당 C 1개). C 창고 재고 = component_wh_qty."""
     session = make_session()
 
-    parent = Item(item_name="동시생산_완제품", process_type_code="TF", unit="EA")
-    child = Item(item_name="동시생산_부품", process_type_code="TR", unit="EA")
+    parent = Item(
+        item_name="동시생산_완제품", process_type_code="TF", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
+    child = Item(
+        item_name="동시생산_부품", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
     session.add_all([parent, child])
     session.flush()
 

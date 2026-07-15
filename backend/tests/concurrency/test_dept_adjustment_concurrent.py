@@ -23,8 +23,14 @@ from app.models import DeptAdjSubTypeEnum
 
 def _setup_two_items(make_session, loc_qty: Decimal, dept: DepartmentEnum):
     session = make_session()
-    item_a = Item(item_name="조정테스트A", process_type_code="TR", unit="EA")
-    item_b = Item(item_name="조정테스트B", process_type_code="TR", unit="EA")
+    item_a = Item(
+        item_name="조정테스트A", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
+    item_b = Item(
+        item_name="조정테스트B", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=2,
+    )
     session.add_all([item_a, item_b])
     session.flush()
 

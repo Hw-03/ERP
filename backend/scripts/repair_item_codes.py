@@ -17,20 +17,27 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 # repo root 의 backend/ 에서 실행. PYTHONPATH 자동 설정.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BACKEND_DIR.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(BACKEND_DIR))
 
+from scripts.ops.maintenance_backup import create_sqlite_snapshot  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.models import Item  # noqa: E402
 from app.utils.mes_code import make_mes_code, next_serial_no  # noqa: E402
 
 CODE_PATTERN = re.compile(r"^(?P<prefix>[0-9]+)-(?P<pt>[A-Z]{2})-(?P<serial>\d{4})$")
+
+
+def create_db_backup(source_path: Path = BACKEND_DIR / "mes.db") -> Path:
+    """Create the pre-repair DB snapshot in MES_RUNTIME_ROOT."""
+    return create_sqlite_snapshot(source_path, "repair-item-codes")
 
 
 def parse_code(code: str) -> dict | None:
@@ -44,13 +51,8 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.apply:
-        # 백업
         db_path = BACKEND_DIR / "mes.db"
-        backup_dir = BACKEND_DIR / "_backup"
-        backup_dir.mkdir(exist_ok=True)
-        stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        backup_path = backup_dir / f"mes_pre_repair_codes_{stamp}.db"
-        shutil.copy2(db_path, backup_path)
+        backup_path = create_db_backup(db_path)
         print(f"[backup] {backup_path}")
 
     db = SessionLocal()

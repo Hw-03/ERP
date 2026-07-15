@@ -21,7 +21,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.base import Base, IntQuantity, UUIDString
 
@@ -29,6 +31,40 @@ __all__ = [
     "Item",
     "BOM",
 ]
+
+
+class _MesCodeExpression(ColumnElement):
+    """Compile the stored item code with each database's established contract."""
+
+    inherit_cache = True
+
+
+@compiles(_MesCodeExpression, "sqlite")
+def _compile_mes_code_sqlite(
+    _element: _MesCodeExpression,
+    _compiler: object,
+    **_kw: object,
+) -> str:
+    return (
+        "model_symbol || '-' || process_type_code || '-' || "
+        "printf('%04d', serial_no)"
+    )
+
+
+@compiles(_MesCodeExpression)
+def _compile_mes_code_portable(
+    _element: _MesCodeExpression,
+    _compiler: object,
+    **_kw: object,
+) -> str:
+    return (
+        "model_symbol || '-' || process_type_code || '-' || "
+        "CASE "
+        "WHEN serial_no < 10 THEN '000' || CAST(serial_no AS VARCHAR) "
+        "WHEN serial_no < 100 THEN '00' || CAST(serial_no AS VARCHAR) "
+        "WHEN serial_no < 1000 THEN '0' || CAST(serial_no AS VARCHAR) "
+        "ELSE CAST(serial_no AS VARCHAR) END"
+    )
 
 
 class Item(Base):
@@ -60,21 +96,18 @@ class Item(Base):
 
     # 3-part item code ([모델기호조합]-[구분코드]-[일련번호])
     # mes_code 는 분해필드 3종에서 DB 가 계산하는 STORED 생성열 — 진실소스는 분해필드, 직접 쓰기 불가.
-    # printf 는 SQLite 전용. PG 활성화 시 표현식을 to_char(serial_no,'FM0000') 로 분기.
+    # SQLite는 현행 printf 계약을 유지하고 PostgreSQL은 같은 양수 포맷의 portable CASE를 쓴다.
     mes_code = Column(
         String(40),
-        Computed(
-            "model_symbol || '-' || process_type_code || '-' || printf('%04d', serial_no)",
-            persisted=True,  # STORED
-        ),
+        Computed(_MesCodeExpression(), persisted=True),  # STORED
         # 전역 unique — 소프트삭제 행도 코드 영구 점유(이력 추적성). 같은 코드 재등록 차단.
         # next_serial_no 가 삭제 포함 전체 max+1 이라 정상 신규 등록은 영향 없음.
         unique=True,
         index=True,
     )
-    model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
-    process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
-    serial_no = Column(Integer, nullable=True)
+    model_symbol = Column(String(20), nullable=False, index=True)  # 예: "346", "3", "34678"
+    process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=False, index=True)
+    serial_no = Column(Integer, nullable=False)
 
     # BOM 완료 워크플로우 — 사용자가 명시적으로 "완료로 표시"를 누를 때만 set/clear
     bom_completed_at = Column(DateTime, nullable=True)

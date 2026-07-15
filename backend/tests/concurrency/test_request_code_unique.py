@@ -48,7 +48,10 @@ def _setup(make_session):
     session.add(emp)
     session.flush()
 
-    item = Item(item_name="코드테스트품목", process_type_code="TR", unit="EA")
+    item = Item(
+        item_name="코드테스트품목", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
     session.add(item)
     session.flush()
 

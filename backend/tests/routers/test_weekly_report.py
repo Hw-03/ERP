@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from itertools import count
 
 import pytest
 from app.models import Inventory, Item, ProductSymbol, TransactionLog, TransactionTypeEnum
@@ -17,6 +18,7 @@ WEEK_START = "2026-05-04"  # 월요일
 WEEK_END = "2026-05-10"    # 일요일
 _WEEK_MID = datetime(2026, 5, 6, 12, 0, 0)
 _WEEK_BEFORE = datetime(2026, 4, 27, 12, 0, 0)
+_ITEM_SERIALS = count(1)
 
 
 def _dec(v) -> Decimal:
@@ -42,8 +44,13 @@ def _make_prod_item(db_session, *, name: str, process_code: str,
                     model_symbol: str | None = None,
                     serial_no: int | None = None,
                     qty: Decimal = Decimal("0")) -> Item:
-    item = Item(item_name=name, process_type_code=process_code, unit="EA",
-                model_symbol=model_symbol, serial_no=serial_no)
+    item = Item(
+        item_name=name,
+        process_type_code=process_code,
+        unit="EA",
+        model_symbol=model_symbol or "9",
+        serial_no=serial_no if serial_no is not None else next(_ITEM_SERIALS),
+    )
     db_session.add(item)
     db_session.flush()
     db_session.add(Inventory(

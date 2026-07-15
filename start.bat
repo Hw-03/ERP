@@ -98,14 +98,14 @@ if exist "requirements.txt" (
 )
 popd
 
-rem ====== Ensure DB schema is up to date (Phase 5.4-B) ======
-rem main.py 의 Base.metadata.create_all 부작용을 제거했으므로,
-rem 신규 모델/컬럼 추가 시 idempotent 하게 반영하기 위해 schema + migrate 둘 다 실행.
+rem ====== Read-only DB readiness guard ======
+rem Server startup must never create, migrate, stamp, or otherwise change the DB.
 pushd "%~dp0backend"
-echo [MES] Ensuring DB schema is up to date...
-py bootstrap_db.py --schema --migrate
+echo [MES] Checking DB schema readiness ^(read-only^)...
+py bootstrap_db.py --check
 if errorlevel 1 (
-    echo [MES] ERROR: bootstrap_db.py --schema --migrate failed. Aborting.
+    echo [MES] ERROR: DB schema is not ready. Server startup aborted.
+    echo [MES] Prepare explicitly: cd backend ^&^& py bootstrap_db.py --all
     popd
     pause
     exit /b 1

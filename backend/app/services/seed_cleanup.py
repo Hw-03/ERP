@@ -146,7 +146,6 @@ def run_cleanup_import(
 
     items_to_add = [
         Item(
-            mes_code=p["erp"],
             item_name=p["item_name"],
             unit="EA",
             model_symbol=p["model_symbol"],

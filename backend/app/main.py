@@ -391,7 +391,15 @@ def health_write_check(db: Session = Depends(get_db)):
     try:
         sp = db.begin_nested()
         # Actual write test: INSERT a temporary item row inside SAVEPOINT
-        db.add(Item(item_name="__health_write_test__", unit="EA"))
+        db.add(
+            Item(
+                item_name="__health_write_test__",
+                unit="EA",
+                model_symbol="9",
+                process_type_code="TR",
+                serial_no=2_147_483_647,
+            )
+        )
         db.flush()
         sp.rollback()
         latency_ms = round((_time.perf_counter() - start) * 1000, 1)

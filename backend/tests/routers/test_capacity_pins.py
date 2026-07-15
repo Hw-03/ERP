@@ -11,25 +11,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-from sqlalchemy import text
-
-
-@pytest.fixture(autouse=True)
-def _create_model_pf_pins_table(db_session):
-    """model_pf_pins 는 bootstrap/migrate.py 의 raw SQL 로 만드는 테이블이라
-    Base.metadata.create_all 만으로는 생성되지 않는다 — 테스트에서 수동 생성.
-    """
-    db_session.execute(text(
-        """CREATE TABLE IF NOT EXISTS model_pf_pins (
-            model_symbol TEXT PRIMARY KEY,
-            pf_item_id   CHAR(36) NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
-            updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )"""
-    ))
-    db_session.commit()
-
-
 def test_pf_pins_get_empty_dict_when_no_pins(client):
     """지정이 하나도 없으면 빈 dict."""
     resp = client.get("/api/production/capacity/pf-pins")

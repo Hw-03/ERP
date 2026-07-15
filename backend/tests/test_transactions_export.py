@@ -42,7 +42,9 @@ def _seed_batch_transaction(db) -> Item:
     """요청자≠승인자인 결재 배치 + 그 결과 TransactionLog 1건."""
     requester = _emp(db, "EXP_REQ", "요청자A")
     approver = _emp(db, "EXP_APP", "승인자B")
-    item = Item(item_name="ExportItem", process_type_code="TR")
+    item = Item(
+        item_name="ExportItem", process_type_code="TR", model_symbol="9", serial_no=1
+    )
     db.add(item)
     db.flush()
 
@@ -112,7 +114,9 @@ def test_export_csv_search_matches_requester_name(client, db_session):
 def test_export_csv_includes_requester_and_approver_from_stock_request_reference(client, db_session):
     requester = _emp(db_session, "EXP_DREQ", "DirectRequester")
     approver = _emp(db_session, "EXP_DAPP", "DirectApprover")
-    item = Item(item_name="DirectExportItem", process_type_code="TR")
+    item = Item(
+        item_name="DirectExportItem", process_type_code="TR", model_symbol="9", serial_no=1
+    )
     db_session.add(item)
     db_session.flush()
 
@@ -158,7 +162,9 @@ def test_export_xlsx_ok(client, db_session):
 
 
 def test_export_xlsx_uses_dynamic_internal_use_label(client, db_session):
-    item = Item(item_name="연구 반출품", process_type_code="TR")
+    item = Item(
+        item_name="연구 반출품", process_type_code="TR", model_symbol="9", serial_no=1
+    )
     db_session.add(item)
     db_session.flush()
     db_session.add(

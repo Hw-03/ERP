@@ -18,7 +18,10 @@ from app.models import DepartmentEnum, Inventory, InventoryLocation, Item, Locat
 
 def _setup_warehouse(make_session, warehouse_qty: Decimal):
     session = make_session()
-    item = Item(item_name="불량테스트품목", process_type_code="TR", unit="EA")
+    item = Item(
+        item_name="불량테스트품목", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
     session.add(item)
     session.flush()
     inv = Inventory(
@@ -36,7 +39,10 @@ def _setup_warehouse(make_session, warehouse_qty: Decimal):
 
 def _setup_production_location(make_session, loc_qty: Decimal, dept: DepartmentEnum):
     session = make_session()
-    item = Item(item_name="불량테스트품목2", process_type_code="TR", unit="EA")
+    item = Item(
+        item_name="불량테스트품목2", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
     session.add(item)
     session.flush()
     inv = Inventory(

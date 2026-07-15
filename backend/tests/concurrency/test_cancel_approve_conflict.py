@@ -62,7 +62,10 @@ def _setup_reserved_request(make_session, suffix: str):
     session.add_all([requester, approver])
     session.flush()
 
-    item = Item(item_name=f"충돌테스트_{suffix}", process_type_code="TR", unit="EA")
+    item = Item(
+        item_name=f"충돌테스트_{suffix}", process_type_code="TR", unit="EA",
+        model_symbol="9", serial_no=1,
+    )
     session.add(item)
     session.flush()
 

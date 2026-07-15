@@ -1,9 +1,11 @@
 """bootstrap_db.py — DB 부트스트랩 CLI 진입점 (얇은 wrapper).
 
 실제 책임은 `bootstrap/` 패키지로 분리됨:
-- `bootstrap.init`    — `Base.metadata.create_all`
-- `bootstrap.migrate` — 멱등 ALTER TABLE / 보조 마이그레이션
-- `bootstrap.seed`    — 참조 데이터 시드 + mes_code 백필
+- `bootstrap.schema` — Alembic 상태 검사·upgrade·안전한 기준선 stamp
+- `bootstrap.seed`   — 참조 데이터 시드 + mes_code 호환 no-op
+
+과거 `run_schema_create_all`/`run_migrations` 공개 이름은 호환을 위해 남지만
+내부 실행은 모두 `ensure_schema` 한 경로를 사용한다.
 
 FastAPI 앱 시작 시 자동 실행되던 부작용들을 여기로 옮겼다.
 `uvicorn app.main:app` 만으로는 DB 가 변하지 않는다. 초기 설치 / 스키마 변경 /
@@ -33,9 +35,13 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from bootstrap import (
+    SchemaBootstrapError,
     bootstrap_all,
     backfill_mes_codes,
+    check_schema,
     check_db,
+    ensure_schema,
+    readonly_connection,
     run_migrations,
     run_schema_create_all,
     seed_reference_data,
@@ -80,8 +86,8 @@ _is_benign_migration_skip = _migrate_mod._is_benign_migration_skip
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="MES backend DB bootstrap tool")
     parser.add_argument("--all", action="store_true", help="schema + migrate + seed + 품목코드 백필")
-    parser.add_argument("--schema", action="store_true", help="run create_all")
-    parser.add_argument("--migrate", action="store_true", help="run ALTER TABLE migrations")
+    parser.add_argument("--schema", action="store_true", help="ensure Alembic schema at head")
+    parser.add_argument("--migrate", action="store_true", help="upgrade Alembic schema to head")
     parser.add_argument("--seed", action="store_true", help="seed reference data")
     parser.add_argument("--mes-code-backfill", action="store_true", help="backfill mes codes")
     parser.add_argument("--check", action="store_true", help="report DB state without writing")
@@ -98,30 +104,39 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv if argv is not None else sys.argv[1:])
 
     if args.check:
-        report = check_db()
+        try:
+            with readonly_connection() as connection:
+                schema = check_schema(connection=connection)
+                print(
+                    f"[schema-check] state={schema.state.value} "
+                    f"revision={schema.revision or '-'} ready={schema.ready}"
+                )
+                for difference in schema.differences:
+                    print(f"  - {difference}")
+                if not schema.ready:
+                    return 1
+                report = check_db(connection=connection)
+        except SchemaBootstrapError as exc:
+            print(f"[schema-check] ERROR: {exc}", file=sys.stderr)
+            return 1
         print("[check] DB state:")
         for key, val in report.items():
             print(f"  {key}: {val}")
         return 0
 
-    exit_code = 0
     did_something = False
-    if args.all or args.schema:
-        run_schema_create_all()
-        print("[schema] create_all completed")
-        did_something = True
-    if args.all or args.migrate:
-        result = run_migrations()
-        errs = result.get("errors") or []
+    if args.all or args.schema or args.migrate:
+        try:
+            result = ensure_schema()
+        except SchemaBootstrapError as exc:
+            print(f"[schema] ERROR: {exc}", file=sys.stderr)
+            return 1
         print(
-            f"[migrate] applied={result['applied']} skipped={result['skipped']} "
-            f"failed={len(errs)}"
+            f"[schema] state={result.previous_state.value} "
+            f"revision={result.revision} changed={result.changed}"
         )
-        if errs:
-            print(f"[migrate] ERROR: {len(errs)} real migration failure(s):")
-            for e in errs:
-                print(f"  - {e}")
-            exit_code = 1
+        if result.backup is not None:
+            print(f"[schema] verified_backup={result.backup.path}")
         did_something = True
     if args.all or args.seed:
         seeded = seed_reference_data()
@@ -135,11 +150,14 @@ def main(argv: list[str] | None = None) -> int:
     if not did_something:
         print("Nothing to do. Try: python bootstrap_db.py --all  (or --help)")
 
-    return exit_code
+    return 0
 
 
 __all__ = [
     "bootstrap_all",
+    "ensure_schema",
+    "check_schema",
+    "readonly_connection",
     "run_schema_create_all",
     "run_migrations",
     "seed_reference_data",

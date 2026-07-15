@@ -7,6 +7,9 @@
 """
 from __future__ import annotations
 
+from sqlalchemy import func, select
+from sqlalchemy.engine import Connection
+
 from app.database import SessionLocal
 from app.models import (
     Department,
@@ -195,8 +198,31 @@ def backfill_mes_codes() -> int:
     return 0
 
 
-def check_db() -> dict:
+def check_db(connection: Connection | None = None) -> dict[str, int]:
     """실행하지 않고 현재 상태만 리포트."""
+    if connection is not None:
+        return {
+            "employees": int(
+                connection.scalar(select(func.count()).select_from(Employee.__table__)) or 0
+            ),
+            "process_types": int(
+                connection.scalar(select(func.count()).select_from(ProcessType.__table__)) or 0
+            ),
+            "product_symbols": int(
+                connection.scalar(select(func.count()).select_from(ProductSymbol.__table__)) or 0
+            ),
+            "items": int(
+                connection.scalar(select(func.count()).select_from(Item.__table__)) or 0
+            ),
+            "items_missing_mes_code": int(
+                connection.scalar(
+                    select(func.count())
+                    .select_from(Item.__table__)
+                    .where(Item.__table__.c.mes_code.is_(None))
+                )
+                or 0
+            ),
+        }
     db = SessionLocal()
     try:
         report = {
