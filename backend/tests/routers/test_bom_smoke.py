@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
 
 
@@ -45,6 +47,37 @@ def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
     assert where_used.status_code == 200, where_used.text
     assert len(where_used.json()) == 1
     assert where_used.json()[0]["parent_item_id"] == str(parent.item_id)
+
+
+def test_bom_flat_orders_children_by_department_stage_and_serial(client, make_item, make_bom):
+    parent = make_item(name="Sort parent", process_type_code="AF", model_symbol="9", serial_no=1)
+    tf_first = make_item(name="TF first", process_type_code="TF", model_symbol="6", serial_no=1)
+    tf_second = make_item(name="TF second", process_type_code="TF", model_symbol="3", serial_no=2)
+    ta = make_item(name="TA", process_type_code="TA", model_symbol="3", serial_no=1)
+    tr = make_item(name="TR", process_type_code="TR", model_symbol="3", serial_no=1)
+    hf = make_item(name="HF", process_type_code="HF", model_symbol="3", serial_no=1)
+    af = make_item(name="AF", process_type_code="AF", model_symbol="3", serial_no=1)
+    aa = make_item(name="AA", process_type_code="AA", model_symbol="3", serial_no=1)
+    ar = make_item(name="AR", process_type_code="AR", model_symbol="3", serial_no=1)
+    pr = make_item(name="PR", process_type_code="PR", model_symbol="3", serial_no=1)
+
+    for child in [pr, ar, aa, af, hf, tr, ta, tf_second, tf_first]:
+        make_bom(parent.item_id, child.item_id, Decimal("1"))
+
+    response = client.get(f"/api/bom/{parent.item_id}")
+
+    assert response.status_code == 200, response.text
+    assert [row["child_item_id"] for row in response.json()] == [
+        str(tf_first.item_id),
+        str(tf_second.item_id),
+        str(ta.item_id),
+        str(tr.item_id),
+        str(hf.item_id),
+        str(af.item_id),
+        str(aa.item_id),
+        str(ar.item_id),
+        str(pr.item_id),
+    ]
 
 
 def test_bom_duplicate_and_circular_references_are_blocked(client, make_item):

@@ -6,15 +6,34 @@ import uuid
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from app.models import BOM
+from app.models import BOM, Item
 
 
 MAX_DEPTH = 10
 
+DEPARTMENT_DISPLAY_ORDER = {"T": 0, "H": 1, "V": 2, "N": 3, "A": 4, "P": 5}
+STAGE_DISPLAY_ORDER = {"F": 0, "A": 1, "R": 2}
+
 # parent_item_id -> List[(child_item_id, per-unit quantity)]
 BomCache = Dict[uuid.UUID, List[Tuple[uuid.UUID, Decimal]]]
+
+
+def bom_child_item_ordering() -> tuple:
+    """Return the standard display ordering for direct BOM child items."""
+    department = func.substr(Item.process_type_code, 1, 1)
+    stage = func.substr(Item.process_type_code, 2, 1)
+    return (
+        case(DEPARTMENT_DISPLAY_ORDER, value=department, else_=len(DEPARTMENT_DISPLAY_ORDER)),
+        case(STAGE_DISPLAY_ORDER, value=stage, else_=len(STAGE_DISPLAY_ORDER)),
+        Item.serial_no.is_(None),
+        Item.serial_no.asc(),
+        Item.mes_code.is_(None),
+        Item.mes_code.asc(),
+        Item.item_id.asc(),
+    )
 
 
 def build_bom_cache(db: Session) -> BomCache:

@@ -82,6 +82,36 @@ def test_companion_lines_do_not_map_bom_inclusion_flags():
     assert "origin" not in column_names
 
 
+def test_default_shipping_bom_lines_use_standard_child_order(db_session, make_item, make_bom):
+    af = make_item(name="AF", process_type_code="AF", model_symbol="3", serial_no=1)
+    aa = make_item(name="AA", process_type_code="AA", model_symbol="3", serial_no=1)
+    ar = make_item(name="AR", process_type_code="AR", model_symbol="3", serial_no=1)
+    pa = make_item(name="PA", process_type_code="PA", model_symbol="3", serial_no=1)
+    pr = make_item(name="PR", process_type_code="PR", model_symbol="3", serial_no=1)
+    pf = make_item(name="PF", process_type_code="PF", model_symbol="3", serial_no=1)
+
+    for child in [pr, pa]:
+        make_bom(pf.item_id, child.item_id, Decimal("1"))
+    for child in [ar, aa, af]:
+        make_bom(pa.item_id, child.item_id, Decimal("1"))
+    db_session.commit()
+
+    request = shipping_svc.create_request(
+        db_session,
+        {"base_pf_item_id": pf.item_id, "requested_by_name": "shipping-user"},
+    )
+
+    assert [line.child_item_id for line in request.bom_lines if line.parent_stage == "PF"] == [
+        pa.item_id,
+        pr.item_id,
+    ]
+    assert [line.child_item_id for line in request.bom_lines if line.parent_stage == "PA"] == [
+        af.item_id,
+        aa.item_id,
+        ar.item_id,
+    ]
+
+
 def test_match_bom_does_not_write_temporary_shipping_rows(db_session, make_item, make_bom):
     af = make_item(name="AF body", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
     pa = make_item(name="Reusable PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)

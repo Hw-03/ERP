@@ -28,6 +28,7 @@ from app.models import (
 from app.repositories import item_repository
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
+from app.services.bom import bom_child_item_ordering
 from app.services.inv_calc import _sync_total
 from app.utils.mes_code import next_serial_no
 
@@ -79,8 +80,9 @@ def _payload_request_quantity(payload: dict) -> int:
 def _direct_children(db: Session, parent_item_id: uuid.UUID) -> list[tuple[uuid.UUID, int, str]]:
     rows = (
         db.query(BOM)
+        .join(Item, BOM.child_item_id == Item.item_id)
         .filter(BOM.parent_item_id == parent_item_id)
-        .order_by(BOM.bom_id)
+        .order_by(*bom_child_item_ordering())
         .all()
     )
     return [(row.child_item_id, int(row.quantity or 0), row.unit or "EA") for row in rows]

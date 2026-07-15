@@ -15,7 +15,7 @@ from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, 
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
 from app._evt import emit as _evt_emit
-from app.services.bom import BomCache, build_bom_cache
+from app.services.bom import BomCache, bom_child_item_ordering, build_bom_cache
 from app.repositories import item_repository
 
 router = APIRouter()
@@ -182,7 +182,13 @@ def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
-    return db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
+    return (
+        db.query(BOM)
+        .join(Item, BOM.child_item_id == Item.item_id)
+        .filter(BOM.parent_item_id == parent_item_id)
+        .order_by(*bom_child_item_ordering())
+        .all()
+    )
 
 
 @router.get("/{parent_item_id}/tree", response_model=BOMTreeNode)
