@@ -2,8 +2,8 @@
 
 routers/production.py 의 production_receipt 엔드포인트에서 추출했다. BOM 전개 →
 사전 재고검사 → 부품 창고 차감(BACKFLUSH) → 완제품 적재(PRODUCE) 흐름을 한 업무
-단위로 묶는다. HTTP/예외 매핑·트랜잭션 커밋은 라우터(Adapter)가 담당하고, 여기서는
-http_error 를 쓰지 않고 도메인 예외만 raise 한다(io_dispatch 패턴).
+단위로 묶는다. 서비스가 트랜잭션 커밋/롤백을 담당하고, 라우터(Adapter)는
+HTTP/예외 매핑만 수행한다. 여기서는 http_error를 쓰지 않고 도메인 예외만 raise 한다.
 
 동작 보존: 라우터에 인라인돼 있던 로직을 그대로 옮겼다. 재고 변경 primitive
 (consume_from_item_department / receive_to_item_department / lock_inventories)와 BOM 전개(explode_bom)는
@@ -20,6 +20,7 @@ from app.models import Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services._tx import transactional
 from app.services.bom import explode_bom, merge_requirements
 
 
@@ -191,14 +192,14 @@ def _record_production(
     transaction_ids.append(produce_log.log_id)
 
 
-def execute_production_receipt(
+def _execute_production_receipt(
     db: Session,
     payload: ProductionReceiptRequest,
     produced_item: Item,
     producer_name: str | None,
     producer_id,
 ) -> dict:
-    """생산 입고 전체 흐름. **commit 하지 않는다**(트랜잭션 경계는 라우터 책임).
+    """생산 입고 변경을 현재 트랜잭션에 적용한다.
 
     raise:
       - ProductionBadRequest  : BOM 순환참조/빈 BOM (→ 400)
@@ -220,3 +221,17 @@ def execute_production_receipt(
         db, payload, produced_item, producer_name, producer_id, transaction_ids,
     )
     return {"transaction_ids": transaction_ids, "backflushed": backflushed}
+
+
+def execute_production_receipt(
+    db: Session,
+    payload: ProductionReceiptRequest,
+    produced_item: Item,
+    producer_name: str | None,
+    producer_id,
+) -> dict:
+    """생산 입고의 재고·원장 변경을 하나의 트랜잭션으로 처리한다."""
+    with transactional(db):
+        return _execute_production_receipt(
+            db, payload, produced_item, producer_name, producer_id,
+        )

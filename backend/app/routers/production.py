@@ -62,16 +62,12 @@ def production_receipt(
         result = production_receipt_svc.execute_production_receipt(
             db, payload, produced_item, producer_name, producer_id,
         )
-        db.commit()
     except ProductionItemNotFound as exc:
-        db.rollback()
         raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, str(exc))
     except ProductionBadRequest as exc:
-        db.rollback()
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
     except ProductionShortage as exc:
         # 사전 재고 부족 — 상세 목록(shortages)을 그대로 422 로 전달.
-        db.rollback()
         raise http_error(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             code=ErrorCode.STOCK_SHORTAGE,
@@ -83,7 +79,6 @@ def production_receipt(
         # 가드(UPDATE ... WHERE qty>=n)가 늦게 ValueError 를 던진다. 사전 검사와
         # 동일하게 깨끗한 422 STOCK_SHORTAGE 로 매핑. db 는 롤백되어 loser 의
         # 부분 배치/orphan TransactionLog 가 남지 않는다.
-        db.rollback()
         raise http_error(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             code=ErrorCode.STOCK_SHORTAGE,
@@ -93,7 +88,6 @@ def production_receipt(
     except Exception as exc:
         # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
         logger.exception("생산 처리 중 예기치 못한 오류")
-        db.rollback()
         raise http_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             ErrorCode.INTERNAL,
