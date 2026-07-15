@@ -94,7 +94,7 @@ export const TRANSACTION_TYPE_LABEL: Record<TransactionType, string> = {
   TRANSFER_DEPT: "부서 → 부서",
   MARK_DEFECTIVE: "새 불량",
   UNMARK_DEFECTIVE: "불량 해제",
-  DEFECT_SCRAP: "불량 처리", // ⚠️ 이전 "폐기" — sub_type defect_process 와 통일
+  DEFECT_SCRAP: "불량 폐기", // 직접 폐기 거래
   SUPPLIER_RETURN: "원자재 반품",
   INTERNAL_USE: "사용출고",
 };

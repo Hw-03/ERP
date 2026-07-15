@@ -385,6 +385,9 @@ export function getHistoryRowPresentation(
   const movement = batch
     ? getHistoryMovementSummary(log, batch)
     : { parts: [getSingleLogMovement(log)] };
+  if (batchStats && batchStats.excludedCount > 0) {
+    movement.supplement = { label: `제외 ${batchStats.excludedCount}`, tone: "muted" };
+  }
   const stock = getStockPresentation(log);
   const requester = getRequesterPresentation(log, batch);
   const rawApprover = (batch?.approver_name ?? log.approver_name ?? "").trim();
@@ -547,6 +550,5 @@ function getStatusChips(
   if (defectReason) chips.push({ label: "\uC0AC\uC720", tone: "warning", title: defectReason });
 
   if (stats && stats.shortageCount > 0) chips.push({ label: `부족 ${stats.shortageCount}`, tone: "danger" });
-  if (stats && stats.excludedCount > 0) chips.push({ label: `제외 ${stats.excludedCount}`, tone: "muted" });
   return chips;
 }

@@ -11,7 +11,6 @@ import {
   getHistoryBomParentLine,
   getDisplayBundles,
   getHistoryLineSignedQuantity,
-  getHistoryLineStatusLabel,
   type LineSignTone,
 } from "./historyBatchInterpreter";
 import {
@@ -131,13 +130,10 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
     </>
   );
 }
-function StatusBadge({ included, shortage }: { included: boolean; shortage: number }) {
-  const status = getHistoryLineStatusLabel({ included, shortage });
-  // 포함(ok) 은 기본값이라 chip 노출 안 함 — 부족/제외만 시각 신호.
-  if (status.tone === "ok") return null;
-  const color = status.tone === "danger" ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
-  // shortage 표기는 formatQty 적용 — helper 의 정수 라벨을 덮어쓴다.
-  const label = status.tone === "danger" ? `부족 ${formatQty(shortage)}` : status.label;
+function StatusBadge({ shortage }: { shortage: number }) {
+  if (shortage <= 0) return null;
+  const color = LEGACY_COLORS.red;
+  const label = `부족 ${formatQty(shortage)}`;
   return (
     <span
       className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold leading-none"
@@ -189,7 +185,6 @@ function BundleRows({
       : `${formatQty(bundle.quantity)}`;
   const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
   const shortageCount = childLines.filter((line) => line.included && line.shortage > 0).length;
-  const excludedCount = childLines.filter((line) => !line.included).length;
   const detailId = `history-bom-${encodeURIComponent(bundle.bundle_id).replaceAll("%", "_")}`;
   const targetPadX = compact ? "px-2" : "px-4";
   const quantityPadX = compact ? "px-2" : "px-4";
@@ -263,11 +258,10 @@ function BundleRows({
             />
           ) : headerQtyText}
         </td>
-        <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="flex flex-wrap gap-1">
-            {shortageCount > 0 && <StatusBadge included shortage={shortageCount} />}
-            {excludedCount > 0 && <StatusBadge included={false} shortage={0} />}
-            {shortageCount === 0 && excludedCount === 0 && (
+        <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="flex flex-wrap justify-center gap-1">
+            {shortageCount > 0 && <StatusBadge shortage={shortageCount} />}
+            {shortageCount === 0 && (
               <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
             )}
           </div>
@@ -354,7 +348,7 @@ function BomLineRow({
         />
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <StatusBadge included={line.included} shortage={line.shortage} />
+        <StatusBadge shortage={line.included ? line.shortage : 0} />
       </td>
     </tr>
   );

@@ -130,7 +130,7 @@ export function MovementSummaryCell({
 }) {
   // 변화량 pill 은 단건/묶음/경고 모두 같은 높이로 고정한다.
   // 단일 pill 폭은 2개 pill(5rem + gap-1 + 5rem)과 맞춰 열의 리듬을 통일한다.
-  const isSingle = summary.parts.length === 1 && !summary.warning;
+  const isSingle = summary.parts.length === 1 && !summary.warning && !summary.supplement;
   const pillClass = compact
     ? "inline-flex h-6 max-w-full min-w-0 flex-1 items-center justify-center truncate rounded-full px-2 text-xs font-bold leading-none"
     : isSingle
@@ -157,6 +157,17 @@ export function MovementSummaryCell({
           </span>
         );
       })}
+      {summary.supplement && (
+        <span
+          className="inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-bold leading-none"
+          style={{
+            background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 18%, transparent)`,
+            color: LEGACY_COLORS.muted2,
+          }}
+        >
+          {summary.supplement.label}
+        </span>
+      )}
       {summary.warning && (
         <span
           className="inline-flex h-6 items-center rounded-full px-2.5 text-xs font-bold leading-none"

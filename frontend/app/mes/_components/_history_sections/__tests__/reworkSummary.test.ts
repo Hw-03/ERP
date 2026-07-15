@@ -54,7 +54,10 @@ describe("buildReworkItemSummaries", () => {
       unit: "EA",
       excluded: false,
     });
-    expect(summaries[0].resultLabel).toBe("폐기 199 EA · 회수 1 EA");
+    expect(summaries[0].resultParts).toEqual([
+      { label: "폐기 199 EA", tone: "danger" },
+      { label: "회수 1 EA", tone: "success" },
+    ]);
   });
 
   it("keeps scrap-only, recovery-only, and excluded rows explicit", () => {
@@ -64,10 +67,10 @@ describe("buildReworkItemSummaries", () => {
       makeLog({ log_id: "excluded", item_id: "EXCLUDED", mes_code: "6-AA-0003", item_name: "처리 제외", transaction_type: "BACKFLUSH", quantity_change: 0, transfer_qty: 0 }),
     ]);
 
-    expect(summaries.map((summary) => summary.resultLabel)).toEqual([
-      "폐기 3 EA",
-      "회수 2 EA",
-      "처리 제외",
+    expect(summaries.map((summary) => summary.resultParts)).toEqual([
+      [{ label: "폐기 3 EA", tone: "danger" }],
+      [{ label: "회수 2 EA", tone: "success" }],
+      [{ label: "처리 제외", tone: "muted" }],
     ]);
     expect(summaries[2].excluded).toBe(true);
   });

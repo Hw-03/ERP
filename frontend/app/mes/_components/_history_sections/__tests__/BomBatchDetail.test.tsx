@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBatch, IoLine } from "@/lib/api/types/io";
 import { BomBatchDetail } from "../BomBatchDetail";
@@ -163,5 +163,71 @@ describe("BomBatchDetail", () => {
 
     expect(container.querySelectorAll("tbody > tr")).toHaveLength(1);
     expect(screen.getByText("+2 EA")).toBeInTheDocument();
+  });
+
+  it("keeps shortage badges but never renders excluded badges in BOM summary or child rows", () => {
+    const batch = makeBatch();
+    batch.bundles[0].lines[1].shortage = 2;
+    batch.bundles[0].lines.push(makeLine({
+      line_id: "excluded-line",
+      item_id: "excluded-item",
+      item_name: "제외 구성품",
+      included: false,
+      shortage: 0,
+    }));
+
+    render(
+      <table>
+        <tbody>
+          <BomBatchDetail
+            batchId={batch.batch_id}
+            colSpan={8}
+            cache={new Map([[batch.batch_id, batch]])}
+            onCached={vi.fn()}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText("부족 1")).toBeInTheDocument();
+    expect(screen.queryByText("제외")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+
+    expect(screen.getByText("제외 구성품")).toBeInTheDocument();
+    expect(screen.queryByText("제외")).not.toBeInTheDocument();
+    expect(screen.getAllByText("부족 2")).toHaveLength(1);
+  });
+
+  it("keeps the status-cell dash fallback for an exclusion-only BOM bundle", () => {
+    const batch = makeBatch();
+    batch.bundles[0].lines.push(makeLine({
+      line_id: "excluded-line",
+      item_id: "excluded-item",
+      item_name: "제외 구성품",
+      included: false,
+      shortage: 0,
+    }));
+
+    render(
+      <table>
+        <tbody>
+          <BomBatchDetail
+            batchId={batch.batch_id}
+            colSpan={8}
+            cache={new Map([[batch.batch_id, batch]])}
+            onCached={vi.fn()}
+          />
+        </tbody>
+      </table>,
+    );
+
+    const headerRow = screen.getByText("아주 긴 완제품 구성 묶음 이름").closest("tr");
+    expect(headerRow).not.toBeNull();
+    const dash = within(headerRow!).getByText("-");
+    expect(dash).toBeInTheDocument();
+    expect(dash.closest("td")).toHaveClass("text-center");
+    expect(dash.parentElement).toHaveClass("justify-center");
+    expect(screen.queryByText("제외")).not.toBeInTheDocument();
   });
 });

@@ -4,9 +4,14 @@ import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import { HISTORY_CELL_TRANSITION, ItemCodeCell } from "./historyTableHelpers";
-import { buildReworkItemSummaries, type ReworkItemSummary } from "./reworkSummary";
+import { buildReworkItemSummaries, type ReworkItemSummary, type ReworkResultTone } from "./reworkSummary";
 
 const REWORK_RESULT_LABEL = "처리결과";
+const REWORK_RESULT_TONE_COLORS: Record<ReworkResultTone, string> = {
+  danger: LEGACY_COLORS.red,
+  success: LEGACY_COLORS.green,
+  muted: LEGACY_COLORS.muted2,
+};
 
 type Props = {
   logs: TransactionLog[];
@@ -47,7 +52,6 @@ export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelle
 
 function ReworkSummaryRow({ summary, compact, rowId, cancelled }: { summary: ReworkItemSummary; compact?: boolean; rowId?: string; cancelled: boolean }) {
   const padX = compact ? "px-2" : "px-4";
-  const resultTone = summary.excluded ? LEGACY_COLORS.muted2 : summary.scrapQty > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green;
 
   return (
     <tr id={rowId} className={cancelled ? "opacity-60" : undefined} style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}>
@@ -56,10 +60,10 @@ function ReworkSummaryRow({ summary, compact, rowId, cancelled }: { summary: Rew
         <span
           aria-label={compact ? REWORK_RESULT_LABEL : undefined}
           title={compact ? REWORK_RESULT_LABEL : undefined}
-          className={`inline-flex items-center justify-center rounded-full py-1 text-xs font-bold ${
+          className={`inline-flex h-6 items-center justify-center rounded-full text-xs font-bold leading-none ${
             compact
               ? "w-full max-w-full min-w-0 overflow-hidden px-2"
-              : "min-w-[6.5rem] px-3"
+              : "w-full max-w-full min-w-0 px-3"
           }`}
           style={{
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
@@ -83,8 +87,19 @@ function ReworkSummaryRow({ summary, compact, rowId, cancelled }: { summary: Rew
         </div>
       </td>
       <ItemCodeCell code={summary.mesCode} compact={compact} dense />
-      <td className={`whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold${cancelled ? " line-through" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: resultTone }}>
-        {summary.resultLabel}
+      <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border }}>
+        {summary.resultParts.map((part, index) => (
+          <span key={`${part.tone}-${part.label}`}>
+            {index > 0 && (
+              <span aria-hidden className={cancelled ? "line-through" : undefined} style={{ color: LEGACY_COLORS.muted2 }}>
+                {" · "}
+              </span>
+            )}
+            <span className={cancelled ? "line-through" : undefined} style={{ color: REWORK_RESULT_TONE_COLORS[part.tone] }}>
+              {part.label}
+            </span>
+          </span>
+        ))}
       </td>
       <td className="border-b px-4 py-2 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         -

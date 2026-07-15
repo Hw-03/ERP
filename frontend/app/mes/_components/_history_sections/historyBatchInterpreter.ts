@@ -214,14 +214,15 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
 /**
  * TransactionLog.notes 파싱 — 시스템 자동 생성 메타와 사용자가 직접 입력한 메모를 분리.
  *
- * 백엔드가 자동으로 채우는 패턴(6 종):
+ * 백엔드가 자동으로 채우는 패턴(7 종):
  *   1·2. "요청 (승인|즉시) 처리: {code} / {from} → {to} / {qty}개 / 요청자 {name}" (stock_requests.py)
  *      3. 위 1·2 끝에 " / 비고: {사용자 입력}" 가 덧붙는 경우 — 비고만이 사용자 메모
  *      4. "[dept_adj:{sub}] {op}: {reason}" (dept_adjustment.py) — reason 이 사용자 입력
  *      5. "[defect_disassemble(:keep|:scrap)?] {note}" (dept_adjustment.py) — note 가 사용자 입력
  *      6. "[격리] {src} → {tgt}" / "[정상복귀] {dept}" (defects.py) — 사용자 입력 없음
+ *      7. "[rework:{kind}]" (재작업 자동 생성) — 사용자 입력 없음
  *
- * 위 6 종 외엔 입출고 2.0 wizard 에서 사용자가 직접 입력한 비고(batch.notes 그대로) → 전체가 사용자 메모.
+ * 위 7 종 외엔 입출고 2.0 wizard 에서 사용자가 직접 입력한 비고(batch.notes 그대로) → 전체가 사용자 메모.
  *
  * 반환: `userMemo` (null 이면 사용자 메모 없음 — UI 에서 메모 카드/알약 미노출).
  */
@@ -275,6 +276,7 @@ export function parseTransactionNotes(notes: string | null | undefined): {
 
 function isGeneratedHistorySystemNote(text: string): boolean {
   if (text.startsWith("??") || text.includes("\uFFFD")) return true;
+  if (/^\[rework:[^\]]+\]/.test(text)) return true;
 
   const systemFragments = [
     "품목 전환 소스",
@@ -346,6 +348,9 @@ export function getHistoryOperationLabel(
   log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): string {
+  if (log.transaction_type === "DEFECT_SCRAP") {
+    return _TX_OPERATION.DEFECT_SCRAP;
+  }
   if (batch?.sub_type === "internal_use_out" || log.transaction_type === "INTERNAL_USE") {
     return _internalUseOperationLabel(log, batch);
   }
@@ -625,6 +630,11 @@ export interface MovementSummary {
   parts: MovementSummaryPart[];
   /** "부족 N" 같은 빨간 경고 텍스트. parts 와 같은 줄에 · 로 구분 노출. */
   warning?: string;
+  /** "제외 N" 같은 보조 수량 정보. */
+  supplement?: {
+    label: string;
+    tone: "muted";
+  };
 }
 
 function _toNum(v: unknown): number {

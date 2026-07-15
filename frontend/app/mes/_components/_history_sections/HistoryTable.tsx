@@ -51,11 +51,11 @@ type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left
 // 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 수량/재고 → 상태.
 const COLUMNS: ColSpec[] = [
   { label: "일시", width: "104px", align: "center" },
-  { label: "작업", width: "168px", align: "center" },
+  { label: "작업", width: "228px", align: "center" },
   { label: "대상" },
   { label: "품목코드", width: "118px", align: "center" },
   { label: "수량", width: "270px", align: "center" },
-  { label: "상태 · 처리", width: "180px", align: "center" },
+  { label: "상태 · 처리", width: "120px", align: "center" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
 
@@ -248,7 +248,7 @@ export function HistoryTable({
           description="조건에 맞는 거래가 없거나 아직 기록이 없습니다."
         />
       ) : (
-        <div className="min-w-0 overflow-x-hidden rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="min-w-0 overflow-x-clip rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
             <thead>
               <tr style={{ background: LEGACY_COLORS.s2 }}>

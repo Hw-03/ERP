@@ -138,11 +138,13 @@ describe("history table helper rendering policies", () => {
     );
 
     const tableCard = container.querySelector("section.card");
-    const tableScroller = container.querySelector("div.overflow-x-hidden");
+    const tableScroller = container.querySelector("div.overflow-x-clip");
     const table = tableScroller?.querySelector("table");
 
     expect(tableCard).not.toBeInTheDocument();
     expect(tableScroller).toHaveClass("min-w-0");
+    expect(tableScroller).toHaveClass("overflow-x-clip");
+    expect(tableScroller).not.toHaveClass("overflow-x-hidden");
     expect(tableScroller).not.toHaveClass("-mr-5");
     expect(table).toHaveClass("w-full");
     expect(table).toHaveClass("table-fixed");
@@ -154,6 +156,8 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByText(/표시 .*건/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "현재 묶음 접기" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "top-0", "z-10");
+    expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "228px" });
+    expect(screen.getByRole("columnheader", { name: "상태 · 처리" })).toHaveStyle({ width: "120px" });
   });
 
   it("defines a single fixed rhythm for main history rows", () => {
@@ -210,12 +214,12 @@ describe("history table helper rendering policies", () => {
     expect(target.style.width).toBe("");
     expect(target.style.minWidth).toBe("");
     expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("104px");
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("168px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
     expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("118px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
-    expect(statusHeader.style.width).toBe("180px");
+    expect(statusHeader.style.width).toBe("120px");
     expect(statusHeader).toHaveClass("text-center");
 
     const row = screen.getByRole("button");
@@ -297,7 +301,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByText("별도 시각")).not.toBeInTheDocument();
   });
 
-  it("uses the freed flow width for the remaining columns while leaving the target flexible", () => {
+  it("uses the rebalanced status width for the work column while leaving the target flexible", () => {
     const log = makeLog();
     render(
       <HistoryTable
@@ -314,11 +318,11 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("168px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
-    expect(statusHeader.style.width).toBe("180px");
+    expect(statusHeader.style.width).toBe("120px");
     expect(statusHeader).toHaveClass("text-center");
   });
 
@@ -358,6 +362,29 @@ describe("history table helper rendering policies", () => {
     expect(pill).toHaveClass("min-w-0");
     expect(pill).toHaveClass("truncate");
     expect(pill).not.toHaveClass("min-w-[10.25rem]");
+  });
+
+  it("renders an excluded-line supplement once before the shortage warning", () => {
+    render(
+      <MovementSummaryCell
+        compact
+        summary={{
+          parts: [{ label: "생산 +1 EA", tone: "primary" }],
+          warning: "부족 1",
+          supplement: { label: "제외 1", tone: "muted" },
+        }}
+      />,
+    );
+
+    const movement = screen.getByText("생산 +1 EA");
+    const warning = screen.getByText("부족 1");
+    const supplement = screen.getByText("제외 1");
+
+    expect(movement).toHaveClass("max-w-full", "min-w-0", "truncate");
+    expect(movement.parentElement).toHaveClass("w-full", "max-w-full", "min-w-0");
+    expect(supplement).toHaveClass("h-5", "shrink-0");
+    expect(screen.getAllByText("제외 1")).toHaveLength(1);
+    expect(supplement.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("uses the real conversion item as each collapsible parent instead of an empty section row", () => {

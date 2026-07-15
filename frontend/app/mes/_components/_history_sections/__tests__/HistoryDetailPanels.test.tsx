@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type TransactionLog } from "@/lib/api";
 import { productionApi } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
-import { HistoryDetailPanel } from "../HistoryDetailPanel";
+import { HistoryDetailMemo, HistoryDetailPanel } from "../HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../HistoryBatchDetailPanel";
 
 vi.mock("@/lib/api", () => ({
@@ -157,6 +157,13 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it("does not render a memo card for a rework child system note", () => {
+    const { container } = render(<HistoryDetailMemo notes="[rework:scrap_child]" />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText("[rework:scrap_child]")).not.toBeInTheDocument();
+  });
+
   it("uses one key-point summary for a single log and puts cancel at the bottom", () => {
     render(
       <HistoryDetailPanel

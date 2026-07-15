@@ -179,7 +179,7 @@ describe("ReworkBatchDetail", () => {
     expect(visibleLabel).toHaveClass("min-w-0", "truncate");
   });
 
-  it("keeps the noncompact result badge unchanged", () => {
+  it("matches the parent rework badge dimensions for a noncompact result", () => {
     render(
       <table>
         <tbody>
@@ -193,10 +193,85 @@ describe("ReworkBatchDetail", () => {
     );
 
     const badge = screen.getByText("처리결과");
-    expect(badge).toHaveClass("min-w-[6.5rem]", "px-3");
-    expect(badge).not.toHaveClass("w-full", "min-w-0");
+    expect(badge).toHaveClass("h-6", "w-full", "max-w-full", "min-w-0", "px-3", "text-xs");
+    expect(badge).not.toHaveClass("min-w-[6.5rem]");
     expect(badge).not.toHaveAttribute("title");
     expect(badge).not.toHaveAttribute("aria-label");
+  });
+
+  it("renders mixed rework results as separately toned parts", () => {
+    render(
+      <table>
+        <tbody>
+          <ReworkBatchDetail
+            logs={[
+              makeLog({ log_id: "scrap", transaction_type: "DEFECT_SCRAP", quantity_change: -5, transfer_qty: 5 }),
+              makeLog({ log_id: "recover", transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 }),
+            ]}
+            parentItemId="PARENT"
+            colSpan={8}
+          />
+        </tbody>
+      </table>,
+    );
+
+    const scrap = screen.getByText("폐기 5 EA");
+    const recovery = screen.getByText("회수 2 EA");
+    expect(scrap).toHaveStyle({ color: LEGACY_COLORS.red });
+    expect(recovery).toHaveStyle({ color: LEGACY_COLORS.green });
+    expect(scrap.closest("td")).toHaveTextContent("폐기 5 EA · 회수 2 EA");
+  });
+
+  it.each([
+    {
+      name: "scrap-only result",
+      logs: [makeLog({ transaction_type: "DEFECT_SCRAP", quantity_change: -5, transfer_qty: 5 })],
+      label: "폐기 5 EA",
+      color: LEGACY_COLORS.red,
+    },
+    {
+      name: "recovery-only result",
+      logs: [makeLog({ transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 })],
+      label: "회수 2 EA",
+      color: LEGACY_COLORS.green,
+    },
+    {
+      name: "excluded result",
+      logs: [makeLog({ transaction_type: "DISASSEMBLE", quantity_change: 0, transfer_qty: 0 })],
+      label: "처리 제외",
+      color: LEGACY_COLORS.muted2,
+    },
+  ])("renders the $name with its result tone", ({ logs, label, color }) => {
+    render(
+      <table>
+        <tbody>
+          <ReworkBatchDetail logs={logs} parentItemId="PARENT" colSpan={8} />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText(label)).toHaveStyle({ color });
+  });
+
+  it("keeps each cancelled result part struck through", () => {
+    render(
+      <table>
+        <tbody>
+          <ReworkBatchDetail
+            logs={[
+              makeLog({ log_id: "scrap", transaction_type: "DEFECT_SCRAP", quantity_change: -5, transfer_qty: 5 }),
+              makeLog({ log_id: "recover", transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 }),
+            ]}
+            parentItemId="PARENT"
+            colSpan={8}
+            cancelled
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText("폐기 5 EA")).toHaveClass("line-through");
+    expect(screen.getByText("회수 2 EA")).toHaveClass("line-through");
   });
 
   it("shows the full overflowing item name on hover and focus", async () => {

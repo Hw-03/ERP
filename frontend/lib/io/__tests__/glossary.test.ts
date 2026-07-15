@@ -123,7 +123,7 @@ describe("glossary — 캐노니컬 라벨 고정", () => {
     expect(SUB_TYPE_LABEL.defect_process).toBe("불량 처리");
     expect(TRANSACTION_TYPE_LABEL.MARK_DEFECTIVE).toBe("새 불량");
     expect(TRANSACTION_TYPE_LABEL.UNMARK_DEFECTIVE).toBe("불량 해제");
-    expect(TRANSACTION_TYPE_LABEL.DEFECT_SCRAP).toBe("불량 처리");
+    expect(TRANSACTION_TYPE_LABEL.DEFECT_SCRAP).toBe("불량 폐기");
   });
 
   it("work type 'process' 는 '부서 입출고'", () => {

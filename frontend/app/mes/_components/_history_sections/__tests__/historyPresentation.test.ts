@@ -218,11 +218,11 @@ describe("historyPresentation", () => {
     expect(row.target.meta).toEqual(["부품 차감 2라인"]);
     expect(row.flow.label).toBe("조립");
     expect(row.people).toEqual({ requester: "김민재", approver: "박승인" });
+    expect(row.movement.supplement).toEqual({ label: "제외 1", tone: "muted" });
     expect(row.statusChips.map((chip) => chip.label)).toEqual([
       "수정 2",
       "메모",
       "부족 1",
-      "제외 1",
     ]);
   });
 
@@ -234,6 +234,12 @@ describe("historyPresentation", () => {
     }));
 
     expect(row.people).toEqual({ requester: "김현우", approver: "" });
+  });
+
+  it("does not add a memo chip for a rework child system note", () => {
+    const row = getHistoryRowPresentation(makeLog({ notes: "[rework:scrap_child]" }));
+
+    expect(row.statusChips.map((chip) => chip.label)).not.toContain("메모");
   });
 
   it("normalizes system-generated actors without exposing automatic-processing wording", () => {

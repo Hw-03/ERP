@@ -16,6 +16,7 @@ import {
   getHistoryMovementSummary,
   getHistoryBomParentLine,
   getHistoryLineStatusLabel,
+  parseTransactionNotes,
 } from "../historyBatchInterpreter";
 import {
   classifyHistoryScope,
@@ -96,6 +97,18 @@ function makeBatch(overrides: Partial<IoBatch> & { bundles?: IoBundle[] } = {}):
     ...overrides,
   };
 }
+
+describe("parseTransactionNotes", () => {
+  it("treats a rework child note as system generated", () => {
+    expect(parseTransactionNotes("[rework:scrap_child]")).toEqual({ userMemo: null });
+  });
+
+  it("preserves existing user memo extraction", () => {
+    expect(parseTransactionNotes("현장 확인 메모")).toEqual({ userMemo: "현장 확인 메모" });
+    expect(parseTransactionNotes("요청 승인 처리: AX-001 / 비고: 작업자 확인")).toEqual({ userMemo: "작업자 확인" });
+    expect(parseTransactionNotes("[defect_disassemble:scrap] 재확인 필요")).toEqual({ userMemo: "재확인 필요" });
+  });
+});
 
 // ──────────────────────────────────────────────────────────────────
 // getHistoryDisplayLabel
@@ -204,6 +217,14 @@ describe("getHistoryOperationLabel", () => {
     expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("새 불량");
   });
 
+  it("DEFECT_SCRAP은 defect_process batch에서도 '불량 폐기'를 우선한다", () => {
+    const batch = makeBatch({ sub_type: "defect_process" });
+    const log = { transaction_type: "DEFECT_SCRAP" };
+
+    expect(getHistoryOperationLabel(log, batch)).toBe("불량 폐기");
+    expect(getHistoryDisplayLabel(log, batch)).toBe("불량 폐기");
+  });
+
   it("모든 tx 타입 매핑 확인 (P0-1: glossary TRANSACTION_TYPE_LABEL 단일 소스)", () => {
     const cases: [string, string][] = [
       ["RECEIVE", "원자재 입고"],
@@ -217,7 +238,7 @@ describe("getHistoryOperationLabel", () => {
       ["ADJUST", "수량 조정"],
       ["MARK_DEFECTIVE", "새 불량"],
       ["UNMARK_DEFECTIVE", "불량 해제"],
-      ["DEFECT_SCRAP", "불량 처리"],
+      ["DEFECT_SCRAP", "불량 폐기"],
       ["SUPPLIER_RETURN", "원자재 반품"],
     ];
     for (const [tx, expected] of cases) {
@@ -242,7 +263,7 @@ describe("getHistoryFlowLabel", () => {
       ["DISASSEMBLE", "분해"],
       ["MARK_DEFECTIVE", "새 불량"],
       ["UNMARK_DEFECTIVE", "불량 해제"],
-      ["DEFECT_SCRAP", "불량 처리"],
+      ["DEFECT_SCRAP", "불량 폐기"],
       ["ADJUST", "수량 조정"],
       ["SUPPLIER_RETURN", "원자재 반품"],
     ];

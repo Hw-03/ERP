@@ -1,6 +1,13 @@
 import type { TransactionLog } from "@/lib/api/types/production";
 import { formatQty } from "@/lib/mes/format";
 
+export type ReworkResultTone = "danger" | "success" | "muted";
+
+export interface ReworkResultPart {
+  label: string;
+  tone: ReworkResultTone;
+}
+
 export interface ReworkItemSummary {
   itemId: string;
   mesCode: string | null;
@@ -9,7 +16,7 @@ export interface ReworkItemSummary {
   scrapQty: number;
   recoverQty: number;
   excluded: boolean;
-  resultLabel: string;
+  resultParts: ReworkResultPart[];
 }
 
 export function buildReworkItemSummaries(logs: TransactionLog[]): ReworkItemSummary[] {
@@ -25,7 +32,7 @@ export function buildReworkItemSummaries(logs: TransactionLog[]): ReworkItemSumm
       scrapQty: 0,
       recoverQty: 0,
       excluded: false,
-      resultLabel: "",
+      resultParts: [],
     };
 
     const qty = getMovedQty(log);
@@ -44,7 +51,7 @@ export function buildReworkItemSummaries(logs: TransactionLog[]): ReworkItemSumm
 
   return Array.from(summaries.values()).map((summary) => ({
     ...summary,
-    resultLabel: formatReworkResult(summary),
+    resultParts: buildReworkResultParts(summary),
   }));
 }
 
@@ -53,11 +60,11 @@ function getMovedQty(log: TransactionLog): number {
   return Number.isFinite(raw) ? Math.abs(raw) : 0;
 }
 
-function formatReworkResult(summary: Pick<ReworkItemSummary, "scrapQty" | "recoverQty" | "unit" | "excluded">): string {
-  if (summary.excluded) return "처리 제외";
+function buildReworkResultParts(summary: Pick<ReworkItemSummary, "scrapQty" | "recoverQty" | "unit" | "excluded">): ReworkResultPart[] {
+  if (summary.excluded) return [{ label: "처리 제외", tone: "muted" }];
   const unit = summary.unit ? ` ${summary.unit}` : "";
-  const parts: string[] = [];
-  if (summary.scrapQty > 0) parts.push(`폐기 ${formatQty(summary.scrapQty)}${unit}`);
-  if (summary.recoverQty > 0) parts.push(`회수 ${formatQty(summary.recoverQty)}${unit}`);
-  return parts.length > 0 ? parts.join(" · ") : "처리 제외";
+  const parts: ReworkResultPart[] = [];
+  if (summary.scrapQty > 0) parts.push({ label: `폐기 ${formatQty(summary.scrapQty)}${unit}`, tone: "danger" });
+  if (summary.recoverQty > 0) parts.push({ label: `회수 ${formatQty(summary.recoverQty)}${unit}`, tone: "success" });
+  return parts.length > 0 ? parts : [{ label: "처리 제외", tone: "muted" }];
 }
