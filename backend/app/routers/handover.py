@@ -19,8 +19,7 @@ from app.schemas import (
     HandoverSubmitRequest,
 )
 from app.services import handover as handover_svc
-from app.services import notifications as notifications_svc
-from app.services._tx import commit_and_refresh
+from app.services import handover_actions as handover_actions_svc
 
 router = APIRouter()
 
@@ -57,13 +56,9 @@ def _inbox_query(db: Session, actor: Employee) -> Optional[SAQuery]:
 def create_handover(payload: HandoverCreate, db: Session = Depends(get_db)):
     author = _load_actor(db, payload.author_employee_id)
     try:
-        doc = handover_svc.create_handover(db, author=author, payload=payload)
+        doc = handover_actions_svc.create_handover(db, author=author, payload=payload)
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-    # 받는 부서 인수 담당자에게 도착 알림 (커밋 전 세션 add → 인수인계와 원자적).
-    notifications_svc.notify_handover_arrived(db, doc)
-    commit_and_refresh(db, doc)
     return doc
 
 
@@ -72,14 +67,15 @@ def save_handover_draft(payload: HandoverDraftUpsert, db: Session = Depends(get_
     """인수인계 임시저장 — handover_id 없으면 신규 draft, 있으면 본인 기존 draft 갱신."""
     author = _load_actor(db, payload.author_employee_id)
     try:
-        doc = handover_svc.save_handover_draft(db, author=author, payload=payload)
+        doc = handover_actions_svc.save_handover_draft(
+            db,
+            author=author,
+            payload=payload,
+        )
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-    commit_and_refresh(db, doc)
     return doc
 
 
@@ -95,16 +91,11 @@ def submit_handover(
         raise http_error(404, ErrorCode.NOT_FOUND, "인수인계서를 찾을 수 없습니다.")
     author = _load_actor(db, payload.author_employee_id)
     try:
-        handover_svc.submit_handover(db, doc, author=author)
+        handover_actions_svc.submit_handover(db, doc, author=author)
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-    # 받는 부서 인수 담당자에게 도착 알림 (커밋 전 세션 add → 제출과 원자적).
-    notifications_svc.notify_handover_arrived(db, doc)
-    commit_and_refresh(db, doc)
     return doc
 
 
@@ -115,15 +106,16 @@ def delete_handover_draft(
     db: Session = Depends(get_db),
 ):
     """임시저장 폐기 — 본인 DRAFT 만 삭제 가능. 이미 없으면 멱등 통과."""
-    doc = db.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).first()
-    if doc is None:
-        return
-    if doc.author_employee_id != author_employee_id:
-        raise http_error(403, ErrorCode.FORBIDDEN, "본인 임시저장만 삭제할 수 있습니다.")
-    if doc.status != HandoverStatusEnum.DRAFT:
-        raise http_error(422, ErrorCode.UNPROCESSABLE, "임시저장 상태만 삭제할 수 있습니다.")
-    db.delete(doc)
-    db.commit()
+    try:
+        handover_actions_svc.delete_handover_draft(
+            db,
+            handover_id=handover_id,
+            author_employee_id=author_employee_id,
+        )
+    except PermissionError as exc:
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
 
 @router.get("", response_model=List[HandoverResponse])
@@ -177,12 +169,9 @@ def receive_handover(
     try:
         handover_svc.receive_handover(db, doc, actor=actor, pin=payload.pin)
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-    commit_and_refresh(db, doc)
     return doc
 
 

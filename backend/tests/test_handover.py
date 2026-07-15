@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import func
 
 from app.models import (
@@ -21,6 +23,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin
+from app.services import handover as handover_svc
 
 
 def _make_employee(
@@ -135,6 +138,38 @@ def test_handover_create_and_receive_moves_stock(client, db_session, make_item):
     )
     assert len(logs) == 1
     assert logs[0].transfer_qty == Decimal("3")
+
+
+def test_handover_receive_rolls_back_inventory_when_ledger_capture_fails(
+    client, db_session, make_item, monkeypatch
+):
+    item = make_item(name="8TF Rollback", warehouse_qty=Decimal("0"))
+    _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
+    author = _make_employee(db_session, code="TUBE_TX", department=DepartmentEnum.TUBE)
+    receiver = _make_employee(
+        db_session,
+        code="HP_TX",
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        department_role="primary",
+    )
+    db_session.commit()
+    handover_id = _create_handover(client, author, "고압", item, qty=3).json()["handover_id"]
+    doc = db_session.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).one()
+
+    def fail_capture(*_args, **_kwargs):
+        raise RuntimeError("ledger failure")
+
+    monkeypatch.setattr(handover_svc.inv_effect, "capture_effect", fail_capture)
+
+    with pytest.raises(RuntimeError, match="ledger failure"):
+        handover_svc.receive_handover(db_session, doc, actor=receiver, pin="0000")
+
+    db_session.expire_all()
+    persisted = db_session.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).one()
+    assert persisted.status == HandoverStatusEnum.SUBMITTED
+    assert _prod_qty(db_session, item.item_id, "튜브") == Decimal("5")
+    assert _prod_qty(db_session, item.item_id, "고압") == Decimal("0")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_handover_receive_insufficient_stock_422(client, db_session, make_item):
@@ -386,6 +421,61 @@ def test_handover_submit_empty_draft_422(client, db_session, make_item):
         json={"author_employee_id": str(author.employee_id)},
     )
     assert sub.status_code == 422, sub.json()
+
+
+def test_handover_delete_draft_preserves_permission_status_and_idempotency(
+    client, db_session, make_item
+):
+    item = make_item(name="8TF Delete Draft", warehouse_qty=Decimal("0"))
+    owner = _make_employee(db_session, code="TUBE_DEL", department=DepartmentEnum.TUBE)
+    other = _make_employee(db_session, code="TUBE_OTHER", department=DepartmentEnum.TUBE)
+    db_session.commit()
+
+    def create_draft(title: str) -> str:
+        response = client.put(
+            "/api/handovers/draft",
+            json={
+                "author_employee_id": str(owner.employee_id),
+                "to_department": "고압",
+                "title": title,
+                "lines": [{"item_id": str(item.item_id), "quantity": 1}],
+            },
+        )
+        assert response.status_code == 200, response.json()
+        return response.json()["handover_id"]
+
+    protected_id = create_draft("권한·상태 보존")
+    denied = client.delete(
+        f"/api/handovers/draft/{protected_id}?author_employee_id={other.employee_id}"
+    )
+    assert denied.status_code == 403
+
+    submitted = client.post(
+        f"/api/handovers/{protected_id}/submit",
+        json={"author_employee_id": str(owner.employee_id)},
+    )
+    assert submitted.status_code == 200, submitted.json()
+    wrong_status = client.delete(
+        f"/api/handovers/draft/{protected_id}?author_employee_id={owner.employee_id}"
+    )
+    assert wrong_status.status_code == 422
+
+    missing = client.delete(
+        f"/api/handovers/draft/{uuid.uuid4()}?author_employee_id={owner.employee_id}"
+    )
+    assert missing.status_code == 204
+
+    deletable_id = create_draft("삭제 가능")
+    deleted = client.delete(
+        f"/api/handovers/draft/{deletable_id}?author_employee_id={owner.employee_id}"
+    )
+    assert deleted.status_code == 204
+    assert (
+        db_session.query(HandoverDoc)
+        .filter(HandoverDoc.handover_id == deletable_id)
+        .first()
+        is None
+    )
 
 
 def test_handover_inbox_only_receiving_dept_member(client, db_session, make_item):

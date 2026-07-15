@@ -26,6 +26,7 @@ from app.models import (
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services.pin_auth import verify_pin
+from app.services._tx import transactional
 
 _FROM_DEPARTMENT = "튜브"
 
@@ -177,8 +178,8 @@ def submit_handover(db: Session, doc: HandoverDoc, *, author: Employee) -> Hando
     return doc
 
 
-def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
-    """인수 확인 — PIN + 인수부서 권한 검증 후 재고 이동(튜브→인수부서)."""
+def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
+    """인수 확인 변경을 현재 트랜잭션에 적용한다."""
     if doc.status == HandoverStatusEnum.RECEIVED:
         return doc  # 멱등 — 이중 이동 방지
     if doc.status != HandoverStatusEnum.SUBMITTED:
@@ -221,3 +222,9 @@ def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str
     doc.received_at = datetime.utcnow()
     db.flush()
     return doc
+
+
+def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
+    """PIN 검증, 재고 이동, 원장과 인수 상태를 원자적으로 확정한다."""
+    with transactional(db):
+        return _receive_handover(db, doc, actor=actor, pin=pin)
