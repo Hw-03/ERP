@@ -82,7 +82,7 @@ export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeCh
             <span className="text-4xl font-black leading-tight">품목 전환</span>
           </div>
           <span className="text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
-            소스 PA 재고를 대상 PA 재고로 전환
+            기존 PA 재고를 대상 PA 재고로 전환
           </span>
         </button>
       )}
