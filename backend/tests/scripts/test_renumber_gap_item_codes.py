@@ -71,6 +71,11 @@ def _load_subject():
     return module
 
 
+@pytest.fixture(autouse=True)
+def _runtime_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
+
+
 def _code(model_symbol: str, process_type: str, serial_no: int) -> str:
     return f"{model_symbol}-{process_type}-{serial_no:04d}"
 
@@ -209,10 +214,11 @@ def test_apply_renumber_updates_codes_and_snapshots_without_changing_bom_item_id
     original_item_ids = _create_database(database_path)
 
     subject = _load_subject()
-    report = subject.renumber_database(database_path, apply=True, backup_dir=tmp_path / "backup")
+    report = subject.renumber_database(database_path, apply=True)
 
     assert report.applied is True
     assert report.renamed_count == 19
+    assert Path(report.backup_path).parent == tmp_path / "runtime" / "backups" / "sqlite"
     conn = sqlite3.connect(database_path)
     try:
         for symbol, process_type, old_serial, new_serial in RENAMES:
@@ -237,13 +243,13 @@ def test_preview_does_not_change_database_or_create_backup(tmp_path: Path) -> No
     before_bytes = database_path.read_bytes()
 
     subject = _load_subject()
-    report = subject.renumber_database(database_path, apply=False, backup_dir=tmp_path / "backup")
+    report = subject.renumber_database(database_path, apply=False)
 
     assert report.applied is False
     assert report.renamed_count == 19
     assert report.backup_path is None
     assert database_path.read_bytes() == before_bytes
-    assert not (tmp_path / "backup").exists()
+    assert not (tmp_path / "runtime").exists()
 
 
 def test_apply_refuses_occupied_target_code_without_changing_database(tmp_path: Path) -> None:
@@ -260,10 +266,10 @@ def test_apply_refuses_occupied_target_code_without_changing_database(tmp_path: 
 
     subject = _load_subject()
     with pytest.raises(ValueError, match="이미 사용 중"):
-        subject.renumber_database(database_path, apply=True, backup_dir=tmp_path / "backup")
+        subject.renumber_database(database_path, apply=True)
 
     assert database_path.read_bytes() == before_bytes
-    assert not (tmp_path / "backup").exists()
+    assert not (tmp_path / "runtime").exists()
 
 
 def test_apply_refuses_missing_target_without_changing_database(tmp_path: Path) -> None:
@@ -277,10 +283,10 @@ def test_apply_refuses_missing_target_without_changing_database(tmp_path: Path) 
 
     subject = _load_subject()
     with pytest.raises(ValueError, match="누락"):
-        subject.renumber_database(database_path, apply=True, backup_dir=tmp_path / "backup")
+        subject.renumber_database(database_path, apply=True)
 
     assert database_path.read_bytes() == before_bytes
-    assert not (tmp_path / "backup").exists()
+    assert not (tmp_path / "runtime").exists()
 
 
 def test_apply_normalizes_all_historical_snapshots_for_a_renumbered_item(tmp_path: Path) -> None:
@@ -295,7 +301,7 @@ def test_apply_normalizes_all_historical_snapshots_for_a_renumbered_item(tmp_pat
     conn.close()
 
     subject = _load_subject()
-    subject.renumber_database(database_path, apply=True, backup_dir=tmp_path / "backup")
+    subject.renumber_database(database_path, apply=True)
 
     conn = sqlite3.connect(database_path)
     try:
@@ -310,7 +316,7 @@ def test_apply_can_be_rerun_to_normalize_snapshot_after_item_codes_are_already_r
     database_path = tmp_path / "mes.db"
     item_ids = _create_database(database_path)
     subject = _load_subject()
-    subject.renumber_database(database_path, apply=True, backup_dir=tmp_path / "first-backup")
+    subject.renumber_database(database_path, apply=True)
 
     conn = sqlite3.connect(database_path)
     conn.execute(
@@ -320,7 +326,7 @@ def test_apply_can_be_rerun_to_normalize_snapshot_after_item_codes_are_already_r
     conn.commit()
     conn.close()
 
-    report = subject.renumber_database(database_path, apply=True, backup_dir=tmp_path / "second-backup")
+    report = subject.renumber_database(database_path, apply=True)
 
     assert report.applied is True
     conn = sqlite3.connect(database_path)
@@ -342,7 +348,6 @@ def test_apply_pr_contiguous_plan_compacts_205_items_and_preserves_bom_item_ids(
         renames=tuple(subject.Rename(*rename) for rename in PR_CONTIGUOUS_RENAMES),
         plan_name="pr-contiguous",
         apply=True,
-        backup_dir=tmp_path / "backup",
     )
 
     assert report.renamed_count == 21
@@ -379,11 +384,10 @@ def test_pr_contiguous_plan_rejects_process_serial_collision_before_creating_bac
             renames=tuple(subject.Rename(*rename) for rename in PR_CONTIGUOUS_RENAMES),
             plan_name="pr-contiguous",
             apply=True,
-            backup_dir=tmp_path / "backup",
         )
 
     assert database_path.read_bytes() == before_bytes
-    assert not (tmp_path / "backup").exists()
+    assert not (tmp_path / "runtime").exists()
 
 
 def _create_full_renumber_database(path: Path) -> dict[str, str]:
@@ -437,14 +441,12 @@ def test_full_rollback_plan_restores_original_codes_and_snapshots(tmp_path: Path
         renames=subject.AR_PR_GAP_RENAMES,
         plan_name="ar-pr-gap",
         apply=True,
-        backup_dir=tmp_path / "forward-gap",
     )
     subject.renumber_database(
         database_path,
         renames=subject.PR_CONTIGUOUS_RENAMES,
         plan_name="pr-contiguous",
         apply=True,
-        backup_dir=tmp_path / "forward-pr",
     )
 
     report = subject.renumber_database(
@@ -452,7 +454,6 @@ def test_full_rollback_plan_restores_original_codes_and_snapshots(tmp_path: Path
         renames=subject.FULL_ROLLBACK_RENAMES,
         plan_name="full-rollback",
         apply=True,
-        backup_dir=tmp_path / "rollback",
     )
 
     assert report.applied is True

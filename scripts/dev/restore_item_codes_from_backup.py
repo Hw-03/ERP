@@ -10,15 +10,19 @@
 5. 진짜 신규 4건은 옛 시리얼 체계의 max+1로 부여
 6. serial_no 컬럼도 item_code 마지막 4자리로 동기화
 """
-import shutil
 import sqlite3
 import re
-from datetime import datetime
+import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.ops.maintenance_backup import create_sqlite_snapshot  # noqa: E402
 
 BAK = Path('backend/_backup/mes_pre_blue_register_20260522_134758.db')
 CUR = Path('backend/mes.db')
-CUR_BAK = Path(f'backend/_backup/mes_pre_restore_codes_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
 
 BLUE_MAP = {
     'ADX6000 내부폼 상판 [47x36.5x2.5 mm] (뱅가드 46F용)': '6-PR-0369',
@@ -45,6 +49,11 @@ BLUE_MAP = {
 }
 
 
+def create_current_db_backup(source_path: Path = CUR) -> Path:
+    """Create the pre-code-restore DB snapshot in MES_RUNTIME_ROOT."""
+    return create_sqlite_snapshot(source_path, "restore-item-codes")
+
+
 def parse_serial(code):
     m = re.search(r'-(\d+)$', code)
     return int(m.group(1)) if m else None
@@ -52,8 +61,8 @@ def parse_serial(code):
 
 def main():
     print('=== 1. 현재 DB 백업 ===')
-    shutil.copy(CUR, CUR_BAK)
-    print(f'  {CUR_BAK.name}')
+    current_backup = create_current_db_backup()
+    print(f'  {current_backup}')
 
     # 백업 매핑 로드
     print()

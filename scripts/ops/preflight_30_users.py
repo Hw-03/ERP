@@ -22,6 +22,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.runtime_paths import runtime_path  # noqa: E402
+from scripts.ops.backup_retention import REGULAR_BACKUP_NAME  # noqa: E402
+
 try:
     import httpx
 except ImportError:
@@ -256,13 +263,18 @@ async def check_concurrent_30(base_url: str) -> None:
 
 async def check_backup_exists() -> None:
     """11. 최근 백업 파일 존재"""
-    backup_dir = Path(__file__).resolve().parents[2] / "outputs" / "backups"
-    if not backup_dir.exists():
-        record("백업 존재", "WARN", "backend/_backup/ 없음 — scripts\ops\backup_db.bat 실행 필요")
+    backup_dirs = [runtime_path("backups", "sqlite"), runtime_path("backups", "postgres")]
+    if not any(path.exists() for path in backup_dirs):
+        record("백업 존재", "WARN", "런타임 백업 폴더 없음 — scripts\\ops\\backup_db.bat 실행 필요")
         return
-    files = sorted(backup_dir.glob("*.db")) + sorted(backup_dir.glob("*.sql"))
+    files = [
+        path
+        for backup_dir in backup_dirs
+        for path in backup_dir.glob("mes_*")
+        if path.is_file() and REGULAR_BACKUP_NAME.fullmatch(path.name)
+    ]
     if not files:
-        record("백업 존재", "WARN", "백업 파일 없음 — scripts\ops\backup_db.bat 실행 필요")
+        record("백업 존재", "WARN", "백업 파일 없음 — scripts\\ops\\backup_db.bat 실행 필요")
         return
     latest = max(f.stat().st_mtime for f in files)
     age_days = (datetime.now(timezone.utc).timestamp() - latest) / 86400

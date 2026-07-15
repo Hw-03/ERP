@@ -20,7 +20,14 @@ from typing import Iterable
 
 
 SAFETY_BUFFER = 100
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.ops.maintenance_backup import create_sqlite_snapshot  # noqa: E402
+from scripts.runtime_paths import runtime_path  # noqa: E402
+
 STOCK_QUERY = """
 SELECT
     items.item_id,
@@ -150,18 +157,9 @@ def _load_stocks_from_session(session: object) -> tuple[DepartmentStock, ...]:
     return tuple(_to_stock(tuple(row)) for row in rows)
 
 
-def _create_backup(database_path: Path, backup_dir: Path) -> Path:
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup_path = backup_dir / f"mes.db.before-department-safety-replenish-{timestamp}.db"
-    source = sqlite3.connect(database_path)
-    destination = sqlite3.connect(backup_path)
-    try:
-        source.backup(destination)
-    finally:
-        destination.close()
-        source.close()
-    return backup_path
+def _create_backup(database_path: Path) -> Path:
+    """Create a pre-replenishment snapshot in the permanent runtime tree."""
+    return create_sqlite_snapshot(database_path, "department-safety-replenish")
 
 
 def _plan_signature(plan: ReplenishmentPlan) -> tuple[tuple[str, int, str], ...]:
@@ -258,7 +256,6 @@ def replenish_database(
     database_path: Path,
     *,
     apply: bool,
-    backup_dir: Path | None = None,
 ) -> ReplenishmentReport:
     """Preview or atomically replenish eligible production stock without changing warehouse stock."""
     database_path = Path(database_path)
@@ -298,8 +295,7 @@ def replenish_database(
     if any(quantity is None for quantity in warehouse_before.values()):
         raise ValueError("target inventory is missing before backup")
 
-    actual_backup_dir = Path(backup_dir) if backup_dir else database_path.parent / "_backup"
-    backup_path = _create_backup(database_path, actual_backup_dir)
+    backup_path = _create_backup(database_path)
     transaction_log_count = _apply_locked_plan(database_path, preview_plan)
     _verify_applied(database_path, preview_plan, warehouse_before)
     return ReplenishmentReport(
@@ -310,9 +306,9 @@ def replenish_database(
     )
 
 
-def _write_report(backup_dir: Path, report: ReplenishmentReport) -> None:
+def _write_report(report_dir: Path, report: ReplenishmentReport) -> None:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    (backup_dir / f"department-safety-replenish-report-{timestamp}.json").write_text(
+    (report_dir / f"department-safety-replenish-report-{timestamp}.json").write_text(
         json.dumps(asdict(report), ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
@@ -320,17 +316,15 @@ def _write_report(backup_dir: Path, report: ReplenishmentReport) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, default=Path("backend/mes.db"))
-    parser.add_argument("--backup-dir", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     try:
         report = replenish_database(
             args.database,
             apply=args.apply,
-            backup_dir=args.backup_dir,
         )
         if report.applied:
-            _write_report(Path(args.backup_dir) if args.backup_dir else args.database.parent / "_backup", report)
+            _write_report(runtime_path("reports", "maintenance", create=True), report)
     except Exception as error:
         print(f"[failed] {error}")
         return 1

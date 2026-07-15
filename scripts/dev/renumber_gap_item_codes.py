@@ -9,10 +9,19 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.ops.maintenance_backup import create_sqlite_snapshot  # noqa: E402
+from scripts.runtime_paths import runtime_path  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -270,25 +279,16 @@ def _assert_integrity(
     foreign_keys = conn.execute("PRAGMA foreign_key_check").fetchall()
     if foreign_keys:
         raise ValueError(f"외래 키 검사 실패: {foreign_keys}")
-def _create_backup(database_path: Path, backup_dir: Path, plan_name: str) -> Path:
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup_path = backup_dir / f"mes.db.before-{plan_name}-{timestamp}.db"
-    source = sqlite3.connect(database_path)
-    destination = sqlite3.connect(backup_path)
-    try:
-        source.backup(destination)
-    finally:
-        destination.close()
-        source.close()
-    return backup_path
+def _create_backup(database_path: Path, plan_name: str) -> Path:
+    """Create a pre-renumber snapshot in the permanent runtime tree."""
+    return create_sqlite_snapshot(database_path, f"renumber-{plan_name}")
 
 
 def _write_report(
-    backup_dir: Path, report: RenumberReport, plan_name: str, renames: tuple[Rename, ...]
+    report_dir: Path, report: RenumberReport, plan_name: str, renames: tuple[Rename, ...]
 ) -> None:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    report_path = backup_dir / f"{plan_name}-renumber-report-{timestamp}.json"
+    report_path = report_dir / f"{plan_name}-renumber-report-{timestamp}.json"
     report_path.write_text(
         json.dumps(
             {
@@ -309,7 +309,6 @@ def renumber_database(
     renames: tuple[Rename, ...] = AR_PR_GAP_RENAMES,
     plan_name: str = "ar-pr-gap",
     apply: bool,
-    backup_dir: Path | None = None,
 ) -> RenumberReport:
     """점검하거나, 명시적으로 요청된 경우에만 지정된 품목 코드를 재번호한다."""
     database_path = Path(database_path)
@@ -333,8 +332,7 @@ def renumber_database(
     finally:
         conn.close()
 
-    actual_backup_dir = Path(backup_dir) if backup_dir else database_path.parent / "_backup"
-    backup_path = _create_backup(database_path, actual_backup_dir, plan_name)
+    backup_path = _create_backup(database_path, plan_name)
     conn = sqlite3.connect(database_path)
     conn.execute("PRAGMA foreign_keys = ON")
     try:
@@ -378,14 +376,14 @@ def renumber_database(
         bom_edge_count=len(before_bom_edges),
         backup_path=str(backup_path),
     )
-    _write_report(actual_backup_dir, report, plan_name, renames)
+    report_dir = runtime_path("reports", "maintenance", create=True)
+    _write_report(report_dir, report, plan_name, renames)
     return report
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, default=Path("backend/mes.db"))
-    parser.add_argument("--backup-dir", type=Path)
     parser.add_argument("--plan", choices=tuple(RENAMES_BY_PLAN), default="ar-pr-gap")
     parser.add_argument("--apply", action="store_true", help="검증 후 실제 DB를 변경합니다.")
     args = parser.parse_args()
@@ -396,7 +394,6 @@ def main() -> int:
             renames=RENAMES_BY_PLAN[args.plan],
             plan_name=args.plan,
             apply=args.apply,
-            backup_dir=args.backup_dir,
         )
     except (FileNotFoundError, ValueError, sqlite3.Error) as error:
         print(f"[실패] {error}")

@@ -15,8 +15,14 @@ import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.runtime_paths import runtime_path  # noqa: E402
+from scripts.ops.backup_retention import REGULAR_BACKUP_NAME  # noqa: E402
+
+
 DEFAULT_DB = PROJECT_ROOT / "backend" / "mes.db"
-DEFAULT_BACKUP_DIR = PROJECT_ROOT / "backend" / "_backup"
 VERIFY_BACKUP = PROJECT_ROOT / "scripts" / "ops" / "_verify_backup.py"
 CHECK_INTEGRITY = PROJECT_ROOT / "scripts" / "ops" / "check_inventory_integrity.py"
 
@@ -32,7 +38,11 @@ def _run_validator(cmd: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def _latest_backup(backup_dir: Path) -> Path | None:
-    files = sorted(backup_dir.glob("mes_*.db"), key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+    files = sorted(
+        (path for path in backup_dir.glob("mes_*.db") if REGULAR_BACKUP_NAME.fullmatch(path.name)),
+        key=lambda p: (p.stat().st_mtime, p.name),
+        reverse=True,
+    )
     return files[0] if files else None
 
 
@@ -97,7 +107,6 @@ def check_inventory_integrity(db_path: Path) -> bool:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Check whether DEXCOWIN MES is ready for daily operation")
     parser.add_argument("--db", default=str(DEFAULT_DB), help="SQLite DB path")
-    parser.add_argument("--backup-dir", default=str(DEFAULT_BACKUP_DIR), help="SQLite backup directory")
     parser.add_argument("--max-backup-age-hours", type=float, default=24.0)
     return parser.parse_args()
 
@@ -105,7 +114,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     db_path = Path(args.db).resolve()
-    backup_dir = Path(args.backup_dir).resolve()
+    backup_dir = runtime_path("backups", "sqlite")
 
     checks = [
         check_database_file(db_path),

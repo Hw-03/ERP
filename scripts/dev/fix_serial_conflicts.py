@@ -1,13 +1,19 @@
 """(process_type, serial) 시리얼 충돌 5건 수정 + 권동환 엑셀 G열 갱신."""
 import shutil
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import openpyxl
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.ops.maintenance_backup import create_sqlite_snapshot  # noqa: E402
+
 DB = Path('backend/mes.db')
-DB_BAK = Path(f'backend/_backup/mes_pre_fix_conflicts_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
 
 EXCEL = Path('_attic/data/0520 권동환 사원님 재고/확정품명, 코드 추가.xlsx')
 EXCEL_BAK = Path(f'_attic/data/0520 권동환 사원님 재고/백업/확정품명, 코드 추가_시리얼수정전_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx')
@@ -22,10 +28,15 @@ FIXES = [
 ]
 
 
+def create_db_backup(source_path: Path = DB) -> Path:
+    """Create the pre-conflict-fix DB snapshot in MES_RUNTIME_ROOT."""
+    return create_sqlite_snapshot(source_path, "fix-conflicts")
+
+
 def fix_db():
     print('=== DB 시리얼 수정 ===')
-    shutil.copy(DB, DB_BAK)
-    print(f'백업: {DB_BAK.name}')
+    db_backup = create_db_backup()
+    print(f'백업: {db_backup}')
     c = sqlite3.connect(DB)
     cur = c.cursor()
     cur.execute('BEGIN')

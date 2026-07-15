@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Back up the DEXCOWIN MES database.
-
-SQLite backups are written to backend/_backup/mes_YYYYMMDD_HHMMSS.db and
-verified before the command reports success.
-"""
+"""Back up the DEXCOWIN MES database into the permanent runtime tree."""
 
 from __future__ import annotations
 
@@ -14,68 +10,105 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SQLITE_BACKUP_DIR = PROJECT_ROOT / "backend" / "_backup"
-POSTGRES_BACKUP_DIR = PROJECT_ROOT / "outputs" / "backups"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.runtime_paths import runtime_path  # noqa: E402
+from scripts.ops.backup_retention import DEFAULT_KEEP, retain_latest_backups  # noqa: E402
+
+
 VERIFY_BACKUP = PROJECT_ROOT / "scripts" / "ops" / "_verify_backup.py"
+
+
+def _regular_backup_name(suffix: str) -> str:
+    """Return a collision-resistant regular backup filename."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    return f"mes_{timestamp}_{uuid4().hex}{suffix}"
+
+
+def _private_backup_path(published_path: Path) -> Path:
+    """Return a same-directory path that retention can never classify as regular."""
+    return published_path.parent / f".{published_path.name}.pending-{uuid4().hex}.tmp"
+
+
+def _remove_private_sqlite_backup(path: Path) -> None:
+    """Remove one unpublished SQLite backup and its private sidecars."""
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        Path(f"{path}{suffix}").unlink(missing_ok=True)
+
+
+def _reject_legacy_backup_override() -> None:
+    if "MES_SQLITE_BACKUP_DIR" in os.environ:
+        print(
+            "[BACKUP] MES_SQLITE_BACKUP_DIR is unsupported; set MES_RUNTIME_ROOT instead",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
 
 def _verify_sqlite_backup(path: Path) -> None:
     result = subprocess.run([sys.executable, str(VERIFY_BACKUP), str(path)], check=False)
     if result.returncode != 0:
-        for suffix in ("", "-wal", "-shm", "-journal"):
-            candidate = Path(str(path) + suffix)
-            candidate.unlink(missing_ok=True)
         raise SystemExit(result.returncode)
 
 
 def backup_sqlite(db_path: str) -> Path:
+    _reject_legacy_backup_override()
     src = Path(db_path).resolve()
     if not src.exists():
         print(f"[BACKUP] SQLite file not found: {src}", file=sys.stderr)
         raise SystemExit(1)
 
-    backup_dir = Path(os.getenv("MES_SQLITE_BACKUP_DIR", str(DEFAULT_SQLITE_BACKUP_DIR))).resolve()
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    dst = backup_dir / f"mes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    backup_dir = runtime_path("backups", "sqlite", create=True)
+    published = backup_dir / _regular_backup_name(".db")
+    staged = _private_backup_path(published)
 
     source = None
     target = None
     failed = False
     try:
-        source = sqlite3.connect(f"file:{src.as_posix()}?mode=ro", uri=True)
-        target = sqlite3.connect(str(dst))
-        source.backup(target)
-    except sqlite3.Error as exc:
-        print(f"[BACKUP] sqlite3 backup failed: {exc}", file=sys.stderr)
-        failed = True
+        try:
+            source = sqlite3.connect(f"file:{src.as_posix()}?mode=ro", uri=True)
+            target = sqlite3.connect(str(staged))
+            source.backup(target)
+        except sqlite3.Error as exc:
+            print(f"[BACKUP] sqlite3 backup failed: {exc}", file=sys.stderr)
+            failed = True
+        finally:
+            if target is not None:
+                target.close()
+            if source is not None:
+                source.close()
+
+        if failed:
+            raise SystemExit(1)
+        if not staged.exists():
+            print(f"[BACKUP] backup file was not created: {staged}", file=sys.stderr)
+            raise SystemExit(1)
+        _verify_sqlite_backup(staged)
+        os.replace(staged, published)
     finally:
-        if target is not None:
-            target.close()
-        if source is not None:
-            source.close()
-    if failed:
-        for suffix in ("", "-wal", "-shm", "-journal"):
-            Path(str(dst) + suffix).unlink(missing_ok=True)
-        raise SystemExit(1)
+        _remove_private_sqlite_backup(staged)
 
-    if not dst.exists():
-        print(f"[BACKUP] backup file was not created: {dst}", file=sys.stderr)
-        raise SystemExit(1)
-
-    _verify_sqlite_backup(dst)
-    size_kb = dst.stat().st_size // 1024
+    removed = retain_latest_backups(backup_dir, suffix=".db", keep=DEFAULT_KEEP)
+    size_kb = published.stat().st_size // 1024
     print("[BACKUP] OK (python sqlite3.backup + verify)")
     print(f"  from : {src}")
-    print(f"  to   : {dst} ({size_kb} KB)")
-    return dst
+    print(f"  to   : {published} ({size_kb} KB)")
+    for removed_path in removed:
+        print(f"  removed by latest-{DEFAULT_KEEP} retention: {removed_path.name}")
+    print(f"BACKUP_PATH={published.resolve()}")
+    return published
 
 
 def backup_postgres(container: str | None, host: str, port: int, user: str, dbname: str) -> Path:
-    POSTGRES_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    dst = POSTGRES_BACKUP_DIR / f"mes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
+    backup_dir = runtime_path("backups", "postgres", create=True)
+    published = backup_dir / _regular_backup_name(".sql")
+    staged = _private_backup_path(published)
 
     if container:
         cmd = ["docker", "exec", container, "pg_dump", "-U", user, dbname]
@@ -92,10 +125,22 @@ def backup_postgres(container: str | None, host: str, port: int, user: str, dbna
         print("[BACKUP] docker or pg_dump command not found", file=sys.stderr)
         raise SystemExit(1)
 
-    dst.write_text(result.stdout, encoding="utf-8")
-    size_kb = dst.stat().st_size // 1024
-    print(f"[BACKUP] OK PostgreSQL: {dst} ({size_kb} KB)")
-    return dst
+    try:
+        staged.write_text(result.stdout, encoding="utf-8")
+        os.replace(staged, published)
+    except OSError as exc:
+        print(f"[BACKUP] PostgreSQL backup publication failed: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+    finally:
+        staged.unlink(missing_ok=True)
+
+    removed = retain_latest_backups(backup_dir, suffix=".sql", keep=DEFAULT_KEEP)
+    size_kb = published.stat().st_size // 1024
+    print(f"[BACKUP] OK PostgreSQL: {published} ({size_kb} KB)")
+    for removed_path in removed:
+        print(f"  removed by latest-{DEFAULT_KEEP} retention: {removed_path.name}")
+    print(f"BACKUP_PATH={published.resolve()}")
+    return published
 
 
 def parse_args() -> argparse.Namespace:

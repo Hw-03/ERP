@@ -8,14 +8,23 @@ inventory integrity verification after restore with --check.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.runtime_paths import runtime_path  # noqa: E402
+
+
 VERIFY_BACKUP = PROJECT_ROOT / "scripts" / "ops" / "_verify_backup.py"
 CHECK_INTEGRITY = PROJECT_ROOT / "scripts" / "ops" / "check_inventory_integrity.py"
 
@@ -38,8 +47,106 @@ def _run_integrity_check(db_url: str) -> None:
     _run([sys.executable, str(CHECK_INTEGRITY), "--db-url", db_url])
 
 
+def _resolve_sqlite_backup(path: str) -> Path:
+    """Resolve a bare backup name inside the canonical runtime backup directory."""
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute() and candidate.parent == Path("."):
+        return runtime_path("backups", "sqlite") / candidate.name
+    return candidate.resolve()
+
+
+def _remove_sqlite_files(path: Path) -> None:
+    """Remove one private SQLite artifact and only its own sidecars."""
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        Path(f"{path}{suffix}").unlink(missing_ok=True)
+
+
+def _copy_live_sqlite(source_path: Path, destination_path: Path) -> None:
+    """Snapshot committed SQLite state, including WAL frames, with the backup API."""
+    source = None
+    destination = None
+    try:
+        source = sqlite3.connect(f"file:{source_path.as_posix()}?mode=ro", uri=True)
+        destination = sqlite3.connect(destination_path)
+        source.backup(destination)
+    finally:
+        if destination is not None:
+            destination.close()
+        if source is not None:
+            source.close()
+
+
+def _create_pre_restore_snapshot(target_path: Path) -> Path:
+    """Create and verify a unique rollback snapshot before a restore begins."""
+    snapshot_dir = runtime_path("backups", "sqlite", create=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    snapshot = snapshot_dir / f"mes_PRE-RESTORE_{timestamp}_{uuid4().hex}.db"
+    complete = False
+    try:
+        _copy_live_sqlite(target_path, snapshot)
+        _verify_sqlite_backup(snapshot)
+        complete = True
+    finally:
+        if not complete:
+            _remove_sqlite_files(snapshot)
+    return snapshot
+
+
+def _rollback_quarantined_files(moved: list[tuple[Path, Path]]) -> None:
+    """Restore quarantined SQLite files in reverse move order."""
+    rollback_errors: list[str] = []
+    for original, quarantined in reversed(moved):
+        if not quarantined.exists():
+            continue
+        try:
+            os.replace(quarantined, original)
+        except OSError as exc:
+            rollback_errors.append(f"{quarantined} -> {original}: {exc}")
+    if rollback_errors:
+        raise RuntimeError("SQLite restore rollback failed: " + "; ".join(rollback_errors))
+
+
+def _cleanup_quarantined_files(moved: list[tuple[Path, Path]]) -> None:
+    """Best-effort delete obsolete files after the new DB is active."""
+    for _, quarantined in moved:
+        try:
+            quarantined.unlink(missing_ok=True)
+        except OSError as exc:
+            print(
+                f"[RESTORE] WARN quarantine cleanup failed; retained at {quarantined}: {exc}",
+                file=sys.stderr,
+            )
+
+
+def _replace_sqlite_atomically(source_path: Path, target_path: Path) -> None:
+    """Install a verified staged DB while preserving rollback for every old file."""
+    staged = target_path.parent / f".{target_path.name}.restore-{uuid4().hex}.tmp"
+    quarantine_base = target_path.parent / f".{target_path.name}.quarantine-{uuid4().hex}"
+    moved: list[tuple[Path, Path]] = []
+    installed = False
+    try:
+        shutil.copy2(source_path, staged)
+        _verify_sqlite_backup(staged)
+        try:
+            for suffix in ("-wal", "-shm", "-journal", ""):
+                original = Path(f"{target_path}{suffix}")
+                if not original.exists():
+                    continue
+                quarantined = Path(f"{quarantine_base}{suffix}")
+                os.replace(original, quarantined)
+                moved.append((original, quarantined))
+            os.replace(staged, target_path)
+            installed = True
+        finally:
+            if moved and not installed:
+                _rollback_quarantined_files(moved)
+    finally:
+        _remove_sqlite_files(staged)
+    _cleanup_quarantined_files(moved)
+
+
 def restore_sqlite(backup_path: str, target_path: str, run_check: bool) -> None:
-    src = Path(backup_path).resolve()
+    src = _resolve_sqlite_backup(backup_path)
     dst = Path(target_path).resolve()
 
     if not src.exists():
@@ -49,14 +156,11 @@ def restore_sqlite(backup_path: str, target_path: str, run_check: bool) -> None:
     _verify_sqlite_backup(src)
 
     if dst.exists():
-        snapshot = dst.with_suffix(f".pre-restore.{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
-        shutil.copy2(dst, snapshot)
+        snapshot = _create_pre_restore_snapshot(dst)
         print(f"[RESTORE] current DB snapshot: {snapshot}")
 
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
-    for suffix in ("-wal", "-shm"):
-        Path(str(dst) + suffix).unlink(missing_ok=True)
+    _replace_sqlite_atomically(src, dst)
 
     size_kb = dst.stat().st_size // 1024
     print(f"[RESTORE] OK SQLite: {src.name} -> {dst} ({size_kb} KB)")
@@ -117,7 +221,7 @@ def restore_postgres(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restore DEXCOWIN MES DB")
     parser.add_argument("--sqlite", metavar="BACKUP_PATH", help="SQLite backup file path")
-    parser.add_argument("--target", default="backend/mes.db", help="Restore target path")
+    parser.add_argument("--target", default=str(PROJECT_ROOT / "backend" / "mes.db"), help="Restore target path")
     parser.add_argument("--postgres", metavar="BACKUP_SQL", help="PostgreSQL dump file path")
     parser.add_argument("--container", help="Docker container name")
     parser.add_argument("--host", default="localhost")
