@@ -6,7 +6,13 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import DepartmentEnum, DeptAdjSubTypeEnum, LocationStatusEnum, TransactionTypeEnum
+from app.models import (
+    DepartmentEnum,
+    DeptAdjSubTypeEnum,
+    LocationStatusEnum,
+    TransactionLog,
+    TransactionTypeEnum,
+)
 from app.services import dept_adjustment as svc
 from app.services import inventory as inv_svc
 
@@ -150,6 +156,37 @@ def test_submit_production(make_item, make_location, db_session):
     types = _tx_types(db_session)
     assert types.count("BACKFLUSH") == 2
     assert types.count("PRODUCE") == 1
+
+
+def test_submit_rolls_back_inventory_when_ledger_capture_fails(
+    make_item, make_location, db_session, monkeypatch
+):
+    item = make_item(name="rollback", process_type_code="AR")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    db_session.commit()
+
+    def fail_capture(*_args, **_kwargs):
+        raise RuntimeError("ledger failure")
+
+    monkeypatch.setattr(svc.inv_effect, "capture_effect", fail_capture)
+
+    with pytest.raises(RuntimeError, match="ledger failure"):
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            [
+                svc.AdjLine(
+                    item_id=item.item_id,
+                    direction="out",
+                    quantity=D("2"),
+                    department=ASSEMBLY,
+                )
+            ],
+        )
+
+    db_session.expire_all()
+    assert _prod_qty(db_session, item.item_id) == D("5")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_submit_production_manual_edit(make_item, make_location, db_session):

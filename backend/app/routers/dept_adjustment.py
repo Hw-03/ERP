@@ -193,15 +193,12 @@ def submit_adjustment(
             notes=payload.notes,
         )
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     except Exception as exc:
         # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
         logger.exception("부서 조정 처리 중 예기치 못한 오류")
-        db.rollback()
         raise http_error(500, ErrorCode.INTERNAL, f"처리 중 오류: {exc}")
 
-    db.commit()
     _evt_emit(
         "dept_adj",
         request=http_request,

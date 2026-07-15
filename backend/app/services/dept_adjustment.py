@@ -2,7 +2,7 @@
 
 처리 정책:
 - 부서 PRODUCTION 재고끼리만 움직임 (즉시 처리, 창고 승인 불필요).
-- 원자성: db.flush()만 사용, commit은 라우터에서. ValueError 발생 시 라우터가 rollback.
+- 원자성: 공개 업무 명령이 commit/rollback하고, 내부 재고 primitive는 flush만 수행.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from app.models import (
 from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services._tx import transactional
 from app.repositories import item_repository
 
 AdjDirection = Literal["in", "out", "defective"]
@@ -207,7 +208,7 @@ _TRANSACTION_TYPE_MAP: dict[tuple[AdjDirection, str], TransactionTypeEnum] = {
 }
 
 
-def submit_adjustment(
+def _apply_adjustment(
     db: Session,
     sub_type: DeptAdjSubTypeEnum,
     lines: list[AdjLine],
@@ -217,10 +218,9 @@ def submit_adjustment(
     reference_no: Optional[str] = None,
     notes: Optional[str] = None,
 ) -> list[uuid.UUID]:
-    """부서 재고 조정 원자 처리. 생성된 TransactionLog ID 목록 반환.
+    """부서 재고 조정과 원장 생성을 현재 트랜잭션에 적용한다.
 
     처리 순서: out → defective → in  (소비 먼저, 입고 마지막).
-    db.flush()만 사용 — commit은 라우터에서.
     """
     if not lines:
         raise ValueError("처리할 라인이 없습니다.")
@@ -288,6 +288,29 @@ def submit_adjustment(
         log_ids.append(log.log_id)
 
     return log_ids
+
+
+def submit_adjustment(
+    db: Session,
+    sub_type: DeptAdjSubTypeEnum,
+    lines: list[AdjLine],
+    *,
+    operator_name: Optional[str] = None,
+    producer_employee_id: Optional[uuid.UUID] = None,
+    reference_no: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> list[uuid.UUID]:
+    """부서 재고 조정과 원장을 하나의 업무 트랜잭션으로 확정한다."""
+    with transactional(db):
+        return _apply_adjustment(
+            db,
+            sub_type,
+            lines,
+            operator_name=operator_name,
+            producer_employee_id=producer_employee_id,
+            reference_no=reference_no,
+            notes=notes,
+        )
 
 
 # ---------------------------------------------------------------------------
