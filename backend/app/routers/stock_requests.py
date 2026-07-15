@@ -35,6 +35,7 @@ from app.schemas import (
     StockRequestSubmitPayload,
 )
 from app.services import stock_requests as svc
+from app.services import stock_request_actions as action_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services import notifications as notif_svc
 from app._evt import emit as _evt_emit
@@ -74,7 +75,7 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
 
     for attempt in range(2):
         try:
-            request = svc.create_request(
+            request = action_svc.create_request(
                 db,
                 requester=requester,
                 request_type=payload.request_type,
@@ -85,13 +86,8 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
                 reason_category=payload.reason_category,
                 reason_memo=payload.reason_memo,
             )
-            # 결재 대기 요청이면 승인 담당자에게 도착 알림 (커밋 전 같은 트랜잭션).
-            notif_svc.notify_request_arrived(db, request)
-            commit_and_refresh(db, request)
-            db.refresh(request)
             return request
         except IntegrityError as exc:
-            db.rollback()
             exc_str = str(exc).lower()
             # client_request_id 중복 → 기존 요청 멱등 반환
             if payload.client_request_id and "client_request_id" in exc_str:
@@ -106,10 +102,8 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
                 raise http_error(409, ErrorCode.CONFLICT, "요청 코드 충돌, 다시 시도해 주세요.")
             # attempt=0, request_code 충돌 → 재시도 (새 suffix 자동 생성)
         except ValueError as exc:
-            db.rollback()
             raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
         except PermissionError as exc:
-            db.rollback()
             raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
 
 
@@ -426,32 +420,21 @@ def approve_stock_request(
 ):
     request = _load_request_for_action(db, request_id)
     approver = _load_actor(db, payload.actor_employee_id)
-    prev_status = request.status
 
     try:
-        svc.approve_request(db, request, approver=approver, pin=payload.pin, http_request=http_request)
+        action_svc.approve_warehouse_request(
+            db,
+            request,
+            approver=approver,
+            pin=payload.pin,
+            http_request=http_request,
+        )
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except svc.FailedApprovalError as exc:
-        # 검증 실패 — 원본 트랜잭션 rollback 후 별도 트랜잭션으로 status 만 기록.
-        db.rollback()
-        request = _load_request_for_action(db, request_id)
-        approver = _load_actor(db, payload.actor_employee_id)
-        svc.mark_failed_approval(db, request, approver=approver, reason=str(exc))
-        commit_and_refresh(db, request)
         raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-
-    # 이번 호출로 실제 COMPLETED 전이됐을 때만 요청자에게 승인 알림 (부분/멱등 제외).
-    if (
-        request.status == StockRequestStatusEnum.COMPLETED
-        and prev_status != StockRequestStatusEnum.COMPLETED
-    ):
-        notif_svc.notify_request_decided(db, request, decision="approved")
-    commit_and_refresh(db, request)
     _evt_emit(
         "sr_approve_warehouse",
         request=http_request,
@@ -507,30 +490,21 @@ def department_approve_stock_request(
     """부서 결재 승인 — department_role in (primary/deputy) 또는 admin."""
     request = _load_request_for_action(db, request_id)
     approver = _load_actor(db, payload.actor_employee_id)
-    prev_status = request.status
 
     try:
-        svc.approve_request_department(db, request, approver=approver, pin=payload.pin, http_request=http_request)
+        action_svc.approve_department_request(
+            db,
+            request,
+            approver=approver,
+            pin=payload.pin,
+            http_request=http_request,
+        )
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except svc.FailedApprovalError as exc:
-        db.rollback()
-        request = _load_request_for_action(db, request_id)
-        approver = _load_actor(db, payload.actor_employee_id)
-        svc.mark_failed_approval(db, request, approver=approver, reason=str(exc))
-        commit_and_refresh(db, request)
         raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-
-    if (
-        request.status == StockRequestStatusEnum.COMPLETED
-        and prev_status != StockRequestStatusEnum.COMPLETED
-    ):
-        notif_svc.notify_request_decided(db, request, decision="approved")
-    commit_and_refresh(db, request)
     _evt_emit(
         "sr_approve_dept",
         request=http_request,
@@ -588,15 +562,17 @@ def cancel_stock_request(
     requester = _load_actor(db, payload.actor_employee_id)
 
     try:
-        svc.cancel_request(db, request, requester=requester, pin=payload.pin, http_request=http_request)
+        action_svc.cancel_request(
+            db,
+            request,
+            requester=requester,
+            pin=payload.pin,
+            http_request=http_request,
+        )
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-
-    commit_and_refresh(db, request)
     _evt_emit(
         "sr_cancel",
         request=http_request,
