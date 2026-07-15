@@ -109,20 +109,14 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 
 ## 7. 정기 백업
 
-### 자동 백업 (Windows — 작업 스케줄러 등록 권장)
-```bat
-scripts\ops\backup_db.bat
+### PostgreSQL 백업 (작업 스케줄러 등록 권장)
+```bash
+python scripts/ops/backup_db.py --postgres --container <postgres-container>
 ```
 
-### 수동 백업 (PostgreSQL)
-```bash
-docker exec <postgres-container> pg_dump -U mes_user mes_db > backup_$(date +%Y%m%d).sql
-```
+`_attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS.sql`에 저장하고 정식 덤프 최신 10개를 유지한다.
 
-### 수동 백업 확인
-```bash
-python scripts/ops/_verify_backup.py
-```
+성공 시 출력되는 `BACKUP_PATH=` 절대 경로의 파일 크기와 생성 시각을 확인한다. `_verify_backup.py`는 SQLite 전용이다.
 
 ---
 
@@ -145,7 +139,7 @@ docker compose -f docker/docker-compose.yml ps postgres
 ### 백업 복구
 ```bash
 # 백업 파일로 복구 (PostgreSQL)
-docker exec -i <postgres-container> psql -U mes_user mes_db < backup_20260508.sql
+docker exec -i <postgres-container> psql -U mes_user mes_db < _attic/runtime/backups/postgres/mes_20260508.sql
 
 # 복구 후 마이그레이션 재실행
 cd backend && python bootstrap_db.py
@@ -190,9 +184,10 @@ New-NetFirewallRule -DisplayName "MES Server" -Direction Inbound -Protocol TCP -
 # 자동화 스크립트 사용 (권장)
 python scripts/ops/backup_db.py --postgres --container <컨테이너명>
 
-# 또는 직접 실행
+# 또는 직접 실행(최신 10개 자동 보존은 적용되지 않음)
 CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
-docker exec $CONTAINER pg_dump -U mes_user mes_db > outputs/backups/mes_$(date +%Y%m%d_%H%M%S).sql
+mkdir -p _attic/runtime/backups/postgres
+docker exec $CONTAINER pg_dump -U mes_user mes_db > _attic/runtime/backups/postgres/mes_$(date +%Y%m%d_%H%M%S).sql
 ```
 
 ### 복구 (스크립트 사용)
@@ -200,7 +195,7 @@ docker exec $CONTAINER pg_dump -U mes_user mes_db > outputs/backups/mes_$(date +
 ```bash
 # 운영 DB 복구 (컨테이너 기준)
 python scripts/ops/restore_db.py \
-    --postgres outputs/backups/mes_YYYYMMDD_HHMMSS.sql \
+    --postgres _attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS.sql \
     --container $CONTAINER \
     --check
 
@@ -214,11 +209,15 @@ python scripts/ops/restore_db.py \
 CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
 docker exec $CONTAINER createdb -U mes_user mes_db_rehearsal
 
-# 2. 백업 복구 to 임시 DB
-docker cp outputs/backups/mes_LATEST.sql $CONTAINER:/tmp/rehearsal.sql
+# 2. backup_db.py의 BACKUP_PATH에서 실제 timestamp 파일명을 복사해 명시적으로 선택
+BACKUP_FILE="_attic/runtime/backups/postgres/mes_20260715_180000.sql"
+test -f "$BACKUP_FILE" || { echo "backup file not found: $BACKUP_FILE"; exit 1; }
+
+# 3. 선택한 백업을 임시 DB에 복구
+docker cp "$BACKUP_FILE" $CONTAINER:/tmp/rehearsal.sql
 docker exec $CONTAINER psql -U mes_user -d mes_db_rehearsal -f /tmp/rehearsal.sql
 
-# 3. 무결성 점검
+# 4. 무결성 점검
 DATABASE_URL=postgresql://mes_user:mes_pass@localhost:5432/mes_db_rehearsal \
     python scripts/ops/check_inventory_integrity.py
 

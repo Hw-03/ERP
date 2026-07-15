@@ -105,7 +105,7 @@ python scripts/ops/load_test_30_users.py --url http://서버IP:8000 --users 30 -
 ```
 
 **주의**: `--confirm` 없이는 실행되지 않습니다. TEST- 코드의 직원/품목만 사용합니다.  
-결과는 `outputs/load_test/YYYYMMDD_HHMMSS_report.json`에 저장됩니다.
+결과는 `_attic/runtime/reports/load-test/YYYYMMDD_HHMMSS_report.json`에 저장됩니다.
 
 ---
 

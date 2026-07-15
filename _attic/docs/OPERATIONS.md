@@ -41,16 +41,18 @@ scripts\ops\healthcheck.bat
 ## DB 백업
 
 - DB 파일: `backend/mes.db` (단일 SQLite 파일, WAL 모드)
+- 런타임 산출물 기본 루트: `_attic/runtime/`. 테스트·직원 서버에서 전체 루트를 바꿀 때만 `MES_RUNTIME_ROOT`를 사용한다.
 - **수동 백업**:
 
 ```bat
 scripts\ops\backup_db.bat
 ```
 
-→ `backend/_backup/mes_YYYYMMDD_HHMMSS.db` 로 복사된다.
+→ `_attic/runtime/backups/sqlite/mes_YYYYMMDD_HHMMSS.db` 로 생성되고 즉시 검증된다. 성공할 때마다 정식 백업 최신 10개만 유지하며 `mes_PRE-*` 스냅샷은 이 개수에 포함하지 않는다.
 
-- **백업 안전성**: 스크립트는 SQLite 의 online backup API(`sqlite3 .backup` 또는 Python `sqlite3.backup`)를 사용하므로 백엔드가 가동 중이어도 트랜잭션 일관성이 보장된다. 둘 다 사용 불가한 환경에서는 WAL checkpoint 후 `mes.db / mes.db-wal / mes.db-shm` 3종을 함께 복사하는 폴백 경로로 진입한다.
-- **권장 주기**: 입출고가 많은 날 일과 종료 후 1회. 외부 디스크 보관이 필요하면 `backend/_backup/` 폴더를 통째로 복사한다.
+- **백업 안전성**: Python `sqlite3.backup` 온라인 백업 API를 사용하고 `_verify_backup.py`가 통과해야만 성공으로 종료한다. 검증 실패 파일은 삭제하고 실패 코드를 반환한다.
+- **권장 주기**: 입출고가 많은 날 일과 종료 후 1회. 외부 디스크 보관이 필요하면 `_attic/runtime/backups/sqlite/`를 복사한다.
+- 기존 `backend/_backup/` 파일은 자동 이동·삭제하지 않으며 필요하면 복구 입력으로 직접 지정한다.
 - **루트 `mes.db` 와 `backend/mes.db` 가 둘 다 존재**할 수 있다. 운영 DB는 `backend/mes.db` 한 개만 사용한다(루트 파일은 손대지 말고, 정리는 다음 작업에서 별도로 진행 예정).
 
 ### 백업 검증 (Phase 5.2)
@@ -59,20 +61,22 @@ scripts\ops\backup_db.bat
 scripts\ops\verify_backup.bat
 ```
 
-가장 최근 정식 백업(`mes_PRE-RESTORE_*` 제외) 1건에 대해:
+가장 최근 정식 백업(`mes_PRE-*` 제외) 1건에 대해:
 - `PRAGMA integrity_check` 결과 (`ok` 면 정상)
-- `items / inventory / inventory_locations / transaction_logs / bom / admin_audit_logs` 행 수
+- `PRAGMA foreign_key_check` 결과
+- `items / inventory / inventory_locations / stock_requests / stock_request_lines / transaction_logs / bom / admin_audit_logs / warehouse_angles / warehouse_boxes / warehouse_box_items` 존재 및 행 수 조회
+- `io_batches / io_bundles / io_lines` 입출고 테이블과 `shipping_requests / shipping_request_bom_lines / shipping_request_companion_lines / shipping_allocations / shipping_request_checklist_lines / shipping_request_events` 출하 테이블 존재 및 행 수 조회
 
 운영 PC 에서 주 1회 정도 수행 권장.
 
 ### 백업 정리 (Phase 5.2)
 
 ```bat
-scripts\ops\cleanup_backups.bat        rem 기본 30일 이상 자동 삭제
-scripts\ops\cleanup_backups.bat 60     rem 60일로 변경
+scripts\ops\cleanup_backups.bat        rem 정식 백업 최신 10개 유지
+scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 ```
 
-`backend/_backup/mes_*.db` 중 N일 이상된 파일을 제거. 디스크 무한 증가 방지.
+`_attic/runtime/backups/sqlite/`의 정식 `mes_YYYYMMDD_HHMMSS.db` 중 지정 개수를 넘는 오래된 파일을 제거한다. `mes_PRE-*` 스냅샷과 기존 `backend/_backup/`은 건드리지 않는다.
 
 ## DB 복구 (Phase 5.2)
 
@@ -91,7 +95,20 @@ scripts\ops\cleanup_backups.bat 60     rem 60일로 변경
 4. `scripts\ops\operational_readiness.bat` 로 DB/백업/재고 무결성 확인
 5. `scripts\ops\healthcheck.bat` 로 서버 정상성 확인
 
-복구 후에도 안전하게 PRE-RESTORE 스냅샷이 `_backup/` 에 남아있어 되돌릴 수 있다.
+복구 후에도 PRE-RESTORE 스냅샷이 `_attic/runtime/backups/sqlite/`에 남아 있어 되돌릴 수 있다.
+
+## 직원 서버 코드 동기화
+
+`scripts/dev/sync-to-employee.ps1`은 다음 순서를 고정한다.
+
+1. 접속자 활동과 스키마 변경 가드
+2. 백엔드·프론트 정지 명령의 종료 코드와 8010/3000 포트 해제를 확인
+3. `C:\ERP-dev\_attic\runtime\backups\sqlite`에 `sqlite3.backup` 백업 생성·검증(최신 10개 유지)
+4. 코드 동기화와 raw bootstrap 마이그레이션
+5. 실제 직원 DB의 SQLite/필수 테이블 검증과 재고 무결성 검증
+6. 서버 시작과 백엔드·프론트 헬스체크
+
+백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션 또는 사후 검증 실패 시 서버와 DB를 자동 복원하지 않으며, 콘솔에 검증된 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --check` 수동 명령을 출력한다.
 
 ## 재시작 절차
 
@@ -160,9 +177,10 @@ curl http://127.0.0.1:8011/health/detailed
 - 브라우저: F12 → Console / Network 탭
 
 ### 파일 로그 (Phase 4 추가)
-- 위치: `backend/logs/mes.log`
+- 위치: `_attic/runtime/logs/backend/mes.log`
+- 런타임 stdout/stderr 및 상태 파일: `_attic/runtime/logs/backend/`, `_attic/runtime/logs/frontend/`
 - 회전: `RotatingFileHandler` 5MB × 5 backup (`mes.log.1` ~ `mes.log.5`)
-- 환경 변수: `LOG_LEVEL` (기본 INFO), `LOG_DIR` (기본 backend/logs)
+- 환경 변수: `LOG_LEVEL` (기본 INFO), `MES_RUNTIME_ROOT` (전체 런타임 루트 재정의)
 - 내용: 전역 예외 핸들러가 잡은 ValueError/IntegrityError/Exception + INFO 레벨 메시지
 
 ### 관리자 감사로그 (Phase 5.2)
@@ -198,7 +216,7 @@ schtasks /Create /TN "MES Backup Daily" /TR "%USERPROFILE%\Documents\GitHub\ERP\
 rem 매주 월요일 09:00 백업 검증
 schtasks /Create /TN "MES Verify Weekly" /TR "%USERPROFILE%\Documents\GitHub\ERP\scripts\ops\verify_backup.bat" /SC WEEKLY /D MON /ST 09:00 /F
 
-rem 매월 1일 03:00 30일 이상 백업 정리
+rem 매월 1일 03:00 정식 백업 최신 10개 유지 확인
 schtasks /Create /TN "MES Cleanup Monthly" /TR "%USERPROFILE%\Documents\GitHub\ERP\scripts\ops\cleanup_backups.bat" /SC MONTHLY /D 1 /ST 03:00 /F
 ```
 

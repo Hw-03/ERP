@@ -64,7 +64,7 @@ http://localhost:3001
 
 | 스크립트 | 역할 |
 |---|---|
-| `scripts/ops/backup_db.bat` | `backend/mes.db` 를 `backend/_backup/mes_YYYYMMDD_HHMMSS.db` 로 복사 |
+| `scripts/ops/backup_db.bat` | `backend/mes.db` 를 `_attic/runtime/backups/sqlite/mes_YYYYMMDD_HHMMSS.db` 로 온라인 백업·검증하고 정식 백업 최신 10개 유지 |
 | `scripts/ops/healthcheck.bat` | `GET /health/detailed` 호출 후 결과 출력 |
 | `scripts/ops/reconcile_inventory.bat` | 정합성 1차 진단 + 자동 백업 |
 
@@ -135,7 +135,9 @@ ERP/
 ├── _attic/               강제 위치 없는 모든 자료의 보관소
 │   ├── docs/             도메인 사전·가이드 (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS 등)
 │   ├── backend-scripts/  1회성 backend 스크립트 (seed/sync/archive/backup)
-│   ├── data/db_backups/  DB 백업 (로컬, .gitignore 매칭)
+│   ├── runtime/          백업·로그·보고서 런타임 산출물 (로컬, .gitignore 매칭)
+│   ├── ai/               공통 프롬프트 진입점·역사 AI 자료
+│   ├── handoff/          활성 작업별 인수인계 위치
 │   └── ONBOARDING.md     신규 합류자 가이드
 ├── start.bat             통합 실행 (Windows)
 ├── README.md             이 문서

@@ -14,9 +14,11 @@
 |---|---|
 | `_attic/docs/` | 도메인 사전·가이드 (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS/ITEM_CODE_RULES/ATTIC_POLICY), 끝난 plan, 발표·연구 자료, feedback 메모 |
 | `_attic/backend-scripts/` | 1회성 backend 스크립트 (seed/sync/archive/backup) — `cd backend && python ../_attic/backend-scripts/<f>.py` |
-| `backend/_backup/` | DEXCOWIN MES SQLite backups from `scripts/ops/backup_db.bat` / `backup_db.py`, local only |
+| `_attic/runtime/` | 로컬 영구 운영 산출물 루트(백업·로그·부하 테스트 보고서, git 추적 제외) |
+| `backend/_backup/` | 새 운영 도구가 더는 쓰지 않는 기존 SQLite 백업 위치(기존 파일은 그대로 유지) |
 | `_attic/ONBOARDING.md` | 신규 합류자 가이드 |
-| `_attic/ai/` | AI 협업자 인수인계 자료 |
+| `_attic/ai/` | 공통 프롬프트 진입점·역사 AI 자료 |
+| `_attic/handoff/` | 활성 작업별 인수인계 위치 |
 | `_attic/_archive/`, `_attic/frontend/`, `_attic/backend/`, `_attic/outputs/` | 옛 코드·자산 (참고용) |
 
 ## 보관 / 이동 기준
@@ -29,9 +31,13 @@
 
 ## DB 백업 (특별 규정)
 
-- ?? ?? ??: `backend/_backup/`
-- `.gitignore` 매칭 (`backend/_backup/`, `*.db.bak*`) — repo 추적 X, 로컬만.
-- 누적 시 외부 NAS/스토리지로 이관 후 로컬 삭제.
+- 새 SQLite 백업: `_attic/runtime/backups/sqlite/`
+- 새 PostgreSQL 백업: `_attic/runtime/backups/postgres/`
+- 정식 백업(`mes_YYYYMMDD_HHMMSS.db/.sql`)은 종류별 최신 10개를 유지한다. `mes_PRE-*` 유지보수·복구 스냅샷은 정식 백업 개수에 포함하지 않는다.
+- `MES_RUNTIME_ROOT`로 테스트·직원 서버의 전체 런타임 루트만 재정의할 수 있다. `MES_SQLITE_BACKUP_DIR`은 지원하지 않는다.
+- `.gitignore` 매칭 (`_attic/runtime/`, 기존 `backend/_backup/`, `*.db.bak*`) — repo 추적 X, 로컬만.
+- 기존 `backend/_backup/` 파일은 자동 이동·삭제하지 않는다.
+- 장기 보관이 필요한 백업은 외부 NAS/스토리지로 별도 이관한다.
 
 ## 삭제 (Delete from repo)
 

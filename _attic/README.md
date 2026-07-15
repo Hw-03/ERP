@@ -3,7 +3,8 @@
 `_attic/` is the repository's archive and reference area for material that is
 not part of the runtime app tree.
 
-Keep runtime files out of this folder. In particular:
+Keep live application code and runtime inputs out of this folder. Local
+operational artifacts belong under `_attic/runtime/`. In particular:
 
 - `backend/mes.db` stays in `backend/`.
 - `backend/schema.sql` stays in `backend/`.
@@ -14,8 +15,11 @@ Keep runtime files out of this folder. In particular:
 
 - `_attic/docs/`: current reference docs plus archived plans, reviews, research,
   and prototypes.
-- `_attic/ai/`: historical AI handoff notes. Treat these as archive unless a
-  file explicitly says otherwise.
+- `_attic/ai/`: shared AI context entry point plus historical AI notes. Start
+  with `_attic/ai/prompt_context.md`; `AI_HANDOVER.md` is archive-only.
+- `_attic/handoff/`: active task-specific handoff documents.
+- `_attic/runtime/`: local operational backups, logs, and reports; excluded
+  from git tracking.
 - `_attic/data/`: raw spreadsheets, extracted image sources, and old DB
   snapshots.
 
@@ -24,6 +28,7 @@ There is no active `vault/` folder in the current repository layout.
 ## Where To Look First
 
 - Root `README.md`: project entry point and startup guide.
+- `_attic/ai/prompt_context.md`: shared Claude Code/Codex context entry point.
 - `_attic/docs/README.md`: docs index.
 - `_attic/docs/REPO_LAYOUT.md`: current live paths, moved files, and archive boundaries.
 

@@ -8,7 +8,7 @@
 cd backend
 python ../_attic/backend-scripts/seed_employees.py
 python ../_attic/backend-scripts/seed_bom.py
-python ../_attic/backend-scripts/backup_db.py --label nightly
+python ../_attic/backend-scripts/backup_db.py
 ```
 
 각 스크립트의 `sys.path` 는 `backend/` 를 자동 추가하도록 패치됨 (`parents[2] / "backend"`).
@@ -24,4 +24,4 @@ python ../_attic/backend-scripts/backup_db.py --label nightly
 | `seed_bom_complete.py` | BOM 시드 (전체) |
 | `sync_excel_stock.py` | xlsx 의 재고와 DB 동기화 |
 | `archive_old_logs.py` | N개월 이전 트랜잭션 로그 아카이브 |
-| `backup_db.py` | `backend/mes.db` → `_attic/data/db_backups/mes_backup_<ts>.db` |
+| `backup_db.py` | 정식 도구 호환 진입점: `backend/mes.db` → `_attic/runtime/backups/sqlite/mes_<ts>.db` (검증 + 최신 10개 유지) |

@@ -116,10 +116,10 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 ### SQLite 복구 (권장: restore_db.bat 사용)
 
 ```bash
-# 최신 백업 확인
-dir /O-D backend\_backup\mes_*.db
+# 최신 정식 백업 확인·검증 (mes_PRE-* 제외)
+scripts\ops\verify_backup.bat
 
-# 복구 (현재 DB를 .pre-restore로 자동 백업 후 복구)
+# 복구 (현재 DB를 런타임의 mes_PRE-RESTORE_* 스냅샷으로 보존 후 복구)
 scripts\ops\restore_db.bat mes_YYYYMMDD_HHMMSS.db
 
 # 무결성 자동 확인됨 (--check 플래그)
@@ -129,18 +129,18 @@ scripts\ops\restore_db.bat mes_YYYYMMDD_HHMMSS.db
 
 ```bash
 # 최신 백업 확인
-ls -lt backend/_backup/mes_*.sql | head -5
+ls -lt _attic/runtime/backups/postgres/mes_*.sql | head -5
 
 # Docker 컨테이너 기준 복구
 CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
 python scripts/ops/restore_db.py \
-    --postgres backend/_backup/mes_YYYYMMDD_HHMMSS.sql \
+    --postgres _attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS.sql \
     --container $CONTAINER \
     --check
 
 # 직접 호스트 기준
 python scripts/ops/restore_db.py \
-    --postgres backend/_backup/mes_YYYYMMDD_HHMMSS.sql \
+    --postgres _attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS.sql \
     --host localhost --port 5432 --user mes_user --dbname mes_db \
     --check
 ```
@@ -161,13 +161,17 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 # 1. 현재 상태 백업
 scripts\ops\backup_db.bat
 
-# 2. 임시 경로에 복구 테스트 (운영 DB 미변경)
-python scripts/ops/restore_db.py --sqlite backend/_backup/mes_LATEST.db --target C:/tmp/mes_rehearsal_test.db --check
+# 2. 위 명령의 BACKUP_PATH에서 실제 timestamp 파일명을 복사해 명시적으로 선택
+set "BACKUP_FILE=_attic\runtime\backups\sqlite\mes_20260715_180000.db"
+if not exist "%BACKUP_FILE%" exit /b 1
 
-# 3. 임시 DB 무결성 직접 확인
+# 3. 임시 경로에 복구 테스트 (운영 DB 미변경)
+python scripts/ops/restore_db.py --sqlite "%BACKUP_FILE%" --target C:/tmp/mes_rehearsal_test.db --check
+
+# 4. 임시 DB 무결성 직접 확인
 python scripts/ops/check_inventory_integrity.py --db-url sqlite:///C:/tmp/mes_rehearsal_test.db
 
-# 4. 정상 확인 후 임시 파일 삭제
+# 5. 정상 확인 후 임시 파일 삭제
 del C:\tmp\mes_rehearsal_test.db
 echo "복구 리허설 완료"
 ```

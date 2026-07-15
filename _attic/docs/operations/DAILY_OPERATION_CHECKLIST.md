@@ -67,7 +67,8 @@
 
 ```
 [ ] 재고 스냅샷 (필요 시)
-    python scripts/ops/check_inventory_integrity.py > outputs/logs/integrity_noon.txt
+    powershell -Command "New-Item -ItemType Directory -Force _attic/runtime/reports | Out-Null"
+    python scripts/ops/check_inventory_integrity.py > _attic/runtime/reports/integrity_noon.txt
 
 [ ] 미승인 요청 재확인
     - 점심 전 제출된 요청 모두 처리되었는지 확인
@@ -102,18 +103,18 @@
 
 ```
 [ ] 백업 파일 보관 확인
-    - backend/_backup/ 에 주간 백업 파일 최소 5개 보관 여부
-    - 오래된 백업(30일 초과) 정리
+    - _attic/runtime/backups/sqlite/ 에 정식 백업 최신 10개 보관 여부
+    - mes_PRE-* 스냅샷이 정식 백업 10개 보존 계산에서 제외되는지 확인
 
 [ ] 성능 추이 확인 (부하 테스트)
     python scripts/ops/load_test_30_users.py --url http://localhost:8011 --confirm
-    결과: outputs/load_test/ 폴더 확인
+    결과: _attic/runtime/reports/load-test/ 폴더 확인
 
 [ ] 동시성 테스트 실행 (개발 환경)
     cd backend && python -m pytest tests/concurrency/ -v
 
 [ ] 로그 정리
-    - outputs/logs/ 7일 초과 파일 정리
+    - _attic/runtime/logs/ 의 운영 정책 초과 파일 정리
 
 [ ] 운영 이슈 주간보고 업데이트
     - docs/주간보고.md 작성
