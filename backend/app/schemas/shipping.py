@@ -137,6 +137,8 @@ class ShippingBomMatchResponse(BaseModel):
     matched_pf_item_name: Optional[str] = None
     requires_pa_name: bool = False
     requires_pf_name: bool = False
+    preview_pa_mes_code: Optional[str] = None
+    preview_pf_mes_code: Optional[str] = None
 
 
 class ShippingBomLineResponse(BaseModel):

@@ -227,4 +227,6 @@ export interface ShippingBomMatchResponse {
   matched_pf_item_name: string | null;
   requires_pa_name: boolean;
   requires_pf_name: boolean;
+  preview_pa_mes_code: string | null;
+  preview_pf_mes_code: string | null;
 }

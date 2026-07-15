@@ -1106,6 +1106,8 @@ describe("DesktopShippingView", () => {
       matched_pf_item_name: null,
       requires_pa_name: true,
       requires_pf_name: true,
+      preview_pa_mes_code: "4-PA-0004",
+      preview_pf_mes_code: "4-PF-0005",
     });
     const onStatusChange = vi.fn();
     const { container } = render(<DesktopShippingView onStatusChange={onStatusChange} />);
@@ -1118,6 +1120,8 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-bom-editor-pa")).toHaveTextContent("Standard PF · PA 구성품");
+    expect(screen.getByTestId("shipping-bom-editor-pf")).toHaveTextContent("Standard PF · PF 구성품");
     expect(screen.queryByTestId("shipping-new-pf-name")).not.toBeInTheDocument();
     expect(screen.getByTestId("shipping-wizard-action-bar")).not.toHaveTextContent("새 PA/PF 이름을 입력하세요.");
 
@@ -1127,8 +1131,13 @@ describe("DesktopShippingView", () => {
     const pfSummary = await screen.findByTestId("shipping-final-pf-summary");
     await waitFor(() => expect(paSummary).toHaveTextContent("새 PA 생성 예정"));
     expect(paSummary).toHaveTextContent("Standard PA");
+    expect(paSummary).toHaveTextContent("4-PA-0004");
+    expect(paSummary).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
     expect(pfSummary).toHaveTextContent("Standard PF");
+    expect(pfSummary).toHaveTextContent("4-PF-0005");
+    expect(pfSummary).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(screen.getByTestId("shipping-match-summary")).not.toHaveTextContent("기본 BOM 유지");
     const actionBar = screen.getByTestId("shipping-wizard-action-bar");
     const paNameInput = screen.getByTestId("shipping-new-pa-name");
     const pfNameInput = screen.getByTestId("shipping-new-pf-name");
@@ -1175,6 +1184,8 @@ describe("DesktopShippingView", () => {
       matched_pf_item_name: null,
       requires_pa_name: true,
       requires_pf_name: true,
+      preview_pa_mes_code: "4-PA-0004",
+      preview_pf_mes_code: "4-PF-0005",
     });
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -1202,7 +1213,10 @@ describe("DesktopShippingView", () => {
     expect(pfGroup).toContainElement(newPf);
     expect(screen.getByTestId("shipping-final-group-list-pf").firstElementChild).toBe(newPf);
     expect(newPf).toHaveTextContent("새 PF");
-    expect(newPf).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
+    expect(newPf).toHaveTextContent("4-PF-0005");
+    expect(newPf).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(screen.getByTestId("shipping-shipment-hero")).toHaveTextContent("4-PF-0005");
+    expect(screen.getByTestId("shipping-shipment-hero")).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(screen.getByTestId("shipping-final-group-pa").firstElementChild).toHaveTextContent("새 PA");
   });
 
@@ -1302,8 +1316,8 @@ describe("DesktopShippingView", () => {
     expect(matchStep).not.toHaveClass("border");
     expect(matchStep).not.toHaveTextContent("BOM 상태");
     expect(screen.getByTestId("shipping-match-summary").parentElement).toHaveClass("gap-4");
-    expect(screen.getByTestId("shipping-match-summary")).toHaveClass("md:grid-cols-3");
-    expect(screen.getByTestId("shipping-match-summary").children).toHaveLength(3);
+    expect(screen.getByTestId("shipping-match-summary")).toHaveClass("md:grid-cols-2");
+    expect(screen.getByTestId("shipping-match-summary").children).toHaveLength(2);
 
     nextStep(container);
     expect(await screen.findByTestId("shipping-wizard-step-4")).not.toHaveClass("border");
@@ -1552,7 +1566,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
   });
 
-  it("gives final BOM and changed-item cards a clean fixed height", async () => {
+  it("keeps the final BOM card fixed while the changed-item card uses its content height", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1569,11 +1583,11 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_432px_432px]", "overflow-y-auto");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_432px_auto]", "overflow-y-auto");
     expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[432px]", "shrink-0");
     expect(screen.getByTestId("shipping-final-requirements-list")).toHaveClass("overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[432px]", "shrink-0");
-    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("flex-1", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-bom-changes")).not.toHaveClass("h-[432px]", "shrink-0");
+    expect(screen.getByTestId("shipping-final-bom-change-list")).not.toHaveClass("flex-1", "overflow-y-auto");
     expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("rounded-[12px]", "border", "px-3", "py-2");
   });
 

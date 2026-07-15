@@ -5893,6 +5893,28 @@
             ],
             "title": "Matched Pf Item Name"
           },
+          "preview_pa_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Pa Mes Code"
+          },
+          "preview_pf_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Pf Mes Code"
+          },
           "requires_pa_name": {
             "default": false,
             "title": "Requires Pa Name",

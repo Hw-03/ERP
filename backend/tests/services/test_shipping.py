@@ -155,6 +155,31 @@ def test_match_bom_does_not_write_temporary_shipping_rows(db_session, make_item,
     assert write_statements == []
 
 
+def test_match_bom_previews_unreserved_codes_for_new_pa_and_pf(db_session, make_item, make_bom):
+    af = make_item(name="AF body", process_type_code="AF", model_symbol="4", serial_no=1)
+    bracket = make_item(name="Bracket", process_type_code="PR", model_symbol="4", serial_no=2)
+    base_pa = make_item(name="Base PA", process_type_code="PA", model_symbol="4", serial_no=6)
+    base_pf = make_item(name="Base PF", process_type_code="PF", model_symbol="4", serial_no=9)
+    make_bom(base_pa.item_id, af.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    match = shipping_svc.match_bom(
+        db_session,
+        bom_lines=[
+            _bom_line(base_pa, stage="PF", origin="DEFAULT"),
+            _bom_line(af, stage="PA", origin="DEFAULT"),
+            _bom_line(bracket, stage="PA"),
+        ],
+        base_pf_item_id=base_pf.item_id,
+    )
+
+    assert match["matched_pa_item_id"] is None
+    assert match["matched_pf_item_id"] is None
+    assert match["preview_pa_mes_code"] == "4-PA-0007"
+    assert match["preview_pf_mes_code"] == "4-PF-0010"
+
+
 
 def test_component_change_then_prepare_and_pickup_reserves_companions(
     db_session, make_item, make_bom, make_location

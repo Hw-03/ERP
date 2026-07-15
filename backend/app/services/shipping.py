@@ -30,7 +30,7 @@ from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services.bom import bom_child_item_ordering
 from app.services.inv_calc import _sync_total
-from app.utils.mes_code import next_serial_no
+from app.utils.mes_code import make_mes_code, next_serial_no
 
 PREPARE_PHASE = "PREPARE"
 PICKUP_PHASE = "PICKUP"
@@ -464,6 +464,16 @@ def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) ->
     if pa is not None:
         pf_sig = _signature((child_id, qty) for child_id, qty, _ in _pf_lines_with_final_pa_from_lines(db, normalized, pa))
         pf = _find_item_by_signature(db, process_type_code="PF", signature=pf_sig)
+    preview_pa_mes_code = None if pa is not None else make_mes_code(
+        base_pf.model_symbol,
+        "PA",
+        next_serial_no(base_pf.model_symbol, "PA", db),
+    )
+    preview_pf_mes_code = None if pf is not None else make_mes_code(
+        base_pf.model_symbol,
+        "PF",
+        next_serial_no(base_pf.model_symbol, "PF", db),
+    )
     return {
         "matched_pa_item_id": pa.item_id if pa else None,
         "matched_pf_item_id": pf.item_id if pf else None,
@@ -471,6 +481,8 @@ def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) ->
         "matched_pf_item_name": pf.item_name if pf else None,
         "requires_pa_name": pa is None,
         "requires_pf_name": pf is None,
+        "preview_pa_mes_code": preview_pa_mes_code,
+        "preview_pf_mes_code": preview_pf_mes_code,
     }
 
 

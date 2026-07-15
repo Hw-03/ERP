@@ -1391,16 +1391,20 @@ function RequestSection(props: {
   const itemCodeText = (item?: Item | null) => item?.mes_code ?? item?.process_type_code ?? "-";
   const itemNameText = (item?: Item | null, fallback = "-") => item?.item_name ?? fallback;
   const generatedCodeNotice = "품목코드는 저장/준비 완료 시 자동 생성 예정";
+  const previewCodeNotice = "예상 코드 · 저장 시 변경 가능";
+  const generatedCodeSummary = (previewCode: string | null | undefined) => previewCode
+    ? { code: previewCode, codeNotice: previewCodeNotice }
+    : { code: generatedCodeNotice };
   const finalPaSummary = reusingExistingPa
-    ? { label: "기존 PA 재사용", name: props.matchResult?.matched_pa_item_name ?? itemNameText(matchedPaItem), code: itemCodeText(matchedPaItem) }
+    ? { label: "기존 PA 재사용", name: props.matchResult?.matched_pa_item_name ?? itemNameText(matchedPaItem), code: itemCodeText(matchedPaItem), codeNotice: undefined }
     : requiresPaName
-      ? { label: "새 PA 생성 예정", name: props.customPaName.trim() || "새 PA 이름 미입력", code: generatedCodeNotice }
-      : { label: "PA 변경 없음", name: "요청 BOM 기준", code: "-" };
+      ? { label: "새 PA 생성 예정", name: props.customPaName.trim() || "새 PA 이름 미입력", ...generatedCodeSummary(props.matchResult?.preview_pa_mes_code) }
+      : { label: "PA 변경 없음", name: "요청 BOM 기준", code: "-", codeNotice: undefined };
   const finalPfSummary = reusingExistingPf
-    ? { label: "기존 PF 재사용", name: props.matchResult?.matched_pf_item_name ?? itemNameText(matchedPfItem), code: itemCodeText(matchedPfItem) }
+    ? { label: "기존 PF 재사용", name: props.matchResult?.matched_pf_item_name ?? itemNameText(matchedPfItem), code: itemCodeText(matchedPfItem), codeNotice: undefined }
     : requiresPfName
-      ? { label: "새 PF 생성 예정", name: props.customPfName.trim() || "새 PF 이름 미입력", code: generatedCodeNotice }
-      : { label: "PF 변경 없음", name: "요청 BOM 기준", code: "-" };
+      ? { label: "새 PF 생성 예정", name: props.customPfName.trim() || "새 PF 이름 미입력", ...generatedCodeSummary(props.matchResult?.preview_pf_mes_code) }
+      : { label: "PF 변경 없음", name: "요청 BOM 기준", code: "-", codeNotice: undefined };
   const paRequirementTitle = requiresPaName || reusingExistingPa ? finalPaSummary.name : basePaName || finalPaSummary.name;
   const pfRequirementTitle = requiresPfName || reusingExistingPf ? finalPfSummary.name : basePfName || finalPfSummary.name;
   const bomChangedLines = props.draftLines.filter((line) => line.origin === "CUSTOM" || !line.included);
@@ -1411,9 +1415,6 @@ function RequestSection(props: {
   const shipmentCode = reusingExistingPf || requiresPfName
     ? finalPfSummary.code
     : basePfItem ? itemCodeText(basePfItem) : finalPfSummary.code;
-  const bomChangedSummary = bomChangedLines.length > 0
-    ? `${bomChangedLines.length}개 변경`
-    : "기본 BOM 유지";
   const hasBomChanges = bomChangedLines.length > 0;
   const canOpenStep = (step: RequestWizardStep) => {
     if (locked && step !== props.wizardStep) return false;
@@ -1561,8 +1562,8 @@ function RequestSection(props: {
                 <EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 PA 구성품과 PF 구성품을 나눠 보여줍니다." />
               ) : (
                 <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_360px]">
-                  <BomEditor title="PA 구성품" stage="PA" lines={grouped.PA} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
-                  <BomEditor title="PF 구성품" stage="PF" lines={grouped.PF} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
+                  <BomEditor title={`${basePfName} · PA 구성품`} stage="PA" lines={grouped.PA} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
+                  <BomEditor title={`${basePfName} · PF 구성품`} stage="PF" lines={grouped.PF} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
                   <CompanionEditor lines={props.companionDraft} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onAdd={props.onAddCompanion} onUpdate={props.onUpdateCompanion} onRemove={props.onRemoveCompanion} />
                 </div>
               )}
@@ -1574,9 +1575,8 @@ function RequestSection(props: {
               <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,7fr)_minmax(120px,3fr)_auto] gap-4 overflow-y-auto pr-1">
                 <ShippingConclusionCard
                   metrics={[
-                    { value: bomChangedSummary },
-                    { value: finalPaSummary.label, name: finalPaSummary.name, code: finalPaSummary.code, testId: "shipping-final-pa-summary" },
-                    { value: finalPfSummary.label, name: finalPfSummary.name, code: finalPfSummary.code, testId: "shipping-final-pf-summary" },
+                    { value: finalPaSummary.label, name: finalPaSummary.name, code: finalPaSummary.code, codeNotice: finalPaSummary.codeNotice, testId: "shipping-final-pa-summary" },
+                    { value: finalPfSummary.label, name: finalPfSummary.name, code: finalPfSummary.code, codeNotice: finalPfSummary.codeNotice, testId: "shipping-final-pf-summary" },
                   ]}
                 />
                 <div data-testid="shipping-match-quantity" className="flex min-h-[120px] flex-wrap items-center justify-between gap-3 rounded-[14px] border px-5 py-4" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
@@ -1621,8 +1621,8 @@ function RequestSection(props: {
 
           {props.wizardStep === 5 && (
             <section data-testid="shipping-wizard-step-5" className="flex h-full min-h-0 flex-col">
-              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 ${hasBomChanges ? "grid-rows-[auto_432px_432px]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-y-auto pr-1`}>
-                <ShippingShipmentHero name={shipmentName} code={shipmentCode} quantity={requestQty} />
+              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 ${hasBomChanges ? "grid-rows-[auto_432px_auto]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-y-auto pr-1`}>
+                <ShippingShipmentHero name={shipmentName} code={shipmentCode} codeNotice={requiresPfName ? finalPfSummary.codeNotice : undefined} quantity={requestQty} />
                 <FinalRequirementReview
                   paLines={grouped.PA.filter((line) => line.included)}
                   pfLines={grouped.PF.filter((line) => line.included)}
@@ -1631,6 +1631,7 @@ function RequestSection(props: {
                   pfTitle={pfRequirementTitle}
                   newPfName={requiresPfName ? finalPfSummary.name : null}
                   newPfCode={requiresPfName ? finalPfSummary.code : null}
+                  newPfCodeNotice={requiresPfName ? finalPfSummary.codeNotice : undefined}
                   itemById={props.itemById}
                   requestQuantity={requestQty}
                   hasBomChanges={hasBomChanges}
@@ -2549,10 +2550,10 @@ function Notice({ tone, title, body }: { tone: string; title: string; body: stri
 function ShippingConclusionCard({
   metrics,
 }: {
-  metrics: { value: string; name?: string; code?: string; testId?: string }[];
+  metrics: { value: string; name?: string; code?: string; codeNotice?: string; testId?: string }[];
 }) {
   return (
-    <section data-testid="shipping-match-summary" className="grid h-full min-h-[168px] gap-3 md:grid-cols-3">
+    <section data-testid="shipping-match-summary" className="grid h-full min-h-[168px] gap-3 md:grid-cols-2">
       {metrics.map((metric, index) => (
         <div key={metric.testId ?? metric.value} data-testid={metric.testId} className="min-w-0 rounded-[14px] border px-4 py-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
           <div className="text-base font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{metric.value}</div>
@@ -2562,9 +2563,9 @@ function ShippingConclusionCard({
               <div className="mt-0.5 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 <SummaryCode code={metric.code ?? "-"} testId={metric.testId ? `${metric.testId}-code` : `shipping-match-code-${index}`} />
               </div>
+              {metric.codeNotice && <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{metric.codeNotice}</div>}
             </div>
           )}
-          {!metric.name && index === 0 && <div className="mt-1.5 text-sm font-bold leading-snug" style={{ color: LEGACY_COLORS.muted2 }}>구성 변경 내용을 확인했습니다.</div>}
         </div>
       ))}
     </section>
@@ -2588,12 +2589,12 @@ function BomChangeSummaryCard({
     return <Notice tone={LEGACY_COLORS.green} title="BOM 변경 없음" body="기본 BOM 구성을 그대로 사용합니다." />;
   }
   return (
-    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex h-[432px] shrink-0 flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
+    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.yellow }}>변경된 구성품 {lines.length}개</div>
         <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>세부 목록</div>
       </div>
-      <div data-testid={scrollListTestId} className={`grid min-h-0 gap-2 pr-1 xl:grid-cols-2 ${finalLayout ? "flex-1 overflow-y-auto content-start" : "max-h-[360px] overflow-y-auto"}`}>
+      <div data-testid={scrollListTestId} className={`grid min-h-0 gap-2 pr-1 xl:grid-cols-2 ${finalLayout ? "" : "max-h-[360px] overflow-y-auto"}`}>
         {lines.map((line) => {
           const item = itemById.get(line.child_item_id);
           const label = !line.included ? "제외" : line.origin === "CUSTOM" ? "추가" : "포함";
@@ -2616,7 +2617,7 @@ function BomChangeSummaryCard({
   );
 }
 
-type FinalRequirementRow = { id: string; testId: string; itemId?: string; itemName?: string; code?: string; quantity: number; unit: string };
+type FinalRequirementRow = { id: string; testId: string; itemId?: string; itemName?: string; code?: string; codeNotice?: string; quantity: number; unit: string };
 
 function FinalRequirementReview({
   paLines,
@@ -2626,6 +2627,7 @@ function FinalRequirementReview({
   pfTitle,
   newPfName,
   newPfCode,
+  newPfCodeNotice,
   itemById,
   requestQuantity,
   hasBomChanges,
@@ -2637,13 +2639,14 @@ function FinalRequirementReview({
   pfTitle: string;
   newPfName: string | null;
   newPfCode: string | null;
+  newPfCodeNotice?: string;
   itemById: Map<string, Item>;
   requestQuantity: number;
   hasBomChanges: boolean;
 }) {
   const paRows = paLines.map((line) => ({ id: `pa-${line.child_item_id}`, testId: `shipping-final-line-pa-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" }));
   const pfRows = [
-    ...(newPfName ? [{ id: "new-pf", testId: "shipping-final-new-pf-link", itemName: newPfName, code: newPfCode ?? "-", quantity: requestQuantity, unit: "EA" }] : []),
+    ...(newPfName ? [{ id: "new-pf", testId: "shipping-final-new-pf-link", itemName: newPfName, code: newPfCode ?? "-", codeNotice: newPfCodeNotice, quantity: requestQuantity, unit: "EA" }] : []),
     ...pfLines.map((line) => ({ id: `pf-${line.child_item_id}`, testId: `shipping-final-line-pf-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
   ];
   const companionRows = companionLines.map((line) => ({ id: `companion-${line.item_id}`, testId: `shipping-final-line-companion-${line.item_id}`, itemId: line.item_id, quantity: line.quantity, unit: line.unit || "EA" }));
@@ -2688,6 +2691,7 @@ function FinalRequirementGroup({
                 <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                   <SummaryCode code={itemCode} testId={`shipping-final-code-${row.id}`} />
                 </div>
+                {row.codeNotice && <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{row.codeNotice}</div>}
               </div>
               <span data-testid={`shipping-final-quantity-${row.id}`} className="shrink-0 self-center text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>총 {row.quantity} {row.unit}</span>
             </div>
@@ -2698,7 +2702,7 @@ function FinalRequirementGroup({
   );
 }
 
-function ShippingShipmentHero({ name, code, quantity }: { name: string; code: string; quantity: number }) {
+function ShippingShipmentHero({ name, code, codeNotice, quantity }: { name: string; code: string; codeNotice?: string; quantity: number }) {
   return (
     <section data-testid="shipping-shipment-hero" className="rounded-[16px] border px-4 py-2" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 34) }}>
       <div data-testid="shipping-shipment-hero-row" className="flex min-w-0 items-center gap-3">
@@ -2707,6 +2711,7 @@ function ShippingShipmentHero({ name, code, quantity }: { name: string; code: st
           <div className="min-w-0 flex-1 truncate text-lg font-black leading-snug" title={name} style={{ color: LEGACY_COLORS.text }}>{name}</div>
           <div className="min-w-0 max-w-[36%] truncate text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             <SummaryCode code={code} testId="shipping-shipment-code" />
+            {codeNotice && <div className="mt-0.5 text-xs font-bold">{codeNotice}</div>}
           </div>
         </div>
         <div data-testid="shipping-shipment-quantity" className="inline-flex shrink-0 items-baseline gap-2 rounded-[10px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: tint(LEGACY_COLORS.blue, 24) }}>
