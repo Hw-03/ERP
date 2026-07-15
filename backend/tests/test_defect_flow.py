@@ -128,6 +128,369 @@ def test_quarantine_sets_defective_at_and_logs(db_session, client, make_item):
     assert log.reason_category == "외관불량"
 
 
+def test_quarantine_rejects_client_request_id_owned_by_other_operation(
+    db_session, client, make_item
+):
+    item = make_item(name="R001-IDEM-CONFLICT", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E01-IDEM-C", name="멱등 충돌 작업자")
+    request_id = "defect-idem-other-operation"
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=Decimal("1"),
+            client_request_id=request_id,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_category": "외관불량",
+            "reason_memo": "다른 작업이 소유한 키",
+            "actor_employee_id": str(actor.employee_id),
+            "client_request_id": request_id,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CONFLICT"
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("10")
+
+
+def test_quarantine_rejects_retry_with_different_quantity(
+    db_session, client, make_item
+):
+    item = make_item(name="R001-IDEM-QTY", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E01-IDEM-Q", name="멱등 수량 작업자")
+    request_id = "defect-idem-different-quantity"
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+            quantity_change=Decimal("0"),
+            client_request_id=request_id,
+            department=DepartmentEnum.ASSEMBLY.value,
+            reason_category="외관불량",
+            reason_memo="첫 요청",
+            producer_employee_id=actor.employee_id,
+            inventory_effect=[
+                {"scope": "warehouse", "delta": -1},
+                {
+                    "scope": "location",
+                    "department": DepartmentEnum.ASSEMBLY.value,
+                    "status": LocationStatusEnum.DEFECTIVE.value,
+                    "delta": 1,
+                },
+            ],
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_category": "외관불량",
+            "reason_memo": "첫 요청",
+            "actor_employee_id": str(actor.employee_id),
+            "client_request_id": request_id,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CONFLICT"
+
+
+def test_quarantine_rejects_retry_for_different_item(
+    db_session, client, make_item
+):
+    original_item = make_item(name="R001-IDEM-ITEM-A", warehouse_qty=Decimal("10"))
+    retry_item = make_item(name="R001-IDEM-ITEM-B", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E01-IDEM-I", name="멱등 품목 작업자")
+    request_id = "defect-idem-different-item"
+    db_session.add(
+        TransactionLog(
+            item_id=original_item.item_id,
+            transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+            quantity_change=Decimal("0"),
+            client_request_id=request_id,
+            department=DepartmentEnum.ASSEMBLY.value,
+            reason_category="외관불량",
+            reason_memo="같은 수량 다른 품목",
+            producer_employee_id=actor.employee_id,
+            inventory_effect=[
+                {"scope": "warehouse", "delta": -2},
+                {
+                    "scope": "location",
+                    "department": DepartmentEnum.ASSEMBLY.value,
+                    "status": LocationStatusEnum.DEFECTIVE.value,
+                    "delta": 2,
+                },
+            ],
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(retry_item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_category": "외관불량",
+            "reason_memo": "같은 수량 다른 품목",
+            "actor_employee_id": str(actor.employee_id),
+            "client_request_id": request_id,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CONFLICT"
+
+
+def test_quarantine_unrelated_integrity_error_is_not_reported_as_success(
+    db_session, client, make_item, monkeypatch
+):
+    from sqlalchemy.exc import IntegrityError
+    from app.routers import defects as defects_router
+
+    item = make_item(name="R001-IDEM-ERROR", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E01-IDEM-E", name="멱등 예외 작업자")
+    db_session.commit()
+    real_commit = db_session.commit
+    real_rollback = db_session.rollback
+    calls = {"commit": 0, "rollback": 0}
+
+    def count_commit():
+        calls["commit"] += 1
+        return real_commit()
+
+    def count_rollback():
+        calls["rollback"] += 1
+        return real_rollback()
+
+    def fail_with_unrelated_integrity_error(*_args, **_kwargs):
+        raise IntegrityError("unrelated constraint", {}, RuntimeError("not idempotency"))
+
+    monkeypatch.setattr(db_session, "commit", count_commit)
+    monkeypatch.setattr(db_session, "rollback", count_rollback)
+    monkeypatch.setattr(
+        defects_router.defect_actions_svc.inv_effect,
+        "capture_effect",
+        fail_with_unrelated_integrity_error,
+    )
+    response = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_category": "외관불량",
+            "reason_memo": "무관한 제약 오류",
+            "actor_employee_id": str(actor.employee_id),
+            "client_request_id": "defect-idem-unrelated-error",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CONFLICT"
+    assert calls == {"commit": 0, "rollback": 1}
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("10")
+    assert (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.client_request_id == "defect-idem-unrelated-error")
+        .count()
+        == 0
+    )
+
+
+def test_quarantine_exact_retry_is_idempotent(db_session, client, make_item):
+    item = make_item(name="R001-IDEM-RETRY", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E01-IDEM-R", name="멱등 재시도 작업자")
+    db_session.commit()
+    payload = {
+        "item_id": str(item.item_id),
+        "qty": "2",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "reason_category": "외관불량",
+        "reason_memo": "같은 요청",
+        "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "defect-idem-exact-retry",
+    }
+
+    first = client.post("/api/defects/quarantine", json=payload)
+    second = client.post("/api/defects/quarantine", json=payload)
+
+    assert first.status_code == 200, first.json()
+    assert second.status_code == 200, second.json()
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("8")
+    assert (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.client_request_id == payload["client_request_id"])
+        .count()
+        == 1
+    )
+
+
+def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
+    db_session, client, make_item, monkeypatch
+):
+    from sqlalchemy import event
+    from sqlalchemy.orm import sessionmaker
+    from app.routers import defects as defects_router
+
+    item = make_item(name="R001-IDEM-RACE", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E01-IDEM-W", name="멱등 경합 작업자")
+    db_session.commit()
+    request_id = "defect-idem-matching-race"
+    original_action = defects_router.defect_actions_svc.quarantine_inventory
+    session_factory = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=db_session.get_bind(),
+    )
+    winner_session = session_factory()
+    winner_session_identity = id(winner_session)
+    try:
+        winner_actor = (
+            winner_session.query(Employee)
+            .filter(Employee.employee_id == actor.employee_id)
+            .one()
+        )
+        original_action(
+            winner_session,
+            item_id=item.item_id,
+            qty=Decimal("2"),
+            source="warehouse",
+            target_dept=DepartmentEnum.ASSEMBLY,
+            source_dept=None,
+            actor=winner_actor,
+            reason_category="외관불량",
+            reason_memo="경합 재시도",
+            client_request_id=request_id,
+        )
+    finally:
+        winner_session.close()
+
+    transaction_events = {"commit": 0, "rollback": 0}
+    rollback_calls = 0
+    find_calls = 0
+    real_rollback = db_session.rollback
+    real_find = defects_router._find_client_request_log
+
+    def record_commit(_session):
+        transaction_events["commit"] += 1
+
+    def record_rollback(_session):
+        transaction_events["rollback"] += 1
+
+    def count_rollback():
+        nonlocal rollback_calls
+        rollback_calls += 1
+        return real_rollback()
+
+    def simulate_precheck_snapshot_then_read_winner(db, client_request_id):
+        nonlocal find_calls
+        find_calls += 1
+        assert db is db_session
+        assert id(db) != winner_session_identity
+        if find_calls == 1:
+            return None
+        assert transaction_events == {"commit": 0, "rollback": 1}
+        assert rollback_calls == 1
+        assert db.is_active
+        return real_find(db, client_request_id)
+
+    event.listen(db_session, "after_commit", record_commit)
+    event.listen(db_session, "after_rollback", record_rollback)
+    monkeypatch.setattr(db_session, "rollback", count_rollback)
+    monkeypatch.setattr(
+        defects_router,
+        "_find_client_request_log",
+        simulate_precheck_snapshot_then_read_winner,
+    )
+    try:
+        response = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": "2",
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_category": "외관불량",
+                "reason_memo": "경합 재시도",
+                "actor_employee_id": str(actor.employee_id),
+                "client_request_id": request_id,
+            },
+        )
+    finally:
+        event.remove(db_session, "after_commit", record_commit)
+        event.remove(db_session, "after_rollback", record_rollback)
+
+    assert response.status_code == 200, response.json()
+    assert transaction_events == {"commit": 0, "rollback": 1}
+    assert rollback_calls == 1
+    assert find_calls == 2
+
+    verify_session = session_factory()
+    try:
+        inventory = (
+            verify_session.query(Inventory)
+            .filter(Inventory.item_id == item.item_id)
+            .one()
+        )
+        defective_location = (
+            verify_session.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == item.item_id,
+                InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+            )
+            .one()
+        )
+        log = (
+            verify_session.query(TransactionLog)
+            .filter(TransactionLog.client_request_id == request_id)
+            .one()
+        )
+        assert inventory.warehouse_qty == Decimal("8")
+        assert inventory.quantity == Decimal("10")
+        assert defective_location.quantity == Decimal("2")
+        assert log.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
+        assert log.inventory_effect is not None
+        assert any(
+            cell.get("scope") == "warehouse" and cell.get("delta") == -2
+            for cell in log.inventory_effect
+        )
+        assert any(
+            cell.get("scope") == "location"
+            and cell.get("department") == DepartmentEnum.ASSEMBLY.value
+            and cell.get("status") == LocationStatusEnum.DEFECTIVE.value
+            and cell.get("delta") == 2
+            for cell in log.inventory_effect
+        )
+    finally:
+        verify_session.close()
+
+
 # ---------------------------------------------------------------------------
 # 시나리오 2: 격리 → 정상복귀 → defective_at NULL, UNMARK_DEFECTIVE 로그
 # ---------------------------------------------------------------------------

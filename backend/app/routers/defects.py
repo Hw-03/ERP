@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -32,8 +32,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.routers._errors import ErrorCode, http_error
-from app.services import inventory as inventory_svc
-from app.services import inv_effect
+from app.services import defect_actions as defect_actions_svc
 from app._evt import emit as _evt_emit
 from app._actor import set_actor
 from app.repositories import item_repository
@@ -102,6 +101,79 @@ def _dept_enum(dept_str: str) -> DepartmentEnum:
         return DepartmentEnum(dept_str)
     except ValueError:
         raise ValueError(f"알 수 없는 부서: {dept_str}")
+
+
+def _sum_inventory_effect(
+    log: TransactionLog,
+    *,
+    scope: str,
+    department: Optional[str] = None,
+    status: Optional[str] = None,
+) -> Optional[Decimal]:
+    """검증 가능한 재고 효과만 합산하며, 손상된 효과는 멱등 성공으로 인정하지 않는다."""
+    effect = log.inventory_effect
+    if not isinstance(effect, list):
+        return None
+
+    total = Decimal("0")
+    for cell in effect:
+        if not isinstance(cell, dict):
+            return None
+        if cell.get("scope") != scope:
+            continue
+        if department is not None and cell.get("department") != department:
+            continue
+        if status is not None and cell.get("status") != status:
+            continue
+        try:
+            total += Decimal(str(cell["delta"]))
+        except (InvalidOperation, KeyError, TypeError, ValueError):
+            return None
+    return total
+
+
+def _matches_quarantine_request(log: TransactionLog, payload: QuarantineRequest) -> bool:
+    """멱등 키가 같은 격리 로그가 현재 요청과 같은 업무 명령인지 검증한다."""
+    if (
+        log.transaction_type != TransactionTypeEnum.MARK_DEFECTIVE
+        or log.item_id != payload.item_id
+        or log.department != payload.target_dept
+        or log.producer_employee_id != payload.actor_employee_id
+        or log.reason_category != payload.reason_category
+        or (log.reason_memo or "") != (payload.reason_memo or "")
+    ):
+        return False
+
+    target_delta = _sum_inventory_effect(
+        log,
+        scope="location",
+        department=payload.target_dept,
+        status=LocationStatusEnum.DEFECTIVE.value,
+    )
+    if target_delta != payload.qty:
+        return False
+
+    if payload.source == "warehouse":
+        source_delta = _sum_inventory_effect(log, scope="warehouse")
+    elif payload.source == "production" and payload.source_dept:
+        source_delta = _sum_inventory_effect(
+            log,
+            scope="location",
+            department=payload.source_dept,
+            status=LocationStatusEnum.PRODUCTION.value,
+        )
+    else:
+        return False
+    return source_delta == -payload.qty
+
+
+def _find_client_request_log(db: Session, client_request_id: str) -> Optional[TransactionLog]:
+    """고유 멱등 키에 해당하는 거래를 현재 DB 상태에서 다시 읽는다."""
+    return (
+        db.query(TransactionLog)
+        .filter(TransactionLog.client_request_id == client_request_id)
+        .first()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -221,15 +293,13 @@ def get_defect_kpi(db: Session = Depends(get_db)):
 @router.post("/quarantine", response_model=DefectActionResult)
 def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
-    # 멱등성: 동일 client_request_id로 이미 처리된 요청이면 즉시 반환.
+    # 멱등성: 동일 키뿐 아니라 같은 격리 명령임이 확인될 때만 성공으로 재사용한다.
     if payload.client_request_id:
-        existing = (
-            db.query(TransactionLog)
-            .filter(TransactionLog.client_request_id == payload.client_request_id)
-            .first()
-        )
+        existing = _find_client_request_log(db, payload.client_request_id)
         if existing:
-            return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
+            if _matches_quarantine_request(existing, payload):
+                return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
+            raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
 
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
@@ -246,63 +316,29 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
 
-    inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    qty_before = inv.quantity or Decimal("0")
-    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
-
     try:
-        inventory_svc.mark_defective(
+        defect_actions_svc.quarantine_inventory(
             db,
-            payload.item_id,
-            payload.qty,
-            inventory_svc.DefectSource(
-                kind=payload.source,
-                target_dept=target_dept,
-                source_dept=source_dept,
-            ),
+            item_id=payload.item_id,
+            qty=payload.qty,
+            source=payload.source,
+            target_dept=target_dept,
+            source_dept=source_dept,
+            actor=actor,
+            reason_category=payload.reason_category,
+            reason_memo=payload.reason_memo,
+            client_request_id=payload.client_request_id,
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
-
-    # defective_at 채우기
-    from sqlalchemy import update as sa_update
-    now = datetime.utcnow()
-    db.execute(
-        sa_update(InventoryLocation)
-        .where(InventoryLocation.item_id == payload.item_id)
-        .where(InventoryLocation.department == target_dept)
-        .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
-        .values(defective_at=now)
-        .execution_options(synchronize_session=False)
-    )
-
-    # TransactionLog 기록
-    db.flush()
-    inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    try:
-        db.add(
-            TransactionLog(
-                item_id=payload.item_id,
-                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
-                quantity_change=Decimal("0"),
-                quantity_before=qty_before,
-                quantity_after=inv.quantity,
-                produced_by=actor.name,
-                producer_employee_id=actor.employee_id,
-                notes=f"격리: {payload.source} → {payload.target_dept}",
-                reason_category=payload.reason_category,
-                reason_memo=payload.reason_memo or None,
-                client_request_id=payload.client_request_id,
-                # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
-                department=getattr(target_dept, "value", target_dept),
-                inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
-            )
-        )
-        db.commit()
     except IntegrityError:
-        db.rollback()
         if payload.client_request_id:
-            return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
+            # application service의 transactional()이 실패를 rollback한 뒤이므로,
+            # 식별 맵을 비우고 경합 승자의 커밋 결과를 새로 확인한다.
+            db.expire_all()
+            existing = _find_client_request_log(db, payload.client_request_id)
+            if existing is not None and _matches_quarantine_request(existing, payload):
+                return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
         raise http_error(409, ErrorCode.CONFLICT, "격리 처리 중 충돌이 발생했습니다.")
     _evt_emit(
         "defect_mark",
@@ -342,45 +378,18 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
 
-    inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    qty_before = inv.quantity or Decimal("0")
-    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
-
     try:
-        inventory_svc.unmark_defective(
+        defect_actions_svc.unquarantine_inventory(
             db,
-            payload.item_id,
-            payload.qty,
-            dept,
-            inventory_svc.ReasonContext(
-                category=payload.reason_category or "",
-                memo=payload.reason_memo or "",
-                actor=actor.name,
-            ),
+            item_id=payload.item_id,
+            qty=payload.qty,
+            dept=dept,
+            actor=actor,
+            reason_category=payload.reason_category,
+            reason_memo=payload.reason_memo,
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
-
-    db.flush()
-    inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    db.add(
-        TransactionLog(
-            item_id=payload.item_id,
-            transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
-            quantity_change=Decimal("0"),
-            quantity_before=qty_before,
-            quantity_after=inv.quantity,
-            produced_by=actor.name,
-            producer_employee_id=actor.employee_id,
-            notes=f"정상 복귀: {payload.dept}",
-            reason_category=payload.reason_category,
-            reason_memo=payload.reason_memo or None,
-            # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
-            department=getattr(dept, "value", dept),
-            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
-        )
-    )
-    db.commit()
     _evt_emit(
         "defect_unmark",
         request=http_request,
