@@ -8,6 +8,7 @@ This folder now mixes two kinds of material:
 ## Start Here
 
 - [Root README](../../README.md): project entry point and startup guide.
+- [AI Context](../ai/prompt_context.md): shared Claude Code/Codex context entry point.
 - [Repo Layout](REPO_LAYOUT.md): current live paths, moved files, and archive boundaries.
 - [Context](CONTEXT.md): business/domain overview.
 - [Glossary](GLOSSARY.md): shared terms and process vocabulary.
@@ -19,7 +20,7 @@ This folder now mixes two kinds of material:
 ## Historical Notes
 
 - [AI Handover](../ai/AI_HANDOVER.md): older Claude/Codex handoff notes. Treat
-  this as archive context.
+  this as archive context, not the current AI entry point.
 - `research/`, one-off plans, review notes, and prototypes remain here for
   reference only unless a file explicitly says it is current.
 

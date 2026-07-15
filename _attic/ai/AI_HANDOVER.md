@@ -1,8 +1,9 @@
 # AI Handover
 
 > Archive note (2026-06-15)
-> - This file is a historical handoff snapshot.
-> - Current entry points are `README.md`, `_attic/docs/REPO_LAYOUT.md`,
+> - This file is a historical handoff snapshot. Do not use it as current context.
+> - The current shared AI entry point is `_attic/ai/prompt_context.md`.
+> - Current repository references include `README.md`, `_attic/docs/REPO_LAYOUT.md`,
 >   `_attic/docs/ITEM_CODE_RULES.md`, and `_attic/docs/CODEX_PROGRESS.md`.
 > - The current repository no longer has an active root `docs/` folder or a
 >   `vault/` folder.

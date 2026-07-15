@@ -121,9 +121,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 
   기본 `-Mode auto` 는 워킹트리 변경 영역만 검증합니다 (docs 약 1초 / frontend 또는 backend 만 해당 게이트). 인프라 파일 또는 매핑되지 않은 경로가 섞이면 자동으로 풀 게이트로 승격. 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`. 같은 세션에서 이미 같은 영역을 통과시켰다면 다시 돌리지 마세요.
 
-## Session Handoff
+## Shared AI Context and Session Handoff
 
-At the start of a new session, check the most recent file in `_attic/handoff/` first (newest date in filename).
+At the start of a new session:
+
+1. Read `_attic/ai/prompt_context.md` for the shared context order and current reference paths.
+2. Check the most recent relevant file in `_attic/handoff/` by the date in its filename. This remains the active location for task-specific handoffs.
+3. Treat `_attic/ai/AI_HANDOVER.md` as historical archive material, not current context.
+
+Repository files above are the canonical shared context. Tool-private memory may supplement them but must not replace or override them.
 
 ## Resource Locations
 
@@ -133,7 +139,8 @@ Only files automatically referenced by tools remain at the root and in each fold
 - One-off backend scripts (seed, sync, archive, backup): `_attic/backend-scripts/`
   - Run: `cd backend && python ../_attic/backend-scripts/<script>.py`
   - `sys.path` is patched to auto-include `backend/`
-- DB backups: `backend/_backup/` (local only, matched by `.gitignore`; not tracked)
+- Permanent runtime artifacts: `_attic/runtime/` (backups/logs/reports; local only, matched by `.gitignore`; not tracked)
+- Legacy backups already under `backend/_backup/` stay in place but new operational backups are not written there.
 - New member guide: `_attic/ONBOARDING.md`
 - Active DB: `backend/mes.db` (single — `app.db`, `erp.db` traces removed)
 

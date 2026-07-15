@@ -7,7 +7,9 @@ moves.
 
 - Root guide: `README.md`
 - Active reference docs: `_attic/docs/`
-- Historical AI notes: `_attic/ai/`
+- Shared AI context entry point: `_attic/ai/prompt_context.md`
+- Active task handoffs: `_attic/handoff/`
+- Historical AI snapshot: `_attic/ai/AI_HANDOVER.md`
 - Backend schema: `backend/schema.sql`
 - Backend database: `backend/mes.db`
 - Docker compose files:
@@ -28,7 +30,8 @@ Use these first when you need the current rules or structure:
 
 - There is no active root `docs/` folder.
 - There is no active `vault/` folder.
-- `_attic/ai/AI_HANDOVER.md` is archive-only handoff context.
+- `_attic/ai/AI_HANDOVER.md` is archive-only historical context; use
+  `_attic/ai/prompt_context.md` for the current AI entry point.
 - `research/`, one-off plans, and prototype files under `_attic/docs/` are
   historical reference unless they explicitly say they are current.
 
