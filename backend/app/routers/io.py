@@ -27,7 +27,9 @@ from app.schemas.shipping import (
 )
 from app._evt import emit as _evt_emit
 from app.services import io as io_svc
+from app.services import io_actions as io_actions_svc
 from app.services import shipping as shipping_svc
+from app.services import shipping_actions as shipping_actions_svc
 from app.services.shipping import ShippingError
 from app.services._tx import commit_only
 from app.models import Employee, TransactionLog
@@ -106,7 +108,7 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
     requester = _load_item_conversion_requester(db, payload.requester_employee_id)
 
     try:
-        result = shipping_svc.execute_component_change_independent(
+        result = shipping_actions_svc.execute_component_change_independent(
             db,
             payload.source_item_id,
             payload.target_item_id,
@@ -116,16 +118,13 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
             requester_name=requester.name,
             requester_employee_id=requester.employee_id,
         )
-        db.commit()
         return ShippingComponentChangeResultResponse(
             **{key: value for key, value in result.items() if key != "transactions"},
             transactions=[_tx_log_response(log) for log in result["transactions"]],
         )
     except ShippingError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 
@@ -226,8 +225,7 @@ def delete_io_draft(
 @router.post("/submit", response_model=IoSubmitResponse, status_code=status.HTTP_201_CREATED)
 def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
-        result = io_svc.submit(db, payload)
-        commit_only(db)
+        result = io_actions_svc.submit(db, payload)
         _batch = result.get("batch") or {}
         _evt_emit(
             "io_submit",
@@ -241,13 +239,10 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
         )
         return result
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     except IntegrityError as exc:
-        db.rollback()
         # client_request_id 중복 → 기존 batch 멱등 반환 (더블클릭/네트워크 retry 보호)
         if payload.client_request_id and "client_request_id" in str(exc).lower():
             existing = io_svc.find_by_client_request_id(db, payload.client_request_id)
@@ -278,18 +273,15 @@ def submit_io_draft(
     db: Session = Depends(get_db),
 ):
     try:
-        result = io_svc.submit_existing_draft(
+        result = io_actions_svc.submit_existing_draft(
             db,
             batch_id=batch_id,
             requester_employee_id=requester_employee_id,
         )
     except PermissionError as exc:
-        db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-    commit_only(db)
     _batch = result.get("batch") or {}
     _evt_emit(
         "io_submit",
