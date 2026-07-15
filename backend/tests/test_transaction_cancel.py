@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+from sqlalchemy.orm import Session
+
 from app.models import (
     DepartmentEnum,
     Employee,
@@ -18,6 +21,8 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.routers.inventory import transactions as transactions_router
+from app.services import transaction_actions
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -167,6 +172,39 @@ def test_cancel_receive_restores_warehouse(client, db_session, make_item):
     assert wh == 0
 
 
+def test_cancel_rolls_back_inventory_and_status_when_audit_fails(
+    client, db_session, make_item, monkeypatch
+):
+    item = make_item(name="취소 롤백품", warehouse_qty=Decimal("50"))
+    actor = _make_employee(db_session, code="CANCEL-ROLLBACK")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("50"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("50"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        inventory_effect=[{"scope": "warehouse", "delta": 50}],
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    def fail_audit(*_args, **_kwargs):
+        raise RuntimeError("audit failure")
+
+    monkeypatch.setattr(transactions_router.transaction_actions_svc.audit, "record", fail_audit)
+
+    with pytest.raises(RuntimeError, match="audit failure"):
+        _cancel(client, log.log_id, code=actor.employee_code)
+
+    db_session.expire_all()
+    assert _cells(db_session, item.item_id)[:2] == (50, 50)
+    refreshed = db_session.query(TransactionLog).filter(TransactionLog.log_id == log.log_id).one()
+    assert refreshed.cancelled is False
+    assert refreshed.cancel_reason is None
+
+
 def test_cancel_internal_use_restores_warehouse_total(client, db_session, make_item):
     item = make_item(name="사내사용 취소품", warehouse_qty=Decimal("12"))
     actor = _make_employee(
@@ -285,6 +323,87 @@ def test_cancel_internal_use_batch_restores_all_items(
     assert all(log.cancelled for log in batch_logs)
     assert _cells(db_session, first.item_id) == (12, 12, {})
     assert _cells(db_session, second.item_id) == (9, 9, {})
+
+
+def test_cancel_batch_rolls_back_first_reversal_when_second_reversal_fails(
+    client, db_session, make_item, monkeypatch
+):
+    first = make_item(name="배치 취소 원자성 A", warehouse_qty=Decimal("12"))
+    second = make_item(name="배치 취소 원자성 B", warehouse_qty=Decimal("9"))
+    actor = _make_employee(
+        db_session,
+        code="IU-BATCH-ROLLBACK",
+        department=DepartmentEnum.RESEARCH,
+    )
+    approver = _make_employee(
+        db_session,
+        code="IU-BATCH-ROLLBACK-WH",
+        warehouse_role="deputy",
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(first.item_id), "quantity": 4},
+                {"source_kind": "direct_item", "item_id": str(second.item_id), "quantity": 5},
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    approved = _approve(client, submitted.json()["stock_request_id"], approver)
+    assert approved.status_code == 200, approved.text
+
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE)
+        .all()
+    )
+    assert len(logs) == 2
+    log_ids = {log.log_id for log in logs}
+    original_cancel_one_log = transaction_actions._cancel_one_log
+    reversed_log_ids = []
+
+    def fail_second_reversal(db, batch_log):
+        reversed_log_ids.append(batch_log.log_id)
+        if len(reversed_log_ids) == 2:
+            raise ValueError("injected second reversal failure")
+        original_cancel_one_log(db, batch_log)
+
+    monkeypatch.setattr(transaction_actions, "_cancel_one_log", fail_second_reversal)
+
+    failed = _cancel(client, logs[0].log_id, code=actor.employee_code)
+
+    assert failed.status_code == 422, failed.text
+    assert len(reversed_log_ids) == 2
+    db_session.expire_all()
+    with Session(bind=db_session.get_bind()) as fresh_db:
+        assert _cells(fresh_db, first.item_id) == (8, 8, {})
+        assert _cells(fresh_db, second.item_id) == (4, 4, {})
+        fresh_logs = (
+            fresh_db.query(TransactionLog)
+            .filter(TransactionLog.log_id.in_(log_ids))
+            .all()
+        )
+        assert len(fresh_logs) == 2
+        assert all(log.cancelled is False for log in fresh_logs)
+        assert all(log.cancel_reason is None for log in fresh_logs)
 
 
 def test_effect_helper_roundtrip(db_session, make_item):

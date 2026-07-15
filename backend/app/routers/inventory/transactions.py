@@ -37,8 +37,7 @@ from app.schemas import (
     TransactionQuantityCorrectionRequest,
     TransactionQuantityCorrectionResponse,
 )
-from app.services import audit, inv_effect, inventory as inventory_svc
-from app.services._tx import commit_only
+from app.services import transaction_actions as transaction_actions_svc
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
 from app._actor import set_actor
@@ -66,19 +65,6 @@ router = APIRouter()
 EXPORT_MAX_ROWS = 50_000
 DISPLAY_GROUP_PAGE_SIZE = 100
 
-
-# 메타데이터(notes/reference_no/produced_by) 수정이 허용되는 거래 타입.
-# 복합 거래(PRODUCE/BACKFLUSH 등)는 수정 금지.
-META_CORRECTABLE = {
-    TransactionTypeEnum.RECEIVE,
-    TransactionTypeEnum.SHIP,
-    TransactionTypeEnum.ADJUST,
-    TransactionTypeEnum.TRANSFER_TO_PROD,
-    TransactionTypeEnum.TRANSFER_TO_WH,
-    TransactionTypeEnum.TRANSFER_DEPT,
-    TransactionTypeEnum.MARK_DEFECTIVE,
-    TransactionTypeEnum.SUPPLIER_RETURN,
-}
 
 # 수량 보정이 허용되는 거래 타입.
 # ADJUST 제외: 절대값 지정 방식이라 delta 보정 정책 애매 (별도 정책 확정 필요).
@@ -949,55 +935,25 @@ def meta_edit_transaction(
     원본 TransactionLog의 메타 필드는 직접 업데이트하지만, 변경 전/후 스냅샷을
     TransactionEditLog에 기록하여 감사 이력을 남긴다.
     """
-    log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
-    if not log:
-        raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
-    item = item_repository.get(db, log.item_id)
-    if not item:
-        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
-
-    if log.transaction_type not in META_CORRECTABLE:
-        raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            f"이 거래 유형({log.transaction_type.value})은 수정을 지원하지 않습니다.",
-        )
-
     editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin, request)
-
-    before = _log_snapshot(log)
-
-    # 변경된 필드만 적용
-    if payload.notes is not None:
-        log.notes = payload.notes
-    if payload.reference_no is not None:
-        log.reference_no = payload.reference_no or None
-    if payload.produced_by is not None:
-        log.produced_by = payload.produced_by or None
-
-    after = _log_snapshot(log)
-
-    edit_log = TransactionEditLog(
-        original_log_id=log.log_id,
-        edited_by_employee_id=editor.employee_id,
-        edited_by_name=editor.name,
-        reason=payload.reason,
-        before_payload=json.dumps(before, ensure_ascii=False),
-        after_payload=json.dumps(after, ensure_ascii=False),
-        correction_log_id=None,
-    )
-    db.add(edit_log)
-
-    audit.record(
-        db,
-        request=request,
-        action="transaction.meta_edit",
-        target_type="transaction_log",
-        target_id=str(log.log_id),
-        payload_summary=f"{editor.name}: {payload.reason}",
-    )
-
-    commit_only(db)
+    try:
+        log, item = transaction_actions_svc.edit_transaction_metadata(
+            db,
+            log_id=log_id,
+            editor=editor,
+            reason=payload.reason,
+            notes=payload.notes,
+            reference_no=payload.reference_no,
+            produced_by=payload.produced_by,
+            request=request,
+        )
+    except (
+        transaction_actions_svc.TransactionLogNotFound,
+        transaction_actions_svc.TransactionItemNotFound,
+    ) as exc:
+        raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+    except transaction_actions_svc.UnsupportedTransactionMetadata as exc:
+        raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
     db.refresh(log)
 
     edit_count = (
@@ -1117,56 +1073,16 @@ def quantity_correct_transaction(
         )
 
     before = _log_snapshot(log)
-    cells_before = inv_effect.snapshot_cells(db, log.item_id)
-
-    # adjust_warehouse 서비스 호출로 재고 절대값 설정
-    adjusted_inv, qty_before, _applied_delta = inventory_svc.adjust_warehouse(
-        db, log.item_id, new_warehouse
-    )
-
-    # 보정 ADJUST 거래 생성 (원본 log 보존)
-    correction_log = TransactionLog(
-        item_id=log.item_id,
-        transaction_type=TransactionTypeEnum.ADJUST,
-        quantity_change=delta,
-        quantity_before=qty_before,
-        quantity_after=adjusted_inv.quantity,
-        notes=f"보정: {payload.reason}",
-        reference_no=str(log.log_id),
-        produced_by=editor.name,
-        producer_employee_id=editor.employee_id,
-        inventory_effect=inv_effect.capture_effect(db, log.item_id, cells_before),
-    )
-    db.add(correction_log)
-    db.flush()  # correction_log.log_id 채움
-
-    after = {
-        **before,
-        "_correction_log_id": str(correction_log.log_id),
-        "_applied_delta": str(delta),
-    }
-
-    edit_log = TransactionEditLog(
-        original_log_id=log.log_id,
-        edited_by_employee_id=editor.employee_id,
-        edited_by_name=editor.name,
-        reason=payload.reason,
-        before_payload=json.dumps(before, ensure_ascii=False),
-        after_payload=json.dumps(after, ensure_ascii=False),
-        correction_log_id=correction_log.log_id,
-    )
-    db.add(edit_log)
-
-    audit.record(
+    correction_log = transaction_actions_svc.correct_transaction_quantity(
         db,
+        log=log,
+        editor=editor,
+        new_warehouse=new_warehouse,
+        delta=delta,
+        reason=payload.reason,
+        before=before,
         request=request,
-        action="transaction.quantity_correction",
-        target_type="transaction_log",
-        target_id=str(log.log_id),
-        payload_summary=f"{editor.name}: delta={float(delta)}, {payload.reason}",
     )
-
-    commit_only(db)
     db.refresh(log)
     db.refresh(correction_log)
 
@@ -1193,32 +1109,6 @@ class TransactionCancelRequest(BaseModel):
     pin: str = Field(..., min_length=1, max_length=20)
 
 
-def _cancel_one_log(db: Session, log: TransactionLog) -> None:
-    """단일 TransactionLog 의 재고 효과를 역방향 적용한다.
-
-    운영 자동 취소는 inventory_effect 에 기록된 실제 재고 셀 증감만 신뢰한다.
-    효과 기록이 없는 과거 로그는 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.
-    """
-    if log.inventory_effect is None:
-        raise ValueError("재고 효과 기록이 없어 자동 취소할 수 없습니다.")
-
-    effect = log.inventory_effect
-    if not isinstance(effect, list) or not effect:
-        raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
-    try:
-        has_nonzero_delta = any(
-            isinstance(cell, dict) and int(cell.get("delta", 0)) != 0
-            for cell in effect
-        )
-    except (TypeError, ValueError):
-        has_nonzero_delta = False
-    if not has_nonzero_delta:
-        raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
-
-    from app.services.inv_effect import apply_effect_reverse
-    apply_effect_reverse(db, log.item_id, effect)
-
-
 @router.post("/transactions/{log_id}/cancel", response_model=TransactionLogResponse)
 def cancel_transaction(
     log_id: uuid.UUID,
@@ -1231,8 +1121,6 @@ def cancel_transaction(
     권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).
     BOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.
     """
-    from datetime import datetime as _dt
-
     log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
     if not log:
         raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
@@ -1278,57 +1166,18 @@ def cancel_transaction(
 
     set_actor(request, canceller)
 
-    # 배치 단위 취소 — 복합 작업은 묶음 전체를 함께 되돌려야 정합이 맞는다.
-    #  - PRODUCE+BACKFLUSH 등 IO v2: operation_batch_id 로 묶임.
-    #  - 분해(재작업): operation_batch_id 가 없고 reference_no="defect-disassemble:{uuid}" 로 묶임.
-    batch_logs: list[TransactionLog] = []
-    if log.operation_batch_id:
-        batch_logs = (
-            db.query(TransactionLog)
-            .filter(
-                TransactionLog.operation_batch_id == log.operation_batch_id,
-                TransactionLog.cancelled.is_(False),
-            )
-            .all()
+    try:
+        transaction_actions_svc.cancel_transaction(
+            db,
+            log=log,
+            canceller=canceller,
+            reason=payload.reason,
+            request=request,
         )
-    elif log.reference_no and log.reference_no.startswith("defect-disassemble:"):
-        batch_logs = (
-            db.query(TransactionLog)
-            .filter(
-                TransactionLog.reference_no == log.reference_no,
-                TransactionLog.cancelled.is_(False),
-            )
-            .all()
-        )
-    if not batch_logs:
-        batch_logs = [log]
-
-    now = _dt.utcnow()
-    for bl in batch_logs:
-        bl_inv = inventory_repository.get(db, bl.item_id)
-        if not bl_inv:
-            raise http_error(404, ErrorCode.NOT_FOUND, f"재고 레코드를 찾을 수 없습니다 (item={bl.item_id}).")
-        try:
-            _cancel_one_log(db, bl)
-        except ValueError as exc:
-            raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
-        from app.services.inv_calc import _sync_total
-        _sync_total(db, bl_inv)
-        bl.cancelled = True
-        bl.cancel_reason = payload.reason
-        bl.cancelled_by = canceller.employee_id
-        bl.cancelled_at = now
-
-    audit.record(
-        db,
-        request=request,
-        action="transaction.cancel",
-        target_type="transaction_log",
-        target_id=str(log.log_id),
-        payload_summary=f"{canceller.name}: {payload.reason}",
-    )
-
-    commit_only(db)
+    except transaction_actions_svc.TransactionInventoryNotFound as exc:
+        raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
     db.refresh(log)
 
     edit_count = (

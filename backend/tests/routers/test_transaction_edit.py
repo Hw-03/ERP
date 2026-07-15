@@ -12,9 +12,11 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     Item,
+    TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.routers.inventory import transactions as transactions_router
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin
 
 
@@ -211,6 +213,39 @@ def test_quantity_correct_receive_creates_adjust(client, db_session, receive_log
     # 원본은 보존 (quantity_change 그대로)
     db_session.refresh(log)
     assert log.quantity_change == Decimal("100")
+
+
+def test_quantity_correct_rolls_back_inventory_when_audit_fails(
+    client, db_session, receive_log, editor, monkeypatch
+):
+    log, item = receive_log
+
+    def fail_audit(*_args, **_kwargs):
+        raise RuntimeError("audit failure")
+
+    monkeypatch.setattr(transactions_router.transaction_actions_svc.audit, "record", fail_audit)
+
+    with pytest.raises(RuntimeError, match="audit failure"):
+        client.post(
+            f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+            json={
+                "quantity_change": 80,
+                "reason": "rollback proof",
+                "edited_by_employee_id": str(editor.employee_id),
+                "edited_by_pin": "0000",
+            },
+        )
+
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inv.warehouse_qty == Decimal("100")
+    assert (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.ADJUST)
+        .count()
+        == 0
+    )
+    assert db_session.query(TransactionEditLog).count() == 0
 
 
 def test_quantity_correct_adjust_log_records_effect_and_editor_id(client, db_session, receive_log, editor):
