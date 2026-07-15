@@ -7,9 +7,10 @@
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -90,6 +91,95 @@ def boxes_total_for_item(db: Session, item_id) -> int:
     return int(total or 0)
 
 
+def _sorted_unique_ids(values: Iterable[object]) -> list[object]:
+    by_key = {str(value): value for value in values if value is not None}
+    return [by_key[key] for key in sorted(by_key)]
+
+
+def lock_warehouse_map_rows(
+    db: Session,
+    *,
+    item_ids: Iterable[object] = (),
+    angle_ids: Iterable[object] = (),
+    box_ids: Iterable[object] = (),
+    include_boxes_for_item_ids: bool = False,
+) -> None:
+    """Lock PostgreSQL warehouse rows in one deadlock-safe shared order.
+
+    Inventory is locked first, followed by affected source/target angles, boxes,
+    and box contents. Sharing the target angle lock keeps capacity and stack-order
+    reads stable even when concurrent admins edit different items. SQLite keeps
+    its existing ``BEGIN IMMEDIATE`` serialization and needs no row locks.
+    """
+    if db.get_bind().dialect.name != "postgresql":
+        return
+
+    ordered_item_ids = _sorted_unique_ids(item_ids)
+    if ordered_item_ids:
+        db.execute(
+            select(Inventory)
+            .where(Inventory.item_id.in_(ordered_item_ids))
+            .order_by(Inventory.item_id.asc())
+            .with_for_update(of=Inventory.__table__)
+            .execution_options(populate_existing=True)
+        ).scalars().all()
+
+    affected_box_ids = list(box_ids)
+    if include_boxes_for_item_ids and ordered_item_ids:
+        affected_box_ids.extend(
+            db.execute(
+                select(WarehouseBoxItem.box_id)
+                .where(WarehouseBoxItem.item_id.in_(ordered_item_ids))
+                .distinct()
+                .order_by(WarehouseBoxItem.box_id.asc())
+            ).scalars().all()
+        )
+
+    ordered_box_ids = _sorted_unique_ids(affected_box_ids)
+    affected_angle_ids = list(angle_ids)
+    if ordered_box_ids:
+        affected_angle_ids.extend(
+            db.execute(
+                select(WarehouseBox.angle_id)
+                .where(WarehouseBox.box_id.in_(ordered_box_ids))
+                .distinct()
+                .order_by(WarehouseBox.angle_id.asc())
+            ).scalars().all()
+        )
+
+    ordered_angle_ids = _sorted_unique_ids(affected_angle_ids)
+    if ordered_angle_ids:
+        db.execute(
+            select(WarehouseAngle)
+            .where(WarehouseAngle.id.in_(ordered_angle_ids))
+            .order_by(WarehouseAngle.id.asc())
+            .with_for_update(of=WarehouseAngle.__table__)
+            .execution_options(populate_existing=True)
+        ).scalars().all()
+
+    if not ordered_box_ids:
+        return
+
+    db.execute(
+        select(WarehouseBox)
+        .where(WarehouseBox.box_id.in_(ordered_box_ids))
+        .order_by(WarehouseBox.box_id.asc())
+        .with_for_update(of=WarehouseBox.__table__)
+        .execution_options(populate_existing=True)
+    ).scalars().all()
+    db.execute(
+        select(WarehouseBoxItem)
+        .where(WarehouseBoxItem.box_id.in_(ordered_box_ids))
+        .order_by(
+            WarehouseBoxItem.box_id.asc(),
+            WarehouseBoxItem.item_id.asc(),
+            WarehouseBoxItem.id.asc(),
+        )
+        .with_for_update(of=WarehouseBoxItem.__table__)
+        .execution_options(populate_existing=True)
+    ).scalars().all()
+
+
 def deplete_boxes_by_order(db: Session, item_id, qty) -> None:
     """창고 출고(warehouse_qty 감소)에 맞춰 박스 수량을 R1 순서로 차감.
 
@@ -101,6 +191,12 @@ def deplete_boxes_by_order(db: Session, item_id, qty) -> None:
     need = int(qty)
     if need <= 0:
         return
+
+    lock_warehouse_map_rows(
+        db,
+        item_ids=[item_id],
+        include_boxes_for_item_ids=True,
+    )
 
     rows = (
         db.query(WarehouseBoxItem)

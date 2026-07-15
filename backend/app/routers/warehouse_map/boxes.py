@@ -93,6 +93,20 @@ def _validate_items(db: Session, items: List[WarehouseBoxItemPayload]) -> None:
             raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
 
+def _box_item_ids(db: Session, box_ids: list[object]) -> list[object]:
+    if not box_ids:
+        return []
+    return [
+        row[0]
+        for row in (
+            db.query(WarehouseBoxItem.item_id)
+            .filter(WarehouseBoxItem.box_id.in_(box_ids))
+            .order_by(WarehouseBoxItem.item_id.asc())
+            .all()
+        )
+    ]
+
+
 def _box_response(db: Session, box_id) -> WarehouseBoxResponse:
     payload = wm_service.build_map_payload(db)
     for b in payload["boxes"]:
@@ -109,6 +123,11 @@ def create_box(
 ):
     angle = _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
     _validate_items(db, payload.items)
+    wm_service.lock_warehouse_map_rows(
+        db,
+        item_ids=[item.item_id for item in payload.items],
+        angle_ids=[payload.angle_id],
+    )
 
     used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
     new_unit = SIZE_UNIT[payload.size]
@@ -155,6 +174,19 @@ def update_box(
     if not box:
         raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
 
+    existing_item_ids = _box_item_ids(db, [box.box_id])
+    new_item_ids = []
+    if payload.items is not None:
+        _validate_items(db, payload.items)
+        new_item_ids = [item.item_id for item in payload.items]
+    wm_service.lock_warehouse_map_rows(
+        db,
+        item_ids=[*existing_item_ids, *new_item_ids],
+        angle_ids=[box.angle_id],
+        box_ids=[box.box_id],
+    )
+    db.refresh(box)
+
     if payload.size is not None and payload.size != (box.size.value if hasattr(box.size, "value") else box.size):
         angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == box.angle_id).first()
         used = _jari_used_units(db, box.angle_id, box.row_no, box.layer_no, box.jari_index, exclude_box_id=box.box_id)
@@ -166,7 +198,6 @@ def update_box(
         box.size = BoxSizeEnum(payload.size)
 
     if payload.items is not None:
-        _validate_items(db, payload.items)
         db.query(WarehouseBoxItem).filter(WarehouseBoxItem.box_id == box.box_id).delete()
         for it in payload.items:
             db.add(WarehouseBoxItem(box_id=box.box_id, item_id=it.item_id, quantity=it.quantity))
@@ -190,6 +221,13 @@ def move_box(
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
     if not box:
         raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
+    wm_service.lock_warehouse_map_rows(
+        db,
+        item_ids=_box_item_ids(db, [box.box_id]),
+        angle_ids=[box.angle_id, payload.angle_id],
+        box_ids=[box.box_id],
+    )
+    db.refresh(box)
 
     same_jari = (box.angle_id, box.row_no, box.layer_no, box.jari_index) == (
         payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index
@@ -240,6 +278,14 @@ def restack_jari(
     boxes = db.query(WarehouseBox).filter(WarehouseBox.box_id.in_(box_ids)).all()
     if len(boxes) != len(set(box_ids)):
         raise http_error(404, ErrorCode.NOT_FOUND, "일부 박스를 찾을 수 없습니다.")
+    wm_service.lock_warehouse_map_rows(
+        db,
+        item_ids=_box_item_ids(db, box_ids),
+        angle_ids=[payload.angle_id, *(box.angle_id for box in boxes)],
+        box_ids=box_ids,
+    )
+    for box in boxes:
+        db.refresh(box)
 
     total = sum(SIZE_UNIT[b.size.value if hasattr(b.size, "value") else b.size] for b in boxes)
     if _is_plain_angle(target_angle) and total > JARI_CAPACITY:
@@ -271,5 +317,12 @@ def delete_box(
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
     if not box:
         raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
+    wm_service.lock_warehouse_map_rows(
+        db,
+        item_ids=_box_item_ids(db, [box.box_id]),
+        angle_ids=[box.angle_id],
+        box_ids=[box.box_id],
+    )
+    db.refresh(box)
     db.delete(box)
     db.commit()

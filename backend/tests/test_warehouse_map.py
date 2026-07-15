@@ -10,7 +10,14 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    WarehouseBox,
+    WarehouseBoxItem,
+)
+from app.services import warehouse_map as warehouse_map_service
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 D = Decimal
@@ -178,6 +185,148 @@ def test_delete_box(client, make_item):
                    items=[{"item_id": str(item.item_id), "quantity": 1}]).json()
     assert client.delete(f"{BASE}/boxes/{box['box_id']}", headers=MGR).status_code == 204
     assert len(client.get(f"{BASE}/map").json()["boxes"]) == 0
+
+
+def test_box_mutations_lock_affected_rows_before_writes(
+    client,
+    db_session,
+    make_item,
+    monkeypatch,
+):
+    angle = _make_angle(client)
+    target_angle = _make_angle(client, label="Lock target")
+    old_item = make_item(name="Lock old", warehouse_qty=D("2"))
+    new_item = make_item(name="Lock new", warehouse_qty=D("2"))
+    calls = []
+
+    def record_lock(
+        db,
+        *,
+        item_ids=(),
+        angle_ids=(),
+        box_ids=(),
+        include_boxes_for_item_ids=False,
+    ):
+        selected_box_ids = {str(value) for value in box_ids}
+        boxes = db.query(WarehouseBox).all()
+        contents = db.query(WarehouseBoxItem).all()
+        calls.append(
+            {
+                "item_ids": {str(value) for value in item_ids},
+                "angle_ids": set(angle_ids),
+                "box_ids": selected_box_ids,
+                "include_boxes_for_item_ids": include_boxes_for_item_ids,
+                "boxes": {
+                    str(box.box_id): (
+                        box.angle_id,
+                        box.row_no,
+                        box.layer_no,
+                        box.jari_index,
+                        box.stack_order,
+                    )
+                    for box in boxes
+                },
+                "contents": {
+                    str(content.box_id): str(content.item_id)
+                    for content in contents
+                },
+            }
+        )
+
+    monkeypatch.setattr(
+        warehouse_map_service,
+        "lock_warehouse_map_rows",
+        record_lock,
+        raising=False,
+    )
+
+    created = _put_box(
+        client,
+        angle["id"],
+        items=[{"item_id": str(old_item.item_id), "quantity": 1}],
+    )
+    assert created.status_code == 201, created.text
+    first_box = created.json()
+    assert calls[-1]["item_ids"] == {str(old_item.item_id)}
+    assert calls[-1]["angle_ids"] == {angle["id"]}
+    assert calls[-1]["box_ids"] == set()
+    assert calls[-1]["boxes"] == {}
+
+    calls.clear()
+    updated = client.put(
+        f"{BASE}/boxes/{first_box['box_id']}",
+        json={"items": [{"item_id": str(new_item.item_id), "quantity": 1}]},
+        headers=MGR,
+    )
+    assert updated.status_code == 200, updated.text
+    assert calls[0]["item_ids"] == {
+        str(old_item.item_id),
+        str(new_item.item_id),
+    }
+    assert calls[0]["box_ids"] == {first_box["box_id"]}
+    assert calls[0]["angle_ids"] == {angle["id"]}
+    assert calls[0]["contents"] == {first_box["box_id"]: str(old_item.item_id)}
+
+    second_box = _put_box(
+        client,
+        angle["id"],
+        jari=1,
+        items=[{"item_id": str(old_item.item_id), "quantity": 1}],
+    ).json()
+
+    calls.clear()
+    moved = client.patch(
+        f"{BASE}/boxes/{first_box['box_id']}/move",
+        json={
+            "angle_id": target_angle["id"],
+            "row_no": 2,
+            "layer_no": 1,
+            "jari_index": 2,
+        },
+        headers=MGR,
+    )
+    assert moved.status_code == 200, moved.text
+    assert calls[0]["item_ids"] == {str(new_item.item_id)}
+    assert calls[0]["angle_ids"] == {angle["id"], target_angle["id"]}
+    assert calls[0]["box_ids"] == {first_box["box_id"]}
+    assert calls[0]["boxes"][first_box["box_id"]][:4] == (angle["id"], 1, 1, 0)
+
+    calls.clear()
+    restacked = client.patch(
+        f"{BASE}/boxes/restack",
+        json={
+            "angle_id": target_angle["id"],
+            "row_no": 1,
+            "layer_no": 1,
+            "jari_index": 2,
+            "box_ids": [first_box["box_id"], second_box["box_id"]],
+        },
+        headers=MGR,
+    )
+    assert restacked.status_code == 200, restacked.text
+    assert calls[0]["item_ids"] == {
+        str(old_item.item_id),
+        str(new_item.item_id),
+    }
+    assert calls[0]["box_ids"] == {
+        first_box["box_id"],
+        second_box["box_id"],
+    }
+    assert calls[0]["angle_ids"] == {angle["id"], target_angle["id"]}
+    assert calls[0]["boxes"][first_box["box_id"]][:4] == (
+        target_angle["id"],
+        2,
+        1,
+        2,
+    )
+
+    calls.clear()
+    deleted = client.delete(f"{BASE}/boxes/{first_box['box_id']}", headers=MGR)
+    assert deleted.status_code == 204, deleted.text
+    assert calls[0]["item_ids"] == {str(new_item.item_id)}
+    assert calls[0]["angle_ids"] == {target_angle["id"]}
+    assert calls[0]["box_ids"] == {first_box["box_id"]}
+    assert first_box["box_id"] in calls[0]["boxes"]
 
 
 # ──────────────────────────── 지도/대조 ────────────────────────────
