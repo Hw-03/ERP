@@ -440,7 +440,7 @@ describe("history table helper rendering policies", () => {
   it("does not prefix system actors with human requester wording", () => {
     const presentation = {
       people: { requester: "권동환", approver: "" },
-      statusChips: [{ label: "자동 처리", tone: "info" }],
+      statusChips: [{ label: "메모", tone: "primary" }],
     } as HistoryRowPresentation;
 
     render(<PeopleStatusCell presentation={presentation} compact />);
@@ -448,29 +448,43 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("권동환")).toBeInTheDocument();
     expect(screen.queryByText("요청 권동환")).not.toBeInTheDocument();
     expect(screen.getByText("권동환")).toHaveAttribute("title", "요청 권동환");
-    expect(screen.getByText("자동 처리")).toBeInTheDocument();
-    expect(screen.getByText("자동 처리").parentElement).toHaveClass("flex-nowrap");
-    expect(screen.getByText("자동 처리").parentElement).toHaveClass("justify-center");
+    expect(screen.getByText("메모").parentElement).toHaveClass("flex-nowrap");
+    expect(screen.getByText("메모").parentElement).toHaveClass("justify-center");
   });
 
   it("centers default requester and status chips inside the status column", () => {
     const presentation = {
       people: { requester: "권동환", approver: "" },
-      statusChips: [{ label: "자동 처리", tone: "info" }],
+      statusChips: [{ label: "메모", tone: "primary" }],
     } as HistoryRowPresentation;
 
     render(<PeopleStatusCell presentation={presentation} />);
 
     expect(screen.getByText("요청 권동환").parentElement).toHaveClass("items-center");
-    expect(screen.getByText("자동 처리").parentElement).toHaveClass("justify-center");
+    expect(screen.getByText("메모").parentElement).toHaveClass("justify-center");
   });
 
-  it("lets a target title use two lines while keeping the main row slot fixed", () => {
+  it("keeps requester, approver, and memo visible without a fixed-height clip", () => {
+    const presentation = {
+      people: { requester: "김재헌", approver: "권동환" },
+      statusChips: [{ label: "메모", tone: "primary" }],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} />);
+
+    const cell = screen.getByText("요청 김재헌").parentElement!;
+    expect(cell).toHaveTextContent("승인 권동환");
+    expect(cell).toHaveTextContent("메모");
+    expect(cell).not.toHaveClass("h-11");
+    expect(cell).not.toHaveClass("overflow-hidden");
+  });
+
+  it("keeps ordinary long target titles on two lines", () => {
     const presentation = {
       target: {
         title: "발생부 고압B/D+튜브 최종 작업판 [COCOON] 매우 긴 품목명",
         code: "7-HF-0007",
-        meta: ["7종 처리", "긴 보조 설명"],
+        meta: ["긴 보조 설명"],
       },
     } as HistoryRowPresentation;
 
@@ -482,7 +496,40 @@ describe("history table helper rendering policies", () => {
     );
 
     expect(screen.getByText(presentation.target.title)).toHaveClass("line-clamp-2");
-    expect(screen.getByText("7종 처리")).toHaveClass("truncate");
+    expect(screen.getByText("긴 보조 설명")).toHaveClass("truncate");
+  });
+
+  it("places processing counts beside the target title", () => {
+    const presentation = {
+      target: {
+        title: "COCOON OP BD ASS'Y",
+        code: "7-AA-0047",
+        meta: ["4종 처리", "긴 보조 설명"],
+      },
+    } as HistoryRowPresentation;
+
+    render(<TargetSummaryBlock presentation={presentation} icon={<span aria-hidden />} />);
+
+    const processingCount = screen.getByText("4종 처리");
+    expect(processingCount.parentElement).toHaveTextContent(presentation.target.title);
+    expect(processingCount).toHaveClass("shrink-0");
+    expect(screen.getByText("긴 보조 설명").parentElement).not.toHaveTextContent("4종 처리");
+  });
+
+  it("strikes through cancelled target titles and quantity pills only", () => {
+    const presentation = {
+      target: { title: "취소된 품목", code: "CANCEL-001", meta: [] },
+    } as HistoryRowPresentation;
+
+    render(
+      <div>
+        <TargetSummaryBlock cancelled presentation={presentation} icon={<span aria-hidden />} />
+        <MovementSummaryCell cancelled summary={{ parts: [{ label: "-3 EA", tone: "danger" }] }} />
+      </div>,
+    );
+
+    expect(screen.getByText("취소된 품목")).toHaveClass("line-through");
+    expect(screen.getByText("-3 EA")).toHaveClass("line-through");
   });
 
   it("lets expanded reference child rows select their own log", () => {

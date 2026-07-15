@@ -412,12 +412,6 @@ function isItemConversionLog(log: TransactionLog): boolean {
   return Boolean(log.reference_no?.startsWith("ITEM-CONV-"));
 }
 
-function isAutomaticLog(log: TransactionLog, batch?: IoBatch | null): boolean {
-  if (batch?.requires_approval === false && !batch.approver_name) return true;
-  if (isItemConversionLog(log)) return true;
-  return Boolean(log.shipping_phase && isSystemActorName(log.produced_by));
-}
-
 function getRequesterPresentation(log: TransactionLog, batch?: IoBatch | null): string {
   const batchRequester = batch?.requester_name?.trim();
   if (batchRequester) return batchRequester;
@@ -425,7 +419,7 @@ function getRequesterPresentation(log: TransactionLog, batch?: IoBatch | null): 
   if (isItemConversionLog(log) && (actor === "-" || isSystemActorName(actor))) {
     return "요청자 미기록";
   }
-  if (isSystemActorName(actor)) return `시스템 처리 · ${actor}`;
+  if (isSystemActorName(actor)) return "시스템 처리";
   return actor || "-";
 }
 
@@ -551,8 +545,6 @@ function getStatusChips(
   if (memo) chips.push({ label: "메모", tone: "primary", title: memo });
   const defectReason = formatDefectReason(log);
   if (defectReason) chips.push({ label: "\uC0AC\uC720", tone: "warning", title: defectReason });
-
-  if (isAutomaticLog(log, batch)) chips.push({ label: "자동 처리", tone: "info" });
 
   if (stats && stats.shortageCount > 0) chips.push({ label: `부족 ${stats.shortageCount}`, tone: "danger" });
   if (stats && stats.excludedCount > 0) chips.push({ label: `제외 ${stats.excludedCount}`, tone: "muted" });

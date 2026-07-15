@@ -136,7 +136,7 @@ export function HistoryKeyPointSummary({
                       key={effect.key}
                       type="button"
                       onClick={() => onImpactClick(effect)}
-                      className={`${rowClass} hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
+                      className={`${rowClass} hover:brightness-125 focus-visible:brightness-125`}
                       style={{ borderColor: LEGACY_COLORS.border }}
                     >
                       {contents}

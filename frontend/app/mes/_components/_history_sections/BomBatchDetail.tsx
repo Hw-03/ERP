@@ -317,6 +317,7 @@ function BomLineRow({
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const dim = !line.included;
+  const cancelled = batch.status === "cancelled";
   const signed = getHistoryLineSignedQuantity(line, batch, bundle);
   const qtyColor = SIGN_TONE_HEX[signed.tone];
   const highlighted = highlightItemId === line.item_id;
@@ -332,7 +333,7 @@ function BomLineRow({
             ? "color-mix(in srgb, var(--c-blue) 3%, transparent)"
             : "color-mix(in srgb, var(--c-red) 5%, transparent)",
         boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
-        opacity: dim ? 0.58 : 1,
+        opacity: dim || cancelled ? 0.58 : 1,
       }}
     >
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
@@ -345,7 +346,7 @@ function BomLineRow({
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={line.item_name}
-            className="truncate text-xs font-semibold leading-snug"
+            className={`truncate text-xs font-semibold leading-snug${cancelled ? " line-through" : ""}`}
             style={{ color: LEGACY_COLORS.text }}
           >
             {line.item_name}
@@ -361,6 +362,7 @@ function BomLineRow({
         <MovementSummaryCell
           summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
           compact={compact}
+          cancelled={cancelled}
         />
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>

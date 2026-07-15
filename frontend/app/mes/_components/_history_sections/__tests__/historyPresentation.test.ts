@@ -236,7 +236,7 @@ describe("historyPresentation", () => {
     expect(row.people).toEqual({ requester: "김현우", approver: "" });
   });
 
-  it("labels system-generated actors separately from human requesters", () => {
+  it("normalizes system-generated actors without exposing automatic-processing wording", () => {
     const row = getHistoryRowPresentation(makeLog({
       requester_name: null,
       approver_name: null,
@@ -244,11 +244,11 @@ describe("historyPresentation", () => {
       shipping_phase: "COMPONENT_CHANGE",
     }));
 
-    expect(row.people).toEqual({ requester: "시스템 처리 · 구성품 변경", approver: "" });
-    expect(row.statusChips.map((chip) => chip.label)).toContain("자동 처리");
+    expect(row.people).toEqual({ requester: "시스템 처리", approver: "" });
+    expect(row.statusChips.map((chip) => chip.label)).not.toContain("자동 처리");
   });
 
-  it("shows the item-conversion requester separately from automatic processing", () => {
+  it("keeps the item-conversion requester without an automatic-processing chip", () => {
     const row = getHistoryRowPresentation(makeLog({
       requester_name: null,
       approver_name: null,
@@ -258,7 +258,7 @@ describe("historyPresentation", () => {
     }));
 
     expect(row.people).toEqual({ requester: "김전환", approver: "" });
-    expect(row.statusChips.map((chip) => chip.label)).toContain("자동 처리");
+    expect(row.statusChips.map((chip) => chip.label)).not.toContain("자동 처리");
   });
 
   it("labels legacy item conversions without requester evidence as unrecorded", () => {
@@ -271,7 +271,7 @@ describe("historyPresentation", () => {
     }));
 
     expect(row.people).toEqual({ requester: "요청자 미기록", approver: "" });
-    expect(row.statusChips.map((chip) => chip.label)).toContain("자동 처리");
+    expect(row.statusChips.map((chip) => chip.label)).not.toContain("자동 처리");
   });
 
   it("keeps single-log stock, actor, and cancel signals visible without reference chips", () => {

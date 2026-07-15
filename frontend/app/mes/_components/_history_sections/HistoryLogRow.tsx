@@ -97,6 +97,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+          cancelled={log.cancelled}
         />
       </td>
       <ItemCodeCell code={presentation.target.code} />
@@ -105,7 +106,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} />
+        <QuantityStockCell presentation={presentation} cancelled={log.cancelled} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />

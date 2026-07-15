@@ -41,6 +41,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
   const statusPadX = compact ? "px-2" : "px-4";
   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
   const childCount = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE").length;
+  const cancelled = group.logs.some((log) => log.cancelled);
   const qty = Math.abs(parentLog.quantity_change);
   const unit = parentLog.item_unit?.trim();
   const basePresentation = getHistoryRowPresentation(parentLog);
@@ -85,7 +86,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.red}` : "none",
@@ -111,6 +112,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
+          cancelled={cancelled}
         />
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
@@ -119,7 +121,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} />
+        <QuantityStockCell presentation={presentation} cancelled={cancelled} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />

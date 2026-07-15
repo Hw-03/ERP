@@ -121,9 +121,11 @@ function getPillDisplayLabel(label: string): { label: string; title?: string } {
 export function MovementSummaryCell({
   summary,
   compact = false,
+  cancelled = false,
 }: {
   summary: MovementSummary;
   compact?: boolean;
+  cancelled?: boolean;
 }) {
   // 변화량 pill 은 단건/묶음/경고 모두 같은 높이로 고정한다.
   // 단일 pill 폭은 2개 pill(5rem + gap-1 + 5rem)과 맞춰 열의 리듬을 통일한다.
@@ -141,7 +143,7 @@ export function MovementSummaryCell({
         return (
           <span
             key={i}
-            className={pillClass}
+            className={`${pillClass}${cancelled ? " line-through" : ""}`}
             title={display.title}
             style={{
               // WCAG AA: 연한 틴트 위 brand 컬러 텍스트는 4.5:1 미달 →
@@ -209,13 +211,18 @@ export function TargetSummaryBlock({
   icon,
   titleOverride,
   metaOverride,
+  cancelled = false,
 }: {
   presentation: HistoryRowPresentation;
   icon: React.ReactNode;
   titleOverride?: string;
   metaOverride?: string[];
+  cancelled?: boolean;
 }) {
   const meta = metaOverride ?? presentation.target.meta;
+  const processingMetaIndex = meta.findIndex((part) => /^\d+종 처리$/.test(part));
+  const processingMeta = processingMetaIndex >= 0 ? meta[processingMetaIndex] : null;
+  const remainingMeta = processingMetaIndex >= 0 ? meta.filter((_, index) => index !== processingMetaIndex) : meta;
   const title = titleOverride ?? presentation.target.title;
   const displayTitle = presentation.target.sourceTitle
     ? `${presentation.target.sourceTitle} → ${title}`
@@ -224,17 +231,20 @@ export function TargetSummaryBlock({
     <div className="max-h-12 min-w-0 overflow-hidden">
       <div className="flex min-w-0 items-center gap-1.5">
         {icon}
-        <TruncatedText
-          accessibilityLabel={displayTitle}
-          className="min-w-0 line-clamp-2 text-sm font-bold leading-snug"
-          style={{ color: LEGACY_COLORS.text }}
-        >
-          {displayTitle}
-        </TruncatedText>
+        <div className="flex min-w-0 items-center gap-2">
+          <TruncatedText
+            accessibilityLabel={displayTitle}
+            className={`min-w-0 ${processingMeta ? "truncate" : "line-clamp-2"} text-sm font-bold leading-snug${cancelled ? " line-through" : ""}`}
+            style={{ color: LEGACY_COLORS.text }}
+          >
+            {displayTitle}
+          </TruncatedText>
+          {processingMeta && <span className="shrink-0 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{processingMeta}</span>}
+        </div>
       </div>
-      {meta.length > 0 && (
+      {remainingMeta.length > 0 && (
         <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {meta.map((part) => (
+          {remainingMeta.map((part) => (
             <span key={part} className="min-w-0 shrink truncate font-semibold">
               {part}
             </span>
@@ -307,14 +317,16 @@ export function QuantityStockCell({
   presentation,
   summary,
   dense = false,
+  cancelled = false,
 }: {
   presentation: HistoryRowPresentation;
   summary?: MovementSummary;
   dense?: boolean;
+  cancelled?: boolean;
 }) {
   return (
     <div className={`flex items-center justify-center overflow-hidden ${dense ? "h-10" : "h-11"}`}>
-      <MovementSummaryCell summary={summary ?? presentation.movement} />
+      <MovementSummaryCell summary={summary ?? presentation.movement} cancelled={cancelled} />
     </div>
   );
 }
@@ -334,7 +346,7 @@ export function PeopleStatusCell({
   const requesterLabel = systemRequester || compact ? requester : `요청 ${requester}`;
   const requesterTitle = systemRequester ? requester : `요청 ${requester}`;
   return (
-    <div className={`flex min-w-0 flex-col items-center justify-center overflow-hidden text-center leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
+    <div className={`flex min-w-0 flex-col items-center justify-center py-1 text-center leading-tight ${dense ? "gap-0.5" : "gap-1"}`}>
       <div title={requesterTitle} className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
         {requesterLabel}
       </div>
@@ -687,6 +699,7 @@ export function BatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+            cancelled={cancelled}
           />
         </div>
       </td>
@@ -696,7 +709,7 @@ export function BatchHeader({
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} />
+        <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
@@ -929,7 +942,7 @@ function ReferenceBatchLineRow({
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={log.item_name}
-            className="truncate text-xs font-semibold"
+            className={`truncate text-xs font-semibold${log.cancelled ? " line-through" : ""}`}
             style={{ color: LEGACY_COLORS.text }}
           >
             {log.item_name}
@@ -943,7 +956,7 @@ function ReferenceBatchLineRow({
       </td>
       <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex h-10 items-center justify-center overflow-hidden">
-          <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} />
+          <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} cancelled={log.cancelled} />
         </div>
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }} />
@@ -1086,6 +1099,7 @@ export function OpBatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+            cancelled={cancelled}
           />
         </div>
       </td>
@@ -1095,7 +1109,7 @@ export function OpBatchHeader({
         <FlowSummaryCell presentation={presentation} />
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} />
+        <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} compact={compact} />

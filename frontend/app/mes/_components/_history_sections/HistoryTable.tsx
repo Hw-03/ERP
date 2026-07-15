@@ -378,6 +378,7 @@ export function HistoryTable({
                           parentItemId={parentLog.item_id}
                           colSpan={COLUMNS.length}
                           controlsId={controlsId}
+                          cancelled={group.logs.some((log) => log.cancelled)}
                         />
                       )}
                     </Fragment>

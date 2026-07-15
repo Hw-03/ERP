@@ -14,9 +14,10 @@ type Props = {
   colSpan: number;
   compact?: boolean;
   controlsId?: string;
+  cancelled?: boolean;
 };
 
-export function ReworkBatchDetail({ logs, colSpan, compact, controlsId }: Props) {
+export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelled = false }: Props) {
   const summaries = buildReworkItemSummaries(logs);
 
   if (summaries.length === 0) {
@@ -37,18 +38,19 @@ export function ReworkBatchDetail({ logs, colSpan, compact, controlsId }: Props)
           summary={summary}
           compact={compact}
           rowId={index === 0 ? controlsId : undefined}
+          cancelled={cancelled}
         />
       ))}
     </>
   );
 }
 
-function ReworkSummaryRow({ summary, compact, rowId }: { summary: ReworkItemSummary; compact?: boolean; rowId?: string }) {
+function ReworkSummaryRow({ summary, compact, rowId, cancelled }: { summary: ReworkItemSummary; compact?: boolean; rowId?: string; cancelled: boolean }) {
   const padX = compact ? "px-2" : "px-4";
   const resultTone = summary.excluded ? LEGACY_COLORS.muted2 : summary.scrapQty > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green;
 
   return (
-    <tr id={rowId} style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}>
+    <tr id={rowId} className={cancelled ? "opacity-60" : undefined} style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}>
       <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
       <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <span
@@ -73,7 +75,7 @@ function ReworkSummaryRow({ summary, compact, rowId }: { summary: ReworkItemSumm
         <div className="min-w-0 pl-5">
           <TruncatedText
             accessibilityLabel={summary.itemName}
-            className="truncate text-xs font-semibold"
+            className={`truncate text-xs font-semibold${cancelled ? " line-through" : ""}`}
             style={{ color: LEGACY_COLORS.text }}
           >
             {summary.itemName}
@@ -85,7 +87,7 @@ function ReworkSummaryRow({ summary, compact, rowId }: { summary: ReworkItemSumm
       <td className="whitespace-nowrap border-b px-5 py-2 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         재작업
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: resultTone }}>
+      <td className={`whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold${cancelled ? " line-through" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: resultTone }}>
         {summary.resultLabel}
       </td>
       <td className="border-b px-4 py-2 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>

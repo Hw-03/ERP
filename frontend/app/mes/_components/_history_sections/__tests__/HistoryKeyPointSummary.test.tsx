@@ -179,7 +179,11 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /완제품 A.*-2 EA/ }));
+    const impactButton = screen.getByRole("button", { name: /완제품 A.*-2 EA/ });
+    expect(impactButton).not.toHaveClass("focus-visible:outline");
+    expect(impactButton).toHaveClass("focus-visible:brightness-125");
+
+    fireEvent.click(impactButton);
     expect(onImpactClick).toHaveBeenCalledWith(expect.objectContaining({ itemId: "item-finished" }));
   });
 });
