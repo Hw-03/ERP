@@ -7,10 +7,12 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: sqlite:////app/mes.db
+      MES_RUNTIME_ROOT: /runtime
     ports:
       - "8010:8010"
     volumes:
       - ../backend/mes.db:/app/mes.db
+      - ../_attic/runtime:/runtime
     # backend.command 제거 — backend/Dockerfile CMD 와 동일 (8010, no --reload).
 
   frontend:

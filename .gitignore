@@ -21,7 +21,7 @@ frontend/.vitest/
 *.db-wal
 *.db.backup-*
 
-# Backend runtime logs (Phase 4)
+# Legacy runtime paths (existing local files stay ignored)
 backend/logs/
 frontend/logs/
 
@@ -101,6 +101,7 @@ data/이미지 추출을 위한 원본/
 *.bak-*
 *.db.bak*
 backend/_backup/
+_attic/runtime/
 
 # Heavy source/extracted materials isolated out of the runtime tree.
 _attic/data/이미지 추출을 위한 원본/
@@ -110,8 +111,7 @@ _attic/data/2607 생산부 재고/
 _attic/backend-scripts/annotate_2607_matching.py
 # 모바일/MCP 화면 캡처 스크린샷 (앱 재실행으로 재생성 가능한 로컬 산출물)
 _attic/screenshots/
-# _attic/ 은 의도적으로 추적·커밋한다(정리 후 나중에 일괄 삭제 예정).
-# DB 백업만 위 규칙으로 자동 제외되고 나머지(스크립트·문서·데이터·카탈로그)는 커밋됨.
+# _attic/ 은 의도적으로 추적·커밋하되, 로컬 운영 산출물인 _attic/runtime/ 은 제외한다.
 
 # /understand 지식 그래프 산출물 (코드에서 재생성 가능한 로컬 파생물·머신 전용 경로 포함)
 .understand-anything/

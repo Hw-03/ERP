@@ -37,6 +37,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://mes_user:mes_pass@postgres:5432/mes_db
+      MES_RUNTIME_ROOT: /runtime
       # WS2 가드: 운영 표식. SQLite/DATABASE_URL 미설정 시 backend 기동 거부(fail-fast).
       APP_ENV: production
     ports:
@@ -53,8 +54,8 @@ services:
       retries: 3
       start_period: 20s
     volumes:
-      # 로그 영속화 — 재시작 시 backend/logs/mes.log 유지(컨테이너 ephemeral 방지).
-      - ../backend/logs:/app/logs
+      # 백업·로그·보고서 영속화 — 호스트의 표준 런타임 루트와 일치.
+      - ../_attic/runtime:/runtime
     logging:
       driver: json-file
       options:

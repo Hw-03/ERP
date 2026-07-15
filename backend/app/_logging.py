@@ -2,11 +2,11 @@
 
 운영 표준:
 - 콘솔 로그: 기존대로 (uvicorn access + 우리 INFO)
-- 파일 로그: backend/logs/mes.log (RotatingFileHandler, 5MB x 5 backup)
+- 파일 로그: _attic/runtime/logs/backend/mes.log (RotatingFileHandler, 5MB x 5 backup)
 
 환경변수:
 - LOG_LEVEL (기본 INFO)
-- LOG_DIR   (기본 backend/logs — 즉, 이 파일 기준 ../../logs)
+- MES_RUNTIME_ROOT (기본 프로젝트/_attic/runtime)
 
 main.py 가 startup 시 setup_logging() 한 번만 호출.
 """
@@ -19,12 +19,28 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # .../backend
+_PROJECT_ROOT = _BACKEND_DIR.parent
+
+
+def get_backend_log_dir() -> Path:
+    """Return the fixed backend log directory under MES_RUNTIME_ROOT."""
+    configured = os.environ.get("MES_RUNTIME_ROOT")
+    runtime_root = Path(configured).expanduser() if configured else _PROJECT_ROOT / "_attic" / "runtime"
+    if not runtime_root.is_absolute():
+        runtime_root = _PROJECT_ROOT / runtime_root
+    runtime_root = runtime_root.resolve()
+    log_dir = (runtime_root / "logs" / "backend").resolve()
+    try:
+        log_dir.relative_to(runtime_root)
+    except ValueError as exc:
+        raise RuntimeError(f"runtime path is outside MES_RUNTIME_ROOT: {log_dir}") from exc
+    return log_dir
 
 
 def setup_logging() -> logging.Logger:
     level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
-    log_dir = Path(os.environ.get("LOG_DIR") or (_BACKEND_DIR / "logs"))
+    log_dir = get_backend_log_dir()
     log_dir.mkdir(parents=True, exist_ok=True)
 
     try:

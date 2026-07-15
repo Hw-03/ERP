@@ -120,28 +120,108 @@ function buildExitDump({
   };
 }
 
+function resolvedRuntimeRoot(rootDir) {
+  const repoRoot = path.resolve(rootDir, "..");
+  const configuredRoot = process.env.MES_RUNTIME_ROOT;
+  return path.resolve(
+    configuredRoot
+      ? path.isAbsolute(configuredRoot)
+        ? configuredRoot
+        : path.join(repoRoot, configuredRoot)
+      : path.join(repoRoot, "_attic", "runtime"),
+  );
+}
+
+function physicalPath(candidate) {
+  const missingParts = [];
+  let existing = path.resolve(candidate);
+  while (!fs.existsSync(existing)) {
+    const parent = path.dirname(existing);
+    if (parent === existing) break;
+    missingParts.unshift(path.basename(existing));
+    existing = parent;
+  }
+  const realExisting = fs.realpathSync.native(existing);
+  return path.resolve(realExisting, ...missingParts);
+}
+
+function assertRuntimePath(runtimeRoot, candidate) {
+  const physicalRoot = physicalPath(runtimeRoot);
+  const physicalCandidate = physicalPath(candidate);
+  const relative = path.relative(physicalRoot, physicalCandidate);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`runtime path is outside MES_RUNTIME_ROOT: ${candidate}`);
+  }
+}
+
+function runtimePath(rootDir, ...parts) {
+  const runtimeRoot = resolvedRuntimeRoot(rootDir);
+  const candidate = path.resolve(runtimeRoot, ...parts);
+  const relative = path.relative(runtimeRoot, candidate);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`runtime path is outside MES_RUNTIME_ROOT: ${candidate}`);
+  }
+  assertRuntimePath(runtimeRoot, candidate);
+  return candidate;
+}
+
+function writeRuntimeFile(runtimeRoot, candidate, content, { append = false } = {}) {
+  assertRuntimePath(runtimeRoot, candidate);
+  const physicalCandidate = physicalPath(candidate);
+  assertRuntimePath(runtimeRoot, physicalCandidate);
+
+  let fd;
+  try {
+    fd = fs.openSync(physicalCandidate, append ? "a" : "wx");
+    const openedFile = fs.fstatSync(fd, { bigint: true });
+    assertRuntimePath(runtimeRoot, candidate);
+    const currentFile = fs.statSync(physicalCandidate, { bigint: true });
+    if (openedFile.dev !== currentFile.dev || openedFile.ino !== currentFile.ino) {
+      throw new Error(`runtime path changed while opening file: ${candidate}`);
+    }
+    if (append) {
+      fs.appendFileSync(fd, content, "utf8");
+    } else {
+      fs.writeFileSync(fd, content, "utf8");
+    }
+    assertRuntimePath(runtimeRoot, candidate);
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 function createDiagnostics(rootDir) {
-  const logsDir = path.join(rootDir, "logs");
+  const runtimeRoot = resolvedRuntimeRoot(rootDir);
+  const logsDir = runtimePath(rootDir, "logs", "frontend");
   const dumpsDir = path.join(logsDir, "dumps");
   const logPath = path.join(logsDir, "dev-server.log");
 
   function ensureDirs() {
+    assertRuntimePath(runtimeRoot, dumpsDir);
     fs.mkdirSync(dumpsDir, { recursive: true });
+    assertRuntimePath(runtimeRoot, dumpsDir);
+    assertRuntimePath(runtimeRoot, logPath);
   }
 
   function log(message, details = null, date = new Date()) {
     ensureDirs();
     const suffix = details ? ` ${JSON.stringify(details)}` : "";
-    fs.appendFileSync(logPath, `[${date.toISOString()}] ${message}${suffix}\n`, "utf8");
+    writeRuntimeFile(
+      runtimeRoot,
+      logPath,
+      `[${date.toISOString()}] ${message}${suffix}\n`,
+      { append: true },
+    );
   }
 
   function logFrontendCompileError(summary, date = new Date()) {
     if (!summary) return;
     ensureDirs();
-    fs.appendFileSync(
+    writeRuntimeFile(
+      runtimeRoot,
       logPath,
       `[${date.toISOString()}] FRONTEND_COMPILE_ERROR file=${quoteLogValue(summary.file)} message="${quoteLogValue(summary.message)}"\n`,
-      "utf8",
+      { append: true },
     );
   }
 
@@ -149,7 +229,7 @@ function createDiagnostics(rootDir) {
     ensureDirs();
     const dump = buildExitDump({ ...input, endTime: input.endTime || date });
     const dumpPath = path.join(dumpsDir, `dev-exit-${timestampForFile(date)}-${process.pid}.json`);
-    fs.writeFileSync(dumpPath, `${JSON.stringify(dump, null, 2)}\n`, "utf8");
+    writeRuntimeFile(runtimeRoot, dumpPath, `${JSON.stringify(dump, null, 2)}\n`);
     log("exit dump written", { path: dumpPath, reason: dump.reason }, date);
     return dumpPath;
   }

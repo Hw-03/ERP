@@ -9,9 +9,10 @@ param(
 $ErrorActionPreference = "Continue"
 
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+. (Join-Path $PSScriptRoot "runtime-paths.ps1")
 $RepoRoot = $Profile.RepoRoot
-$BackendLogDir = Join-Path $RepoRoot "backend\logs"
-$FrontendLogDir = Join-Path $RepoRoot "frontend\logs"
+$BackendLogDir = Get-MesRuntimePath -RepoRoot $RepoRoot -RelativePath "logs\backend"
+$FrontendLogDir = Get-MesRuntimePath -RepoRoot $RepoRoot -RelativePath "logs\frontend"
 $BackendOut = Join-Path $BackendLogDir "backend-dev.out.log"
 $BackendErr = Join-Path $BackendLogDir "backend-dev.err.log"
 $FrontendOut = Join-Path $FrontendLogDir "frontend-dev.out.log"

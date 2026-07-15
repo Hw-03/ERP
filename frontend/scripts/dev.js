@@ -1,7 +1,7 @@
 // Custom dev server wrapper for Next.js
 // - Prints a tidy banner with the real LAN IP
 // - Suppresses Next's default banner lines
-// - Records exit dumps under frontend/logs when the dev server stops
+// - Records exit dumps under _attic/runtime/logs/frontend when the dev server stops
 
 const { execFileSync, spawn } = require("child_process");
 const os = require("os");

@@ -3,9 +3,10 @@
 $ErrorActionPreference = "Stop"
 
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+. (Join-Path $PSScriptRoot "runtime-paths.ps1")
 . (Join-Path $PSScriptRoot "runtime-control.ps1")
 
-$LogDir = Join-Path $Profile.RepoRoot "backend\logs"
+$LogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\backend" -CreateDirectory
 $StatePath = Join-Path $LogDir "backend-runtime.json"
 $EventPath = Join-Path $LogDir "backend-runtime-events.jsonl"
 $ControlPath = Join-Path $LogDir "backend-runtime-control.json"

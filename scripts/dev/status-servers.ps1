@@ -3,7 +3,10 @@
 $ErrorActionPreference = "Continue"
 
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+. (Join-Path $PSScriptRoot "runtime-paths.ps1")
 . (Join-Path $PSScriptRoot "runtime-control.ps1")
+$BackendLogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\backend"
+$FrontendLogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\frontend"
 
 function Test-HttpReady {
     param([string] $Url)
@@ -117,13 +120,13 @@ Write-Host ""
 Show-ServiceStatus `
     -Service "backend" `
     -Port $Profile.BackendPort `
-    -StatePath (Join-Path $Profile.RepoRoot "backend\logs\backend-runtime.json") `
-    -EventPath (Join-Path $Profile.RepoRoot "backend\logs\backend-runtime-events.jsonl") `
+    -StatePath (Join-Path $BackendLogDir "backend-runtime.json") `
+    -EventPath (Join-Path $BackendLogDir "backend-runtime-events.jsonl") `
     -HealthUrl "http://127.0.0.1:$($Profile.BackendPort)/health/live"
 
 Show-ServiceStatus `
     -Service "frontend" `
     -Port $Profile.FrontendPort `
-    -StatePath (Join-Path $Profile.RepoRoot "frontend\logs\frontend-runtime.json") `
-    -EventPath (Join-Path $Profile.RepoRoot "frontend\logs\frontend-runtime-events.jsonl") `
+    -StatePath (Join-Path $FrontendLogDir "frontend-runtime.json") `
+    -EventPath (Join-Path $FrontendLogDir "frontend-runtime-events.jsonl") `
     -HealthUrl "http://127.0.0.1:$($Profile.FrontendPort)/mes"

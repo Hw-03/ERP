@@ -5,10 +5,12 @@ param([switch] $NoReload)
 $ErrorActionPreference = "Stop"
 
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+. (Join-Path $PSScriptRoot "runtime-paths.ps1")
 . (Join-Path $PSScriptRoot "runtime-control.ps1")
 
 $BackendDir = Join-Path $Profile.RepoRoot "backend"
-$LogDir = Join-Path $BackendDir "logs"
+$RuntimeRoot = Get-MesRuntimeRoot -RepoRoot $Profile.RepoRoot
+$LogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\backend" -CreateDirectory
 $StatePath = Join-Path $LogDir "backend-runtime.json"
 $EventPath = Join-Path $LogDir "backend-runtime-events.jsonl"
 $ControlPath = Join-Path $LogDir "backend-runtime-control.json"
@@ -37,7 +39,8 @@ $launch = Start-ServiceSupervisor `
     -ControlPath $ControlPath `
     -StdoutLog $StdoutLog `
     -StderrLog $StderrLog `
-    -ChildCommand $childCommand
+    -ChildCommand $childCommand `
+    -Environment @{ MES_RUNTIME_ROOT = $RuntimeRoot }
 
 $healthUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"
 $ok = $false

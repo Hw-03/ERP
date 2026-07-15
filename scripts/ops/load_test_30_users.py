@@ -12,7 +12,7 @@
     - --confirm 없이는 실행되지 않습니다.
 
 결과:
-    outputs/load_test/YYYYMMDD_HHMMSS_report.json 에 저장됩니다.
+    _attic/runtime/reports/load-test/YYYYMMDD_HHMMSS_report.json 에 저장됩니다.
 """
 
 import argparse
@@ -27,6 +27,12 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.runtime_paths import runtime_path  # noqa: E402
 
 try:
     import httpx
@@ -584,8 +590,7 @@ async def main():
     report = await run_load_test(args.url, args.users, args.rounds, emp_id, item_id)
 
     # 결과 저장
-    output_dir = Path(__file__).resolve().parents[2] / "outputs" / "load_test"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = runtime_path("reports", "load-test", create=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = output_dir / f"{ts}_report.json"
     with open(output_path, "w", encoding="utf-8") as f:

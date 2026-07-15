@@ -3,10 +3,12 @@
 $ErrorActionPreference = "Stop"
 
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
+. (Join-Path $PSScriptRoot "runtime-paths.ps1")
 . (Join-Path $PSScriptRoot "runtime-control.ps1")
 
 $FrontendDir = Join-Path $Profile.RepoRoot "frontend"
-$LogDir = Join-Path $FrontendDir "logs"
+$RuntimeRoot = Get-MesRuntimeRoot -RepoRoot $Profile.RepoRoot
+$LogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\frontend" -CreateDirectory
 $StatePath = Join-Path $LogDir "frontend-runtime.json"
 $EventPath = Join-Path $LogDir "frontend-runtime-events.jsonl"
 $ControlPath = Join-Path $LogDir "frontend-runtime-control.json"
@@ -30,6 +32,7 @@ $launch = Start-ServiceSupervisor `
     -StderrLog $StderrLog `
     -ChildCommand @("node", "scripts/dev.js") `
     -Environment @{
+        MES_RUNTIME_ROOT = $RuntimeRoot
         PORT = [string] $Profile.FrontendPort
         BACKEND_INTERNAL_URL = $Profile.BackendInternalUrl
     }
