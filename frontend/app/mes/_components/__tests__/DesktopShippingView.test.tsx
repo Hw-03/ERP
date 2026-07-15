@@ -1138,6 +1138,100 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
   });
 
+  it("shows the new PA inside the final shipment BOM when both new item names are entered", async () => {
+    vi.mocked(api.matchShippingBom).mockResolvedValue({
+      matched_pa_item_id: null,
+      matched_pf_item_id: null,
+      matched_pa_item_name: null,
+      matched_pf_item_name: null,
+      requires_pa_name: true,
+      requires_pf_name: true,
+    });
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-2");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-3");
+
+    fireEvent.change(await screen.findByTestId("shipping-new-pa-name"), { target: { value: "새 PA" } });
+    fireEvent.change(screen.getByTestId("shipping-new-pf-name"), { target: { value: "새 PF" } });
+
+    expect(screen.queryByTestId("shipping-new-pf-pa-link-notice")).not.toBeInTheDocument();
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-4");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-5");
+
+    const newPa = screen.getByTestId("shipping-final-new-pa-link");
+    expect(screen.getByTestId("shipping-final-requirements-list")).toContainElement(newPa);
+    expect(newPa).toHaveTextContent("새 PA");
+    expect(newPa).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
+  });
+
+  it("hides the new PF-to-PA relationship when either item is reused", async () => {
+    vi.mocked(api.matchShippingBom).mockResolvedValue({
+      matched_pa_item_id: "pa-1",
+      matched_pf_item_id: null,
+      matched_pa_item_name: "Standard PA",
+      matched_pf_item_name: null,
+      requires_pa_name: false,
+      requires_pf_name: true,
+    });
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-2");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-3");
+
+    expect(screen.queryByTestId("shipping-new-pf-pa-link-notice")).not.toBeInTheDocument();
+  });
+
+  it("returns a preparing request to the three-column request list after saving", async () => {
+    vi.mocked(api.matchShippingBom).mockResolvedValue({
+      matched_pa_item_id: "pa-1",
+      matched_pf_item_id: "pf-1",
+      matched_pa_item_name: "Standard PA",
+      matched_pf_item_name: "Standard PF",
+      requires_pa_name: false,
+      requires_pf_name: false,
+    });
+    vi.mocked(api.updateShippingRequest).mockResolvedValue(request());
+    const onStatusChange = vi.fn();
+    const { container } = render(<DesktopShippingView onStatusChange={onStatusChange} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openRequestById(container, "req-1");
+    fireEvent.click(await screen.findByTestId("shipping-edit-request"));
+    await screen.findByTestId("shipping-wizard-step-2");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-3");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-4");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-5");
+    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+
+    await waitFor(() => {
+      expect(api.updateShippingRequest).toHaveBeenCalledWith("req-1", expect.any(Object));
+      expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveTextContent("Standard PF");
+    expect(onStatusChange).toHaveBeenCalledWith("출하 요청을 수정했습니다.");
+  });
+
   it("removes repeated headers from wizard steps two through five", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 

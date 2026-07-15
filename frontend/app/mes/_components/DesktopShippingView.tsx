@@ -577,6 +577,9 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       upsertRequest(saved);
       setEditingId(saved.request_id);
       onStatusChange(editingId ? "출하 요청을 수정했습니다." : "출하 요청을 생성했습니다.");
+      if (saved.status === "PREPARING") {
+        navigateView("requestList");
+      }
       return saved;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "출하 요청 저장에 실패했습니다.";
@@ -1331,6 +1334,7 @@ function RequestSection(props: {
   const basePfName = basePfItem?.item_name.trim() ?? "";
   const paNameNeedsChange = requiresPaName && (!props.customPaName.trim() || props.customPaName.trim() === basePaName);
   const pfNameNeedsChange = requiresPfName && (!props.customPfName.trim() || props.customPfName.trim() === basePfName);
+  const showsNewPfPaLink = requiresPaName && requiresPfName;
   const missingNewBomNames = Boolean(props.matchResult && (paNameNeedsChange || pfNameNeedsChange));
   const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
   const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
@@ -1582,6 +1586,7 @@ function RequestSection(props: {
                   paLines={grouped.PA.filter((line) => line.included)}
                   pfLines={grouped.PF.filter((line) => line.included)}
                   companionLines={props.companionDraft}
+                  newPaName={showsNewPfPaLink ? finalPaSummary.name : null}
                   itemById={props.itemById}
                   requestQuantity={requestQty}
                   hasBomChanges={hasBomChanges}
@@ -2551,6 +2556,7 @@ function FinalRequirementReview({
   paLines,
   pfLines,
   companionLines,
+  newPaName,
   itemById,
   requestQuantity,
   hasBomChanges,
@@ -2558,11 +2564,13 @@ function FinalRequirementReview({
   paLines: DraftLine[];
   pfLines: DraftLine[];
   companionLines: CompanionDraftLine[];
+  newPaName: string | null;
   itemById: Map<string, Item>;
   requestQuantity: number;
   hasBomChanges: boolean;
 }) {
-  const rows = [
+  const rows: { id: string; testId: string; label: string; tone: string; itemId?: string; itemName?: string; code?: string; quantity: number; unit: string }[] = [
+    ...(newPaName ? [{ id: "new-pa", testId: "shipping-final-new-pa-link", label: "신규 PA", tone: LEGACY_COLORS.blue, itemName: newPaName, code: "품목코드는 저장/준비 완료 시 자동 생성 예정", quantity: requestQuantity, unit: "EA" }] : []),
     ...paLines.map((line) => ({ id: `pa-${line.child_item_id}`, testId: `shipping-final-line-pa-${line.child_item_id}`, label: "PA", tone: LEGACY_COLORS.green, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
     ...pfLines.map((line) => ({ id: `pf-${line.child_item_id}`, testId: `shipping-final-line-pf-${line.child_item_id}`, label: "PF", tone: LEGACY_COLORS.blue, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
     ...companionLines.map((line) => ({ id: `companion-${line.item_id}`, testId: `shipping-final-line-companion-${line.item_id}`, label: "동반", tone: LEGACY_COLORS.purple, itemId: line.item_id, quantity: line.quantity, unit: line.unit || "EA" })),
@@ -2574,16 +2582,18 @@ function FinalRequirementReview({
         {rows.length === 0 ? (
           <div className={SHIPPING_EMPTY_BOX_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>표시할 품목 없음</div>
         ) : rows.map((row) => {
-          const item = itemById.get(row.itemId);
+          const item = row.itemId ? itemById.get(row.itemId) : undefined;
           const companion = row.label === "동반";
+          const itemName = row.itemName ?? item?.item_name ?? "품목 없음";
+          const itemCode = row.code ?? item?.mes_code ?? "코드 없음";
           return (
             <div key={row.id} data-testid={row.testId} className={SHIPPING_CELL_CLASS} style={{ background: companion ? tint(LEGACY_COLORS.purple, 8) : LEGACY_COLORS.bg, borderColor: companion ? tint(LEGACY_COLORS.purple, 30) : LEGACY_COLORS.border }}>
               <div className="flex min-w-0 items-start justify-between gap-2">
-                <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
+                <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{itemName}</div>
                 <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(row.tone, 14), color: row.tone }}>{row.label}</span>
               </div>
               <div className="mt-0.5 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                <span>{item?.mes_code ?? "코드 없음"}</span>
+                <span>{itemCode}</span>
                 <span>총 {row.quantity} {row.unit}</span>
               </div>
             </div>
