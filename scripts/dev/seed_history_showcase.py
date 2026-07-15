@@ -41,6 +41,7 @@ from app.models import (
 from app.schemas import ProductionReceiptRequest
 from app.services import inv_effect, inventory as inventory_svc, shipping as shipping_svc, stock_requests
 from app.services import io_dispatch
+from app.services._tx import transactional
 from app.services.bom import explode_bom, merge_requirements
 from app.services.dept_adjustment import submit_normal_disassemble
 from app.services.inv_calc import _sync_total
@@ -431,7 +432,7 @@ def _run_defects(db, plan: ShowcasePlan, marker: str) -> None:
 def apply_showcase(db, marker: str | None = None) -> ShowcaseResult:
     """모든 시나리오를 실행한다. 실패하면 호출자에게 예외를 전달하기 전 롤백한다."""
     marker = marker or f"{DEMO_TAG}[{datetime.now(UTC):%Y%m%d-%H%M%S}]"
-    try:
+    with transactional(db):
         plan = build_showcase_plan(db)
         previous_log_ids = {row.log_id for row in db.query(TransactionLog.log_id).all()}
         _run_basic_io(db, plan, marker)
@@ -456,9 +457,6 @@ def apply_showcase(db, marker: str | None = None) -> ShowcaseResult:
             log_ids=[log.log_id for log in logs],
             transaction_types=sorted({log.transaction_type.value for log in logs}),
         )
-    except Exception:
-        db.rollback()
-        raise
 
 
 def _marker_logs(db, marker: str) -> list[TransactionLog]:
@@ -603,7 +601,6 @@ def main() -> int:
             print("dry-run 완료. 실제 반영: python scripts/dev/seed_history_showcase.py --apply")
             return 0
         result = apply_showcase(db)
-        db.commit()
         print(f"검색어: {result.marker}")
         print(f"생성 로그: {len(result.log_ids)}건")
         print("거래 유형: " + ", ".join(result.transaction_types))

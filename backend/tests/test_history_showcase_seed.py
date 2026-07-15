@@ -5,6 +5,9 @@ import sys
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import Mock
+
+from sqlalchemy import event
 
 from app.models import DepartmentEnum, Employee, EmployeeLevelEnum, InventoryLocation, LocationStatusEnum
 
@@ -90,15 +93,25 @@ def test_showcase_apply_rolls_back_everything_when_a_late_step_fails(db_session,
 
     before = db_session.query(InventoryLocation).filter(InventoryLocation.item_id == raw.item_id).count()
     monkeypatch.setattr(module, "_run_shipping", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("late failure")))
+    count_commit = Mock()
+    count_rollback = Mock()
+
+    event.listen(db_session, "after_commit", count_commit)
+    event.listen(db_session, "after_rollback", count_rollback)
 
     try:
-        module.apply_showcase(db_session, marker="[HISTORY-DEMO][ROLLBACK]")
-    except RuntimeError as exc:
-        assert str(exc) == "late failure"
-        db_session.rollback()
-    else:
-        raise AssertionError("late failure must escape apply_showcase")
+        try:
+            module.apply_showcase(db_session, marker="[HISTORY-DEMO][ROLLBACK]")
+        except RuntimeError as exc:
+            assert str(exc) == "late failure"
+        else:
+            raise AssertionError("late failure must escape apply_showcase")
+    finally:
+        event.remove(db_session, "after_commit", count_commit)
+        event.remove(db_session, "after_rollback", count_rollback)
 
+    assert count_commit.call_count == 0
+    assert count_rollback.call_count == 1
     assert db_session.query(InventoryLocation).filter(InventoryLocation.item_id == raw.item_id).count() == before
     assert db_session.query(module.TransactionLog).filter(module.TransactionLog.reference_no.like("%ROLLBACK%")).count() == 0
 
@@ -129,8 +142,19 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
         make_location(item.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("20"))
     db_session.commit()
 
-    result = module.apply_showcase(db_session, marker="[HISTORY-DEMO][TEST]")
+    count_commit = Mock()
+    count_rollback = Mock()
 
+    event.listen(db_session, "after_commit", count_commit)
+    event.listen(db_session, "after_rollback", count_rollback)
+    try:
+        result = module.apply_showcase(db_session, marker="[HISTORY-DEMO][TEST]")
+    finally:
+        event.remove(db_session, "after_commit", count_commit)
+        event.remove(db_session, "after_rollback", count_rollback)
+
+    assert count_commit.call_count == 1
+    assert count_rollback.call_count == 0
     expected = {
         "RECEIVE", "SHIP", "ADJUST", "BACKFLUSH", "PRODUCE", "DISASSEMBLE",
         "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT", "MARK_DEFECTIVE",
