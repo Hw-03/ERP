@@ -1573,7 +1573,7 @@ function RequestSection(props: {
 
           {props.wizardStep === 5 && (
             <section data-testid="shipping-wizard-step-5" className="flex h-full min-h-0 flex-col">
-              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 ${hasBomChanges ? "grid-rows-[auto_369px_369px]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-y-auto pr-1`}>
+              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 ${hasBomChanges ? "grid-rows-[auto_minmax(0,1fr)_auto]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-y-auto pr-1`}>
                 <ShippingShipmentHero name={shipmentName} code={shipmentCode} quantity={requestQty} />
                 <FinalRequirementReview
                   paLines={grouped.PA.filter((line) => line.included)}
@@ -2534,12 +2534,12 @@ function BomChangeSummaryCard({
     return <Notice tone={LEGACY_COLORS.green} title="BOM 변경 없음" body="기본 BOM 구성을 그대로 사용합니다." />;
   }
   return (
-    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex h-[369px] shrink-0 flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
+    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex h-[112px] shrink-0 self-end flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.yellow }}>변경된 구성품 {lines.length}개</div>
         <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>세부 목록</div>
       </div>
-      <div data-testid={scrollListTestId} className={`grid min-h-0 gap-2 pr-1 xl:grid-cols-2 ${finalLayout ? "flex-1 overflow-y-auto content-start" : "max-h-[360px] overflow-y-auto"}`}>
+      <div data-testid={scrollListTestId} className={`grid min-h-0 gap-2 pr-1 xl:grid-cols-2 ${finalLayout ? "h-[62px] shrink-0 overflow-y-auto content-start" : "max-h-[360px] overflow-y-auto"}`}>
         {lines.map((line) => {
           const item = itemById.get(line.child_item_id);
           const label = !line.included ? "제외" : line.origin === "CUSTOM" ? "추가" : "포함";
@@ -2593,7 +2593,7 @@ function FinalRequirementReview({
     { id: "companion", testId: "shipping-final-group-companion", title: "카톤·동반 출하품", tone: LEGACY_COLORS.purple, rows: rows.filter((row) => row.id.startsWith("companion-")) },
   ];
   return (
-    <section data-testid="shipping-final-requirements" className={`${SHIPPING_PANEL_CLASS} ${hasBomChanges ? "h-[369px] shrink-0" : "h-full min-h-0"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <section data-testid="shipping-final-requirements" className={`${SHIPPING_PANEL_CLASS} h-full`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-1.5 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>BOM·동반 출하품</div>
       <div data-testid="shipping-final-requirements-list" className="grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
         {groups.map((group) => (

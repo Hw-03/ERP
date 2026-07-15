@@ -1497,7 +1497,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
   });
 
-  it("keeps final BOM and changed-item panels at 369px with independent scrolling", async () => {
+  it("limits the final changed-item preview to one row and gives the BOM panel the remaining height", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1514,11 +1514,11 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_369px_369px]", "overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[369px]", "shrink-0");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_minmax(0,1fr)_auto]", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-full", "min-h-0");
     expect(screen.getByTestId("shipping-final-requirements-list")).toHaveClass("overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[369px]", "shrink-0");
-    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("h-[112px]", "shrink-0", "self-end");
+    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("h-[62px]", "shrink-0", "overflow-y-auto");
     expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("rounded-[12px]", "border", "px-3", "py-2");
   });
 
