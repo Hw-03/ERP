@@ -144,6 +144,19 @@ describe("ItemConversionView", () => {
     expect(onItemConversion).toHaveBeenCalledTimes(1);
   });
 
+  it("labels the conversion card as existing PA inventory", () => {
+    render(
+      <IoWorkTypeStep
+        workType="process"
+        operator={{ employee_id: "op-1", name: "operator", department: "조립" }}
+        onWorkTypeChange={() => {}}
+        onItemConversion={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("warehouse-item-conversion-card")).toHaveTextContent("기존 PA 재고를 대상 PA 재고로 전환");
+  });
+
   it("품목 전환 카드는 조립·출하 부서에만 표시한다", () => {
     const { rerender } = render(
       <IoWorkTypeStep

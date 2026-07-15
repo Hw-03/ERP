@@ -569,6 +569,8 @@ describe("DesktopShippingView", () => {
 
     const detail = await screen.findByTestId("shipping-prep-detail");
     await waitFor(() => expect(detail).toHaveTextContent("출하 수량"));
+    expect(screen.getByTestId("shipping-prep-requirements")).toHaveClass("min-h-0", "flex-1");
+    expect(screen.getByTestId("shipping-prep-actions")).toHaveClass("shrink-0");
     expect(detail).toHaveTextContent("총 1대 출하");
     expect(detail).toHaveTextContent("1대 기준 2 EA");
     expect(detail).toHaveTextContent("총 필요 2 EA");
@@ -702,6 +704,25 @@ describe("DesktopShippingView", () => {
     await openRequestById(container, "requested-1");
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
     expect(screen.queryByText(/requested-1/)).not.toBeInTheDocument();
+  });
+
+  it("emphasizes parsed summary-code kinds and aligns quantities in request detail", async () => {
+    const codedRequest = request({
+      request_id: "detail-codes",
+      bom_lines: request().bom_lines.map((line) => (
+        line.line_id === "bom-1" ? { ...line, mes_code: "34-PR-0051" } :
+          line.line_id === "bom-2" ? { ...line, mes_code: "3-AF-0018" } : line
+      )),
+    });
+    vi.mocked(api.getShippingRequests).mockResolvedValue([codedRequest]);
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=detail-codes";
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByTestId("shipping-summary-code-bom-1-PF-kind")).toHaveTextContent("PR");
+    expect(screen.getByTestId("shipping-summary-code-bom-2-PA-kind")).toHaveTextContent("AF");
+    expect(screen.getByTestId("shipping-summary-quantity-bom-1-PF")).toHaveTextContent("1 EA");
+    expect(screen.getByTestId("shipping-summary-quantity-bom-1-PF")).toHaveClass("tabular-nums");
   });
 
   it("can send an existing requested detail to prep", async () => {
@@ -1000,9 +1021,11 @@ describe("DesktopShippingView", () => {
     const header = await screen.findByTestId("shipping-work-header");
     const tabs = screen.getByTestId("shipping-step-tabs");
     const actionBar = screen.getByTestId("shipping-wizard-action-bar");
+    expect(screen.getByTestId("shipping-request-work-shell").firstElementChild).toBe(header);
     expect(header).toHaveClass("xl:grid-cols-[auto_minmax(0,1fr)_auto]");
     expect(tabs).toHaveClass("gap-1");
     expect(screen.getByTestId("shipping-wizard-content-frame")).not.toHaveClass("border");
+    expect(screen.getByTestId("shipping-wizard-step-1")).not.toHaveClass("border");
     expect(actionBar).toContainElement(screen.getByTestId("shipping-request-quantity"));
     expect(actionBar).not.toHaveTextContent("기준 PF를 먼저 선택하세요.");
   });
@@ -1331,6 +1354,9 @@ describe("DesktopShippingView", () => {
     expect(hero).not.toHaveTextContent("Standard PF");
     expect(finalSummary).toHaveTextContent("Standard PA");
     expect(finalSummary).toHaveTextContent("Custom PF");
+    expect(screen.getByTestId("shipping-final-group-pa")).toContainElement(screen.getByTestId("shipping-final-line-pa-acc-1"));
+    expect(screen.getByTestId("shipping-final-group-pf")).toContainElement(screen.getByTestId("shipping-final-line-pf-pa-1"));
+    expect(screen.getByTestId("shipping-final-group-companion")).toContainElement(screen.getByTestId("shipping-final-line-companion-carton-1"));
     expect(finalSummary).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
     expect(screen.getByTestId("shipping-final-line-pa-acc-1")).toHaveTextContent("Cable Set");
     expect(screen.getByTestId("shipping-final-line-companion-carton-1")).toHaveTextContent("Carton Box");
