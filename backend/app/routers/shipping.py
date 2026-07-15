@@ -39,6 +39,7 @@ from app.schemas.shipping import (
     ShippingTransactionLogResponse,
 )
 from app.services import shipping as shipping_svc
+from app.services import shipping_actions as shipping_actions_svc
 from app.services.shipping import ShippingError
 
 
@@ -182,18 +183,12 @@ def _to_response(db: Session, req: ShippingRequest) -> ShippingRequestResponse:
     )
 
 
-def _commit_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+def _action_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     try:
-        obj = func(db, *args, **kwargs)
-        db.commit()
-        if obj is not None:
-            db.refresh(obj)
-        return obj
+        return func(db, *args, **kwargs)
     except ShippingError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 
@@ -260,7 +255,6 @@ def component_change_preview_independent(
             requested_mode,
         )
     except ShippingError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
 
 
@@ -275,7 +269,7 @@ def component_change_independent(
     if payload.target_pa_item_id is None:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, "대상 PA를 선택해야 합니다.")
     try:
-        result = shipping_svc.execute_component_change_independent(
+        result = shipping_actions_svc.execute_component_change_independent(
             db,
             payload.source_pa_item_id,
             payload.target_pa_item_id,
@@ -285,16 +279,13 @@ def component_change_independent(
             requester_name=requester.name,
             requester_employee_id=requester.employee_id,
         )
-        db.commit()
         return ShippingComponentChangeResultResponse(
             **{key: value for key, value in result.items() if key != "transactions"},
             transactions=[_tx_log_response(log) for log in result["transactions"]],
         )
     except ShippingError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
     except ValueError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
 @router.get("/requests", response_model=list[ShippingRequestResponse])
@@ -311,9 +302,9 @@ def list_requests(
 
 @router.post("/requests", response_model=ShippingRequestResponse, status_code=status.HTTP_201_CREATED)
 def create_request(payload: ShippingRequestCreate, db: Session = Depends(get_db)):
-    req = _commit_or_422(
+    req = _action_or_422(
         db,
-        shipping_svc.create_request,
+        shipping_actions_svc.create_request,
         {
             "base_pf_item_id": payload.base_pf_item_id,
             "requested_by_name": payload.requested_by_name,
@@ -335,31 +326,31 @@ def update_request(request_id: uuid.UUID, payload: ShippingRequestUpdate, db: Se
         update["bom_lines"] = _line_payload(payload.bom_lines)
     if "companion_lines" in update:
         update["companion_lines"] = _companion_payload(payload.companion_lines)
-    req = _commit_or_422(db, shipping_svc.update_request, request_id, update)
+    req = _action_or_422(db, shipping_actions_svc.update_request, request_id, update)
     return _to_response(db, req)
 
 
 @router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    _commit_or_422(db, shipping_svc.delete_request, request_id)
+    _action_or_422(db, shipping_actions_svc.delete_request, request_id)
     return None
 
 @router.post("/requests/{request_id}/send-to-prep", response_model=ShippingRequestResponse)
 def send_to_prep(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _commit_or_422(db, shipping_svc.send_to_prep, request_id)
+    req = _action_or_422(db, shipping_actions_svc.send_to_prep, request_id)
     return _to_response(db, req)
 
 
 @router.patch("/requests/{request_id}/checklist", response_model=ShippingRequestResponse)
 def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, db: Session = Depends(get_db)):
     checks = {line.item_id: line.checked for line in payload.checks}
-    req = _commit_or_422(db, shipping_svc.update_checklist, request_id, checks)
+    req = _action_or_422(db, shipping_actions_svc.update_checklist, request_id, checks)
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/checklist/clear", response_model=ShippingRequestResponse)
 def clear_checklist(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _commit_or_422(db, shipping_svc.clear_checklist, request_id)
+    req = _action_or_422(db, shipping_actions_svc.clear_checklist, request_id)
     return _to_response(db, req)
 
 
@@ -376,7 +367,6 @@ def component_change_preview(
     try:
         return shipping_svc.component_change_preview(db, request_id, source_pa_item_id, quantity, requested_mode)
     except ShippingError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
 
 
@@ -388,9 +378,9 @@ def component_change(
     db: Session = Depends(get_db),
 ):
     requester = _load_component_change_actor(http_request, db)
-    req = _commit_or_422(
+    req = _action_or_422(
         db,
-        shipping_svc.execute_component_change,
+        shipping_actions_svc.execute_component_change,
         request_id,
         payload.source_pa_item_id,
         payload.quantity,
@@ -404,19 +394,19 @@ def component_change(
 
 @router.post("/requests/{request_id}/prepare-complete", response_model=ShippingRequestResponse)
 def prepare_complete(request_id: uuid.UUID, payload: ShippingPrepareCompleteRequest, db: Session = Depends(get_db)):
-    req = _commit_or_422(db, shipping_svc.prepare_complete, request_id)
+    req = _action_or_422(db, shipping_actions_svc.prepare_complete, request_id)
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/prepare-cancel", response_model=ShippingRequestResponse)
 def prepare_cancel(request_id: uuid.UUID, payload: ShippingPrepareCancelRequest, db: Session = Depends(get_db)):
-    req = _commit_or_422(db, shipping_svc.prepare_cancel, request_id, payload.reason)
+    req = _action_or_422(db, shipping_actions_svc.prepare_cancel, request_id, payload.reason)
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/pickup-complete", response_model=ShippingRequestResponse)
 def pickup_complete(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _commit_or_422(db, shipping_svc.pickup_complete, request_id)
+    req = _action_or_422(db, shipping_actions_svc.pickup_complete, request_id)
     return _to_response(db, req)
 
 
@@ -440,5 +430,4 @@ def bom_match(payload: ShippingBomMatchRequest, db: Session = Depends(get_db)):
             payload.base_pf_item_id,
         )
     except ShippingError as exc:
-        db.rollback()
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
