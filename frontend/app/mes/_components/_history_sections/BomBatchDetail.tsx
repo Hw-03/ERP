@@ -20,7 +20,6 @@ import {
   HISTORY_CHILD_ROW_CLASS,
   ItemCodeCell,
   MovementSummaryCell,
-  SpacerCell,
 } from "./historyTableHelpers";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
@@ -132,7 +131,6 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
     </>
   );
 }
-
 function StatusBadge({ included, shortage }: { included: boolean; shortage: number }) {
   const status = getHistoryLineStatusLabel({ included, shortage });
   // 포함(ok) 은 기본값이라 chip 노출 안 함 — 부족/제외만 시각 신호.
@@ -194,7 +192,6 @@ function BundleRows({
   const excludedCount = childLines.filter((line) => !line.included).length;
   const detailId = `history-bom-${encodeURIComponent(bundle.bundle_id).replaceAll("%", "_")}`;
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
 
@@ -258,10 +255,6 @@ function BundleRows({
           </div>
         </td>
         <ItemCodeCell code={bundle.source_mes_code ?? singleLineCode} compact={compact} dense />
-        <SpacerCell compact={compact} dense />
-        <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${flowPadX} text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-          {isBomParent ? `부품 ${childLines.length}라인` : "단품 라인"}
-        </td>
         <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
           {headerSigned ? (
             <MovementSummaryCell
@@ -313,7 +306,6 @@ function BomLineRow({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const dim = !line.included;
@@ -354,10 +346,6 @@ function BomLineRow({
         </div>
       </td>
       <ItemCodeCell code={line.mes_code} compact={compact} dense />
-      <SpacerCell compact={compact} dense />
-      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${flowPadX} text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-        {getLineRoleLabel(line, batch)}
-      </td>
       <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: qtyColor }}>
         <MovementSummaryCell
           summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
@@ -389,13 +377,4 @@ function LineKindBadge({ line, compact }: { line: IoLine; compact?: boolean }) {
       <span className={compact ? "min-w-0 truncate" : undefined}>{isAuto ? "자동차감" : "수동"}</span>
     </span>
   );
-}
-
-function getLineRoleLabel(line: IoLine, batch: IoBatch): string {
-  if (line.origin === "bom_auto" || line.origin === "package_auto") {
-    return batch.sub_type === "disassemble" ? "부품 회수" : "부품 차감";
-  }
-  if (line.direction === "move") return "위치 이동";
-  if (line.direction === "adjust") return "수량 조정";
-  return line.included ? "적용" : "제외";
 }

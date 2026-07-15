@@ -1,6 +1,6 @@
 """거래 로그·메타수정·수량보정 schema."""
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -85,6 +85,22 @@ class TransactionLogResponse(BaseModel):
     cancelled_by: Optional[uuid.UUID] = None
     cancelled_at: Optional[UtcDatetime] = None
     inventory_effect: Optional[list[dict[str, Any]]] = None
+
+
+class TransactionDisplayGroupResponse(BaseModel):
+    """PC 입출고 내역 목록의 대표 행과 그에 속한 전체 거래 로그."""
+
+    type: Literal["solo", "batch", "op_batch", "defect_lifecycle"]
+    key: str
+    logs: list[TransactionLogResponse]
+
+
+class TransactionDisplayGroupPageResponse(BaseModel):
+    """대표 행 기준 커서 페이지. cursor 는 다음 요청에 그대로 전달한다."""
+
+    groups: list[TransactionDisplayGroupResponse]
+    next_cursor: Optional[str] = None
+    has_more: bool
 
 
 class TransactionQuantityCorrectionResponse(BaseModel):

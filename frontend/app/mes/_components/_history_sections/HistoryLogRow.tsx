@@ -10,12 +10,11 @@ import { formatHistoryDate } from "./historyFormat";
 import { getHistoryRowPresentation } from "./historyPresentation";
 import {
   FlowBadge,
-  FlowSummaryCell,
   HISTORY_CELL_TRANSITION,
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
+  HISTORY_STATUS_CELL_CLASS,
   ItemCodeCell,
-  SpacerCell,
   PeopleStatusCell,
   QuantityStockCell,
   TargetSummaryBlock,
@@ -37,7 +36,6 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
   const [hovered, setHovered] = useState(false);
   const padX = "px-4";
   const targetPadX = "px-4";
-  const flowPadX = "px-2";
   const quantityPadX = "px-4";
   const statusPadX = "px-4";
   const basePresentation = getHistoryRowPresentation(log);
@@ -101,14 +99,10 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         />
       </td>
       <ItemCodeCell code={presentation.target.code} />
-      <SpacerCell />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowSummaryCell presentation={presentation} />
-      </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <QuantityStockCell presentation={presentation} cancelled={log.cancelled} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>

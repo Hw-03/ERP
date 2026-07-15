@@ -92,7 +92,11 @@ describe("buildHistoryDetailSummary", () => {
     ]);
     expect(summary).not.toHaveProperty("stock");
     expect(summary).not.toHaveProperty("movement");
-    expect(summary).not.toHaveProperty("flow");
+    expect(summary.flow).toEqual({
+      label: "생산 입고",
+      from: null,
+      to: null,
+    });
   });
 
   it("hides a matching warehouse box effect when the warehouse total already states the same impact", () => {

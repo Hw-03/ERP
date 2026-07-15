@@ -11,13 +11,13 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   FlowBadge,
-  FlowSummaryCell,
   ItemCodeCell,
   MovementSummaryCell,
   PeopleStatusCell,
   ReferenceBatchDetail,
   TargetSummaryBlock,
   buildGroups,
+  toHistoryLogGroups,
 } from "../historyTableHelpers";
 
 function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
@@ -73,6 +73,48 @@ describe("buildGroups shipping phase grouping", () => {
     if (groups[1].type === "solo") {
       expect(groups[1].log.shipping_phase).toBe("PICKUP");
     }
+  });
+});
+
+describe("toHistoryLogGroups", () => {
+  it("서버 대표 묶음의 경계와 안정 키를 다시 묶지 않고 표 행 모델로 변환한다", () => {
+    const parent = makeLog({ log_id: "defect-parent", transaction_type: "MARK_DEFECTIVE" });
+    const child = makeLog({ log_id: "defect-child", transaction_type: "DISASSEMBLE" });
+    const groups = toHistoryLogGroups([
+      { type: "op_batch", key: "batch-1", logs: [makeLog({ operation_batch_id: "batch-1" })] },
+      { type: "batch", key: "REF-1::PICKUP", logs: [makeLog({ reference_no: "REF-1", shipping_phase: "PICKUP" })] },
+      { type: "defect_lifecycle", key: "defect-lifecycle:defect-parent:defect-child", logs: [parent, child] },
+    ]);
+
+    expect(groups).toEqual([
+      expect.objectContaining({ type: "op_batch", batchId: "batch-1" }),
+      expect.objectContaining({ type: "batch", refKey: "REF-1::PICKUP", refNo: "REF-1" }),
+      expect.objectContaining({ type: "defect_lifecycle", parent, child }),
+    ]);
+  });
+});
+
+describe("HistoryTable server groups", () => {
+  it("클라이언트 원본 로그를 다시 묶지 않고 서버가 준 대표 묶음을 렌더링한다", () => {
+    const first = makeLog({ log_id: "server-group-first", reference_no: "SERVER-REF" });
+    const second = makeLog({ log_id: "server-group-second", reference_no: "SERVER-REF" });
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[]}
+        displayGroups={[{ type: "batch", refKey: "SERVER-REF::", refNo: "SERVER-REF", logs: [first, second] }]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "묶음 펼치기" })).toBeInTheDocument();
   });
 });
 
@@ -170,7 +212,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("104px");
     expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("168px");
     expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("118px");
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("190px");
+    expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
     expect(statusHeader.style.width).toBe("180px");
@@ -255,7 +297,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByText("별도 시각")).not.toBeInTheDocument();
   });
 
-  it("widens the default flow, quantity, and status columns while leaving the target flexible", () => {
+  it("uses the freed flow width for the remaining columns while leaving the target flexible", () => {
     const log = makeLog();
     render(
       <HistoryTable
@@ -273,7 +315,7 @@ describe("history table helper rendering policies", () => {
     );
 
     expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("168px");
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("190px");
+    expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
     expect(statusHeader.style.width).toBe("180px");
@@ -301,16 +343,6 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("완제품 +5 EA")).toHaveClass("min-w-[6.25rem]");
     expect(screen.getByText("부품 -10 EA")).toHaveClass("h-6");
     expect(screen.getByText("부품 -10 EA")).toHaveClass("min-w-[6.25rem]");
-  });
-
-  it("uses the widened flow space before truncating the production result", () => {
-    const presentation = {
-      flow: { label: "완제품 입고 · 부품 차감" },
-    } as HistoryRowPresentation;
-
-    render(<FlowSummaryCell presentation={presentation} />);
-
-    expect(screen.getByText("완제품 입고 · 부품 차감")).toHaveClass("max-w-[10.75rem]");
   });
 
   it("lets compact movement pills shrink and truncate inside the preserved quantity column", () => {
@@ -392,7 +424,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("변경품 구성품")).toBeInTheDocument();
   });
 
-  it("keeps the full flow width when the detail panel opens", () => {
+  it("keeps the flow column absent when the detail panel opens", () => {
     render(
       <HistoryTable
         loading={false}
@@ -408,7 +440,7 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "흐름" }).style.width).toBe("190px");
+    expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
   });
 
   it("keeps the operation badge dimensions stable when the detail panel opens", () => {
@@ -464,7 +496,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("메모").parentElement).toHaveClass("justify-center");
   });
 
-  it("keeps requester, approver, and memo visible without a fixed-height clip", () => {
+  it("uses the full fixed main-row height for requester, approver, and memo", () => {
     const presentation = {
       people: { requester: "김재헌", approver: "권동환" },
       statusChips: [{ label: "메모", tone: "primary" }],
@@ -475,8 +507,10 @@ describe("history table helper rendering policies", () => {
     const cell = screen.getByText("요청 김재헌").parentElement!;
     expect(cell).toHaveTextContent("승인 권동환");
     expect(cell).toHaveTextContent("메모");
-    expect(cell).not.toHaveClass("h-11");
-    expect(cell).not.toHaveClass("overflow-hidden");
+    expect(cell).toHaveClass("h-16");
+    expect(cell).toHaveClass("overflow-hidden");
+    expect(cell).toHaveClass("gap-1");
+    expect(screen.getByText("메모")).toHaveClass("h-5");
   });
 
   it("keeps ordinary long target titles on two lines", () => {

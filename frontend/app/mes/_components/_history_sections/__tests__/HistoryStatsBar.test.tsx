@@ -22,6 +22,6 @@ describe("HistoryStatsBar", () => {
     expect(screen.getByText("목록 조건")).toBeInTheDocument();
     expect(screen.getByText("100건")).toBeInTheDocument();
     expect(screen.getByText("전체 437건")).toBeInTheDocument();
-    expect(screen.getAllByText("표시 전용")).toHaveLength(3);
+    expect(screen.queryByText("표시 전용")).not.toBeInTheDocument();
   });
 });

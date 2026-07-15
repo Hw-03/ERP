@@ -55,6 +55,7 @@ export const queryKeys = {
   transactions: {
     all: ["transactions"] as const,
     list: (params?: object) => ["transactions", "list", params ?? {}] as const,
+    displayGroups: (params?: object) => ["transactions", "displayGroups", params ?? {}] as const,
     summary: (params?: object) => ["transactions", "summary", params ?? {}] as const,
     referenceSummaries: (params?: object) => ["transactions", "referenceSummaries", params ?? {}] as const,
     edits: (logId: string) => ["transactions", "edits", logId] as const,

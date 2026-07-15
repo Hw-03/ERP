@@ -733,7 +733,7 @@ export function getHistoryMovementSummary(
     const childUnitLabel = childUnit && !childUnitMixed ? ` ${childUnit}` : "";
 
     if (topSum > 0) parts.push({
-      label: `완제품 ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
+      label: `${isRework ? "분해" : "생산"} ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
       tone: isRework ? "danger" : "primary",
     });
     if (childSum > 0) parts.push({

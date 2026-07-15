@@ -122,7 +122,6 @@ describe("ReworkBatchHeader", () => {
     expect(cells[2]).toHaveClass("px-2");
     expect(cells[4]).toHaveClass("px-2");
     expect(cells[5]).toHaveClass("px-2");
-    expect(cells[6]).toHaveClass("px-2");
     expect(quantityPill).toHaveClass("min-w-[12.75rem]");
     expect(quantityPill).not.toHaveClass("min-w-0", "flex-1");
   });

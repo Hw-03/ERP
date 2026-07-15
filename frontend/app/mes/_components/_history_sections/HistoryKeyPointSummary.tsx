@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, Clock3, UserRound } from "lucide-react";
+import { Activity, ArrowRight, Clock3, MapPin, UserRound } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import type {
@@ -52,6 +52,45 @@ export function HistoryKeyPointSummary({
           {summary.status.label}
         </span>
       </div>
+
+      <div
+        className="grid gap-2 border-t px-4 py-3 text-xs sm:grid-cols-2"
+        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <UserRound className="h-4 w-4 shrink-0" />
+          <span>요청자</span>
+          <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
+            {summary.requester.name}
+          </span>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <Clock3 className="h-4 w-4 shrink-0" />
+          <span className="truncate">{formatHistoryDateTimeLong(summary.requester.at)}</span>
+        </div>
+      </div>
+
+      {summary.flow && (
+        <div className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            위치 / 이동 경로
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+            <MapPin className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+            <span className="rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+              {summary.flow.from ?? summary.flow.label}
+            </span>
+            {summary.flow.from && summary.flow.to && summary.flow.from !== summary.flow.to && (
+              <>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+                <span className="rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+                  {summary.flow.to}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {summary.conversion && (
         <div className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -136,7 +175,7 @@ export function HistoryKeyPointSummary({
                       key={effect.key}
                       type="button"
                       onClick={() => onImpactClick(effect)}
-                      className={`${rowClass} hover:brightness-125 focus-visible:brightness-125`}
+                      className={`${rowClass} no-btn-inset hover:brightness-125 focus-visible:brightness-125`}
                       style={{ borderColor: LEGACY_COLORS.border }}
                     >
                       {contents}
@@ -152,23 +191,6 @@ export function HistoryKeyPointSummary({
           ))}
         </div>
       )}
-
-      <div
-        className="grid gap-2 border-t px-4 py-3 text-xs sm:grid-cols-2"
-        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          <UserRound className="h-4 w-4 shrink-0" />
-          <span>요청자</span>
-          <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
-            {summary.requester.name}
-          </span>
-        </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <Clock3 className="h-4 w-4 shrink-0" />
-          <span className="truncate">{formatHistoryDateTimeLong(summary.requester.at)}</span>
-        </div>
-      </div>
 
       {summary.status.reason && (
         <div

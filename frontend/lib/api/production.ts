@@ -36,6 +36,20 @@ export interface TransactionReferenceSummary {
   unit: string | null;
 }
 
+export type TransactionDisplayGroupType = "solo" | "batch" | "op_batch" | "defect_lifecycle";
+
+export interface TransactionDisplayGroup {
+  type: TransactionDisplayGroupType;
+  key: string;
+  logs: TransactionLog[];
+}
+
+export interface TransactionDisplayGroupPage {
+  groups: TransactionDisplayGroup[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 export const productionApi = {
   productionReceipt: (payload: {
     item_id: string;
@@ -145,6 +159,49 @@ export const productionApi = {
       deptCount: res.dept_count,
       adjustCount: res.adjust_count,
       departmentCounts: res.department_counts ?? {},
+    }));
+  },
+
+  getTransactionDisplayGroups: (
+    params?: {
+      transactionTypes?: string;
+      operationKeys?: string;
+      search?: string;
+      department?: string;
+      model?: string;
+      processStep?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      includeArchived?: boolean;
+      limit?: number;
+      cursor?: string | null;
+    },
+    opts?: { signal?: AbortSignal },
+  ): Promise<TransactionDisplayGroupPage> => {
+    const query = new URLSearchParams();
+    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
+    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
+    if (params?.search) query.set("search", params.search);
+    if (params?.department) query.set("department", params.department);
+    if (params?.model) query.set("model", params.model);
+    if (params?.processStep) query.set("process_step", params.processStep);
+    if (params?.dateFrom) query.set("date_from", params.dateFrom);
+    if (params?.dateTo) query.set("date_to", params.dateTo);
+    if (params?.includeArchived) query.set("include_archived", "true");
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+    if (params?.cursor) query.set("cursor", params.cursor);
+    const qs = query.toString();
+    return fetcher<{
+      groups: TransactionDisplayGroup[];
+      next_cursor: string | null;
+      has_more: boolean;
+    }>(
+      toApiUrl(`/api/inventory/transactions/display-groups${qs ? `?${qs}` : ""}`),
+      opts?.signal,
+    ).then((page) => ({
+      groups: page.groups,
+      nextCursor: page.next_cursor,
+      hasMore: page.has_more,
     }));
   },
 

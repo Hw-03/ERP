@@ -521,29 +521,29 @@ describe("getHistoryMovementSummary", () => {
     expect(result.parts[0].tone).toBe("success");
   });
 
-  it("produce → 완제품/부품 파트 분리", () => {
+  it("produce → 생산/부품 파트 분리", () => {
     const parentLine = makeLine({ origin: "direct", quantity: 5, unit: "EA" });
     const childLine = makeLine({ line_id: "l2", item_id: "ITEM-002", origin: "bom_auto", quantity: 10, unit: "EA" });
     const bundle = makeBundle({ source_kind: "bom_parent", lines: [parentLine, childLine] });
     const batch = makeBatch({ sub_type: "produce", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "PRODUCE" }, batch);
     const labels = result.parts.map((p) => p.label);
-    expect(labels).toContain("완제품 +5 EA");
+    expect(labels).toContain("생산 +5 EA");
     expect(labels).toContain("부품 -10 EA");
-    // produce: 완제품=primary, 부품=danger
-    expect(result.parts.find((p) => p.label.includes("완제품"))?.tone).toBe("primary");
+    // produce: 생산=primary, 부품=danger
+    expect(result.parts.find((p) => p.label.includes("생산"))?.tone).toBe("primary");
     expect(result.parts.find((p) => p.label.includes("부품"))?.tone).toBe("danger");
   });
 
-  it("disassemble → 완제품=danger, 부품=primary", () => {
+  it("disassemble → 분해=danger, 부품=primary", () => {
     const parentLine = makeLine({ origin: "direct", quantity: 5, unit: "EA" });
     const childLine = makeLine({ line_id: "l2", item_id: "ITEM-002", origin: "bom_auto", quantity: 10, unit: "EA" });
     const bundle = makeBundle({ source_kind: "bom_parent", lines: [parentLine, childLine] });
     const batch = makeBatch({ sub_type: "disassemble", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "DISASSEMBLE" }, batch);
-    expect(result.parts.find((p) => p.label.includes("완제품"))?.label).toBe("완제품 -5 EA");
+    expect(result.parts.find((p) => p.label.includes("분해"))?.label).toBe("분해 -5 EA");
     expect(result.parts.find((p) => p.label.includes("부품"))?.label).toBe("부품 +10 EA");
-    expect(result.parts.find((p) => p.label.includes("완제품"))?.tone).toBe("danger");
+    expect(result.parts.find((p) => p.label.includes("분해"))?.tone).toBe("danger");
     expect(result.parts.find((p) => p.label.includes("부품"))?.tone).toBe("primary");
   });
 

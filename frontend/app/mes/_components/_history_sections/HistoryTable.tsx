@@ -26,7 +26,9 @@ type Props = {
   loading: boolean;
   error?: string | null;
   onRetry?: () => void;
-  filteredLogs: TransactionLog[];
+  filteredLogs?: TransactionLog[];
+  /** PC 그룹 API가 보장한 대표 행 경계. 제공되면 원본 로그를 다시 묶지 않는다. */
+  displayGroups?: LogGroup[];
   selection: HistorySelection | null;
   onSelectLog: (log: TransactionLog) => void;
   /** 묶음 하위 행은 상세 조회만 허용하고 취소는 부모 행에 남긴다. */
@@ -46,14 +48,12 @@ type Props = {
 
 type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center" | "right"; hidden?: boolean; px?: string };
 
-// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 흐름 → 수량/재고 → 상태.
+// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 수량/재고 → 상태.
 const COLUMNS: ColSpec[] = [
   { label: "일시", width: "104px", align: "center" },
   { label: "작업", width: "168px", align: "center" },
   { label: "대상" },
   { label: "품목코드", width: "118px", align: "center" },
-  { label: "", width: "0px", align: "center", px: "px-0" },
-  { label: "흐름", width: "190px", align: "center" },
   { label: "수량", width: "270px", align: "center" },
   { label: "상태 · 처리", width: "180px", align: "center" },
 ];
@@ -73,7 +73,8 @@ export function HistoryTable({
   loading,
   error,
   onRetry,
-  filteredLogs,
+  filteredLogs = [],
+  displayGroups,
   selection,
   onSelectLog,
   onSelectChildLog,
@@ -116,7 +117,8 @@ export function HistoryTable({
     return () => window.clearTimeout(handle);
   }, [focusTarget]);
 
-  const groups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
+  const localGroups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
+  const groups = displayGroups ?? localGroups;
 
   // ── visible op_batch lazy fetch ──
   // observer 는 마운트 시 한 번만. batchCache 변경마다 재생성하지 않게 ref 만 본다.
@@ -239,7 +241,7 @@ export function HistoryTable({
           retryLabel="다시 시도"
           prefix="입출고 내역을 불러오지 못했습니다"
         />
-      ) : filteredLogs.length === 0 ? (
+      ) : groups.length === 0 ? (
         <EmptyState
           variant="no-data"
           title="거래 이력이 없습니다."
@@ -423,7 +425,7 @@ export function HistoryTable({
         </div>
       )}
 
-      {!loading && !error && filteredLogs.length > 0 && loadMoreError && (
+      {!loading && !error && groups.length > 0 && loadMoreError && (
         <div className="mt-4">
           <LoadFailureCard
             message={loadMoreError}

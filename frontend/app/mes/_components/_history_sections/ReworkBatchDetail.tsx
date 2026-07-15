@@ -3,7 +3,7 @@
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
-import { HISTORY_CELL_TRANSITION, ItemCodeCell, SpacerCell } from "./historyTableHelpers";
+import { HISTORY_CELL_TRANSITION, ItemCodeCell } from "./historyTableHelpers";
 import { buildReworkItemSummaries, type ReworkItemSummary } from "./reworkSummary";
 
 const REWORK_RESULT_LABEL = "처리결과";
@@ -83,10 +83,6 @@ function ReworkSummaryRow({ summary, compact, rowId, cancelled }: { summary: Rew
         </div>
       </td>
       <ItemCodeCell code={summary.mesCode} compact={compact} dense />
-      <SpacerCell compact={compact} dense />
-      <td className="whitespace-nowrap border-b px-5 py-2 text-center text-xs font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-        재작업
-      </td>
       <td className={`whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold${cancelled ? " line-through" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: resultTone }}>
         {summary.resultLabel}
       </td>

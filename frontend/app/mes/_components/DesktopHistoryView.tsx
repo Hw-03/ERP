@@ -13,7 +13,7 @@ import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import type { HistoryTableFocusTarget } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
-import { useHistoryData } from "./_hooks/useHistoryData";
+import { useDesktopHistoryGroups } from "./_hooks/useDesktopHistoryGroups";
 import { useToggleSet } from "./_hooks/useToggleSet";
 import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
@@ -27,6 +27,7 @@ import {
   reconcileHistorySelection,
   type HistoryLoadReconcileState,
 } from "./_history_sections/historyCancellation";
+import { toHistoryLogGroups } from "./_history_sections/historyTableHelpers";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -112,18 +113,17 @@ export function DesktopHistoryView() {
     [referenceSummaryRows],
   );
 
-  const historyData = useHistoryData({
+  const historyData = useDesktopHistoryGroups({
     operations: opParam,
     dateFilter,
     debouncedSearch,
     selectedDateKey: selectedDay,
     department: deptParam,
     model: modelParam,
-    totalCount: summary?.total,
   });
   const {
-    logs,
-    setLogs,
+    groups: serverGroups,
+    setGroups,
     loading,
     error: historyError,
     retry,
@@ -132,6 +132,8 @@ export function DesktopHistoryView() {
     canLoadMore,
     loadMore,
   } = historyData;
+  const logs = useMemo(() => serverGroups.flatMap((group) => group.logs), [serverGroups]);
+  const displayGroups = useMemo(() => toHistoryLogGroups(serverGroups), [serverGroups]);
   const loadReconcileRef = useRef<HistoryLoadReconcileState>({
     wasLoading: loading,
     loadingLogs: loading ? logs : null,
@@ -329,11 +331,14 @@ export function DesktopHistoryView() {
   }, [historyError, loading, logs, selection]);
 
   function applyCancellationUpdate(updated: TransactionLog, batchId?: string | null) {
-    setLogs((currentLogs) => applyHistoryCancellation(
-      { logs: currentLogs, selection: null, batchCache: new Map() },
-      updated,
-      batchId,
-    ).logs);
+    setGroups((currentGroups) => currentGroups.map((group) => ({
+      ...group,
+      logs: applyHistoryCancellation(
+        { logs: group.logs, selection: null, batchCache: new Map() },
+        updated,
+        batchId,
+      ).logs,
+    })));
     setSelection((currentSelection) => applyHistoryCancellation(
       { logs: [], selection: currentSelection, batchCache: new Map() },
       updated,
@@ -362,7 +367,10 @@ export function DesktopHistoryView() {
       applyCancellationUpdate(updated, updated.operation_batch_id);
       return;
     }
-    setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
+    setGroups((currentGroups) => currentGroups.map((group) => ({
+      ...group,
+      logs: group.logs.map((log) => (log.log_id === updated.log_id ? updated : log)),
+    })));
     setSelection((current) =>
       current?.kind === "log" && current.log.log_id === updated.log_id
         ? { ...current, log: updated }
@@ -583,6 +591,7 @@ export function DesktopHistoryView() {
             error={historyError}
             onRetry={retryHistoryResults}
             filteredLogs={logs}
+            displayGroups={displayGroups}
             selection={selection}
             onSelectLog={handleSelectLog}
             onSelectChildLog={handleSelectChildLog}

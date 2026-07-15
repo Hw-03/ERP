@@ -26,8 +26,8 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
-vi.mock("../_hooks/useHistoryData", () => ({
-  useHistoryData: (args: any) => {
+vi.mock("../_hooks/useDesktopHistoryGroups", () => ({
+  useDesktopHistoryGroups: (args: any) => {
     testState.historyArgs = args;
     return testState.historyResult;
   },
@@ -202,7 +202,7 @@ function makeBatch(): IoBatch {
 
 function setHistoryResult(logs: TransactionLog[], loading: boolean, error: string | null = null): void {
   testState.historyResult = {
-    logs,
+    groups: logs.map((log) => ({ type: "solo", key: `solo:${log.log_id}`, logs: [log] })),
     loading,
     error,
     retry: vi.fn(),
@@ -210,9 +210,9 @@ function setHistoryResult(logs: TransactionLog[], loading: boolean, error: strin
     loadMoreError: null,
     canLoadMore: false,
     loadMore: vi.fn(),
-    setLogs: (update: React.SetStateAction<TransactionLog[]>) => {
-      const next = typeof update === "function" ? update(testState.historyResult.logs) : update;
-      testState.historyResult = { ...testState.historyResult, logs: next };
+    setGroups: (update: React.SetStateAction<any[]>) => {
+      const next = typeof update === "function" ? update(testState.historyResult.groups) : update;
+      testState.historyResult = { ...testState.historyResult, groups: next };
     },
   };
 }
@@ -237,7 +237,7 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
-  it("feeds the successful summary total into history data and clears it for a changed condition", async () => {
+  it("keeps the history group query independent from a changing summary total", async () => {
     testState.summaryMock.mockResolvedValue({
       total: 42,
       warehouseCount: 12,
@@ -247,15 +247,11 @@ describe("DesktopHistoryView history state", () => {
     });
     render(<DesktopHistoryView />);
 
-    await waitFor(() => {
-      expect(testState.historyArgs).toMatchObject({ totalCount: 42 });
-    });
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({ operations: "" }));
 
     testState.summaryMock.mockImplementation(() => new Promise(() => {}));
     fireEvent.click(screen.getByRole("button", { name: "기간 변경" }));
-    await waitFor(() => {
-      expect(testState.historyArgs).toHaveProperty("totalCount", undefined);
-    });
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({ dateFilter: "WEEK" }));
   });
 
   it("retries the list and filtered summary together and clears a failed summary", async () => {
@@ -267,7 +263,7 @@ describe("DesktopHistoryView history state", () => {
       departmentCounts: {},
     });
     render(<DesktopHistoryView />);
-    await waitFor(() => expect(testState.historyArgs).toMatchObject({ totalCount: 42 }));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({ operations: "" }));
     const callsBeforeRetry = testState.summaryMock.mock.calls.length;
     const retry = testState.historyResult.retry;
     testState.summaryMock.mockRejectedValue(new Error("summary 실패"));
@@ -277,7 +273,7 @@ describe("DesktopHistoryView history state", () => {
     expect(retry).toHaveBeenCalledTimes(1);
     await waitFor(() => {
       expect(testState.summaryMock.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
-      expect(testState.historyArgs).toHaveProperty("totalCount", undefined);
+      expect(testState.historyArgs).toMatchObject({ operations: "" });
     });
   });
 
@@ -381,7 +377,7 @@ describe("DesktopHistoryView history state", () => {
     await waitFor(() => {
       expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-name", "재작업 부모");
       expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-selection-cancelled", "yes");
-      const cancelledReferenceLogs = testState.historyResult.logs.filter(
+      const cancelledReferenceLogs = testState.historyResult.groups.flatMap((group: any) => group.logs).filter(
         (log: TransactionLog) => log.reference_no === referenceNo,
       );
       expect(cancelledReferenceLogs.every((log: TransactionLog) => log.cancelled)).toBe(true);
@@ -419,7 +415,7 @@ describe("DesktopHistoryView history state", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-name", "현재 대상");
-      expect(testState.historyResult.logs.find((log: TransactionLog) => log.log_id === first.log_id)?.cancelled).toBe(true);
+      expect(testState.historyResult.groups.flatMap((group: any) => group.logs).find((log: TransactionLog) => log.log_id === first.log_id)?.cancelled).toBe(true);
     });
   });
 });

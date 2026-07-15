@@ -53,6 +53,11 @@ export type HistoryDetailSummary = {
     name: string;
     at: string;
   };
+  flow: {
+    label: string;
+    from: string | null;
+    to: string | null;
+  } | null;
   composition: HistoryBatchLineStats | null;
 };
 
@@ -243,6 +248,13 @@ export function buildHistoryDetailSummary(
       name: batch?.requester_name?.trim() || presentation.people.requester,
       at: batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
     },
+    flow: presentation.flow.label
+      ? {
+        label: presentation.flow.label,
+        from: presentation.flow.from ?? null,
+        to: presentation.flow.to ?? null,
+      }
+      : null,
     composition: batch ? getBatchLineStats(batch) : null,
   };
 }

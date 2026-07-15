@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import csv
 import json
 import uuid
@@ -27,6 +29,8 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
+    TransactionDisplayGroupPageResponse,
+    TransactionDisplayGroupResponse,
     TransactionEditLogResponse,
     TransactionLogResponse,
     TransactionMetaEditRequest,
@@ -60,6 +64,7 @@ router = APIRouter()
 
 # 단일 export 요청에서 허용하는 최대 행 수. 운영 PC 메모리 보호용 안전 상한.
 EXPORT_MAX_ROWS = 50_000
+DISPLAY_GROUP_PAGE_SIZE = 100
 
 
 # 메타데이터(notes/reference_no/produced_by) 수정이 허용되는 거래 타입.
@@ -102,6 +107,184 @@ class ReferenceSummaryResponse(BaseModel):
     item_count: int
     total_quantity: float
     unit: Optional[str] = None
+
+
+def _display_group_cursor(group: TransactionDisplayGroupResponse) -> str:
+    """대표 행의 정렬 기준과 안정 키를 포함한 불투명 커서."""
+    sort_at, created_at, log_id = _display_group_sort_tuple(group)
+    payload = {
+        "type": group.type,
+        "key": group.key,
+        "sort_at": sort_at,
+        "created_at": created_at,
+        "log_id": log_id,
+    }
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
+    return encoded.rstrip("=")
+
+
+def _decode_display_group_cursor(cursor: str) -> dict[str, str | None]:
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        value = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+        if not isinstance(value, dict) or not all(
+            isinstance(value.get(field), str) for field in ("type", "key", "sort_at", "created_at", "log_id")
+        ):
+            raise ValueError
+        return value
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
+        raise http_error(400, ErrorCode.BAD_REQUEST, "유효하지 않은 대표 행 페이지 커서입니다.")
+
+
+def _display_group_sort_tuple(
+    group: TransactionDisplayGroupResponse,
+) -> tuple[str, str, str]:
+    # 불량 lifecycle은 화면 의미상 부모→후속 로그 순서를 보존한다. 다만 대표 행의
+    # 정렬·커서는 실제 목록에서 먼저 나타나는(가장 최신인) 후속 로그를 기준으로 삼아야
+    # 그 사이에 생긴 다른 대표 행이 다음 페이지에서 누락되지 않는다.
+    anchor = max(
+        group.logs,
+        key=lambda log: (
+            (log.requested_at or log.created_at).isoformat(),
+            log.created_at.isoformat(),
+            str(log.log_id),
+        ),
+    ) if group.type == "defect_lifecycle" else group.logs[0]
+    return (
+        (anchor.requested_at or anchor.created_at).isoformat(),
+        anchor.created_at.isoformat(),
+        str(anchor.log_id),
+    )
+
+
+def _is_after_display_group_cursor(
+    group: TransactionDisplayGroupResponse,
+    cursor: dict[str, str | None],
+) -> bool:
+    """내림차순 대표 행 정렬에서 커서 뒤에 남아야 하는 그룹인지 판단한다."""
+    return _display_group_sort_tuple(group) < (
+        cursor["sort_at"] or "",
+        cursor["created_at"] or "",
+        cursor["log_id"] or "",
+    )
+
+
+def _reference_group_key(log: TransactionLogResponse) -> str:
+    return f"{log.reference_no or ''}::{log.shipping_phase or ''}"
+
+
+def _defect_actor(log: TransactionLogResponse) -> Optional[str]:
+    return (log.requester_name or log.produced_by or "").strip() or None
+
+
+def _defect_reason_key(log: TransactionLogResponse) -> Optional[str]:
+    category = (log.reason_category or "").strip()
+    memo = (log.reason_memo or "").strip()
+    return f"{category}::{memo}" if category or memo else None
+
+
+def _is_matching_defect_lifecycle(parent: TransactionLogResponse, child: TransactionLogResponse) -> bool:
+    if child.transaction_type not in {
+        TransactionTypeEnum.DEFECT_SCRAP,
+        TransactionTypeEnum.SUPPLIER_RETURN,
+        TransactionTypeEnum.DISASSEMBLE,
+    }:
+        return False
+    if parent.item_id != child.item_id or abs(parent.quantity_change) != abs(child.quantity_change):
+        return False
+    parent_actor, child_actor = _defect_actor(parent), _defect_actor(child)
+    if not parent_actor or parent_actor != child_actor:
+        return False
+    parent_department = (parent.department or "").strip()
+    child_department = (child.department or "").strip()
+    if not parent_department or parent_department != child_department:
+        return False
+    parent_reason, child_reason = _defect_reason_key(parent), _defect_reason_key(child)
+    if not parent_reason or parent_reason != child_reason:
+        return False
+    elapsed = (child.created_at - parent.created_at).total_seconds()
+    return 0 <= elapsed <= 60
+
+
+def _find_defect_lifecycle_pairs(
+    logs: list[TransactionLogResponse],
+) -> list[tuple[TransactionLogResponse, TransactionLogResponse]]:
+    chronological = sorted(logs, key=lambda log: log.created_at)
+    used: set[uuid.UUID] = set()
+    pairs: list[tuple[TransactionLogResponse, TransactionLogResponse]] = []
+    for index, parent in enumerate(chronological):
+        if parent.transaction_type != TransactionTypeEnum.MARK_DEFECTIVE or parent.log_id in used:
+            continue
+        child = next(
+            (
+                candidate
+                for candidate in chronological[index + 1 :]
+                if candidate.log_id not in used and _is_matching_defect_lifecycle(parent, candidate)
+            ),
+            None,
+        )
+        if child is not None:
+            used.update({parent.log_id, child.log_id})
+            pairs.append((parent, child))
+    return pairs
+
+
+def _build_display_groups(logs: list[TransactionLogResponse]) -> list[TransactionDisplayGroupResponse]:
+    """프런트엔드 buildGroups 와 같은 우선순위로 화면 대표 행을 만든다."""
+    op_batches: dict[uuid.UUID, list[TransactionLogResponse]] = {}
+    reference_batches: dict[str, list[TransactionLogResponse]] = {}
+    pairs = _find_defect_lifecycle_pairs(logs)
+    pair_by_log_id: dict[uuid.UUID, tuple[TransactionLogResponse, TransactionLogResponse, uuid.UUID]] = {}
+    log_positions = {log.log_id: index for index, log in enumerate(logs)}
+    for parent, child in pairs:
+        anchor_id = parent.log_id if log_positions[parent.log_id] <= log_positions[child.log_id] else child.log_id
+        pair_by_log_id[parent.log_id] = (parent, child, anchor_id)
+        pair_by_log_id[child.log_id] = (parent, child, anchor_id)
+    for log in logs:
+        if log.operation_batch_id:
+            op_batches.setdefault(log.operation_batch_id, []).append(log)
+        elif log.reference_no:
+            reference_batches.setdefault(_reference_group_key(log), []).append(log)
+
+    groups: list[TransactionDisplayGroupResponse] = []
+    seen_operation_batches: set[uuid.UUID] = set()
+    seen_reference_batches: set[str] = set()
+    for log in logs:
+        pair = pair_by_log_id.get(log.log_id)
+        if pair:
+            parent, child, anchor_id = pair
+            if anchor_id == log.log_id:
+                groups.append(TransactionDisplayGroupResponse(
+                    type="defect_lifecycle",
+                    key=f"defect-lifecycle:{parent.log_id}:{child.log_id}",
+                    logs=[parent, child],
+                ))
+            continue
+        if log.operation_batch_id:
+            batch_id = log.operation_batch_id
+            if batch_id in seen_operation_batches:
+                continue
+            seen_operation_batches.add(batch_id)
+            batch_logs = op_batches[batch_id]
+            groups.append(TransactionDisplayGroupResponse(
+                type="solo" if len(batch_logs) == 1 else "op_batch",
+                key=str(batch_id) if len(batch_logs) > 1 else f"solo:{batch_logs[0].log_id}",
+                logs=batch_logs,
+            ))
+        elif log.reference_no:
+            reference_key = _reference_group_key(log)
+            if reference_key in seen_reference_batches:
+                continue
+            seen_reference_batches.add(reference_key)
+            reference_logs = reference_batches[reference_key]
+            groups.append(TransactionDisplayGroupResponse(
+                type="solo" if len(reference_logs) == 1 else "batch",
+                key=reference_key if len(reference_logs) > 1 else f"solo:{reference_logs[0].log_id}",
+                logs=reference_logs,
+            ))
+        else:
+            groups.append(TransactionDisplayGroupResponse(type="solo", key=f"solo:{log.log_id}", logs=[log]))
+    return groups
 
 
 def _require_export_range(start_date: Optional[date], end_date: Optional[date]) -> tuple[datetime, datetime]:
@@ -297,6 +480,102 @@ def list_transactions(
             )
         )
     return result
+
+
+@router.get(
+    "/transactions/display-groups",
+    response_model=TransactionDisplayGroupPageResponse,
+)
+def list_transaction_display_groups(
+    item_id: Optional[uuid.UUID] = Query(None),
+    operation_batch_id: Optional[uuid.UUID] = Query(None),
+    transaction_type: Optional[TransactionTypeEnum] = Query(None),
+    transaction_types: Optional[str] = Query(None),
+    operation_keys: Optional[str] = Query(None),
+    reference_no: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    model: Optional[str] = Query(None),
+    process_step: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    include_archived: bool = Query(False),
+    cursor: Optional[str] = Query(None),
+    limit: int = Query(DISPLAY_GROUP_PAGE_SIZE, ge=1, le=DISPLAY_GROUP_PAGE_SIZE),
+    db: Session = Depends(get_db),
+) -> TransactionDisplayGroupPageResponse:
+    """필터된 로그를 화면 대표 행으로 묶어, 완결된 그룹 단위로 페이지를 반환한다."""
+    edit_count_sq = (
+        select(func.count(TransactionEditLog.edit_id))
+        .where(TransactionEditLog.original_log_id == TransactionLog.log_id)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
+    query = (
+        db.query(TransactionLog, Item, edit_count_sq.label("edit_count"))
+        .join(Item, TransactionLog.item_id == Item.item_id)
+        .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
+    )
+    if item_id:
+        query = query.filter(TransactionLog.item_id == item_id)
+    if operation_batch_id:
+        query = query.filter(TransactionLog.operation_batch_id == operation_batch_id)
+    if transaction_type:
+        query = query.filter(TransactionLog.transaction_type == transaction_type)
+    if reference_no:
+        query = query.filter(TransactionLog.reference_no == reference_no)
+    query = _apply_common_filters(
+        query,
+        db,
+        transaction_types=transaction_types,
+        operation_keys=operation_keys,
+        search=search,
+        department=department,
+        model=model,
+        process_step=process_step,
+        date_from=date_from,
+        date_to=date_to,
+        include_archived=include_archived,
+    )
+    requested_at_order = func.coalesce(
+        IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at
+    )
+    rows = query.order_by(
+        requested_at_order.desc(),
+        TransactionLog.created_at.desc(),
+        TransactionLog.log_id.desc(),
+    ).all()
+    batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
+    batch_map = _batch_name_map(db, batch_ids)
+    reference_nos = {log.reference_no for log, _, _ in rows if log.reference_no}
+    stock_request_map = _stock_request_info_map(db, reference_nos)
+    logs = []
+    for log, item, edit_count in rows:
+        info = batch_map.get(log.operation_batch_id)
+        if info is None and log.reference_no:
+            info = stock_request_map.get(log.reference_no)
+        logs.append(
+            _to_log_response(
+                log,
+                item,
+                int(edit_count or 0),
+                requester_name=info.requester_name if info else None,
+                approver_name=info.approver_name if info else None,
+                requested_at=info.requested_at if info else None,
+                approved_at=info.approved_at if info else None,
+            )
+        )
+    groups = _build_display_groups(logs)
+    if cursor:
+        cursor_value = _decode_display_group_cursor(cursor)
+        groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
+    page_groups = groups[:limit]
+    has_more = len(page_groups) < len(groups)
+    return TransactionDisplayGroupPageResponse(
+        groups=page_groups,
+        next_cursor=_display_group_cursor(page_groups[-1]) if has_more and page_groups else None,
+        has_more=has_more,
+    )
 
 
 @router.get(

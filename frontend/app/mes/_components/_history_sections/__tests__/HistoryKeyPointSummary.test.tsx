@@ -30,6 +30,7 @@ function summary(overrides: Partial<HistoryDetailSummary> = {}): HistoryDetailSu
     impactGroups: [{ key: "actual", label: null, effects: [effect()] }],
     conversion: null,
     requester: { name: "요청자 A", at: "2026-07-10T01:00:00Z" },
+    flow: null,
     composition: null,
     ...overrides,
   };
@@ -141,6 +142,42 @@ describe("HistoryKeyPointSummary", () => {
     ))).toBeInTheDocument();
   });
 
+  it("places requester metadata before conversion and actual impact", () => {
+    const { container } = render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          conversion: {
+            source: { itemId: "source", itemName: "기존품", mesCode: "SRC-001" },
+            target: { itemId: "target", itemName: "변경품", mesCode: "TGT-001" },
+          },
+        })}
+      />,
+    );
+
+    const requester = screen.getByText("요청자 A");
+    const conversion = screen.getByText("품목 전환");
+    const impact = screen.getByText("실제 영향");
+
+    expect(requester.compareDocumentPosition(conversion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(requester.compareDocumentPosition(impact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector("[data-testid='history-key-point-summary']")).toContainElement(requester);
+  });
+
+  it("shows the location or movement route in the desktop summary only when it exists", () => {
+    const { rerender } = render(
+      <HistoryKeyPointSummary
+        summary={summary({ flow: { label: "조립 재고", from: "창고", to: "조립" } })}
+      />,
+    );
+
+    expect(screen.getByText("위치 / 이동 경로")).toBeInTheDocument();
+    expect(screen.getByText("창고")).toBeInTheDocument();
+    expect(screen.getByText("조립")).toBeInTheDocument();
+
+    rerender(<HistoryKeyPointSummary summary={summary({ flow: null })} />);
+    expect(screen.queryByText("위치 / 이동 경로")).not.toBeInTheDocument();
+  });
+
   it("keeps partial impacts hidden while the complete scope is loading or failed", () => {
     const onRetryImpact = vi.fn();
     const { rerender } = render(
@@ -182,6 +219,7 @@ describe("HistoryKeyPointSummary", () => {
     const impactButton = screen.getByRole("button", { name: /완제품 A.*-2 EA/ });
     expect(impactButton).not.toHaveClass("focus-visible:outline");
     expect(impactButton).toHaveClass("focus-visible:brightness-125");
+    expect(impactButton).toHaveClass("no-btn-inset");
 
     fireEvent.click(impactButton);
     expect(onImpactClick).toHaveBeenCalledWith(expect.objectContaining({ itemId: "item-finished" }));

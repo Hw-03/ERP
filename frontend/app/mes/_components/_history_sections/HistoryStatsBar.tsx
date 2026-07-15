@@ -118,9 +118,6 @@ function StatBox({
       <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
         {sub}
       </div>
-      <div className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
-        표시 전용
-      </div>
     </div>
   );
 }

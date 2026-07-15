@@ -7,7 +7,7 @@ import {
   Package, PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench,
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import type { TransactionReferenceSummary } from "@/lib/api/production";
+import type { TransactionDisplayGroup, TransactionReferenceSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import type { HistoryPresentationTone, HistoryRowPresentation } from "./historyPresentation";
@@ -44,6 +44,7 @@ export const HISTORY_CELL_TRANSITION =
   "padding 160ms cubic-bezier(0.4, 0, 0.2, 1), width 160ms cubic-bezier(0.4, 0, 0.2, 1)";
 export const HISTORY_MAIN_ROW_CLASS = "h-[64px]";
 export const HISTORY_MAIN_CELL_CLASS = "border-b py-2 align-middle";
+export const HISTORY_STATUS_CELL_CLASS = "border-b py-0 align-middle";
 export const HISTORY_CHILD_ROW_CLASS = "h-[40px]";
 export const HISTORY_CHILD_CELL_CLASS = "h-[40px] overflow-hidden border-b py-0 align-middle";
 
@@ -283,36 +284,6 @@ export function ItemCodeCell({
   );
 }
 
-export function SpacerCell({ compact, dense = false }: { compact?: boolean; dense?: boolean }) {
-  return (
-    <td
-      aria-hidden
-      className={`${compact ? "px-0" : "px-2"} ${dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS}`}
-      style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
-    />
-  );
-}
-
-export function FlowSummaryCell({
-  presentation,
-  dense = false,
-}: {
-  presentation: HistoryRowPresentation;
-  dense?: boolean;
-}) {
-  return (
-    <div className={`flex flex-col items-center justify-center overflow-hidden text-xs leading-tight ${dense ? "h-10 gap-0.5" : "h-11 gap-1"}`}>
-      <span className="max-w-[10.75rem] truncate rounded-full border px-2.5 py-1 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-        {presentation.flow.label}
-      </span>
-      {presentation.flow.hint && (
-        <span className="max-w-[10.75rem] truncate" style={{ color: LEGACY_COLORS.muted2 }}>
-          {presentation.flow.hint}
-        </span>
-      )}
-    </div>
-  );
-}
 export function QuantityStockCell({
   presentation,
   summary,
@@ -346,12 +317,12 @@ export function PeopleStatusCell({
   const requesterLabel = systemRequester || compact ? requester : `요청 ${requester}`;
   const requesterTitle = systemRequester ? requester : `요청 ${requester}`;
   return (
-    <div className={`flex min-w-0 flex-col items-center justify-center py-1 text-center leading-tight ${dense ? "gap-0.5" : "gap-1"}`}>
-      <div title={requesterTitle} className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+    <div className={`flex min-w-0 flex-col items-center justify-center overflow-hidden text-center ${dense ? "h-10 gap-0" : "h-16 gap-1"}`}>
+      <div title={requesterTitle} className="truncate text-xs font-semibold leading-tight" style={{ color: LEGACY_COLORS.text }}>
         {requesterLabel}
       </div>
       {approver && approver !== "-" && (
-        <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className="truncate text-xs leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
           승인 {approver}
         </div>
       )}
@@ -364,6 +335,39 @@ export type LogGroup =
   | { type: "batch"; refKey: string; refNo: string; logs: TransactionLog[] }
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] }
   | { type: "defect_lifecycle"; key: string; parent: TransactionLog; child: TransactionLog };
+
+/** 서버가 확정한 대표 묶음을 표 렌더링 모델로만 변환한다. 새 묶음을 만들거나 합치지 않는다. */
+export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[] {
+  return groups.reduce<LogGroup[]>((result, group) => {
+    const first = group.logs[0];
+    if (!first) return result;
+    if (group.type === "solo") {
+      result.push({ type: "solo", log: first });
+      return result;
+    }
+    if (group.type === "op_batch") {
+      result.push({
+        type: "op_batch",
+        batchId: first.operation_batch_id ?? group.key,
+        refNo: first.reference_no ?? null,
+        logs: group.logs,
+      });
+      return result;
+    }
+    if (group.type === "batch") {
+      result.push({
+        type: "batch",
+        refKey: group.key,
+        refNo: first.reference_no ?? "",
+        logs: group.logs,
+      });
+      return result;
+    }
+    const child = group.logs[1];
+    if (child) result.push({ type: "defect_lifecycle", key: group.key, parent: first, child });
+    return result;
+  }, []);
+}
 
 function referenceGroupKey(log: TransactionLog): string {
   return `${log.reference_no ?? ""}::${log.shipping_phase ?? ""}`;
@@ -623,7 +627,6 @@ export function BatchHeader({
 }) {
   const padX = "px-4";
   const targetPadX = "px-4";
-  const flowPadX = "px-2";
   const quantityPadX = "px-4";
   const statusPadX = "px-4";
   const first = group.logs[0];
@@ -704,14 +707,10 @@ export function BatchHeader({
         </div>
       </td>
       <ItemCodeCell code={presentation.target.code} sourceCode={presentation.target.sourceCode} />
-      <SpacerCell />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowSummaryCell presentation={presentation} />
-      </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
@@ -890,7 +889,6 @@ function ReferenceBatchLineRow({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const presentation = getHistoryRowPresentation(log);
@@ -950,10 +948,6 @@ function ReferenceBatchLineRow({
         </div>
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} dense />
-      <SpacerCell compact={compact} dense />
-      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowSummaryCell presentation={presentation} dense />
-      </td>
       <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex h-10 items-center justify-center overflow-hidden">
           <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} cancelled={log.cancelled} />
@@ -1022,7 +1016,6 @@ export function OpBatchHeader({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
@@ -1104,14 +1097,10 @@ export function OpBatchHeader({
         </div>
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
-      <SpacerCell compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowSummaryCell presentation={presentation} />
-      </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} compact={compact} />
       </td>
     </tr>

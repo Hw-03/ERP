@@ -8,12 +8,11 @@ import { formatHistoryDate } from "./historyFormat";
 import {
   ChevronToggleBtn,
   FlowBadge,
-  FlowSummaryCell,
   HISTORY_CELL_TRANSITION,
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
+  HISTORY_STATUS_CELL_CLASS,
   ItemCodeCell,
-  SpacerCell,
   PeopleStatusCell,
   QuantityStockCell,
   TargetSummaryBlock,
@@ -36,7 +35,6 @@ type Props = {
 export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelect, compact, controlsId }: Props) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const flowPadX = "px-2";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
@@ -116,14 +114,10 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         />
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
-      <SpacerCell compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${flowPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowSummaryCell presentation={presentation} />
-      </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
         <QuantityStockCell presentation={presentation} cancelled={cancelled} />
       </td>
-      <td className={`${HISTORY_MAIN_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
     </tr>
