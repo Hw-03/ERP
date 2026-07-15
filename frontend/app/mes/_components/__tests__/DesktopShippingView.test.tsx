@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
 import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingRequest } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 const navigationMock = vi.hoisted(() => ({
   push: vi.fn(),
@@ -711,7 +712,8 @@ describe("DesktopShippingView", () => {
       request_id: "detail-codes",
       bom_lines: request().bom_lines.map((line) => (
         line.line_id === "bom-1" ? { ...line, mes_code: "34-PR-0051" } :
-          line.line_id === "bom-2" ? { ...line, mes_code: "3-AF-0018" } : line
+          line.line_id === "bom-2" ? { ...line, mes_code: "3-AF-0018" } :
+            line.line_id === "bom-3" ? { ...line, mes_code: "9-PF-0007" } : line
       )),
     });
     vi.mocked(api.getShippingRequests).mockResolvedValue([codedRequest]);
@@ -721,6 +723,10 @@ describe("DesktopShippingView", () => {
 
     expect(await screen.findByTestId("shipping-summary-code-bom-1-PF-kind")).toHaveTextContent("PR");
     expect(screen.getByTestId("shipping-summary-code-bom-2-PA-kind")).toHaveTextContent("AF");
+    expect(screen.getByTestId("shipping-summary-code-bom-3-PA-kind")).toHaveTextContent("PF");
+    expect(screen.getByTestId("shipping-summary-code-bom-1-PF-kind")).toHaveStyle({ color: LEGACY_COLORS.purple });
+    expect(screen.getByTestId("shipping-summary-code-bom-2-PA-kind")).toHaveStyle({ color: LEGACY_COLORS.green });
+    expect(screen.getByTestId("shipping-summary-code-bom-3-PA-kind")).toHaveStyle({ color: LEGACY_COLORS.blue });
     expect(screen.getByTestId("shipping-summary-quantity-bom-1-PF")).toHaveTextContent("1 EA");
     expect(screen.getByTestId("shipping-summary-quantity-bom-1-PF")).toHaveClass("tabular-nums");
   });
@@ -1331,6 +1337,9 @@ describe("DesktopShippingView", () => {
   });
 
   it("summarizes new or reused PA/PF names and item codes on the final step", async () => {
+    vi.mocked(api.getItems).mockResolvedValue(items.map((current) => (
+      current.item_id === "acc-1" ? { ...current, mes_code: "348-PR-0037" } : current
+    )));
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1359,6 +1368,9 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-final-group-companion")).toContainElement(screen.getByTestId("shipping-final-line-companion-carton-1"));
     expect(finalSummary).toHaveTextContent("품목코드는 저장/준비 완료 시 자동 생성 예정");
     expect(screen.getByTestId("shipping-final-line-pa-acc-1")).toHaveTextContent("Cable Set");
+    expect(screen.getByTestId("shipping-final-line-pa-acc-1")).toHaveClass("flex", "items-center");
+    expect(screen.getByTestId("shipping-final-code-pa-acc-1-kind")).toHaveTextContent("PR");
+    expect(screen.getByTestId("shipping-final-quantity-pa-acc-1")).toHaveClass("self-center", "tabular-nums");
     expect(screen.getByTestId("shipping-final-line-companion-carton-1")).toHaveTextContent("Carton Box");
   });
 

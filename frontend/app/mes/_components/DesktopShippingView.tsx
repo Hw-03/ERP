@@ -2329,14 +2329,21 @@ function SummaryList({ title, lines, empty = "등록 없음" }: { title: string;
   );
 }
 
+const SUMMARY_CODE_KIND_COLORS: Record<string, string> = {
+  PR: LEGACY_COLORS.purple,
+  PF: LEGACY_COLORS.blue,
+  AF: LEGACY_COLORS.green,
+};
+
 function SummaryCode({ code, testId }: { code: string; testId: string }) {
   const segments = code.split("-");
   const hasClassifiedCode = segments.length === 3 && segments.every(Boolean);
+  const kindColor = hasClassifiedCode ? (SUMMARY_CODE_KIND_COLORS[segments[1]] ?? LEGACY_COLORS.blue) : LEGACY_COLORS.blue;
   return (
     <span data-testid={testId} className="min-w-0 truncate">
       {hasClassifiedCode ? (
         <>
-          {segments[0]}-<strong data-testid={`${testId}-kind`} className="font-black" style={{ color: LEGACY_COLORS.text }}>{segments[1]}</strong>-{segments[2]}
+          {segments[0]}-<strong data-testid={`${testId}-kind`} className="font-black" style={{ color: kindColor }}>{segments[1]}</strong>-{segments[2]}
         </>
       ) : code}
     </span>
@@ -2615,12 +2622,14 @@ function FinalRequirementGroup({
           const itemName = row.itemName ?? item?.item_name ?? "품목 없음";
           const itemCode = row.code ?? item?.mes_code ?? "코드 없음";
           return (
-            <div key={row.id} data-testid={row.testId} className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{itemName}</div>
-              <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                <span className="truncate">{itemCode}</span>
-                <span className="shrink-0 tabular-nums">총 {row.quantity} {row.unit}</span>
+            <div key={row.id} data-testid={row.testId} className={`${SHIPPING_CELL_CLASS} flex min-w-0 items-center justify-between gap-2`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <div className="min-w-0">
+                <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{itemName}</div>
+                <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <SummaryCode code={itemCode} testId={`shipping-final-code-${row.id}`} />
+                </div>
               </div>
+              <span data-testid={`shipping-final-quantity-${row.id}`} className="shrink-0 self-center text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>총 {row.quantity} {row.unit}</span>
             </div>
           );
         })}
