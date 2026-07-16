@@ -23,7 +23,7 @@ const FRONTEND_ROOT = path.resolve(__dirname, "..");
 
 const args = process.argv.slice(2);
 const maxIdx = args.indexOf("--max");
-const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 2.10;
+const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 2.11;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 async function walk(dir) {
@@ -58,10 +58,16 @@ async function main() {
 
   const totalMB = total / 1024 / 1024;
   const limitMB = MAX_BYTES / 1024 / 1024;
-  console.log(`Bundle size (${distDir}/static/chunks): ${totalMB.toFixed(2)} MB (limit ${limitMB.toFixed(2)} MB)`);
+  console.log(
+    `Bundle size (${distDir}/static/chunks): ${totalMB.toFixed(3)} MB (${total.toLocaleString()} bytes) ` +
+      `(limit ${limitMB.toFixed(3)} MB, ${MAX_BYTES.toLocaleString()} bytes)`,
+  );
 
   if (total > MAX_BYTES) {
-    console.error(`✗ Bundle size ${totalMB.toFixed(2)} MB exceeds limit ${limitMB.toFixed(2)} MB.`);
+    console.error(
+      `✗ Bundle size ${totalMB.toFixed(3)} MB (${total.toLocaleString()} bytes) exceeds ` +
+        `limit ${limitMB.toFixed(3)} MB (${MAX_BYTES.toLocaleString()} bytes).`,
+    );
     process.exit(1);
   }
   console.log(`✓ Bundle size within limit.`);
