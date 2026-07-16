@@ -1416,6 +1416,7 @@ function RequestSection(props: {
     ? finalPfSummary.code
     : basePfItem ? itemCodeText(basePfItem) : finalPfSummary.code;
   const hasBomChanges = bomChangedLines.length > 0;
+  const finalSummaryUsesOuterScroll = bomChangedLines.length > 2;
   const canOpenStep = (step: RequestWizardStep) => {
     if (locked && step !== props.wizardStep) return false;
     if (props.pending !== null && step !== props.wizardStep) return false;
@@ -1621,17 +1622,21 @@ function RequestSection(props: {
 
           {props.wizardStep === 5 && (
             <section data-testid="shipping-wizard-step-5" className="flex h-full min-h-0 flex-col">
-              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 ${hasBomChanges ? "grid-rows-[auto_432px_auto]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-y-auto pr-1`}>
-                <ShippingShipmentHero name={shipmentName} code={shipmentCode} codeNotice={requiresPfName ? finalPfSummary.codeNotice : undefined} quantity={requestQty} />
+              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 content-start ${hasBomChanges ? "grid-rows-[auto_432px_auto]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 ${finalSummaryUsesOuterScroll ? "overflow-y-auto" : "overflow-hidden"} pr-1`}>
+                <ShippingShipmentHero name={shipmentName} code={shipmentCode} codeNotice={requiresPfName ? finalPfSummary.codeNotice : undefined} />
                 <FinalRequirementReview
                   paLines={grouped.PA.filter((line) => line.included)}
                   pfLines={grouped.PF.filter((line) => line.included)}
                   companionLines={props.companionDraft}
                   paTitle={paRequirementTitle}
                   pfTitle={pfRequirementTitle}
-                  newPfName={requiresPfName ? finalPfSummary.name : null}
-                  newPfCode={requiresPfName ? finalPfSummary.code : null}
-                  newPfCodeNotice={requiresPfName ? finalPfSummary.codeNotice : undefined}
+                  paCode={requiresPaName ? finalPaSummary.code : undefined}
+                  paCodeNotice={requiresPaName ? finalPaSummary.codeNotice : undefined}
+                  pfCode={requiresPfName ? finalPfSummary.code : undefined}
+                  pfCodeNotice={requiresPfName ? finalPfSummary.codeNotice : undefined}
+                  newPaName={requiresPaName && requiresPfName ? finalPaSummary.name : null}
+                  newPaCode={requiresPaName && requiresPfName ? finalPaSummary.code : null}
+                  newPaCodeNotice={requiresPaName && requiresPfName ? finalPaSummary.codeNotice : undefined}
                   itemById={props.itemById}
                   requestQuantity={requestQty}
                   hasBomChanges={hasBomChanges}
@@ -1645,7 +1650,7 @@ function RequestSection(props: {
         </div>
 
 
-        <div data-testid="shipping-wizard-action-bar" className="mt-3 grid items-center gap-2 rounded-[14px] border p-3 md:grid-cols-[auto_minmax(0,1fr)_auto]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div data-testid="shipping-wizard-action-bar" className={`mt-3 grid items-center gap-2 rounded-[14px] border p-3 ${props.wizardStep === 5 ? "md:grid-cols-[auto_minmax(0,1fr)_auto_auto]" : "md:grid-cols-[auto_minmax(0,1fr)_auto]"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           <button type="button" onClick={goPrev} disabled={props.wizardStep === 1 || props.pending !== null} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-4 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>이전</button>
           <div data-testid="shipping-wizard-action-center" className="min-w-0">
             {props.wizardStep === 1 ? (
@@ -1717,6 +1722,12 @@ function RequestSection(props: {
               <div className="min-w-0 text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{footerHint}</div>
             )}
           </div>
+          {props.wizardStep === 5 && (
+            <div data-testid="shipping-final-action-quantity" className="inline-flex shrink-0 items-baseline justify-center gap-2 rounded-[10px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: tint(LEGACY_COLORS.blue, 24) }}>
+              <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</span>
+              <span className="text-xl font-black" style={{ color: LEGACY_COLORS.blue }}> {requestQty}대</span>
+            </div>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
             {props.wizardStep < 5 ? (
               <button
@@ -2625,9 +2636,13 @@ function FinalRequirementReview({
   companionLines,
   paTitle,
   pfTitle,
-  newPfName,
-  newPfCode,
-  newPfCodeNotice,
+  paCode,
+  paCodeNotice,
+  pfCode,
+  pfCodeNotice,
+  newPaName,
+  newPaCode,
+  newPaCodeNotice,
   itemById,
   requestQuantity,
   hasBomChanges,
@@ -2637,22 +2652,26 @@ function FinalRequirementReview({
   companionLines: CompanionDraftLine[];
   paTitle: string;
   pfTitle: string;
-  newPfName: string | null;
-  newPfCode: string | null;
-  newPfCodeNotice?: string;
+  paCode?: string;
+  paCodeNotice?: string;
+  pfCode?: string;
+  pfCodeNotice?: string;
+  newPaName: string | null;
+  newPaCode: string | null;
+  newPaCodeNotice?: string;
   itemById: Map<string, Item>;
   requestQuantity: number;
   hasBomChanges: boolean;
 }) {
   const paRows = paLines.map((line) => ({ id: `pa-${line.child_item_id}`, testId: `shipping-final-line-pa-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" }));
   const pfRows = [
-    ...(newPfName ? [{ id: "new-pf", testId: "shipping-final-new-pf-link", itemName: newPfName, code: newPfCode ?? "-", codeNotice: newPfCodeNotice, quantity: requestQuantity, unit: "EA" }] : []),
+    ...(newPaName ? [{ id: "new-pa", testId: "shipping-final-new-pa-link", itemName: newPaName, code: newPaCode ?? "-", codeNotice: newPaCodeNotice, quantity: requestQuantity, unit: "EA" }] : []),
     ...pfLines.map((line) => ({ id: `pf-${line.child_item_id}`, testId: `shipping-final-line-pf-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
   ];
   const companionRows = companionLines.map((line) => ({ id: `companion-${line.item_id}`, testId: `shipping-final-line-companion-${line.item_id}`, itemId: line.item_id, quantity: line.quantity, unit: line.unit || "EA" }));
   const groups = [
-    { id: "pa", testId: "shipping-final-group-pa", title: paTitle, tone: LEGACY_COLORS.green, rows: paRows },
-    { id: "pf", testId: "shipping-final-group-pf", title: pfTitle, tone: LEGACY_COLORS.blue, rows: pfRows },
+    { id: "pa", testId: "shipping-final-group-pa", title: paTitle, code: paCode, codeNotice: paCodeNotice, tone: LEGACY_COLORS.green, rows: paRows },
+    { id: "pf", testId: "shipping-final-group-pf", title: pfTitle, code: pfCode, codeNotice: pfCodeNotice, tone: LEGACY_COLORS.blue, rows: pfRows },
     { id: "companion", testId: "shipping-final-group-companion", title: "카톤·동반 출하품", tone: LEGACY_COLORS.purple, rows: companionRows },
   ];
   return (
@@ -2671,12 +2690,20 @@ function FinalRequirementGroup({
   group,
   itemById,
 }: {
-  group: { id: string; testId: string; title: string; tone: string; rows: FinalRequirementRow[] };
+  group: { id: string; testId: string; title: string; code?: string; codeNotice?: string; tone: string; rows: FinalRequirementRow[] };
   itemById: Map<string, Item>;
 }) {
   return (
     <section data-testid={group.testId} className="flex min-h-0 flex-col rounded-[12px] border p-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-      <div data-testid={`shipping-final-group-title-${group.id}`} className="mb-2 text-sm font-black" style={{ color: group.tone }}>{group.title}</div>
+      <div data-testid={`shipping-final-group-title-${group.id}`} className="mb-2 flex min-w-0 items-center gap-1" style={{ color: group.tone }}>
+        <span className="min-w-0 truncate text-sm font-black">{group.title}</span>
+        {group.code && (
+          <span data-testid={`shipping-final-group-code-${group.id}`} className="flex min-w-0 items-center gap-1 whitespace-nowrap text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            <SummaryCode code={group.code} testId={`shipping-final-group-code-value-${group.id}`} />
+            {group.codeNotice && <span className="min-w-0 truncate">{group.codeNotice}</span>}
+          </span>
+        )}
+      </div>
       <div data-testid={`shipping-final-group-list-${group.id}`} className={SHIPPING_SCROLL_LIST_CLASS}>
         {group.rows.length === 0 ? (
           <div className={SHIPPING_EMPTY_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>표시할 항목 없음</div>
@@ -2688,10 +2715,10 @@ function FinalRequirementGroup({
             <div key={row.id} data-testid={row.testId} className={`${SHIPPING_CELL_CLASS} flex min-w-0 items-center justify-between gap-2`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
               <div className="min-w-0">
                 <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{itemName}</div>
-                <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div data-testid={`shipping-final-code-meta-${row.id}`} className="mt-0.5 flex min-w-0 items-center gap-1 whitespace-nowrap text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                   <SummaryCode code={itemCode} testId={`shipping-final-code-${row.id}`} />
+                  {row.codeNotice && <span className="min-w-0 truncate">{row.codeNotice}</span>}
                 </div>
-                {row.codeNotice && <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{row.codeNotice}</div>}
               </div>
               <span data-testid={`shipping-final-quantity-${row.id}`} className="shrink-0 self-center text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>총 {row.quantity} {row.unit}</span>
             </div>
@@ -2702,21 +2729,17 @@ function FinalRequirementGroup({
   );
 }
 
-function ShippingShipmentHero({ name, code, codeNotice, quantity }: { name: string; code: string; codeNotice?: string; quantity: number }) {
+function ShippingShipmentHero({ name, code, codeNotice }: { name: string; code: string; codeNotice?: string }) {
   return (
     <section data-testid="shipping-shipment-hero" className="rounded-[16px] border px-4 py-2" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 34) }}>
       <div data-testid="shipping-shipment-hero-row" className="flex min-w-0 items-center gap-3">
         <div className="contents">
           <div className="shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>출하 품목</div>
-          <div className="min-w-0 flex-1 truncate text-lg font-black leading-snug" title={name} style={{ color: LEGACY_COLORS.text }}>{name}</div>
-          <div className="min-w-0 max-w-[36%] truncate text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="min-w-0 max-w-[42%] flex-1 truncate text-lg font-black leading-snug" title={name} style={{ color: LEGACY_COLORS.text }}>{name}</div>
+          <div data-testid="shipping-shipment-code-meta" className="flex min-w-0 items-center gap-1 whitespace-nowrap text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             <SummaryCode code={code} testId="shipping-shipment-code" />
-            {codeNotice && <div className="mt-0.5 text-xs font-bold">{codeNotice}</div>}
+            {codeNotice && <span className="min-w-0 truncate text-xs font-bold">{codeNotice}</span>}
           </div>
-        </div>
-        <div data-testid="shipping-shipment-quantity" className="inline-flex shrink-0 items-baseline gap-2 rounded-[10px] border px-3 py-2" style={{ background: LEGACY_COLORS.bg, borderColor: tint(LEGACY_COLORS.blue, 24) }}>
-          <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</div>
-          <div className="text-xl font-black" style={{ color: LEGACY_COLORS.blue }}>{quantity}대</div>
         </div>
       </div>
     </section>

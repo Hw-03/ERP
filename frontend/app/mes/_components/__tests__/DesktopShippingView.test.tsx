@@ -1176,7 +1176,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
   });
 
-  it("shows a new PF first inside the final PF list when both new item names are entered", async () => {
+  it("shows a new PA first inside the final PF list when both new item names are entered", async () => {
     vi.mocked(api.matchShippingBom).mockResolvedValue({
       matched_pa_item_id: null,
       matched_pf_item_id: null,
@@ -1208,13 +1208,17 @@ describe("DesktopShippingView", () => {
     nextStep(container);
     await screen.findByTestId("shipping-wizard-step-5");
 
-    const newPf = screen.getByTestId("shipping-final-new-pf-link");
+    const newPa = screen.getByTestId("shipping-final-new-pa-link");
     const pfGroup = screen.getByTestId("shipping-final-group-pf");
-    expect(pfGroup).toContainElement(newPf);
-    expect(screen.getByTestId("shipping-final-group-list-pf").firstElementChild).toBe(newPf);
-    expect(newPf).toHaveTextContent("새 PF");
-    expect(newPf).toHaveTextContent("4-PF-0005");
-    expect(newPf).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(pfGroup).toContainElement(newPa);
+    expect(screen.getByTestId("shipping-final-group-list-pf").firstElementChild).toBe(newPa);
+    expect(newPa).toHaveTextContent("새 PA");
+    expect(newPa).toHaveTextContent("4-PA-0004");
+    expect(newPa).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(screen.queryByTestId("shipping-final-new-pf-link")).not.toBeInTheDocument();
+    expect(screen.getByTestId("shipping-final-code-meta-new-pa")).toHaveClass("flex", "items-center", "whitespace-nowrap");
+    expect(screen.getByTestId("shipping-final-group-title-pa")).toHaveTextContent("4-PA-0004");
+    expect(screen.getByTestId("shipping-final-group-title-pf")).toHaveTextContent("4-PF-0005");
     expect(screen.getByTestId("shipping-shipment-hero")).toHaveTextContent("4-PF-0005");
     expect(screen.getByTestId("shipping-shipment-hero")).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(screen.getByTestId("shipping-final-group-pa").firstElementChild).toHaveTextContent("새 PA");
@@ -1242,6 +1246,15 @@ describe("DesktopShippingView", () => {
     await screen.findByTestId("shipping-wizard-step-3");
 
     expect(screen.queryByTestId("shipping-new-pf-pa-link-notice")).not.toBeInTheDocument();
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "새 PF" } });
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-4");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-5");
+
+    expect(screen.queryByTestId("shipping-final-new-pa-link")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-final-new-pf-link")).not.toBeInTheDocument();
+    expect(screen.getByTestId("shipping-final-group-list-pf")).toContainElement(screen.getByTestId("shipping-final-line-pf-pa-1"));
   });
 
   it("returns a preparing request to the three-column request list after saving", async () => {
@@ -1375,7 +1388,9 @@ describe("DesktopShippingView", () => {
     const hero = await screen.findByTestId("shipping-shipment-hero");
     expect(hero).toHaveClass("py-2");
     expect(screen.getByTestId("shipping-shipment-hero-row")).toHaveClass("items-center");
-    expect(screen.getByTestId("shipping-shipment-quantity")).toHaveClass("inline-flex", "items-baseline");
+    expect(screen.queryByTestId("shipping-shipment-quantity")).not.toBeInTheDocument();
+    expect(screen.getByTestId("shipping-shipment-code-meta")).toHaveClass("flex", "items-center", "whitespace-nowrap");
+    expect(screen.getByTestId("shipping-final-action-quantity")).toHaveTextContent("출하 수량 1대");
     expect(hero).toHaveTextContent("Custom PF");
     expect(hero).not.toHaveTextContent("Standard PF");
     expect(finalSummary).toHaveTextContent("Standard PA");
@@ -1583,7 +1598,7 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_432px_auto]", "overflow-y-auto");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_432px_auto]", "content-start", "overflow-hidden");
     expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[432px]", "shrink-0");
     expect(screen.getByTestId("shipping-final-requirements-list")).toHaveClass("overflow-y-auto");
     expect(screen.getByTestId("shipping-final-bom-changes")).not.toHaveClass("h-[432px]", "shrink-0");
