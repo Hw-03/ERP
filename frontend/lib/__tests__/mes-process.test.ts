@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   PROCESS_LABEL,
+  PROCESS_TYPE_COLORS,
   PROCESS_TO_DEPT,
   processStageLabel,
+  processTypeColor,
   mesCodeDept,
   mesCodeDeptBadge,
   displayPart,
@@ -55,6 +57,23 @@ describe("PROCESS_TO_DEPT", () => {
   it("covers 18 stage codes mapping to 6 부서", () => {
     expect(Object.keys(PROCESS_TO_DEPT).length).toBe(18);
     expect(new Set(Object.values(PROCESS_TO_DEPT)).size).toBe(6);
+  });
+});
+
+describe("processTypeColor", () => {
+  it("returns the approved token for every process code", () => {
+    expect(Object.keys(PROCESS_TYPE_COLORS)).toHaveLength(18);
+    expect(processTypeColor("PR")).toBe("var(--c-process-pr)");
+    expect(processTypeColor("PA")).toBe("var(--c-process-pa)");
+    expect(processTypeColor("PF")).toBe("var(--c-process-pf)");
+    expect(processTypeColor("AR")).toBe("var(--c-process-ar)");
+    expect(processTypeColor("AA")).toBe("var(--c-process-aa)");
+    expect(processTypeColor("AF")).toBe("var(--c-process-af)");
+  });
+
+  it("uses the neutral token for unknown or missing codes", () => {
+    expect(processTypeColor("XX")).toBe("var(--c-muted2)");
+    expect(processTypeColor()).toBe("var(--c-muted2)");
   });
 });
 

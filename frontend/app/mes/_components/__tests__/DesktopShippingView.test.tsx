@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render as rtlRender, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
 import { DesktopShippingView } from "../DesktopShippingView";
@@ -724,9 +724,9 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-summary-code-bom-1-PF-kind")).toHaveTextContent("PR");
     expect(screen.getByTestId("shipping-summary-code-bom-2-PA-kind")).toHaveTextContent("AF");
     expect(screen.getByTestId("shipping-summary-code-bom-3-PA-kind")).toHaveTextContent("PF");
-    expect(screen.getByTestId("shipping-summary-code-bom-1-PF-kind")).toHaveStyle({ color: LEGACY_COLORS.purple });
-    expect(screen.getByTestId("shipping-summary-code-bom-2-PA-kind")).toHaveStyle({ color: LEGACY_COLORS.green });
-    expect(screen.getByTestId("shipping-summary-code-bom-3-PA-kind")).toHaveStyle({ color: LEGACY_COLORS.blue });
+    expect(screen.getByTestId("shipping-summary-code-bom-1-PF-kind")).toHaveStyle({ color: "var(--c-process-pr)" });
+    expect(screen.getByTestId("shipping-summary-code-bom-2-PA-kind")).toHaveStyle({ color: "var(--c-process-af)" });
+    expect(screen.getByTestId("shipping-summary-code-bom-3-PA-kind")).toHaveStyle({ color: "var(--c-process-pf)" });
     expect(screen.getByTestId("shipping-summary-quantity-bom-1-PF")).toHaveTextContent("1 EA");
     expect(screen.getByTestId("shipping-summary-quantity-bom-1-PF")).toHaveClass("tabular-nums");
   });
@@ -828,6 +828,7 @@ describe("DesktopShippingView", () => {
 
     expect(await screen.findByTestId("shipping-work-title")).toBeInTheDocument();
     expect(container.querySelectorAll('[data-testid="shipping-work-title"]')).toHaveLength(1);
+    expect(within(screen.getByTestId("shipping-work-title")).queryByText("출하 요청", { exact: true })).not.toBeInTheDocument();
     expect(container.querySelector("select")).not.toBeInTheDocument();
   });
 
@@ -1122,6 +1123,8 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-bom-editor-pa")).toHaveTextContent("Standard PF · PA 구성품");
     expect(screen.getByTestId("shipping-bom-editor-pf")).toHaveTextContent("Standard PF · PF 구성품");
+    expect(screen.getByTestId("shipping-bom-title-stage-pa")).toHaveStyle({ color: "var(--c-process-pa)" });
+    expect(screen.getByTestId("shipping-bom-title-stage-pf")).toHaveStyle({ color: "var(--c-process-pf)" });
     expect(screen.queryByTestId("shipping-new-pf-name")).not.toBeInTheDocument();
     expect(screen.getByTestId("shipping-wizard-action-bar")).not.toHaveTextContent("새 PA/PF 이름을 입력하세요.");
 
@@ -1132,11 +1135,13 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(paSummary).toHaveTextContent("새 PA 생성 예정"));
     expect(paSummary).toHaveTextContent("Standard PA");
     expect(paSummary).toHaveTextContent("4-PA-0004");
-    expect(paSummary).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(paSummary).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
     expect(pfSummary).toHaveTextContent("Standard PF");
     expect(pfSummary).toHaveTextContent("4-PF-0005");
-    expect(pfSummary).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(pfSummary).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(screen.getByTestId("shipping-final-pa-summary-label")).toHaveStyle({ color: "var(--c-process-pa)" });
+    expect(screen.getByTestId("shipping-final-pf-summary-label")).toHaveStyle({ color: "var(--c-process-pf)" });
     expect(screen.getByTestId("shipping-match-summary")).not.toHaveTextContent("기본 BOM 유지");
     const actionBar = screen.getByTestId("shipping-wizard-action-bar");
     const paNameInput = screen.getByTestId("shipping-new-pa-name");
@@ -1214,13 +1219,16 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-final-group-list-pf").firstElementChild).toBe(newPa);
     expect(newPa).toHaveTextContent("새 PA");
     expect(newPa).toHaveTextContent("4-PA-0004");
-    expect(newPa).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(newPa).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(screen.queryByTestId("shipping-final-new-pf-link")).not.toBeInTheDocument();
     expect(screen.getByTestId("shipping-final-code-meta-new-pa")).toHaveClass("flex", "items-center", "whitespace-nowrap");
     expect(screen.getByTestId("shipping-final-group-title-pa")).toHaveTextContent("4-PA-0004");
     expect(screen.getByTestId("shipping-final-group-title-pf")).toHaveTextContent("4-PF-0005");
+    expect(screen.getByTestId("shipping-final-group-title-pa")).toHaveStyle({ color: "var(--c-process-pa)" });
+    expect(screen.getByTestId("shipping-final-group-title-pf")).toHaveStyle({ color: "var(--c-process-pf)" });
+    expect(screen.getByTestId("shipping-final-group-title-pa")).toHaveClass("justify-between");
     expect(screen.getByTestId("shipping-shipment-hero")).toHaveTextContent("4-PF-0005");
-    expect(screen.getByTestId("shipping-shipment-hero")).toHaveTextContent("예상 코드 · 저장 시 변경 가능");
+    expect(screen.getByTestId("shipping-shipment-hero")).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(screen.getByTestId("shipping-final-group-pa").firstElementChild).toHaveTextContent("새 PA");
   });
 
@@ -1389,7 +1397,12 @@ describe("DesktopShippingView", () => {
     expect(hero).toHaveClass("py-2");
     expect(screen.getByTestId("shipping-shipment-hero-row")).toHaveClass("items-center");
     expect(screen.queryByTestId("shipping-shipment-quantity")).not.toBeInTheDocument();
-    expect(screen.getByTestId("shipping-shipment-code-meta")).toHaveClass("flex", "items-center", "whitespace-nowrap");
+    const shipmentName = screen.getByTestId("shipping-shipment-name");
+    const shipmentCode = screen.getByTestId("shipping-shipment-code-meta");
+    expect(shipmentName).not.toHaveClass("flex-1");
+    expect(shipmentName).toHaveClass("shrink", "truncate");
+    expect(shipmentName.nextElementSibling).toBe(shipmentCode);
+    expect(shipmentCode).toHaveClass("flex", "items-center", "whitespace-nowrap");
     expect(screen.getByTestId("shipping-final-action-quantity")).toHaveTextContent("출하 수량 1대");
     expect(hero).toHaveTextContent("Custom PF");
     expect(hero).not.toHaveTextContent("Standard PF");
@@ -1529,15 +1542,15 @@ describe("DesktopShippingView", () => {
     const search = await screen.findByTestId("shipping-pf-search");
     fireEvent.change(search, { target: { value: "Standard" } });
     expect(screen.getByTestId("shipping-pf-option-code-pf-1-kind")).toHaveTextContent("PF");
-    expect(screen.getByTestId("shipping-pf-option-code-pf-1-kind")).toHaveStyle({ color: LEGACY_COLORS.blue });
+    expect(screen.getByTestId("shipping-pf-option-code-pf-1-kind")).toHaveStyle({ color: "var(--c-process-pf)" });
 
     fireEvent.click(screen.getByTestId("shipping-pf-option-pf-1"));
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
 
-    expect(await screen.findByTestId("shipping-bom-code-af-1-kind")).toHaveStyle({ color: LEGACY_COLORS.green });
-    expect(screen.getByTestId("shipping-bom-code-pa-1-kind")).toHaveStyle({ color: LEGACY_COLORS.blue });
-    expect(screen.getByTestId("shipping-bom-code-acc-1-kind")).toHaveStyle({ color: LEGACY_COLORS.purple });
+    expect(await screen.findByTestId("shipping-bom-code-af-1-kind")).toHaveStyle({ color: "var(--c-process-af)" });
+    expect(screen.getByTestId("shipping-bom-code-pa-1-kind")).toHaveStyle({ color: "var(--c-process-pa)" });
+    expect(screen.getByTestId("shipping-bom-code-acc-1-kind")).toHaveStyle({ color: "var(--c-process-pr)" });
   });
 
   it("reorders a newly added AF BOM item before later BOM stages", async () => {
@@ -1605,6 +1618,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("shrink-0");
     expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("h-[58px]", "grid-cols-2", "overflow-x-hidden", "overflow-y-auto");
     expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("h-[58px]", "overflow-hidden", "rounded-[12px]", "border", "px-3", "py-2");
+    expect(screen.queryByText("세부 목록", { exact: true })).not.toBeInTheDocument();
   });
 
   it("탭 재마운트 시(같은 QueryClient) 캐시 히트로 재요청 없음 — flicker 회귀 방지", async () => {

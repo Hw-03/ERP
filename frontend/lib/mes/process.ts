@@ -6,6 +6,35 @@
  * — 부서명 매핑은 품목코드 static 매핑이라 부서 정규화 충돌과 무관.
  */
 
+import type { ProcessTypeCode } from "@/lib/api";
+
+export const PROCESS_TYPE_COLORS: Record<ProcessTypeCode, string> = {
+  TR: "var(--c-process-tr)",
+  TA: "var(--c-process-ta)",
+  TF: "var(--c-process-tf)",
+  HR: "var(--c-process-hr)",
+  HA: "var(--c-process-ha)",
+  HF: "var(--c-process-hf)",
+  VR: "var(--c-process-vr)",
+  VA: "var(--c-process-va)",
+  VF: "var(--c-process-vf)",
+  NR: "var(--c-process-nr)",
+  NA: "var(--c-process-na)",
+  NF: "var(--c-process-nf)",
+  AR: "var(--c-process-ar)",
+  AA: "var(--c-process-aa)",
+  AF: "var(--c-process-af)",
+  PR: "var(--c-process-pr)",
+  PA: "var(--c-process-pa)",
+  PF: "var(--c-process-pf)",
+};
+
+export function processTypeColor(code?: string | null): string {
+  return code && code in PROCESS_TYPE_COLORS
+    ? PROCESS_TYPE_COLORS[code as ProcessTypeCode]
+    : "var(--c-muted2)";
+}
+
 /**
  * 품목코드 process stage 코드 → 한국어 라벨.
  *   - 첫 글자: 부서 (T=튜브, H=고압, V=진공, N=튜닝, A=조립, P=출하)
