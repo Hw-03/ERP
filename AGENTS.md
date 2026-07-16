@@ -134,7 +134,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
 
-  기본 `-Mode auto` 는 워킹트리 변경 영역만 검증합니다 (docs 약 1초 / frontend 또는 backend 만 해당 게이트). 인프라 파일 또는 매핑되지 않은 경로가 섞이면 자동으로 풀 게이트로 승격. 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`. 같은 세션에서 이미 같은 영역을 통과시켰다면 다시 돌리지 마세요.
+  기본 `-Mode auto` 는 워킹트리 변경 영역만 검증합니다 (docs 약 1초 / frontend 또는 backend 만 해당 게이트). 인프라 파일 또는 매핑되지 않은 경로가 섞이면 자동으로 풀 게이트로 승격. 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`.
+
+  검증은 변경 범위와 위험도에 맞춘다. 같은 세션에서 관련 영역 게이트가 이미 통과한 뒤 CI 실패를 재현·수정한 좁은 변경은, 실패했던 테스트와 직접 영향받는 테스트만 다시 실행한다. 이 경우 전체 게이트를 관성적으로 반복하지 않는다. 전체 게이트는 아직 검증되지 않은 영역을 넓게 건드렸거나, 인프라·통합 경계 변경이 추가됐거나, 통합 과정에서 검증 대상이 달라졌을 때만 실행한다.
 
 ## Shared AI Context and Session Handoff
 
