@@ -19,12 +19,10 @@ export function HistoryKeyPointSummary({
   summary,
   impactStatus = "ready",
   onRetryImpact,
-  onImpactClick,
 }: {
   summary: HistoryDetailSummary;
   impactStatus?: "ready" | "loading" | "error";
   onRetryImpact?: () => void;
-  onImpactClick?: (impact: HistoryDetailImpact) => void;
 }) {
   const statusColor = STATUS_COLORS[summary.status.tone];
   const [expandedImpactGroups, setExpandedImpactGroups] = useState<Set<string>>(new Set());
@@ -70,7 +68,7 @@ export function HistoryKeyPointSummary({
       </div>
 
       <div
-        className="grid gap-2 border-t px-4 py-3 text-xs sm:grid-cols-2"
+        className="grid gap-2 border-t px-4 py-3 text-xs sm:grid-cols-[minmax(0,1fr)_auto]"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -82,7 +80,7 @@ export function HistoryKeyPointSummary({
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <Clock3 className="h-4 w-4 shrink-0" />
-          <span className="font-medium leading-snug">{formatHistoryDateTimeLong(summary.requester.at)}</span>
+          <span className="whitespace-nowrap font-medium leading-snug">{formatHistoryDateTimeLong(summary.requester.at)}</span>
         </div>
       </div>
 
@@ -128,16 +126,16 @@ export function HistoryKeyPointSummary({
             style={{ color: LEGACY_COLORS.muted2 }}
           >
             <Activity className="h-4 w-4" />
-            실제 영향
+            재고 변화
           </div>
           {impactStatus === "loading" && (
             <div className="px-4 pb-3 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              실제 영향 불러오는 중
+              재고 변화 불러오는 중
             </div>
           )}
           {impactStatus === "error" && (
             <div className="flex items-center justify-between gap-3 px-4 pb-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span>실제 영향을 불러오지 못했습니다.</span>
+              <span>재고 변화를 불러오지 못했습니다.</span>
               {onRetryImpact && (
                 <button
                   type="button"
@@ -145,7 +143,7 @@ export function HistoryKeyPointSummary({
                   className="rounded-full border px-2.5 py-1 font-bold"
                   style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
                 >
-                  실제 영향 다시 불러오기
+                  재고 변화 다시 불러오기
                 </button>
               )}
             </div>
@@ -163,7 +161,11 @@ export function HistoryKeyPointSummary({
                     onClick={() => toggleImpactGroup(group.key)}
                     aria-expanded={isExpanded}
                     aria-controls={contentId}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg py-2 text-left hover:brightness-125 focus-visible:brightness-125"
+                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left hover:brightness-110 focus-visible:brightness-110"
+                    style={{
+                      borderColor: LEGACY_COLORS.border,
+                      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 6%, transparent)`,
+                    }}
                   >
                     <span className="min-w-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
                       {group.label ?? "재고"} · {group.effects.length}품목{amount ? ` · ${amount}` : ""}
@@ -175,7 +177,7 @@ export function HistoryKeyPointSummary({
                   </button>
                 )}
                 {isExpanded && (
-                  <div id={contentId}>
+                  <div id={contentId} className={hasMultipleImpactLocations ? "px-3" : undefined}>
                     {group.effects.map((effect, index) => {
                       const color = effect.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
                       const rowClass = `flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left ${
@@ -203,17 +205,7 @@ export function HistoryKeyPointSummary({
                             {effect.deltaLabel}{effect.unit ? ` ${effect.unit}` : ""}
                           </div>
                         </>;
-                      return onImpactClick && effect.role ? (
-                        <button
-                          key={effect.key}
-                          type="button"
-                          onClick={() => onImpactClick(effect)}
-                          className={`${rowClass} no-btn-inset hover:brightness-125 focus-visible:brightness-125`}
-                          style={{ borderColor: LEGACY_COLORS.border }}
-                        >
-                          {contents}
-                        </button>
-                      ) : (
+                      return (
                         <div key={effect.key} className={rowClass} style={{ borderColor: LEGACY_COLORS.border }}>
                           {contents}
                         </div>

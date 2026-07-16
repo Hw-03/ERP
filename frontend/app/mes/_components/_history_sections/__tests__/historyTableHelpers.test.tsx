@@ -470,14 +470,14 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
   });
 
-  it("keeps the operation badge dimensions stable when the detail panel opens", () => {
+  it("keeps operation badges at the shared fixed width when the detail panel opens", () => {
     const { rerender } = render(
       <FlowBadge type="REWORK" label="재작업" color="#3b82f6" />,
     );
-    expect(screen.getByText("재작업").parentElement).toHaveClass("w-40", "px-3");
+    expect(screen.getByText("재작업").parentElement).toHaveClass("w-32", "max-w-full", "px-3");
 
     rerender(<FlowBadge type="REWORK" label="재작업" color="#3b82f6" compact />);
-    expect(screen.getByText("재작업").parentElement).toHaveClass("w-40", "px-3");
+    expect(screen.getByText("재작업").parentElement).toHaveClass("w-32", "max-w-full", "px-3");
   });
 
   it("renders conversion item codes as source, arrow, and target on separate lines", () => {

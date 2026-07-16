@@ -11,12 +11,14 @@ import {
   getHistoryBomParentLine,
   getDisplayBundles,
   getHistoryLineSignedQuantity,
+  isManualOnlyProductionBatch,
   type LineSignTone,
 } from "./historyBatchInterpreter";
 import {
   HISTORY_CELL_TRANSITION,
   HISTORY_CHILD_CELL_CLASS,
   HISTORY_CHILD_ROW_CLASS,
+  HISTORY_TABLE_OPERATION_PILL_CLASS,
   ItemCodeCell,
   MovementSummaryCell,
 } from "./historyTableHelpers";
@@ -111,7 +113,7 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
   }
 
   if (!batch || batch.bundles.length === 0) return null;
-  const displayBundles = getDisplayBundles(batch).filter((bundle) => {
+  const displayBundles = getAdjustmentDisplayBundles(batch).filter((bundle) => {
     const parentLine = getHistoryBomParentLine(bundle);
     return parentLine?.included ?? bundle.lines.some((line) => line.included);
   });
@@ -133,6 +135,28 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
     </>
   );
 }
+
+function getAdjustmentDisplayBundles(batch: IoBatch): IoBundle[] {
+  const bundles = getDisplayBundles(batch);
+  const isLegacyAdjustmentIn = isManualOnlyProductionBatch(batch);
+  const isMultiItemAdjustment = (batch.sub_type === "adjust_in" || batch.sub_type === "adjust_out" || isLegacyAdjustmentIn)
+    && bundles.length > 1;
+
+  if (!isMultiItemAdjustment) return bundles;
+
+  const lines = bundles.flatMap((bundle) => bundle.lines.map((line) => ({ ...line })));
+  return [{
+    bundle_id: `history-adjustment-${batch.batch_id}`,
+    source_kind: "manual",
+    title: batch.sub_type === "adjust_in" || isLegacyAdjustmentIn ? "수량보정 입고" : "출고",
+    source_item_id: null,
+    source_mes_code: null,
+    quantity: lines.reduce((total, line) => total + Math.abs(line.quantity), 0),
+    expanded_level: 1,
+    lines,
+  }];
+}
+
 function StatusBadge({ shortage }: { shortage: number }) {
   if (shortage <= 0) return null;
   const color = LEGACY_COLORS.red;
@@ -205,7 +229,7 @@ function BundleRows({
         <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
           <span
             className={`inline-flex h-6 items-center justify-center gap-1 rounded-full text-xs font-bold leading-none ${
-              "w-40 max-w-full min-w-0 overflow-hidden px-3"
+              `${HISTORY_TABLE_OPERATION_PILL_CLASS} px-3`
             }`}
             style={{
               background: isBomParent
@@ -361,7 +385,7 @@ function LineKindBadge({ line, compact }: { line: IoLine; compact?: boolean }) {
   return (
     <span
       className={`inline-flex h-6 items-center justify-center gap-1 rounded-full text-xs font-bold leading-none ${
-        "w-40 max-w-full min-w-0 overflow-hidden px-3"
+        `${HISTORY_TABLE_OPERATION_PILL_CLASS} px-3`
       }`}
       style={{
         background: `color-mix(in srgb, ${color} 14%, transparent)`,

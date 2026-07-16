@@ -44,7 +44,7 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.getAllByText("생산")).toHaveLength(1);
     expect(screen.getAllByText("완료")).toHaveLength(1);
     expect(screen.getAllByText("요청자 A")).toHaveLength(1);
-    expect(screen.getByText("실제 영향")).toBeInTheDocument();
+    expect(screen.getByText("재고 변화")).toBeInTheDocument();
     expect(screen.getByText("조립 재고")).toBeInTheDocument();
     expect(screen.getByText("+1 EA")).toBeInTheDocument();
     expect(screen.getByText("완제품 A")).toBeInTheDocument();
@@ -147,7 +147,7 @@ describe("HistoryKeyPointSummary", () => {
     ))).toHaveLength(2);
   });
 
-  it("places requester metadata before conversion and actual impact", () => {
+  it("places requester metadata before conversion and inventory change", () => {
     const { container } = render(
       <HistoryKeyPointSummary
         summary={summary({
@@ -161,7 +161,7 @@ describe("HistoryKeyPointSummary", () => {
 
     const requester = screen.getByText("요청자 A");
     const conversion = screen.getByText("품목 전환");
-    const impact = screen.getByText("실제 영향");
+    const impact = screen.getByText("재고 변화");
 
     expect(requester.compareDocumentPosition(conversion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(requester.compareDocumentPosition(impact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -195,7 +195,9 @@ describe("HistoryKeyPointSummary", () => {
   it("does not truncate the requester timestamp", () => {
     render(<HistoryKeyPointSummary summary={summary()} />);
 
-    expect(screen.getByText(/2026년 7월 10일/)).not.toHaveClass("truncate");
+    const timestamp = screen.getByText(/2026년 7월 10일/);
+    expect(timestamp).not.toHaveClass("truncate");
+    expect(timestamp).toHaveClass("whitespace-nowrap");
   });
 
   it("shows the location or movement route in the desktop summary only when it exists", () => {
@@ -222,7 +224,7 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    expect(screen.getByText("실제 영향 불러오는 중")).toBeInTheDocument();
+    expect(screen.getByText("재고 변화 불러오는 중")).toBeInTheDocument();
 
     rerender(
       <HistoryKeyPointSummary
@@ -232,12 +234,11 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "실제 영향 다시 불러오기" }));
+    fireEvent.click(screen.getByRole("button", { name: "재고 변화 다시 불러오기" }));
     expect(onRetryImpact).toHaveBeenCalledOnce();
   });
 
-  it("makes a BOM-backed actual impact focusable from the summary", () => {
-    const onImpactClick = vi.fn();
+  it("renders BOM-backed inventory changes as read-only rows", () => {
     render(
       <HistoryKeyPointSummary
         summary={summary({
@@ -247,16 +248,9 @@ describe("HistoryKeyPointSummary", () => {
             effects: [effect({ role: "부품", delta: -2, deltaLabel: "-2" })],
           }],
         })}
-        onImpactClick={onImpactClick}
       />,
     );
 
-    const impactButton = screen.getByRole("button", { name: /완제품 A.*-2 EA/ });
-    expect(impactButton).not.toHaveClass("focus-visible:outline");
-    expect(impactButton).toHaveClass("focus-visible:brightness-125");
-    expect(impactButton).toHaveClass("no-btn-inset");
-
-    fireEvent.click(impactButton);
-    expect(onImpactClick).toHaveBeenCalledWith(expect.objectContaining({ itemId: "item-finished" }));
+    expect(screen.getByText("완제품 A").closest("button")).toBeNull();
   });
 });

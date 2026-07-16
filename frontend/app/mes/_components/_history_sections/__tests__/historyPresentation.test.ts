@@ -448,6 +448,22 @@ describe("history immediate UX presentation policies", () => {
 
     expect(row.stock?.label).toBe("불량 재고 398 EA");
   });
+
+  it("shows the department-to-disposal route for direct defect scrapping", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "DEFECT_SCRAP",
+      department: "조립",
+    }));
+    const legacy = getHistoryRowPresentation(makeLog({
+      transaction_type: "DEFECT_SCRAP",
+      department: null,
+    }));
+
+    expect(row.flow).toMatchObject({ label: "조립 → 폐기", from: "조립", to: "폐기" });
+    expect(legacy.flow).toMatchObject({ label: "불량 폐기" });
+    expect(legacy.flow.from).toBeUndefined();
+    expect(legacy.flow.to).toBeUndefined();
+  });
 });
 describe("shipping phase history presentation", () => {
   it("labels shipping component-change batches by phase", () => {

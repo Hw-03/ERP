@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
-import { ChevronToggleBtn, HISTORY_CELL_TRANSITION, ItemCodeCell } from "./historyTableHelpers";
+import { ChevronToggleBtn, HISTORY_CELL_TRANSITION, HISTORY_TABLE_OPERATION_PILL_CLASS, ItemCodeCell } from "./historyTableHelpers";
 import { buildReworkItemSummaries, type ReworkItemSummary, type ReworkResultTone } from "./reworkSummary";
 
 const REWORK_RESULT_LABEL = "처리결과";
@@ -107,7 +107,7 @@ function ResultBadge({ compact }: { compact?: boolean }) {
     <span
       aria-label={compact ? REWORK_RESULT_LABEL : undefined}
       title={compact ? REWORK_RESULT_LABEL : undefined}
-      className="inline-flex h-6 w-40 max-w-full min-w-0 items-center justify-center overflow-hidden rounded-full px-3 text-xs font-bold leading-none"
+      className={`inline-flex h-6 items-center justify-center rounded-full px-3 text-xs font-bold leading-none ${HISTORY_TABLE_OPERATION_PILL_CLASS}`}
       style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`, color: LEGACY_COLORS.red }}
     >
       {compact ? <span className="min-w-0 max-w-full truncate">{REWORK_RESULT_LABEL}</span> : REWORK_RESULT_LABEL}

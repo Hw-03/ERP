@@ -172,7 +172,7 @@ describe("ReworkBatchDetail", () => {
     const badge = cell.querySelector("span.inline-flex")!;
     const visibleLabel = badge.querySelector("span");
 
-    expect(badge).toHaveClass("w-40", "max-w-full", "min-w-0", "px-3");
+    expect(badge).toHaveClass("w-32", "max-w-full", "min-w-0", "px-3");
     expect(badge).not.toHaveClass("min-w-[6.5rem]");
     expect(badge).toHaveAttribute("title", "처리결과");
     expect(badge).toHaveAttribute("aria-label", "처리결과");
@@ -193,7 +193,7 @@ describe("ReworkBatchDetail", () => {
     );
 
     const badge = screen.getByText("처리결과");
-    expect(badge).toHaveClass("h-6", "w-40", "max-w-full", "min-w-0", "px-3", "text-xs");
+    expect(badge).toHaveClass("h-6", "w-32", "max-w-full", "min-w-0", "px-3", "text-xs");
     expect(badge).not.toHaveClass("min-w-[6.5rem]");
     expect(badge).not.toHaveAttribute("title");
     expect(badge).not.toHaveAttribute("aria-label");

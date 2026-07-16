@@ -115,6 +115,30 @@ function makeDuplicateManualBatch(): IoBatch {
   };
 }
 
+function makeMultiItemAdjustmentBatch(): IoBatch {
+  const batch = makeDuplicateManualBatch();
+  batch.bundles[0] = {
+    ...batch.bundles[0],
+    title: "보정 품목 A",
+    lines: [{ ...batch.bundles[0].lines[0], item_name: "보정 품목 A" }],
+  };
+  batch.bundles[1] = {
+    ...batch.bundles[1],
+    bundle_id: "bundle-2",
+    title: "보정 품목 B",
+    source_item_id: "item-2",
+    source_mes_code: "MES-002",
+    lines: [{
+      ...batch.bundles[1].lines[0],
+      line_id: "line-2",
+      item_id: "item-2",
+      item_name: "보정 품목 B",
+      mes_code: "MES-002",
+    }],
+  };
+  return batch;
+}
+
 describe("BomBatchDetail", () => {
   it.each(["Enter", " "])("uses a real button for BOM expansion with %s", (key) => {
     const batch = makeBatch();
@@ -199,15 +223,79 @@ describe("BomBatchDetail", () => {
     expect(screen.getAllByText("부족 2")).toHaveLength(1);
   });
 
-  it("uses the same 160px operation width for the BOM section and its item rows", () => {
+  it("uses the shared fixed operation pill width for the BOM section and its item rows", () => {
     const batch = makeBatch();
     render(
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
     );
 
-    expect(screen.getByText("BOM").parentElement).toHaveClass("w-40");
+    expect(screen.getByText("BOM").parentElement).toHaveClass("w-32", "max-w-full");
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
-    expect(screen.getByText("자동차감").parentElement).toHaveClass("w-40");
+    expect(screen.getByText("자동차감").parentElement).toHaveClass("w-32", "max-w-full");
+  });
+
+  it.each(["Enter", " "])("expands multi-item quantity adjustments with %s", (key) => {
+    const batch = makeMultiItemAdjustmentBatch();
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    expect(screen.getByText("수량보정 입고")).toBeInTheDocument();
+    expect(screen.queryByText("보정 품목 A")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "라인 구성 펼치기" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.keyDown(toggle, { key });
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("보정 품목 A")).toBeInTheDocument();
+    expect(screen.getByText("보정 품목 B")).toBeInTheDocument();
+  });
+
+  it("uses the approved 출고 label for a multi-item quantity adjustment", () => {
+    const batch = makeMultiItemAdjustmentBatch();
+    batch.sub_type = "adjust_out";
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    expect(screen.getByText("출고")).toBeInTheDocument();
+    expect(screen.queryByText("수량보정 입고")).not.toBeInTheDocument();
+  });
+
+  it("groups legacy manual-only production batches as quantity adjustments", () => {
+    const batch = makeMultiItemAdjustmentBatch();
+    batch.sub_type = "produce";
+    batch.bundles = batch.bundles.map((bundle) => ({
+      ...bundle,
+      lines: bundle.lines.map((line) => ({
+        ...line,
+        direction: "in",
+        from_bucket: "none",
+        from_department: null,
+        to_bucket: "production",
+        to_department: "조립",
+      })),
+    }));
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    expect(screen.getByText("수량보정 입고")).toBeInTheDocument();
+    expect(screen.queryByText("보정 품목 A")).not.toBeInTheDocument();
+  });
+
+  it("keeps a single quantity adjustment as a direct item row", () => {
+    const batch = makeMultiItemAdjustmentBatch();
+    batch.bundles = [batch.bundles[0]];
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    expect(screen.getByText("보정 품목 A")).toBeInTheDocument();
+    expect(screen.queryByText("수량보정 입고")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "라인 구성 펼치기" })).not.toBeInTheDocument();
   });
 
   it("keeps the status-cell dash fallback for an exclusion-only BOM bundle", () => {

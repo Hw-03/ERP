@@ -99,6 +99,18 @@ describe("buildHistoryDetailSummary", () => {
     });
   });
 
+  it("shows the department-to-disposal flow for a direct defect scrap", () => {
+    const summary = buildHistoryDetailSummary([
+      makeLog({ transaction_type: "DEFECT_SCRAP", department: "조립" }),
+    ], null);
+
+    expect(summary.flow).toEqual({
+      label: "조립 → 폐기",
+      from: "조립",
+      to: "폐기",
+    });
+  });
+
   it("hides a matching warehouse box effect when the warehouse total already states the same impact", () => {
     const summary = buildHistoryDetailSummary([
       makeLog({

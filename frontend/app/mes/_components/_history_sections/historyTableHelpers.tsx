@@ -47,6 +47,7 @@ export const HISTORY_MAIN_CELL_CLASS = "border-b py-2 align-middle";
 export const HISTORY_STATUS_CELL_CLASS = "border-b py-0 align-middle";
 export const HISTORY_CHILD_ROW_CLASS = "h-[40px]";
 export const HISTORY_CHILD_CELL_CLASS = "h-[40px] overflow-hidden border-b py-0 align-middle";
+export const HISTORY_TABLE_OPERATION_PILL_CLASS = "w-32 max-w-full min-w-0 overflow-hidden";
 
 export function FlowBadge({
   type,
@@ -70,7 +71,7 @@ export function FlowBadge({
       aria-label={accessibleLabel}
       title={fullLabel !== label ? fullLabel : undefined}
       className={`inline-flex h-6 min-w-0 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none ${
-        variant === "table" ? "w-40 max-w-full overflow-hidden" : "max-w-full"
+        variant === "table" ? HISTORY_TABLE_OPERATION_PILL_CLASS : "max-w-full"
       }`}
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >

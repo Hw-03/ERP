@@ -198,10 +198,6 @@ export function HistoryBatchDetailPanel({
     }
   }
 
-  function handleImpactClick(itemId: string) {
-    onFocusLineInList?.({ groupKey: batchId, itemId });
-  }
-
   if (variant === "desktop") {
     return (
       <div className="space-y-4">
@@ -209,7 +205,6 @@ export function HistoryBatchDetailPanel({
           summary={summary}
           impactStatus={cancellationScope.status}
           onRetryImpact={cancellationScope.retry}
-          onImpactClick={batch && onFocusLineInList ? (impact) => handleImpactClick(impact.itemId) : undefined}
         />
         {excludedLineCount > 0 && (
           <div className="px-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>

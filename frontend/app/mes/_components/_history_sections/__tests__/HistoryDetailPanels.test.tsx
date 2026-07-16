@@ -325,8 +325,8 @@ describe("desktop history detail panels", () => {
     expect(screen.getByTestId("history-key-point-summary")).toBeInTheDocument();
     expect(await screen.findByText("완제품")).toBeInTheDocument();
     expect(screen.getByText("구성 검산 라인")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /구성 검산 라인/ }));
-    expect(onFocusLineInList).toHaveBeenCalledWith({ groupKey: "batch-1", itemId: "component-a" });
+    expect(screen.queryByRole("button", { name: /구성 검산 라인/ })).not.toBeInTheDocument();
+    expect(onFocusLineInList).not.toHaveBeenCalled();
 
     const cancel = await screen.findByRole("button", { name: "이 내역 취소" });
     expect(screen.getByTestId("history-key-point-summary").compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -369,7 +369,7 @@ describe("desktop history detail panels", () => {
       { operationBatchId: "batch-1", limit: 2000, skip: 0 },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(screen.getByText("실제 영향 불러오는 중")).toBeInTheDocument();
+    expect(screen.getByText("재고 변화 불러오는 중")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
     expect(screen.getByText("취소 범위 확인 중...")).toBeInTheDocument();
 
