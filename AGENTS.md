@@ -45,6 +45,11 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
   - `frontend/app/globals.css`: the `button.no-btn-inset` opt-out rule (frozen: 2026-06-16)
   - Do not touch the tab bar layout, button design, shadow, or pill styling without an explicit request.
   - **"More" behavior change (2026-06-17, user-approved)**: "More" was converted from a BottomSheet to a proper 5th full-width tab (`more`, `MobileMoreScreen`). `pillOverride`, the 470ms sheet delay, and `MobileMoreSheet` were removed. The NavButton, `<nav>`, and pill visual design itself remain frozen.
+- **Desktop shipping step 5 final card sizes are frozen (complete)**
+  - `frontend/app/mes/_components/DesktopShippingView.tsx`: the `BOM·동반 출하품` and `변경된 구성품` card height allocation in step 5 (frozen: 2026-07-16).
+  - `BOM·동반 출하품` must keep the remaining available height and scroll only its inner list.
+  - `변경된 구성품` must keep one visible 58px row with two columns; additional items scroll vertically inside that card.
+  - Do not change either card's height, grid row allocation, column count, or overflow behavior without an explicit user request.
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.

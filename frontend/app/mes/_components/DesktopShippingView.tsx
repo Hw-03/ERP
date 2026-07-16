@@ -1416,7 +1416,6 @@ function RequestSection(props: {
     ? finalPfSummary.code
     : basePfItem ? itemCodeText(basePfItem) : finalPfSummary.code;
   const hasBomChanges = bomChangedLines.length > 0;
-  const finalSummaryUsesOuterScroll = bomChangedLines.length > 2;
   const canOpenStep = (step: RequestWizardStep) => {
     if (locked && step !== props.wizardStep) return false;
     if (props.pending !== null && step !== props.wizardStep) return false;
@@ -1622,7 +1621,7 @@ function RequestSection(props: {
 
           {props.wizardStep === 5 && (
             <section data-testid="shipping-wizard-step-5" className="flex h-full min-h-0 flex-col">
-              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 content-start ${hasBomChanges ? "grid-rows-[auto_432px_auto]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 ${finalSummaryUsesOuterScroll ? "overflow-y-auto" : "overflow-hidden"} pr-1`}>
+              <div data-testid="shipping-final-summary" className={`grid h-full min-h-0 content-start ${hasBomChanges ? "grid-rows-[auto_minmax(0,1fr)_auto]" : "grid-rows-[auto_minmax(0,1fr)]"} gap-3 overflow-hidden pr-1`}>
                 <ShippingShipmentHero name={shipmentName} code={shipmentCode} codeNotice={requiresPfName ? finalPfSummary.codeNotice : undefined} />
                 <FinalRequirementReview
                   paLines={grouped.PA.filter((line) => line.included)}
@@ -1639,7 +1638,6 @@ function RequestSection(props: {
                   newPaCodeNotice={requiresPaName && requiresPfName ? finalPaSummary.codeNotice : undefined}
                   itemById={props.itemById}
                   requestQuantity={requestQty}
-                  hasBomChanges={hasBomChanges}
                 />
                 {hasBomChanges && (
                   <BomChangeSummaryCard lines={bomChangedLines} itemById={props.itemById} dataTestId="shipping-final-bom-changes" scrollListTestId="shipping-final-bom-change-list" finalLayout />
@@ -2600,20 +2598,20 @@ function BomChangeSummaryCard({
     return <Notice tone={LEGACY_COLORS.green} title="BOM 변경 없음" body="기본 BOM 구성을 그대로 사용합니다." />;
   }
   return (
-    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
+    <section data-testid={dataTestId} className={`rounded-[14px] border p-3 ${finalLayout ? "flex min-h-0 shrink-0 flex-col" : ""}`} style={{ background: tint(LEGACY_COLORS.yellow, 8), borderColor: tint(LEGACY_COLORS.yellow, 36) }}>
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.yellow }}>변경된 구성품 {lines.length}개</div>
         <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>세부 목록</div>
       </div>
-      <div data-testid={scrollListTestId} className={`grid min-h-0 gap-2 pr-1 xl:grid-cols-2 ${finalLayout ? "" : "max-h-[360px] overflow-y-auto"}`}>
+      <div data-testid={scrollListTestId} className={`grid min-h-0 gap-2 pr-1 ${finalLayout ? "h-[58px] grid-cols-2 overflow-x-hidden overflow-y-auto" : "max-h-[360px] overflow-y-auto xl:grid-cols-2"}`}>
         {lines.map((line) => {
           const item = itemById.get(line.child_item_id);
           const label = !line.included ? "제외" : line.origin === "CUSTOM" ? "추가" : "포함";
           const tone = !line.included ? LEGACY_COLORS.red : line.origin === "CUSTOM" ? LEGACY_COLORS.cyan : LEGACY_COLORS.green;
           return (
-            <div key={line.key} data-testid="shipping-final-bom-change-row" className={SHIPPING_CELL_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+            <div key={line.key} data-testid="shipping-final-bom-change-row" className={`${SHIPPING_CELL_CLASS} ${finalLayout ? "h-[58px] overflow-hidden" : ""}`} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
               <div className="flex min-w-0 items-start justify-between gap-2">
-                <div className="line-clamp-2 text-sm font-black leading-snug" title={item?.item_name ?? "품목 없음"} style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
+                <div className={`${finalLayout ? "truncate" : "line-clamp-2"} text-sm font-black leading-snug`} title={item?.item_name ?? "품목 없음"} style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
                 <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(tone, 14), color: tone }}>{label}</span>
               </div>
               <div className="mt-0.5 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -2645,7 +2643,6 @@ function FinalRequirementReview({
   newPaCodeNotice,
   itemById,
   requestQuantity,
-  hasBomChanges,
 }: {
   paLines: DraftLine[];
   pfLines: DraftLine[];
@@ -2661,7 +2658,6 @@ function FinalRequirementReview({
   newPaCodeNotice?: string;
   itemById: Map<string, Item>;
   requestQuantity: number;
-  hasBomChanges: boolean;
 }) {
   const paRows = paLines.map((line) => ({ id: `pa-${line.child_item_id}`, testId: `shipping-final-line-pa-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" }));
   const pfRows = [
@@ -2675,7 +2671,7 @@ function FinalRequirementReview({
     { id: "companion", testId: "shipping-final-group-companion", title: "카톤·동반 출하품", tone: LEGACY_COLORS.purple, rows: companionRows },
   ];
   return (
-    <section data-testid="shipping-final-requirements" className={`${SHIPPING_PANEL_CLASS} ${hasBomChanges ? "h-[432px] shrink-0" : "h-full min-h-0"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <section data-testid="shipping-final-requirements" className={`${SHIPPING_PANEL_CLASS} h-full min-h-0`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-1.5 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>BOM·동반 출하품</div>
       <div data-testid="shipping-final-requirements-list" className="grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
         {groups.map((group) => (

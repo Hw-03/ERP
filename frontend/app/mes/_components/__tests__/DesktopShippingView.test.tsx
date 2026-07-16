@@ -1581,7 +1581,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-wizard-action-center")).toBeEmptyDOMElement();
   });
 
-  it("keeps the final BOM card fixed while the changed-item card uses its content height", async () => {
+  it("fills the remaining final-step height with the BOM card and scrolls changed items after one two-column row", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1598,12 +1598,13 @@ describe("DesktopShippingView", () => {
     nextStep(container);
 
     const finalSummary = await screen.findByTestId("shipping-final-summary");
-    expect(finalSummary).toHaveClass("grid-rows-[auto_432px_auto]", "content-start", "overflow-hidden");
-    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-[432px]", "shrink-0");
+    expect(finalSummary).toHaveClass("grid-rows-[auto_minmax(0,1fr)_auto]", "content-start", "overflow-hidden");
+    expect(screen.getByTestId("shipping-final-requirements")).toHaveClass("h-full", "min-h-0");
+    expect(screen.getByTestId("shipping-final-requirements")).not.toHaveClass("h-[432px]", "shrink-0");
     expect(screen.getByTestId("shipping-final-requirements-list")).toHaveClass("overflow-y-auto");
-    expect(screen.getByTestId("shipping-final-bom-changes")).not.toHaveClass("h-[432px]", "shrink-0");
-    expect(screen.getByTestId("shipping-final-bom-change-list")).not.toHaveClass("flex-1", "overflow-y-auto");
-    expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("rounded-[12px]", "border", "px-3", "py-2");
+    expect(screen.getByTestId("shipping-final-bom-changes")).toHaveClass("shrink-0");
+    expect(screen.getByTestId("shipping-final-bom-change-list")).toHaveClass("h-[58px]", "grid-cols-2", "overflow-x-hidden", "overflow-y-auto");
+    expect(screen.getAllByTestId("shipping-final-bom-change-row")[0]).toHaveClass("h-[58px]", "overflow-hidden", "rounded-[12px]", "border", "px-3", "py-2");
   });
 
   it("탭 재마운트 시(같은 QueryClient) 캐시 히트로 재요청 없음 — flicker 회귀 방지", async () => {
