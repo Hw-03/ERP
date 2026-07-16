@@ -86,7 +86,7 @@ describe("buildHistoryDetailSummary", () => {
       expect.objectContaining({
         itemId: "item-finished",
         unit: "EA",
-        label: "조립 생산",
+        label: "조립 재고",
         delta: 1,
       }),
     ]);
@@ -110,7 +110,7 @@ describe("buildHistoryDetailSummary", () => {
     ], null);
 
     expect(summary.impactGroups[0].effects).toEqual([
-      expect.objectContaining({ label: "창고", delta: -1 }),
+      expect.objectContaining({ label: "창고 재고", delta: -1 }),
     ]);
   });
 
@@ -124,9 +124,15 @@ describe("buildHistoryDetailSummary", () => {
       }),
     ], null);
 
-    expect(summary.impactGroups[0].effects).toEqual([
-      expect.objectContaining({ label: "창고", delta: -2 }),
-      expect.objectContaining({ label: "박스 box-1", delta: -1 }),
+    expect(summary.impactGroups).toEqual([
+      expect.objectContaining({
+        label: "창고 재고",
+        effects: [expect.objectContaining({ label: "창고 재고", delta: -2 })],
+      }),
+      expect.objectContaining({
+        label: "박스 재고",
+        effects: [expect.objectContaining({ label: "박스 재고", delta: -1 })],
+      }),
     ]);
   });
 
@@ -169,7 +175,7 @@ describe("buildHistoryDetailSummary", () => {
     const summary = buildHistoryDetailSummary(logs, makeBatch());
 
     expect(summary.target.itemId).toBe("item-finished");
-    expect(summary.impactGroups.map((group) => group.label)).toEqual([null]);
+    expect(summary.impactGroups.map((group) => group.label)).toEqual(["조립 재고"]);
     expect(summary.impactGroups[0].effects.map((effect) => [effect.itemId, effect.delta])).toEqual([
       ["item-finished", 2],
       ["item-a", -2],

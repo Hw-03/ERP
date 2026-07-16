@@ -4,6 +4,7 @@ import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import {
   formatDefectReason,
   getBatchLineStats,
+  getHistoryListOperationLabel,
   getHistoryRowPresentation,
   getReferenceBatchLinePresentation,
   getReferenceBatchPresentation,
@@ -120,6 +121,17 @@ describe("formatDefectReason", () => {
   });
 });
 describe("historyPresentation", () => {
+  it("uses menu-level labels in the list while retaining the detailed movement elsewhere", () => {
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "ADJUST" }))).toBe("부서 입출고");
+    expect(getHistoryListOperationLabel(
+      makeLog({ transaction_type: "DISASSEMBLE", reference_no: "defect-disassemble:1" }),
+    )).toBe("불량");
+    expect(getHistoryListOperationLabel(
+      makeLog({ transaction_type: "SHIP", shipping_phase: "PICKUP" }),
+    )).toBe("출하");
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "UNMARK_DEFECTIVE" }))).toBe("불량");
+  });
+
   it("internal use의 stock 표시는 창고 수량을 우선 사용한다", () => {
     const row = getHistoryRowPresentation(makeLog({
       transaction_type: "INTERNAL_USE",

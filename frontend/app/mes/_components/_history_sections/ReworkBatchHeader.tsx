@@ -104,7 +104,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`}
         style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}
       >
-        <FlowBadge type={parentLog.transaction_type} label={REWORK_LABEL} color={LEGACY_COLORS.red} compact={compact} />
+        <FlowBadge type={parentLog.transaction_type} label="불량" color={LEGACY_COLORS.red} compact={compact} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock

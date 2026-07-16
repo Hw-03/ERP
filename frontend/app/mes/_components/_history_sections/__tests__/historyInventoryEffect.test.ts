@@ -28,7 +28,7 @@ describe("toInventoryEffectRows", () => {
         boxId: null,
         department: null,
         status: null,
-        label: "창고",
+        label: "창고 재고",
         delta: -3,
         deltaLabel: "-3",
       },
@@ -42,7 +42,7 @@ describe("toInventoryEffectRows", () => {
         boxId: null,
         department: "조립",
         status: "PRODUCTION",
-        label: "조립 생산",
+        label: "조립 재고",
         delta: 3,
         deltaLabel: "+3",
       },
@@ -62,12 +62,12 @@ describe("toInventoryEffectRows", () => {
       {
         key: "item-a:EA:warehouse_box::::box-1",
         boxId: "box-1",
-        label: "박스 box-1",
+        label: "박스 재고",
       },
       {
         key: "item-a:EA:warehouse_box::::box-2",
         boxId: "box-2",
-        label: "박스 box-2",
+        label: "박스 재고",
       },
     ]);
   });

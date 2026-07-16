@@ -10,6 +10,7 @@ import {
   getHistoryDisplaySubLabel,
   getHistoryFlowLabel,
   getHistoryMovementSummary,
+  getHistoryWorkTypeLabel,
   getSingleLogMovement,
   parseTransactionNotes,
   type MovementSummary,
@@ -548,4 +549,43 @@ function getStatusChips(
 
   if (stats && stats.shortageCount > 0) chips.push({ label: `부족 ${stats.shortageCount}`, tone: "danger" });
   return chips;
+}
+
+/** 입출고 내역 목록에서는 세부 작업명 대신 사용자가 선택한 메뉴 분류만 표시한다. */
+export function getHistoryListOperationLabel(
+  log: TransactionLog,
+  batch?: IoBatch | null,
+): string {
+  if (log.reference_no?.startsWith("defect-disassemble:")) return "불량";
+
+  const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);
+  if (phaseLabel) return phaseLabel;
+  if (log.transaction_type === "SHIP" && isShippingReference(log)) return "출하";
+
+  if (batch) return getHistoryWorkTypeLabel(batch.work_type);
+
+  switch (log.transaction_type) {
+    case "RECEIVE":
+      return "원자재 입고";
+    case "TRANSFER_TO_PROD":
+    case "TRANSFER_TO_WH":
+      return "창고 입출고";
+    case "PRODUCE":
+    case "DISASSEMBLE":
+    case "BACKFLUSH":
+    case "TRANSFER_DEPT":
+    case "ADJUST":
+      return "부서 입출고";
+    case "MARK_DEFECTIVE":
+    case "UNMARK_DEFECTIVE":
+    case "DEFECT_SCRAP":
+    case "SUPPLIER_RETURN":
+      return "불량";
+    case "SHIP":
+      return "출하";
+    case "INTERNAL_USE":
+      return "AS·연구 사용출고";
+    default:
+      return getHistoryDisplayLabel(log, batch);
+  }
 }

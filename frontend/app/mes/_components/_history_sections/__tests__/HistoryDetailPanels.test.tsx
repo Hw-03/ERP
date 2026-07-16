@@ -201,7 +201,7 @@ describe("desktop history detail panels", () => {
     );
 
     expect(screen.getByTestId("history-key-point-summary")).toBeInTheDocument();
-    expect(screen.getByText("조립 생산")).toBeInTheDocument();
+    expect(screen.getByText("조립 재고")).toBeInTheDocument();
     expect(screen.getByText("+2 EA")).toBeInTheDocument();
     expect(screen.queryByText(/처리 전|처리 후|창고 401/)).not.toBeInTheDocument();
     expect(screen.getByText("완제품 A")).toBeInTheDocument();
@@ -288,7 +288,7 @@ describe("desktop history detail panels", () => {
     expect(screen.queryByText("대상 1건")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
     expect(screen.getByText("대상 1건")).toBeInTheDocument();
-    expect(screen.getAllByText("조립 생산")).toHaveLength(2);
+    expect(screen.getAllByText("조립 재고")).toHaveLength(2);
   });
 
   it("uses the shared summary without a duplicate desktop composition card", async () => {
@@ -374,10 +374,11 @@ describe("desktop history detail panels", () => {
     expect(screen.getByText("취소 범위 확인 중...")).toBeInTheDocument();
 
     await act(async () => resolveScope([visible, hidden]));
-    expect(await screen.findByText("hidden-component")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /assembly 재고.*1품목.*-7 EA/ })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
 
-    expect(screen.getAllByText("hidden-component")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /assembly 재고.*1품목.*-7 EA/ })).toHaveLength(1);
+    expect(screen.getByText("hidden-component")).toBeInTheDocument();
   });
 
   it("blocks cancellation after a scope load failure and retries the whole group", async () => {
@@ -440,7 +441,8 @@ describe("desktop history detail panels", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getAllByText("reference-sibling")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /assembly 재고.*1품목.*-3 EA/ })).toHaveLength(1);
+    expect(screen.getByText("reference-sibling")).toBeInTheDocument();
   });
 
   it("hides single cancellation when the fresh full scope is already cancelled", async () => {

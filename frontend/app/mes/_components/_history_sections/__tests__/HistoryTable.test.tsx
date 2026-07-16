@@ -49,6 +49,34 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByText("BOM 구성품")).toBeInTheDocument();
   });
 
+  it("keeps multi-item quantity adjustments behind one operation batch row", () => {
+    const first = makeLog({
+      log_id: "adjust-a",
+      item_name: "보정 품목 A",
+      transaction_type: "ADJUST",
+      operation_batch_id: "batch-adjust",
+    });
+    const second = makeLog({
+      log_id: "adjust-b",
+      item_id: "ITEM-2",
+      item_name: "보정 품목 B",
+      transaction_type: "ADJUST",
+      operation_batch_id: "batch-adjust",
+    });
+    const batch = { ...makeBatch(), batch_id: "batch-adjust", sub_type: "adjust_in", bundles: [] };
+
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-adjust", refNo: null, logs: [first, second] }],
+      new Map([["batch-adjust", batch]]),
+    );
+
+    expect(screen.queryByText("보정 품목 B")).not.toBeInTheDocument();
+    expect(document.querySelectorAll("[data-history-main-row='true']")).toHaveLength(1);
+    const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("keeps multi-item shipment rows behind their section", () => {
     const first = makeLog({ log_id: "ship-a", item_name: "출하 품목 A", transaction_type: "SHIP", shipping_phase: "PICKUP" });
     const second = makeLog({ log_id: "ship-b", item_id: "ITEM-2", item_name: "출하 품목 B", transaction_type: "SHIP", shipping_phase: "PICKUP" });

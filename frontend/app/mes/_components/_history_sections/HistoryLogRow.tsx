@@ -7,7 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor } from "@/lib/mes-status";
 import { formatHistoryDate } from "./historyFormat";
-import { getHistoryRowPresentation } from "./historyPresentation";
+import { getHistoryListOperationLabel, getHistoryRowPresentation } from "./historyPresentation";
 import {
   FlowBadge,
   HISTORY_CELL_TRANSITION,
@@ -89,7 +89,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={log.transaction_type} label={presentation.operation.label} color={tcolor} />
+        <FlowBadge type={log.transaction_type} label={getHistoryListOperationLabel(log)} color={tcolor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock

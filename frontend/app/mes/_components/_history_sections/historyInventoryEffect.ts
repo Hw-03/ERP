@@ -46,28 +46,18 @@ function normalizeText(value?: string | null): string | null {
   return text || null;
 }
 
-function statusLabel(status?: string | null): string {
-  switch (status) {
-    case "PRODUCTION":
-      return "생산";
-    case "DEFECTIVE":
-      return "불량";
-    default:
-      return status ?? "위치";
-  }
-}
-
 function cellLabel(
   scope: InventoryEffectScope,
   cell: InventoryEffectCell,
   locationId: string | null,
   boxId: string | null,
 ): string {
-  if (scope === "warehouse") return "창고";
-  if (scope === "warehouse_box") return boxId ? `박스 ${boxId}` : "박스 재고";
+  if (scope === "warehouse") return "창고 재고";
+  if (scope === "warehouse_box") return "박스 재고";
   const department = normalizeText(cell.department);
-  if (department) return `${department} ${statusLabel(normalizeText(cell.status))}`;
-  return locationId ? `위치 ${locationId}` : statusLabel(normalizeText(cell.status));
+  if (normalizeText(cell.status) === "DEFECTIVE") return "불량 재고";
+  if (department) return `${department} 재고`;
+  return locationId ? "재고" : "재고";
 }
 
 export function toInventoryEffectRows(

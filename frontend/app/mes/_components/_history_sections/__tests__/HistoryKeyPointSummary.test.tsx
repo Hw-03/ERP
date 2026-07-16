@@ -15,7 +15,7 @@ function effect(overrides: Partial<InventoryEffectRow> = {}): InventoryEffectRow
     boxId: null,
     department: "조립",
     status: "PRODUCTION",
-    label: "조립 생산",
+    label: "조립 재고",
     delta: 1,
     deltaLabel: "+1",
     ...overrides,
@@ -32,6 +32,7 @@ function summary(overrides: Partial<HistoryDetailSummary> = {}): HistoryDetailSu
     requester: { name: "요청자 A", at: "2026-07-10T01:00:00Z" },
     flow: null,
     composition: null,
+    impactIdentity: "log-1",
     ...overrides,
   };
 }
@@ -44,7 +45,7 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.getAllByText("완료")).toHaveLength(1);
     expect(screen.getAllByText("요청자 A")).toHaveLength(1);
     expect(screen.getByText("실제 영향")).toBeInTheDocument();
-    expect(screen.getByText("조립 생산")).toBeInTheDocument();
+    expect(screen.getByText("조립 재고")).toBeInTheDocument();
     expect(screen.getByText("+1 EA")).toBeInTheDocument();
     expect(screen.getByText("완제품 A")).toBeInTheDocument();
     expect(screen.queryByText(/처리 전|처리 후|창고 401/)).not.toBeInTheDocument();
@@ -85,8 +86,12 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    expect(screen.getByText("완제품")).toBeInTheDocument();
-    expect(screen.getByText("부품")).toBeInTheDocument();
+    const output = screen.getByRole("button", { name: /완제품.*1품목.*\+2 EA/ });
+    const components = screen.getByRole("button", { name: /부품.*2품목.*-5 EA/ });
+    expect(output).toHaveAttribute("aria-expanded", "false");
+    expect(components).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(output);
+    fireEvent.click(components);
     expect(screen.getByText("완제품 A")).toBeInTheDocument();
     expect(screen.getByText("부품 A")).toBeInTheDocument();
     expect(screen.getByText("부품 B")).toBeInTheDocument();
@@ -137,9 +142,9 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.getByText("TGT-001")).toBeInTheDocument();
     expect(screen.getByText("완제품")).toBeInTheDocument();
     expect(screen.getByText("부품")).toBeInTheDocument();
-    expect(screen.getByText((_, element) => (
-      element?.textContent === "R-001 · 조립 생산 · BOM 4 EA"
-    ))).toBeInTheDocument();
+    expect(screen.getAllByText((_, element) => (
+      element?.textContent === "조립 재고"
+    ))).toHaveLength(2);
   });
 
   it("places requester metadata before conversion and actual impact", () => {
@@ -161,6 +166,36 @@ describe("HistoryKeyPointSummary", () => {
     expect(requester.compareDocumentPosition(conversion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(requester.compareDocumentPosition(impact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector("[data-testid='history-key-point-summary']")).toContainElement(requester);
+  });
+
+  it("starts every location collapsed when an operation affects multiple locations", () => {
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          impactGroups: [
+            { key: "warehouse", label: "창고 재고", effects: [effect({ label: "창고 재고", delta: -10, deltaLabel: "-10" })] },
+            { key: "location:출하", label: "출하 재고", effects: [effect({ key: "outbound", label: "출하 재고", itemName: "출하 품목", delta: 10, deltaLabel: "+10" })] },
+          ],
+        })}
+      />,
+    );
+
+    const warehouse = screen.getByRole("button", { name: /창고 재고.*1품목.*-10 EA/ });
+    const outbound = screen.getByRole("button", { name: /출하 재고.*1품목.*\+10 EA/ });
+    expect(warehouse).toHaveAttribute("aria-expanded", "false");
+    expect(outbound).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("출하 품목")).not.toBeInTheDocument();
+
+    fireEvent.click(outbound);
+    expect(outbound).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("출하 품목")).toBeInTheDocument();
+    expect(warehouse).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("does not truncate the requester timestamp", () => {
+    render(<HistoryKeyPointSummary summary={summary()} />);
+
+    expect(screen.getByText(/2026년 7월 10일/)).not.toHaveClass("truncate");
   });
 
   it("shows the location or movement route in the desktop summary only when it exists", () => {

@@ -27,7 +27,7 @@ import {
   type MovementTone,
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
-import { getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel } from "./historyPresentation";
+import { getHistoryListOperationLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 
 const TX_ICON = {
@@ -712,7 +712,7 @@ export function BatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} />
+        <FlowBadge type={primaryType} label={getHistoryListOperationLabel(first)} color={flowColor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-1.5">
@@ -1167,7 +1167,7 @@ export function OpBatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={presentation.operation.label} color={flowColor} compact={compact} />
+        <FlowBadge type={primaryType} label={getHistoryListOperationLabel(first, batch)} color={flowColor} compact={compact} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-1.5">

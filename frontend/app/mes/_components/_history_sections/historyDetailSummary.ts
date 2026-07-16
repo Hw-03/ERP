@@ -19,7 +19,7 @@ export type HistoryDetailStatus = {
 };
 
 export type HistoryImpactGroup = {
-  key: "actual" | "output" | "component" | "other";
+  key: string;
   label: string | null;
   effects: HistoryDetailImpact[];
 };
@@ -59,6 +59,7 @@ export type HistoryDetailSummary = {
     to: string | null;
   } | null;
   composition: HistoryBatchLineStats | null;
+  impactIdentity: string;
 };
 
 function mergeEffects(effects: InventoryEffectRow[]): InventoryEffectRow[] {
@@ -169,7 +170,22 @@ function enrichActualEffects(
 
 function buildImpactGroups(logs: TransactionLog[], batch: IoBatch | null): HistoryImpactGroup[] {
   const effects = enrichActualEffects(withoutDuplicatedWarehouseBoxEffects(effectsFromLogs(logs)), batch);
-  return effects.length > 0 ? [{ key: "actual", label: null, effects }] : [];
+  const groups = new Map<string, HistoryImpactGroup>();
+  for (const effect of effects) {
+    const group = getImpactLocationGroup(effect);
+    const existing = groups.get(group.key);
+    if (existing) existing.effects.push(effect);
+    else groups.set(group.key, { ...group, effects: [effect] });
+  }
+  return Array.from(groups.values());
+}
+
+function getImpactLocationGroup(effect: InventoryEffectRow): Pick<HistoryImpactGroup, "key" | "label"> {
+  if (effect.scope === "warehouse") return { key: "warehouse", label: "창고 재고" };
+  if (effect.scope === "warehouse_box") return { key: "warehouse_box", label: "박스 재고" };
+  if (effect.status === "DEFECTIVE") return { key: "defective", label: "불량 재고" };
+  if (effect.department) return { key: `department:${effect.department}`, label: `${effect.department} 재고` };
+  return { key: `location:${effect.locationId ?? "unknown"}`, label: "재고" };
 }
 
 function toConversionEndpoint(log: TransactionLog): HistoryConversionEndpoint {
@@ -256,5 +272,6 @@ export function buildHistoryDetailSummary(
       }
       : null,
     composition: batch ? getBatchLineStats(batch) : null,
+    impactIdentity: logs.map((log) => log.log_id).sort().join(":"),
   };
 }

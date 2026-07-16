@@ -1,4 +1,5 @@
-import { Activity, ArrowRight, Clock3, MapPin, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, ArrowRight, ChevronDown, Clock3, MapPin, UserRound } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import type {
@@ -26,6 +27,21 @@ export function HistoryKeyPointSummary({
   onImpactClick?: (impact: HistoryDetailImpact) => void;
 }) {
   const statusColor = STATUS_COLORS[summary.status.tone];
+  const [expandedImpactGroups, setExpandedImpactGroups] = useState<Set<string>>(new Set());
+  const hasMultipleImpactLocations = summary.impactGroups.length > 1;
+
+  useEffect(() => {
+    setExpandedImpactGroups(new Set());
+  }, [summary.impactIdentity]);
+
+  const toggleImpactGroup = (key: string) => {
+    setExpandedImpactGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <section
@@ -66,7 +82,7 @@ export function HistoryKeyPointSummary({
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <Clock3 className="h-4 w-4 shrink-0" />
-          <span className="truncate">{formatHistoryDateTimeLong(summary.requester.at)}</span>
+          <span className="font-medium leading-snug">{formatHistoryDateTimeLong(summary.requester.at)}</span>
         </div>
       </div>
 
@@ -134,61 +150,80 @@ export function HistoryKeyPointSummary({
               )}
             </div>
           )}
-          {impactStatus === "ready" && summary.impactGroups.map((group) => (
-            <div key={group.key} className="px-4 pb-3">
-              {group.label && (
-                <div className="pb-1 pt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                  {group.label}
-                </div>
-              )}
-              <div>
-                {group.effects.map((effect, index) => {
-                  const color = effect.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
-                  const rowClass = `flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left ${
-                    index > 0 ? "border-t" : ""
-                  }`;
-                  const contents = <>
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          {effect.role && (
-                            <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                              {effect.role}
-                            </span>
-                          )}
-                          <div className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-                            {effect.itemName}
+          {impactStatus === "ready" && summary.impactGroups.map((group) => {
+            const isExpanded = !hasMultipleImpactLocations || expandedImpactGroups.has(group.key);
+            const amount = getImpactGroupAmount(group.effects);
+            const contentId = `history-impact-${summary.impactIdentity}-${group.key}`;
+
+            return (
+              <div key={group.key} className="px-4 pb-3">
+                {hasMultipleImpactLocations && (
+                  <button
+                    type="button"
+                    onClick={() => toggleImpactGroup(group.key)}
+                    aria-expanded={isExpanded}
+                    aria-controls={contentId}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg py-2 text-left hover:brightness-125 focus-visible:brightness-125"
+                  >
+                    <span className="min-w-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
+                      {group.label ?? "재고"} · {group.effects.length}품목{amount ? ` · ${amount}` : ""}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                      style={{ color: LEGACY_COLORS.muted2 }}
+                    />
+                  </button>
+                )}
+                {isExpanded && (
+                  <div id={contentId}>
+                    {group.effects.map((effect, index) => {
+                      const color = effect.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
+                      const rowClass = `flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left ${
+                        index > 0 ? "border-t" : ""
+                      }`;
+                      const contents = <>
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              {effect.role && (
+                                <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
+                                  {effect.role}
+                                </span>
+                              )}
+                              <div className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+                                {effect.itemName}
+                              </div>
+                            </div>
+                            {!hasMultipleImpactLocations && effect.label && (
+                              <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                                {effect.label}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div
-                          className="mt-0.5 text-xs"
-                          style={{ color: LEGACY_COLORS.muted2 }}
+                          <div className="shrink-0 text-sm font-black" style={{ color }}>
+                            {effect.deltaLabel}{effect.unit ? ` ${effect.unit}` : ""}
+                          </div>
+                        </>;
+                      return onImpactClick && effect.role ? (
+                        <button
+                          key={effect.key}
+                          type="button"
+                          onClick={() => onImpactClick(effect)}
+                          className={`${rowClass} no-btn-inset hover:brightness-125 focus-visible:brightness-125`}
+                          style={{ borderColor: LEGACY_COLORS.border }}
                         >
-                          {[effect.mesCode, effect.label, effect.mismatchLabel].filter(Boolean).join(" · ")}
+                          {contents}
+                        </button>
+                      ) : (
+                        <div key={effect.key} className={rowClass} style={{ borderColor: LEGACY_COLORS.border }}>
+                          {contents}
                         </div>
-                      </div>
-                      <div className="shrink-0 text-sm font-black" style={{ color }}>
-                        {effect.deltaLabel}{effect.unit ? ` ${effect.unit}` : ""}
-                      </div>
-                    </>;
-                  return onImpactClick && effect.role ? (
-                    <button
-                      key={effect.key}
-                      type="button"
-                      onClick={() => onImpactClick(effect)}
-                      className={`${rowClass} no-btn-inset hover:brightness-125 focus-visible:brightness-125`}
-                      style={{ borderColor: LEGACY_COLORS.border }}
-                    >
-                      {contents}
-                    </button>
-                  ) : (
-                    <div key={effect.key} className={rowClass} style={{ borderColor: LEGACY_COLORS.border }}>
-                      {contents}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -203,6 +238,15 @@ export function HistoryKeyPointSummary({
       )}
     </section>
   );
+}
+
+function getImpactGroupAmount(effects: HistoryDetailImpact[]): string | null {
+  const units = new Set(effects.map((effect) => effect.unit).filter(Boolean));
+  if (units.size !== 1) return null;
+  const delta = effects.reduce((total, effect) => total + effect.delta, 0);
+  if (delta === 0) return null;
+  const [unit] = Array.from(units);
+  return `${delta > 0 ? "+" : ""}${delta} ${unit}`;
 }
 
 function ConversionEndpoint({
