@@ -38,18 +38,19 @@ export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelle
   }
 
   if (summaries.length === 1) {
-    return <ReworkSummaryRow summary={summaries[0]} compact={compact} rowId={controlsId} cancelled={cancelled} />;
+    return <ReworkSummaryRow summary={summaries[0]} title={getResultTitle(summaries[0])} compact={compact} rowId={controlsId} cancelled={cancelled} />;
   }
 
-  const [first, ...children] = summaries;
+  const [first] = summaries;
   const detailId = `${controlsId ?? "history-rework"}-items`;
   return (
     <>
-      <ReworkSummaryRow summary={first} compact={compact} rowId={controlsId} cancelled={cancelled} expanded={expanded} onToggle={() => setExpanded((value) => !value)} controlsId={detailId} />
-      {expanded && children.map((summary, index) => (
+      <ReworkSummaryRow summary={first} title={getResultTitle(first)} compact={compact} rowId={controlsId} cancelled={cancelled} expanded={expanded} onToggle={() => setExpanded((value) => !value)} controlsId={detailId} />
+      {expanded && summaries.map((summary, index) => (
         <ReworkSummaryRow
           key={`${summary.itemId}-${summary.mesCode ?? ""}`}
           summary={summary}
+          title={summary.itemName}
           compact={compact}
           rowId={index === 0 ? detailId : undefined}
           cancelled={cancelled}
@@ -59,8 +60,15 @@ export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelle
   );
 }
 
-function ReworkSummaryRow({ summary, compact, rowId, cancelled, expanded, onToggle, controlsId }: { summary: ReworkItemSummary; compact?: boolean; rowId?: string; cancelled: boolean; expanded?: boolean; onToggle?: () => void; controlsId?: string }) {
+function getResultTitle(summary: ReworkItemSummary): string {
+  return summary.resultParts.length === 1 && summary.resultParts[0].label.startsWith("폐기 ")
+    ? "폐기 결과"
+    : summary.itemName;
+}
+
+function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded, onToggle, controlsId }: { summary: ReworkItemSummary; title?: string; compact?: boolean; rowId?: string; cancelled: boolean; expanded?: boolean; onToggle?: () => void; controlsId?: string }) {
   const padX = compact ? "px-2" : "px-4";
+  const displayTitle = title ?? summary.itemName;
 
   return (
     <tr id={rowId} className={cancelled ? "opacity-60" : undefined} style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}>
@@ -72,11 +80,11 @@ function ReworkSummaryRow({ summary, compact, rowId, cancelled, expanded, onTogg
         <div className="flex min-w-0 items-center gap-2">
           {onToggle ? <ChevronToggleBtn label="처리결과 구성" expanded={expanded ?? false} onToggle={onToggle} controlsId={controlsId} /> : <span aria-hidden className="h-5 w-5 shrink-0" />}
           <TruncatedText
-            accessibilityLabel={summary.itemName}
+            accessibilityLabel={displayTitle}
             className={`truncate text-xs font-semibold${cancelled ? " line-through" : ""}`}
             style={{ color: LEGACY_COLORS.text }}
           >
-            {summary.itemName}
+            {displayTitle}
           </TruncatedText>
         </div>
       </td>

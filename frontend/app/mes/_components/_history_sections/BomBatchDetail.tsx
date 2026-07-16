@@ -214,6 +214,9 @@ function BundleRows({
   const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
   const shortageCount = childLines.filter((line) => line.included && line.shortage > 0).length;
   const detailId = `history-bom-${encodeURIComponent(bundle.bundle_id).replaceAll("%", "_")}`;
+  const displayTitle = isBomParent && (batch.sub_type === "warehouse_to_dept" || batch.sub_type === "dept_to_warehouse")
+    ? "이동 구성"
+    : bundle.title;
   const targetPadX = compact ? "px-2" : "px-4";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
@@ -269,11 +272,11 @@ function BundleRows({
               ? <GitBranch className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
               : <Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
             <TruncatedText
-              accessibilityLabel={bundle.title}
+              accessibilityLabel={displayTitle}
               className="line-clamp-2 min-w-0 break-words text-xs font-bold leading-snug"
               style={{ color: LEGACY_COLORS.text }}
             >
-              {bundle.title}
+              {displayTitle}
             </TruncatedText>
           </div>
         </td>

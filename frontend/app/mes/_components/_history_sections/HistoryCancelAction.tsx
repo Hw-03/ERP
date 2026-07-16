@@ -5,6 +5,7 @@ import { XCircle } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { productionApi } from "@/lib/api/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import {
   getHistoryCancelCopy,
   type HistoryCancelScope,
@@ -189,6 +190,7 @@ export function HistoryCancelAction({
   triggerLabel,
   scopeCount,
   children,
+  pinToDesktopFooter = false,
 }: {
   panelOpen: boolean;
   identity: string;
@@ -201,6 +203,7 @@ export function HistoryCancelAction({
   triggerLabel?: string;
   scopeCount?: number;
   children?: (controller: HistoryCancelController) => ReactNode;
+  pinToDesktopFooter?: boolean;
 }) {
   const copy = getHistoryCancelCopy(scope);
   const [step, setStep] = useState<CancelStep>("idle");
@@ -278,14 +281,11 @@ export function HistoryCancelAction({
 
   if (children) return <>{children(controller)}</>;
 
-  if (!panelOpen || cancelled) return null;
-
-  if (scopeStatus !== "ready") {
-    return <HistoryCancelScopeLoadState status={scopeStatus} onRetry={onRetryScope} />;
-  }
-
-  if (step === "idle") {
-    return (
+  let content: ReactNode = null;
+  if (panelOpen && !cancelled && scopeStatus !== "ready") {
+    content = <HistoryCancelScopeLoadState status={scopeStatus} onRetry={onRetryScope} />;
+  } else if (panelOpen && !cancelled && step === "idle") {
+    content = (
       <div className="border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
         <button
           type="button"
@@ -302,9 +302,8 @@ export function HistoryCancelAction({
         </button>
       </div>
     );
-  }
-
-  return (
+  } else if (panelOpen && !cancelled) {
+    content = (
     <section
       data-testid="history-cancel-confirmation"
       className="space-y-3 border-t pt-4"
@@ -373,7 +372,10 @@ export function HistoryCancelAction({
         </button>
       </div>
     </section>
-  );
+    );
+  }
+
+  return pinToDesktopFooter ? <DesktopRightPanelFooter>{content}</DesktopRightPanelFooter> : content;
 }
 
 function HistoryCancelImpactPreview({

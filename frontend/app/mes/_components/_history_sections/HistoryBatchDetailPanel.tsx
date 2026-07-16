@@ -200,11 +200,12 @@ export function HistoryBatchDetailPanel({
 
   if (variant === "desktop") {
     return (
-      <div className="space-y-4">
+      <div className="flex min-h-full min-h-0 flex-col gap-4">
         <HistoryKeyPointSummary
           summary={summary}
           impactStatus={cancellationScope.status}
           onRetryImpact={cancellationScope.retry}
+          fillHeight
         />
         {excludedLineCount > 0 && (
           <div className="px-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -224,6 +225,7 @@ export function HistoryBatchDetailPanel({
           onSubmit={handleCancelSubmit}
           triggerLabel="이 내역 취소"
           scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
+          pinToDesktopFooter
         />
       </div>
     );

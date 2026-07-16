@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowRight, ChevronDown, Clock3, MapPin, UserRound } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useDesktopRightPanelBody } from "../DesktopRightPanel";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import type {
   HistoryDetailSummary,
@@ -19,18 +20,44 @@ export function HistoryKeyPointSummary({
   summary,
   impactStatus = "ready",
   onRetryImpact,
+  fillHeight = false,
 }: {
   summary: HistoryDetailSummary;
   impactStatus?: "ready" | "loading" | "error";
   onRetryImpact?: () => void;
+  fillHeight?: boolean;
 }) {
   const statusColor = STATUS_COLORS[summary.status.tone];
   const [expandedImpactGroups, setExpandedImpactGroups] = useState<Set<string>>(new Set());
+  const [autoCollapsedImpactIdentity, setAutoCollapsedImpactIdentity] = useState<string | null>(null);
+  const panelBody = useDesktopRightPanelBody();
   const hasMultipleImpactLocations = summary.impactGroups.length > 1;
+  const impactLayoutKey = `${impactStatus}:${summary.impactGroups.map((group) => `${group.key}:${group.effects.length}`).join("|")}`;
 
   useEffect(() => {
     setExpandedImpactGroups(new Set());
+    setAutoCollapsedImpactIdentity(null);
   }, [summary.impactIdentity]);
+
+  useEffect(() => {
+    if (!panelBody || autoCollapsedImpactIdentity === summary.impactIdentity) return;
+
+    const measureOverflow = () => {
+      if (panelBody.scrollHeight > panelBody.clientHeight) {
+        setAutoCollapsedImpactIdentity(summary.impactIdentity);
+      }
+    };
+    measureOverflow();
+    window.addEventListener("resize", measureOverflow);
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(measureOverflow);
+    observer?.observe(panelBody);
+    return () => {
+      window.removeEventListener("resize", measureOverflow);
+      observer?.disconnect();
+    };
+  }, [autoCollapsedImpactIdentity, impactLayoutKey, panelBody, summary.impactIdentity]);
 
   const toggleImpactGroup = (key: string) => {
     setExpandedImpactGroups((current) => {
@@ -44,7 +71,7 @@ export function HistoryKeyPointSummary({
   return (
     <section
       data-testid="history-key-point-summary"
-      className="overflow-hidden rounded-[20px] border"
+      className={`${fillHeight ? "min-h-0 flex-1 " : ""}overflow-hidden rounded-[20px] border`}
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
       <div className="flex items-start justify-between gap-3 px-4 py-3.5">
@@ -149,13 +176,14 @@ export function HistoryKeyPointSummary({
             </div>
           )}
           {impactStatus === "ready" && summary.impactGroups.map((group) => {
-            const isExpanded = !hasMultipleImpactLocations || expandedImpactGroups.has(group.key);
+            const isToggleable = hasMultipleImpactLocations || autoCollapsedImpactIdentity === summary.impactIdentity;
+            const isExpanded = !isToggleable || expandedImpactGroups.has(group.key);
             const amount = getImpactGroupAmount(group.effects);
             const contentId = `history-impact-${summary.impactIdentity}-${group.key}`;
 
             return (
               <div key={group.key} className="px-4 pb-3">
-                {hasMultipleImpactLocations && (
+                {isToggleable && (
                   <button
                     type="button"
                     onClick={() => toggleImpactGroup(group.key)}
@@ -177,7 +205,7 @@ export function HistoryKeyPointSummary({
                   </button>
                 )}
                 {isExpanded && (
-                  <div id={contentId} className={hasMultipleImpactLocations ? "px-3" : undefined}>
+                  <div id={contentId} className={isToggleable ? "px-3" : undefined}>
                     {group.effects.map((effect, index) => {
                       const color = effect.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
                       const rowClass = `flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left ${

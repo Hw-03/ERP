@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { InventoryEffectRow } from "../historyInventoryEffect";
 import type { HistoryDetailSummary } from "../historyDetailSummary";
+import { DesktopRightPanel } from "../../DesktopRightPanel";
 import { HistoryKeyPointSummary } from "../HistoryKeyPointSummary";
 
 function effect(overrides: Partial<InventoryEffectRow> = {}): InventoryEffectRow {
@@ -198,6 +199,30 @@ describe("HistoryKeyPointSummary", () => {
     const timestamp = screen.getByText(/2026년 7월 10일/);
     expect(timestamp).not.toHaveClass("truncate");
     expect(timestamp).toHaveClass("whitespace-nowrap");
+  });
+
+  it("collapses a single location when its expanded detail overflows the panel body", () => {
+    render(
+      <DesktopRightPanel title="Detail">
+        <HistoryKeyPointSummary
+          summary={summary({
+            impactGroups: [{ key: "single", label: "Single location", effects: [effect({ label: "Single location" })] }],
+          })}
+        />
+      </DesktopRightPanel>,
+    );
+
+    const body = screen.getByTestId("desktop-right-panel-body");
+    Object.defineProperty(body, "clientHeight", { configurable: true, value: 120 });
+    Object.defineProperty(body, "scrollHeight", { configurable: true, value: 240 });
+    fireEvent(window, new Event("resize"));
+
+    const header = screen.getByRole("button", { name: /Single location/ });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(header!);
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    fireEvent(window, new Event("resize"));
+    expect(header).toHaveAttribute("aria-expanded", "true");
   });
 
   it("shows the location or movement route in the desktop summary only when it exists", () => {

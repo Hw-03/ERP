@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { DesktopRightPanel } from "../DesktopRightPanel";
+import { DesktopRightPanel, DesktopRightPanelFooter } from "../DesktopRightPanel";
 
 describe("DesktopRightPanel", () => {
   it("exposes a labelled title target while keeping the two-line clamp", () => {
@@ -29,5 +29,21 @@ describe("DesktopRightPanel", () => {
     const scroller = container.querySelector(".overflow-y-auto");
     expect(scroller).toHaveClass("sg");
     expect(scroller).not.toHaveClass("scrollbar-hide");
+  });
+
+  it("renders a footer outside the scrolling detail body", () => {
+    render(
+      <DesktopRightPanel title="Detail">
+        <div>Scrollable body</div>
+        <DesktopRightPanelFooter>
+          <button type="button">Cancel this record</button>
+        </DesktopRightPanelFooter>
+      </DesktopRightPanel>,
+    );
+
+    const footer = screen.getByTestId("desktop-right-panel-footer");
+    const body = screen.getByTestId("desktop-right-panel-body");
+    expect(footer).toContainElement(screen.getByRole("button", { name: "Cancel this record" }));
+    expect(body).not.toContainElement(screen.getByRole("button", { name: "Cancel this record" }));
   });
 });

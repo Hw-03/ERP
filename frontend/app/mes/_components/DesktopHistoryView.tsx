@@ -65,6 +65,7 @@ export function DesktopHistoryView() {
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
   const [focusTarget, setFocusTarget] = useState<HistoryTableFocusTarget | null>(null);
+  const [collapseRequestNonce, setCollapseRequestNonce] = useState(0);
   // 우측 패널 내 드릴(BOM 세부) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
 
@@ -605,6 +606,7 @@ export function DesktopHistoryView() {
             focusTarget={focusTarget}
             referenceSummaries={referenceSummaries}
             referenceSummariesLoading={referenceSummariesLoading}
+            collapseRequestNonce={collapseRequestNonce}
           />
         </div>
       </div>
@@ -623,6 +625,7 @@ export function DesktopHistoryView() {
         onClose={() => {
           setSelectionStack([]);
           setSelection(null);
+          setCollapseRequestNonce((nonce) => nonce + 1);
         }}
       />
     </div>

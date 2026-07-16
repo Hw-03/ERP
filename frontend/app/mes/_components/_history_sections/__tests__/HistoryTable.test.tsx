@@ -31,9 +31,9 @@ function makeBatch(): IoBatch {
   };
 }
 
-function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>()) {
-  render(
-    <HistoryTable loading={false} displayGroups={groups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={batchCache} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>(), collapseRequestNonce = 0) {
+  return render(
+    <HistoryTable loading={false} displayGroups={groups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={batchCache} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} collapseRequestNonce={collapseRequestNonce} />,
   );
 }
 
@@ -96,9 +96,28 @@ describe("HistoryTable hierarchy", () => {
     renderTable([{ type: "batch", refKey: "rework", refNo: parent.reference_no!, logs: [parent, first, second] }]);
 
     fireEvent.click(screen.getByRole("button", { name: "묶음 펼치기" }));
-    expect(screen.getByText("폐기 품목 A")).toBeInTheDocument();
+    expect(screen.getByText("폐기 결과")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "처리결과 구성 펼치기" }));
     expect(screen.getByText("폐기 품목 A")).toBeInTheDocument();
     expect(screen.getByText("폐기 품목 B")).toBeInTheDocument();
+  });
+
+  it("collapses an open group when the detail panel requests a close", () => {
+    const first = makeLog({ log_id: "ship-close-a", item_name: "Shipment A", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+    const second = makeLog({ log_id: "ship-close-b", item_id: "ITEM-2", item_name: "Shipment B", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+    const groups: LogGroup[] = [{ type: "batch", refKey: "shipment-close", refNo: "shipment-close", logs: [first, second] }];
+    const view = renderTable(groups);
+    const toggle = screen.getAllByRole("button").find((button) => button.hasAttribute("aria-expanded"));
+
+    expect(toggle).toBeDefined();
+    fireEvent.click(toggle!);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    view.rerender(
+      <HistoryTable loading={false} displayGroups={groups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} collapseRequestNonce={1} />,
+    );
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Shipment B")).not.toBeInTheDocument();
   });
 });

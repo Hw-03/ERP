@@ -140,6 +140,21 @@ function makeMultiItemAdjustmentBatch(): IoBatch {
 }
 
 describe("BomBatchDetail", () => {
+  it("uses an operation label for a warehouse-to-department BOM bundle while preserving its component names", () => {
+    const batch = makeBatch();
+    batch.sub_type = "warehouse_to_dept";
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    expect(screen.getByText("이동 구성")).toBeInTheDocument();
+    expect(screen.queryByText("아주 긴 완제품 구성 묶음 이름")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+    expect(screen.getByText("아주 긴 구성품 라인 이름")).toBeInTheDocument();
+  });
+
   it.each(["Enter", " "])("uses a real button for BOM expansion with %s", (key) => {
     const batch = makeBatch();
     render(

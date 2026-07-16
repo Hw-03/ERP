@@ -154,6 +154,30 @@ describe("ReworkBatchHeader", () => {
 });
 
 describe("ReworkBatchDetail", () => {
+  it("labels a scrap-only result by its outcome while keeping the item in the expanded list", () => {
+    render(
+      <table>
+        <tbody>
+          <ReworkBatchDetail
+            logs={[
+              makeLog({ log_id: "scrap-a", item_id: "A", item_name: "폐기 품목 A" }),
+              makeLog({ log_id: "scrap-b", item_id: "B", item_name: "폐기 품목 B" }),
+            ]}
+            parentItemId="PARENT"
+            colSpan={8}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText("폐기 결과")).toBeInTheDocument();
+    expect(screen.queryByText("폐기 품목 A")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "처리결과 구성 펼치기" }));
+    expect(screen.getByText("폐기 품목 A")).toBeInTheDocument();
+    expect(screen.getByText("폐기 품목 B")).toBeInTheDocument();
+  });
+
   it("constrains the compact result badge while preserving its full label", () => {
     render(
       <table>
@@ -215,7 +239,8 @@ describe("ReworkBatchDetail", () => {
       </table>,
     );
 
-    expect(screen.getByText("폐기 품목 A")).toBeInTheDocument();
+    expect(screen.getByText("폐기 결과")).toBeInTheDocument();
+    expect(screen.queryByText("폐기 품목 B")).not.toBeInTheDocument();
     const toggle = screen.getByRole("button", { name: "처리결과 구성 펼치기" });
     fireEvent.click(toggle);
     expect(screen.getByText("폐기 품목 A")).toBeInTheDocument();
@@ -303,7 +328,7 @@ describe("ReworkBatchDetail", () => {
       <table>
         <tbody>
           <ReworkBatchDetail
-            logs={[makeLog({ item_name: longName })]}
+            logs={[makeLog({ item_name: longName, transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 })]}
             parentItemId="PARENT"
             colSpan={8}
             compact
@@ -333,7 +358,7 @@ describe("ReworkBatchDetail", () => {
       <table>
         <tbody>
           <ReworkBatchDetail
-            logs={[makeLog({ item_name: "짧은 품목명" })]}
+            logs={[makeLog({ item_name: "짧은 품목명", transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 })]}
             parentItemId="PARENT"
             colSpan={8}
           />

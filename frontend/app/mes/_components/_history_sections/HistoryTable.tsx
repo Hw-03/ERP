@@ -44,6 +44,7 @@ type Props = {
   focusTarget?: HistoryTableFocusTarget | null;
   referenceSummaries?: Map<string, TransactionReferenceSummary>;
   referenceSummariesLoading?: boolean;
+  collapseRequestNonce?: number;
 };
 
 type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center" | "right"; hidden?: boolean; px?: string };
@@ -88,8 +89,16 @@ export function HistoryTable({
   focusTarget,
   referenceSummaries,
   referenceSummariesLoading = false,
+  collapseRequestNonce = 0,
 }: Props) {
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+  const previousCollapseRequestRef = useRef(collapseRequestNonce);
+
+  useEffect(() => {
+    if (previousCollapseRequestRef.current === collapseRequestNonce) return;
+    previousCollapseRequestRef.current = collapseRequestNonce;
+    setExpandedGroupKey(null);
+  }, [collapseRequestNonce]);
 
   // 선택 변화에 따른 op_batch 자동 토글 — "선택해서 열린" 묶음만 자동 접힘.
   // 단건/다른 묶음/none 으로 selection 이 바뀌면 이전 선택 묶음 접기 + 새 묶음이면 펼침.

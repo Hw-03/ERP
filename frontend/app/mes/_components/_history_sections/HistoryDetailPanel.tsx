@@ -180,12 +180,13 @@ export function HistoryDetailPanel({
   };
 
   return (
-    <div className="space-y-4">
+    <div className={variant === "desktop" ? "flex min-h-full min-h-0 flex-col gap-4" : "space-y-4"}>
       {variant === "desktop" ? (
         <HistoryKeyPointSummary
           summary={summary}
           impactStatus={cancellationScope.status}
           onRetryImpact={cancellationScope.retry}
+          fillHeight
         />
       ) : (
         <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
@@ -236,6 +237,7 @@ export function HistoryDetailPanel({
               onSubmit={handleCancelSubmit}
               triggerLabel="이 내역 취소"
               scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
+              pinToDesktopFooter
             />
           )}
         </>
