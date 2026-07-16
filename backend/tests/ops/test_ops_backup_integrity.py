@@ -922,6 +922,7 @@ def test_cleanup_backups_keeps_latest_ten_regular_runtime_backups(tmp_path: Path
     assert legacy.exists()
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows cmd.exe is required")
 def test_backup_batch_propagates_python_failure_exit_code(tmp_path: Path) -> None:
     missing = tmp_path / "missing.db"
 
@@ -937,6 +938,7 @@ def test_backup_batch_propagates_python_failure_exit_code(tmp_path: Path) -> Non
     assert "not found" in (result.stdout + result.stderr).lower()
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows cmd.exe is required")
 def test_restore_batch_propagates_python_failure_exit_code(tmp_path: Path) -> None:
     missing = tmp_path / "missing.db"
 
