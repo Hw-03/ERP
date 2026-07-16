@@ -318,6 +318,7 @@ function HistoryDetailHero({
           type={log.transaction_type}
           label={presentation.operation.label}
           color={tcolor}
+          variant="panel"
         />
         <MovementSummaryCell summary={presentation.movement} />
         {editCount > 0 && (

@@ -60,7 +60,7 @@ export function DesktopRightPanel({
           )}
         </div>
       </div>
-      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto">{children}</div>
+      <div className="sg min-h-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   );
 }

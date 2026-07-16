@@ -54,12 +54,14 @@ export function FlowBadge({
   color,
   compact = false,
   accessibleLabel,
+  variant = "table",
 }: {
   type: TransactionLog["transaction_type"] | null;
   label: string;
   color: string;
   compact?: boolean;
   accessibleLabel?: string;
+  variant?: "table" | "panel";
 }) {
   const Icon = type ? TX_ICON[transactionIconName(type)] : null;
   const fullLabel = accessibleLabel ?? label;
@@ -67,7 +69,9 @@ export function FlowBadge({
     <span
       aria-label={accessibleLabel}
       title={fullLabel !== label ? fullLabel : undefined}
-      className="inline-flex h-6 w-full max-w-full min-w-0 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none"
+      className={`inline-flex h-6 min-w-0 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none ${
+        variant === "table" ? "w-40 max-w-full overflow-hidden" : "max-w-full"
+      }`}
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
@@ -579,15 +583,17 @@ export function ChevronToggleBtn({
   expanded,
   onToggle,
   controlsId,
+  label = "묶음",
 }: {
   expanded: boolean;
   onToggle: () => void;
   controlsId?: string;
+  label?: string;
 }) {
   return (
     <button
       type="button"
-      aria-label={expanded ? "묶음 접기" : "묶음 펼치기"}
+      aria-label={`${label} ${expanded ? "접기" : "펼치기"}`}
       aria-expanded={expanded}
       aria-controls={controlsId}
       onClick={(e) => {
@@ -757,6 +763,19 @@ export function ReferenceBatchDetail({
     );
   }
 
+  if (sortedLogs.length > 1) {
+    return (
+      <ReferenceBatchSectionRow
+        logs={sortedLogs}
+        presentation={presentation}
+        compact={compact}
+        highlightLogId={highlightLogId}
+        onSelectLog={onSelectLog}
+        controlsId={controlsId}
+      />
+    );
+  }
+
   return (
     <>
       {sortedLogs.map((log, index) => (
@@ -768,6 +787,56 @@ export function ReferenceBatchDetail({
           highlightLogId={highlightLogId}
           onSelectLog={onSelectLog}
           rowId={index === 0 ? controlsId : undefined}
+        />
+      ))}
+    </>
+  );
+}
+
+function ReferenceBatchSectionRow({
+  logs,
+  presentation,
+  compact,
+  highlightLogId,
+  onSelectLog,
+  controlsId,
+}: {
+  logs: TransactionLog[];
+  presentation: ReturnType<typeof getReferenceBatchPresentation>;
+  compact?: boolean;
+  highlightLogId?: string | null;
+  onSelectLog?: (log: TransactionLog) => void;
+  controlsId?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const sectionId = `${controlsId ?? "history-reference"}-items`;
+  const [first, ...children] = logs;
+  if (!first) return null;
+
+  return (
+    <>
+      <ReferenceBatchLineRow
+        log={first}
+        kind={presentation.kind}
+        compact={compact}
+        highlightLogId={highlightLogId}
+        onSelectLog={onSelectLog}
+        rowId={controlsId}
+        sectionLabel={presentation.operationLabel}
+        toggleLabel={`${presentation.operationLabel} 구성`}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+        controlsId={sectionId}
+      />
+      {expanded && children.map((log, index) => (
+        <ReferenceBatchLineRow
+          key={log.log_id}
+          log={log}
+          kind={presentation.kind}
+          compact={compact}
+          highlightLogId={highlightLogId}
+          onSelectLog={onSelectLog}
+          rowId={index === 0 ? sectionId : undefined}
         />
       ))}
     </>
@@ -883,6 +952,7 @@ function ReferenceBatchLineRow({
   onSelectLog,
   rowId,
   sectionLabel,
+  toggleLabel,
   expanded,
   onToggle,
   controlsId,
@@ -894,6 +964,7 @@ function ReferenceBatchLineRow({
   onSelectLog?: (log: TransactionLog) => void;
   rowId?: string;
   sectionLabel?: string;
+  toggleLabel?: string;
   expanded?: boolean;
   onToggle?: () => void;
   controlsId?: string;
@@ -946,7 +1017,7 @@ function ReferenceBatchLineRow({
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-2">
           {onToggle
-            ? <ChevronToggleBtn expanded={expanded ?? true} onToggle={onToggle} controlsId={controlsId} />
+            ? <ChevronToggleBtn label={toggleLabel} expanded={expanded ?? true} onToggle={onToggle} controlsId={controlsId} />
             : <span aria-hidden className="h-5 w-5 shrink-0" />}
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText

@@ -385,9 +385,6 @@ export function getHistoryRowPresentation(
   const movement = batch
     ? getHistoryMovementSummary(log, batch)
     : { parts: [getSingleLogMovement(log)] };
-  if (batchStats && batchStats.excludedCount > 0) {
-    movement.supplement = { label: `제외 ${batchStats.excludedCount}`, tone: "muted" };
-  }
   const stock = getStockPresentation(log);
   const requester = getRequesterPresentation(log, batch);
   const rawApprover = (batch?.approver_name ?? log.approver_name ?? "").trim();

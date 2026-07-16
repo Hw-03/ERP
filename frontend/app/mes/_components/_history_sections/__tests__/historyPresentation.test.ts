@@ -218,7 +218,7 @@ describe("historyPresentation", () => {
     expect(row.target.meta).toEqual(["부품 차감 2라인"]);
     expect(row.flow.label).toBe("조립");
     expect(row.people).toEqual({ requester: "김민재", approver: "박승인" });
-    expect(row.movement.supplement).toEqual({ label: "제외 1", tone: "muted" });
+    expect(row.movement.supplement).toBeUndefined();
     expect(row.statusChips.map((chip) => chip.label)).toEqual([
       "수정 2",
       "메모",

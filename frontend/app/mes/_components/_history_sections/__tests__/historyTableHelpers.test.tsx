@@ -213,7 +213,7 @@ describe("history table helper rendering policies", () => {
     const target = screen.getByRole("columnheader", { name: "대상" });
     expect(target.style.width).toBe("");
     expect(target.style.minWidth).toBe("");
-    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("104px");
+    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("120px");
     expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
     expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("118px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
@@ -474,10 +474,10 @@ describe("history table helper rendering policies", () => {
     const { rerender } = render(
       <FlowBadge type="REWORK" label="재작업" color="#3b82f6" />,
     );
-    expect(screen.getByText("재작업").parentElement).toHaveClass("px-3");
+    expect(screen.getByText("재작업").parentElement).toHaveClass("w-40", "px-3");
 
     rerender(<FlowBadge type="REWORK" label="재작업" color="#3b82f6" compact />);
-    expect(screen.getByText("재작업").parentElement).toHaveClass("px-3");
+    expect(screen.getByText("재작업").parentElement).toHaveClass("w-40", "px-3");
   });
 
   it("renders conversion item codes as source, arrow, and target on separate lines", () => {
@@ -617,6 +617,20 @@ describe("history table helper rendering policies", () => {
     fireEvent.click(screen.getByText("구성품 라인"));
     expect(onSelectLog).toHaveBeenCalledWith(expect.objectContaining({ log_id: "child-log" }));
     expect(screen.getByText("구성품 라인").closest("tr")).toHaveClass("h-[40px]");
+  });
+
+  it("keeps multiple reference items behind a collapsed section", () => {
+    const first = makeLog({ log_id: "shipment-a", item_name: "출고 품목 A", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+    const second = makeLog({ log_id: "shipment-b", item_id: "ITEM-2", item_name: "출고 품목 B", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+
+    render(
+      <table><tbody><ReferenceBatchDetail logs={[first, second]} /></tbody></table>,
+    );
+
+    expect(screen.getByText("출고 품목 A")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "출하 구성 펼치기" }));
+    expect(screen.getByText("출고 품목 A")).toBeInTheDocument();
+    expect(screen.getByText("출고 품목 B")).toBeInTheDocument();
   });
 
   it("shortens the compact additional component badge but preserves its full title and accessible name", () => {

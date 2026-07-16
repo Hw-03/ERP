@@ -167,6 +167,12 @@ export function HistoryBatchDetailPanel({
   const summary = cancellationScope.status === "ready"
     ? buildHistoryDetailSummary(cancellationScope.logs, batch)
     : { ...visibleSummary, impactGroups: [] };
+  const excludedLineCount = batch
+    ? batch.bundles.reduce((count, bundle) => {
+      const parent = getHistoryBomParentLine(bundle);
+      return count + bundle.lines.filter((line) => line !== parent && !line.included).length;
+    }, 0)
+    : 0;
   const isBatchCancelled = cancellationLogs.every((log) => log.cancelled);
   const effects = cancellationScopeStatus === "ready"
     ? cancellationSummary.impactGroups.flatMap((group) => group.effects)
@@ -205,6 +211,11 @@ export function HistoryBatchDetailPanel({
           onRetryImpact={cancellationScope.retry}
           onImpactClick={batch && onFocusLineInList ? (impact) => handleImpactClick(impact.itemId) : undefined}
         />
+        {excludedLineCount > 0 && (
+          <div className="px-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            제외 {excludedLineCount}개
+          </div>
+        )}
         <HistoryDetailMemo notes={first.notes} />
 
         <HistoryCancelAction
@@ -334,7 +345,6 @@ function HistoryBatchHero({
   const flow = batch ? describeBatchFlow(first, batch) : null;
 
   let lineCount = 0;
-  let included = 0;
   let excluded = 0;
   let shortage = 0;
   let bundleCount = 0;
@@ -345,7 +355,7 @@ function HistoryBatchHero({
       for (const l of b.lines) {
         if (l === parent) continue;
         lineCount += 1;
-        if (l.included) included++; else excluded++;
+        if (!l.included) excluded++;
         if (l.shortage > 0) shortage++;
       }
     }
@@ -363,6 +373,7 @@ function HistoryBatchHero({
           type={displayType}
           label={getHistoryDisplayLabel(first, batch ?? undefined)}
           color={tcolor}
+          variant="panel"
         />
         <MovementSummaryCell summary={summary} />
       </div>
@@ -401,7 +412,8 @@ function HistoryBatchHero({
       {/* 3줄: 라인 카운트 (batch 있을 때만) */}
       {batch && (
         <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          총 {bundleCount}묶음 / {lineCount}라인 · 포함 {included} · 제외 {excluded}
+          총 {bundleCount}묶음 / {lineCount}라인
+          {excluded > 0 && <span> · 제외 {excluded}개</span>}
           {shortage > 0 && (
             <span style={{ color: LEGACY_COLORS.red }}> · 부족 {shortage}</span>
           )}
@@ -534,9 +546,8 @@ function BundleBlock({
       </div>
 
       <div>
-        {childLines.map((line) => {
+        {childLines.filter((line) => line.included).map((line) => {
           const clickable = isLineClickable(line);
-          const dim = !line.included;
           const signed = getHistoryLineSignedQuantity(line, batch, bundle);
           const qtyColor = SIGN_TONE_HEX[signed.tone];
           return (
@@ -548,12 +559,7 @@ function BundleBlock({
               className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left transition-colors disabled:cursor-default enabled:hover:brightness-125"
               style={{
                 borderColor: LEGACY_COLORS.border,
-                background: line.included
-                  ? "transparent"
-                  : framed
-                    ? "rgba(255,100,100,.04)"
-                    : `color-mix(in srgb, ${LEGACY_COLORS.red} 4%, transparent)`,
-                opacity: dim ? 0.6 : 1,
+                background: "transparent",
               }}
             >
               <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>└</span>

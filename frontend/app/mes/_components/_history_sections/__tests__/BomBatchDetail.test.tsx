@@ -194,9 +194,20 @@ describe("BomBatchDetail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
-    expect(screen.getByText("제외 구성품")).toBeInTheDocument();
+    expect(screen.queryByText("제외 구성품")).not.toBeInTheDocument();
     expect(screen.queryByText("제외")).not.toBeInTheDocument();
     expect(screen.getAllByText("부족 2")).toHaveLength(1);
+  });
+
+  it("uses the same 160px operation width for the BOM section and its item rows", () => {
+    const batch = makeBatch();
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    expect(screen.getByText("BOM").parentElement).toHaveClass("w-40");
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+    expect(screen.getByText("자동차감").parentElement).toHaveClass("w-40");
   });
 
   it("keeps the status-cell dash fallback for an exclusion-only BOM bundle", () => {

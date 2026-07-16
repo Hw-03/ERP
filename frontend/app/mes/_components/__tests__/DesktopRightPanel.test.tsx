@@ -18,4 +18,16 @@ describe("DesktopRightPanel", () => {
     expect(titleText).toHaveClass("line-clamp-2");
     expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
   });
+
+  it("keeps the detail body scrollbar visible and draggable", () => {
+    const { container } = render(
+      <DesktopRightPanel title="상세">
+        <div>내용</div>
+      </DesktopRightPanel>,
+    );
+
+    const scroller = container.querySelector(".overflow-y-auto");
+    expect(scroller).toHaveClass("sg");
+    expect(scroller).not.toHaveClass("scrollbar-hide");
+  });
 });

@@ -172,7 +172,7 @@ describe("ReworkBatchDetail", () => {
     const badge = cell.querySelector("span.inline-flex")!;
     const visibleLabel = badge.querySelector("span");
 
-    expect(badge).toHaveClass("w-full", "max-w-full", "min-w-0", "px-2");
+    expect(badge).toHaveClass("w-40", "max-w-full", "min-w-0", "px-3");
     expect(badge).not.toHaveClass("min-w-[6.5rem]");
     expect(badge).toHaveAttribute("title", "처리결과");
     expect(badge).toHaveAttribute("aria-label", "처리결과");
@@ -193,10 +193,33 @@ describe("ReworkBatchDetail", () => {
     );
 
     const badge = screen.getByText("처리결과");
-    expect(badge).toHaveClass("h-6", "w-full", "max-w-full", "min-w-0", "px-3", "text-xs");
+    expect(badge).toHaveClass("h-6", "w-40", "max-w-full", "min-w-0", "px-3", "text-xs");
     expect(badge).not.toHaveClass("min-w-[6.5rem]");
     expect(badge).not.toHaveAttribute("title");
     expect(badge).not.toHaveAttribute("aria-label");
+  });
+
+  it("keeps multiple rework items behind a collapsed result section", () => {
+    render(
+      <table>
+        <tbody>
+          <ReworkBatchDetail
+            logs={[
+              makeLog({ log_id: "scrap-a", item_id: "A", item_name: "폐기 품목 A" }),
+              makeLog({ log_id: "scrap-b", item_id: "B", item_name: "폐기 품목 B" }),
+            ]}
+            parentItemId="PARENT"
+            colSpan={8}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText("폐기 품목 A")).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "처리결과 구성 펼치기" });
+    fireEvent.click(toggle);
+    expect(screen.getByText("폐기 품목 A")).toBeInTheDocument();
+    expect(screen.getByText("폐기 품목 B")).toBeInTheDocument();
   });
 
   it("renders mixed rework results as separately toned parts", () => {

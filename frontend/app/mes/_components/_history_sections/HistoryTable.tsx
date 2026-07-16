@@ -50,7 +50,7 @@ type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left
 
 // 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 수량/재고 → 상태.
 const COLUMNS: ColSpec[] = [
-  { label: "일시", width: "104px", align: "center" },
+  { label: "일시", width: "120px", align: "center" },
   { label: "작업", width: "228px", align: "center" },
   { label: "대상" },
   { label: "품목코드", width: "118px", align: "center" },

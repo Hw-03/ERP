@@ -111,7 +111,10 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
   }
 
   if (!batch || batch.bundles.length === 0) return null;
-  const displayBundles = getDisplayBundles(batch);
+  const displayBundles = getDisplayBundles(batch).filter((bundle) => {
+    const parentLine = getHistoryBomParentLine(bundle);
+    return parentLine?.included ?? bundle.lines.some((line) => line.included);
+  });
 
   return (
     <>
@@ -164,7 +167,8 @@ function BundleRows({
   const padX = compact ? "px-2" : "px-4";
   const isBomParent = bundle.source_kind === "bom_parent";
   const parentLine = getHistoryBomParentLine(bundle);
-  const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
+  const childLines = (parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines)
+    .filter((line) => line.included);
   const isSingleLineDirect = !isBomParent && childLines.length === 1;
   const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
@@ -201,7 +205,7 @@ function BundleRows({
         <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
           <span
             className={`inline-flex h-6 items-center justify-center gap-1 rounded-full text-xs font-bold leading-none ${
-              compact ? "w-full max-w-full min-w-0 px-2" : "min-w-[6.5rem] px-3"
+              "w-40 max-w-full min-w-0 overflow-hidden px-3"
             }`}
             style={{
               background: isBomParent
@@ -211,7 +215,7 @@ function BundleRows({
             }}
           >
             {isBomParent ? <GitBranch className="h-3.5 w-3.5 shrink-0" /> : <Package className="h-3.5 w-3.5 shrink-0" />}
-            <span className={compact ? "min-w-0 truncate" : undefined}>{isBomParent ? "BOM" : "단품"}</span>
+            <span className="min-w-0 truncate">{isBomParent ? "BOM" : "단품"}</span>
           </span>
         </td>
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
@@ -302,7 +306,6 @@ function BomLineRow({
   const targetPadX = compact ? "px-2" : "px-4";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
-  const dim = !line.included;
   const cancelled = batch.status === "cancelled";
   const signed = getHistoryLineSignedQuantity(line, batch, bundle);
   const qtyColor = SIGN_TONE_HEX[signed.tone];
@@ -315,11 +318,9 @@ function BomLineRow({
       style={{
         background: highlighted
           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-          : line.included
-            ? "color-mix(in srgb, var(--c-blue) 3%, transparent)"
-            : "color-mix(in srgb, var(--c-red) 5%, transparent)",
+          : "color-mix(in srgb, var(--c-blue) 3%, transparent)",
         boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
-        opacity: dim || cancelled ? 0.58 : 1,
+        opacity: cancelled ? 0.58 : 1,
       }}
     >
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
@@ -348,7 +349,7 @@ function BomLineRow({
         />
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <StatusBadge shortage={line.included ? line.shortage : 0} />
+        <StatusBadge shortage={line.shortage} />
       </td>
     </tr>
   );
@@ -360,7 +361,7 @@ function LineKindBadge({ line, compact }: { line: IoLine; compact?: boolean }) {
   return (
     <span
       className={`inline-flex h-6 items-center justify-center gap-1 rounded-full text-xs font-bold leading-none ${
-        compact ? "w-full max-w-full min-w-0 px-2" : "min-w-[6.5rem] px-3"
+        "w-40 max-w-full min-w-0 overflow-hidden px-3"
       }`}
       style={{
         background: `color-mix(in srgb, ${color} 14%, transparent)`,
@@ -368,7 +369,7 @@ function LineKindBadge({ line, compact }: { line: IoLine; compact?: boolean }) {
       }}
     >
       {isAuto ? <Recycle className="h-3.5 w-3.5 shrink-0" /> : <Package className="h-3.5 w-3.5 shrink-0" />}
-      <span className={compact ? "min-w-0 truncate" : undefined}>{isAuto ? "자동차감" : "수동"}</span>
+      <span className="min-w-0 truncate">{isAuto ? "자동차감" : "수동"}</span>
     </span>
   );
 }

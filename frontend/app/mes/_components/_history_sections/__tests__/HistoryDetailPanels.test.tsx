@@ -157,6 +157,31 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it("summarizes excluded batch lines without listing their item names", () => {
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    const batch = makeBatch();
+    batch.bundles[0].lines[1] = {
+      ...batch.bundles[0].lines[1],
+      item_name: "제외된 구성품",
+      included: false,
+    };
+
+    render(
+      <HistoryBatchDetailPanel
+        panelOpen
+        batchId={batch.batch_id}
+        logs={[makeLog({ operation_batch_id: batch.batch_id })]}
+        batchCache={new Map([[batch.batch_id, batch]])}
+        setBatchCache={() => {}}
+        onBatchCancelled={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    expect(screen.getByText("제외 1개")).toBeInTheDocument();
+    expect(screen.queryByText("제외된 구성품")).not.toBeInTheDocument();
+  });
+
   it("does not render a memo card for a rework child system note", () => {
     const { container } = render(<HistoryDetailMemo notes="[rework:scrap_child]" />);
 
