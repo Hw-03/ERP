@@ -127,6 +127,59 @@ def test_display_groups_applies_existing_search_filter_and_sort(client, db_sessi
     ]
 
 
+def test_display_groups_apply_parent_operation_keys_visibility_and_request_date(
+    client, db_session, make_item
+):
+    """표시 묶음도 5종 작업·완료 가시성·최초 요청 시각을 공통으로 사용한다."""
+    item = make_item(name="display-group-operation-key-item")
+    request_date = datetime(2026, 7, 3, 9, 0, 0)
+    visible = _add_batch(db_session, "visible-operation-key")
+    visible.sub_type = "warehouse_to_dept"
+    visible.submitted_at = request_date
+    visible_log = _add_log(
+        db_session,
+        item,
+        created_at=datetime(2026, 6, 30, 23, 0, 0),
+        operation_batch_id=visible.batch_id,
+        transaction_type=TransactionTypeEnum.TRANSFER_TO_PROD,
+    )
+    hidden = _add_batch(db_session, "hidden-operation-key")
+    hidden.sub_type = "warehouse_to_dept"
+    hidden.status = "submitted"
+    hidden.submitted_at = request_date
+    hidden_log = _add_log(
+        db_session,
+        item,
+        created_at=datetime(2026, 6, 30, 23, 0, 0),
+        operation_batch_id=hidden.batch_id,
+        transaction_type=TransactionTypeEnum.TRANSFER_TO_PROD,
+    )
+    process_log = _add_log(
+        db_session,
+        item,
+        created_at=request_date,
+        transaction_type=TransactionTypeEnum.PRODUCE,
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/display-groups",
+        params={
+            "operation_keys": "warehouse,process",
+            "date_from": "2026-07-03",
+            "date_to": "2026-07-03",
+        },
+    )
+    assert response.status_code == 200, response.text
+    returned_ids = {
+        row["log_id"]
+        for group in response.json()["groups"]
+        for row in group["logs"]
+    }
+    assert returned_ids == {str(visible_log.log_id), str(process_log.log_id)}
+    assert str(hidden_log.log_id) not in returned_ids
+
+
 def test_display_groups_cursor_skips_a_batch_that_gains_a_newer_log(client, db_session, make_item):
     item = make_item(name="커서 갱신 품목")
     base = datetime(2026, 7, 15, 12, 0, 0)

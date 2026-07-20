@@ -8,6 +8,74 @@ from decimal import Decimal
 import pytest
 
 
+def test_monthly_counts_use_history_visibility_and_request_date(client, make_item, db_session):
+    """달력은 완료 배치만, 목록과 같은 최초 요청 시각의 월로 집계한다."""
+    from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
+
+    item = make_item(name="monthly-history-visibility")
+    employee = Employee(
+        employee_code="MONTHLY-HISTORY",
+        name="Monthly History",
+        role="operator",
+        department="assembly",
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    completed = IoBatch(
+        work_type="process",
+        sub_type="produce",
+        status="completed",
+        requester_employee_id=employee.employee_id,
+        requester_name=employee.name,
+        requester_department=employee.department,
+        submitted_at=datetime(2026, 7, 2, 9, 0, 0),
+        created_at=datetime(2026, 7, 1, 9, 0, 0),
+    )
+    submitted = IoBatch(
+        work_type="warehouse_io",
+        sub_type="warehouse_to_dept",
+        status="submitted",
+        requester_employee_id=employee.employee_id,
+        requester_name=employee.name,
+        requester_department=employee.department,
+        submitted_at=datetime(2026, 7, 3, 9, 0, 0),
+        created_at=datetime(2026, 7, 3, 9, 0, 0),
+    )
+    db_session.add_all([completed, submitted])
+    db_session.flush()
+    db_session.add_all(
+        [
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.PRODUCE,
+                quantity_change=Decimal("1"),
+                operation_batch_id=completed.batch_id,
+                created_at=datetime(2026, 6, 30, 23, 0, 0),
+            ),
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.TRANSFER_TO_PROD,
+                quantity_change=Decimal("1"),
+                operation_batch_id=submitted.batch_id,
+                created_at=datetime(2026, 6, 30, 23, 0, 0),
+            ),
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.RECEIVE,
+                quantity_change=Decimal("1"),
+                created_at=datetime(2026, 6, 30, 23, 0, 0),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions/monthly-counts?year=2026")
+    assert response.status_code == 200, response.text
+    assert response.json()["2026-06"] == 1
+    assert response.json()["2026-07"] == 1
+
+
 def _make_log(db_session, item, tx_type: str, created_at: datetime):
     """TransactionLog 픽스처 헬퍼."""
     from app.models import TransactionLog, TransactionTypeEnum

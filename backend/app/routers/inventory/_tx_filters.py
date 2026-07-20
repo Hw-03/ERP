@@ -11,7 +11,7 @@ import uuid
 from datetime import date, datetime, time
 from typing import NamedTuple, Optional
 
-from sqlalchemy import ColumnElement, and_, case, func, or_
+from sqlalchemy import ColumnElement, and_, case, false, func, not_, or_
 from sqlalchemy.orm import Query, Session
 
 from app.models import (
@@ -46,6 +46,23 @@ _SUMMARY_DEFECT_TYPES = [
     TransactionTypeEnum.DEFECT_SCRAP,
     TransactionTypeEnum.SUPPLIER_RETURN,
 ]
+
+
+def _history_visibility_filter() -> ColumnElement:
+    """완료된 배치 또는 배치 없는 기존 로그만 입출고 이력에 노출한다."""
+    return or_(
+        TransactionLog.operation_batch_id.is_(None),
+        IoBatch.status == "completed",
+    )
+
+
+def _history_request_date_expr() -> ColumnElement:
+    """입출고 이력의 정렬·기간·달력에 공통으로 쓰는 최초 요청 시각."""
+    return func.coalesce(
+        IoBatch.submitted_at,
+        IoBatch.created_at,
+        TransactionLog.created_at,
+    )
 
 
 def _department_label_expr() -> ColumnElement:
@@ -247,6 +264,15 @@ def _tx_in(*codes: str) -> list[TransactionTypeEnum]:
     ]
 
 
+def _legacy_defect_rework_filter() -> ColumnElement:
+    """배치 없이 저장된 재작업 묶음 전체를 불량 작업으로 분류한다."""
+    return and_(
+        TransactionLog.operation_batch_id.is_(None),
+        TransactionLog.reference_no.isnot(None),
+        TransactionLog.reference_no.like("defect-disassemble:%"),
+    )
+
+
 def _plain_tx_clause(*codes: str) -> ColumnElement:
     """shipping_phase/sub_type 이 화면 구분을 덮어쓰지 않는 단건 tx 매칭."""
     return and_(
@@ -257,6 +283,7 @@ def _plain_tx_clause(*codes: str) -> ColumnElement:
             IoBatch.sub_type.is_(None),
             IoBatch.sub_type.notin_(list(_DETERMINING_SUBTYPES)),
         ),
+        not_(_legacy_defect_rework_filter()),
     )
 
 
@@ -270,50 +297,42 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
     if not operation_keys:
         return None
 
+    no_shipping_phase = TransactionLog.shipping_phase.is_(None)
     key_clauses: dict[str, ColumnElement] = {
-        "item_conversion": TransactionLog.shipping_phase == "COMPONENT_CHANGE",
-        "shipping_prepare": TransactionLog.shipping_phase == "PREPARE",
-        "shipping": TransactionLog.shipping_phase == "PICKUP",
-        "receive": or_(
-            IoBatch.sub_type == "receive_supplier",
-            _plain_tx_clause("RECEIVE"),
+        "warehouse": or_(
+            and_(
+                IoBatch.sub_type.in_(
+                    ["receive_supplier", "warehouse_to_dept", "dept_to_warehouse", "internal_use_out"]
+                ),
+                no_shipping_phase,
+            ),
+            _plain_tx_clause("RECEIVE", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE"),
         ),
-        "produce": or_(
-            and_(IoBatch.sub_type == "produce", TransactionLog.shipping_phase.is_(None)),
-            _plain_tx_clause("PRODUCE"),
-        ),
-        "disassemble": or_(
-            IoBatch.sub_type == "disassemble",
-            _plain_tx_clause("DISASSEMBLE"),
-        ),
-        "outbound": _plain_tx_clause("SHIP"),
-        "warehouse_to_dept": or_(
-            IoBatch.sub_type == "warehouse_to_dept",
-            _plain_tx_clause("TRANSFER_TO_PROD"),
-        ),
-        "dept_to_warehouse": or_(
-            IoBatch.sub_type == "dept_to_warehouse",
-            _plain_tx_clause("TRANSFER_TO_WH"),
-        ),
-        "dept_transfer": or_(
-            IoBatch.sub_type == "dept_transfer",
-            _plain_tx_clause("TRANSFER_DEPT"),
-        ),
-        "adjust": or_(
-            IoBatch.sub_type.in_(["adjust_in", "adjust_out"]),
-            _plain_tx_clause("ADJUST"),
+        "process": or_(
+            and_(
+                IoBatch.sub_type.in_(
+                    ["produce", "disassemble", "dept_transfer", "adjust_in", "adjust_out"]
+                ),
+                no_shipping_phase,
+            ),
+            _plain_tx_clause("PRODUCE", "DISASSEMBLE", "BACKFLUSH", "TRANSFER_DEPT", "ADJUST"),
         ),
         "defect": or_(
-            IoBatch.sub_type.in_(["defect_quarantine", "defect_restore", "defect_process"]),
-            _plain_tx_clause("MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP"),
+            IoBatch.sub_type.in_(
+                ["defect_quarantine", "defect_restore", "defect_process", "supplier_return"]
+            ),
+            _legacy_defect_rework_filter(),
+            _plain_tx_clause(
+                "MARK_DEFECTIVE",
+                "UNMARK_DEFECTIVE",
+                "DEFECT_SCRAP",
+                "SUPPLIER_RETURN",
+            ),
         ),
-        "supplier_return": or_(
-            IoBatch.sub_type == "supplier_return",
-            _plain_tx_clause("SUPPLIER_RETURN"),
-        ),
-        "internal_use": or_(
-            IoBatch.sub_type == "internal_use_out",
-            _plain_tx_clause("INTERNAL_USE"),
+        "item_conversion": TransactionLog.shipping_phase == "COMPONENT_CHANGE",
+        "shipping": or_(
+            TransactionLog.shipping_phase.in_(["PREPARE", "PICKUP"]),
+            _plain_tx_clause("SHIP"),
         ),
     }
 
@@ -324,7 +343,7 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
             clauses.append(key_clauses[key])
 
     if not clauses:
-        return None
+        return false()
     return or_(*clauses)
 
 
@@ -348,6 +367,7 @@ def _apply_common_filters(
     화면 공통 조건(operation 구분·기간·아카이브·검색·부서·공정·모델)을 AND 로 덧붙인다.
     item_id/transaction_type/reference_no 같은 list 전용 필터는 호출부가 직접 처리.
     """
+    query = query.filter(_history_visibility_filter())
     if operation_keys:
         _key_f = _operation_keys_filter(operation_keys)
         if _key_f is not None:
@@ -365,7 +385,7 @@ def _apply_common_filters(
     _md = _model_filter(db, model)
     if _md is not None:
         query = query.filter(_md)
-    request_date_expr = func.coalesce(IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at)
+    request_date_expr = _history_request_date_expr()
     if date_from:
         query = query.filter(request_date_expr >= datetime.combine(date_from, time.min))
     if date_to:

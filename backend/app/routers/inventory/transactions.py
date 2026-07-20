@@ -51,6 +51,8 @@ from app.routers.inventory._tx_filters import (
     _department_filter,
     _operation_filter,
     _apply_common_filters,
+    _history_visibility_filter,
+    _history_request_date_expr,
     _batch_name_map,
     _stock_request_info_map,
     _to_log_response,
@@ -64,6 +66,9 @@ router = APIRouter()
 # 단일 export 요청에서 허용하는 최대 행 수. 운영 PC 메모리 보호용 안전 상한.
 EXPORT_MAX_ROWS = 50_000
 DISPLAY_GROUP_PAGE_SIZE = 100
+OPERATION_KEYS_DESCRIPTION = (
+    "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping"
+)
 
 
 # 수량 보정이 허용되는 거래 타입.
@@ -349,16 +354,19 @@ def monthly_counts(
     응답 예: { "2026-01": 142, "2026-02": 89, ..., "2026-12": 0 }
     archived_at 이 있는 레코드는 제외한다.
     """
+    request_date_expr = _history_request_date_expr()
     rows = (
         db.query(
-            extract("month", TransactionLog.created_at).label("month"),
+            extract("month", request_date_expr).label("month"),
             func.count(TransactionLog.log_id).label("count"),
         )
+        .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
         .filter(
-            extract("year", TransactionLog.created_at) == year,
+            extract("year", request_date_expr) == year,
             TransactionLog.archived_at.is_(None),
+            _history_visibility_filter(),
         )
-        .group_by(extract("month", TransactionLog.created_at))
+        .group_by(extract("month", request_date_expr))
         .all()
     )
     counts = {f"{year:04d}-{int(r.month):02d}": int(r.count) for r in rows}
@@ -371,7 +379,7 @@ def list_transactions(
     operation_batch_id: Optional[uuid.UUID] = Query(None),
     transaction_type: Optional[TransactionTypeEnum] = Query(None),
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입. 예: RECEIVE,SHIP"),
-    operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키. 예: item_conversion,shipping_prepare"),
+    operation_keys: Optional[str] = Query(None, description=OPERATION_KEYS_DESCRIPTION),
     reference_no: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
@@ -429,9 +437,7 @@ def list_transactions(
         include_archived=include_archived,
     )
 
-    requested_at_order = func.coalesce(
-        IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at
-    )
+    requested_at_order = _history_request_date_expr()
     rows = (
         query.order_by(
             requested_at_order.desc(),
@@ -477,7 +483,7 @@ def list_transaction_display_groups(
     operation_batch_id: Optional[uuid.UUID] = Query(None),
     transaction_type: Optional[TransactionTypeEnum] = Query(None),
     transaction_types: Optional[str] = Query(None),
-    operation_keys: Optional[str] = Query(None),
+    operation_keys: Optional[str] = Query(None, description=OPERATION_KEYS_DESCRIPTION),
     reference_no: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
@@ -523,9 +529,7 @@ def list_transaction_display_groups(
         date_to=date_to,
         include_archived=include_archived,
     )
-    requested_at_order = func.coalesce(
-        IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at
-    )
+    requested_at_order = _history_request_date_expr()
     rows = query.order_by(
         requested_at_order.desc(),
         TransactionLog.created_at.desc(),
@@ -570,7 +574,7 @@ def list_transaction_display_groups(
 )
 def list_reference_summaries(
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
-    operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키"),
+    operation_keys: Optional[str] = Query(None, description=OPERATION_KEYS_DESCRIPTION),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(None, description="부서 라벨 필터"),
     model: Optional[str] = Query(None, description="제품 모델명 필터"),
@@ -635,7 +639,7 @@ def list_reference_summaries(
 @router.get("/transactions/summary", response_model=TransactionSummaryResponse)
 def get_transactions_summary(
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
-    operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키"),
+    operation_keys: Optional[str] = Query(None, description=OPERATION_KEYS_DESCRIPTION),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
         None, description="부서 라벨 필터 (쉼표 복수). 예: 창고,조립,고압"

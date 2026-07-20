@@ -464,6 +464,20 @@ describe("history immediate UX presentation policies", () => {
     expect(legacy.flow.from).toBeUndefined();
     expect(legacy.flow.to).toBeUndefined();
   });
+
+  it.each([
+    ["disassemble", "재작업"],
+    ["defect_quarantine", "불량 격리"],
+    ["defect_restore", "불량 해제"],
+  ] as const)("uses the %s batch context for a defect-scrap detail route", (subType, expected) => {
+    const row = getHistoryRowPresentation(
+      makeLog({ transaction_type: "DEFECT_SCRAP" }),
+      makeBatch({ sub_type: subType }),
+    );
+
+    expect(row.operation.label).toBe(expected);
+    expect(row.flow.label).toBe(expected);
+  });
 });
 describe("shipping phase history presentation", () => {
   it("labels shipping component-change batches by phase", () => {

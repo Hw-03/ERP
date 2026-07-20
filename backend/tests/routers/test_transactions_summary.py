@@ -19,6 +19,24 @@ from app.models import (
 )
 
 
+def test_operation_keys_openapi_description_lists_five_parent_categories(client):
+    """이력 API 문서는 프런트가 전송할 5개 작업 종류 키를 안내한다."""
+    expected = "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping"
+    schema = client.app.openapi()
+    descriptions = []
+    for path in (
+        "/api/inventory/transactions",
+        "/api/inventory/transactions/display-groups",
+        "/api/inventory/transactions/reference-summaries",
+        "/api/inventory/transactions/summary",
+    ):
+        for parameter in schema["paths"][path]["get"]["parameters"]:
+            if parameter["name"] == "operation_keys":
+                descriptions.append(parameter.get("description"))
+
+    assert descriptions == [expected] * 4
+
+
 def _seed_log(
     db_session,
     item,
@@ -57,6 +75,7 @@ def _seed_batch_log(
     shipping_phase: str | None = None,
     log_department: str | None = None,
     requester_department: str | None = None,
+    status: str = "completed",
 ) -> None:
     """IoBatch 가 붙은 거래. 부서 라벨은 COALESCE(to, from).
 
@@ -75,6 +94,7 @@ def _seed_batch_log(
     batch = IoBatch(
         work_type="process",
         sub_type=sub_type,
+        status=status,
         requester_employee_id=emp.employee_id,
         requester_name=emp.name,
         requester_department=emp.department,
@@ -131,11 +151,40 @@ def test_internal_use_is_warehouse_kpi_with_destination_department(
 
     summary = client.get(
         "/api/inventory/transactions/summary",
-        params={"operation_keys": "internal_use"},
+        params={"operation_keys": "warehouse"},
     )
     assert summary.status_code == 200, summary.text
     assert summary.json()["warehouse_count"] == 1
     assert summary.json()["department_counts"] == {"연구": 1}
+
+
+def test_unsupported_operation_key_returns_no_history_rows_or_summary(
+    client, db_session, make_item
+):
+    """폐기된 작업 종류 키는 전체 이력으로 느슨하게 해석하지 않는다."""
+    item = make_item(name="unsupported-operation-key-item", warehouse_qty=Decimal("0"))
+    _seed_log(db_session, item, TransactionTypeEnum.RECEIVE, Decimal("1"))
+    db_session.commit()
+
+    rows = client.get(
+        "/api/inventory/transactions", params={"operation_keys": "internal_use"}
+    )
+    assert rows.status_code == 200, rows.text
+    assert rows.json() == []
+
+    summary = client.get(
+        "/api/inventory/transactions/summary",
+        params={"operation_keys": "internal_use"},
+    )
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["total"] == 0
+
+    mixed = client.get(
+        "/api/inventory/transactions/summary",
+        params={"operation_keys": "internal_use,warehouse"},
+    )
+    assert mixed.status_code == 200, mixed.text
+    assert mixed.json()["total"] == 1
 
 
 def test_reference_summaries_use_all_matching_logs_and_exclude_operation_batches(
@@ -242,6 +291,71 @@ def test_reference_summaries_use_all_matching_logs_and_exclude_operation_batches
             "unit": None,
         },
     ]
+
+
+def test_reference_summaries_apply_parent_operation_keys_multiple_selection_and_date(
+    client, db_session, make_item
+):
+    """참조 요약도 레거시 이력의 작업 종류·복수 선택·기간 필터를 따른다."""
+    item = make_item(name="reference-operation-key-item", warehouse_qty=Decimal("0"))
+    current_day = datetime(2026, 7, 3, 9, 0, 0)
+    db_session.add_all(
+        [
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.RECEIVE,
+                quantity_change=Decimal("1"),
+                reference_no="REFERENCE-WAREHOUSE",
+                created_at=current_day,
+            ),
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.TRANSFER_DEPT,
+                quantity_change=Decimal("1"),
+                reference_no="REFERENCE-PROCESS",
+                created_at=current_day,
+            ),
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=Decimal("-1"),
+                reference_no="REFERENCE-SHIPPING",
+                created_at=current_day,
+            ),
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.RECEIVE,
+                quantity_change=Decimal("1"),
+                reference_no="REFERENCE-OLD",
+                created_at=datetime(2026, 7, 2, 9, 0, 0),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/reference-summaries",
+        params={
+            "operation_keys": "warehouse,shipping",
+            "date_from": "2026-07-03",
+            "date_to": "2026-07-03",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert {row["reference_no"] for row in response.json()} == {
+        "REFERENCE-WAREHOUSE",
+        "REFERENCE-SHIPPING",
+    }
+
+    response = client.get(
+        "/api/inventory/transactions/reference-summaries",
+        params={"operation_keys": "warehouse,process", "date_from": "2026-07-03"},
+    )
+    assert response.status_code == 200, response.text
+    assert {row["reference_no"] for row in response.json()} == {
+        "REFERENCE-WAREHOUSE",
+        "REFERENCE-PROCESS",
+    }
 
 
 def test_summary_categorizes_by_transaction_type(client, db_session, make_item):
@@ -650,7 +764,7 @@ def test_operation_filter_plain_receive(client, db_session, make_item):
     assert res.json()["total"] == 1
 
 
-def test_operation_keys_filter_shipping_phases(client, db_session, make_item):
+def test_operation_keys_filter_uses_five_parent_work_categories(client, db_session, make_item):
     """operation_keys 는 화면 거래 종류 기준으로 shipping_phase 를 직접 필터한다."""
     item = make_item(name="출하단계필터품", warehouse_qty=Decimal("0"))
     _seed_batch_log(
@@ -686,15 +800,179 @@ def test_operation_keys_filter_shipping_phases(client, db_session, make_item):
     assert len(rows) == 1
     assert rows[0]["shipping_phase"] == "COMPONENT_CHANGE"
 
-    res = client.get("/api/inventory/transactions/summary", params={"operation_keys": "shipping_prepare"})
+    res = client.get("/api/inventory/transactions/summary", params={"operation_keys": "shipping"})
     assert res.status_code == 200, res.text
-    assert res.json()["total"] == 1
+    assert res.json()["total"] == 2
 
     res = client.get("/api/inventory/transactions", params={"operation_keys": "shipping"})
     assert res.status_code == 200, res.text
     rows = res.json()
-    assert len(rows) == 1
-    assert rows[0]["shipping_phase"] == "PICKUP"
+    assert {row["shipping_phase"] for row in rows} == {"PREPARE", "PICKUP"}
+
+
+def test_operation_keys_group_legacy_logs_into_parent_categories(client, db_session, make_item):
+    """배치 없는 기존 로그도 5개 작업 종류에 같은 규칙으로 포함된다."""
+    item = make_item(name="operation-key-legacy-item", warehouse_qty=Decimal("0"))
+    for tx_type in (
+        TransactionTypeEnum.RECEIVE,
+        TransactionTypeEnum.TRANSFER_TO_PROD,
+        TransactionTypeEnum.TRANSFER_TO_WH,
+        TransactionTypeEnum.INTERNAL_USE,
+        TransactionTypeEnum.PRODUCE,
+        TransactionTypeEnum.DISASSEMBLE,
+        TransactionTypeEnum.BACKFLUSH,
+        TransactionTypeEnum.TRANSFER_DEPT,
+        TransactionTypeEnum.ADJUST,
+        TransactionTypeEnum.MARK_DEFECTIVE,
+        TransactionTypeEnum.SHIP,
+    ):
+        _seed_log(db_session, item, tx_type, Decimal("1"))
+    db_session.commit()
+
+    expected_counts = {
+        "warehouse": 4,
+        "process": 5,
+        "defect": 1,
+        "shipping": 1,
+    }
+    for operation_key, expected_count in expected_counts.items():
+        response = client.get(
+            "/api/inventory/transactions/summary",
+            params={"operation_keys": operation_key},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == expected_count
+
+    response = client.get(
+        "/api/inventory/transactions/summary",
+        params={"operation_keys": "warehouse,process"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 9
+
+
+def test_operation_keys_keep_legacy_rework_reference_in_defect(client, db_session, make_item):
+    """재작업 묶음의 구성품 입고는 원시 RECEIVE여도 불량으로 필터링한다."""
+    item = make_item(name="legacy-rework-filter-item", warehouse_qty=Decimal("0"))
+    reference_no = "defect-disassemble:legacy-rework"
+    db_session.add_all(
+        [
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.DISASSEMBLE,
+                quantity_change=Decimal("-1"),
+                quantity_before=Decimal("1"),
+                quantity_after=Decimal("0"),
+                reference_no=reference_no,
+                notes="[rework:normal]",
+            ),
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.RECEIVE,
+                quantity_change=Decimal("1"),
+                quantity_before=Decimal("0"),
+                quantity_after=Decimal("1"),
+                reference_no=reference_no,
+                notes="[rework:normal_child]",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    warehouse = client.get(
+        "/api/inventory/transactions/summary", params={"operation_keys": "warehouse"}
+    )
+    assert warehouse.status_code == 200, warehouse.text
+    assert warehouse.json()["total"] == 0
+
+    defect = client.get(
+        "/api/inventory/transactions", params={"operation_keys": "defect"}
+    )
+    assert defect.status_code == 200, defect.text
+    assert {row["transaction_type"] for row in defect.json()} == {"DISASSEMBLE", "RECEIVE"}
+
+
+def test_operation_keys_group_completed_batches_and_exclude_shipping_phases(
+    client, db_session, make_item
+):
+    """완료 배치도 부모 작업으로 묶되, 출하 단계 행은 해당 작업에서 제외한다."""
+    item = make_item(name="operation-key-batch-item", warehouse_qty=Decimal("0"))
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.TRANSFER_TO_PROD,
+        Decimal("1"),
+        sub_type="warehouse_to_dept",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.PRODUCE,
+        Decimal("1"),
+        sub_type="produce",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.TRANSFER_TO_PROD,
+        Decimal("1"),
+        sub_type="warehouse_to_dept",
+        shipping_phase="PREPARE",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.BACKFLUSH,
+        Decimal("1"),
+        sub_type="produce",
+        shipping_phase="COMPONENT_CHANGE",
+    )
+    db_session.commit()
+
+    expected_counts = {
+        "warehouse": 1,
+        "process": 1,
+        "item_conversion": 1,
+        "shipping": 1,
+    }
+    for operation_key, expected_count in expected_counts.items():
+        response = client.get(
+            "/api/inventory/transactions/summary",
+            params={"operation_keys": operation_key},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == expected_count
+
+
+def test_operation_keys_defect_includes_supplier_return_batches_and_legacy_logs(
+    client, db_session, make_item
+):
+    """공급처 반품은 완료 배치와 레거시 로그 모두 불량 작업에 속한다."""
+    item = make_item(name="supplier-return-operation-key-item", warehouse_qty=Decimal("0"))
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.SUPPLIER_RETURN,
+        Decimal("-1"),
+        sub_type="supplier_return",
+    )
+    _seed_log(db_session, item, TransactionTypeEnum.SUPPLIER_RETURN, Decimal("-1"))
+    _seed_log(db_session, item, TransactionTypeEnum.RECEIVE, Decimal("1"))
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/summary",
+        params={"operation_keys": "defect"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 2
+
+    response = client.get(
+        "/api/inventory/transactions/summary",
+        params={"operation_keys": "defect,warehouse"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 3
 
 
 # ──────────────────────────────────────────────────────────────────

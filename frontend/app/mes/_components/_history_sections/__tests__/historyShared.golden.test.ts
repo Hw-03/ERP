@@ -224,12 +224,23 @@ describe("getHistoryOperationLabel", () => {
     expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("격리");
   });
 
-  it("DEFECT_SCRAP은 defect_process batch에서도 '폐기'를 우선한다", () => {
+  it.each([
+    ["disassemble", "재작업"],
+    ["defect_quarantine", "불량 격리"],
+    ["defect_restore", "불량 해제"],
+  ])("DEFECT_SCRAP은 %s batch 맥락을 우선한다", (subType, expected) => {
+    const batch = makeBatch({ sub_type: subType as IoBatch["sub_type"] });
+    const log = { transaction_type: "DEFECT_SCRAP" };
+
+    expect(getHistoryOperationLabel(log, batch)).toBe(expected);
+    expect(getHistoryDisplayLabel(log, batch)).toBe(expected);
+  });
+
+  it("DEFECT_SCRAP은 defect_process batch에서 폐기 결과를 유지한다", () => {
     const batch = makeBatch({ sub_type: "defect_process" });
     const log = { transaction_type: "DEFECT_SCRAP" };
 
     expect(getHistoryOperationLabel(log, batch)).toBe("폐기");
-    expect(getHistoryDisplayLabel(log, batch)).toBe("폐기");
   });
 
   it("모든 tx 타입 매핑 확인 (history 처리 용어 우선)", () => {
@@ -1044,15 +1055,13 @@ describe("internal use history", () => {
 });
 
 describe("OPERATION_OPTIONS", () => {
-  it("uses the same field-language labels as the history list", () => {
-    const labels = OPERATION_OPTIONS.map((option) => option.label);
-    expect(labels).toContain("품목 전환");
-    expect(labels).toContain("출하 준비");
-    expect(labels).toContain("출하");
-    expect(labels).toContain("창고 → 부서");
-    expect(OPERATION_OPTIONS).toContainEqual({ value: "internal_use", label: "AS·연구 반출" });
-    expect(labels).not.toContain("생산 | 입고");
-    expect(labels).not.toContain("분해 | 출고");
-    expect(labels).not.toContain("자동 차감");
+  it("uses the five parent work-type API keys", () => {
+    expect(OPERATION_OPTIONS).toEqual([
+      { value: "warehouse", label: "창고 입출고" },
+      { value: "process", label: "부서 입출고" },
+      { value: "defect", label: "불량" },
+      { value: "item_conversion", label: "품목 전환" },
+      { value: "shipping", label: "출하" },
+    ]);
   });
 });

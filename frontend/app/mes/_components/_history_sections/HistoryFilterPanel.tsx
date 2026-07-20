@@ -8,7 +8,7 @@ import { OPERATION_OPTIONS } from "./historyQuery";
 
 // 3차: 유일 필터 패널. 3카드 모두 다중 선택.
 // 부서 = 서버 departmentCounts 기반 동적("창고" 포함, 미상은 진짜 unknown만).
-// 거래 종류 = 전 16종 고정(공정 R/A/F 카드 폐기). KPI 박스는 표시 전용이라 동기 없음.
+// 작업 종류 = 부모 작업 5종 고정. KPI 박스는 표시 전용이라 동기 없음.
 type Props = {
   open: boolean;
   /** baseline summary 의 부서별 카운트 — 부서 칩 소스(동적). */
@@ -52,12 +52,12 @@ export function HistoryFilterPanel({
     <div className="grid gap-2.5 xl:grid-cols-3">
       <Card icon={<Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />} title="부서 구분">
         <FilterChip active={selectedDepts.length === 0} label="전체" onClick={clearDepts} tone={LEGACY_COLORS.green} className="w-full" />
-        {deptEntries.map(([name, count]) => (
+        {deptEntries.map(([name]) => (
           <FilterChip
             key={name}
             active={selectedDepts.includes(name)}
             // 표시는 정규화(더티 "DepartmentEnum.X" 방어), 필터 값은 raw 유지 → 매칭 정확
-            label={`${formatDepartmentFilterLabel(name)} · ${count.toLocaleString()}건`}
+            label={formatDepartmentFilterLabel(name)}
             onClick={() => toggleDept(name)}
             tone={LEGACY_COLORS.green}
             className="w-full"
@@ -79,7 +79,7 @@ export function HistoryFilterPanel({
         ))}
       </Card>
 
-      <Card icon={<Layers className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />} title="거래 종류">
+      <Card icon={<Layers className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />} title="작업 종류">
         <FilterChip active={selectedOps.length === 0} label="전체" onClick={clearOps} tone={LEGACY_COLORS.yellow} className="w-full" />
         {OPERATION_OPTIONS.map((opt) => (
           <FilterChip

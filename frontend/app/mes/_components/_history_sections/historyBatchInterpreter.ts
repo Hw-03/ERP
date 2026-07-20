@@ -316,6 +316,13 @@ const _TX_OPERATION: Record<string, string> = {
   DEFECT_SCRAP: "폐기",
 };
 
+/** 하위 폐기 결과를 선택해도 부모 batch 작업 맥락을 유지할 작업명. */
+const _CHILD_RESULT_BATCH_OPERATION: Record<string, string> = {
+  disassemble: "재작업",
+  defect_quarantine: "불량 격리",
+  defect_restore: "불량 해제",
+};
+
 const _DISPLAY_SUB_LABEL: Record<string, string> = {
   // sub_type
   produce: "부품 차감 + 완제품 입고",
@@ -353,6 +360,8 @@ export function getHistoryOperationLabel(
   log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): string {
+  const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
+  if (batchContext) return batchContext;
   if (log.transaction_type === "DEFECT_SCRAP") {
     return _TX_OPERATION.DEFECT_SCRAP;
   }
@@ -364,6 +373,15 @@ export function getHistoryOperationLabel(
     if (fromSub) return fromSub;
   }
   return _TX_OPERATION[log.transaction_type] ?? log.transaction_type;
+}
+
+/** 하위 DEFECT_SCRAP 결과에 적용할 부모 batch 작업명. */
+export function getHistoryChildResultBatchOperationLabel(
+  log: { transaction_type: string },
+  batch?: IoBatch | null,
+): string | undefined {
+  if (!batch || log.transaction_type !== "DEFECT_SCRAP") return undefined;
+  return _CHILD_RESULT_BATCH_OPERATION[_historySubType(batch)];
 }
 
 const _WORK_TYPE_LABEL: Record<string, string> = _WORK_LABEL;
@@ -404,6 +422,8 @@ export function getHistoryFlowLabel(
   log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): string {
+  const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
+  if (batchContext) return batchContext;
   if (batch?.sub_type === "internal_use_out" || log.transaction_type === "INTERNAL_USE") {
     return `창고 → ${_internalUseDestination(_internalUseDepartment(log, batch))}`;
   }

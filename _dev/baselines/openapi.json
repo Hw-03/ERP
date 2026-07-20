@@ -12999,7 +12999,7 @@
             }
           },
           {
-            "description": "화면 거래 종류 키. 예: item_conversion,shipping_prepare",
+            "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
             "in": "query",
             "name": "operation_keys",
             "required": false,
@@ -13012,7 +13012,7 @@
                   "type": "null"
                 }
               ],
-              "description": "화면 거래 종류 키. 예: item_conversion,shipping_prepare",
+              "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
               "title": "Operation Keys"
             }
           },
@@ -13049,7 +13049,7 @@
             }
           },
           {
-            "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
+            "description": "부서 라벨 필터 (쉼표 복수). 예: 창고,조립,고압",
             "in": "query",
             "name": "department",
             "required": false,
@@ -13062,7 +13062,7 @@
                   "type": "null"
                 }
               ],
-              "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
+              "description": "부서 라벨 필터 (쉼표 복수). 예: 창고,조립,고압",
               "title": "Department"
             }
           },
@@ -13280,6 +13280,7 @@
             }
           },
           {
+            "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
             "in": "query",
             "name": "operation_keys",
             "required": false,
@@ -13292,6 +13293,7 @@
                   "type": "null"
                 }
               ],
+              "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
               "title": "Operation Keys"
             }
           },
@@ -13751,7 +13753,7 @@
             }
           },
           {
-            "description": "화면 거래 종류 키",
+            "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
             "in": "query",
             "name": "operation_keys",
             "required": false,
@@ -13764,7 +13766,7 @@
                   "type": "null"
                 }
               ],
-              "description": "화면 거래 종류 키",
+              "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
               "title": "Operation Keys"
             }
           },
@@ -13921,7 +13923,7 @@
     },
     "/api/inventory/transactions/summary": {
       "get": {
-        "description": "KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라\n숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.\ndepartment_counts 는 전 거래를 3단계 라벨(부서명·'창고'·'미상')로 묶은 카운트.",
+        "description": "KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라\n숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.\ndepartment_counts 는 전 거래를 실제 부서명 또는 '창고'로 묶은 카운트.",
         "operationId": "get_transactions_summary_api_inventory_transactions_summary_get",
         "parameters": [
           {
@@ -13943,7 +13945,7 @@
             }
           },
           {
-            "description": "화면 거래 종류 키",
+            "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
             "in": "query",
             "name": "operation_keys",
             "required": false,
@@ -13956,7 +13958,7 @@
                   "type": "null"
                 }
               ],
-              "description": "화면 거래 종류 키",
+              "description": "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping",
               "title": "Operation Keys"
             }
           },
@@ -13977,7 +13979,7 @@
             }
           },
           {
-            "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
+            "description": "부서 라벨 필터 (쉼표 복수). 예: 창고,조립,고압",
             "in": "query",
             "name": "department",
             "required": false,
@@ -13990,7 +13992,7 @@
                   "type": "null"
                 }
               ],
-              "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
+              "description": "부서 라벨 필터 (쉼표 복수). 예: 창고,조립,고압",
               "title": "Department"
             }
           },

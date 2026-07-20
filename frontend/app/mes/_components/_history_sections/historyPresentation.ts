@@ -5,6 +5,7 @@ import { formatQty } from "@/lib/mes/format";
 import {
   getBatchFlowEndpoints,
   getHistoryActor,
+  getHistoryChildResultBatchOperationLabel,
   getHistoryBomParentLine,
   getHistoryDisplayLabel,
   getHistoryDisplaySubLabel,
@@ -459,6 +460,8 @@ function getFlowPresentation(
   batch: IoBatch | null | undefined,
   hint?: string,
 ): HistoryFlowPresentation {
+  const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
+  if (batchContext) return { label: batchContext };
   const phaseFlowLabel = getShippingPhaseFlowLabel(log.shipping_phase);
   if (!batch && phaseFlowLabel) {
     return { label: log.department?.trim() || phaseFlowLabel };
