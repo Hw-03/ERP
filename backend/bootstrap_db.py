@@ -109,7 +109,8 @@ def main(argv: list[str] | None = None) -> int:
                 schema = check_schema(connection=connection)
                 print(
                     f"[schema-check] state={schema.state.value} "
-                    f"revision={schema.revision or '-'} ready={schema.ready}"
+                    f"revision={schema.revision or '-'} ready={schema.ready} "
+                    f"profile={schema.profile_id or '-'}"
                 )
                 for difference in schema.differences:
                     print(f"  - {difference}")
@@ -133,10 +134,14 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(
             f"[schema] state={result.previous_state.value} "
-            f"revision={result.revision} changed={result.changed}"
+            f"revision={result.revision} changed={result.changed} "
+            f"profile={result.profile_id or '-'}"
         )
         if result.backup is not None:
             print(f"[schema] verified_backup={result.backup.path}")
+        if result.business_data_unchanged is not None:
+            unchanged = str(result.business_data_unchanged).lower()
+            print(f"[schema] business_data_unchanged={unchanged}")
         did_something = True
     if args.all or args.seed:
         seeded = seed_reference_data()

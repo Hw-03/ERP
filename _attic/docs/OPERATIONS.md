@@ -104,11 +104,13 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 1. 접속자 활동과 스키마 변경 가드
 2. 백엔드·프론트 정지 명령의 종료 코드와 8010/3000 포트 해제를 확인
 3. `C:\ERP-dev\_attic\runtime\backups\sqlite`에 `sqlite3.backup` 백업 생성·검증(최신 10개 유지)
-4. 코드 동기화와 raw bootstrap 마이그레이션
+4. 코드 동기화 후 `bootstrap_db.py --migrate`로 Alembic upgrade 또는 승인된 레거시 기준선 등록
 5. 실제 직원 DB의 SQLite/필수 테이블 검증과 재고 무결성 검증
 6. 서버 시작과 백엔드·프론트 헬스체크
 
 백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션 또는 사후 검증 실패 시 서버와 DB를 자동 복원하지 않으며, 콘솔에 검증된 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --check` 수동 명령을 출력한다.
+
+미버전 SQLite DB는 검토·고정된 개발/직원 스키마 지문과 정확히 일치할 때만 등록한다. 등록 전 검증 백업을 만들고 업무 데이터 지문을 전후 비교하며, 알 수 없는 구조·데이터 변경·Alembic revision과 상태표 불일치는 모두 서버 시작 전에 중단한다. 임의의 `alembic stamp`로 이 검사를 우회하지 않는다.
 
 ## 재시작 절차
 
@@ -234,9 +236,9 @@ schtasks /Create /TN "MES Cleanup Monthly" /TR "%USERPROFILE%\Documents\GitHub\E
 - `docker-compose.yml` 포트 정렬·내용 변경 (현재 docker는 실험용으로만 둠)
 - 루트 `mes.db` 정리
 - `backend/seed*.py`·`bootstrap_db.py` 등 운영 보조 스크립트 위치 이동
-- Alembic 마이그레이션 활성화
 
-자세한 배경은 `docs/BACKEND_REFACTOR_PLAN.md` 참고.
+자세한 배경은 `_attic/docs/BACKEND_REFACTOR_PLAN.md` 참고.
+
 ## 운영 안전장치: missing transaction effects 추적
 
 `operational_readiness.bat`에서 `WARN missing transaction effects: N`이 나오면 신규 입출고를 막는 FAIL은 아니다. 다만 과거 거래 중 자동 취소와 감사 추적에 필요한 `inventory_effect`가 비어 있는 로그가 있다는 뜻이므로, 해당 과거 거래는 자동 취소하지 말고 히스토리와 현재 재고를 대조한 뒤 별도 보정 거래로 처리한다.

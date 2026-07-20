@@ -9,10 +9,17 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 
+import bootstrap.legacy_profiles as legacy_profiles
 from app.models import Base
+from bootstrap.legacy_profiles import (
+    LegacySQLiteProfile,
+    sqlite_business_data_fingerprint,
+    sqlite_schema_fingerprint,
+)
 from bootstrap.schema import (
     BackupError,
     BackupReceipt,
+    DataFingerprintError,
     DataPreflightError,
     RevisionStateError,
     SchemaMismatchError,
@@ -25,7 +32,11 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260715_0001"
+HEAD_REVISION = "20260720_0003"
+
+
+def test_schema_state_exposes_explicit_legacy_onboarding_state():
+    assert SchemaState.UNVERSIONED_LEGACY.value == "unversioned_legacy"
 
 
 def _config(path: Path) -> Config:
@@ -37,7 +48,11 @@ def _config(path: Path) -> Config:
 @pytest.fixture(scope="module")
 def head_database(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path = tmp_path_factory.mktemp("schema-state") / "head.db"
-    command.upgrade(_config(path), "head")
+    engine = _engine(path)
+    try:
+        ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
     return path
 
 
@@ -46,6 +61,7 @@ def _copy_head(head_database: Path, target: Path, *, unversioned: bool = False) 
     if unversioned:
         with sqlite3.connect(target) as db:
             db.execute("DROP TABLE alembic_version")
+            db.execute("DROP TABLE alembic_schema_state")
     return target
 
 
@@ -63,6 +79,45 @@ def _version_rows(path: Path) -> list[str]:
         return [row[0] for row in db.execute("SELECT version_num FROM alembic_version")]
 
 
+def _infrastructure_tables(path: Path) -> set[str]:
+    with sqlite3.connect(path) as db:
+        return {
+            str(row[0])
+            for row in db.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name IN "
+                "('alembic_version', 'alembic_schema_state')"
+            )
+        }
+
+
+def _schema_state_row(path: Path) -> tuple[str, str, str] | None:
+    with sqlite3.connect(path) as db:
+        exists = db.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='alembic_schema_state'"
+        ).fetchone()
+        if not exists:
+            return None
+        row = db.execute(
+            "SELECT profile_id, revision, schema_fingerprint "
+            "FROM alembic_schema_state WHERE id=1"
+        ).fetchone()
+        return tuple(row) if row is not None else None
+
+
+def _fingerprints(path: Path) -> tuple[str, str]:
+    engine = _engine(path)
+    try:
+        with engine.connect() as connection:
+            return (
+                sqlite_schema_fingerprint(connection),
+                sqlite_business_data_fingerprint(connection),
+            )
+    finally:
+        engine.dispose()
+
+
 def _receipt_provider(receipt_path: Path, calls: list[bool]):
     def provider(connection: sa.Connection) -> BackupReceipt:
         calls.append("alembic_version" not in sa.inspect(connection).get_table_names())
@@ -70,6 +125,25 @@ def _receipt_provider(receipt_path: Path, calls: list[bool]):
         return BackupReceipt(path=receipt_path, verified=True)
 
     return provider
+
+
+def _approve_current_profile(
+    path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    profile_id: str = "test_legacy",
+) -> LegacySQLiteProfile:
+    schema_fingerprint, _ = _fingerprints(path)
+    profile = LegacySQLiteProfile(
+        profile_id=profile_id,
+        schema_fingerprint=schema_fingerprint,
+    )
+    monkeypatch.setattr(
+        legacy_profiles,
+        "LEGACY_SQLITE_PROFILES",
+        {schema_fingerprint: profile},
+    )
+    return profile
 
 
 def _create_independent_legacy_items_database(path: Path) -> None:
@@ -215,6 +289,69 @@ def test_empty_database_upgrades_to_head_and_is_idempotent(tmp_path: Path):
     assert second.revision == HEAD_REVISION
     assert second.changed is False
     assert _version_rows(path) == [HEAD_REVISION]
+    state = _schema_state_row(path)
+    assert state is not None
+    assert state[:2] == ("canonical", HEAD_REVISION)
+
+
+def test_empty_sqlite_upgrade_failure_rolls_back_partial_ddl(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "empty-upgrade-fails.db"
+
+    def fail_after_ddl(config: Config, _revision: str) -> None:
+        connection = config.attributes["connection"]
+        connection.exec_driver_sql("CREATE TABLE partial_empty_upgrade (id INTEGER)")
+        raise RuntimeError("simulated empty upgrade failure")
+
+    monkeypatch.setattr(command, "upgrade", fail_after_ddl)
+    engine = _engine(path)
+    try:
+        with pytest.raises(RuntimeError, match="simulated empty upgrade failure"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    with sqlite3.connect(path) as db:
+        tables = {
+            str(row[0])
+            for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+    assert "partial_empty_upgrade" not in tables
+
+
+def test_versioned_sqlite_upgrade_failure_rolls_back_partial_ddl(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "versioned-upgrade-fails.db"
+    command.upgrade(_config(path), "20260715_0001")
+
+    def fail_after_ddl(config: Config, _revision: str) -> None:
+        connection = config.attributes["connection"]
+        connection.exec_driver_sql("CREATE TABLE partial_future_upgrade (id INTEGER)")
+        raise RuntimeError("simulated future upgrade failure")
+
+    monkeypatch.setattr(command, "upgrade", fail_after_ddl)
+    engine = _engine(path)
+    try:
+        with pytest.raises(RuntimeError, match="simulated future upgrade failure"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    with sqlite3.connect(path) as db:
+        tables = {
+            str(row[0])
+            for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+    assert "partial_future_upgrade" not in tables
+    assert _version_rows(path) == ["20260715_0001"]
 
 
 def test_exact_unversioned_database_is_backed_up_before_stamp(
@@ -240,6 +377,287 @@ def test_exact_unversioned_database_is_backed_up_before_stamp(
     assert second.previous_state is SchemaState.VERSIONED
     assert second.changed is False
     assert _version_rows(path) == [HEAD_REVISION]
+
+
+def test_approved_legacy_schema_is_backed_up_and_stamped_without_business_changes(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "approved-legacy.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    profile = _approve_current_profile(path, monkeypatch)
+    before_schema, before_data = _fingerprints(path)
+    receipt_path = tmp_path / "approved-legacy-receipt.db"
+    calls: list[bool] = []
+    engine = _engine(path)
+    try:
+        read_only = check_schema(engine=engine)
+        first = ensure_schema(
+            engine=engine,
+            backup_provider=_receipt_provider(receipt_path, calls),
+        )
+        second = ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert read_only.state is SchemaState.UNVERSIONED_LEGACY
+    assert read_only.profile_id == profile.profile_id
+    assert read_only.ready is False
+    assert calls == [True]
+    assert first.previous_state is SchemaState.UNVERSIONED_LEGACY
+    assert first.profile_id == profile.profile_id
+    assert first.business_data_unchanged is True
+    assert first.backup == BackupReceipt(path=receipt_path, verified=True)
+    assert second.previous_state is SchemaState.VERSIONED
+    assert second.profile_id == profile.profile_id
+    assert second.changed is False
+    assert _version_rows(path) == [HEAD_REVISION]
+    assert _schema_state_row(path) == (
+        profile.profile_id,
+        HEAD_REVISION,
+        before_schema,
+    )
+    assert _fingerprints(path) == (before_schema, before_data)
+
+
+def test_approved_legacy_backup_failure_leaves_no_version_or_state_row(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "legacy-backup-fails.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    _approve_current_profile(path, monkeypatch)
+
+    def fail_backup(_connection: sa.Connection) -> BackupReceipt:
+        raise OSError("legacy backup unavailable")
+
+    engine = _engine(path)
+    try:
+        with pytest.raises(BackupError, match="legacy backup unavailable"):
+            ensure_schema(engine=engine, backup_provider=fail_backup)
+    finally:
+        engine.dispose()
+
+    assert _infrastructure_tables(path) == set()
+
+
+def test_approved_legacy_rechecks_schema_after_verified_backup(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "legacy-backup-toctou.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    _approve_current_profile(path, monkeypatch)
+    receipt_path = tmp_path / "toctou-receipt.db"
+    receipt_path.touch()
+
+    def mutate_after_approval(connection: sa.Connection) -> BackupReceipt:
+        connection.exec_driver_sql(
+            "CREATE TABLE injected_after_approval (id INTEGER PRIMARY KEY)"
+        )
+        return BackupReceipt(path=receipt_path, verified=True)
+
+    engine = _engine(path)
+    try:
+        with pytest.raises(SchemaMismatchError, match="changed during verified backup"):
+            ensure_schema(engine=engine, backup_provider=mutate_after_approval)
+    finally:
+        engine.dispose()
+
+    with sqlite3.connect(path) as db:
+        tables = {
+            str(row[0])
+            for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+    assert "injected_after_approval" not in tables
+    assert _infrastructure_tables(path) == set()
+
+
+def test_approved_legacy_data_fingerprint_change_rolls_back_stamp(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "legacy-data-change.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    _approve_current_profile(path, monkeypatch)
+    fingerprints = iter(["before", "after"])
+    monkeypatch.setattr(
+        legacy_profiles,
+        "sqlite_business_data_fingerprint",
+        lambda _connection: next(fingerprints),
+    )
+    engine = _engine(path)
+    try:
+        with pytest.raises(DataFingerprintError, match="business data fingerprint"):
+            ensure_schema(
+                engine=engine,
+                backup_provider=_receipt_provider(tmp_path / "data-receipt.db", []),
+            )
+    finally:
+        engine.dispose()
+
+    assert _infrastructure_tables(path) == set()
+
+
+def test_registered_legacy_schema_rejects_manual_ddl_drift(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "legacy-manual-drift.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    _approve_current_profile(path, monkeypatch)
+    receipt_path = tmp_path / "legacy-drift-receipt.db"
+    engine = _engine(path)
+    try:
+        ensure_schema(
+            engine=engine,
+            backup_provider=_receipt_provider(receipt_path, []),
+        )
+        with sqlite3.connect(path) as db:
+            db.execute("CREATE TABLE unexpected_legacy_drift (id INTEGER PRIMARY KEY)")
+        check = check_schema(engine=engine)
+        with pytest.raises(SchemaMismatchError, match="fingerprint"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert any("fingerprint" in difference for difference in check.differences)
+
+
+def test_registered_legacy_schema_rejects_state_revision_tampering(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "legacy-state-drift.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    _approve_current_profile(path, monkeypatch)
+    engine = _engine(path)
+    try:
+        ensure_schema(
+            engine=engine,
+            backup_provider=_receipt_provider(tmp_path / "state-receipt.db", []),
+        )
+        with sqlite3.connect(path) as db:
+            db.execute(
+                "UPDATE alembic_schema_state SET revision='tampered' WHERE id=1"
+            )
+        with pytest.raises(RevisionStateError, match="schema state revision"):
+            check_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+
+def test_registered_legacy_schema_rejects_stored_fingerprint_tampering(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "legacy-fingerprint-drift.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    _approve_current_profile(path, monkeypatch)
+    engine = _engine(path)
+    try:
+        ensure_schema(
+            engine=engine,
+            backup_provider=_receipt_provider(tmp_path / "fingerprint-receipt.db", []),
+        )
+        with sqlite3.connect(path) as db:
+            db.execute(
+                "UPDATE alembic_schema_state "
+                "SET schema_fingerprint=? WHERE id=1",
+                ("0" * 64,),
+            )
+        check = check_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert check.differences == (
+        "schema fingerprint mismatch: "
+        f"expected={'0' * 64} actual={_fingerprints(path)[0]}",
+    )
+
+
+def test_registered_legacy_schema_rejects_known_profile_id_swap(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "legacy-profile-swap.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+    approved = _approve_current_profile(path, monkeypatch, profile_id="approved_legacy")
+    other = LegacySQLiteProfile(
+        profile_id="other_known_legacy",
+        schema_fingerprint="f" * 64,
+    )
+    monkeypatch.setattr(
+        legacy_profiles,
+        "LEGACY_SQLITE_PROFILES",
+        {
+            approved.schema_fingerprint: approved,
+            other.schema_fingerprint: other,
+        },
+    )
+    engine = _engine(path)
+    try:
+        ensure_schema(
+            engine=engine,
+            backup_provider=_receipt_provider(tmp_path / "profile-swap-receipt.db", []),
+        )
+        with sqlite3.connect(path) as db:
+            db.execute(
+                "UPDATE alembic_schema_state SET profile_id=? WHERE id=1",
+                (other.profile_id,),
+            )
+        check = check_schema(engine=engine)
+        with pytest.raises(SchemaMismatchError, match="does not match approved baseline"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert check.differences == (
+        "schema state profile does not match approved baseline: "
+        f"profile={other.profile_id} revision={HEAD_REVISION}",
+    )
+
+
+def test_current_sqlite_revision_without_schema_state_is_not_ready(
+    tmp_path: Path,
+    head_database: Path,
+):
+    path = _copy_head(head_database, tmp_path / "missing-state.db")
+    with sqlite3.connect(path) as db:
+        db.execute("DELETE FROM alembic_schema_state")
+    engine = _engine(path)
+    try:
+        check = check_schema(engine=engine)
+        with pytest.raises(SchemaMismatchError, match="checkpoint is missing"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert check.differences == (
+        "schema state checkpoint is missing for the current SQLite revision",
+    )
 
 
 def test_exact_unversioned_sqlite_uses_verified_runtime_backup(
@@ -493,7 +911,7 @@ def test_versioned_head_manual_drift_is_not_ready_and_ensure_fails(
     engine = _engine(path)
     try:
         check = check_schema(engine=engine)
-        with pytest.raises(SchemaMismatchError, match="ix_items_sort_order"):
+        with pytest.raises(SchemaMismatchError, match="schema fingerprint mismatch"):
             ensure_schema(engine=engine)
     finally:
         engine.dispose()
@@ -501,7 +919,7 @@ def test_versioned_head_manual_drift_is_not_ready_and_ensure_fails(
     assert check.state is SchemaState.VERSIONED
     assert check.revision == HEAD_REVISION
     assert check.ready is False
-    assert any("ix_items_sort_order" in difference for difference in check.differences)
+    assert any("fingerprint mismatch" in difference for difference in check.differences)
     assert _version_rows(path) == [HEAD_REVISION]
 
 

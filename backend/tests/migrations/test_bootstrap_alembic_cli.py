@@ -16,7 +16,7 @@ from bootstrap.schema import (
 )
 
 
-HEAD_REVISION = "20260715_0001"
+HEAD_REVISION = "20260720_0003"
 
 
 def _ensured() -> SchemaEnsureResult:
@@ -94,6 +94,7 @@ def test_check_reports_schema_and_data_without_ensuring(
             state=SchemaState.VERSIONED,
             revision=HEAD_REVISION,
             ready=True,
+            profile_id="canonical",
         ),
     )
     monkeypatch.setattr(
@@ -111,6 +112,7 @@ def test_check_reports_schema_and_data_without_ensuring(
     output = capsys.readouterr().out
     assert "versioned" in output
     assert HEAD_REVISION in output
+    assert "profile=canonical" in output
     assert "items: 3" in output
 
 
@@ -202,3 +204,31 @@ def test_schema_output_includes_backup_path_when_unversioned(
 
     assert bootstrap_db.main(["--migrate"]) == 0
     assert str(receipt_path) in capsys.readouterr().out
+
+
+def test_legacy_schema_output_reports_profile_and_unchanged_business_data(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    receipt_path = tmp_path / "legacy-verified.db"
+    receipt_path.touch()
+    from bootstrap.schema import BackupReceipt
+
+    monkeypatch.setattr(
+        bootstrap_db,
+        "ensure_schema",
+        lambda: SchemaEnsureResult(
+            previous_state=SchemaState.UNVERSIONED_LEGACY,
+            revision=HEAD_REVISION,
+            changed=True,
+            backup=BackupReceipt(path=receipt_path, verified=True),
+            profile_id="employee_legacy_20260720",
+            business_data_unchanged=True,
+        ),
+    )
+
+    assert bootstrap_db.main(["--migrate"]) == 0
+    output = capsys.readouterr().out
+    assert "profile=employee_legacy_20260720" in output
+    assert "business_data_unchanged=true" in output

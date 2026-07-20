@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -177,12 +178,13 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
     try:
         inspector = sa.inspect(engine)
         assert set(inspector.get_table_names()) == set(Base.metadata.tables) | {
-            "alembic_version"
+            "alembic_version",
+            "alembic_schema_state",
         }
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260715_0001"
+            ) == "20260720_0003"
             connection.execute(
                 sa.text(
                     "INSERT INTO system_settings (setting_key, setting_value) "
@@ -212,6 +214,27 @@ def test_empty_sqlite_upgrade_accepts_supplied_connection(tmp_path):
         engine.dispose()
 
 
+def test_head_revision_creates_empty_schema_state_table(tmp_path):
+    path = tmp_path / "schema-state.db"
+    command.upgrade(_config(f"sqlite:///{path.as_posix()}"), "head")
+
+    with sqlite3.connect(path) as db:
+        columns = {
+            row[1]: row[2]
+            for row in db.execute("PRAGMA table_info(alembic_schema_state)")
+        }
+        rows = db.execute("SELECT * FROM alembic_schema_state").fetchall()
+
+    assert columns == {
+        "id": "INTEGER",
+        "profile_id": "VARCHAR(64)",
+        "revision": "VARCHAR(32)",
+        "schema_fingerprint": "VARCHAR(64)",
+        "updated_at": "DATETIME",
+    }
+    assert rows == []
+
+
 def test_baseline_schema_has_no_semantic_metadata_diff(tmp_path):
     url = f"sqlite:///{(tmp_path / 'diff.db').as_posix()}"
     command.upgrade(_config(url), "head")
@@ -224,7 +247,7 @@ def test_baseline_schema_has_no_semantic_metadata_diff(tmp_path):
                 opts={
                     "compare_type": compare_migration_type,
                     "include_object": lambda obj, name, type_, reflected, compare_to: (
-                        name != "alembic_version"
+                        name not in {"alembic_version", "alembic_schema_state"}
                     ),
                 },
             )

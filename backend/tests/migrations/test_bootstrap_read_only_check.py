@@ -9,23 +9,22 @@ from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 
 import bootstrap.seed as seed_module
 import bootstrap_db
-from bootstrap.schema import SchemaCheckResult, SchemaState
+from bootstrap.schema import SchemaCheckResult, SchemaState, ensure_schema
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260715_0001"
+HEAD_REVISION = "20260720_0003"
 
 
 def _upgrade_head(path: Path) -> None:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", f"sqlite:///{path.as_posix()}")
-    command.upgrade(config, "head")
+    engine = sa.create_engine(f"sqlite:///{path.as_posix()}")
+    try:
+        ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
 
 
 def _run_check(path: Path) -> subprocess.CompletedProcess[str]:
