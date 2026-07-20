@@ -31,6 +31,21 @@ describe("DesktopRightPanel", () => {
     expect(scroller).not.toHaveClass("scrollbar-hide");
   });
 
+  it("renders a metadata badge beside the subtitle without using the title action slot", () => {
+    render(
+      <DesktopRightPanel
+        title="선택 품목"
+        subtitle="46-AA-0080"
+        subtitleBadge={<span>정상</span>}
+      >
+        <div>상세 내용</div>
+      </DesktopRightPanel>,
+    );
+
+    const code = screen.getByText("46-AA-0080");
+    expect(code.parentElement).toContainElement(screen.getByText("정상"));
+  });
+
   it("renders a footer outside the scrolling detail body", () => {
     render(
       <DesktopRightPanel title="Detail">

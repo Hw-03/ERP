@@ -56,7 +56,7 @@ const COLUMNS: ColSpec[] = [
   { label: "대상" },
   { label: "품목코드", width: "118px", align: "center" },
   { label: "수량", width: "270px", align: "center" },
-  { label: "상태 · 처리", width: "120px", align: "center" },
+  { label: "담당자", width: "120px", align: "center" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
 

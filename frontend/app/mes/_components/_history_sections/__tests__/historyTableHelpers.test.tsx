@@ -157,7 +157,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByRole("button", { name: "현재 묶음 접기" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "top-0", "z-10");
     expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "228px" });
-    expect(screen.getByRole("columnheader", { name: "상태 · 처리" })).toHaveStyle({ width: "120px" });
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "120px" });
   });
 
   it("defines a single fixed rhythm for main history rows", () => {
@@ -218,7 +218,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("118px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
-    const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
+    const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
     expect(statusHeader.style.width).toBe("120px");
     expect(statusHeader).toHaveClass("text-center");
 
@@ -321,7 +321,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
-    const statusHeader = screen.getByRole("columnheader", { name: "상태 · 처리" });
+    const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
     expect(statusHeader.style.width).toBe("120px");
     expect(statusHeader).toHaveClass("text-center");
   });
@@ -552,7 +552,7 @@ describe("history table helper rendering policies", () => {
     expect(within(cell!).getByText("↓")).toBeInTheDocument();
   });
 
-  it("does not prefix system actors with human requester wording", () => {
+  it("shows an unapproved requester name without a requester prefix in compact cells", () => {
     const presentation = {
       people: { requester: "권동환", approver: "" },
       statusChips: [{ label: "메모", tone: "primary" }],
@@ -562,12 +562,12 @@ describe("history table helper rendering policies", () => {
 
     expect(screen.getByText("권동환")).toBeInTheDocument();
     expect(screen.queryByText("요청 권동환")).not.toBeInTheDocument();
-    expect(screen.getByText("권동환")).toHaveAttribute("title", "요청 권동환");
+    expect(screen.getByText("권동환")).toHaveAttribute("title", "권동환");
     expect(screen.getByText("메모").parentElement).toHaveClass("flex-nowrap");
     expect(screen.getByText("메모").parentElement).toHaveClass("justify-center");
   });
 
-  it("centers default requester and status chips inside the status column", () => {
+  it("shows an unapproved requester name without a requester prefix in default cells", () => {
     const presentation = {
       people: { requester: "권동환", approver: "" },
       statusChips: [{ label: "메모", tone: "primary" }],
@@ -575,7 +575,8 @@ describe("history table helper rendering policies", () => {
 
     render(<PeopleStatusCell presentation={presentation} />);
 
-    expect(screen.getByText("요청 권동환").parentElement).toHaveClass("items-center");
+    expect(screen.getByText("권동환")).toHaveAttribute("title", "권동환");
+    expect(screen.getByText("권동환").parentElement).toHaveClass("items-center");
     expect(screen.getByText("메모").parentElement).toHaveClass("justify-center");
   });
 
@@ -594,6 +595,31 @@ describe("history table helper rendering policies", () => {
     expect(cell).toHaveClass("overflow-hidden");
     expect(cell).toHaveClass("gap-1");
     expect(screen.getByText("메모")).toHaveClass("h-5");
+  });
+
+  it("keeps requester and approver roles in the visible text and tooltip when approved", () => {
+    const presentation = {
+      people: { requester: "김재헌", approver: "권동환" },
+      statusChips: [],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} compact />);
+
+    expect(screen.getByText("요청 김재헌")).toHaveAttribute("title", "요청 김재헌");
+    expect(screen.getByText("승인 권동환")).toBeInTheDocument();
+  });
+
+  it("keeps system requester wording unprefixed while preserving the approver role", () => {
+    const presentation = {
+      people: { requester: "시스템 처리", approver: "권동환" },
+      statusChips: [],
+    } as HistoryRowPresentation;
+
+    render(<PeopleStatusCell presentation={presentation} />);
+
+    expect(screen.getByText("시스템 처리")).toHaveAttribute("title", "시스템 처리");
+    expect(screen.queryByText("요청 시스템 처리")).not.toBeInTheDocument();
+    expect(screen.getByText("승인 권동환")).toBeInTheDocument();
   });
 
   it("keeps ordinary long target titles on two lines", () => {

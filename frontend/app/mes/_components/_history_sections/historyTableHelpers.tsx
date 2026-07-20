@@ -330,14 +330,15 @@ export function PeopleStatusCell({
   const approver = presentation.people.approver?.trim();
   const requester = presentation.people.requester?.trim() || "-";
   const systemRequester = requester.startsWith("시스템 처리");
-  const requesterLabel = systemRequester || compact ? requester : `요청 ${requester}`;
-  const requesterTitle = systemRequester ? requester : `요청 ${requester}`;
+  const hasApprover = Boolean(approver && approver !== "-");
+  const requesterLabel = hasApprover && !systemRequester ? `요청 ${requester}` : requester;
+  const requesterTitle = requesterLabel;
   return (
     <div className={`flex min-w-0 flex-col items-center justify-center overflow-hidden text-center ${dense ? "h-10 gap-0" : "h-16 gap-1"}`}>
       <div title={requesterTitle} className="truncate text-xs font-semibold leading-tight" style={{ color: LEGACY_COLORS.text }}>
         {requesterLabel}
       </div>
-      {approver && approver !== "-" && (
+      {hasApprover && (
         <div className="truncate text-xs leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
           승인 {approver}
         </div>

@@ -22,6 +22,7 @@ export function DesktopRightPanel({
   title,
   titleId,
   subtitle,
+  subtitleBadge,
   headerBadge,
   backButton,
   onClose,
@@ -30,6 +31,7 @@ export function DesktopRightPanel({
   title: string;
   titleId?: string;
   subtitle?: string;
+  subtitleBadge?: React.ReactNode;
   headerBadge?: React.ReactNode;
   backButton?: React.ReactNode;
   onClose?: () => void;
@@ -56,9 +58,10 @@ export function DesktopRightPanel({
             >
               {title}
             </TruncatedText>
-            {subtitle ? (
-              <div className="mt-1.5 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
-                {subtitle}
+            {subtitle || subtitleBadge ? (
+              <div className="mt-1.5 flex items-center gap-2 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
+                {subtitle ? <span>{subtitle}</span> : null}
+                {subtitleBadge}
               </div>
             ) : null}
           </div>
