@@ -11,6 +11,8 @@ export interface HistoryStatsBarProps {
   /** 현재 필터(거래종류/검색/부서/모델)가 적용된 건수 — X(분자). */
   currentCount: number | null;
   loading: boolean;
+  /** PC 첫 진입에서는 최종 카드 구조를 유지하는 중립 블록을 사용한다. */
+  loadingDisplay?: "ellipsis" | "skeleton";
   /** "이번달" / "오늘" / "이번주" / "전체" / 선택한 날짜. */
   periodLabel: string;
 }
@@ -27,6 +29,7 @@ export function HistoryStatsBar({
   baseline,
   currentCount,
   loading,
+  loadingDisplay = "ellipsis",
   periodLabel,
 }: HistoryStatsBarProps) {
   const countsMatch = currentCount != null && baseline?.total != null && currentCount === baseline.total;
@@ -36,7 +39,7 @@ export function HistoryStatsBar({
       <div className="mb-3 flex flex-wrap items-baseline gap-2">
         {countsMatch ? (
           <span className="text-3xl font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
-            {periodLabel} {NUM(loading, currentCount)}건
+            {periodLabel} <HistoryCountValue loading={loading} value={currentCount} display={loadingDisplay} size="large" />
           </span>
         ) : (
           <>
@@ -47,10 +50,10 @@ export function HistoryStatsBar({
               목록 조건
             </span>
             <span className="text-3xl font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
-              {NUM(loading, currentCount)}건
+              <HistoryCountValue loading={loading} value={currentCount} display={loadingDisplay} size="large" />
             </span>
             <span className="text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              전체 {NUM(loading, baseline?.total)}건
+              전체 <HistoryCountValue loading={loading} value={baseline?.total} display={loadingDisplay} size="small" />
             </span>
           </>
         )}
@@ -61,21 +64,27 @@ export function HistoryStatsBar({
         <StatBox
           icon={<Building2 className="h-3.5 w-3.5" />}
           label="창고"
-          value={NUM(loading, baseline?.warehouseCount)}
+          value={baseline?.warehouseCount}
+          loading={loading}
+          loadingDisplay={loadingDisplay}
           sub="창고 재고가 움직인 작업"
           color={LEGACY_COLORS.green}
         />
         <StatBox
           icon={<Layers className="h-3.5 w-3.5" />}
           label="부서"
-          value={NUM(loading, baseline?.deptCount)}
+          value={baseline?.deptCount}
+          loading={loading}
+          loadingDisplay={loadingDisplay}
           sub="부서 안에서만 움직인 작업"
           color={LEGACY_COLORS.cyan}
         />
         <StatBox
           icon={<Sliders className="h-3.5 w-3.5" />}
           label="수량조정"
-          value={NUM(loading, baseline?.adjustCount)}
+          value={baseline?.adjustCount}
+          loading={loading}
+          loadingDisplay={loadingDisplay}
           sub="재고 수량을 직접 조정한 거래"
           color={LEGACY_COLORS.yellow}
         />
@@ -84,16 +93,43 @@ export function HistoryStatsBar({
   );
 }
 
+function HistoryCountValue({
+  loading,
+  value,
+  display,
+  size,
+}: {
+  loading: boolean;
+  value: number | null | undefined;
+  display: "ellipsis" | "skeleton";
+  size: "large" | "small";
+}) {
+  if (display === "skeleton" && (loading || value == null)) {
+    return (
+      <span
+        aria-label="집계 중"
+        className={`inline-block animate-pulse rounded-[6px] align-middle ${size === "large" ? "h-7 w-20" : "h-5 w-14"}`}
+        style={{ background: LEGACY_COLORS.s3 }}
+      />
+    );
+  }
+  return <>{NUM(loading, value)}건</>;
+}
+
 function StatBox({
   icon,
   label,
   value,
+  loading,
+  loadingDisplay,
   sub,
   color,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: number | null | undefined;
+  loading: boolean;
+  loadingDisplay: "ellipsis" | "skeleton";
   sub: string;
   color: string;
 }) {
@@ -113,7 +149,7 @@ function StatBox({
         className="text-2xl font-black tabular-nums"
         style={{ color: `color-mix(in srgb, ${color} 55%, ${LEGACY_COLORS.text})` }}
       >
-        {value}건
+        <HistoryCountValue loading={loading} value={value} display={loadingDisplay} size="small" />
       </div>
       <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
         {sub}

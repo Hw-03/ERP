@@ -49,6 +49,27 @@ afterEach(() => {
 });
 
 describe("useDesktopHistoryGroups", () => {
+  it("restores fresh groups immediately without another request after remount", async () => {
+    const page = { groups: [makeGroup(0)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn().mockResolvedValue(makeResponse(page));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 30 * 60_000 } },
+    });
+    const wrapper = makeWrapper(client);
+
+    const firstMount = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => expect(firstMount.result.current.loading).toBe(false));
+    expect(firstMount.result.current.groups).toEqual(page.groups);
+    firstMount.unmount();
+
+    const secondMount = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper });
+
+    expect(secondMount.result.current.loading).toBe(false);
+    expect(secondMount.result.current.groups).toEqual(page.groups);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("대표 행 100개를 받고 다음 요청에는 서버 커서를 전달해 완결된 묶음을 덧붙인다", async () => {
     const firstPage = { groups: Array.from({ length: 100 }, (_, index) => makeGroup(index)), next_cursor: "cursor-100", has_more: true };
     const secondPage = { groups: [makeGroup(100)], next_cursor: null, has_more: false };

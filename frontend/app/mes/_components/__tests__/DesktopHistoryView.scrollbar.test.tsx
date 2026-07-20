@@ -9,6 +9,7 @@ vi.mock("@/lib/api/production", () => ({
 }));
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useMonthlyCountsQuery: () => ({ data: {} }),
+  useTransactionsSummaryQuery: () => ({ data: null, isLoading: false, refetch: vi.fn() }),
   useTransactionReferenceSummariesQuery: () => ({ data: [], isLoading: false }),
 }));
 vi.mock("../_hooks/useDesktopHistoryGroups", () => ({

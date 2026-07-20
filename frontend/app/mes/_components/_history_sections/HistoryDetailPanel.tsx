@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
@@ -72,7 +72,7 @@ export function HistoryDetailPanel({
     referenceNo: selected?.operation_batch_id ? null : selected?.reference_no ?? null,
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selected) {
       setEdits([]);
       setEditsLoaded(false);
@@ -100,7 +100,7 @@ export function HistoryDetailPanel({
     // 교체돼도(목록 갱신 등) 수정이력을 불필요하게 재조회하지 않도록 의도적 최소화.
   }, [selected?.log_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selected) {
       setFlow({ status: "idle" });
       return;

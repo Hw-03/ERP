@@ -1,8 +1,15 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { DesktopHistoryRightPanel } from "../DesktopHistoryRightPanel";
+
+const detailLifecycle = vi.hoisted(() => ({
+  batchMounted: vi.fn(),
+  batchUnmounted: vi.fn(),
+  logMounted: vi.fn(),
+  logUnmounted: vi.fn(),
+}));
 
 vi.mock("../../common", () => ({
   SlidePanel: ({ modal, labelledBy, children }: any) => (
@@ -18,23 +25,44 @@ vi.mock("../../common", () => ({
 
 vi.mock("../../DesktopRightPanel", () => ({
   DesktopRightPanel: ({ title, titleId, children }: any) => (
-    <div>
+    <div data-testid="desktop-history-right-panel">
       <h2 id={titleId}>{title}</h2>
       {children}
     </div>
   ),
 }));
 
-vi.mock("../HistoryDetailPanel", () => ({
-  HistoryDetailPanel: ({ allowCancellation }: any) => (
-    <div data-testid="history-detail-panel" data-allow-cancellation={allowCancellation === false ? "false" : "true"}>
-      단건 상세
-    </div>
-  ),
-}));
-vi.mock("../HistoryBatchDetailPanel", () => ({ HistoryBatchDetailPanel: () => <div>묶음 상세</div> }));
+vi.mock("../HistoryDetailPanel", async () => {
+  const { useEffect } = await import("react");
+  return {
+    HistoryDetailPanel: ({ selected, allowCancellation }: any) => {
+      useEffect(() => {
+        detailLifecycle.logMounted();
+        return () => detailLifecycle.logUnmounted();
+      }, []);
+      return (
+        <div data-testid="history-detail-panel" data-allow-cancellation={allowCancellation === false ? "false" : "true"}>
+          {selected.item_name}
+        </div>
+      );
+    },
+  };
+});
 
-function makeLog(): TransactionLog {
+vi.mock("../HistoryBatchDetailPanel", async () => {
+  const { useEffect } = await import("react");
+  return {
+    HistoryBatchDetailPanel: ({ logs }: any) => {
+      useEffect(() => {
+        detailLifecycle.batchMounted();
+        return () => detailLifecycle.batchUnmounted();
+      }, []);
+      return <div data-testid="history-batch-detail-panel">{logs[0].item_name}</div>;
+    },
+  };
+});
+
+function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   return {
     log_id: "log-1",
     item_id: "item-1",
@@ -62,6 +90,7 @@ function makeLog(): TransactionLog {
     cancelled_by: null,
     cancelled_at: null,
     inventory_effect: [],
+    ...overrides,
   };
 }
 
@@ -119,30 +148,38 @@ function makeDuplicateManualBatch(): IoBatch {
   };
 }
 
+function panel(selection: any, batchCache = new Map<string, IoBatch>()) {
+  return (
+    <DesktopHistoryRightPanel
+      selection={selection}
+      displaySelection={selection}
+      batchCache={batchCache}
+      setBatchCache={() => {}}
+      onSelectLog={() => {}}
+      canGoBack={false}
+      onBack={() => {}}
+      onLogUpdated={() => {}}
+      onBatchCancelled={() => {}}
+      onFocusLineInList={() => {}}
+      onClose={() => {}}
+    />
+  );
+}
+
 describe("DesktopHistoryRightPanel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("uses a non-modal complementary panel labelled by the stable title id", () => {
     const selection = { kind: "log" as const, log: makeLog() };
-    render(
-      <DesktopHistoryRightPanel
-        selection={selection}
-        displaySelection={selection}
-        batchCache={new Map()}
-        setBatchCache={() => {}}
-        onSelectLog={() => {}}
-        canGoBack={false}
-        onBack={() => {}}
-        onLogUpdated={() => {}}
-        onBatchCancelled={() => {}}
-        onFocusLineInList={() => {}}
-        onClose={() => {}}
-      />,
-    );
+    render(panel(selection));
 
-    const panel = screen.getByTestId("desktop-history-slide-panel");
+    const slidePanel = screen.getByTestId("desktop-history-slide-panel");
     const title = screen.getByRole("heading", { name: "부품 A" });
-    expect(panel).toHaveAttribute("data-modal", "false");
+    expect(slidePanel).toHaveAttribute("data-modal", "false");
     expect(title.id).not.toBe("");
-    expect(panel).toHaveAttribute("data-labelled-by", title.id);
+    expect(slidePanel).toHaveAttribute("data-labelled-by", title.id);
   });
 
   it("hides cancellation for a detail opened from a grouped child row", () => {
@@ -150,46 +187,59 @@ describe("DesktopHistoryRightPanel", () => {
       kind: "log" as const,
       log: makeLog(),
       allowCancellation: false,
-    } as any;
-    render(
-      <DesktopHistoryRightPanel
-        selection={selection}
-        displaySelection={selection}
-        batchCache={new Map()}
-        setBatchCache={() => {}}
-        onSelectLog={() => {}}
-        canGoBack={false}
-        onBack={() => {}}
-        onLogUpdated={() => {}}
-        onBatchCancelled={() => {}}
-        onFocusLineInList={() => {}}
-        onClose={() => {}}
-      />,
-    );
+    };
+    render(panel(selection));
 
     expect(screen.getByTestId("history-detail-panel")).toHaveAttribute("data-allow-cancellation", "false");
+    expect(screen.getByTestId("history-detail-panel")).toHaveTextContent("부품 A");
   });
 
   it("uses the merged manual bundle count in the detail title", () => {
-    const log = { ...makeLog(), operation_batch_id: "batch-1" };
+    const log = makeLog({ operation_batch_id: "batch-1" });
     const selection = { kind: "batch" as const, batchId: "batch-1", logs: [log] };
-    render(
-      <DesktopHistoryRightPanel
-        selection={selection}
-        displaySelection={selection}
-        batchCache={new Map([["batch-1", makeDuplicateManualBatch()]])}
-        setBatchCache={() => {}}
-        onSelectLog={() => {}}
-        canGoBack={false}
-        onBack={() => {}}
-        onLogUpdated={() => {}}
-        onBatchCancelled={() => {}}
-        onFocusLineInList={() => {}}
-        onClose={() => {}}
-      />,
-    );
+    render(panel(selection, new Map([["batch-1", makeDuplicateManualBatch()]])));
 
     expect(screen.getByRole("heading", { name: "알루미늄 필터" })).toBeInTheDocument();
-    expect(screen.queryByText("알루미늄 필터 외 1건")).not.toBeInTheDocument();
+    expect(screen.queryByText(/알루미늄 필터.*1/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the desktop detail card and single-log detail mounted while selecting another log", () => {
+    const firstSelection = { kind: "log" as const, log: makeLog({ item_name: "Single A" }) };
+    const { rerender } = render(panel(firstSelection));
+
+    const slidePanelBefore = screen.getByTestId("desktop-history-slide-panel");
+    const cardBefore = screen.getByTestId("desktop-history-right-panel");
+    const secondSelection = { kind: "log" as const, log: makeLog({ log_id: "log-2", item_name: "Single B" }) };
+    rerender(panel(secondSelection));
+
+    expect(screen.getByTestId("desktop-history-slide-panel")).toBe(slidePanelBefore);
+    expect(screen.getByTestId("desktop-history-right-panel")).toBe(cardBefore);
+    expect(screen.getByRole("heading", { name: "Single B" })).toBeInTheDocument();
+    expect(detailLifecycle.logMounted).toHaveBeenCalledTimes(1);
+    expect(detailLifecycle.logUnmounted).not.toHaveBeenCalled();
+  });
+
+  it("keeps the desktop detail card and batch detail mounted while selecting another batch", () => {
+    const firstSelection = {
+      kind: "batch" as const,
+      batchId: "batch-1",
+      logs: [makeLog({ item_name: "Batch A", operation_batch_id: "batch-1" })],
+    };
+    const { rerender } = render(panel(firstSelection));
+
+    const slidePanelBefore = screen.getByTestId("desktop-history-slide-panel");
+    const cardBefore = screen.getByTestId("desktop-history-right-panel");
+    const secondSelection = {
+      kind: "batch" as const,
+      batchId: "batch-2",
+      logs: [makeLog({ log_id: "log-2", item_name: "Batch B", operation_batch_id: "batch-2" })],
+    };
+    rerender(panel(secondSelection));
+
+    expect(screen.getByTestId("desktop-history-slide-panel")).toBe(slidePanelBefore);
+    expect(screen.getByTestId("desktop-history-right-panel")).toBe(cardBefore);
+    expect(screen.getByRole("heading")).toHaveTextContent("Batch B");
+    expect(detailLifecycle.batchMounted).toHaveBeenCalledTimes(1);
+    expect(detailLifecycle.batchUnmounted).not.toHaveBeenCalled();
   });
 });

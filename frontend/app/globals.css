@@ -359,26 +359,7 @@
 }
 
 .desktop-tab-content {
-  view-transition-name: desktop-tab-content;
   contain: layout paint;
-}
-
-::view-transition-old(desktop-tab-content) {
-  animation: desktop-tab-out 120ms ease-out both;
-}
-
-::view-transition-new(desktop-tab-content) {
-  animation: desktop-tab-in 140ms ease-out both;
-}
-
-@keyframes desktop-tab-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
-
-@keyframes desktop-tab-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
 }
 
 /* === Admin PIN Lock (DesktopPinLock) === */

@@ -3,6 +3,24 @@ import { describe, expect, it } from "vitest";
 import { HistoryStatsBar } from "../HistoryStatsBar";
 
 describe("HistoryStatsBar", () => {
+  it("uses fixed neutral placeholders instead of ellipsis during desktop loading", () => {
+    render(
+      <HistoryStatsBar
+        baseline={null}
+        currentCount={null}
+        loading
+        loadingDisplay="skeleton"
+        periodLabel="이번달"
+      />,
+    );
+
+    expect(screen.queryByText(/…/)).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("집계 중")).toHaveLength(5);
+    expect(screen.getByText("창고")).toBeInTheDocument();
+    expect(screen.getByText("부서")).toBeInTheDocument();
+    expect(screen.getByText("수량조정")).toBeInTheDocument();
+  });
+
   it("separates current list conditions from period summary counts", () => {
     render(
       <HistoryStatsBar

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { GitBranch, Package, XCircle } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
@@ -90,7 +90,7 @@ export function HistoryBatchDetailPanel({
         : { status: "unavailable" },
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!operationBatchId) {
       setState({ status: "unavailable" });
       return;

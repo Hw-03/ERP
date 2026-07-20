@@ -451,6 +451,62 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("변경품 구성품")).toBeInTheDocument();
   });
 
+  it("keeps expanded component-change child rows informational", () => {
+    const onSelectLog = vi.fn();
+    const source = makeLog({
+      log_id: "conversion-source",
+      item_name: "기존품",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 소스 PA 사용",
+    });
+    const additional = makeLog({
+      log_id: "conversion-additional",
+      item_name: "추가 차감품",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 차감",
+    });
+    const target = makeLog({
+      log_id: "conversion-target",
+      item_name: "변경품",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 대상 PA 입고",
+    });
+    const targetAdditional = makeLog({
+      log_id: "conversion-target-additional",
+      item_name: "변경품 구성품",
+      transaction_type: "PRODUCE",
+      quantity_change: 1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 추가 입고",
+    });
+
+    render(
+      <table>
+        <tbody>
+          <ReferenceBatchDetail logs={[source, additional, target, targetAdditional]} onSelectLog={onSelectLog} />
+        </tbody>
+      </table>,
+    );
+
+    fireEvent.click(within(screen.getByText("기존품").closest("tr")!).getByRole("button", { name: "묶음 펼치기" }));
+    fireEvent.click(within(screen.getByText("변경품").closest("tr")!).getByRole("button", { name: "묶음 펼치기" }));
+
+    for (const childName of ["추가 차감품", "변경품 구성품"]) {
+      const childRow = screen.getByText(childName).closest("tr");
+      expect(childRow).not.toHaveAttribute("role");
+      expect(childRow).not.toHaveAttribute("tabindex");
+      fireEvent.click(childRow!);
+    }
+
+    expect(onSelectLog).not.toHaveBeenCalled();
+  });
+
   it("keeps the flow column absent when the detail panel opens", () => {
     render(
       <HistoryTable

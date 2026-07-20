@@ -79,7 +79,6 @@ export function DesktopHistoryRightPanel({
           onClose={onClose}
         >
           <HistoryDetailPanel
-            key={displaySelection.log.log_id}
             panelOpen={!!selection}
             selected={displaySelection.log}
             allowCancellation={displaySelection.allowCancellation}
@@ -117,7 +116,6 @@ export function DesktopHistoryRightPanel({
             onClose={onClose}
           >
             <HistoryBatchDetailPanel
-              key={displaySelection.batchId}
               panelOpen={!!selection}
               batchId={displaySelection.batchId}
               logs={displaySelection.logs}

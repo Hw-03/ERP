@@ -14,6 +14,7 @@ const testState = vi.hoisted(() => ({
   drillTarget: null as any,
   capturedLogUpdated: null as null | ((updated: TransactionLog) => void),
   summaryMock: vi.fn(),
+  summaryQuery: vi.fn(),
   referenceSummaryQuery: { data: [], isLoading: false, refetch: vi.fn() },
   queryClient: null as QueryClient | null,
 }));
@@ -51,10 +52,20 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useMonthlyCountsQuery: () => ({ data: {} }),
+  useTransactionsSummaryQuery: (...args: any[]) => testState.summaryQuery(...args),
   useTransactionReferenceSummariesQuery: () => testState.referenceSummaryQuery,
 }));
 
-vi.mock("../_history_sections/HistoryStatsBar", () => ({ HistoryStatsBar: () => null }));
+vi.mock("../_history_sections/HistoryStatsBar", () => ({
+  HistoryStatsBar: ({ baseline, currentCount, loading }: any) => (
+    <div
+      data-testid="history-stats-state"
+      data-baseline={baseline?.total ?? ""}
+      data-current={currentCount ?? ""}
+      data-loading={loading ? "yes" : "no"}
+    />
+  ),
+}));
 vi.mock("../_history_sections/HistoryFilterBar", () => ({
   HistoryFilterBar: ({ setDateFilter }: any) => (
     <button type="button" onClick={() => setDateFilter("WEEK")}>기간 변경</button>
@@ -226,6 +237,8 @@ beforeEach(() => {
   testState.drillTarget = null;
   testState.capturedLogUpdated = null;
   testState.summaryMock.mockReset();
+  testState.summaryQuery.mockReset();
+  testState.summaryQuery.mockReturnValue({ data: undefined, isLoading: true, refetch: vi.fn() });
   testState.summaryMock.mockImplementation(() => new Promise(() => {}));
   testState.updated = makeLog({
     cancelled: true,
@@ -237,6 +250,39 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it("restores cached batch metadata immediately when the history tab remounts", () => {
+    const firstMount = render(<DesktopHistoryView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "묶음 선택" }));
+    expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-cache-status", "completed");
+
+    firstMount.unmount();
+    render(<DesktopHistoryView />);
+
+    expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-cache-status", "completed");
+  });
+
+  it("shows cached KPI values immediately when the history tab remounts", () => {
+    const cachedSummary = {
+      total: 796,
+      warehouseCount: 136,
+      deptCount: 547,
+      adjustCount: 54,
+      departmentCounts: {},
+    };
+    testState.summaryQuery.mockReturnValue({ data: cachedSummary, isLoading: false, refetch: vi.fn() });
+
+    const { unmount } = render(<DesktopHistoryView />);
+    expect(screen.getByTestId("history-stats-state")).toHaveAttribute("data-current", "796");
+    expect(screen.getByTestId("history-stats-state")).toHaveAttribute("data-baseline", "796");
+    expect(screen.getByTestId("history-stats-state")).toHaveAttribute("data-loading", "no");
+
+    unmount();
+    render(<DesktopHistoryView />);
+    expect(screen.getByTestId("history-stats-state")).toHaveAttribute("data-current", "796");
+    expect(screen.getByTestId("history-stats-state")).toHaveAttribute("data-loading", "no");
+  });
+
   it("keeps the history group query independent from a changing summary total", async () => {
     testState.summaryMock.mockResolvedValue({
       total: 42,
@@ -262,19 +308,17 @@ describe("DesktopHistoryView history state", () => {
       adjustCount: 5,
       departmentCounts: {},
     });
+    const summaryRefetch = vi.fn();
+    testState.summaryQuery.mockReturnValue({ data: undefined, isLoading: false, refetch: summaryRefetch });
     render(<DesktopHistoryView />);
     await waitFor(() => expect(testState.historyArgs).toMatchObject({ operations: "" }));
-    const callsBeforeRetry = testState.summaryMock.mock.calls.length;
     const retry = testState.historyResult.retry;
-    testState.summaryMock.mockRejectedValue(new Error("summary 실패"));
 
     fireEvent.click(screen.getByRole("button", { name: "목록 재시도" }));
 
     expect(retry).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(testState.summaryMock.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
-      expect(testState.historyArgs).toMatchObject({ operations: "" });
-    });
+    expect(summaryRefetch).toHaveBeenCalledTimes(2);
+    expect(testState.historyArgs).toMatchObject({ operations: "" });
   });
 
   it("keeps selection during loading/error, refreshes it on success, and closes stale selection", async () => {

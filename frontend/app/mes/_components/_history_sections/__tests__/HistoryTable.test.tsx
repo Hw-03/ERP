@@ -38,6 +38,26 @@ function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>()
 }
 
 describe("HistoryTable hierarchy", () => {
+  it("keeps the final table geometry while the first page is loading", () => {
+    const { container } = render(
+      <HistoryTable loading displayGroups={[]} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+    );
+
+    expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "작업" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "수량" })).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-history-loading-row='true']")).toHaveLength(8);
+  });
+
+  it("shows neutral placeholders instead of inferred operation details before batch metadata arrives", () => {
+    const parent = makeLog({ operation_batch_id: "batch-1" });
+
+    renderTable([{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [parent] }]);
+
+    expect(screen.queryByText("부서 입출고")).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("작업 정보 확인 중")).toHaveLength(2);
+  });
+
   it("shows BOM sections before their item rows", () => {
     const parent = makeLog({ operation_batch_id: "batch-1" });
     renderTable([{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [parent] }], new Map([["batch-1", makeBatch()]]));

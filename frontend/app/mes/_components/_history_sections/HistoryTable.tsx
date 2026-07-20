@@ -7,7 +7,7 @@ import type { TransactionReferenceSummary } from "@/lib/api/production";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
+import { EmptyState, LoadFailureCard } from "../common";
 import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
 import { BatchHeader, OpBatchHeader, ReferenceBatchDetail, buildGroups, getHistorySeparationHint, type LogGroup, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
@@ -59,6 +59,56 @@ const COLUMNS: ColSpec[] = [
   { label: "상태 · 처리", width: "120px", align: "center" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
+
+function HistoryTableSkeleton() {
+  return (
+    <div className="min-w-0 overflow-x-clip rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+      <table
+        aria-busy="true"
+        aria-label="입출고 내역 불러오는 중"
+        className="w-full table-fixed border-separate border-spacing-0 text-sm"
+      >
+        <thead>
+          <tr style={{ background: LEGACY_COLORS.s2 }}>
+            {COLUMNS.map(({ label, width, minWidth, align, hidden, px }, index) => (
+              <th
+                key={label || `loading-spacer-${index}`}
+                scope={label ? "col" : undefined}
+                aria-hidden={label ? undefined : true}
+                className={`sticky top-0 z-10 whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"}`}
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
+              >
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }, (_, rowIndex) => (
+            <tr key={rowIndex} data-history-loading-row="true" className="h-[64px]">
+              {COLUMNS.map((column, columnIndex) => (
+                <td
+                  key={`${column.label}-${columnIndex}`}
+                  className="border-b px-4 py-2 align-middle"
+                  style={{ borderColor: LEGACY_COLORS.border }}
+                >
+                  <div
+                    aria-hidden="true"
+                    className="mx-auto h-4 animate-pulse rounded-[6px]"
+                    style={{
+                      background: LEGACY_COLORS.s3,
+                      width: columnIndex === 2 ? "72%" : columnIndex === 4 ? "76%" : "58%",
+                    }}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function historyGroupPanelId(groupKey: string): string {
   return `history-group-${encodeURIComponent(groupKey).replaceAll("%", "_")}`;
@@ -242,7 +292,7 @@ export function HistoryTable({
   return (
     <div className="min-w-0">
       {loading ? (
-        <LoadingSkeleton variant="list" rows={8} />
+        <HistoryTableSkeleton />
       ) : error ? (
         <LoadFailureCard
           message={error}

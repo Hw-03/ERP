@@ -93,28 +93,21 @@ vi.mock("../_weekly_sections/WeeklyWeekPicker", () => ({
 
 describe("DesktopMesShell tab transition", () => {
   const originalStartViewTransition = document.startViewTransition;
-  const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
     routerPush.mockClear();
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
     vi.mocked(sendClientEvent).mockClear();
-    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
   });
 
   afterEach(() => {
     document.startViewTransition = originalStartViewTransition;
-    window.matchMedia = originalMatchMedia;
   });
 
-  it("commits a tab click inside the desktop content view transition when available", () => {
-    const callbacks: Array<() => void> = [];
-    document.startViewTransition = vi.fn((callback: () => void) => {
-      callbacks.push(callback);
-      callback();
-      return { finished: Promise.resolve(), ready: Promise.resolve(), updateCallbackDone: Promise.resolve() };
-    });
+  it("commits a tab click immediately and updates the URL without App Router navigation", () => {
+    document.startViewTransition = vi.fn();
+    const pushState = vi.spyOn(window.history, "pushState");
 
     render(<DesktopMesShell />);
 
@@ -122,10 +115,13 @@ describe("DesktopMesShell tab transition", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "weekly" }));
 
-    expect(document.startViewTransition).toHaveBeenCalledTimes(1);
-    expect(callbacks).toHaveLength(1);
+    expect(document.startViewTransition).not.toHaveBeenCalled();
     expect(screen.getByText("weekly content")).toBeInTheDocument();
-    expect(routerPush).toHaveBeenCalledWith("?tab=weekly", { scroll: false });
+    expect(screen.getByRole("banner")).toHaveTextContent("주간보고");
+    expect(screen.getByRole("button", { name: "weekly" })).toHaveAttribute("aria-current", "page");
+    expect(pushState).toHaveBeenCalledWith(null, "", "?tab=weekly");
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
     expect(sendClientEvent).toHaveBeenCalledWith({
       event: "ui_nav",
       from: "history",
@@ -135,16 +131,26 @@ describe("DesktopMesShell tab transition", () => {
     });
   });
 
-  it("falls back to an immediate tab commit when motion is reduced", () => {
-    document.startViewTransition = vi.fn();
-    window.matchMedia = vi.fn().mockReturnValue({ matches: true });
-
+  it("prefetches the default history page before the first history tab visit", () => {
     render(<DesktopMesShell />);
 
-    fireEvent.click(screen.getByRole("button", { name: "dashboard" }));
-
-    expect(document.startViewTransition).not.toHaveBeenCalled();
-    expect(screen.getByText("dashboard content")).toBeInTheDocument();
-    expect(routerPush).toHaveBeenCalledWith("?tab=dashboard", { scroll: false });
+    expect(queryClientMock.prefetchQuery.mock.calls[0][0].queryKey.slice(0, 2)).toEqual([
+      "transactions",
+      "displayGroups",
+    ]);
+    expect(queryClientMock.prefetchQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: [
+        "transactions",
+        "displayGroups",
+        expect.objectContaining({ limit: 100, cursor: null }),
+      ],
+    }));
+    expect(queryClientMock.prefetchQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: [
+        "transactions",
+        "summary",
+        expect.objectContaining({ dateFrom: expect.any(String) }),
+      ],
+    }));
   });
 });

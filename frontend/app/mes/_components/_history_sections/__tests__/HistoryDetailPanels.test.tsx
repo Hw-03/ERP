@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type TransactionLog } from "@/lib/api";
+import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
+import { ioApi } from "@/lib/api/io";
 import { productionApi } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { HistoryDetailMemo, HistoryDetailPanel } from "../HistoryDetailPanel";
@@ -157,6 +158,129 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it("aborts a prior edit request and ignores its late response after the selected log changes", async () => {
+    let firstSignal: AbortSignal | undefined;
+    let resolveFirst: (edits: TransactionEditLog[]) => void = () => {};
+    let resolveSecond: (edits: TransactionEditLog[]) => void = () => {};
+    const firstEdit: TransactionEditLog = {
+      edit_id: "edit-a",
+      original_log_id: "log-a",
+      edited_by_employee_id: "employee-a",
+      edited_by_name: "First editor",
+      reason: "first reason",
+      before_payload: "{}",
+      after_payload: "{}",
+      correction_log_id: null,
+      created_at: "2026-07-10T01:00:00Z",
+    };
+    const secondEdit: TransactionEditLog = {
+      ...firstEdit,
+      edit_id: "edit-b",
+      original_log_id: "log-b",
+      edited_by_name: "Second editor",
+      reason: "second reason",
+    };
+    vi.mocked(api.getTransactionEdits)
+      .mockImplementationOnce((_logId, options) => new Promise<TransactionEditLog[]>((resolve) => {
+        firstSignal = options?.signal;
+        resolveFirst = resolve;
+      }))
+      .mockImplementationOnce((_logId, _options) => new Promise<TransactionEditLog[]>((resolve) => {
+        resolveSecond = resolve;
+      }));
+    const first = makeLog({ log_id: "log-a", edit_count: undefined });
+    const second = makeLog({ log_id: "log-b", edit_count: undefined });
+    const { rerender } = render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={first}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    expect(firstSignal).toBeDefined();
+    rerender(
+      <HistoryDetailPanel
+        panelOpen
+        selected={second}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    expect(firstSignal?.aborted).toBe(true);
+    await act(async () => {
+      resolveSecond([secondEdit]);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /수정 이력.*1/ }));
+    expect(await screen.findByText("Second editor")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFirst([firstEdit]);
+    });
+    expect(screen.getByText("Second editor")).toBeInTheDocument();
+    expect(screen.queryByText("First editor")).not.toBeInTheDocument();
+  });
+
+  it("aborts a prior batch-flow request and ignores its late response after the selected log changes", async () => {
+    let firstSignal: AbortSignal | undefined;
+    let resolveFirst: (batch: IoBatch) => void = () => {};
+    let resolveSecond: (batch: IoBatch) => void = () => {};
+    const firstBatch = makeBatch({
+      batch_id: "batch-a",
+      from_department: "Flow A",
+      to_department: "Flow A",
+    });
+    const secondBatch = makeBatch({
+      batch_id: "batch-b",
+      from_department: "Flow B",
+      to_department: "Flow B",
+    });
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce((_batchId, options) => new Promise<IoBatch>((resolve) => {
+        firstSignal = options?.signal;
+        resolveFirst = resolve;
+      }))
+      .mockImplementationOnce((_batchId, _options) => new Promise<IoBatch>((resolve) => {
+        resolveSecond = resolve;
+      }));
+    const first = makeLog({ log_id: "log-a", operation_batch_id: "batch-a" });
+    const second = makeLog({ log_id: "log-b", operation_batch_id: "batch-b" });
+    const { rerender } = render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={first}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+      />,
+    );
+
+    expect(firstSignal).toBeDefined();
+    rerender(
+      <HistoryDetailPanel
+        panelOpen
+        selected={second}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+      />,
+    );
+
+    expect(firstSignal?.aborted).toBe(true);
+    await act(async () => {
+      resolveSecond(secondBatch);
+    });
+    expect(await screen.findByText("Flow B")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFirst(firstBatch);
+    });
+    expect(screen.getByText("Flow B")).toBeInTheDocument();
+    expect(screen.queryByText("Flow A")).not.toBeInTheDocument();
+  });
+
   it("summarizes excluded batch lines without listing their item names", () => {
     vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
     const batch = makeBatch();

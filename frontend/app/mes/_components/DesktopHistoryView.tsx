@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type TransactionLog } from "@/lib/api";
-import { productionApi, type TransactionSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
@@ -15,7 +14,7 @@ import type { HistoryTableFocusTarget } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useDesktopHistoryGroups } from "./_hooks/useDesktopHistoryGroups";
 import { useToggleSet } from "./_hooks/useToggleSet";
-import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery } from "@/lib/queries/useTransactionsQuery";
+import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery, useTransactionsSummaryQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
@@ -70,7 +69,18 @@ export function DesktopHistoryView() {
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
 
   // batchCache — HistoryTable 의 visible lazy fetch + 우측 batch 상세 패널이 공유.
-  const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
+  // 탭이 언마운트되어도 같은 QueryClient 안에서는 최종 의미 라벨을 즉시 복원한다.
+  const [batchCache, setBatchCacheState] = useState<Map<string, IoBatch>>(
+    () => queryClient.getQueryData<Map<string, IoBatch>>(queryKeys.transactions.batchCache()) ?? new Map(),
+  );
+  const batchCacheRef = useRef(batchCache);
+  batchCacheRef.current = batchCache;
+  const setBatchCache = useCallback<React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>>((update) => {
+    const next = typeof update === "function" ? update(batchCacheRef.current) : update;
+    batchCacheRef.current = next;
+    queryClient.setQueryData(queryKeys.transactions.batchCache(), next);
+    setBatchCacheState(next);
+  }, [queryClient]);
 
   // 달력 — 상단 접이식 패널. 기본 접힘. 펼쳤을 때만 월간 fetch.
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -88,11 +98,6 @@ export function DesktopHistoryView() {
     ? selectedDay
     : (DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "전체");
 
-  const [summary, setSummary] = useState<TransactionSummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryRetryNonce, setSummaryRetryNonce] = useState(0);
-  const summaryKeyRef = useRef("");
-
   const historyFilterParams = useMemo(() => ({
     operationKeys: opParam || undefined,
     dateFrom: selectedDay ?? dateFilterToFrom(dateFilter),
@@ -101,6 +106,20 @@ export function DesktopHistoryView() {
     department: deptParam || undefined,
     model: modelParam || undefined,
   }), [dateFilter, debouncedSearch, deptParam, modelParam, opParam, selectedDay]);
+  const baselineSummaryParams = useMemo(() => ({
+    dateFrom: selectedDay ?? dateFilterToFrom(dateFilter),
+    dateTo: selectedDay ?? undefined,
+  }), [dateFilter, selectedDay]);
+  const {
+    data: summary = null,
+    isLoading: summaryLoading,
+    refetch: refetchSummary,
+  } = useTransactionsSummaryQuery(historyFilterParams);
+  const {
+    data: baselineSummary = null,
+    isLoading: baselineLoading,
+    refetch: refetchBaselineSummary,
+  } = useTransactionsSummaryQuery(baselineSummaryParams);
   const {
     data: referenceSummaryRows,
     isLoading: referenceSummariesLoading,
@@ -228,77 +247,12 @@ export function DesktopHistoryView() {
     window.history.pushState(null, "");
   }
 
-  // X(분자) summary — 현재 필터(거래종류/검색/부서/모델) 전체 카운트. 페이지네이션 무관.
-  useEffect(() => {
-    const operationKeys = opParam || undefined;
-    const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
-    const dateTo = selectedDay ?? undefined;
-    const searchParam = debouncedSearch.trim() || undefined;
-    const department = deptParam || undefined;
-    const model = modelParam || undefined;
-
-    const myKey = `${operationKeys ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${searchParam ?? ""}|${department ?? ""}|${model ?? ""}`;
-    summaryKeyRef.current = myKey;
-
-    setSummary(null);
-    setSummaryLoading(true);
-    const ctrl = new AbortController();
-    void productionApi
-      .getTransactionsSummary(
-        { operationKeys, dateFrom, dateTo, search: searchParam, department, model },
-        { signal: ctrl.signal },
-      )
-      .then((s) => {
-        if (summaryKeyRef.current !== myKey) return;
-        setSummary(s);
-        setSummaryLoading(false);
-      })
-      .catch((err) => {
-        if ((err as Error)?.name === "AbortError") return;
-        if (summaryKeyRef.current !== myKey) return;
-        setSummary(null);
-        setSummaryLoading(false);
-      });
-    return () => ctrl.abort();
-  }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam, summaryRetryNonce]);
-
   function retryHistoryResults() {
-    setSummary(null);
     retry();
-    setSummaryRetryNonce((nonce) => nonce + 1);
+    void refetchSummary();
+    void refetchBaselineSummary();
     void refetchReferenceSummaries();
   }
-
-  // Y(분모) baseline summary — 선택한 기간만 필터. 거래종류/검색/부서/모델 무시.
-  // 상단 박스 숫자·부서칩·"{기간} Y건 중 X건"의 Y 를 고정 제공.
-  const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
-  const [baselineLoading, setBaselineLoading] = useState(false);
-  const baselineKeyRef = useRef("");
-
-  useEffect(() => {
-    const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
-    const dateTo = selectedDay ?? undefined;
-    const myKey = `${dateFrom ?? ""}|${dateTo ?? ""}`;
-    baselineKeyRef.current = myKey;
-
-    setBaselineSummary(null);
-    setBaselineLoading(true);
-    const ctrl = new AbortController();
-    void productionApi
-      .getTransactionsSummary({ dateFrom, dateTo }, { signal: ctrl.signal })
-      .then((s) => {
-        if (baselineKeyRef.current !== myKey) return;
-        setBaselineSummary(s);
-        setBaselineLoading(false);
-      })
-      .catch((err) => {
-        if ((err as Error)?.name === "AbortError") return;
-        if (baselineKeyRef.current !== myKey) return;
-        setBaselineSummary(null);
-        setBaselineLoading(false);
-      });
-    return () => ctrl.abort();
-  }, [dateFilter, selectedDay]);
 
   // 13-2번: 다른 날짜로 navigate 후 logs 가 로드되면 해당 거래 행으로 스크롤.
   useEffect(() => {
@@ -511,6 +465,7 @@ export function DesktopHistoryView() {
             baseline={baselineSummary}
             currentCount={summary?.total ?? null}
             loading={summaryLoading || baselineLoading}
+            loadingDisplay="skeleton"
             periodLabel={periodLabel}
           />
 

@@ -758,7 +758,6 @@ export function ReferenceBatchDetail({
         logs={sortedLogs}
         compact={compact}
         highlightLogId={highlightLogId}
-        onSelectLog={onSelectLog}
         controlsId={controlsId}
       />
     );
@@ -848,13 +847,11 @@ function ComponentChangeDetail({
   logs,
   compact,
   highlightLogId,
-  onSelectLog,
   controlsId,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
   highlightLogId?: string | null;
-  onSelectLog?: (log: TransactionLog) => void;
   controlsId?: string;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ source: false, target: false });
@@ -886,7 +883,6 @@ function ComponentChangeDetail({
               kind="shipment"
               compact={compact}
               highlightLogId={highlightLogId}
-              onSelectLog={onSelectLog}
               rowId={index === 0 ? sectionId : undefined}
             />
           ));
@@ -900,7 +896,6 @@ function ComponentChangeDetail({
               kind="shipment"
               compact={compact}
               highlightLogId={highlightLogId}
-              onSelectLog={onSelectLog}
               rowId={sectionId}
             />
           );
@@ -913,7 +908,6 @@ function ComponentChangeDetail({
               kind="shipment"
               compact={compact}
               highlightLogId={highlightLogId}
-              onSelectLog={onSelectLog}
               sectionLabel={section.label}
               expanded={sectionExpanded}
               onToggle={() => setExpanded((previous) => ({ ...previous, [section.key]: !previous[section.key] }))}
@@ -926,7 +920,6 @@ function ComponentChangeDetail({
                 kind="shipment"
                 compact={compact}
                 highlightLogId={highlightLogId}
-                onSelectLog={onSelectLog}
                 rowId={index === 0 ? sectionId : undefined}
               />
             ))}
@@ -1105,7 +1098,9 @@ export function OpBatchHeader({
   const rawPrimaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const primaryType = getHistoryDisplayTransactionType({ transaction_type: rawPrimaryType }, batch);
   const basePresentation = getHistoryRowPresentation(first, batch ?? undefined);
-  const flowColor = isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType);
+  const flowColor = batch
+    ? (isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType))
+    : LEGACY_COLORS.muted2;
   const cancelled = group.logs.some((log) => log.cancelled);
 
   let titleText: string;
@@ -1168,7 +1163,11 @@ export function OpBatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={getHistoryListOperationLabel(first, batch)} color={flowColor} compact={compact} />
+        {batch ? (
+          <FlowBadge type={primaryType} label={getHistoryListOperationLabel(first, batch)} color={flowColor} compact={compact} />
+        ) : (
+          <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-20" : "w-32"} />
+        )}
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-1.5">
@@ -1181,11 +1180,25 @@ export function OpBatchHeader({
       </td>
       <ItemCodeCell code={presentation.target.code} compact={compact} />
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
+        {batch ? (
+          <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
+        ) : (
+          <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-28" : "w-48"} />
+        )}
       </td>
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} compact={compact} />
       </td>
     </tr>
+  );
+}
+
+function HistoryBatchMetadataPlaceholder({ widthClass }: { widthClass: string }) {
+  return (
+    <span
+      aria-label="작업 정보 확인 중"
+      className={`mx-auto block h-4 animate-pulse rounded-[6px] ${widthClass}`}
+      style={{ background: LEGACY_COLORS.s3 }}
+    />
   );
 }

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
-import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
@@ -24,7 +23,9 @@ import {
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
 import type { Item, ProductionCapacity } from "@/lib/api";
+import { productionApi } from "@/lib/api/production";
 import { warehouseMapApi } from "@/lib/api/warehouse-map";
+import { STALE_TIME } from "@/lib/queries/client";
 import { queryKeys } from "@/lib/queries/keys";
 import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { sendClientEvent } from "@/lib/client-events";
@@ -32,6 +33,8 @@ import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
+import { HISTORY_PAGE_SIZE } from "./_history_sections/historyConstants";
+import { dateFilterToFrom } from "./_history_sections/historyQuery";
 import {
   filterVisibleSidebarTabs,
   SIDEBAR_TAB_IDS,
@@ -42,20 +45,9 @@ const DEFAULT_STATUS = "DEXCOWIN MES System";
 const MS_PER_DAY = 86400000;
 
 type DesktopTabNavigation = "push" | "replace" | "none";
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void) => {
-    finished: Promise<void>;
-    ready: Promise<void>;
-    updateCallbackDone: Promise<void>;
-  };
-};
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-function shouldReduceMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
@@ -146,23 +138,11 @@ function DesktopMesShellInner() {
     };
 
     if (navigation !== "none") pendingUrlTabRef.current = tab;
+    updateTabState();
 
-    const transitionDocument = document as ViewTransitionDocument;
-    if (
-      activeTab !== tab &&
-      !shouldReduceMotion() &&
-      typeof transitionDocument.startViewTransition === "function"
-    ) {
-      transitionDocument.startViewTransition(() => {
-        flushSync(updateTabState);
-      });
-    } else {
-      updateTabState();
-    }
-
-    if (navigation === "push") router.push(url, { scroll: false });
-    if (navigation === "replace") router.replace(url, { scroll: false });
-  }, [activeTab, router]);
+    if (navigation === "push") window.history.pushState(null, "", url);
+    if (navigation === "replace") window.history.replaceState(null, "", url);
+  }, [activeTab]);
 
   function handleTabChange(tab: DesktopTabId) {
     if (warehouseMapFullscreen && tab === activeTab) {
@@ -255,6 +235,30 @@ function DesktopMesShellInner() {
   }, [activeTab, warehouseMapFullscreen]);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
+
+  useEffect(() => {
+    const params = {
+      limit: HISTORY_PAGE_SIZE,
+      cursor: null,
+      operationKeys: undefined,
+      dateFrom: dateFilterToFrom("MONTH"),
+      dateTo: undefined,
+      search: undefined,
+      department: undefined,
+      model: undefined,
+    };
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.transactions.displayGroups(params),
+      queryFn: ({ signal }) => productionApi.getTransactionDisplayGroups(params, { signal }),
+      staleTime: STALE_TIME.VOLATILE,
+    });
+    const summaryParams = { dateFrom: params.dateFrom, dateTo: undefined };
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.transactions.summary(summaryParams),
+      queryFn: ({ signal }) => productionApi.getTransactionsSummary(summaryParams, { signal }),
+      staleTime: STALE_TIME.VOLATILE,
+    });
+  }, [queryClient]);
 
   useEffect(() => {
     const weekStart = toDateStr(weekMon);
