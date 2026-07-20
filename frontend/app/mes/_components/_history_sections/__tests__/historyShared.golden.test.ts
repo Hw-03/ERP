@@ -118,8 +118,7 @@ describe("getHistoryDisplayLabel", () => {
     expect(getHistoryDisplayLabel({ transaction_type: "RECEIVE" })).toBe("원자재 입고");
   });
 
-  // P0-1: 라벨 단일화 — 이전의 "생산 | 입고" / "분해 | 출고" / "창고 반출" 같은
-  // history 전용 변형은 폐기. 모든 화면이 glossary.ts 의 SUB_TYPE_LABEL 을 따른다.
+  // history에서는 업무 상태를 명확히 하기 위해 DISASSEMBLE을 재작업으로 표기한다.
   it("batch sub_type=produce → 생산", () => {
     const batch = makeBatch({ sub_type: "produce" });
     expect(getHistoryDisplayLabel({ transaction_type: "PRODUCE" }, batch)).toBe("생산");
@@ -134,9 +133,9 @@ describe("getHistoryDisplayLabel", () => {
     expect(getHistoryDisplaySubLabel({ transaction_type: "PRODUCE" }, batch)).toBe("재고 수량 직접 수정");
   });
 
-  it("batch sub_type=disassemble → 분해", () => {
+  it("batch sub_type=disassemble → 재작업", () => {
     const batch = makeBatch({ sub_type: "disassemble" });
-    expect(getHistoryDisplayLabel({ transaction_type: "DISASSEMBLE" }, batch)).toBe("분해");
+    expect(getHistoryDisplayLabel({ transaction_type: "DISASSEMBLE" }, batch)).toBe("재작업");
   });
 
   it("batch sub_type=warehouse_to_dept → 창고 → 부서", () => {
@@ -172,9 +171,9 @@ describe("getHistoryDisplaySubLabel", () => {
     const line = makeLine({ from_bucket: "production", to_bucket: "none", from_department: "조립" });
     const bundle = makeBundle({ lines: [line] });
     const batch = makeBatch({ sub_type: "disassemble", bundles: [bundle] });
-    // P0-1: _labelNoneBucket("disassemble","to") 는 이제 SUB_TYPE_LABEL.disassemble = "분해"
+    // history에서는 재작업 처리임을 명확히 보인다.
     const result = getHistoryDisplaySubLabel({ transaction_type: "DISASSEMBLE" }, batch);
-    expect(result).toBe("조립 → 분해");
+    expect(result).toBe("조립 → 재작업");
   });
 
   it("sub_type=adjust_in → '재고 수량 직접 수정'", () => {
@@ -192,6 +191,14 @@ describe("getHistoryDisplaySubLabel", () => {
 
   it("BACKFLUSH (no batch) → 'BOM 기준 부품 차감'", () => {
     expect(getHistoryDisplaySubLabel({ transaction_type: "BACKFLUSH" })).toBe("BOM 기준 부품 차감");
+  });
+
+  it.each([
+    ["MARK_DEFECTIVE", "격리"],
+    ["UNMARK_DEFECTIVE", "격리 해제"],
+    ["DEFECT_SCRAP", "폐기"],
+  ])("%s detail label uses %s", (transactionType, expected) => {
+    expect(getHistoryDisplaySubLabel({ transaction_type: transactionType })).toBe(expected);
   });
 
   it("batch 없음, tx 매핑 없으면 undefined", () => {
@@ -212,20 +219,20 @@ describe("getHistoryOperationLabel", () => {
     expect(getHistoryOperationLabel({ transaction_type: "TRANSFER_DEPT" }, batch)).toBe("부서 → 부서");
   });
 
-  it("sub_type=defect_quarantine → '새 불량' (glossary 통일)", () => {
+  it("sub_type=defect_quarantine → '격리'", () => {
     const batch = makeBatch({ sub_type: "defect_quarantine" });
-    expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("새 불량");
+    expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("격리");
   });
 
-  it("DEFECT_SCRAP은 defect_process batch에서도 '불량 폐기'를 우선한다", () => {
+  it("DEFECT_SCRAP은 defect_process batch에서도 '폐기'를 우선한다", () => {
     const batch = makeBatch({ sub_type: "defect_process" });
     const log = { transaction_type: "DEFECT_SCRAP" };
 
-    expect(getHistoryOperationLabel(log, batch)).toBe("불량 폐기");
-    expect(getHistoryDisplayLabel(log, batch)).toBe("불량 폐기");
+    expect(getHistoryOperationLabel(log, batch)).toBe("폐기");
+    expect(getHistoryDisplayLabel(log, batch)).toBe("폐기");
   });
 
-  it("모든 tx 타입 매핑 확인 (P0-1: glossary TRANSACTION_TYPE_LABEL 단일 소스)", () => {
+  it("모든 tx 타입 매핑 확인 (history 처리 용어 우선)", () => {
     const cases: [string, string][] = [
       ["RECEIVE", "원자재 입고"],
       ["SHIP", "출고"],
@@ -234,11 +241,11 @@ describe("getHistoryOperationLabel", () => {
       ["TRANSFER_DEPT", "부서 → 부서"],
       ["BACKFLUSH", "자동 차감"],
       ["PRODUCE", "생산"],
-      ["DISASSEMBLE", "분해"],
+      ["DISASSEMBLE", "재작업"],
       ["ADJUST", "수량 조정"],
-      ["MARK_DEFECTIVE", "새 불량"],
-      ["UNMARK_DEFECTIVE", "불량 해제"],
-      ["DEFECT_SCRAP", "불량 폐기"],
+      ["MARK_DEFECTIVE", "격리"],
+      ["UNMARK_DEFECTIVE", "격리 해제"],
+      ["DEFECT_SCRAP", "폐기"],
       ["SUPPLIER_RETURN", "원자재 반품"],
     ];
     for (const [tx, expected] of cases) {
@@ -260,10 +267,10 @@ describe("getHistoryFlowLabel", () => {
       ["TRANSFER_DEPT", "부서 ↔ 부서"],
       ["BACKFLUSH", "자동차감"],
       ["PRODUCE", "생산 입고"],
-      ["DISASSEMBLE", "분해"],
-      ["MARK_DEFECTIVE", "새 불량"],
-      ["UNMARK_DEFECTIVE", "불량 해제"],
-      ["DEFECT_SCRAP", "불량 폐기"],
+      ["DISASSEMBLE", "재작업"],
+      ["MARK_DEFECTIVE", "격리"],
+      ["UNMARK_DEFECTIVE", "격리 해제"],
+      ["DEFECT_SCRAP", "폐기"],
       ["ADJUST", "수량 조정"],
       ["SUPPLIER_RETURN", "원자재 반품"],
     ];
@@ -330,12 +337,12 @@ describe("getBatchFlowEndpoints", () => {
     expect(getBatchFlowEndpoints(batch)).toBeNull();
   });
 
-  it("disassemble: production→none → from=부서, to='분해' (P0-1 통일)", () => {
+  it("disassemble: production→none → from=부서, to='재작업'", () => {
     const line = makeLine({ from_bucket: "production", from_department: "조립", to_bucket: "none" });
     const bundle = makeBundle({ lines: [line] });
     const batch = makeBatch({ sub_type: "disassemble", bundles: [bundle] });
     const result = getBatchFlowEndpoints(batch);
-    expect(result).toEqual({ from: "조립", to: "분해", mixed: false });
+    expect(result).toEqual({ from: "조립", to: "재작업", mixed: false });
   });
 });
 
@@ -556,15 +563,15 @@ describe("getHistoryMovementSummary", () => {
     expect(result.parts.find((p) => p.label.includes("부품"))?.tone).toBe("danger");
   });
 
-  it("disassemble → 분해=danger, 부품=primary", () => {
+  it("disassemble → 재작업=danger, 부품=primary", () => {
     const parentLine = makeLine({ origin: "direct", quantity: 5, unit: "EA" });
     const childLine = makeLine({ line_id: "l2", item_id: "ITEM-002", origin: "bom_auto", quantity: 10, unit: "EA" });
     const bundle = makeBundle({ source_kind: "bom_parent", lines: [parentLine, childLine] });
     const batch = makeBatch({ sub_type: "disassemble", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "DISASSEMBLE" }, batch);
-    expect(result.parts.find((p) => p.label.includes("분해"))?.label).toBe("분해 -5 EA");
+    expect(result.parts.find((p) => p.label.includes("재작업"))?.label).toBe("재작업 -5 EA");
     expect(result.parts.find((p) => p.label.includes("부품"))?.label).toBe("부품 +10 EA");
-    expect(result.parts.find((p) => p.label.includes("분해"))?.tone).toBe("danger");
+    expect(result.parts.find((p) => p.label.includes("재작업"))?.tone).toBe("danger");
     expect(result.parts.find((p) => p.label.includes("부품"))?.tone).toBe("primary");
   });
 
@@ -594,13 +601,26 @@ describe("getHistoryMovementSummary", () => {
     expect(result.parts[0].tone).toBe("danger");
   });
 
-  it("defect_quarantine → '불량 N품목' danger", () => {
+  it("defect_quarantine → '격리 N품목' danger", () => {
     const line = makeLine();
     const bundle = makeBundle({ lines: [line] });
     const batch = makeBatch({ sub_type: "defect_quarantine", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "MARK_DEFECTIVE" }, batch);
-    expect(result.parts[0].label).toContain("불량");
+    expect(result.parts[0].label).toContain("격리");
     expect(result.parts[0].tone).toBe("danger");
+  });
+
+  it.each([
+    ["defect_restore", "UNMARK_DEFECTIVE", "격리 해제", "success"],
+    ["defect_process", "DEFECT_SCRAP", "폐기", "danger"],
+  ])("%s summary uses %s", (subType, transactionType, label, tone) => {
+    const line = makeLine();
+    const bundle = makeBundle({ lines: [line] });
+    const batch = makeBatch({ sub_type: subType, bundles: [bundle] });
+
+    const result = getHistoryMovementSummary({ transaction_type: transactionType }, batch);
+
+    expect(result.parts[0]).toMatchObject({ label: `${label} 1품목`, tone });
   });
 
   it("adjust_in + positive qty → '증가 N' success", () => {

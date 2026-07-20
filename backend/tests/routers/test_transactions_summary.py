@@ -19,7 +19,15 @@ from app.models import (
 )
 
 
-def _seed_log(db_session, item, tx_type: TransactionTypeEnum, qty: Decimal, notes: str = "") -> None:
+def _seed_log(
+    db_session,
+    item,
+    tx_type: TransactionTypeEnum,
+    qty: Decimal,
+    notes: str = "",
+    *,
+    department: str | None = None,
+) -> None:
     db_session.add(
         TransactionLog(
             item_id=item.item_id,
@@ -28,6 +36,7 @@ def _seed_log(db_session, item, tx_type: TransactionTypeEnum, qty: Decimal, note
             quantity_before=Decimal("0"),
             quantity_after=qty,
             notes=notes,
+            department=department,
         )
     )
 
@@ -46,6 +55,8 @@ def _seed_batch_log(
     submitted_at: datetime | None = None,
     log_created_at: datetime | None = None,
     shipping_phase: str | None = None,
+    log_department: str | None = None,
+    requester_department: str | None = None,
 ) -> None:
     """IoBatch 가 붙은 거래. 부서 라벨은 COALESCE(to, from).
 
@@ -57,7 +68,7 @@ def _seed_batch_log(
         employee_code=f"E{suffix}",
         name="테스트작업자",
         role="작업자",
-        department=to_department or from_department or "조립",
+        department=requester_department or to_department or from_department or "조립",
     )
     db_session.add(emp)
     db_session.flush()
@@ -85,6 +96,7 @@ def _seed_batch_log(
             transfer_qty=transfer_qty,
             created_at=log_created_at,
             shipping_phase=shipping_phase,
+            department=log_department,
         )
     )
 
@@ -241,9 +253,27 @@ def test_summary_categorizes_by_transaction_type(client, db_session, make_item):
     _seed_log(db_session, item, TransactionTypeEnum.SHIP, Decimal("-5"))
     _seed_log(db_session, item, TransactionTypeEnum.SHIP, Decimal("-10"))
     _seed_log(db_session, item, TransactionTypeEnum.TRANSFER_TO_PROD, Decimal("0"))
-    _seed_log(db_session, item, TransactionTypeEnum.PRODUCE, Decimal("5"))
-    _seed_log(db_session, item, TransactionTypeEnum.BACKFLUSH, Decimal("-5"))
-    _seed_log(db_session, item, TransactionTypeEnum.ADJUST, Decimal("3"))
+    _seed_log(
+        db_session,
+        item,
+        TransactionTypeEnum.PRODUCE,
+        Decimal("5"),
+        department="조립",
+    )
+    _seed_log(
+        db_session,
+        item,
+        TransactionTypeEnum.BACKFLUSH,
+        Decimal("-5"),
+        department="조립",
+    )
+    _seed_log(
+        db_session,
+        item,
+        TransactionTypeEnum.ADJUST,
+        Decimal("3"),
+        department="창고",
+    )
     db_session.commit()
 
     res = client.get("/api/inventory/transactions/summary")
@@ -253,15 +283,13 @@ def test_summary_categorizes_by_transaction_type(client, db_session, make_item):
     # dept_internal: PRODUCE(1) + BACKFLUSH(1) = 2
     # adjust: 1
     # total: 9
-    # PRODUCE/BACKFLUSH 는 dept-bucket 이지만 배치 없음 → '미상' 2건
     # RECEIVE(3)+SHIP(2)+TRANSFER_TO_PROD(1) 는 창고계열 → '창고' 6건
-    # ADJUST(1) → '미상' (dept/warehouse 아님)
     assert body == {
         "total": 9,
         "warehouse_count": 6,
         "dept_count": 2,
         "adjust_count": 1,
-        "department_counts": {"창고": 6, "미상": 3},
+        "department_counts": {"창고": 7, "조립": 2},
     }
 
 
@@ -305,15 +333,21 @@ def test_summary_transaction_types_filter(client, db_session, make_item):
 
 def test_summary_department_counts(client, db_session, make_item):
     """dept-bucket 거래 부서별 카운트. 같은 배치의 PRODUCE(to)·BACKFLUSH(from)가
-    같은 부서로 집계되고, 배치 없는 dept-bucket 은 '미상'."""
+    같은 부서로 집계되고, 배치 없는 dept-bucket 은 로그 부서로 집계된다."""
     item = make_item(name="부서집계품", warehouse_qty=Decimal("0"))
     # 조립: PRODUCE(to=조립) + BACKFLUSH(from=조립) = 2
     _seed_batch_log(db_session, item, TransactionTypeEnum.PRODUCE, Decimal("5"), to_department="조립")
     _seed_batch_log(db_session, item, TransactionTypeEnum.BACKFLUSH, Decimal("-5"), from_department="조립")
     # 고압: PRODUCE 1
     _seed_batch_log(db_session, item, TransactionTypeEnum.PRODUCE, Decimal("3"), to_department="고압")
-    # 배치 없는 dept-bucket → '미상'
-    _seed_log(db_session, item, TransactionTypeEnum.DISASSEMBLE, Decimal("1"))
+    # 배치 없는 dept-bucket → 로그의 실제 부서
+    _seed_log(
+        db_session,
+        item,
+        TransactionTypeEnum.DISASSEMBLE,
+        Decimal("1"),
+        department="연구",
+    )
     # warehouse-bucket → '창고' 로 department_counts 에 집계됨
     _seed_log(db_session, item, TransactionTypeEnum.RECEIVE, Decimal("10"))
     db_session.commit()
@@ -322,7 +356,73 @@ def test_summary_department_counts(client, db_session, make_item):
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["dept_count"] == 4  # PRODUCE x2 + BACKFLUSH + DISASSEMBLE
-    assert body["department_counts"] == {"조립": 2, "고압": 1, "미상": 1, "창고": 1}
+    assert body["department_counts"] == {"조립": 2, "고압": 1, "연구": 1, "창고": 1}
+
+
+def test_summary_department_uses_complete_precedence_and_preserves_new_names(
+    client, db_session, make_item
+):
+    """도착→출발→로그→요청자 순으로 공백을 건너뛰고 실제 명칭을 보존한다."""
+    item = make_item(name="부서우선순위품", warehouse_qty=Decimal("0"))
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.PRODUCE,
+        Decimal("1"),
+        to_department="튜닝",
+        from_department="진공",
+        log_department="조립",
+        requester_department="연구",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.PRODUCE,
+        Decimal("1"),
+        from_department="진공",
+        log_department="조립",
+        requester_department="연구",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.PRODUCE,
+        Decimal("1"),
+        to_department="  ",
+        from_department=" ",
+        log_department="AS",
+        requester_department="연구",
+    )
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.PRODUCE,
+        Decimal("1"),
+        requester_department="미래신설부서",
+    )
+    db_session.commit()
+
+    res = client.get("/api/inventory/transactions/summary")
+    assert res.status_code == 200, res.text
+    assert res.json()["department_counts"] == {
+        "튜닝": 1,
+        "진공": 1,
+        "AS": 1,
+        "미래신설부서": 1,
+    }
+
+
+def test_summary_does_not_emit_unknown_department_bucket(
+    client, db_session, make_item
+):
+    item = make_item(name="미분류방어품", warehouse_qty=Decimal("0"))
+    _seed_log(db_session, item, TransactionTypeEnum.DISASSEMBLE, Decimal("1"))
+    db_session.commit()
+
+    res = client.get("/api/inventory/transactions/summary")
+    assert res.status_code == 200, res.text
+    assert res.json()["total"] == 1
+    assert res.json()["department_counts"] == {}
 
 
 def test_summary_department_filter(client, db_session, make_item):

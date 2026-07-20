@@ -156,6 +156,9 @@ def test_submit_production(make_item, make_location, db_session):
     types = _tx_types(db_session)
     assert types.count("BACKFLUSH") == 2
     assert types.count("PRODUCE") == 1
+    assert {
+        log.department for log in db_session.query(TransactionLog).all()
+    } == {ASSEMBLY.value}
 
 
 def test_submit_rolls_back_inventory_when_ledger_capture_fails(

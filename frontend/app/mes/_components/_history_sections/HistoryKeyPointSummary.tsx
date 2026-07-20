@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Activity, ArrowRight, ChevronDown, Clock3, MapPin, UserRound } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Tooltip } from "@/lib/ui/Tooltip";
 import { useDesktopRightPanelBody } from "../DesktopRightPanel";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import type {
@@ -219,7 +220,11 @@ export function HistoryKeyPointSummary({
                                   {effect.role}
                                 </span>
                               )}
-                              <div className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+                              <div
+                                data-history-impact-item-name
+                                className="truncate text-sm font-bold"
+                                style={{ color: LEGACY_COLORS.text }}
+                              >
                                 {effect.itemName}
                               </div>
                             </div>
@@ -234,9 +239,13 @@ export function HistoryKeyPointSummary({
                           </div>
                         </>;
                       return (
-                        <div key={effect.key} className={rowClass} style={{ borderColor: LEGACY_COLORS.border }}>
+                        <HistoryImpactTooltip
+                          key={effect.key}
+                          itemName={effect.itemName}
+                          rowClass={rowClass}
+                        >
                           {contents}
-                        </div>
+                        </HistoryImpactTooltip>
                       );
                     })}
                   </div>
@@ -257,6 +266,58 @@ export function HistoryKeyPointSummary({
         </div>
       )}
     </section>
+  );
+}
+
+function HistoryImpactTooltip({
+  itemName,
+  rowClass,
+  children,
+}: {
+  itemName: string;
+  rowClass: string;
+  children: ReactNode;
+}) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [isItemNameOverflow, setIsItemNameOverflow] = useState(false);
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const itemNameElement = row?.querySelector<HTMLElement>("[data-history-impact-item-name]");
+    if (!itemNameElement) return;
+
+    const check = () => {
+      setIsItemNameOverflow(
+        itemNameElement.scrollWidth > itemNameElement.clientWidth
+        || itemNameElement.scrollHeight > itemNameElement.clientHeight,
+      );
+    };
+
+    check();
+    let observer: ResizeObserver | null = null;
+    try {
+      observer = new ResizeObserver(check);
+      observer.observe(itemNameElement);
+    } catch {
+      window.addEventListener("resize", check);
+      return () => window.removeEventListener("resize", check);
+    }
+    return () => observer?.disconnect();
+  }, [itemName]);
+
+  return (
+    <Tooltip
+      content={itemName}
+      disabled={!isItemNameOverflow}
+      multiline
+      triggerClassName="relative block w-full"
+      triggerTabIndex={isItemNameOverflow ? 0 : undefined}
+      triggerAriaLabel={itemName}
+    >
+      <div ref={rowRef} className={rowClass} style={{ borderColor: LEGACY_COLORS.border }}>
+        {children}
+      </div>
+    </Tooltip>
   );
 }
 

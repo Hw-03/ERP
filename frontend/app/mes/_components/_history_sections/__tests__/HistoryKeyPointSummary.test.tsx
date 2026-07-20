@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { InventoryEffectRow } from "../historyInventoryEffect";
 import type { HistoryDetailSummary } from "../historyDetailSummary";
@@ -36,6 +36,16 @@ function summary(overrides: Partial<HistoryDetailSummary> = {}): HistoryDetailSu
     impactIdentity: "log-1",
     ...overrides,
   };
+}
+
+function setBoxMetrics(
+  element: HTMLElement,
+  metrics: { clientWidth: number; scrollWidth: number; clientHeight: number; scrollHeight: number },
+) {
+  for (const [key, value] of Object.entries(metrics)) {
+    Object.defineProperty(element, key, { configurable: true, value });
+  }
+  fireEvent(window, new Event("resize"));
 }
 
 describe("HistoryKeyPointSummary", () => {
@@ -261,6 +271,57 @@ describe("HistoryKeyPointSummary", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "재고 변화 다시 불러오기" }));
     expect(onRetryImpact).toHaveBeenCalledOnce();
+  });
+
+  it("shows an overflowing impact item name from the entire row on hover and focus", async () => {
+    const longName = "An exceptionally long inventory impact item name".repeat(6);
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          impactGroups: [{
+            key: "actual",
+            label: null,
+            effects: [effect({ itemName: longName, role: "Finished", deltaLabel: "+5", delta: 5 })],
+          }],
+        })}
+      />,
+    );
+
+    const itemName = screen.getByText(longName);
+    setBoxMetrics(itemName, { clientWidth: 100, scrollWidth: 420, clientHeight: 20, scrollHeight: 20 });
+
+    const row = itemName.closest("[class*='min-h-11']")!;
+    const trigger = row.parentElement!;
+    await waitFor(() => expect(trigger).toHaveAttribute("tabindex", "0"));
+    expect(trigger).toContainElement(row);
+    expect(trigger).toHaveTextContent("Finished");
+    expect(trigger).toHaveTextContent("+5 EA");
+
+    fireEvent.mouseEnter(trigger);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(longName);
+    fireEvent.mouseLeave(trigger);
+
+    fireEvent.focus(trigger);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(longName);
+  });
+
+  it("does not add an impact-row tooltip or focus stop when the item name fits", () => {
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          impactGroups: [{ key: "actual", label: null, effects: [effect({ itemName: "Fits" })] }],
+        })}
+      />,
+    );
+
+    const itemName = screen.getByText("Fits");
+    setBoxMetrics(itemName, { clientWidth: 160, scrollWidth: 160, clientHeight: 20, scrollHeight: 20 });
+
+    const row = itemName.closest("[class*='min-h-11']")!;
+    const trigger = row.parentElement!;
+    expect(trigger).not.toHaveAttribute("tabindex");
+    fireEvent.mouseEnter(trigger);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("renders BOM-backed inventory changes as read-only rows", () => {

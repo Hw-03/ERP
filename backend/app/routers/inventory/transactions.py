@@ -80,7 +80,7 @@ class TransactionSummaryResponse(BaseModel):
     warehouse_count: int
     dept_count: int
     adjust_count: int
-    # dept-bucket 거래의 부서별 카운트 {부서명: 건수}. 배치/부서 없으면 '미상' 키.
+    # 전 거래의 실제 부서 또는 창고별 카운트 {라벨: 건수}.
     department_counts: dict[str, int] = {}
 
 
@@ -375,7 +375,7 @@ def list_transactions(
     reference_no: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
-        None, description="부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능"
+        None, description="부서 라벨 필터 (쉼표 복수). 예: 창고,조립,고압"
     ),
     model: Optional[str] = Query(None, description="제품 모델명 필터 (쉼표 복수)"),
     process_step: Optional[str] = Query(
@@ -638,7 +638,7 @@ def get_transactions_summary(
     operation_keys: Optional[str] = Query(None, description="화면 거래 종류 키"),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
-        None, description="부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능"
+        None, description="부서 라벨 필터 (쉼표 복수). 예: 창고,조립,고압"
     ),
     model: Optional[str] = Query(None, description="제품 모델명 필터 (쉼표 복수)"),
     process_step: Optional[str] = Query(
@@ -651,7 +651,7 @@ def get_transactions_summary(
 ):
     """KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라
     숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.
-    department_counts 는 전 거래를 3단계 라벨(부서명·'창고'·'미상')로 묶은 카운트.
+    department_counts 는 전 거래를 실제 부서명 또는 '창고'로 묶은 카운트.
     """
     # list_transactions 와 동일한 join 패턴 — search 가 IoBatch.requester_name 까지 닿게.
     query = (
@@ -692,8 +692,8 @@ def get_transactions_summary(
         ).label("adjust_count"),
     ).one()
 
-    # 전 거래 부서별 카운트 (3단계 라벨 기준: 부서명·'창고'·'미상').
-    # 제한 필터 없음 — '창고' 도 집계됨. NULL 반환은 없지만 방어 가드 유지.
+    # 전 거래 부서별 카운트. 제한 필터 없음 — '창고'도 집계됨.
+    # 마이그레이션 전/비정상 미분류 NULL은 UI 분류값으로 만들지 않고 건너뛴다.
     dexpr = _department_label_expr()
     dept_rows = (
         query.with_entities(dexpr.label("dept"), func.count(TransactionLog.log_id).label("c"))

@@ -111,7 +111,7 @@ export function HistoryFilterPanel({
 }
 
 function formatDepartmentFilterLabel(name: string): string {
-  return name === "미상" ? "부서 기록 없음" : normalizeDepartment(name);
+  return normalizeDepartment(name);
 }
 
 function Card({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {

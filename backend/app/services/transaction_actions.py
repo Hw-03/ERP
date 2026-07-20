@@ -146,6 +146,7 @@ def correct_transaction_quantity(
             reference_no=str(log.log_id),
             produced_by=editor.name,
             producer_employee_id=editor.employee_id,
+            department="창고",
             inventory_effect=inv_effect.capture_effect(db, log.item_id, cells_before),
         )
         db.add(correction_log)

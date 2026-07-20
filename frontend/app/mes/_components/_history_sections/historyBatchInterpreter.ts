@@ -110,7 +110,7 @@ function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to
     case "produce":
       return _SUB_LABEL.produce;
     case "disassemble":
-      return _SUB_LABEL.disassemble;
+      return "재작업";
     case "adjust_in":
     case "adjust_out":
       return "수량 조정";
@@ -291,11 +291,10 @@ function isGeneratedHistorySystemNote(text: string): boolean {
   return systemFragments.some((fragment) => text.includes(fragment));
 }
 
-// 작업 의도 라벨 — base 라벨은 모두 glossary 단일 사전에서 가져옴 (P0-1).
-// 일부 키만 history 컨텍스트에 맞춰 변형 (예: dept_transfer 는 "부서 이동" 으로 동사형 유지).
+// 작업 의도 라벨 — base 라벨은 glossary에서 가져오되, history에서는 실제 처리 상태를 우선한다.
 const _SUB_TYPE_OPERATION: Record<string, string> = {
   produce: _SUB_LABEL.produce,
-  disassemble: _SUB_LABEL.disassemble,
+  disassemble: "재작업",
   warehouse_to_dept: _SUB_LABEL.warehouse_to_dept,
   dept_to_warehouse: _SUB_LABEL.dept_to_warehouse,
   dept_transfer: _SUB_LABEL.dept_transfer,
@@ -303,13 +302,19 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   adjust_out: _SUB_LABEL.adjust_out,
   receive_supplier: _SUB_LABEL.receive_supplier,
   supplier_return: _SUB_LABEL.supplier_return,
-  defect_quarantine: _SUB_LABEL.defect_quarantine,
-  defect_restore: _SUB_LABEL.defect_restore,
-  defect_process: _SUB_LABEL.defect_process,
+  defect_quarantine: "격리",
+  defect_restore: "격리 해제",
+  defect_process: "폐기",
   internal_use_out: _SUB_LABEL.internal_use_out,
 };
 
-const _TX_OPERATION: Record<string, string> = _TX_LABEL;
+const _TX_OPERATION: Record<string, string> = {
+  ..._TX_LABEL,
+  DISASSEMBLE: "재작업",
+  MARK_DEFECTIVE: "격리",
+  UNMARK_DEFECTIVE: "격리 해제",
+  DEFECT_SCRAP: "폐기",
+};
 
 const _DISPLAY_SUB_LABEL: Record<string, string> = {
   // sub_type
@@ -317,9 +322,9 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   receive_supplier: "창고로 들어옴",
   warehouse_to_dept: "창고에서 부서로 이동",
   dept_to_warehouse: "부서에서 창고로 이동",
-  defect_quarantine: "정상 재고 → 불량 재고",
-  defect_restore: "불량 재고 → 정상 재고",
-  defect_process: "불량 재고 폐기",
+  defect_quarantine: "격리",
+  defect_restore: "격리 해제",
+  defect_process: "폐기",
   supplier_return: "공급사로 돌려보냄",
   internal_use_out: "창고에서 AS·연구 용도로 반출",
   adjust_in: "재고 수량 직접 수정",
@@ -332,9 +337,9 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   PRODUCE: "부품 차감 + 완제품 입고",
   TRANSFER_TO_PROD: "창고에서 부서로 이동",
   TRANSFER_TO_WH: "부서에서 창고로 이동",
-  MARK_DEFECTIVE: "정상 재고 → 불량 재고",
-  UNMARK_DEFECTIVE: "불량 재고 → 정상 재고",
-  DEFECT_SCRAP: "불량 재고 폐기",
+  MARK_DEFECTIVE: "격리",
+  UNMARK_DEFECTIVE: "격리 해제",
+  DEFECT_SCRAP: "폐기",
   SUPPLIER_RETURN: "불량 재고 공급사 반품",
   INTERNAL_USE: "창고에서 AS·연구 용도로 반출",
 };
@@ -414,10 +419,10 @@ export function getHistoryFlowLabel(
     case "TRANSFER_DEPT": return "부서 ↔ 부서";
     case "BACKFLUSH": return "자동차감";
     case "PRODUCE": return "생산 입고";
-    case "DISASSEMBLE": return _TX_LABEL.DISASSEMBLE;
-    case "MARK_DEFECTIVE": return _TX_LABEL.MARK_DEFECTIVE;
-    case "UNMARK_DEFECTIVE": return _TX_LABEL.UNMARK_DEFECTIVE;
-    case "DEFECT_SCRAP": return _TX_LABEL.DEFECT_SCRAP;
+    case "DISASSEMBLE": return _TX_OPERATION.DISASSEMBLE;
+    case "MARK_DEFECTIVE": return _TX_OPERATION.MARK_DEFECTIVE;
+    case "UNMARK_DEFECTIVE": return _TX_OPERATION.UNMARK_DEFECTIVE;
+    case "DEFECT_SCRAP": return _TX_OPERATION.DEFECT_SCRAP;
     case "ADJUST": return _TX_LABEL.ADJUST;
     case "SUPPLIER_RETURN": return _TX_LABEL.SUPPLIER_RETURN;
     case "INTERNAL_USE": return "창고 → AS·연구";
@@ -743,7 +748,7 @@ export function getHistoryMovementSummary(
     const childUnitLabel = childUnit && !childUnitMixed ? ` ${childUnit}` : "";
 
     if (topSum > 0) parts.push({
-      label: `${isRework ? "분해" : "생산"} ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
+      label: `${isRework ? "재작업" : "생산"} ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
       tone: isRework ? "danger" : "primary",
     });
     if (childSum > 0) parts.push({
@@ -762,9 +767,9 @@ export function getHistoryMovementSummary(
   } else if (sub === "supplier_return" || tx === "SUPPLIER_RETURN") {
     parts.push({ label: `반품 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "defect_quarantine" || tx === "MARK_DEFECTIVE") {
-    parts.push({ label: `불량 ${_distinctItemCount(included)}품목`, tone: "danger" });
+    parts.push({ label: `격리 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "defect_restore" || tx === "UNMARK_DEFECTIVE") {
-    parts.push({ label: `해제 ${_distinctItemCount(included)}품목`, tone: "success" });
+    parts.push({ label: `격리 해제 ${_distinctItemCount(included)}품목`, tone: "success" });
   } else if (sub === "defect_process" || tx === "DEFECT_SCRAP") {
     parts.push({ label: `폐기 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "adjust_in" || sub === "adjust_out" || tx === "ADJUST") {
@@ -807,11 +812,11 @@ const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: bo
   TRANSFER_DEPT: { verb: "이동", tone: "info" },
   BACKFLUSH: { verb: _TX_LABEL.BACKFLUSH, tone: "danger" },
   PRODUCE: { verb: _TX_LABEL.PRODUCE, tone: "success" },
-  DISASSEMBLE: { verb: _TX_LABEL.DISASSEMBLE, tone: "danger" },
-  // 불량 처리 4종 — 전부 danger 톤, 라벨은 구분 알약과 동일
-  MARK_DEFECTIVE: { verb: _TX_LABEL.MARK_DEFECTIVE, tone: "danger" },
-  UNMARK_DEFECTIVE: { verb: _TX_LABEL.UNMARK_DEFECTIVE, tone: "success" },
-  DEFECT_SCRAP: { verb: _TX_LABEL.DEFECT_SCRAP, tone: "danger" },
+  DISASSEMBLE: { verb: _TX_OPERATION.DISASSEMBLE, tone: "danger" },
+  // 불량 처리 — 라벨은 목록·상세·수량 요약과 동일하게 유지한다.
+  MARK_DEFECTIVE: { verb: _TX_OPERATION.MARK_DEFECTIVE, tone: "danger" },
+  UNMARK_DEFECTIVE: { verb: _TX_OPERATION.UNMARK_DEFECTIVE, tone: "success" },
+  DEFECT_SCRAP: { verb: _TX_OPERATION.DEFECT_SCRAP, tone: "danger" },
   SUPPLIER_RETURN: { verb: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
   INTERNAL_USE: { verb: "반출", tone: "danger" },
 };

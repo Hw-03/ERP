@@ -281,6 +281,7 @@ def _apply_adjustment(
             produced_by=operator_name,
             producer_employee_id=producer_employee_id,
             notes=log_notes or None,
+            department=dept_enum.value,
             inventory_effect=inv_effect.capture_effect(db, ln.item_id, cells_before),
         )
         db.add(log)

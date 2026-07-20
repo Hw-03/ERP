@@ -460,7 +460,7 @@ describe("history immediate UX presentation policies", () => {
     }));
 
     expect(row.flow).toMatchObject({ label: "조립 → 폐기", from: "조립", to: "폐기" });
-    expect(legacy.flow).toMatchObject({ label: "불량 폐기" });
+    expect(legacy.flow).toMatchObject({ label: "폐기" });
     expect(legacy.flow.from).toBeUndefined();
     expect(legacy.flow.to).toBeUndefined();
   });

@@ -51,37 +51,34 @@ _SUMMARY_DEFECT_TYPES = [
 def _department_label_expr() -> ColumnElement:
     """거래 한 건의 부서 라벨 식.
 
-    1) 사내 사용(INTERNAL_USE): TransactionLog.department 또는 IoBatch.to_department.
-    2) 부서계열(PRODUCE/BACKFLUSH/…): IoBatch.to/from_department.
-    3) 창고계열(RECEIVE/SHIP/…): 고정 '창고'.
-    4) 수량조정(ADJUST): IoBatch.to/from_department (io.py 통해 배치 있음).
-    5) 불량계열(MARK_DEFECTIVE/…): IoBatch 우선, 없으면 TransactionLog.department.
-    6) 그 외: '미상'.
+    창고계열은 '창고'로 고정하고, 그 외 거래는 배치 도착→출발→로그→
+    배치 요청자 부서 순서로 공백이 아닌 실제 명칭을 사용한다.
     """
+    resolved_department = func.coalesce(
+        func.nullif(func.trim(IoBatch.to_department), ""),
+        func.nullif(func.trim(IoBatch.from_department), ""),
+        func.nullif(func.trim(TransactionLog.department), ""),
+        func.nullif(func.trim(IoBatch.requester_department), ""),
+    )
     return case(
         (
             TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE,
-            func.coalesce(TransactionLog.department, IoBatch.to_department, "미상"),
+            resolved_department,
         ),
         (
             TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES),
-            func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
+            resolved_department,
         ),
         (TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES), "창고"),
         (
             TransactionLog.transaction_type.in_(_SUMMARY_ADJUST_TYPES),
-            func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
+            resolved_department,
         ),
         (
             TransactionLog.transaction_type.in_(_SUMMARY_DEFECT_TYPES),
-            func.coalesce(
-                IoBatch.to_department,
-                IoBatch.from_department,
-                TransactionLog.department,
-                "미상",
-            ),
+            resolved_department,
         ),
-        else_="미상",
+        else_=resolved_department,
     )
 
 
@@ -140,7 +137,7 @@ def _model_filter(db: Session, model: Optional[str]) -> Optional[ColumnElement]:
 
 def _department_filter(department: Optional[str]) -> Optional[ColumnElement]:
     """부서 라벨 IN 필터. 쉼표 복수 가능. 없으면 None.
-    _department_label_expr() 기준(부서계열→부서명·창고계열→'창고'·그외→'미상').
+    _department_label_expr() 기준(창고계열→'창고', 그 외→실제 부서명).
     """
     if not department:
         return None

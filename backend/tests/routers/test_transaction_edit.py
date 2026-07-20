@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from decimal import Decimal
 
 import pytest
@@ -374,6 +375,9 @@ def test_quantity_correct_links_correction_log(client, db_session, receive_log, 
     edits = client.get(f"/api/inventory/transactions/{log.log_id}/edits").json()
     assert len(edits) == 1
     assert edits[0]["correction_log_id"] == correction_id
+    correction = db_session.get(TransactionLog, uuid.UUID(correction_id))
+    assert correction is not None
+    assert correction.department == "창고"
 
 
 def test_quantity_correct_blocks_double_correction(client, db_session, receive_log, editor):
