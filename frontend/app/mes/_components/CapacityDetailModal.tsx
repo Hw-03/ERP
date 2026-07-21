@@ -19,8 +19,13 @@ import {
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 
-const SHARED_HINT =
-  "각 수량은 AF별 독립 계산값 · 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않음";
+const SHARED_HINT_LINES = [
+  "※ 공용 자재가 겹치는 모델은 표시 수량을 모두 동시에 생산할 수 없습니다.",
+  "한 모델에 자재를 사용하면 다른 모델의 생산 가능 수량은 줄어들 수 있습니다.",
+];
+
+const DESKTOP_CAPACITY_GRID =
+  "grid-cols-[20px_minmax(0,1fr)_72px_minmax(0,1fr)_84px_84px_84px]";
 
 /**
  * 생산 가능수량 상세 모달 — AF(조립 완제품) 기준.
@@ -66,21 +71,18 @@ export function CapacityDetailModal({
               ✕
             </button>
           </div>
-          <div className="mt-0.5 text-xs font-semibold sm:text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-            조립 완제품(AF) 기준
-          </div>
           <div className="mt-2 space-y-1 sm:mt-3 sm:space-y-1.5">
             <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 창고에 이미 완성된 PF(출하 완제품) 재고예요. 부품 확인 없이 지금 당장 고객에게 보낼 수 있어요.</span>
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 박스 포장까지 완료되어 픽업을 기다리고 있는 재고입니다.</span>
             </div>
             <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span> — AF 재고 + AF 직계 1단계 부품으로 만들 수 있는 AF를 PF로 환산한 수량이에요. 포장 구간 부품도 함께 확인해요.</span>
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span> — 테스트가 완료된 완제품 재고와 포장 자재를 확인해 빠르게 박스 포장까지 할 수 있는 수량입니다.</span>
             </div>
             <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
               <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.purple }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — PF를 기준으로 BOM 전체를 끝까지 펼쳐서 이론적으로 만들 수 있는 최대 수량이에요. 부품 공유로 인한 중복은 제거해요.</span>
+              <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — 튜브부터 박스까지 사내 재고를 사용해 이론적으로 생산할 수 있는 총합입니다.</span>
             </div>
           </div>
           <div
@@ -91,7 +93,9 @@ export function CapacityDetailModal({
             }}
           >
             <AlertTriangle className="h-3 w-3 mt-[2px] shrink-0 sm:mt-0" />
-            {SHARED_HINT}
+            <span className="flex flex-col">
+              {SHARED_HINT_LINES.map((line) => <span key={line}>{line}</span>)}
+            </span>
           </div>
         </div>
 
@@ -367,11 +371,13 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
       {/* 데스크톱 테이블 레이아웃 (≥ 640px) */}
       <div className="hidden sm:block rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
         <div
-          className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] border-b px-4 py-4 text-sm font-bold uppercase tracking-[0.12em]"
+          className={`grid ${DESKTOP_CAPACITY_GRID} border-b px-4 py-4 text-sm font-bold uppercase tracking-[0.12em]`}
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
         >
           <span />
-          <span>조립 완제품 · 병목</span>
+          <span>조립 완제품</span>
+          <span>모델 수</span>
+          <span>기준 모델</span>
           <span className="text-right">출하 대기</span>
           <span className="text-right">빠른 생산</span>
           <span className="text-right">총생산</span>
@@ -393,7 +399,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           return (
           <div key={group.key}>
             <div
-              className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-5 cursor-pointer select-none"
+              className={`grid ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-5 cursor-pointer select-none`}
               style={{
                 borderColor: LEGACY_COLORS.border,
                 background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
@@ -407,20 +413,22 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-base font-black" style={{ color: LEGACY_COLORS.blue }}>
-                  {group.label}{" "}
-                  <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                    · {group.items.length}종
-                  </span>
+                  {group.label}
                 </span>
+              </div>
+              <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {group.items.length}종
+              </span>
+              <div className="min-w-0">
                 {pinnedVariant ? (
                   <span
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm font-bold"
+                    className="inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-sm font-bold"
                     style={{
                       background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)`,
                       color: LEGACY_COLORS.cyan,
                     }}
                   >
-                    {pinnedVariant.pf_name || pinnedVariant.pf_code}
+                    <span className="truncate">{pinnedVariant.pf_name || pinnedVariant.pf_code}</span>
                     <button
                       type="button"
                       disabled={isPinLoading}
@@ -449,14 +457,14 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                   <QtyCell value={pinnedNumbers.fast_production} color={LEGACY_COLORS.blue} />
                   <QtyCell value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
                 </>
-              ) : (
+                ) : (
                 <>
                   <div className="text-right text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
                   <div className="text-right text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
                   <div className="text-right text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
                 </>
-              )}
-            </div>
+                )}
+              </div>
 
             {!groupCollapsed && group.items.map((it) => {
               const expanded = expandedIds.has(it.af_item_id);
@@ -466,7 +474,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                   <button
                     type="button"
                     onClick={() => toggleExpand(it.af_item_id)}
-                    className="grid w-full cursor-pointer grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-2.5 text-left transition-colors hover:brightness-110"
+                    className={`grid w-full cursor-pointer ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-2.5 text-left transition-colors hover:brightness-110`}
                     style={{ borderColor: LEGACY_COLORS.border }}
                   >
                     {expanded ? (
@@ -492,6 +500,8 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         </div>
                       )}
                     </div>
+                    <span />
+                    <span />
                     <QtyCell value={it.ship_ready} color={LEGACY_COLORS.cyan} />
                     <QtyCell value={it.fast_production} color={LEGACY_COLORS.blue} />
                     <QtyCell value={it.total_production} color={LEGACY_COLORS.purple} />

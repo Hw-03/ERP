@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type BOMTreeNode, type Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -79,35 +79,68 @@ afterEach(() => {
 });
 
 describe("InventoryDetailPanel desktop quick actions", () => {
-  it("uses pastel blue and red cards with matching action borders", () => {
+  it("keeps pastel color on each quick-action group while expanded actions stay neutral", () => {
     render(
       <DesktopRightPanel title="테스트 항목">
         <InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />
       </DesktopRightPanel>,
     );
 
+    expect(screen.getByTestId("quick-action-group-in")).toHaveStyle({
+      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 7%, ${LEGACY_COLORS.s2})`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 32%, ${LEGACY_COLORS.border})`,
+    });
+    expect(screen.getByTestId("quick-action-group-out")).toHaveStyle({
+      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 7%, ${LEGACY_COLORS.s2})`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 32%, ${LEGACY_COLORS.border})`,
+    });
     expect(screen.getByRole("button", { name: "입고" })).toHaveStyle({
-      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 42%, ${LEGACY_COLORS.border})`,
-      color: LEGACY_COLORS.blue,
+      background: LEGACY_COLORS.s1,
+      borderColor: LEGACY_COLORS.border,
+      color: LEGACY_COLORS.text,
     });
     expect(screen.getByRole("button", { name: "출고" })).toHaveStyle({
-      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 42%, ${LEGACY_COLORS.border})`,
-      color: LEGACY_COLORS.red,
+      background: LEGACY_COLORS.s1,
+      borderColor: LEGACY_COLORS.border,
+      color: LEGACY_COLORS.text,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "입고" }));
     expect(screen.getByRole("button", { name: /부서 입고/ })).toHaveStyle({
-      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`,
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 32%, ${LEGACY_COLORS.border})`,
+      background: LEGACY_COLORS.s1,
+      borderColor: LEGACY_COLORS.border,
+      color: LEGACY_COLORS.text,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "출고" }));
     expect(screen.getByRole("button", { name: /부서 출고/ })).toHaveStyle({
-      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 32%, ${LEGACY_COLORS.border})`,
+      background: LEGACY_COLORS.s1,
+      borderColor: LEGACY_COLORS.border,
+      color: LEGACY_COLORS.text,
     });
+  });
+
+  it("renders available stock before pending approval quantity", () => {
+    render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />);
+
+    const availableLabel = screen.getByText("사용 가능 재고");
+    const pendingLabel = screen.getByText("승인 대기 수량");
+    expect(availableLabel.compareDocumentPosition(pendingLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps the pending approval warning on the right-hand card", () => {
+    render(
+      <InventoryDetailPanel
+        item={{ ...makeItem(), available_quantity: 10, pending_quantity: 5 } as Item}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    const pendingCard = screen.getByText("승인 대기 수량").parentElement;
+    expect(pendingCard).toHaveStyle({
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
+    });
+    expect(within(pendingCard!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.yellow });
   });
 
   it("portals desktop quick actions into the fixed right-panel footer", () => {
@@ -135,18 +168,34 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
       </DesktopRightPanel>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     const dialog = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
     expect(dialog).toHaveTextContent("구성품 A");
     expect(dialog).toHaveTextContent("현재 재고 10 EA");
     expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
+    expect(screen.getByTestId("bom-detail-modal-panel")).toHaveClass("w-[calc(100vw-128px)]", "max-h-[84vh]");
+    expect(screen.getByRole("button", { name: "하위 구성 보기" }).querySelector("svg.lucide-chevron-right")).toBeNull();
+    expect(within(dialog).queryByText("닫기")).not.toBeInTheDocument();
+    expect(dialog.querySelector("footer")).toBeNull();
+  });
+
+  it("highlights the modal BOM parent with a BOM badge and parent metadata", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+
+    const parentHeader = await screen.findByTestId("bom-tree-parent-header");
+    expect(within(parentHeader).getByText("BOM", { exact: true })).toBeInTheDocument();
+    expect(within(parentHeader).getByText(bomTree.item_name)).toHaveClass("font-black");
+    expect(within(parentHeader).getByText(bomTree.mes_code)).toHaveClass("font-mono");
   });
 
   it("identifies the BOM parent item in the loaded modal header", async () => {
     vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
     render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog).toHaveTextContent(bomTree.item_name));
@@ -158,7 +207,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
       .mockRejectedValueOnce(new Error("network failure"))
       .mockResolvedValueOnce(bomTree);
     render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
@@ -167,11 +216,11 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     await waitFor(() => expect(screen.getByRole("dialog")).toHaveTextContent(bomTree.item_name));
   });
 
-  it("closes the BOM modal with Escape or the backdrop and returns focus to its trigger", async () => {
+  it("closes the BOM modal with Escape, its X button, or the backdrop and returns focus to its trigger", async () => {
     vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
     render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
 
-    const trigger = screen.getByRole("button", { name: "BOM 보기" });
+    const trigger = screen.getByRole("button", { name: "하위 구성 보기" });
     fireEvent.click(trigger);
     await screen.findByRole("dialog", { name: "BOM 구성 보기" });
     fireEvent.keyDown(window, { key: "Escape" });
@@ -179,9 +228,16 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(trigger).toHaveFocus();
 
     fireEvent.click(trigger);
+    const closeButton = await screen.findByRole("button", { name: "닫기" });
+    fireEvent.click(closeButton);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
     const dialog = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
     fireEvent.click(dialog);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
   });
 
   it("closes only the BOM modal when Escape is pressed inside a containing SlidePanel", async () => {
@@ -194,7 +250,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
       </SlidePanel>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
     await screen.findByRole("dialog", { name: "BOM 구성 보기" });
     fireEvent.keyDown(window, { key: "Escape" });
 
@@ -207,7 +263,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     vi.spyOn(HTMLElement.prototype, "offsetParent", "get").mockReturnValue(document.body);
     render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
     await screen.findByRole("dialog", { name: "BOM 구성 보기" });
     const closeButton = screen.getByRole("button", { name: "닫기" });
     expect(closeButton).toHaveFocus();
@@ -257,10 +313,29 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
     render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
     await screen.findByRole("dialog", { name: "BOM 구성 보기" });
 
     expect(await screen.findByText("구성품 A")).toHaveClass("break-words");
     expect(screen.getByText("현재 재고 10 EA")).toBeInTheDocument();
+  });
+});
+
+describe("InventoryDetailPanel mobile BOM viewer", () => {
+  it("keeps the BOM parent header exclusive to the desktop modal", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    render(
+      <InventoryDetailPanel
+        item={makeBomItem()}
+        onGoToWarehouse={() => {}}
+        quickActionVariant="mobile"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+
+    expect(await screen.findByText("구성품 A")).toBeInTheDocument();
+    expect(screen.queryByTestId("bom-tree-parent-header")).not.toBeInTheDocument();
+    expect(screen.queryByText("BOM", { exact: true })).not.toBeInTheDocument();
   });
 });
