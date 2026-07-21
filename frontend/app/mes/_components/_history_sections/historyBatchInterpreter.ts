@@ -302,8 +302,8 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   adjust_out: _SUB_LABEL.adjust_out,
   receive_supplier: _SUB_LABEL.receive_supplier,
   supplier_return: _SUB_LABEL.supplier_return,
-  defect_quarantine: "격리",
-  defect_restore: "격리 해제",
+  defect_quarantine: "불량 격리",
+  defect_restore: "정상 복귀",
   defect_process: "폐기",
   internal_use_out: _SUB_LABEL.internal_use_out,
 };
@@ -311,16 +311,17 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
 const _TX_OPERATION: Record<string, string> = {
   ..._TX_LABEL,
   DISASSEMBLE: "재작업",
-  MARK_DEFECTIVE: "격리",
-  UNMARK_DEFECTIVE: "격리 해제",
+  MARK_DEFECTIVE: "불량 격리",
+  UNMARK_DEFECTIVE: "정상 복귀",
   DEFECT_SCRAP: "폐기",
+  SUPPLIER_RETURN: "반품",
 };
 
 /** 하위 폐기 결과를 선택해도 부모 batch 작업 맥락을 유지할 작업명. */
 const _CHILD_RESULT_BATCH_OPERATION: Record<string, string> = {
   disassemble: "재작업",
   defect_quarantine: "불량 격리",
-  defect_restore: "불량 해제",
+  defect_restore: "정상 복귀",
 };
 
 const _DISPLAY_SUB_LABEL: Record<string, string> = {
@@ -380,7 +381,11 @@ export function getHistoryChildResultBatchOperationLabel(
   log: { transaction_type: string },
   batch?: IoBatch | null,
 ): string | undefined {
-  if (!batch || log.transaction_type !== "DEFECT_SCRAP") return undefined;
+  if (!batch) return undefined;
+  if (_historySubType(batch) === "disassemble" && (log.transaction_type === "DEFECT_SCRAP" || log.transaction_type === "RECEIVE")) {
+    return _CHILD_RESULT_BATCH_OPERATION.disassemble;
+  }
+  if (log.transaction_type !== "DEFECT_SCRAP") return undefined;
   return _CHILD_RESULT_BATCH_OPERATION[_historySubType(batch)];
 }
 

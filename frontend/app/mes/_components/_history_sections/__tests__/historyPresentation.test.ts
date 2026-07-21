@@ -166,6 +166,32 @@ describe("historyPresentation", () => {
     });
   });
 
+  it.each([
+    ["MARK_DEFECTIVE", "불량 격리"],
+    ["UNMARK_DEFECTIVE", "정상 복귀"],
+    ["DEFECT_SCRAP", "폐기"],
+    ["SUPPLIER_RETURN", "반품"],
+  ] as const)("keeps %s in the defect list while showing %s in detail", (transactionType, detailLabel) => {
+    const log = makeLog({ transaction_type: transactionType });
+
+    expect(getHistoryListOperationLabel(log)).toBe("불량");
+    expect(getHistoryRowPresentation(log).operation.label).toBe(detailLabel);
+  });
+
+  it("keeps defect disassembly list rows under 불량 and prioritizes 재작업 for every batch result", () => {
+    const batch = makeBatch({ sub_type: "disassemble" });
+    const disassembly = makeLog({ transaction_type: "DISASSEMBLE", reference_no: "defect-disassemble:1" });
+    const scrap = makeLog({ transaction_type: "DEFECT_SCRAP", reference_no: "defect-disassemble:1" });
+    const recovered = makeLog({ transaction_type: "RECEIVE", reference_no: "defect-disassemble:1" });
+
+    expect(getHistoryListOperationLabel(disassembly)).toBe("불량");
+    expect(getHistoryListOperationLabel(scrap)).toBe("불량");
+    expect(getHistoryListOperationLabel(recovered)).toBe("불량");
+    expect(getHistoryRowPresentation(disassembly, batch).operation.label).toBe("재작업");
+    expect(getHistoryRowPresentation(scrap, batch).operation.label).toBe("재작업");
+    expect(getHistoryRowPresentation(recovered, batch).operation.label).toBe("재작업");
+  });
+
   it("uses the complete reference summary instead of the loaded page subset", () => {
     const presentation = Reflect.apply(getReferenceBatchPresentation, undefined, [
       [makeLog({ transaction_type: "SHIP", reference_no: "REF-ALL", quantity_change: -1, transfer_qty: 1 })],
@@ -468,7 +494,7 @@ describe("history immediate UX presentation policies", () => {
   it.each([
     ["disassemble", "재작업"],
     ["defect_quarantine", "불량 격리"],
-    ["defect_restore", "불량 해제"],
+    ["defect_restore", "정상 복귀"],
   ] as const)("uses the %s batch context for a defect-scrap detail route", (subType, expected) => {
     const row = getHistoryRowPresentation(
       makeLog({ transaction_type: "DEFECT_SCRAP" }),

@@ -185,6 +185,28 @@ describe("BomBatchDetail", () => {
     expect(document.getElementById(controlsId!)).toBe(child.closest("tr"));
   });
 
+  it.each(["click", "Enter", " "])("toggles an expandable BOM row with %s", (interaction) => {
+    const batch = makeBatch();
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    const toggle = screen.getByRole("button", { name: "BOM 구성 펼치기" });
+    const row = toggle.closest("tr")!;
+    const controlsId = toggle.getAttribute("aria-controls")!;
+
+    expect(row).not.toHaveAttribute("role");
+    expect(row).toHaveAttribute("tabindex", "0");
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(row).toHaveAttribute("aria-controls", controlsId);
+
+    if (interaction === "click") fireEvent.click(row);
+    else fireEvent.keyDown(row, { key: interaction });
+
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(controlsId)).toBeInTheDocument();
+  });
+
   it("merges duplicate manual item bundles into one displayed quantity", () => {
     const batch = makeDuplicateManualBatch();
     const { container } = render(

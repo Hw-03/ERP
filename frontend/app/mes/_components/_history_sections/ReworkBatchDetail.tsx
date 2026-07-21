@@ -71,7 +71,22 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
   const displayTitle = title ?? summary.itemName;
 
   return (
-    <tr id={rowId} className={cancelled ? "opacity-60" : undefined} style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}>
+    <tr
+      id={rowId}
+      tabIndex={onToggle ? 0 : undefined}
+      aria-label={onToggle ? `처리결과 구성 ${displayTitle}` : undefined}
+      aria-expanded={onToggle ? expanded ?? false : undefined}
+      aria-controls={onToggle ? controlsId : undefined}
+      onClick={onToggle}
+      onKeyDown={onToggle ? (event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onToggle();
+      } : undefined}
+      className={`${onToggle ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : ""}${cancelled ? " opacity-60" : ""}`}
+      style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}
+    >
       <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
       <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <ResultBadge compact={compact} />

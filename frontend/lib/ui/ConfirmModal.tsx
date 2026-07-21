@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -23,7 +23,9 @@ interface Props {
   open: boolean;
   title: string;
   onClose: () => void;
-  onConfirm: () => void | Promise<void>;
+  onConfirm?: () => void | Promise<void>;
+  /** 읽기 전용 팝업: backdrop 닫기를 켜고 확인 액션을 숨긴다. */
+  viewer?: boolean;
   tone?: ConfirmTone;
   cautionMessage?: string;
   children?: ReactNode;
@@ -40,6 +42,7 @@ export function ConfirmModal({
   title,
   onClose,
   onConfirm,
+  viewer = false,
   tone = "normal",
   cautionMessage,
   children,
@@ -56,10 +59,14 @@ export function ConfirmModal({
     const handler = (e: KeyboardEvent) => {
       if (busy) return;
       if (e.key === "Escape") {
+        if (viewer) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
         onClose();
         return;
       }
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && onConfirm) {
         const target = e.target as HTMLElement | null;
         // 다행 텍스트는 Enter 가 줄바꿈
         if (target?.tagName === "TEXTAREA") return;
@@ -70,12 +77,15 @@ export function ConfirmModal({
         void onConfirm();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, busy, onClose, onConfirm]);
+    window.addEventListener("keydown", handler, viewer);
+    return () => window.removeEventListener("keydown", handler, viewer);
+  }, [open, busy, onClose, onConfirm, viewer]);
 
   const titleId = useId();
-  const panelRef = useFocusTrap<HTMLDivElement>(open);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useFocusTrap<HTMLDivElement>(open, {
+    initialFocusRef: viewer ? closeRef : undefined,
+  });
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -94,6 +104,7 @@ export function ConfirmModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      onClick={viewer ? onClose : undefined}
     >
       <div
         ref={panelRef}
@@ -131,6 +142,7 @@ export function ConfirmModal({
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <button
+            ref={closeRef}
             type="button"
             onClick={onClose}
             disabled={busy}
@@ -143,15 +155,17 @@ export function ConfirmModal({
           >
             {cancelLabel}
           </button>
-          <button
-            type="button"
-            onClick={() => void onConfirm()}
-            disabled={busy || confirmDisabled}
-            className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-            style={{ background: accent }}
-          >
-            {busy ? busyLabel : confirmLabel}
-          </button>
+          {!viewer && onConfirm && (
+            <button
+              type="button"
+              onClick={() => void onConfirm()}
+              disabled={busy || confirmDisabled}
+              className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+              style={{ background: accent }}
+            >
+              {busy ? busyLabel : confirmLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>,

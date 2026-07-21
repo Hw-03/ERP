@@ -154,6 +154,38 @@ describe("ReworkBatchHeader", () => {
 });
 
 describe("ReworkBatchDetail", () => {
+  it.each(["click", "Enter", " "])("toggles an expandable result row with %s", (interaction) => {
+    render(
+      <table>
+        <tbody>
+          <ReworkBatchDetail
+            logs={[
+              makeLog({ log_id: "scrap-a", item_id: "A", item_name: "폐기 품목 A" }),
+              makeLog({ log_id: "scrap-b", item_id: "B", item_name: "폐기 품목 B" }),
+            ]}
+            parentItemId="PARENT"
+            colSpan={8}
+            controlsId="rework-results"
+          />
+        </tbody>
+      </table>,
+    );
+
+    const row = screen.getByText("폐기 결과").closest("tr")!;
+    const toggle = screen.getByRole("button", { name: "처리결과 구성 펼치기" });
+    const controlsId = toggle.getAttribute("aria-controls")!;
+
+    expect(row).not.toHaveAttribute("role");
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(row).toHaveAttribute("aria-controls", controlsId);
+
+    if (interaction === "click") fireEvent.click(row);
+    else fireEvent.keyDown(row, { key: interaction });
+
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(controlsId)).toHaveTextContent("폐기 품목 A");
+  });
+
   it("labels a scrap-only result by its outcome while keeping the item in the expanded list", () => {
     render(
       <table>

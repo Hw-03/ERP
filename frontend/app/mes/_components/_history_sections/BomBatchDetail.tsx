@@ -225,7 +225,18 @@ function BundleRows({
     <>
       <tr
         id={rowId}
-        className={HISTORY_CHILD_ROW_CLASS}
+        tabIndex={canExpand ? 0 : undefined}
+        aria-label={canExpand ? `${isBomParent ? "BOM 구성" : "라인 구성"} ${displayTitle}` : undefined}
+        aria-expanded={canExpand ? expanded : undefined}
+        aria-controls={canExpand ? detailId : undefined}
+        onClick={canExpand ? onToggle : undefined}
+        onKeyDown={canExpand ? (event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          onToggle();
+        } : undefined}
+        className={`${HISTORY_CHILD_ROW_CLASS}${canExpand ? " cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : ""}`}
         style={{ background: "color-mix(in srgb, var(--c-blue) 5%, transparent)" }}
       >
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
@@ -253,7 +264,10 @@ function BundleRows({
                 aria-label={`${isBomParent ? "BOM 구성" : "라인 구성"} ${expanded ? "접기" : "펼치기"}`}
                 aria-expanded={expanded}
                 aria-controls={detailId}
-                onClick={onToggle}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggle();
+                }}
                 onKeyDown={(event) => {
                   event.stopPropagation();
                   if (event.key !== "Enter" && event.key !== " ") return;

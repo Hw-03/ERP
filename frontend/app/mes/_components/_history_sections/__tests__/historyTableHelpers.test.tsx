@@ -715,6 +715,31 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("출고 품목 B")).toBeInTheDocument();
   });
 
+  it.each(["click", "Enter", " "])("toggles an expandable reference row with %s without selecting its log", (interaction) => {
+    const onSelectLog = vi.fn();
+    const first = makeLog({ log_id: "shipment-a", item_name: "출고 품목 A", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+    const second = makeLog({ log_id: "shipment-b", item_id: "ITEM-2", item_name: "출고 품목 B", transaction_type: "SHIP", shipping_phase: "PICKUP" });
+
+    render(
+      <table><tbody><ReferenceBatchDetail logs={[first, second]} onSelectLog={onSelectLog} controlsId="shipment-items" /></tbody></table>,
+    );
+
+    const row = screen.getByText("출고 품목 A").closest("tr")!;
+    const toggle = screen.getByRole("button", { name: "출하 구성 펼치기" });
+    const controlsId = toggle.getAttribute("aria-controls")!;
+
+    expect(row).not.toHaveAttribute("role");
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(row).toHaveAttribute("aria-controls", controlsId);
+
+    if (interaction === "click") fireEvent.click(row);
+    else fireEvent.keyDown(row, { key: interaction });
+
+    expect(onSelectLog).not.toHaveBeenCalled();
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(controlsId)).toHaveTextContent("출고 품목 B");
+  });
+
   it("shortens the compact additional component badge but preserves its full title and accessible name", () => {
     const child = makeLog({
       log_id: "additional-component",

@@ -219,15 +219,15 @@ describe("getHistoryOperationLabel", () => {
     expect(getHistoryOperationLabel({ transaction_type: "TRANSFER_DEPT" }, batch)).toBe("부서 → 부서");
   });
 
-  it("sub_type=defect_quarantine → '격리'", () => {
+  it("sub_type=defect_quarantine → '불량 격리'", () => {
     const batch = makeBatch({ sub_type: "defect_quarantine" });
-    expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("격리");
+    expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("불량 격리");
   });
 
   it.each([
     ["disassemble", "재작업"],
     ["defect_quarantine", "불량 격리"],
-    ["defect_restore", "불량 해제"],
+    ["defect_restore", "정상 복귀"],
   ])("DEFECT_SCRAP은 %s batch 맥락을 우선한다", (subType, expected) => {
     const batch = makeBatch({ sub_type: subType as IoBatch["sub_type"] });
     const log = { transaction_type: "DEFECT_SCRAP" };
@@ -254,10 +254,10 @@ describe("getHistoryOperationLabel", () => {
       ["PRODUCE", "생산"],
       ["DISASSEMBLE", "재작업"],
       ["ADJUST", "수량 조정"],
-      ["MARK_DEFECTIVE", "격리"],
-      ["UNMARK_DEFECTIVE", "격리 해제"],
+      ["MARK_DEFECTIVE", "불량 격리"],
+      ["UNMARK_DEFECTIVE", "정상 복귀"],
       ["DEFECT_SCRAP", "폐기"],
-      ["SUPPLIER_RETURN", "원자재 반품"],
+      ["SUPPLIER_RETURN", "반품"],
     ];
     for (const [tx, expected] of cases) {
       expect(getHistoryOperationLabel({ transaction_type: tx })).toBe(expected);
@@ -279,8 +279,8 @@ describe("getHistoryFlowLabel", () => {
       ["BACKFLUSH", "자동차감"],
       ["PRODUCE", "생산 입고"],
       ["DISASSEMBLE", "재작업"],
-      ["MARK_DEFECTIVE", "격리"],
-      ["UNMARK_DEFECTIVE", "격리 해제"],
+      ["MARK_DEFECTIVE", "불량 격리"],
+      ["UNMARK_DEFECTIVE", "정상 복귀"],
       ["DEFECT_SCRAP", "폐기"],
       ["ADJUST", "수량 조정"],
       ["SUPPLIER_RETURN", "원자재 반품"],

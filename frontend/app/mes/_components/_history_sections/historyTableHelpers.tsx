@@ -974,22 +974,25 @@ function ReferenceBatchLineRow({
   const lineLabel = compact && fullLineLabel === "추가 구성품 차감" ? "추가 차감" : fullLineLabel;
   const lineColor = PRESENTATION_TONE_COLOR[linePresentation.tone];
   const highlighted = highlightLogId === log.log_id;
+  const canToggle = Boolean(onToggle);
+  const onRowAction = onToggle ?? (onSelectLog ? () => onSelectLog(log) : undefined);
 
   return (
     <tr
       id={rowId}
-      role={onSelectLog ? "button" : undefined}
-      tabIndex={onSelectLog ? 0 : undefined}
+      tabIndex={onRowAction ? 0 : undefined}
+      aria-expanded={canToggle ? expanded ?? false : undefined}
+      aria-controls={canToggle ? controlsId : undefined}
       data-history-focus-line={highlighted ? "true" : undefined}
-      onClick={() => onSelectLog?.(log)}
+      onClick={onRowAction}
       onKeyDown={(e) => {
-        if (!onSelectLog) return;
+        if (!onRowAction || e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onSelectLog(log);
+          onRowAction();
         }
       }}
-      className={`${HISTORY_CHILD_ROW_CLASS}${onSelectLog ? " cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : ""}`}
+      className={`${HISTORY_CHILD_ROW_CLASS}${onRowAction ? " cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : ""}`}
       style={{
         background: highlighted
           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
