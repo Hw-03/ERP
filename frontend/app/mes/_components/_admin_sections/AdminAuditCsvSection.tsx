@@ -99,7 +99,6 @@ export function AdminAuditCsvSection() {
       <AdminPageHeader
         icon={FileArchive}
         title="외부 제출용 입출고 로그"
-        description="외부 심사 대응용 월별 입출고 CSV. 거래 발생 시 자동 누적됩니다."
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">

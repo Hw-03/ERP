@@ -7,7 +7,6 @@ import {
   Download,
   FileArchive,
   Layers,
-  Lock,
   Network,
   ShieldCheck,
   Users,
@@ -49,10 +48,9 @@ const SECTION_GROUPS: { label: string; tabs: AdminSectionTab[] }[] = [
 interface AdminSectionTabsProps {
   section: AdminSection;
   onSelect: (next: AdminSection) => void;
-  onLock: () => void;
 }
 
-export function AdminSectionTabs({ section, onSelect, onLock }: AdminSectionTabsProps) {
+export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
   return (
     <nav
       aria-label="관리자 섹션"
@@ -63,18 +61,18 @@ export function AdminSectionTabs({ section, onSelect, onLock }: AdminSectionTabs
         boxShadow: "var(--c-card-shadow)",
       }}
     >
-      <div className="flex min-w-max items-center gap-3">
-        {SECTION_GROUPS.map((group, groupIndex) => (
-          <div key={group.label} className="flex items-center gap-2">
-            {groupIndex > 0 && (
-              <span
-                aria-hidden
-                className="h-6 w-px"
-                style={{ background: LEGACY_COLORS.border }}
-              />
-            )}
+      <div className="flex min-w-max items-center gap-2">
+        {SECTION_GROUPS.map((group, index) => (
+          <div
+            key={group.label}
+            data-admin-tab-group
+            role="group"
+            aria-label={group.label}
+            className={`flex flex-col gap-1 ${index > 0 ? "ml-2 border-l pl-4" : ""}`}
+            style={index > 0 ? { borderColor: LEGACY_COLORS.border } : undefined}
+          >
             <span
-              className="text-[12px] font-black tracking-[0.08em]"
+              className="pointer-events-none select-none text-[12px] font-black tracking-[0.08em]"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
               {group.label}
@@ -108,17 +106,6 @@ export function AdminSectionTabs({ section, onSelect, onLock }: AdminSectionTabs
         ))}
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center border-l pl-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <button
-          type="button"
-          onClick={onLock}
-          className="flex h-11 items-center gap-2 rounded-[12px] px-3 text-[14px] font-bold transition-colors hover:brightness-105 active:scale-[0.98]"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          <Lock className="h-4 w-4" />
-          관리자 잠금
-        </button>
-      </div>
     </nav>
   );
 }

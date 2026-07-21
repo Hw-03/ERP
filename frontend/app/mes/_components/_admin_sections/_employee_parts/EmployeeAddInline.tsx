@@ -4,7 +4,12 @@ import { type DepartmentMaster, type DepartmentRole, type ProductModel, type War
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AssignedModelsEditor } from "../AssignedModelsEditor";
 import { useAdminEmployeesContext } from "../AdminEmployeesContext";
-import { ASSEMBLY_DEPT, DEPARTMENT_ROLE_LABEL, WAREHOUSE_ROLE_LABEL } from "./employeeRoleLabels";
+import {
+  ASSEMBLY_DEPT,
+  DEPARTMENT_ROLE_LABEL,
+  employeePositionOptions,
+  WAREHOUSE_ROLE_LABEL,
+} from "./employeeRoleLabels";
 import { FieldRow, SelectInput, TextInput } from "./employeeDetailPrimitives";
 
 interface EmployeeAddInlineProps {
@@ -33,12 +38,12 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
             placeholder="예: 홍길동"
           />
         </FieldRow>
-        <FieldRow label="직급" htmlFor="emp-add-role">
-          <TextInput
-            id="emp-add-role"
+        <FieldRow label="직급">
+          <SelectInput
             value={form.role}
             onChange={(v) => setForm((f) => ({ ...f, role: v }))}
-            placeholder="예: 조립/사원"
+            options={employeePositionOptions(form.role)}
+            triggerAriaLabel="직급"
           />
         </FieldRow>
         <FieldRow label="연락처" htmlFor="emp-add-phone">

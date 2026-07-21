@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { DepartmentMaster, Employee } from "@/lib/api";
 import { EmployeeDetailGrid } from "../EmployeeDetailGrid";
 import type { EmployeeEditForm } from "../../../_admin_hooks/useAdminEmployees";
@@ -75,5 +75,26 @@ describe("EmployeeDetailGrid", () => {
     expect(screen.getByText("계정 상태 및 위험 작업")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "직원 비활성화" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "직원 삭제" })).toBeInTheDocument();
+  });
+  it("비표준 직급은 선택 목록에서 기존 직급으로 읽기 전용 보존한다", () => {
+    render(
+      <EmployeeDetailGrid
+        employee={employee}
+        form={form}
+        setForm={vi.fn()}
+        departments={departments}
+        productModels={[]}
+        onRequestPinReset={vi.fn()}
+        onToggle={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const selectors = screen.getAllByRole("combobox");
+    expect(selectors).toHaveLength(4);
+    expect(screen.getByRole("combobox", { name: "직급" })).toBe(selectors[0]);
+
+    fireEvent.click(selectors[0]);
+    expect(screen.getByRole("option", { name: "기존 직급: 팀장" })).toHaveAttribute("aria-disabled", "true");
   });
 });

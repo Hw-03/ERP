@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
+import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
@@ -83,7 +84,10 @@ export function AdminDepartmentsSection({
   const itemCountByDept = useMemo(() => {
     const map = new Map<string, number>();
     for (const it of items) {
-      const dept = it.department ? normalizeDepartment(String(it.department)) : null;
+      const mappedDepartment = it.process_type_code
+        ? PROCESS_TO_DEPT[it.process_type_code]
+        : null;
+      const dept = mappedDepartment ? normalizeDepartment(mappedDepartment) : null;
       if (!dept) continue;
       map.set(dept, (map.get(dept) ?? 0) + 1);
     }
@@ -174,20 +178,21 @@ export function AdminDepartmentsSection({
         <AdminPageHeader
           icon={Building2}
           title="부서 관리"
-          description="조직의 부서를 관리하고 색상·구성원을 설정합니다."
+          summary={
+            <AdminKpiBar
+              placement="header"
+              items={[
+                { key: "all", label: "전체 부서", value: departments.length, hint: "등록된 부서 수", tone: LEGACY_COLORS.blue },
+                { key: "active", label: "사용 중", value: stats.active, hint: "활성 부서", tone: LEGACY_COLORS.green },
+                { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
+              ]}
+            />
+          }
           actions={
             <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               부서 추가
             </Button>
           }
-        />
-
-        <AdminKpiBar
-          items={[
-            { key: "all", label: "전체 부서", value: departments.length, hint: "등록된 부서 수", tone: LEGACY_COLORS.blue },
-            { key: "active", label: "사용 중", value: stats.active, hint: "활성 부서", tone: LEGACY_COLORS.green },
-            { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
-          ]}
         />
 
         <div className="flex min-h-0 flex-1 gap-4">

@@ -158,16 +158,17 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
       <AdminPageHeader
         icon={Box}
         title="품목 관리"
-        description="모든 품목의 정보를 조회하고 관리할 수 있습니다."
-      />
-
-      <AdminKpiBar
-        items={[
-          { key: "all", label: "전체 품목", value: visibleItems.length, hint: "필터·검색 적용 결과", tone: LEGACY_COLORS.blue },
-          { key: "ok", label: "정상", value: stats.ok, hint: "안전재고 충족", tone: LEGACY_COLORS.green },
-          { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.yellow },
-          { key: "zero", label: "품절", value: stats.zero, hint: "재고 0 이하", tone: LEGACY_COLORS.red },
-        ]}
+        summary={
+          <AdminKpiBar
+            placement="header"
+            items={[
+              { key: "all", label: "전체 품목", value: visibleItems.length, hint: "필터·검색 적용 결과", tone: LEGACY_COLORS.blue },
+              { key: "ok", label: "정상", value: stats.ok, hint: "안전재고 충족", tone: LEGACY_COLORS.green },
+              { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.yellow },
+              { key: "zero", label: "품절", value: stats.zero, hint: "재고 0 이하", tone: LEGACY_COLORS.red },
+            ]}
+          />
+        }
       />
 
       <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "minmax(420px, 0.92fr) minmax(460px, 1.08fr)", gridTemplateRows: "1fr" }}>
@@ -244,13 +245,8 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     {item.item_name}
                   </span>
                   <span
-                    className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-black tabular-nums"
-                    style={{
-                      background: isSelected
-                        ? LEGACY_COLORS.blue
-                        : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)`,
-                      color: isSelected ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                    }}
+                    className="shrink-0 font-mono text-[12px] font-semibold tabular-nums"
+                    style={{ color: LEGACY_COLORS.muted }}
                   >
                     {item.mes_code ?? "—"}
                   </span>

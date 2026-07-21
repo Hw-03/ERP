@@ -42,18 +42,6 @@ describe("useAdminSession", () => {
     expect(result.current.pin).toBe("1234");
   });
 
-  it("clears pin to null when clearPin is called", () => {
-    const { result } = renderHook(() => useAdminSession(), { wrapper });
-    act(() => {
-      result.current.setPin("9999");
-    });
-    expect(result.current.pin).toBe("9999");
-
-    act(() => {
-      result.current.clearPin();
-    });
-    expect(result.current.pin).toBeNull();
-  });
 });
 
 describe("AdminSessionProvider × api-core PIN injection", () => {

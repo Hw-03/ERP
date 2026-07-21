@@ -81,10 +81,12 @@ export function SelectInput({
   value,
   onChange,
   options,
+  triggerAriaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  triggerAriaLabel?: string;
 }) {
   return (
     <AppSelect
@@ -92,6 +94,7 @@ export function SelectInput({
       onChange={onChange}
       options={options}
       size="md"
+      triggerAriaLabel={triggerAriaLabel}
       triggerStyle={{ background: LEGACY_COLORS.s1 }}
     />
   );

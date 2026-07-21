@@ -38,7 +38,6 @@ const ADD_LABEL = "\uCD94\uAC00";
 const EDIT_LABEL = "\uD3B8\uC9D1";
 const DELETE_STRUCTURE_LABEL = "\uAD6C\uC870 \uC0AD\uC81C";
 const STRUCTURE_HEADER_TITLE = "\uAD6C\uC870 \uD3B8\uC9D1";
-const STRUCTURE_HEADER_DESCRIPTION = "\uC575\uAE00\u00B7\uD1B5\uB85C\u00B7PL\uC744 \uB4DC\uB798\uADF8\uD574 \uC704\uCE58\uB97C \uC62E\uAE30\uACE0, \uC624\uB978\uCABD \uBAA8\uC11C\uB9AC\uB85C \uD06C\uAE30\uB97C \uC870\uC808\uD558\uC138\uC694. \uC190\uC744 \uB5BC\uBA74 10px \uB2E8\uC704\uB85C \uC790\uB3D9 \uC800\uC7A5\uB429\uB2C8\uB2E4.";
 
 function structureKind(angle: WarehouseAngle): WarehouseAngleType {
   return angle.angle_type ?? "angle";
@@ -227,7 +226,6 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
       <AdminPageHeader
         icon={Warehouse}
         title={STRUCTURE_HEADER_TITLE}
-        description={STRUCTURE_HEADER_DESCRIPTION}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={() => void addStructure("angle")}>

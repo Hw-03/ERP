@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { loginAsOperator } from "./_helpers";
 
 test.describe("관리자 상단 탭", () => {
-  test("PIN 잠금 해제 후 모든 섹션을 순회하고 다시 잠글 수 있다", async ({ page }) => {
+  test("PIN 잠금 해제 후 모든 섹션을 순회한다", async ({ page }) => {
     await loginAsOperator(page, { code: "E01" });
     await page.goto("/mes?tab=admin");
 
@@ -29,7 +29,5 @@ test.describe("관리자 상단 탭", () => {
       await expect(tab).toHaveAttribute("aria-current", "page");
     }
 
-    await navigation.getByRole("button", { name: "관리자 잠금", exact: true }).click();
-    await expect(page.getByText("관리자 인증", { exact: true })).toBeVisible();
   });
 });

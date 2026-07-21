@@ -3,6 +3,28 @@ import type { DepartmentRole, WarehouseRole } from "@/lib/api";
 
 export const ASSEMBLY_DEPT = "조립";
 
+export const EMPLOYEE_POSITION_OPTIONS = [
+  "사원",
+  "주임",
+  "대리",
+  "과장",
+  "부장",
+  "이사",
+  "대표",
+  "선임연구원",
+  "책임연구원",
+] as const;
+
+export function employeePositionOptions(
+  currentRole: string,
+): { value: string; label: string; disabled?: boolean }[] {
+  const standardOptions = EMPLOYEE_POSITION_OPTIONS.map((role) => ({ value: role, label: role }));
+  if (!currentRole || EMPLOYEE_POSITION_OPTIONS.includes(currentRole as typeof EMPLOYEE_POSITION_OPTIONS[number])) {
+    return standardOptions;
+  }
+  return [{ value: currentRole, label: `기존 직급: ${currentRole}`, disabled: true }, ...standardOptions];
+}
+
 export const WAREHOUSE_ROLE_LABEL: Record<WarehouseRole, { label: string; hint: string; tone: string }> = {
   none: { label: "없음", hint: "기본 작업만 수행", tone: LEGACY_COLORS.muted2 },
   primary: { label: "정", hint: "창고 주담당 결재", tone: LEGACY_COLORS.blue },

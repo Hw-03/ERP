@@ -30,7 +30,6 @@ export function DesktopAdminView({
     selectedDept,
     setSelectedDept,
     unlock,
-    lock,
     selectSection,
   } = useAdminViewState("models");
 
@@ -91,7 +90,6 @@ export function DesktopAdminView({
         <AdminSectionTabs
           section={section}
           onSelect={guardedSelectSection}
-          onLock={lock}
         />
 
         {/* 워크스페이스 */}

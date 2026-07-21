@@ -58,10 +58,10 @@ function DirtyModal({
   }, [modal.open, modal.busy, onCancel]);
   if (!modal.open) return null;
   const confirmOnly = modal.confirmOnly;
-  const title = confirmOnly ? "이 화면에서 나갈까요?" : "작성 중인 입출고가 있어요";
+  const title = "이 화면에서 나갈까요?";
   const bodyLines = confirmOnly
     ? ["현재 진행 중인 작업이 있습니다.", "나가면 이 작업 화면에서 벗어납니다."]
-    : ["임시저장하면 ‘내 요청’에서 이어서 진행할 수 있습니다.", "저장하지 않고 이동하면 현재 작성 중인 내용은 사라집니다."];
+    : ["저장하면 변경한 내용을 반영한 뒤 이동합니다.", "저장하지 않고 이동하면 현재 작성 중인 내용은 사라집니다."];
 
   return (
     <div
@@ -131,7 +131,7 @@ function DirtyModal({
                 style={{ background: LEGACY_COLORS.blue }}
               >
                 <Save className="h-5 w-5" />
-                {modal.busy ? "임시저장 중..." : "임시저장하고 이동"}
+                {modal.busy ? "저장 중..." : "저장하고 이동"}
               </button>
               <button
                 type="button"

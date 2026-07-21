@@ -282,7 +282,6 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
       <AdminPageHeader
         icon={Download}
         title="내보내기"
-        description="시스템 데이터를 안전하게 내보내고 관리하세요."
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">

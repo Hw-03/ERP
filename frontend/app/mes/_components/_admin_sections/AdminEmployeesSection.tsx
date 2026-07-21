@@ -114,6 +114,7 @@ export function AdminEmployeesSection() {
 
   function handleStartAdd() {
     confirmNavigation(() => {
+      setEmpAddForm((form) => ({ ...form, role: form.role || "사원" }));
       setEmpAddMode(true);
       setSelectedEmployee(null);
     });
@@ -132,20 +133,21 @@ export function AdminEmployeesSection() {
         <AdminPageHeader
           icon={Users}
           title="직원 관리"
-          description="직원 정보·권한·PIN을 등록하고 관리합니다."
+          summary={
+            <AdminKpiBar
+              placement="header"
+              items={[
+                { key: "all", label: "전체 직원", value: employees.length, hint: "등록된 모든 직원", tone: LEGACY_COLORS.blue },
+                { key: "active", label: "활성", value: stats.active, hint: "근무 중", tone: LEGACY_COLORS.green },
+                { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
+              ]}
+            />
+          }
           actions={
             <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               직원 추가
             </Button>
           }
-        />
-
-        <AdminKpiBar
-          items={[
-            { key: "all", label: "전체 직원", value: employees.length, hint: "등록된 모든 직원", tone: LEGACY_COLORS.blue },
-            { key: "active", label: "활성", value: stats.active, hint: "근무 중", tone: LEGACY_COLORS.green },
-            { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
-          ]}
         />
 
         <div className="flex min-h-0 flex-1 gap-4">
@@ -156,12 +158,15 @@ export function AdminEmployeesSection() {
             searchValue={search}
             searchPlaceholder="이름·부서·직급 검색"
             onSearchChange={setSearch}
-            filters={
+            action={
               <AppSelect
                 value={deptFilter}
                 onChange={setDeptFilter}
                 options={deptOptions.map((d) => ({ value: d, label: d === "ALL" ? "전체 부서" : d }))}
                 size="sm"
+                className="w-[144px] shrink-0"
+                triggerClassName="whitespace-nowrap"
+                triggerAriaLabel="부서 필터"
                 triggerStyle={{ background: LEGACY_COLORS.s2 }}
               />
             }

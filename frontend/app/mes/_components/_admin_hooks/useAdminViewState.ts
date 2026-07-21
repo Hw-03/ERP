@@ -30,12 +30,11 @@ export interface UseAdminViewStateResult {
   selectedDept: DepartmentMaster | null;
   setSelectedDept: React.Dispatch<React.SetStateAction<DepartmentMaster | null>>;
   unlock: (pin: string) => void;
-  lock: () => void;
   selectSection: (next: AdminSection) => void;
 }
 
 export function useAdminViewState(initialSection: AdminSection = "items"): UseAdminViewStateResult {
-  const { setPin, clearPin } = useAdminSession();
+  const { setPin } = useAdminSession();
   const [unlocked, setUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [section, setSection] = useState<AdminSection>(initialSection);
@@ -49,12 +48,6 @@ export function useAdminViewState(initialSection: AdminSection = "items"): UseAd
     setPin(pin);
   }, [setPin]);
 
-  const lock = useCallback(() => {
-    setUnlocked(false);
-    // 잠금 시 세션 PIN 도 정리 — 다음 요청부터 헤더 미주입.
-    clearPin();
-  }, [clearPin]);
-
   const selectSection = useCallback((next: AdminSection) => {
     setSection(next);
   }, []);
@@ -66,7 +59,6 @@ export function useAdminViewState(initialSection: AdminSection = "items"): UseAd
     selectedDept,
     setSelectedDept,
     unlock,
-    lock,
     selectSection,
   };
 }

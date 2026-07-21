@@ -183,15 +183,16 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
       <AdminPageHeader
         icon={Layers}
         title="모델 관리"
-        description="제품 모델 정보를 등록하고 사용 현황을 확인할 수 있습니다."
-      />
-
-      <AdminKpiBar
-        items={[
-          { key: "total", label: "전체 모델", value: productModels.length, hint: "등록된 슬롯", tone: LEGACY_COLORS.blue },
-          { key: "use", label: "사용 중", value: inUse.length, hint: "이름이 등록된 모델", tone: LEGACY_COLORS.green },
-          { key: "idle", label: "비활성", value: idle, hint: "이름 없는 빈 슬롯", tone: LEGACY_COLORS.muted2 },
-        ]}
+        summary={
+          <AdminKpiBar
+            placement="header"
+            items={[
+              { key: "total", label: "전체 모델", value: productModels.length, hint: "등록된 슬롯", tone: LEGACY_COLORS.blue },
+              { key: "use", label: "사용 중", value: inUse.length, hint: "이름이 등록된 모델", tone: LEGACY_COLORS.green },
+              { key: "idle", label: "비활성", value: idle, hint: "이름 없는 빈 슬롯", tone: LEGACY_COLORS.muted2 },
+            ]}
+          />
+        }
       />
 
       <div className="flex min-h-0 flex-1 gap-4">
@@ -455,21 +456,6 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-          {/* 모델 코드 — 읽기 전용 */}
-          <EditFieldRow label="모델 코드">
-            <div className="text-[14px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              M-{String(model.slot).padStart(4, "0")}
-            </div>
-          </EditFieldRow>
-
-          {/* 상태 — 읽기 전용 */}
-          <EditFieldRow label="상태">
-            <StatusPill
-              label={model.model_name ? "사용 중" : "비활성"}
-              tone={model.model_name ? "success" : "neutral"}
-            />
-          </EditFieldRow>
-
           {/* 모델명 — 편집 */}
           <div className="col-span-2">
             <EditFieldRow label="모델명">

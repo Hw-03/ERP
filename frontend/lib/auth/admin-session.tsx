@@ -12,7 +12,7 @@
  *   새로고침 시 PIN 재입력은 의도된 데모/보안 안전 동작.
  * - **호출자 코드 변경 최소**: 기존 payload.pin / query.pin 흐름은 그대로.
  *   백엔드 (W3-A) 의 PIN 추출 우선순위는 X-Admin-Pin → body.pin → query.pin.
- * - **인터페이스 깊이**: Provider + 1 hook (3 메소드) + 1 register = 5 ≤ 6.
+ * - **인터페이스 깊이**: Provider + 1 hook (2 메소드) + 1 register = 4 ≤ 6.
  */
 
 import {
@@ -30,7 +30,6 @@ import { registerAdminPinProvider } from "@/lib/api-core";
 export interface AdminSessionValue {
   pin: string | null;
   setPin: (pin: string) => void;
-  clearPin: () => void;
 }
 
 const AdminSessionContext = createContext<AdminSessionValue | null>(null);
@@ -53,13 +52,9 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
     setPinState(next);
   }, []);
 
-  const clearPin = useCallback(() => {
-    setPinState(null);
-  }, []);
-
   const value = useMemo<AdminSessionValue>(
-    () => ({ pin, setPin, clearPin }),
-    [pin, setPin, clearPin],
+    () => ({ pin, setPin }),
+    [pin, setPin],
   );
 
   return (

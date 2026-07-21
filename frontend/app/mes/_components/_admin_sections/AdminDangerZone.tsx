@@ -54,7 +54,6 @@ export function AdminDangerZone({
         <AdminPageHeader
           icon={ShieldCheck}
           title="보안"
-          description="관리자 PIN을 변경하여 계정 보안을 강화하세요."
         />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">

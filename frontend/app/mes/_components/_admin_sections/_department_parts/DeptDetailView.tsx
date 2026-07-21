@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Palette, Trash2 } from "lucide-react";
 import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { normalizeDepartment } from "@/lib/mes/department";
+import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useRefreshDepartments } from "../../DepartmentsContext";
 import { deptColor, TAILWIND_PALETTE } from "./departmentColors";
@@ -48,6 +50,10 @@ export function DeptDetailView({
   const [colorInputError, setColorInputError] = useState<string | null>(null);
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
+  const normalizedDepartment = normalizeDepartment(dept.name);
+  const isProcessMappedDepartment = Object.values(PROCESS_TO_DEPT).some(
+    (name) => name === normalizedDepartment,
+  );
 
   // dept 변경 시 폼 초기화
   useEffect(() => {
@@ -122,6 +128,9 @@ export function DeptDetailView({
         <MetaCell label="소속 직원" value={`${empCount}명`} tone={LEGACY_COLORS.purple} />
         <MetaCell label="관련 품목" value={`${itemCount}개`} tone={LEGACY_COLORS.blue} />
       </div>
+      <p className="-mt-2 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        품목 코드 공정 기준{!isProcessMappedDepartment ? " · 공정 코드 매핑 없음" : ""}
+      </p>
 
       {/* 색상 변경 */}
       <DetailCardSlot

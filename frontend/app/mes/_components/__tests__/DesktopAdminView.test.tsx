@@ -23,7 +23,6 @@ vi.mock("../_admin_hooks/useAdminViewState", () => ({
     selectedDept: null,
     setSelectedDept: vi.fn(),
     unlock: vi.fn(),
-    lock: vi.fn(),
     selectSection: vi.fn(),
   }),
 }));

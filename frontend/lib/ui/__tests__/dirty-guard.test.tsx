@@ -101,7 +101,7 @@ describe("dirty-guard", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("dirty=true 등록 상태에서는 PC 저장 모달을 명확한 문구로 보여준다", () => {
+  it("dirty=true 등록 상태에서는 업무에 종속되지 않은 저장 안내 문구를 보여준다", () => {
     const proceed = vi.fn();
     const save = vi.fn();
     render(
@@ -113,15 +113,16 @@ describe("dirty-guard", () => {
     fireEvent.click(screen.getByRole("button", { name: "이동" }));
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("작성 중인 입출고가 있어요")).toBeInTheDocument();
-    expect(screen.getByText(/임시저장하면 ‘내 요청’에서 이어서 진행할 수 있습니다/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "임시저장하고 이동" })).toBeInTheDocument();
+    expect(screen.getByText("이 화면에서 나갈까요?")).toBeInTheDocument();
+    expect(screen.getByText("저장하면 변경한 내용을 반영한 뒤 이동합니다.")).toBeInTheDocument();
+    expect(screen.queryByText("작성 중인 입출고가 있어요")).toBeNull();
+    expect(screen.getByRole("button", { name: "저장하고 이동" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "저장 안 하고 나가기" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "계속 작성" })).toBeInTheDocument();
     expect(proceed).not.toHaveBeenCalled();
   });
 
-  it("임시저장하고 이동은 save 후 proceed를 호출한다", async () => {
+  it("저장하고 이동은 save 후 proceed를 호출한다", async () => {
     const proceed = vi.fn();
     const save = vi.fn().mockResolvedValue(undefined);
     render(
@@ -131,7 +132,7 @@ describe("dirty-guard", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "이동" }));
-    fireEvent.click(screen.getByRole("button", { name: "임시저장하고 이동" }));
+    fireEvent.click(screen.getByRole("button", { name: "저장하고 이동" }));
 
     await waitFor(() => expect(proceed).toHaveBeenCalledTimes(1));
     expect(save).toHaveBeenCalledTimes(1);
@@ -188,7 +189,7 @@ describe("dirty-guard", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "이동" }));
-    fireEvent.click(screen.getByRole("button", { name: "임시저장하고 이동" }));
+    fireEvent.click(screen.getByRole("button", { name: "저장하고 이동" }));
 
     await waitFor(() => expect(proceed).toHaveBeenCalledTimes(1));
     expect(saveDirty).toHaveBeenCalledTimes(1);
@@ -207,7 +208,7 @@ describe("dirty-guard", () => {
     fireEvent.click(screen.getByRole("button", { name: "로컬이동" }));
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("작성 중인 입출고가 있어요")).toBeInTheDocument();
+    expect(screen.getByText("이 화면에서 나갈까요?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "저장 안 하고 나가기" }));
 
     expect(proceed).toHaveBeenCalledTimes(1);
@@ -232,7 +233,7 @@ describe("dirty-guard", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("이 화면에서 나갈까요?")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "임시저장하고 이동" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "저장하고 이동" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "나가기" }));
 
     expect(proceed).toHaveBeenCalledTimes(1);

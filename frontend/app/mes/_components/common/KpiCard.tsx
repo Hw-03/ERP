@@ -13,9 +13,10 @@ interface Props {
   active?: boolean;
   onClick?: () => void;
   compact?: boolean;
+  headerCompact?: boolean;
 }
 
-function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false }: Props) {
+function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false, headerCompact = false }: Props) {
   const [hovered, setHovered] = useState(false);
 
   const bg = active
@@ -25,11 +26,27 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
     : tint(tone, 8);
   const border = active || hovered ? tone : tint(tone, 35);
 
-  const boxCls = compact
+  const boxCls = headerCompact
+    ? "rounded-[12px] border px-3 py-2"
+    : compact
     ? "rounded-[12px] border px-4 py-2.5"
     : "rounded-[16px] border px-3 py-3 lg:px-5 lg:py-5";
 
-  const content = compact ? (
+  const content = headerCompact ? (
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0 truncate text-[14px] font-black leading-tight" style={{ color: tone }}>
+        {label}
+      </div>
+      <div className="shrink-0 text-[24px] font-black leading-none" style={{ color: tone }}>
+        {value}
+        {unit && (
+          <span className="ml-0.5 text-[12px] font-bold" style={{ opacity: 0.7 }}>
+            {unit}
+          </span>
+        )}
+      </div>
+    </div>
+  ) : compact ? (
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-0.5">
         <div

@@ -14,6 +14,7 @@ import { useAdminEmployeesContext } from "../AdminEmployeesContext";
 import {
   ASSEMBLY_DEPT,
   DEPARTMENT_ROLE_LABEL,
+  employeePositionOptions,
   WAREHOUSE_ROLE_LABEL,
 } from "./employeeRoleLabels";
 import { DetailCardSlot, FieldRow, SelectInput, TextInput } from "./employeeDetailPrimitives";
@@ -84,11 +85,12 @@ export function EmployeeDetailGrid({
               onChange={(v) => setForm((f) => ({ ...f, name: v }))}
             />
           </FieldRow>
-          <FieldRow label="직급" htmlFor="emp-edit-role">
-            <TextInput
-              id="emp-edit-role"
+          <FieldRow label="직급">
+            <SelectInput
               value={form.role}
               onChange={(v) => setForm((f) => ({ ...f, role: v }))}
+              options={employeePositionOptions(form.role)}
+              triggerAriaLabel="직급"
             />
           </FieldRow>
           <FieldRow label="부서">

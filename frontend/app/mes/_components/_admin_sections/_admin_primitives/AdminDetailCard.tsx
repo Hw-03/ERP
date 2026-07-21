@@ -64,7 +64,8 @@ export function AdminDetailCard({
       )}
       {tabs && tabs.length > 0 && (
         <div
-          className="flex shrink-0 gap-1 border-b px-3 pt-2"
+          role="tablist"
+          className="flex shrink-0 gap-2 border-b px-4 pt-2"
           style={{ borderColor: LEGACY_COLORS.border }}
         >
           {tabs.map((tab) => {
@@ -73,8 +74,10 @@ export function AdminDetailCard({
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => onTabChange?.(tab.id)}
-                className="relative px-4 py-2 text-[14px] font-bold transition-colors"
+                className="relative px-2.5 py-2 text-[14px] font-bold transition-colors"
                 style={{
                   color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
                 }}

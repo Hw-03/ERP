@@ -304,7 +304,19 @@ export function BomWorkbench({
       <AdminPageHeader
         icon={Network}
         title="BOM 관리"
-        description="부모-자식 자재 구성을 편집하고 사용처를 조회합니다."
+        summary={
+          mode === "edit" ? (
+            <BomStatsRow
+              total={stats.total}
+              done={stats.done}
+              wip={stats.wip}
+              todo={stats.todo}
+              active={statusFilter}
+              onChange={setStatusFilter}
+              placement="header"
+            />
+          ) : undefined
+        }
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -362,20 +374,6 @@ export function BomWorkbench({
           </div>
         }
       />
-
-      {/* 4-state KPI (= 부모 리스트 상태 필터) */}
-      {mode === "edit" && (
-        <div className="mb-3">
-          <BomStatsRow
-            total={stats.total}
-            done={stats.done}
-            wip={stats.wip}
-            todo={stats.todo}
-            active={statusFilter}
-            onChange={setStatusFilter}
-          />
-        </div>
-      )}
 
       {/* 부서 탭 + 선택된 부모 헤더 (한 줄) */}
       <div className="mb-3 flex min-w-0 flex-wrap items-center gap-3">

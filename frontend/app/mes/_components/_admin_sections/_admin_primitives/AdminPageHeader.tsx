@@ -7,7 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 export interface AdminPageHeaderProps {
   icon: ElementType;
   title: string;
-  description?: string;
+  summary?: ReactNode;
   actions?: ReactNode;
   danger?: boolean;
 }
@@ -15,16 +15,16 @@ export interface AdminPageHeaderProps {
 export function AdminPageHeader({
   icon: Icon,
   title,
-  description,
+  summary,
   actions,
   danger = false,
 }: AdminPageHeaderProps) {
   const tone = danger ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   return (
-    <div className="mb-4 flex items-start justify-between gap-3">
-      <div className="flex min-w-0 items-start gap-3">
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <div
-          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"
           style={{
             background: `color-mix(in srgb, ${tone} 14%, transparent)`,
             color: tone,
@@ -54,17 +54,10 @@ export function AdminPageHeader({
               </span>
             )}
           </div>
-          {description && (
-            <p
-              className="mt-1 text-[14px] leading-snug"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              {description}
-            </p>
-          )}
         </div>
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {summary && <div className="min-w-[420px] flex-1">{summary}</div>}
+      {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
     </div>
   );
 }

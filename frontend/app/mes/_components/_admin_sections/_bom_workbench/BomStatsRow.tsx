@@ -22,6 +22,7 @@ interface Props {
   todo: number;
   active: StatusFilter;
   onChange: (next: StatusFilter) => void;
+  placement?: "block" | "header";
 }
 
 const CARDS: { id: StatusFilter; label: string; hint: string; tone: string }[] = [
@@ -31,11 +32,12 @@ const CARDS: { id: StatusFilter; label: string; hint: string; tone: string }[] =
   { id: "todo", label: "미착수", hint: "자식 없음", tone: LEGACY_COLORS.yellow },
 ];
 
-export function BomStatsRow({ total, done, wip, todo, active, onChange }: Props) {
+export function BomStatsRow({ total, done, wip, todo, active, onChange, placement = "block" }: Props) {
   const values: Record<StatusFilter, number> = { ALL: total, done, wip, todo };
 
   return (
     <AdminKpiBar
+      placement={placement}
       items={CARDS.map((c) => {
         const isActive = active === c.id;
         return {
