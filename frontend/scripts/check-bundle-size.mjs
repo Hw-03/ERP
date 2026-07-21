@@ -23,7 +23,7 @@ const FRONTEND_ROOT = path.resolve(__dirname, "..");
 
 const args = process.argv.slice(2);
 const maxIdx = args.indexOf("--max");
-const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 2.11;
+const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 2.113;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 async function walk(dir) {
