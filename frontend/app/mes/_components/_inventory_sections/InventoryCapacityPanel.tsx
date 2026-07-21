@@ -158,7 +158,7 @@ function AfPanel({
           <table className="w-full table-fixed text-right text-sm">
             <thead>
               <tr>
-                <th className="pb-1 text-left text-xs font-bold" />
+                <th className="pb-1 text-left text-xs font-bold">모델</th>
                 <th className="w-16 whitespace-nowrap pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</th>
                 <th className="w-16 whitespace-nowrap pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</th>
                 <th className="w-16 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</th>

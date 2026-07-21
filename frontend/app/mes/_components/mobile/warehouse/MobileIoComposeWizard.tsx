@@ -488,7 +488,7 @@ export function MobileIoComposeWizard({
           스크롤된다. (이전 fixed top-0 는 셸 헤더 DEXCOWIN MES 를 덮는 버그였음)
           항목 6 — 페이지 배경과 같은 톤으로 두어 위 섹션 탭과 자연스럽게 이어지게(카드감 제거). */}
       <div
-        className="z-10 flex shrink-0 items-center gap-2 border-b px-3 py-2"
+        className={`z-10 flex shrink-0 items-center gap-2 px-3 py-2 ${step === 5 ? "" : "border-b"}`}
         style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
       >
         {step > 1 ? (

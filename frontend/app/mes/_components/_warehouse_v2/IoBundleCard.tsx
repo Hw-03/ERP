@@ -132,12 +132,10 @@ export function IoBundleCard({
       }}
     >
       <div
-        className="relative mb-3 grid gap-3 lg:items-center"
+        className="relative mb-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px] lg:items-center"
         onClick={() => { if (isCollapsible) setCollapsed((v) => !v); }}
         style={{
           cursor: isCollapsible ? "pointer" : "default",
-          gridTemplateColumns:
-            "minmax(0,1.6fr) minmax(132px,auto) minmax(80px,auto) minmax(80px,auto) 44px",
         }}
         role={isCollapsible ? "button" : undefined}
         aria-expanded={isCollapsible ? !collapsed : undefined}
@@ -179,7 +177,7 @@ export function IoBundleCard({
             )}
           </div>
         </div>
-        <div onClick={(e) => e.stopPropagation()} className="self-center">
+        <div onClick={(e) => e.stopPropagation()} className="border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0">
           {showBundleQtyStepper ? (
             <QuantityStepper
               value={stepperQty}
@@ -198,7 +196,7 @@ export function IoBundleCard({
           )}
         </div>
         {directParentLine && (
-          <>
+          <div className="grid grid-cols-2 border-t pt-3 lg:contents lg:border-t-0 lg:pt-0" style={{ borderColor: LEGACY_COLORS.border }}>
             <div className="self-center text-center">
               <div
                 className="text-[9px] font-bold uppercase tracking-[1.5px]"
@@ -227,12 +225,12 @@ export function IoBundleCard({
                 {parentExpected === null ? "-" : formatQty(parentExpected)}
               </div>
             </div>
-          </>
+          </div>
         )}
         {!directParentLine && (
           <>
-            <span aria-hidden="true" />
-            <span aria-hidden="true" />
+            <span aria-hidden="true" className="hidden lg:block" />
+            <span aria-hidden="true" className="hidden lg:block" />
           </>
         )}
         <button

@@ -213,17 +213,14 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           const pinnedNumbers = getPinnedPfNumbers(group.key, pfPins, af);
           const groupCollapsed = !expandedGroups.has(group.key);
           return (
-          <div key={group.key}>
-            {/* 모델 그룹 헤더 */}
-            <div
-              className="border-t px-4 py-2.5 first:border-t-0 cursor-pointer select-none"
-              style={{
-                borderColor: LEGACY_COLORS.border,
-                background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
-              }}
+          <div key={group.key} className="border-t first:border-t-0" style={{ borderColor: LEGACY_COLORS.border }}>
+            {/* 모델 그룹 제목만 접기·펼치기 동작을 담당한다. */}
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
               onClick={() => toggleGroup(group.key)}
+              aria-expanded={!groupCollapsed}
             >
-              <div className="flex flex-wrap items-center gap-2">
                 {groupCollapsed ? (
                   <ChevronRight className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
                 ) : (
@@ -235,52 +232,64 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                     · {group.items.length}종
                   </span>
                 </span>
-                {pinnedVariant ? (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm font-bold"
+            </button>
+
+            {pinnedVariant ? (
+              <div className="border-t px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+                <div className="text-[10px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  기준 출하 완제품
+                </div>
+                <div className="mt-0.5 flex items-start gap-2">
+                  <span className="min-w-0 flex-1 break-words text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
+                    {pinnedVariant.pf_name || pinnedVariant.pf_code}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isPinLoading}
+                    onClick={() => setUnpinTarget(group.key)}
+                    className="shrink-0 rounded-full px-1.5 py-0.5 text-sm font-bold"
                     style={{
                       background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)`,
                       color: LEGACY_COLORS.cyan,
                     }}
+                    aria-label="기준 PF 해제"
                   >
-                    {pinnedVariant.pf_name || pinnedVariant.pf_code}
-                    <button
-                      type="button"
-                      disabled={isPinLoading}
-                      onClick={(e) => { e.stopPropagation(); setUnpinTarget(group.key); }}
-                      className="ml-0.5"
-                      aria-label="기준 PF 해제"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ) : (
-                  <span
-                    className="rounded-full px-2 py-0.5 text-sm font-semibold"
-                    style={{
-                      background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 12%, transparent)`,
-                      color: LEGACY_COLORS.muted2,
-                    }}
-                  >
-                    출고처 미지정
-                  </span>
-                )}
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
-              <div className="mt-1.5 grid grid-cols-3 gap-1">
-                {pinnedNumbers ? (
-                  <>
+            ) : (
+              <div className="border-t px-4 py-2 text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                기준 출하 완제품 미지정
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 divide-x border-t" style={{ borderColor: LEGACY_COLORS.border }}>
+              {pinnedNumbers ? (
+                <>
+                  <div className="px-1.5 py-2">
                     <QtyLabelCell label="출하 대기" value={pinnedNumbers.ship_ready} color={LEGACY_COLORS.cyan} />
+                  </div>
+                  <div className="px-1.5 py-2">
                     <QtyLabelCell label="빠른 생산" value={pinnedNumbers.fast_production} color={LEGACY_COLORS.blue} />
+                  </div>
+                  <div className="px-1.5 py-2">
                     <QtyLabelCell label="총생산" value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
-                  </>
-                ) : (
-                  <>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="px-1.5 py-2">
                     <DashLabelCell label="출하 대기" />
+                  </div>
+                  <div className="px-1.5 py-2">
                     <DashLabelCell label="빠른 생산" />
+                  </div>
+                  <div className="px-1.5 py-2">
                     <DashLabelCell label="총생산" />
-                  </>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
             </div>
             {/* AF 아이템 카드 */}
             {!groupCollapsed && group.items.map((it) => {
