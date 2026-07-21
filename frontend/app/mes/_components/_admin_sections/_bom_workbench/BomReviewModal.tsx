@@ -83,7 +83,7 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
             <TruncatedText className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
               {parent.item_name}
             </TruncatedText>
-            <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <TruncatedText className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
               {parent.mes_code ?? "(코드 없음)"} · {rows.length}개 자식
             </TruncatedText>
           </div>

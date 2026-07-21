@@ -62,12 +62,12 @@ export function AssignedModelsEditor({
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
               <span
-                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[12px] font-bold"
                 style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
               >
                 {idx + 1}
               </span>
-              <span className="flex-1 text-[13px]" style={{ color: LEGACY_COLORS.text }}>
+              <span className="flex-1 text-[14px]" style={{ color: LEGACY_COLORS.text }}>
                 {labelOf(slot)}
               </span>
               <button
@@ -106,7 +106,7 @@ export function AssignedModelsEditor({
 
       {unselected.length > 0 ? (
         <div className="mt-2">
-          <div className="mb-1 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mb-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
             추가
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -115,7 +115,7 @@ export function AssignedModelsEditor({
                 key={m.slot}
                 type="button"
                 onClick={() => add(m.slot)}
-                className="rounded-full border px-2 py-[3px] text-[11px] transition-colors hover:brightness-110"
+                className="rounded-full border px-2 py-[3px] text-[12px] transition-colors hover:brightness-110"
                 style={{
                   background: LEGACY_COLORS.s1,
                   borderColor: LEGACY_COLORS.border,

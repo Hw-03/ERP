@@ -119,7 +119,7 @@ export function BomParentList({
               </button>
             );
           })}
-          <span className="ml-auto self-center text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span className="ml-auto self-center text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
             {list.length}건
           </span>
         </div>
@@ -155,14 +155,14 @@ export function BomParentList({
                     {i.item_name}
                   </TruncatedText>
                   {i.mes_code && (
-                    <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <TruncatedText className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       {i.mes_code}
                     </TruncatedText>
                   )}
                 </div>
                 {mode === "edit" ? (
                   <span
-                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold"
+                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-bold"
                     style={{
                       background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
                       color: meta.color,

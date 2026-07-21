@@ -47,7 +47,7 @@ export function AdminDetailCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {title && (
-                <div className="text-[17px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                <div className="text-[18px] font-black" style={{ color: LEGACY_COLORS.text }}>
                   {title}
                 </div>
               )}
@@ -74,7 +74,7 @@ export function AdminDetailCard({
                 key={tab.id}
                 type="button"
                 onClick={() => onTabChange?.(tab.id)}
-                className="relative px-4 py-2 text-[13px] font-bold transition-colors"
+                className="relative px-4 py-2 text-[14px] font-bold transition-colors"
                 style={{
                   color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
                 }}

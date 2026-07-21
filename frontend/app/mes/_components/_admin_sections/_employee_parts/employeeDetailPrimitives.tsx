@@ -9,7 +9,7 @@ export function DetailCardSlot({ title, children }: { title: string; children: R
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
       <div
-        className="mb-3 text-[11px] font-black uppercase tracking-[0.18em]"
+        className="mb-3 text-[12px] font-black tracking-[0.12em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         {title}
@@ -34,7 +34,7 @@ export function FieldRow({
     <div className="flex flex-col gap-1">
       <label
         htmlFor={htmlFor}
-        className="text-[11px] font-bold uppercase tracking-[0.08em]"
+        className="text-[12px] font-bold tracking-[0.04em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         {label}
@@ -67,7 +67,7 @@ export function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+      className="w-full rounded-[10px] border px-3 py-2 text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
       style={{
         background: LEGACY_COLORS.s1,
         borderColor: LEGACY_COLORS.border,

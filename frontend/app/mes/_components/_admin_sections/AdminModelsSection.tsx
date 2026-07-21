@@ -109,15 +109,6 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
   );
   const idle = productModels.length - inUse.length;
 
-  // KPI: 연결 품목 총합
-  const totalLinkedItems = useMemo(() => {
-    let count = 0;
-    for (const it of items) {
-      if (Array.isArray(it.model_slots) && it.model_slots.length > 0) count += 1;
-    }
-    return count;
-  }, [items]);
-
   // 첫 항목 자동 선택
   useEffect(() => {
     if (selectedSlot !== null) return;
@@ -200,7 +191,6 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
           { key: "total", label: "전체 모델", value: productModels.length, hint: "등록된 슬롯", tone: LEGACY_COLORS.blue },
           { key: "use", label: "사용 중", value: inUse.length, hint: "이름이 등록된 모델", tone: LEGACY_COLORS.green },
           { key: "idle", label: "비활성", value: idle, hint: "이름 없는 빈 슬롯", tone: LEGACY_COLORS.muted2 },
-          { key: "linked", label: "연결 품목 수", value: totalLinkedItems, hint: "모델이 지정된 품목", tone: LEGACY_COLORS.purple },
         ]}
       />
 
@@ -208,7 +198,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         <AdminListPanel
           title="모델 목록"
           countLabel={`${productModels.length}건`}
-          width={320}
+          width={288}
           action={
             <Button variant="primary" size="sm" iconLeft={<Plus className="h-3.5 w-3.5" />} onClick={handleStartAdd}>
               추가
@@ -271,7 +261,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                     <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
                       {model.model_name ?? `슬롯 ${model.slot}`}
                     </div>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       M-{String(model.slot).padStart(4, "0")}
                     </div>
                   </div>
@@ -487,7 +477,7 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
                 value={editForm.model_name}
                 onChange={(e) => setEditForm((f) => ({ ...f, model_name: e.target.value }))}
                 placeholder="모델명 입력"
-                className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+                className="w-full rounded-[10px] border px-3 py-2 text-[14px] outline-none focus:border-[var(--c-blue)]"
                 style={{
                   background: LEGACY_COLORS.s1,
                   borderColor: LEGACY_COLORS.border,
@@ -503,7 +493,7 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
               value={editForm.symbol}
               onChange={(e) => setEditForm((f) => ({ ...f, symbol: e.target.value.slice(0, 5) }))}
               placeholder="예: A"
-              className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+              className="w-full rounded-[10px] border px-3 py-2 text-[14px] outline-none focus:border-[var(--c-blue)]"
               style={{
                 background: LEGACY_COLORS.s1,
                 borderColor: LEGACY_COLORS.border,
@@ -539,17 +529,17 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
           >
             {linkedItems.slice(0, 6).map((it) => (
-              <div key={it.item_id} className="flex items-center justify-between gap-2 text-[13px]">
+              <div key={it.item_id} className="flex items-center justify-between gap-2 text-[14px]">
                 <div className="min-w-0 flex-1 truncate" style={{ color: LEGACY_COLORS.text }}>
                   {it.item_name}
                 </div>
-                <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {it.mes_code ?? "—"}
                 </span>
               </div>
             ))}
             {linkedItems.length > 6 && (
-              <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 외 {linkedItems.length - 6}건
               </div>
             )}
@@ -578,7 +568,7 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
 function EditFieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="text-[12px] font-bold tracking-[0.06em]" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </div>
       {children}
@@ -611,7 +601,7 @@ function SummaryStat({
       <div className="mt-1 text-[24px] font-black leading-none" style={{ color: tone }}>
         {value}
       </div>
-      <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
         {hint}
       </div>
     </div>

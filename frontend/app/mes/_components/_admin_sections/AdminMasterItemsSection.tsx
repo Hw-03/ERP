@@ -170,7 +170,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         ]}
       />
 
-      <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "55fr 45fr", gridTemplateRows: "1fr" }}>
+      <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "minmax(420px, 0.92fr) minmax(460px, 1.08fr)", gridTemplateRows: "1fr" }}>
         <AdminListPanel
           title="품목 목록"
           countLabel={`${formatQty(visibleItems.length)}건`}
@@ -235,7 +235,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
                   />
                   <span
-                    className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black tabular-nums"
+                    className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-black tabular-nums"
                     style={{
                       background: isSelected
                         ? LEGACY_COLORS.blue
@@ -246,7 +246,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     {item.mes_code ?? "—"}
                   </span>
                   <span
-                    className="min-w-0 flex-1 truncate text-[13px] font-semibold"
+                    className="min-w-0 flex-1 truncate text-[14px] font-semibold"
                     style={{
                       color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
                       textDecoration: isDeleted ? "line-through" : "none",
@@ -557,7 +557,7 @@ function BomList({
               }}
             >
               <span
-                className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black"
+                className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-black"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 14%, transparent)`,
                   color: LEGACY_COLORS.muted,
@@ -578,7 +578,7 @@ function BomList({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="w-full px-4 py-2 text-left text-[11px] font-bold transition-colors hover:brightness-105"
+            className="w-full px-4 py-2 text-left text-[12px] font-bold transition-colors hover:brightness-105"
             style={{
               borderTop: `1px solid ${LEGACY_COLORS.border}`,
               color: LEGACY_COLORS.blue,
@@ -621,12 +621,12 @@ function HistoryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1">
       <div
-        className="text-[11px] font-bold uppercase tracking-[0.08em]"
+        className="text-[12px] font-bold tracking-[0.06em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         {label}
       </div>
-      <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+      <div className="text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
         {value}
       </div>
     </div>

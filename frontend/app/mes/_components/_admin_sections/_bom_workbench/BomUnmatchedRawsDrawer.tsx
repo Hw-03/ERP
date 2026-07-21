@@ -44,7 +44,7 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
             미배치 원자재
           </span>
           <span
-            className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+            className="rounded-full px-2 py-0.5 text-[12px] font-bold"
             style={{
               background: `color-mix(in srgb, ${accent} 14%, transparent)`,
               color: accent,
@@ -79,7 +79,7 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
                   {i.item_name}
                 </TruncatedText>
               </div>
-              <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 {i.mes_code}
               </div>
             </div>

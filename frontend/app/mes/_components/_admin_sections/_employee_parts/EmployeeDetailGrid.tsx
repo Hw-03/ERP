@@ -67,7 +67,7 @@ export function EmployeeDetailGrid({
         <div className="grid grid-cols-2 gap-3">
           <FieldRow label="사번">
             <div
-              className="w-full rounded-[10px] border px-3 py-2 text-[13px] font-bold"
+              className="w-full rounded-[10px] border px-3 py-2 text-[14px] font-bold"
               style={{
                 background: LEGACY_COLORS.s1,
                 borderColor: LEGACY_COLORS.border,
@@ -123,7 +123,7 @@ export function EmployeeDetailGrid({
               }))}
             />
             <div
-              className="mt-1.5 text-[11px]"
+              className="mt-1.5 text-[12px]"
               style={{ color: whMeta.tone }}
             >
               {whMeta.hint}
@@ -139,7 +139,7 @@ export function EmployeeDetailGrid({
               }))}
             />
             <div
-              className="mt-1.5 text-[11px]"
+              className="mt-1.5 text-[12px]"
               style={{ color: deptMeta.tone }}
             >
               {deptMeta.hint}
@@ -159,82 +159,82 @@ export function EmployeeDetailGrid({
                       borderColor: LEGACY_COLORS.border,
                     }}
                   />
-                  <span className="text-[13px]" style={{ color: LEGACY_COLORS.text }}>
+                  <span className="text-[14px]" style={{ color: LEGACY_COLORS.text }}>
                     {SIDEBAR_TAB_LABELS[tab]}
                   </span>
                 </label>
               ))}
             </div>
-            <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mt-1.5 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
               체크 해제한 탭은 해당 직원의 PC 사이드바와 모바일 메뉴에서 숨겨집니다.
             </div>
           </FieldRow>
         </div>
       </DetailCardSlot>
 
-      {/* 카드 3: PIN */}
-      <DetailCardSlot title="PIN">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <span
-              className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+      <div className="grid gap-3 lg:col-span-2 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <DetailCardSlot title="PIN">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span
+                className="rounded-full px-2.5 py-0.5 text-[12px] font-bold"
+                style={{
+                  background: `color-mix(in srgb, ${
+                    employee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green
+                  } 18%, transparent)`,
+                  color: employee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green,
+                }}
+              >
+                {employee.pin_is_default ? "기본 PIN (0000)" : "직원 설정 PIN"}
+              </span>
+            </div>
+            <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              마지막 변경:{" "}
+              {employee.pin_last_changed
+                ? new Date(employee.pin_last_changed).toLocaleDateString("ko-KR")
+                : "변경 이력 없음"}
+            </div>
+            <button
+              type="button"
+              onClick={() => onRequestPinReset(employee)}
+              className="mt-1 min-h-11 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110 active:scale-[0.98]"
               style={{
-                background: `color-mix(in srgb, ${
-                  employee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green
-                } 18%, transparent)`,
-                color: employee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green,
+                background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`,
+                color: LEGACY_COLORS.yellow,
               }}
             >
-              {employee.pin_is_default ? "기본 PIN (0000)" : "직원 설정 PIN"}
-            </span>
+              PIN 초기화 (0000)
+            </button>
           </div>
-          <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            마지막 변경:{" "}
-            {employee.pin_last_changed
-              ? new Date(employee.pin_last_changed).toLocaleDateString("ko-KR")
-              : "변경 이력 없음"}
-          </div>
-          <button
-            type="button"
-            onClick={() => onRequestPinReset(employee)}
-            className="mt-1 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`,
-              color: LEGACY_COLORS.yellow,
-            }}
-          >
-            PIN 초기화 (0000)
-          </button>
-        </div>
-      </DetailCardSlot>
+        </DetailCardSlot>
 
-      {/* 카드 4: 상태 */}
-      <DetailCardSlot title="상태">
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => onToggle(employee)}
-            className="rounded-[10px] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:brightness-110"
-            style={{ background: employee.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
-          >
-            {employee.is_active ? "직원 비활성화" : "직원 활성화"}
-          </button>
-          <button
-            type="button"
-            onClick={() => onRequestDelete(employee)}
-            className="flex items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
-              color: LEGACY_COLORS.red,
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            직원 삭제
-          </button>
-        </div>
-      </DetailCardSlot>
+        <DetailCardSlot title="계정 상태 및 위험 작업">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => onToggle(employee)}
+              className="min-h-11 flex-1 rounded-[10px] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:brightness-110 active:scale-[0.98]"
+              style={{ background: employee.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
+            >
+              {employee.is_active ? "직원 비활성화" : "직원 활성화"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onRequestDelete(employee)}
+              className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110 active:scale-[0.98]"
+              style={{
+                background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
+                color: LEGACY_COLORS.red,
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              직원 삭제
+            </button>
+          </div>
+        </DetailCardSlot>
+      </div>
 
       {/* 카드 5: 담당 모델 — 조립 부서일 때만 노출. 입출고 화면에서 조립 그룹 내 정렬 우선순위로 사용. */}
       {form.department === ASSEMBLY_DEPT ? (

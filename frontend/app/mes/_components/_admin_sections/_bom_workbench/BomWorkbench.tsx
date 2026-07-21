@@ -378,7 +378,7 @@ export function BomWorkbench({
       )}
 
       {/* 부서 탭 + 선택된 부모 헤더 (한 줄) */}
-      <div className="mb-3 flex min-w-0 items-center gap-3">
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-3">
         <div className="shrink-0">
           <BomDeptTabs value={dept} onChange={handleDeptChange} />
         </div>
@@ -392,8 +392,15 @@ export function BomWorkbench({
       </div>
 
       {/* 메인: 좌(상위) | 중(자식추가) | 우(현재구성) */}
-      <div className="flex min-h-0 flex-1 gap-3">
-        <div className="flex w-[26%] min-w-[260px] flex-col gap-2">
+      <div
+        className="grid min-h-0 flex-1 gap-3"
+        style={{
+          gridTemplateColumns: mode === "edit"
+            ? "minmax(280px, 0.78fr) minmax(340px, 1.1fr) minmax(340px, 1.1fr)"
+            : "minmax(280px, 0.78fr) minmax(0, 1.22fr)",
+        }}
+      >
+        <div className="flex min-w-0 flex-col gap-2">
           <BomParentList
             dept={dept}
             items={items}
@@ -408,7 +415,7 @@ export function BomWorkbench({
 
         {mode === "edit" ? (
           <>
-            <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {parent ? (
                 <BomChildAddBox
                   parent={parent}
@@ -429,7 +436,7 @@ export function BomWorkbench({
                 </div>
               )}
             </div>
-            <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <BomEditPanel
                 parent={parent}
                 bomRows={bomRows}
@@ -442,7 +449,7 @@ export function BomWorkbench({
             </div>
           </>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <BomWhereUsedPanel
               selected={parent}
               rows={whereUsedRows}

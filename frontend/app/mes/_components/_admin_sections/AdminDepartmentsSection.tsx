@@ -187,7 +187,6 @@ export function AdminDepartmentsSection({
             { key: "all", label: "전체 부서", value: departments.length, hint: "등록된 부서 수", tone: LEGACY_COLORS.blue },
             { key: "active", label: "사용 중", value: stats.active, hint: "활성 부서", tone: LEGACY_COLORS.green },
             { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
-            { key: "emp", label: "소속 직원 수", value: stats.employees, hint: "전체 직원 합", tone: LEGACY_COLORS.purple },
           ]}
         />
 
@@ -195,7 +194,7 @@ export function AdminDepartmentsSection({
           <AdminListPanel
             title="부서 목록"
             countLabel={`${filteredDepartments.length}개`}
-            width={340}
+            width={300}
             searchValue={search}
             searchPlaceholder="부서명 검색"
             onSearchChange={setSearch}
@@ -238,10 +237,10 @@ export function AdminDepartmentsSection({
                     style={{ background: color }}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                    <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
                       {dept.name}
                     </div>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       DPT-{String(dept.id).padStart(2, "0")} · {empCount}명
                     </div>
                   </div>

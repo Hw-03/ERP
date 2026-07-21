@@ -67,7 +67,7 @@ export function BomParentHeader({
       {mode === "edit" && (
         <>
           <span
-            className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-bold"
+            className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[12px] font-bold"
             style={{
               background: `color-mix(in srgb, ${statusMeta.color} 14%, transparent)`,
               color: statusMeta.color,

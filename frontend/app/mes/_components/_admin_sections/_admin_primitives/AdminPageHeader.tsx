@@ -21,7 +21,7 @@ export function AdminPageHeader({
 }: AdminPageHeaderProps) {
   const tone = danger ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   return (
-    <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="mb-4 flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-3">
         <div
           className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"
@@ -42,7 +42,7 @@ export function AdminPageHeader({
             </h2>
             {danger && (
               <span
-                className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold"
+                className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-bold"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`,
                   borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
@@ -56,7 +56,7 @@ export function AdminPageHeader({
           </div>
           {description && (
             <p
-              className="mt-1 text-[13px] leading-snug"
+              className="mt-1 text-[14px] leading-snug"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
               {description}

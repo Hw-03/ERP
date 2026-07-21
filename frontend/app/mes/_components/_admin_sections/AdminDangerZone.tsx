@@ -35,10 +35,8 @@ export function AdminDangerZone({
           description="관리자 PIN을 변경하여 계정 보안을 강화하세요."
         />
 
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
-          {/* 일반 설정 */}
-          <div>
-            <SectionLabel>일반 설정</SectionLabel>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
+          <div className="w-full max-w-[560px]">
             <div
               className="rounded-[16px] border p-5"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
@@ -62,18 +60,21 @@ export function AdminDangerZone({
                   </div>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              <div className="mt-5 grid gap-3">
                 <PinField
+                  id="admin-current-pin"
                   label="현재 PIN"
                   value={pinForm.current_pin}
                   onChange={(v) => setPinForm((c) => ({ ...c, current_pin: v }))}
                 />
                 <PinField
+                  id="admin-new-pin"
                   label="새 PIN"
                   value={pinForm.new_pin}
                   onChange={(v) => setPinForm((c) => ({ ...c, new_pin: v }))}
                 />
                 <PinField
+                  id="admin-confirm-pin"
                   label="새 PIN 확인"
                   value={pinForm.confirm_pin}
                   onChange={(v) => setPinForm((c) => ({ ...c, confirm_pin: v }))}
@@ -89,7 +90,7 @@ export function AdminDangerZone({
                 size="md"
                 onClick={onChangePin}
                 disabled={!canChangePin}
-                className="mt-4"
+                className="mt-5"
               >
                 PIN 변경
               </Button>
@@ -101,43 +102,40 @@ export function AdminDangerZone({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.22em]"
-      style={{ color: LEGACY_COLORS.muted2 }}
-    >
-      {children}
-    </div>
-  );
-}
-
 function PinField({
+  id,
   label,
   value,
   onChange,
   error,
 }: {
+  id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
   error?: string;
 }) {
+  const errorId = `${id}-error`;
+
   return (
     <div>
-      <div
-        className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em]"
+      <label
+        htmlFor={id}
+        className="mb-1 block text-[12px] font-bold tracking-[0.04em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         {label}
-      </div>
+      </label>
       <input
+        id={id}
         type="password"
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="0000"
-        className="w-full rounded-[10px] border px-3 py-2.5 text-[14px] tracking-widest outline-none focus:border-[var(--c-blue)]"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className="w-full rounded-[10px] border px-3 py-2.5 text-[14px] tracking-widest outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: error ? LEGACY_COLORS.red : LEGACY_COLORS.border,
@@ -145,7 +143,7 @@ function PinField({
         }}
       />
       {error && (
-        <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.red }}>
+        <div id={errorId} className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.red }}>
           {error}
         </div>
       )}

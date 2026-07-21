@@ -20,7 +20,7 @@ export function AdminKpiBar({ items }: AdminKpiBarProps) {
   if (items.length === 0) return null;
   return (
     <div
-      className="mb-2 grid shrink-0 gap-2"
+      className="mb-3 grid shrink-0 gap-2"
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((kpi) => (

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DesktopPinLock } from "./DesktopPinLock";
-import { AdminSidebar } from "./_admin_sections/AdminSidebar";
+import { AdminSectionTabs } from "./_admin_sections/AdminSectionTabs";
 import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
@@ -13,7 +13,7 @@ import { Toast, type ToastState } from "@/lib/ui/Toast";
 
 /**
  * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
- * 본 파일은 PIN gate, 좌/우 레이아웃 wrapper, 토스트 영역만 담당.
+ * 본 파일은 PIN gate, 상단 섹션 탐색, 작업 영역 wrapper, 토스트 영역만 담당.
  */
 export function DesktopAdminView({
   globalSearch,
@@ -85,19 +85,16 @@ export function DesktopAdminView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4 overflow-y-auto lg:overflow-hidden">
-      <div
-        className="flex flex-col gap-4 lg:grid lg:min-h-0 lg:flex-1"
-        style={{ gridTemplateColumns: "240px minmax(0,1fr)", transition: "grid-template-columns 0.2s ease" }}
-      >
-        <AdminSidebar
+    <div className="flex min-h-0 flex-1 overflow-y-auto pr-4 lg:overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <AdminSectionTabs
           section={section}
           onSelect={guardedSelectSection}
           onLock={lock}
         />
 
         {/* 워크스페이스 */}
-        <section className="flex flex-col overflow-auto lg:min-h-0 lg:overflow-hidden">
+        <section className="flex min-h-0 flex-1 flex-col overflow-auto pt-3 lg:overflow-hidden">
           {/* 섹션별 콘텐츠 */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AdminSectionContent

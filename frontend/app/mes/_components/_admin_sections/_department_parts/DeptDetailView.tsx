@@ -102,14 +102,15 @@ export function DeptDetailView({
       {/* 메타 그리드 */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: LEGACY_COLORS.muted2 }}>
+          <label htmlFor="department-name" className="text-[12px] font-bold tracking-wide" style={{ color: LEGACY_COLORS.muted2 }}>
             부서명
-          </span>
+          </label>
           <input
+            id="department-name"
             type="text"
             value={editForm.name}
             onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-            className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+            className="w-full rounded-[10px] border px-3 py-2 text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.border,
@@ -147,6 +148,7 @@ export function DeptDetailView({
             )}
             <div className="flex flex-col gap-0.5">
               <input
+                aria-label="색상 코드"
                 type="text"
                 value={editForm.color_hex}
                 onChange={(e) => {
@@ -159,7 +161,7 @@ export function DeptDetailView({
                   }
                 }}
                 placeholder="#000000"
-                className="w-32 rounded-[8px] border px-2 py-1 font-mono text-[13px] outline-none focus:border-[var(--c-blue)]"
+                className="w-32 rounded-[8px] border px-2 py-1 font-mono text-[14px] outline-none focus-visible:border-[var(--c-blue)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/20"
                 style={{
                   background: LEGACY_COLORS.s1,
                   borderColor: colorInputError ? "#ef4444" : LEGACY_COLORS.border,
@@ -167,34 +169,42 @@ export function DeptDetailView({
                 }}
               />
               {colorInputError && (
-                <span className="text-[11px]" style={{ color: "#ef4444" }}>
+                <span className="text-[12px]" style={{ color: "#ef4444" }}>
                   {colorInputError}
                 </span>
               )}
             </div>
           </div>
-          {/* Tailwind 프리셋 팔레트 (9 hues × 4 shades = 36 swatches) */}
-          <div className="grid grid-cols-9 gap-1">
-            {TAILWIND_PALETTE.map((swatch) => (
-              <button
-                key={swatch.hex}
-                type="button"
-                title={`${swatch.name} — ${swatch.hex}`}
-                className="h-7 w-7 rounded-lg border-2 transition-transform hover:scale-110 active:scale-95"
-                style={{
-                  background: swatch.hex,
-                  borderColor:
-                    editForm.color_hex.toLowerCase() === swatch.hex.toLowerCase()
-                      ? LEGACY_COLORS.text
-                      : "transparent",
-                }}
-                onClick={() => {
-                  setEditForm((f) => ({ ...f, color_hex: swatch.hex }));
-                  setColorInputError(null);
-                }}
-              />
-            ))}
-          </div>
+          <details>
+            <summary
+              className="cursor-pointer select-none text-[12px] font-bold"
+              style={{ color: LEGACY_COLORS.blue }}
+            >
+              전체 색상 보기
+            </summary>
+            <div className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-9">
+              {TAILWIND_PALETTE.map((swatch) => {
+                const selected = editForm.color_hex.toLowerCase() === swatch.hex.toLowerCase();
+                return (
+                  <button
+                    key={swatch.hex}
+                    type="button"
+                    aria-label={`${swatch.name} ${swatch.hex}`}
+                    aria-pressed={selected}
+                    className="h-11 w-11 rounded-lg border-2 transition-transform hover:scale-105 active:scale-[0.98]"
+                    style={{
+                      background: swatch.hex,
+                      borderColor: selected ? LEGACY_COLORS.text : "transparent",
+                    }}
+                    onClick={() => {
+                      setEditForm((f) => ({ ...f, color_hex: swatch.hex }));
+                      setColorInputError(null);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </details>
         </div>
       </DetailCardSlot>
 
@@ -207,7 +217,7 @@ export function DeptDetailView({
         ) : (
           <div className="flex flex-col gap-1.5">
             {deptEmployees.slice(0, 5).map((e) => (
-              <div key={e.employee_id} className="flex items-center gap-2 text-[13px]">
+              <div key={e.employee_id} className="flex items-center gap-2 text-[14px]">
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: e.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2 }}
@@ -223,7 +233,7 @@ export function DeptDetailView({
               </div>
             ))}
             {deptEmployees.length > 5 && (
-              <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 외 {deptEmployees.length - 5}명 더보기
               </div>
             )}

@@ -17,7 +17,7 @@ export function MetaCell({
       className="rounded-[12px] border px-3 py-2.5"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="text-[10px] font-bold uppercase tracking-[0.1em]" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="text-[12px] font-bold tracking-[0.08em]" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </div>
       <div
@@ -45,7 +45,7 @@ export function DetailCardSlot({
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
       <div
-        className="mb-3 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.18em]"
+        className="mb-3 flex items-center gap-1.5 text-[12px] font-black tracking-[0.12em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         {icon}

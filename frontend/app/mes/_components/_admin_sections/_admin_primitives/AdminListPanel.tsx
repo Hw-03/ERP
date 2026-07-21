@@ -66,7 +66,7 @@ export function AdminListPanel<T>({
               </div>
             )}
             {countLabel && (
-              <div className="text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="text-[12px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                 {countLabel}
               </div>
             )}

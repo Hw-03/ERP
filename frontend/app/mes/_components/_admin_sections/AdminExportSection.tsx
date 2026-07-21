@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common";
 import { FilterChip } from "../common/FilterChip";
-import { AdminKpiBar, AdminPageHeader } from "./_admin_primitives";
+import { AdminPageHeader } from "./_admin_primitives";
 
 type Props = {
   itemsExportUrl: string;
@@ -109,13 +109,6 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
   }, []);
 
   const range = useMemo(() => presetRange(preset), [preset]);
-
-  const stats = useMemo(() => {
-    const total = recent.length;
-    const success = recent.filter((r) => r.status === "success").length;
-    const failed = total - success;
-    return { total, success, failed };
-  }, [recent]);
 
   function pushRecord(rec: ExportRecord) {
     saveRecent(rec);
@@ -290,15 +283,6 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
         description="시스템 데이터를 안전하게 내보내고 관리하세요."
       />
 
-      <AdminKpiBar
-        items={[
-          { key: "total", label: "이번 세션 내보내기", value: stats.total, hint: "현재 세션 합계", tone: LEGACY_COLORS.blue },
-          { key: "success", label: "성공", value: stats.success, hint: "다운로드 완료", tone: LEGACY_COLORS.green },
-          { key: "failed", label: "실패", value: stats.failed, hint: "재시도 권장", tone: LEGACY_COLORS.red },
-          { key: "scope", label: "현재 범위", value: SCOPE_LABEL[scope], hint: "선택 데이터 범위", tone: LEGACY_COLORS.purple },
-        ]}
-      />
-
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
         {/* 상단 2개 카드 */}
         <div className="grid gap-3 lg:grid-cols-2">
@@ -327,7 +311,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
           className="rounded-[16px] border p-4"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
-          <div className="mb-3 flex items-center gap-2 text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
+          <div className="mb-3 flex items-center gap-2 text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
             <Calendar className="h-4 w-4" />
             내보내기 범위 설정
           </div>
@@ -335,7 +319,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             <div>
               <Label>기간 선택</Label>
               <div
-                className="rounded-[10px] border px-3 py-2 text-[13px]"
+                className="rounded-[10px] border px-3 py-2 text-[14px]"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
                 {range.start} ~ {range.end}
@@ -355,12 +339,12 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             <div>
               <Label>데이터 유형</Label>
               <div
-                className="rounded-[10px] border px-3 py-2 text-[13px]"
+                className="rounded-[10px] border px-3 py-2 text-[14px]"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
                 전체 데이터
               </div>
-              <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 CSV는 아래 데이터 범위 기준으로 내보냅니다.
               </div>
             </div>
@@ -380,7 +364,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             </div>
             <div>
               <Label>추가 옵션</Label>
-              <div className="flex flex-col gap-1.5 text-[13px]" style={{ color: LEGACY_COLORS.text }}>
+              <div className="flex flex-col gap-1.5 text-[14px]" style={{ color: LEGACY_COLORS.text }}>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -403,20 +387,20 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
         </div>
 
         {/* 하단: 최근 기록 + 마지막 내보내기 */}
-        <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
+        <div className={`grid gap-3 ${lastExport ? "lg:grid-cols-[1fr_280px]" : ""}`}>
           <div
             className="rounded-[16px] border p-4"
             style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
           >
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
+              <div className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
                 최근 내보내기 기록 (이번 세션)
               </div>
               {recent.length > 0 && (
                 <button
                   type="button"
                   onClick={handleClearRecent}
-                  className="text-[11px] font-bold transition-colors hover:underline"
+                  className="min-h-11 px-2 text-[12px] font-bold transition-colors hover:underline"
                   style={{ color: LEGACY_COLORS.muted2 }}
                 >
                   기록 지우기
@@ -433,7 +417,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             ) : (
               <div className="overflow-hidden rounded-[10px] border" style={{ borderColor: LEGACY_COLORS.border }}>
                 <div
-                  className="grid items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-[0.08em]"
+                  className="grid items-center gap-2 px-3 py-2 text-[12px] font-black uppercase tracking-[0.08em]"
                   style={{
                     gridTemplateColumns: "120px 60px 100px 1fr 70px 70px",
                     background: LEGACY_COLORS.s3,
@@ -468,7 +452,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                       {r.sizeKb ? `${r.sizeKb} KB` : "—"}
                     </span>
                     <span
-                      className="flex items-center justify-end gap-1 text-[11px] font-bold"
+                      className="flex items-center justify-end gap-1 text-[12px] font-bold"
                       style={{
                         color: r.status === "success" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
                       }}
@@ -492,14 +476,14 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
           </div>
 
           {/* 마지막 내보내기 */}
-          <div
-            className="rounded-[16px] border p-4"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-          >
+          {lastExport && (
+            <div
+              className="rounded-[16px] border p-4"
+              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+            >
             <div className="mb-2 text-[12px] font-black uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
               마지막 내보내기
             </div>
-            {lastExport ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   {lastExport.format === "Excel" ? (
@@ -508,16 +492,16 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                     <FileText className="h-5 w-5" style={{ color: LEGACY_COLORS.blue }} />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                    <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
                       {lastExport.fileName}
                     </div>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       {SCOPE_LABEL[lastExport.scope]} · {lastExport.format}
                     </div>
                   </div>
                 </div>
                 <div
-                  className="rounded-[8px] border px-2.5 py-1.5 text-[11px]"
+                  className="rounded-[8px] border px-2.5 py-1.5 text-[12px]"
                   style={{
                     background: `color-mix(in srgb, ${
                       lastExport.status === "success" ? LEGACY_COLORS.green : LEGACY_COLORS.red
@@ -530,21 +514,17 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                 >
                   {lastExport.status === "success" ? "✓ 다운로드 성공" : `✗ ${lastExport.error ?? "실패"}`}
                 </div>
-                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {formatDateTime(lastExport.time)}
                   {lastExport.sizeKb ? ` · ${lastExport.sizeKb} KB` : ""}
                 </div>
               </div>
-            ) : (
-              <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                기록 없음
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div
-          className="rounded-[10px] border px-3 py-2 text-[11px]"
+          className="rounded-[10px] border px-3 py-2 text-[12px]"
           style={{
             background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`,
             borderColor: LEGACY_COLORS.border,
@@ -599,7 +579,7 @@ function ExportCard({ tone, icon, title, description, actionLabel, onClick, disa
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[13px] font-bold text-white transition-opacity disabled:opacity-50"
+        className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-opacity disabled:opacity-50"
         style={{ background: tone }}
       >
         <Download className="h-4 w-4" />
@@ -612,7 +592,7 @@ function ExportCard({ tone, icon, title, description, actionLabel, onClick, disa
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.1em]"
+      className="mb-1.5 text-[12px] font-bold uppercase tracking-[0.1em]"
       style={{ color: LEGACY_COLORS.muted2 }}
     >
       {children}

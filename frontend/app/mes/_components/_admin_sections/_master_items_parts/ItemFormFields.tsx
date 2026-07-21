@@ -38,7 +38,7 @@ function FieldLabel({ label, badge }: { label: string; badge?: "필수" | "선�
       {label}
       {badge && (
         <span
-          className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+          className="rounded-full px-1.5 py-0.5 text-[12px] font-bold"
           style={{
             background: badge === "필수"
               ? `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`

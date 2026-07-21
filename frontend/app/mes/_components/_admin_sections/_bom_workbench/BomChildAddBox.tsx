@@ -210,14 +210,14 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                       {c.item_name}
                     </TruncatedText>
                     {c.mes_code && (
-                      <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      <TruncatedText className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                         {c.mes_code}
                       </TruncatedText>
                     )}
                   </div>
                   {already ? (
                     <span
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold"
+                      className="inline-flex items-center gap-1 text-[12px] font-semibold"
                       style={{ color: LEGACY_COLORS.green }}
                     >
                       <Check size={12} /> 등록됨

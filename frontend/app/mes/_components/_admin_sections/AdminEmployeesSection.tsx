@@ -145,7 +145,6 @@ export function AdminEmployeesSection() {
             { key: "all", label: "전체 직원", value: employees.length, hint: "등록된 모든 직원", tone: LEGACY_COLORS.blue },
             { key: "active", label: "활성", value: stats.active, hint: "근무 중", tone: LEGACY_COLORS.green },
             { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
-            { key: "mgr", label: "관리자·창고담당", value: stats.mgrOrWh, hint: "특별 권한 보유", tone: LEGACY_COLORS.purple },
           ]}
         />
 
@@ -153,7 +152,7 @@ export function AdminEmployeesSection() {
           <AdminListPanel
             title="직원 목록"
             countLabel={`${filteredEmployees.length}명`}
-            width={320}
+            width={288}
             searchValue={search}
             searchPlaceholder="이름·부서·직급 검색"
             onSearchChange={setSearch}
@@ -198,13 +197,13 @@ export function AdminEmployeesSection() {
                   />
                   <div className="min-w-0 flex-1">
                     <div
-                      className="truncate text-[13px] font-bold"
+                      className="truncate text-[14px] font-bold"
                       style={{ color: LEGACY_COLORS.text }}
                     >
                       {employee.name}
                     </div>
                     <div
-                      className="truncate text-[11px]"
+                      className="truncate text-[12px]"
                       style={{ color: LEGACY_COLORS.muted2 }}
                     >
                       {deptName}
