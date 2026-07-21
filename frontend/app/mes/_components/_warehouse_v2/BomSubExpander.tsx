@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, GitBranch } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMTreeNode } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -307,9 +307,30 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
         style={{ borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}
       >다시 시도</button>}
       {tree && <>
-        {modal && <p className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-          {tree.item_name} · {tree.mes_code}
-        </p>}
+        {modal && <div
+          data-testid="bom-tree-parent-header"
+          className="mb-3 flex items-start gap-3 rounded-[18px] border px-4 py-3"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+          }}
+        >
+          <span
+            className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black"
+            style={{ color: LEGACY_COLORS.blue, background: tint(LEGACY_COLORS.blue, 12) }}
+          >
+            <GitBranch className="h-3 w-3" />
+            BOM
+          </span>
+          <div className="min-w-0">
+            <p className="break-words text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+              {tree.item_name}
+            </p>
+            <p className="mt-1 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              {tree.mes_code}
+            </p>
+          </div>
+        </div>}
         {tree.children.length === 0 ? (
           <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             하위 품목이 없습니다.

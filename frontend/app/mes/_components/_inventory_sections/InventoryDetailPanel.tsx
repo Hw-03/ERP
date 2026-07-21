@@ -2,18 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Eye, ImageOff } from "lucide-react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Eye, ImageOff } from "lucide-react";
 import { api, type Item, type StockRequestReservationLine } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 import { getStockState } from "@/lib/mes/inventory";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
-import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
+import { BomDetailModal } from "./BomDetailModal";
 import { BomSubExpander } from "../_warehouse_v2/BomSubExpander";
 import { inboundChoices, outboundChoices, quickChoiceToIntent } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
@@ -151,6 +150,17 @@ export function InventoryDetailPanel({
           <div className="grid grid-cols-2 gap-3">
             <div
               className="rounded-[18px] border px-4 py-3"
+              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+            >
+              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                사용 가능 재고
+              </div>
+              <div className="mt-1 text-xl font-black" style={{ color: availableState.color }}>
+                {formatQty(availableQty)}
+              </div>
+            </div>
+            <div
+              className="rounded-[18px] border px-4 py-3"
               style={{
                 background: LEGACY_COLORS.s1,
                 borderColor: pendingQty > 0
@@ -166,17 +176,6 @@ export function InventoryDetailPanel({
                 style={{ color: pendingQty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}
               >
                 {formatQty(pendingQty)}
-              </div>
-            </div>
-            <div
-              className="rounded-[18px] border px-4 py-3"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                사용 가능 재고
-              </div>
-              <div className="mt-1 text-xl font-black" style={{ color: availableState.color }}>
-                {formatQty(availableQty)}
               </div>
             </div>
           </div>
@@ -244,8 +243,8 @@ export function InventoryDetailPanel({
               color: LEGACY_COLORS.text,
             }}
           >
-            <ChevronRight size={15} strokeWidth={2.5} />
-            {quickActionVariant === "desktop" ? "BOM 보기" : `하위 구성 ${mobileBomOpen ? "접기" : "보기"}`}
+            {quickActionVariant === "mobile" && <ChevronRight size={15} strokeWidth={2.5} />}
+            {quickActionVariant === "desktop" ? "하위 구성 보기" : `하위 구성 ${mobileBomOpen ? "접기" : "보기"}`}
           </button>
           {quickActionVariant === "mobile" && mobileBomOpen && (
             <div className="mt-2">
@@ -261,18 +260,11 @@ export function InventoryDetailPanel({
         </div>
       )}
       {quickActionVariant === "desktop" && (
-        <ConfirmModal
+        <BomDetailModal
+          itemId={item.item_id}
           open={bomModalOpen}
-          viewer
-          title="BOM 구성 보기"
-          cancelLabel="닫기"
           onClose={() => setBomModalOpen(false)}
-        >
-          <div className="max-h-[60vh] overflow-y-auto">
-            <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>읽기 전용 · 구성품별 현재 재고</p>
-            <BomSubExpander itemId={item.item_id} open modal />
-          </div>
-        </ConfirmModal>
+        />
       )}
 
       {/* 빠른 작업 */}
@@ -340,15 +332,23 @@ export function InventoryDetailPanel({
             ["in", "입고", LEGACY_COLORS.blue, inboundChoices(canReceive)],
             ["out", "출고", LEGACY_COLORS.red, outboundChoices],
           ] as const).map(([direction, label, accent, choices]) => (
-            <div key={direction} className="flex flex-col gap-1">
+            <div
+              key={direction}
+              data-testid={`quick-action-group-${direction}`}
+              className="flex flex-col gap-1 rounded-[18px] border p-1.5"
+              style={{
+                borderColor: mix(accent, 32, LEGACY_COLORS.border),
+                background: mix(accent, 7, LEGACY_COLORS.s2),
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setIoMenu((menu) => menu === direction ? null : direction)}
                 className="w-full rounded-[18px] border px-4 py-3 text-sm font-bold transition-opacity hover:opacity-90"
                 style={{
-                  background: mix(accent, 14),
-                  borderColor: mix(accent, 42, LEGACY_COLORS.border),
-                  color: accent,
+                  background: LEGACY_COLORS.s1,
+                  borderColor: LEGACY_COLORS.border,
+                  color: LEGACY_COLORS.text,
                 }}
               >
                 {label}
@@ -356,8 +356,8 @@ export function InventoryDetailPanel({
               {ioMenu === direction && <div
                 className={`flex w-[calc(200%+0.5rem)] flex-col gap-2 rounded-[14px] border p-3${direction === "out" ? " -translate-x-[calc(50%+0.25rem)]" : ""}`}
                 style={{
-                  borderColor: mix(accent, 32, LEGACY_COLORS.border),
-                  background: mix(accent, 7, LEGACY_COLORS.s2),
+                  borderColor: LEGACY_COLORS.border,
+                  background: LEGACY_COLORS.s1,
                 }}
               >
                 {choices.map((choice) => <button
@@ -369,8 +369,9 @@ export function InventoryDetailPanel({
                   }}
                   className="flex min-h-[64px] flex-col items-start justify-center rounded-[10px] border px-3 py-3 text-left transition-colors hover:opacity-80"
                   style={{
-                    background: mix(accent, 10),
-                    borderColor: mix(accent, 32, LEGACY_COLORS.border),
+                    background: LEGACY_COLORS.s1,
+                    borderColor: LEGACY_COLORS.border,
+                    color: LEGACY_COLORS.text,
                   }}
                 >
                   <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>{choice.label}</span>
