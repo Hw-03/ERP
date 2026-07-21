@@ -231,6 +231,42 @@ describe("buildHistoryDetailSummary", () => {
     ]);
   });
 
+  it("uses the disassembly parent as the primary target for mixed rework results", () => {
+    const scrap = makeLog({
+      log_id: "scrap",
+      item_id: "scrap-item",
+      item_name: "폐기 결과",
+      mes_code: "SCRAP-001",
+      transaction_type: "DEFECT_SCRAP",
+      quantity_change: -3,
+    });
+    const recovered = makeLog({
+      log_id: "recovered",
+      item_id: "recovered-item",
+      item_name: "회수 결과",
+      mes_code: "RECOVER-001",
+      transaction_type: "RECEIVE",
+      quantity_change: 2,
+    });
+    const disassembly = makeLog({
+      log_id: "disassembly",
+      item_id: "parent-item",
+      item_name: "재작업 대상",
+      mes_code: "PARENT-001",
+      transaction_type: "DISASSEMBLE",
+      quantity_change: -5,
+    });
+
+    const summary = buildHistoryDetailSummary([scrap, recovered, disassembly], makeBatch({ sub_type: "disassemble" }));
+
+    expect(summary.target).toEqual({
+      itemId: "parent-item",
+      itemName: "재작업 대상",
+      mesCode: "PARENT-001",
+    });
+    expect(summary.operationLabel).toBe("재작업");
+  });
+
   it("uses the first bundle source item as the primary target for multiple outputs", () => {
     const secondaryOutput = makeLog({
       log_id: "secondary-output",

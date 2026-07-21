@@ -211,6 +211,9 @@ function getItemConversion(logs: TransactionLog[]): HistoryDetailSummary["conver
 }
 
 function getPrimaryLog(logs: TransactionLog[], batch: IoBatch | null): TransactionLog {
+  if (batch?.sub_type === "disassemble") {
+    return logs.find((log) => log.transaction_type === "DISASSEMBLE") ?? logs[0];
+  }
   if (batch?.sub_type === "produce") {
     const sourceItemId = batch.bundles[0]?.source_item_id;
     return logs.find(

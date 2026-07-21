@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMTreeNode } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { formatQty } from "@/lib/mes/format";
 import { mesCodeDeptBadge } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 
@@ -35,15 +36,8 @@ function Connector({ isLast }: { isLast: boolean }) {
       {/* 세로: top → 중앙 (위로 연결) */}
       <span
         className="absolute left-1/2 -translate-x-1/2"
-        style={{ top: 0, height: ROW_H / 2, width: RAIL_W, background: RAIL }}
+        style={{ top: 0, height: isLast ? ROW_H / 2 : ROW_H, width: RAIL_W, background: RAIL }}
       />
-      {/* 세로: 중앙 → bottom (막내가 아니면 다음 형제로 계속) */}
-      {!isLast && (
-        <span
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{ top: ROW_H / 2, bottom: 0, width: RAIL_W, background: RAIL }}
-        />
-      )}
       {/* 가로: 중앙 → 우측 끝 */}
       <span
         className="absolute -translate-y-1/2"
@@ -59,6 +53,7 @@ function BomTreeItem({
   isLast,
   compact = false,
   tapToExpandName = false,
+  stock = false,
 }: {
   node: BOMTreeNode;
   rails: boolean[];
@@ -66,11 +61,12 @@ function BomTreeItem({
   compact?: boolean;
   /** 항목 2-1 (모바일 전용) — 이름 행을 탭하면 풀네임 펼침. 데스크톱 호출처는 미전달(기본 false). */
   tapToExpandName?: boolean;
+  stock?: boolean;
 }) {
   const getDeptColor = useDeptColorLookup();
   const [open, setOpen] = useState(false);
   // 항목 2-1 — 이름 탭 펼침 상태(모바일 전용). tapToExpandName=false 면 항상 false 라 데스크톱 영향 없음.
-  const [nameExpanded, setNameExpanded] = useState(false);
+  const [nameExpanded, setNameExpanded] = useState(stock);
   const hasKids = node.children.length > 0;
   const deptBadge = node.mes_code ? mesCodeDeptBadge(node.mes_code, getDeptColor) : null;
   const qty = node.required_quantity;
@@ -107,28 +103,25 @@ function BomTreeItem({
         <span className="mr-px text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>×</span>
         {qty}
       </span>
+      {stock && (
+        <span
+          className="text-xs font-bold tabular-nums"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          현재 재고 {formatQty(node.current_stock)} {node.unit}
+        </span>
+      )}
     </>
   );
 
   return (
     <li>
       <div
-        className={
-          tapToExpandName && nameExpanded
-            ? "flex items-start transition-colors duration-150"
-            : "flex items-center transition-colors duration-150"
-        }
+        className={`flex ${tapToExpandName && nameExpanded ? "items-start" : "items-center"} transition-colors duration-150 hover:bg-[var(--c-s4)]`}
         style={{
           height: tapToExpandName && nameExpanded ? undefined : ROW_H,
           minHeight: ROW_H,
-          background: "transparent",
         }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLDivElement).style.background = LEGACY_COLORS.s4)
-        }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLDivElement).style.background = "transparent")
-        }
       >
         {/* 가이드 레일 + 엘보 */}
         {rails.map((show, i) => (
@@ -161,6 +154,7 @@ function BomTreeItem({
         {tapToExpandName && nameExpanded ? (
           <button
             type="button"
+            disabled={stock}
             onClick={() => setNameExpanded(false)}
             className="no-btn-inset ml-1 flex min-w-0 flex-1 flex-col gap-1 py-1.5 text-left"
           >
@@ -216,6 +210,7 @@ function BomTreeItem({
               isLast={i === node.children.length - 1}
               compact={compact}
               tapToExpandName={tapToExpandName}
+              stock={stock}
             />
           ))}
         </ul>
@@ -231,37 +226,50 @@ interface Props {
   compact?: boolean;
   /** 항목 2-1 (모바일 전용) — 이름 탭 풀네임 펼침. 데스크톱 호출처는 미전달(기본 false). */
   tapToExpandName?: boolean;
+  /** 팝업 본문용 — 부모 식별, 현재 재고, 재시도를 표시한다. */
+  modal?: boolean;
 }
 
-export function BomSubExpander({ itemId, open, compact = false, tapToExpandName = false }: Props) {
-  const [tree, setTree] = useState<BOMTreeNode | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+export function BomSubExpander({ itemId, open, compact = false, tapToExpandName = false, modal = false }: Props) {
+  const [tree, setTree] = useState<BOMTreeNode | false | null>(null);
+  const [requestVersion, setRequestVersion] = useState(0);
+  const loadedItemRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!open || tree) return;
-    setLoading(true);
-    setError(false);
+    let active = true;
+    if (!open || loadedItemRef.current === itemId) return;
+    setTree(null);
     api
       .getBOMTree(itemId)
-      .then(setTree)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [open, itemId, tree]);
+      .then((nextTree) => {
+        if (!active) return;
+        loadedItemRef.current = itemId;
+        setTree(nextTree);
+      })
+      .catch(() => {
+        if (!active) return;
+        setTree(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, itemId, requestVersion]);
 
   if (!open) return null;
 
   return (
     <div
       className={
-        compact
+        modal
+          ? ""
+          : compact
           ? "overflow-hidden rounded-[14px] border"
           : "mb-2 ml-12 mr-4 overflow-hidden rounded-xl border"
       }
-      style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+      style={modal ? undefined : { borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
     >
       {/* 맥락 헤더 — 읽기전용 명시 */}
-      <div
+      {!modal && <div
         className="flex items-center justify-between border-b px-3 py-1.5"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
@@ -277,37 +285,47 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
         >
           읽기 전용
         </span>
-      </div>
+      </div>}
 
-      {loading && (
+      {tree === null && (
         <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
           불러오는 중…
         </div>
       )}
-      {error && !loading && (
+      {tree === false && (
         <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.red }}>
           하위 구성을 불러오지 못했습니다.
         </div>
       )}
-      {!loading && !error && tree && tree.children.length > 0 && (
-        <ul className="py-1">
-          {tree.children.map((c, i) => (
-            <BomTreeItem
-              key={c.item_id}
-              node={c}
-              rails={[]}
-              isLast={i === tree.children.length - 1}
-              compact={compact}
-              tapToExpandName={tapToExpandName}
-            />
-          ))}
-        </ul>
-      )}
-      {!loading && !error && tree && tree.children.length === 0 && (
-        <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          하위 품목이 없습니다.
-        </div>
-      )}
+      {modal && tree === false && <button
+        type="button"
+        onClick={() => {
+          setTree(null);
+          setRequestVersion((version) => version + 1);
+        }}
+        className="mb-4 rounded-lg border px-3 py-2 text-sm font-bold"
+        style={{ borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}
+      >다시 시도</button>}
+      {tree && <>
+        {modal && <p className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+          {tree.item_name} · {tree.mes_code}
+        </p>}
+        {tree.children.length === 0 ? (
+          <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            하위 품목이 없습니다.
+          </div>
+        ) : <ul className="py-1">
+          {tree.children.map((child, index) => <BomTreeItem
+            key={child.item_id}
+            node={child}
+            rails={[]}
+            isLast={index === tree.children.length - 1}
+            compact={compact}
+            tapToExpandName={modal || tapToExpandName}
+            stock={modal}
+          />)}
+        </ul>}
+      </>}
     </div>
   );
 }

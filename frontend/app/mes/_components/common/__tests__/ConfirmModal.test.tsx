@@ -52,6 +52,39 @@ describe("ConfirmModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("viewer에서만 backdrop을 닫고 확인 버튼을 숨김", () => {
+    const onClose = vi.fn();
+    render(
+      <ConfirmModal
+        open
+        viewer
+        title="BOM 구성 보기"
+        onClose={onClose}
+      >
+        <p>읽기 전용 구성</p>
+      </ConfirmModal>
+    );
+
+    expect(screen.queryByRole("button", { name: "확인" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("기본 확인창은 backdrop 클릭으로 닫히지 않음", () => {
+    const onClose = vi.fn();
+    render(
+      <ConfirmModal
+        open
+        title="확인"
+        onClose={onClose}
+        onConfirm={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("open=false 면 아무것도 렌더 안 함", () => {
     render(
       <ConfirmModal

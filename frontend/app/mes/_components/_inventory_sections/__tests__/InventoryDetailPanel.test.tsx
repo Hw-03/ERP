@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Item } from "@/lib/api";
+import { api, type BOMTreeNode, type Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopRightPanel } from "../../DesktopRightPanel";
+import { SlidePanel } from "../../common/SlidePanel";
+import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
 
 vi.mock("@/app/mes/_components/DepartmentsContext", () => ({
   useDeptColorLookup: () => () => LEGACY_COLORS.blue,
@@ -21,12 +23,10 @@ vi.mock("../InventoryDetailLocations", () => ({
 
 import { InventoryDetailPanel } from "../InventoryDetailPanel";
 
-const originalScrollToDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
-
 function makeItem(): Item {
   return {
     item_id: "item-1",
-    item_name: "테스트 품목",
+    item_name: "테스트 항목",
     mes_code: "46-AA-0080",
     spec: null,
     unit: "EA",
@@ -40,101 +40,227 @@ function makeItem(): Item {
   } as unknown as Item;
 }
 
+function makeBomItem(): Item {
+  return { ...makeItem(), bom_completed_at: "2026-07-21T00:00:00Z" } as Item;
+}
+
+const bomTree: BOMTreeNode = {
+  item_id: "item-1",
+  item_name: "완성품",
+  mes_code: "46-AA-0080",
+  process_type_code: null,
+  unit: "EA",
+  required_quantity: 1,
+  current_stock: 3,
+  children: [{
+    item_id: "component-1",
+    item_name: "구성품 A",
+    mes_code: "46-AA-0081",
+    process_type_code: null,
+    unit: "EA",
+    required_quantity: 2,
+    current_stock: 10,
+    children: [],
+  }],
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
-  if (originalScrollToDescriptor) {
-    Object.defineProperty(HTMLElement.prototype, "scrollTo", originalScrollToDescriptor);
-  } else {
-    delete (HTMLElement.prototype as { scrollTo?: HTMLElement["scrollTo"] }).scrollTo;
-  }
 });
 
 describe("InventoryDetailPanel desktop quick actions", () => {
-  it("uses the danger token for the outbound action", () => {
-    render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />);
+  it("uses pastel blue and red cards with matching action borders", () => {
+    render(
+      <DesktopRightPanel title="테스트 항목">
+        <InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />
+      </DesktopRightPanel>,
+    );
 
+    expect(screen.getByRole("button", { name: "입고" })).toHaveStyle({
+      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 42%, ${LEGACY_COLORS.border})`,
+      color: LEGACY_COLORS.blue,
+    });
     expect(screen.getByRole("button", { name: "출고" })).toHaveStyle({
-      background: LEGACY_COLORS.red,
-      color: LEGACY_COLORS.white,
+      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 42%, ${LEGACY_COLORS.border})`,
+      color: LEGACY_COLORS.red,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "입고" }));
+    expect(screen.getByRole("button", { name: /부서 입고/ })).toHaveStyle({
+      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 32%, ${LEGACY_COLORS.border})`,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "출고" }));
+    expect(screen.getByRole("button", { name: /부서 출고/ })).toHaveStyle({
+      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 32%, ${LEGACY_COLORS.border})`,
     });
   });
 
-  it("scrolls only the desktop detail body when opening an inbound menu", async () => {
-    const scrollTo = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
-      configurable: true,
-      value: scrollTo,
-    });
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
-      if (this.dataset.testid === "desktop-right-panel-body") {
-        return { top: 0, bottom: 500 } as DOMRect;
-      }
-      if (this.textContent?.includes("부서 입고")) {
-        return { top: 460, bottom: 560 } as DOMRect;
-      }
-      return { top: 0, bottom: 0 } as DOMRect;
-    });
-
+  it("portals desktop quick actions into the fixed right-panel footer", () => {
     render(
-      <DesktopRightPanel title="테스트 품목">
+      <DesktopRightPanel title="테스트 항목">
         <InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />
       </DesktopRightPanel>,
     );
 
+    const footer = screen.getByTestId("desktop-right-panel-footer");
     const body = screen.getByTestId("desktop-right-panel-body");
-    Object.defineProperty(body, "scrollTop", { configurable: true, value: 40 });
-    fireEvent.click(screen.getByRole("button", { name: "입고" }));
-
-    await waitFor(() => {
-      expect(scrollTo).toHaveBeenCalledWith({ top: 116, behavior: "smooth" });
-    });
+    expect(footer).toContainElement(screen.getByRole("button", { name: "입고" }));
+    expect(footer).toContainElement(screen.getByRole("button", { name: "출고" }));
+    expect(body).not.toContainElement(screen.getByRole("button", { name: "입고" }));
+    expect(footer).toHaveClass("max-h-[45%]", "overflow-y-auto");
   });
+});
 
-  it("scrolls the desktop detail body when opening an outbound menu", async () => {
-    const scrollTo = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
-      configurable: true,
-      value: scrollTo,
-    });
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
-      if (this.dataset.testid === "desktop-right-panel-body") {
-        return { top: 0, bottom: 500 } as DOMRect;
-      }
-      if (this.textContent?.includes("부서 출고")) {
-        return { top: 470, bottom: 570 } as DOMRect;
-      }
-      return { top: 0, bottom: 0 } as DOMRect;
-    });
-
+describe("InventoryDetailPanel desktop BOM viewer", () => {
+  it("opens a read-only BOM modal that shows the tree and current component stock", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
     render(
-      <DesktopRightPanel title="테스트 품목">
-        <InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />
+      <DesktopRightPanel title="테스트 항목">
+        <InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />
       </DesktopRightPanel>,
     );
 
-    const body = screen.getByTestId("desktop-right-panel-body");
-    Object.defineProperty(body, "scrollTop", { configurable: true, value: 40 });
-    fireEvent.click(screen.getByRole("button", { name: "출고" }));
+    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
 
-    await waitFor(() => {
-      expect(scrollTo).toHaveBeenCalledWith({ top: 126, behavior: "smooth" });
+    const dialog = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    expect(dialog).toHaveTextContent("구성품 A");
+    expect(dialog).toHaveTextContent("현재 재고 10 EA");
+    expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
+  });
+
+  it("identifies the BOM parent item in the loaded modal header", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialog).toHaveTextContent(bomTree.item_name));
+    expect(dialog).toHaveTextContent(bomTree.mes_code);
+  });
+
+  it("retries the same BOM request after a load error", async () => {
+    vi.spyOn(api, "getBOMTree")
+      .mockRejectedValueOnce(new Error("network failure"))
+      .mockResolvedValueOnce(bomTree);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+
+    await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
+
+    await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveTextContent(bomTree.item_name));
+  });
+
+  it("closes the BOM modal with Escape or the backdrop and returns focus to its trigger", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+
+    const trigger = screen.getByRole("button", { name: "BOM 보기" });
+    fireEvent.click(trigger);
+    await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    const dialog = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    fireEvent.click(dialog);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("closes only the BOM modal when Escape is pressed inside a containing SlidePanel", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    const closePanel = vi.fn();
+    render(
+      <SlidePanel open onClose={closePanel} hideCloseButton labelledBy="inventory-panel-title">
+        <h2 id="inventory-panel-title">재고 상세</h2>
+        <InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />
+      </SlidePanel>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "BOM 구성 보기" })).not.toBeInTheDocument());
+    expect(closePanel).not.toHaveBeenCalled();
+  });
+
+  it("traps Tab and Shift+Tab on the modal close button", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    vi.spyOn(HTMLElement.prototype, "offsetParent", "get").mockReturnValue(document.body);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    const closeButton = screen.getByRole("button", { name: "닫기" });
+    expect(closeButton).toHaveFocus();
+
+    expect(fireEvent.keyDown(closeButton, { key: "Tab" })).toBe(false);
+    expect(closeButton).toHaveFocus();
+    expect(fireEvent.keyDown(closeButton, { key: "Tab", shiftKey: true })).toBe(false);
+    expect(closeButton).toHaveFocus();
+  });
+
+  it("does not render stale BOM responses after item changes and a rapid reopen", async () => {
+    const first = deferred<BOMTreeNode>();
+    const second = deferred<BOMTreeNode>();
+    const latest = deferred<BOMTreeNode>();
+    vi.spyOn(api, "getBOMTree")
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockReturnValueOnce(latest.promise);
+    const { rerender } = render(
+      <BomSubExpander itemId="item-1" open modal />,
+    );
+
+    await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(1));
+    rerender(<BomSubExpander itemId="item-2" open modal />);
+    await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(2));
+    rerender(<BomSubExpander itemId="item-2" open={false} modal />);
+    rerender(<BomSubExpander itemId="item-2" open modal />);
+    await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(3));
+
+    await act(async () => {
+      latest.resolve({ ...bomTree, children: [{ ...bomTree.children[0], item_name: "최신 구성품" }] });
+      await latest.promise;
     });
+    expect(await screen.findByText("최신 구성품")).toBeInTheDocument();
+
+    await act(async () => {
+      first.resolve({ ...bomTree, children: [{ ...bomTree.children[0], item_name: "오래된 구성품 1" }] });
+      second.resolve({ ...bomTree, children: [{ ...bomTree.children[0], item_name: "오래된 구성품 2" }] });
+      await Promise.all([first.promise, second.promise]);
+    });
+    expect(screen.queryByText("오래된 구성품 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("오래된 구성품 2")).not.toBeInTheDocument();
+    expect(screen.getByText("최신 구성품")).toBeInTheDocument();
   });
 
-  it("gives expanded desktop choices a clearly taller tap area", () => {
-    render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />);
+  it("uses the responsive BOM tree layout inside the modal", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "입고" }));
-    const choice = screen.getByRole("button", { name: /부서 입고/ });
-    expect(choice).toHaveClass("min-h-[64px]", "py-3");
-    expect(choice.parentElement).toHaveClass("w-[calc(200%+0.5rem)]", "gap-2", "p-3");
-  });
+    fireEvent.click(screen.getByRole("button", { name: "BOM 보기" }));
+    await screen.findByRole("dialog", { name: "BOM 구성 보기" });
 
-  it("aligns outbound choices with the desktop detail panel left edge", () => {
-    render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "출고" }));
-    const choice = screen.getByRole("button", { name: /부서 출고/ });
-    expect(choice.parentElement).toHaveClass("-translate-x-[calc(50%+0.25rem)]");
+    expect(await screen.findByText("구성품 A")).toHaveClass("break-words");
+    expect(screen.getByText("현재 재고 10 EA")).toBeInTheDocument();
   });
 });

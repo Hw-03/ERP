@@ -83,7 +83,7 @@ export function DesktopRightPanel({
         </div>
       </div>
           <div ref={setBody} data-testid="desktop-right-panel-body" className="sg min-h-0 flex-1 overflow-y-auto">{children}</div>
-          <div ref={setFooter} data-testid="desktop-right-panel-footer" className="shrink-0 empty:hidden pt-4" />
+          <div ref={setFooter} data-testid="desktop-right-panel-footer" className="max-h-[45%] shrink-0 overflow-y-auto empty:hidden pt-4" />
         </div>
       </DesktopRightPanelFooterContext.Provider>
     </DesktopRightPanelBodyContext.Provider>

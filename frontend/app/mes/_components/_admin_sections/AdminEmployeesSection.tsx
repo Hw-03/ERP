@@ -6,7 +6,7 @@ import { type Employee, type ProductModel } from "@/lib/api";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { PIN_LENGTH } from "@/lib/auth/constants";
-import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
+import { normalizeDepartment, resolveDepartmentColor } from "@/lib/mes/department";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
@@ -177,7 +177,7 @@ export function AdminEmployeesSection() {
             renderItem={(employee) => {
               const active = selectedEmployee?.employee_id === employee.employee_id;
               const deptName = normalizeDepartment(employee.department);
-              const deptColor = getDepartmentFallbackColor(deptName);
+              const deptColor = resolveDepartmentColor(departments, deptName);
               return (
                 <button
                   key={employee.employee_id}

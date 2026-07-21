@@ -115,6 +115,28 @@ export function getDepartmentFallbackColor(departmentName: string): string {
   return MES_DEPARTMENT_COLORS[key] ?? FALLBACK_COLOR;
 }
 
+type DepartmentColorSource = {
+  name: string;
+  color_hex?: string | null;
+};
+
+/**
+ * 현재 부서 마스터 목록에서 부서 색을 해석한다.
+ *
+ * 저장된 color_hex를 우선하고, 매칭되는 마스터가 없거나 색이 비어 있을 때만
+ * 공통 fallback으로 안전하게 처리한다.
+ */
+export function resolveDepartmentColor(
+  departments: readonly DepartmentColorSource[],
+  departmentName: string | null | undefined,
+): string {
+  const normalized = normalizeDepartmentName(departmentName);
+  const matched = departments.find(
+    (department) => normalizeDepartmentName(department.name) === normalized,
+  );
+  return matched?.color_hex?.trim() || getDepartmentFallbackColor(normalized);
+}
+
 /**
  * 부서 이니셜 한 글자.
  */

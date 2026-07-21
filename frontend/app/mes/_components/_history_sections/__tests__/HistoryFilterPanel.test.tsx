@@ -48,7 +48,7 @@ describe("HistoryFilterPanel", () => {
 
     expect(screen.getByText("작업 종류")).toBeInTheDocument();
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(expect.arrayContaining([
-      "전체", "창고", "부서 입출고", "불량", "품목 전환", "출하",
+      "전체", "창고 입출고", "부서 입출고", "불량", "품목 전환", "출하",
     ]));
     expect(screen.queryByRole("button", { name: "원자재 입고" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "출하 준비" })).not.toBeInTheDocument();
@@ -74,7 +74,7 @@ describe("HistoryFilterPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "창고" }));
+    fireEvent.click(screen.getByRole("button", { name: "창고 입출고" }));
     fireEvent.click(screen.getByRole("button", { name: "부서 입출고" }));
 
     expect(toggleOp).toHaveBeenNthCalledWith(1, "warehouse");
