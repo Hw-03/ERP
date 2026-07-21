@@ -153,6 +153,15 @@ function authHeaders(): Record<string, string> {
   return { ...adminPinHeaders(), ...operatorCredsHeaders(), ...logActorHeaders() };
 }
 
+function rethrowGetRequestError(error: unknown, url: string): never {
+  if ((error as Error)?.name === "AbortError") throw error;
+  throw new Error(
+    error instanceof Error
+      ? `API 연결에 실패했습니다. ${url} 주소에 접근할 수 있는지 확인해 주세요.`
+      : "API 연결에 실패했습니다.",
+  );
+}
+
 /**
  * 일반 GET 페치 — JSON 응답 반환. AbortSignal 지원.
  */
@@ -164,17 +173,29 @@ export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> 
     if (Object.keys(headers).length > 0) init.headers = headers;
     res = await fetch(url, init);
   } catch (error) {
-    if ((error as Error)?.name === "AbortError") throw error;
-    throw new Error(
-      error instanceof Error
-        ? `API 연결에 실패했습니다. ${url} 주소에 접근할 수 있는지 확인해 주세요.`
-        : "API 연결에 실패했습니다.",
-    );
+    rethrowGetRequestError(error, url);
   }
   if (!res.ok) {
     throw new ApiError(await parseError(res), res.status);
   }
   return res.json();
+}
+
+/** 인증 헤더를 포함해 파일 응답을 Blob 으로 내려받는다. */
+export async function fetchBlob(url: string, signal?: AbortSignal): Promise<Blob> {
+  let res: Response;
+  try {
+    const headers = authHeaders();
+    const init: RequestInit = { signal };
+    if (Object.keys(headers).length > 0) init.headers = headers;
+    res = await fetch(url, init);
+  } catch (error) {
+    rethrowGetRequestError(error, url);
+  }
+  if (!res.ok) {
+    throw new ApiError(await parseError(res), res.status);
+  }
+  return res.blob();
 }
 
 /**

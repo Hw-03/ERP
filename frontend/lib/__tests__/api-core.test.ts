@@ -4,12 +4,16 @@ import {
   extractErrorMessage,
   parseError,
   fetcher,
+  fetchBlob,
   postJson,
   putJson,
   patchJson,
   deleteJson,
   FALLBACK_SERVER_API_BASE,
+  registerAdminPinProvider,
+  ApiError,
 } from "../api-core";
+import { adminApi } from "../api/admin";
 
 // Helpers --------------------------------------------------------
 
@@ -126,6 +130,7 @@ describe("fetcher / write helpers", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     window.localStorage.clear();
+    registerAdminPinProvider(() => null);
     vi.useRealTimers();
   });
 
@@ -238,6 +243,80 @@ describe("fetcher / write helpers", () => {
 
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.headers).toBeUndefined();
+  });
+
+  it("fetchBlob sends the registered admin PIN header and returns the response Blob", async () => {
+    const blob = new Blob(["audit export"], { type: "text/csv" });
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, statusText: "OK", blob: () => Promise.resolve(blob) }),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    registerAdminPinProvider(() => "2468");
+
+    await expect(fetchBlob("/api/admin/audit-csv/2026-05.csv")).resolves.toBe(blob);
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toMatchObject({ "X-Admin-Pin": "2468" });
+  });
+
+  it("adminApi.downloadAuditFile returns the downloaded Blob", async () => {
+    const blob = new Blob(["xlsx export"]);
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, statusText: "OK", blob: () => Promise.resolve(blob) }),
+    ) as unknown as typeof fetch;
+
+    await expect(adminApi.downloadAuditFile("2026-05", "xlsx")).resolves.toBe(blob);
+  });
+
+  it("fetchBlob converts a network error into the fetcher connection guidance", async () => {
+    const url = "/api/admin/audit-csv/2026-05.csv";
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error("network unavailable"))) as unknown as typeof fetch;
+
+    await expect(fetchBlob(url)).rejects.toThrow(
+      `API 연결에 실패했습니다. ${url} 주소에 접근할 수 있는지 확인해 주세요.`,
+    );
+  });
+
+  it("fetcher and fetchBlob use the same network failure guidance", async () => {
+    const url = "/api/admin/audit-csv/2026-05.csv";
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error("network unavailable"))) as unknown as typeof fetch;
+
+    const fetcherFailure = await fetcher(url).catch((error) => error);
+    const blobFailure = await fetchBlob(url).catch((error) => error);
+
+    expect(fetcherFailure).toMatchObject({
+      message: `API 연결에 실패했습니다. ${url} 주소에 접근할 수 있는지 확인해 주세요.`,
+    });
+    expect(blobFailure).toMatchObject({ message: fetcherFailure.message });
+  });
+
+  it("fetchBlob rethrows AbortError without wrapping it", async () => {
+    const abort = new Error("request cancelled");
+    abort.name = "AbortError";
+    globalThis.fetch = vi.fn(() => Promise.reject(abort)) as unknown as typeof fetch;
+
+    await expect(fetchBlob("/api/admin/audit-csv/2026-05.csv")).rejects.toBe(abort);
+  });
+
+  it("fetchBlob preserves the exact AbortError object when a signal is supplied", async () => {
+    const controller = new AbortController();
+    const abort = new Error("request cancelled");
+    abort.name = "AbortError";
+    const fetchSpy = vi.fn(() => Promise.reject(abort));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(fetchBlob("/api/admin/audit-csv/2026-05.csv", controller.signal)).rejects.toBe(abort);
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBe(controller.signal);
+  });
+
+  it("fetchBlob preserves an HTTP error as ApiError with its parsed message", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: false, status: 403, body: { detail: { message: "PIN required" } } })),
+    ) as unknown as typeof fetch;
+
+    const failure = await fetchBlob("/api/admin/audit-csv/2026-05.csv").catch((error) => error);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({ message: "PIN required", status: 403 });
   });
 
   it("deleteJson uses DELETE method and parses JSON when present", async () => {

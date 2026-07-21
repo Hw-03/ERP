@@ -1,13 +1,32 @@
 # DEXCOWIN MES 관리자 모드 UI 감사 TODO
 
+> **2026-07-21 구현·후속 결과:** 12건 모두 완료했다. 후속 4건(6·10·11·12번)은 데이터 모델·서버 API 경로·관리자 PIN 정책을 바꾸지 않고 UI·인증 다운로드 경계에서 보완했다. 제품 코드는 수정하지 않았다.
+
+## 2026-07-21 구현 점검
+
+- 점검 기준: `446ce28c` (`2026-07-21 admin: 관리자 UI 작업 영역 개선`)의 구현과 현재 코드, 모델 관리 화면(1919px급 데스크톱) 및 관리자 전용 Vitest 5개 파일·7개 테스트 통과를 대조했다.
+- 완료: 1(상단 탭 전환), 2(헤더 여백), 3(공통 타이포그래피), 4(KPI 축소·구분), 5(모델 작업 영역), 7(직원 위험 작업 분리), 8(부서 색상 선택), 9(BOM 작업 영역).
+- 후속 4건 완료:
+  - **6 품목 관리:** 행을 드래그 핸들 → 품목명 → MES 코드 → 상태 순서로 바꿨고, 렌더 테스트로 이름이 코드보다 앞서는 것을 고정했다. `frontend/app/mes/_components/_admin_sections/AdminMasterItemsSection.tsx:229-273`
+  - **10 내보내기:** CSV 설명·범위·조건부 기간·해당 옵션·실행을 하나의 작업 블록으로 묶고, 범위별 요약을 표시한다. Excel 전체 내보내기와 세션 기록 보존은 유지했다. `frontend/app/mes/_components/_admin_sections/AdminExportSection.tsx:111-113`, `:299-404`
+  - **11 외부 제출용 로그:** 관리자 PIN 헤더를 포함하는 Blob 다운로드로 CSV/XLSX를 요청하고, 형식별 진행 상태·오류 표시를 추가했다. `frontend/lib/api-core.ts:185-201`, `frontend/lib/api/admin.ts:32-33`, `frontend/app/mes/_components/_admin_sections/AdminAuditCsvSection.tsx:61-102`
+  - **12 보안:** 4~32자·확인 일치의 즉시 검증, 저장 중 잠금·중복 요청 차단, 성공 토스트 경로를 적용했다. `frontend/app/mes/_components/_admin_hooks/useAdminSettings.ts:30-90`, `frontend/app/mes/_components/_admin_sections/AdminDangerZone.tsx:25-118`
+
+## 2026-07-21 후속 구현 검증
+
+- 프런트엔드 관리자 관련 Vitest: 6개 파일, 53개 테스트 통과.
+- 백엔드 감사 로그 PIN 보호 테스트: 9개 통과.
+- 프런트엔드 전체 게이트(`verify_local.ps1 -Mode frontend`): strict lint, 타입 검사, 테스트·커버리지 통과.
+- 브라우저에서는 잠금 해제 뒤 품목 행 순서와 CSV 범위별 조건부 설정을 확인했다. 외부 제출용 로그의 CSV 버튼은 오류·콘솔 오류 없이 완료됐지만 Blob 다운로드 이벤트는 자동화 도구가 수집하지 못했다. PIN의 짧음·불일치·유효 상태와 성공 토스트를 확인했으며, `0000 → 0001 → 0000`으로 즉시 원복해 관리자 PIN은 기존 값으로 유지했다(감사 기록 2건 생성).
+
 > 관리자 모드의 실제 데스크톱 화면을 구현 전에 검토·우선순위화하기 위한 인계 문서.
 > 점검일: 2026-07-21
 > 점검 조건: 1919×908, 라이트 모드, 데이터가 채워진 기본 선택 상태.
 
 ## 전체 현황
 
-- 구현 완료를 기준으로 한 TODO: 0개
-- 구현해야 할 후속 TODO: 12개
+- 구현 완료를 기준으로 한 TODO: 12개
+- 구현해야 할 후속 TODO: 0개
 - 총 관리 TODO: 12개
 - 확정 후속 TODO: 0개
 - 에이전트 추가 TODO: 10개
@@ -21,8 +40,8 @@
 - 내보내기: 1개
 - 외부 제출용 로그: 1개
 - 보안: 1개
-- 우선순위: 높음 3개 / 중간 8개 / 낮음 1개
-- 구현 전 정책 확인 필요: 2개
+- 우선순위: 높음 0개 / 중간 0개 / 낮음 0개
+- 구현 전 정책 확인 필요: 0개
 - 문서 목적: 관리자 모드의 탐색 폭, 정보 밀도, 화면별 레이아웃을 사용자 검토 후 구현 가능한 단위로 인계한다.
 
 ## 참고한 기준과 근거
@@ -30,7 +49,7 @@
 - 기존 완료 문서: 없음. 이 문서는 관리자 모드 전용의 새 작업 흐름이다.
 - 별도 세션 TODO 기준: `_attic/handoff/2026-07-20-dashboard-followup-todo.md`
 - 브라우저 확인: 관리자 > 모델 관리·품목 관리·직원 관리·부서 관리·BOM 관리·내보내기·외부 제출용 로그·보안의 기본 상태, 대시보드와 입출고 내역의 기본 상태를 같은 1919×908 뷰포트에서 대조했다.
-- 코드 확인: `frontend/app/mes/_components/DesktopAdminView.tsx:88`, `frontend/app/mes/_components/_admin_sections/AdminSidebar.tsx:57`, `frontend/app/mes/_components/DesktopSidebar.tsx:70`, `frontend/app/mes/_components/_admin_sections/_admin_primitives/AdminPageHeader.tsx:24`, `frontend/app/mes/_components/_admin_sections/_admin_primitives/AdminKpiBar.tsx:22`, `frontend/app/mes/_components/_admin_sections/AdminModelsSection.tsx:191`, `frontend/app/mes/_components/_admin_sections/AdminMasterItemsSection.tsx:157`, `frontend/app/mes/_components/_admin_sections/AdminEmployeesSection.tsx:131`, `frontend/app/mes/_components/_admin_sections/AdminDepartmentsSection.tsx:173`, `frontend/app/mes/_components/_admin_sections/_bom_workbench/BomWorkbench.tsx:303`, `frontend/app/mes/_components/_admin_sections/AdminExportSection.tsx:285`, `frontend/app/mes/_components/_admin_sections/AdminAuditCsvSection.tsx:69`, `frontend/app/mes/_components/_admin_sections/AdminDangerZone.tsx:31`.
+- 코드 확인(2026-07-21 구현 점검): `frontend/app/mes/_components/DesktopAdminView.tsx:88-97`, `frontend/app/mes/_components/_admin_sections/AdminSectionTabs.tsx:55-122`, `frontend/app/mes/_components/_admin_sections/_admin_primitives/AdminPageHeader.tsx:24-67`, `frontend/app/mes/_components/_admin_sections/AdminModelsSection.tsx:188-202`, `frontend/app/mes/_components/_admin_sections/AdminMasterItemsSection.tsx:164-178`, `frontend/app/mes/_components/_admin_sections/AdminEmployeesSection.tsx:143-150`, `frontend/app/mes/_components/_admin_sections/AdminDepartmentsSection.tsx:185-192`, `frontend/app/mes/_components/_admin_sections/_bom_workbench/BomWorkbench.tsx:380-416`, `frontend/app/mes/_components/_admin_sections/AdminExportSection.tsx:288-387`, `frontend/app/mes/_components/_admin_sections/AdminAuditCsvSection.tsx:59-66`, `frontend/app/mes/_components/_admin_sections/AdminDangerZone.tsx:38-148`.
 
 ## 사용자 경험 기준
 

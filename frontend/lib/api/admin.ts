@@ -5,7 +5,7 @@
  *   - verifyAdminPin / updateAdminPin
  */
 
-import { fetcher, postJson, putJson, toApiUrl } from "../api-core";
+import { fetchBlob, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 
 export interface AuditCsvFile {
   month: string;
@@ -29,11 +29,8 @@ export const adminApi = {
   listAuditCsvFiles: () =>
     fetcher<AuditCsvFile[]>(toApiUrl("/api/admin/audit-csv/files")),
 
-  auditCsvDownloadUrl: (month: string) =>
-    toApiUrl(`/api/admin/audit-csv/${month}.csv`),
-
-  auditXlsxDownloadUrl: (month: string) =>
-    toApiUrl(`/api/admin/audit-csv/${month}.xlsx`),
+  downloadAuditFile: (month: string, format: "csv" | "xlsx"): Promise<Blob> =>
+    fetchBlob(toApiUrl(`/api/admin/audit-csv/${month}.${format}`)),
 
   triggerAuditCsvBackfill: () =>
     postJson<AuditCsvBackfillResult>(toApiUrl("/api/admin/audit-csv/backfill")),

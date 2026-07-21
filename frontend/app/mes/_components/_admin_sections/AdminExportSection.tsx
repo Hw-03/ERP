@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Calendar,
   CheckCircle2,
   Download,
   FileSpreadsheet,
@@ -38,7 +37,7 @@ interface ExportRecord {
 const SCOPE_LABEL: Record<DataScope, string> = {
   all: "전체",
   items: "품목",
-  transactions: "거래",
+  transactions: "입출고",
   employees: "직원",
   bom: "BOM",
 };
@@ -109,6 +108,9 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
   }, []);
 
   const range = useMemo(() => presetRange(preset), [preset]);
+  const scopeSummary = scope === "all" ? "전체 범위 CSV 4개" : SCOPE_LABEL[scope];
+  const includesTransactions = scope === "all" || scope === "transactions";
+  const includesEmployees = scope === "all" || scope === "employees";
 
   function pushRecord(rec: ExportRecord) {
     saveRecent(rec);
@@ -284,8 +286,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
-        {/* 상단 2개 카드 */}
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <ExportCard
             tone={LEGACY_COLORS.green}
             icon={<FileSpreadsheet className="h-6 w-6" />}
@@ -295,95 +296,112 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             onClick={handleExcelAll}
             disabled={busy}
           />
-          <ExportCard
-            tone={LEGACY_COLORS.blue}
-            icon={<FileText className="h-6 w-6" />}
-            title="선택 데이터 내보내기 (CSV)"
-            description="필터로 선택한 데이터만 CSV 파일로 내보냅니다. 맞춤 분석 및 공유에 유용합니다."
-            actionLabel={busy ? "내보내는 중..." : "선택 데이터 내보내기"}
-            onClick={handleCsvSelected}
-            disabled={busy}
-          />
-        </div>
+          <section
+            aria-label="선택 데이터 내보내기 (CSV)"
+            className="rounded-[16px] border p-5"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]"
+                style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`, color: LEGACY_COLORS.blue }}
+              >
+                <FileText className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                  선택 데이터 내보내기 (CSV)
+                </div>
+                <p className="mt-1 text-[12px] leading-snug" style={{ color: LEGACY_COLORS.muted2 }}>
+                  필요한 데이터 범위와 옵션을 선택해 CSV 파일로 내보냅니다.
+                </p>
+              </div>
+            </div>
 
-        {/* 범위 설정 */}
-        <div
-          className="rounded-[16px] border p-4"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="mb-3 flex items-center gap-2 text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
-            <Calendar className="h-4 w-4" />
-            내보내기 범위 설정
-          </div>
-          <div className="grid gap-4 lg:grid-cols-4">
-            <div>
-              <Label>기간 선택</Label>
-              <div
-                className="rounded-[10px] border px-3 py-2 text-[14px]"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              >
-                {range.start} ~ {range.end}
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <Label>데이터 범위</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {(["all", "items", "transactions", "employees", "bom"] as DataScope[]).map((s) => (
+                    <FilterChip
+                      key={s}
+                      active={scope === s}
+                      label={SCOPE_LABEL[s]}
+                      onClick={() => setScope(s)}
+                      size="sm"
+                    />
+                  ))}
+                </div>
+                <div
+                  data-testid="csv-scope-summary"
+                  className="mt-2 rounded-[10px] border px-3 py-2 text-[14px] font-bold"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                >
+                  {scopeSummary}
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {(["today", "7d", "30d", "90d"] as RangePreset[]).map((p) => (
-                  <FilterChip
-                    key={p}
-                    active={preset === p}
-                    label={p === "today" ? "오늘" : p === "7d" ? "7일" : p === "30d" ? "30일" : "90일"}
-                    onClick={() => setPreset(p)}
-                    size="sm"
-                  />
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label>데이터 유형</Label>
-              <div
-                className="rounded-[10px] border px-3 py-2 text-[14px]"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              >
-                전체 데이터
-              </div>
-              <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                CSV는 아래 데이터 범위 기준으로 내보냅니다.
-              </div>
-            </div>
-            <div>
-              <Label>데이터 범위</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {(["all", "items", "transactions", "employees", "bom"] as DataScope[]).map((s) => (
-                  <FilterChip
-                    key={s}
-                    active={scope === s}
-                    label={SCOPE_LABEL[s]}
-                    onClick={() => setScope(s)}
-                    size="sm"
-                  />
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label>추가 옵션</Label>
-              <div className="flex flex-col gap-1.5 text-[14px]" style={{ color: LEGACY_COLORS.text }}>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={includeHeader}
-                    onChange={(e) => setIncludeHeader(e.target.checked)}
-                  />
-                  헤더 포함
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={includeInactive}
-                    onChange={(e) => setIncludeInactive(e.target.checked)}
-                  />
-                  비활성 데이터 포함
-                </label>
+
+              <div>
+                {includesTransactions && (
+                  <div data-testid="csv-period-settings">
+                    <Label>기간 선택</Label>
+                    <div
+                      className="rounded-[10px] border px-3 py-2 text-[14px]"
+                      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                    >
+                      {range.start} ~ {range.end}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(["today", "7d", "30d", "90d"] as RangePreset[]).map((p) => (
+                        <FilterChip
+                          key={p}
+                          active={preset === p}
+                          label={p === "today" ? "오늘" : p === "7d" ? "7일" : p === "30d" ? "30일" : "90일"}
+                          onClick={() => setPreset(p)}
+                          size="sm"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className={includesTransactions ? "mt-4" : ""}>
+                  <Label>추가 옵션</Label>
+                  <div className="flex flex-col gap-1.5 text-[14px]" style={{ color: LEGACY_COLORS.text }}>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={includeHeader}
+                        onChange={(e) => setIncludeHeader(e.target.checked)}
+                      />
+                      헤더 포함
+                    </label>
+                    {includesEmployees && (
+                      <label data-testid="csv-inactive-option" className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={includeInactive}
+                          onChange={(e) => setIncludeInactive(e.target.checked)}
+                        />
+                        비활성 데이터 포함
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+
+            <button
+              type="button"
+              onClick={handleCsvSelected}
+              disabled={busy}
+              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-opacity disabled:opacity-50"
+              style={{ background: LEGACY_COLORS.blue }}
+            >
+              <Download className="h-4 w-4" />
+              {busy ? "내보내는 중..." : "선택 데이터 내보내기"}
+            </button>
+          </section>
         </div>
 
         {/* 하단: 최근 기록 + 마지막 내보내기 */}

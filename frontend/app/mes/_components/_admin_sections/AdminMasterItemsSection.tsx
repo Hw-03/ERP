@@ -235,6 +235,15 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
                   />
                   <span
+                    className="min-w-0 flex-1 truncate text-[14px] font-semibold"
+                    style={{
+                      color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                      textDecoration: isDeleted ? "line-through" : "none",
+                    }}
+                  >
+                    {item.item_name}
+                  </span>
+                  <span
                     className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-black tabular-nums"
                     style={{
                       background: isSelected
@@ -244,15 +253,6 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     }}
                   >
                     {item.mes_code ?? "—"}
-                  </span>
-                  <span
-                    className="min-w-0 flex-1 truncate text-[14px] font-semibold"
-                    style={{
-                      color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
-                      textDecoration: isDeleted ? "line-through" : "none",
-                    }}
-                  >
-                    {item.item_name}
                   </span>
                   {isDeleted ? (
                     <div className="shrink-0">

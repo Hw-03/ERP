@@ -15,6 +15,7 @@ import { AdminAuditCsvSection } from "./AdminAuditCsvSection";
 import { AdminDangerZone } from "./AdminDangerZone";
 import { AdminDepartmentsProvider } from "./AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
+import type { AdminPinForm } from "../_admin_hooks/adminPinValidation";
 
 /**
  * Round-11A (#4) 추출 — DesktopAdminView 의 section 별 콘텐츠 분기.
@@ -22,8 +23,6 @@ import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
  * 7 section (items / employees / bom / models / departments / export / settings)
  * 의 Provider + Section 매핑을 부모 파일에서 분리해 본 컴포넌트로 흡수.
  */
-type PinForm = { current_pin: string; new_pin: string; confirm_pin: string };
-
 export interface AdminSectionContentProps {
   section: string;
   globalSearch: string;
@@ -45,8 +44,9 @@ export interface AdminSectionContentProps {
   refreshAllBom: () => void;
   refreshItems: () => Promise<void>;
 
-  pinForm: PinForm;
-  setPinForm: Dispatch<SetStateAction<PinForm>>;
+  pinForm: AdminPinForm;
+  setPinForm: Dispatch<SetStateAction<AdminPinForm>>;
+  isSaving: boolean;
   changePin: () => Promise<void>;
   adminPin: string;
 }
@@ -61,7 +61,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     selectedDept, setSelectedDept,
     allBomRows, refreshAllBom, refreshItems,
     pinForm, setPinForm,
-    changePin, adminPin,
+    isSaving, changePin, adminPin,
   } = props;
 
   if (section === "items") {
@@ -156,7 +156,8 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
       <AdminDangerZone
         pinForm={pinForm}
         setPinForm={setPinForm}
-        onChangePin={() => void changePin()}
+        isSaving={isSaving}
+        onChangePin={changePin}
       />
     );
   }

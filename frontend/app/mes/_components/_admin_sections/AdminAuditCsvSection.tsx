@@ -32,6 +32,8 @@ export function AdminAuditCsvSection() {
   const busy = backfillMutation.isPending;
   const error = qError ? (qError instanceof Error ? qError.message : "파일 목록 조회 실패") : null;
   const [lastBackfill, setLastBackfill] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<Set<string>>(() => new Set());
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const stats = useMemo(() => {
     const total = files.reduce((s, f) => s + f.row_count, 0);
@@ -56,13 +58,40 @@ export function AdminAuditCsvSection() {
     });
   };
 
-  function handleDownload(url: string, fileName: string) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  async function handleDownload(
+    month: string,
+    format: "csv" | "xlsx",
+    fileName: string,
+  ): Promise<void> {
+    const downloadKey = `${month}:${format}`;
+    setDownloading((current) => new Set(current).add(downloadKey));
+    setDownloadError(null);
+    try {
+      const blob = await adminApi.downloadAuditFile(month, format);
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = fileName;
+      try {
+        document.body.appendChild(a);
+        a.click();
+      } finally {
+        if (a.parentNode) a.parentNode.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (downloadFailure) {
+      setDownloadError(
+        downloadFailure instanceof Error
+          ? downloadFailure.message
+          : "파일 다운로드에 실패했습니다.",
+      );
+    } finally {
+      setDownloading((current) => {
+        const next = new Set(current);
+        next.delete(downloadKey);
+        return next;
+      });
+    }
   }
 
   return (
@@ -134,8 +163,9 @@ export function AdminAuditCsvSection() {
             </button>
           </div>
 
-          {error && (
+          {(error || downloadError) && (
             <div
+              role="alert"
               className="mb-3 rounded-[10px] border px-3 py-2 text-[12px]"
               style={{
                 background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
@@ -143,7 +173,7 @@ export function AdminAuditCsvSection() {
                 color: LEGACY_COLORS.red,
               }}
             >
-              {error}
+              {error || downloadError}
             </div>
           )}
 
@@ -194,10 +224,9 @@ export function AdminAuditCsvSection() {
                   <span className="flex justify-end gap-1.5">
                     <button
                       type="button"
-                      onClick={() =>
-                        handleDownload(adminApi.auditXlsxDownloadUrl(f.month), `inout_${f.month}.xlsx`)
-                      }
-                      className="flex min-h-11 items-center gap-1 rounded-[8px] px-2.5 py-1 text-[12px] font-bold text-white"
+                      onClick={() => void handleDownload(f.month, "xlsx", `inout_${f.month}.xlsx`)}
+                      disabled={downloading.has(`${f.month}:xlsx`)}
+                      className="flex min-h-11 items-center gap-1 rounded-[8px] px-2.5 py-1 text-[12px] font-bold text-white disabled:opacity-50"
                       style={{ background: LEGACY_COLORS.green }}
                     >
                       <FileSpreadsheet className="h-3 w-3" />
@@ -205,10 +234,9 @@ export function AdminAuditCsvSection() {
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        handleDownload(adminApi.auditCsvDownloadUrl(f.month), f.file_name)
-                      }
-                      className="flex min-h-11 items-center gap-1 rounded-[8px] px-2.5 py-1 text-[12px] font-bold text-white"
+                      onClick={() => void handleDownload(f.month, "csv", f.file_name)}
+                      disabled={downloading.has(`${f.month}:csv`)}
+                      className="flex min-h-11 items-center gap-1 rounded-[8px] px-2.5 py-1 text-[12px] font-bold text-white disabled:opacity-50"
                       style={{ background: LEGACY_COLORS.blue }}
                     >
                       <FileText className="h-3 w-3" />

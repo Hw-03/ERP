@@ -79,6 +79,31 @@ def test_backfill_then_list_and_download(client, db_session, make_item, csv_env)
     assert len(xlsx_resp.content) > 0
 
 
+@pytest.mark.parametrize("suffix", ["csv", "xlsx"])
+def test_download_requires_admin_pin(client, csv_env, suffix):
+    res = client.get(f"/api/admin/audit-csv/2026-05.{suffix}")
+    assert res.status_code == 400
+    assert res.json()["detail"]["message"] == "관리자 PIN이 필요합니다."
+
+
+@pytest.mark.parametrize("suffix", ["csv", "xlsx"])
+def test_download_with_admin_pin_returns_file(client, db_session, make_item, csv_env, suffix):
+    item = make_item(name="audit file")
+    _add_log(
+        db_session,
+        item.item_id,
+        tx=TransactionTypeEnum.RECEIVE,
+        qty=Decimal("1"),
+        when=datetime(2026, 5, 10, 9, 0),
+    )
+    db_session.commit()
+    assert client.post("/api/admin/audit-csv/backfill", headers=ADMIN_HEADERS).status_code == 200
+
+    res = client.get(f"/api/admin/audit-csv/2026-05.{suffix}", headers=ADMIN_HEADERS)
+    assert res.status_code == 200
+    assert res.content
+
+
 def test_internal_use_label_is_reused_by_audit_xlsx(
     client, db_session, make_item, csv_env
 ):

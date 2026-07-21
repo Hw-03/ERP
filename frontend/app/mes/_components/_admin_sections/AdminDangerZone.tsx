@@ -1,30 +1,52 @@
 "use client";
 
+import { useState } from "react";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
+import {
+  getAdminPinLengthError,
+  isAdminPinLengthValid,
+  type AdminPinForm,
+} from "../_admin_hooks/adminPinValidation";
 import { AdminPageHeader } from "./_admin_primitives";
 
-type PinForm = { current_pin: string; new_pin: string; confirm_pin: string };
-
 type Props = {
-  pinForm: PinForm;
-  setPinForm: (updater: (current: PinForm) => PinForm) => void;
-  onChangePin: () => void;
+  pinForm: AdminPinForm;
+  setPinForm: (updater: (current: AdminPinForm) => AdminPinForm) => void;
+  onChangePin: () => Promise<void>;
+  isSaving?: boolean;
 };
-
 
 export function AdminDangerZone({
   pinForm,
   setPinForm,
   onChangePin,
+  isSaving = false,
 }: Props) {
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const saving = isSaving || isSubmitting;
+  const currentPinError = getAdminPinLengthError(pinForm.current_pin);
+  const newPinError = getAdminPinLengthError(pinForm.new_pin);
+  const confirmPinError = getAdminPinLengthError(pinForm.confirm_pin)
+    ?? (pinForm.new_pin.length > 0 && pinForm.confirm_pin.length > 0 && pinForm.new_pin !== pinForm.confirm_pin
+      ? "새 PIN과 일치하지 않습니다."
+      : undefined);
   const canChangePin =
-    pinForm.current_pin.trim() &&
-    pinForm.new_pin.trim() &&
-    pinForm.confirm_pin.trim() &&
-    pinForm.new_pin === pinForm.confirm_pin;
+    isAdminPinLengthValid(pinForm.current_pin)
+    && isAdminPinLengthValid(pinForm.new_pin)
+    && isAdminPinLengthValid(pinForm.confirm_pin)
+    && pinForm.new_pin === pinForm.confirm_pin;
+
+  async function handleChangePin(): Promise<void> {
+    if (saving) return;
+    setIsSubmitting(true);
+    try {
+      await onChangePin();
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -66,33 +88,34 @@ export function AdminDangerZone({
                   label="현재 PIN"
                   value={pinForm.current_pin}
                   onChange={(v) => setPinForm((c) => ({ ...c, current_pin: v }))}
+                  error={currentPinError}
+                  disabled={saving}
                 />
                 <PinField
                   id="admin-new-pin"
                   label="새 PIN"
                   value={pinForm.new_pin}
                   onChange={(v) => setPinForm((c) => ({ ...c, new_pin: v }))}
+                  error={newPinError}
+                  disabled={saving}
                 />
                 <PinField
                   id="admin-confirm-pin"
                   label="새 PIN 확인"
                   value={pinForm.confirm_pin}
                   onChange={(v) => setPinForm((c) => ({ ...c, confirm_pin: v }))}
-                  error={
-                    pinForm.confirm_pin.length > 0 && pinForm.new_pin !== pinForm.confirm_pin
-                      ? "새 PIN과 일치하지 않습니다."
-                      : undefined
-                  }
+                  error={confirmPinError}
+                  disabled={saving}
                 />
               </div>
               <Button
                 variant="primary"
                 size="md"
-                onClick={onChangePin}
-                disabled={!canChangePin}
+                onClick={handleChangePin}
+                disabled={saving || !canChangePin}
                 className="mt-5"
               >
-                PIN 변경
+                {saving ? "변경 중..." : "PIN 변경"}
               </Button>
             </div>
           </div>
@@ -108,12 +131,14 @@ function PinField({
   value,
   onChange,
   error,
+  disabled,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
   error?: string;
+  disabled: boolean;
 }) {
   const errorId = `${id}-error`;
 
@@ -132,6 +157,7 @@ function PinField({
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
         placeholder="0000"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}

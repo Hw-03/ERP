@@ -59,6 +59,7 @@ export function DesktopAdminView({
 
   const {
     pinForm, setPinForm,
+    isSaving,
     saveMessage,
     showSave,
     changePin,
@@ -118,6 +119,7 @@ export function DesktopAdminView({
               refreshItems={refreshItems}
               pinForm={pinForm}
               setPinForm={setPinForm}
+              isSaving={isSaving}
               changePin={changePin}
               adminPin={adminPin}
             />
