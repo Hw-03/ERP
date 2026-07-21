@@ -62,7 +62,9 @@ test.describe("라벨 일관성 (glossary 단일 사전)", () => {
     await page.goto("/mes");
     await page.getByRole("navigation").getByRole("button", { name: /내역/ }).first().click();
 
-    const banned = ["새 격리", "격리 해제", "폐기", "격리 폐기"];
+    // 이력은 처리 결과를 명확히 하기 위해 "격리 해제"·"폐기"를 사용한다.
+    // "새 격리"와 "격리 폐기"만 폐기된 표현이다.
+    const banned = ["새 격리", "격리 폐기"];
     for (const word of banned) {
       await expectLabelAbsent(page, word);
     }
