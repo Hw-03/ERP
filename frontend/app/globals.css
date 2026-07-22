@@ -7,7 +7,7 @@
   to   { opacity: 1;   transform: translateY(0);    }
 }
 
-@keyframes shippingNameValidationCollect {
+@keyframes statusTargetNoticeCollect {
   0% {
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.94);
@@ -19,19 +19,19 @@
   100% {
     opacity: 0;
     transform: translate(
-      calc(-50% + var(--shipping-notice-x)),
-      calc(-50% + var(--shipping-notice-y))
+      calc(-50% + var(--status-target-notice-x)),
+      calc(-50% + var(--status-target-notice-y))
     ) scale(0.18);
   }
 }
 
-.shipping-name-validation-notice {
-  animation: shippingNameValidationCollect 1.2s cubic-bezier(0.4, 0, 0.2, 1) both;
+.status-target-notice {
+  animation: statusTargetNoticeCollect 1.2s cubic-bezier(0.4, 0, 0.2, 1) both;
   transform-origin: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shipping-name-validation-notice {
+  .status-target-notice {
     animation: statusFlash 0.35s ease-out both;
   }
 }

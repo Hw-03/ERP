@@ -59,6 +59,26 @@ describe("AdminSectionTabs", () => {
     });
   });
 
+  it("fills the desktop row proportionally while retaining a narrow-screen scroll width", () => {
+    const { container } = render(<AdminSectionTabs section="models" onSelect={vi.fn()} />);
+    const groups = container.querySelectorAll<HTMLElement>("[data-admin-tab-group]");
+    const row = container.querySelector("nav > div");
+
+    expect(row).toHaveClass("min-w-[880px]", "lg:min-w-0", "flex-1");
+    expect(groups[0]).toHaveStyle({ flexGrow: "4" });
+    expect(groups[1]).toHaveStyle({ flexGrow: "1" });
+    expect(groups[2]).toHaveStyle({ flexGrow: "3" });
+    expect(groups[0]).toHaveStyle({ flexBasis: "0px" });
+    expect(groups[1]).toHaveStyle({ flexBasis: "0px" });
+    expect(groups[2]).toHaveStyle({ flexBasis: "0px" });
+
+    groups.forEach((group) => {
+      within(group).getAllByRole("button").forEach((tab) => {
+        expect(tab).toHaveClass("flex-1", "justify-center");
+      });
+    });
+  });
+
   it("접근 가능한 이름으로 탭 그룹과 소속 탭을 연결한다", () => {
     render(<AdminSectionTabs section="models" onSelect={vi.fn()} />);
 

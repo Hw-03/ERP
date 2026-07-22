@@ -89,7 +89,7 @@ export function EmployeeDetailGrid({
             <SelectInput
               value={form.role}
               onChange={(v) => setForm((f) => ({ ...f, role: v }))}
-              options={employeePositionOptions(form.role)}
+              options={employeePositionOptions()}
               triggerAriaLabel="직급"
             />
           </FieldRow>
@@ -174,10 +174,11 @@ export function EmployeeDetailGrid({
         </div>
       </DetailCardSlot>
 
-      <div className="grid gap-3 lg:col-span-2 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <DetailCardSlot title="PIN">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
+      <div className="grid items-start gap-3 lg:col-span-2 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <DetailCardSlot
+          title="PIN"
+          headerAccessory={(
+            <div className="flex items-center gap-2 text-[12px] normal-case tracking-normal">
               <span
                 className="rounded-full px-2.5 py-0.5 text-[12px] font-bold"
                 style={{
@@ -189,26 +190,27 @@ export function EmployeeDetailGrid({
               >
                 {employee.pin_is_default ? "기본 PIN (0000)" : "직원 설정 PIN"}
               </span>
-            </div>
-            <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <span style={{ color: LEGACY_COLORS.muted2 }}>
               마지막 변경:{" "}
               {employee.pin_last_changed
                 ? new Date(employee.pin_last_changed).toLocaleDateString("ko-KR")
                 : "변경 이력 없음"}
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={() => onRequestPinReset(employee)}
-              className="mt-1 min-h-11 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110 active:scale-[0.98]"
-              style={{
-                background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
-                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`,
-                color: LEGACY_COLORS.yellow,
-              }}
-            >
-              PIN 초기화 (0000)
-            </button>
-          </div>
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => onRequestPinReset(employee)}
+            className="min-h-11 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110 active:scale-[0.98]"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`,
+              color: LEGACY_COLORS.yellow,
+            }}
+          >
+            PIN 초기화 (0000)
+          </button>
         </DetailCardSlot>
 
         <DetailCardSlot title="계정 상태 및 위험 작업">

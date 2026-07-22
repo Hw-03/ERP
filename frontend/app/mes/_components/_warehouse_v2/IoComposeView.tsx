@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
@@ -27,6 +28,7 @@ import { useIoPreselect } from "./useIoPreselect";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { IoComposeViewProps } from "./types";
 import { ItemConversionWorkView } from "./ItemConversionView";
+import { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "../common/StatusTargetNotice";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -55,6 +57,7 @@ function prefersReducedMotion() {
 }
 
 type ItemConversionHistoryStep = 1 | 2 | 3;
+type DraftSaveNotice = StatusTargetNoticeState & { status: string };
 
 function isItemConversionHistoryStep(value: unknown): value is ItemConversionHistoryStep {
   return value === 1 || value === 2 || value === 3;
@@ -118,6 +121,8 @@ export function IoComposeView({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [draftSaveNotice, setDraftSaveNotice] = useState<DraftSaveNotice | null>(null);
+  const draftSaveNoticeIdRef = useRef(0);
   // BOM 부모 item_id 집합 — process workType에서 "BOM 적용" 버튼 활성 판단용. 마운트 시 1회 fetch.
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
   // BOM 적재 완료 플래그 — useIoPreselect 의 race 가드 (S1: 빈 set 상태에서 BOM 부모를 일반 품목으로 오인하던 결함).
@@ -525,8 +530,12 @@ export function IoComposeView({
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, "0");
       const mm = String(now.getMinutes()).padStart(2, "0");
-      onStatusChange(`저장됨 · ${hh}:${mm}`);
-      setToast({ message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.", type: "success" });
+      draftSaveNoticeIdRef.current += 1;
+      setDraftSaveNotice({
+        id: draftSaveNoticeIdRef.current,
+        message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.",
+        status: `저장됨 · ${hh}:${mm}`,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
       setToast({ message, type: "error" });
@@ -1157,6 +1166,19 @@ export function IoComposeView({
         onClose={() => setResult(null)}
         onGoToMap={() => router.push("?tab=warehouseMap", { scroll: false })}
       />
+      {draftSaveNotice && (
+        <StatusTargetNotice
+          key={draftSaveNotice.id}
+          notice={draftSaveNotice}
+          icon={CheckCircle2}
+          dataTestId="io-draft-save-notice"
+          onArrive={(noticeId) => {
+            if (draftSaveNoticeIdRef.current !== noticeId) return;
+            onStatusChange(draftSaveNotice.status);
+            setDraftSaveNotice((current) => current?.id === noticeId ? null : current);
+          }}
+        />
+      )}
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );

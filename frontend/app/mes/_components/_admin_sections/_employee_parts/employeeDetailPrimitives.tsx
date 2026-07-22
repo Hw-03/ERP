@@ -2,17 +2,28 @@ import type { ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect } from "../../common/AppSelect";
 
-export function DetailCardSlot({ title, children }: { title: string; children: ReactNode }) {
+export function DetailCardSlot({
+  title,
+  headerAccessory,
+  children,
+}: {
+  title: string;
+  headerAccessory?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div
       className="rounded-[14px] border p-4"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
-      <div
-        className="mb-3 text-[12px] font-black tracking-[0.12em]"
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        {title}
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className="text-[12px] font-black tracking-[0.12em]"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          {title}
+        </span>
+        {headerAccessory}
       </div>
       {children}
     </div>

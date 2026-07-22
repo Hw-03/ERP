@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminModelsSection } from "../AdminModelsSection";
@@ -37,5 +37,31 @@ describe("AdminModelsSection", () => {
     await waitFor(() => {
       expect(screen.getAllByText("M-0001")).toHaveLength(2);
     });
+  });
+
+  it("lays name and symbol out responsively and limits the saved symbol to five characters", async () => {
+    let savedEditForm = context.editForm;
+    context.setEditForm.mockClear();
+    context.setEditForm.mockImplementation((updater) => {
+      savedEditForm = updater(context.editForm);
+    });
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminModelsSection items={[]} allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    const name = await screen.findByDisplayValue("DX3000");
+    const symbol = screen.getByDisplayValue("A");
+    const fields = container.querySelector("[data-model-edit-fields]");
+
+    expect(fields).toHaveClass("grid-cols-1", "sm:grid-cols-[minmax(0,1fr)_7rem]");
+
+    fireEvent.change(symbol, { target: { value: "ABCDEF" } });
+    expect(savedEditForm).toEqual({
+      model_name: "DX3000",
+      symbol: "ABCDE",
+    });
+    expect(name).toBeInTheDocument();
   });
 });

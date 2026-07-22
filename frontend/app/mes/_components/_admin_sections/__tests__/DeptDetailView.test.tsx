@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DeptDetailView } from "../_department_parts/DeptDetailView";
 
@@ -15,7 +15,7 @@ vi.mock("@/lib/ui/ConfirmModal", () => ({
 }));
 
 describe("DeptDetailView", () => {
-  it("현재 색상은 유지하고 전체 팔레트는 기본 접힘으로 제공한다", () => {
+  it("starts the palette closed and exposes it through an accessible button", () => {
     render(
       <DeptDetailView
         dept={{ id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" }}
@@ -33,6 +33,15 @@ describe("DeptDetailView", () => {
     );
 
     expect(screen.getByTitle("현재 저장된 색상")).toBeInTheDocument();
-    expect(screen.getByText("전체 색상 보기").closest("details")).not.toHaveAttribute("open");
+
+    const toggle = screen.getByRole("button", { name: "전체 색상 보기" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "department-color-palette");
+    expect(screen.queryByRole("button", { name: /blue-500/i })).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /blue-500/i })).toBeInTheDocument();
   });
 });

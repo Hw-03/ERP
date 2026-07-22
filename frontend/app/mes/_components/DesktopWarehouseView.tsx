@@ -98,6 +98,7 @@ export function DesktopWarehouseView({
   useEffect(() => {
     const handlePopState = () => {
       const next = normalizeSectionTab(new URLSearchParams(window.location.search).get("section"));
+      if (next !== "compose") setItemConversionFocused(false);
       setSectionTab(next);
     };
     window.addEventListener("popstate", handlePopState);
@@ -155,6 +156,7 @@ export function DesktopWarehouseView({
   }
 
   function handleSectionTabChange(next: WarehouseSectionTab) {
+    if (next !== "compose") setItemConversionFocused(false);
     setSectionTab(next);
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -181,7 +183,7 @@ export function DesktopWarehouseView({
       <div className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-2.5 ${isComposeSection ? "pb-0" : "pb-10"}`}>
         <WarehouseHeader loadFailure={loadFailure} />
         <div
-          className={`overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ${
+          className={`shrink-0 overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ${
             hideSectionTabs ? "-mb-3 max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"
           }`}
           aria-hidden={hideSectionTabs}

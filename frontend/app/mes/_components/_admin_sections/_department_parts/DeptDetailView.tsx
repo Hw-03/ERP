@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Palette, Trash2 } from "lucide-react";
+import { ChevronDown, Palette, Trash2 } from "lucide-react";
 import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
@@ -48,6 +48,7 @@ export function DeptDetailView({
     color_hex: savedColor,
   });
   const [colorInputError, setColorInputError] = useState<string | null>(null);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
   const normalizedDepartment = normalizeDepartment(dept.name);
@@ -62,6 +63,7 @@ export function DeptDetailView({
       name: dept.name,
       color_hex: color,
     });
+    setIsPaletteOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dept.id, dept.color_hex, dept.name]);
 
@@ -184,36 +186,54 @@ export function DeptDetailView({
               )}
             </div>
           </div>
-          <details>
-            <summary
-              className="cursor-pointer select-none text-[12px] font-bold"
-              style={{ color: LEGACY_COLORS.blue }}
+          <div>
+            <button
+              type="button"
+              aria-expanded={isPaletteOpen}
+              aria-controls="department-color-palette"
+              onClick={() => setIsPaletteOpen((open) => !open)}
+              className="flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[12px] font-bold transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 active:scale-[0.98]"
+              style={{
+                background: isPaletteOpen
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
+                  : LEGACY_COLORS.s1,
+                borderColor: isPaletteOpen
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`
+                  : LEGACY_COLORS.border,
+                color: isPaletteOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+              }}
             >
               전체 색상 보기
-            </summary>
-            <div className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-9">
-              {TAILWIND_PALETTE.map((swatch) => {
-                const selected = editForm.color_hex.toLowerCase() === swatch.hex.toLowerCase();
-                return (
-                  <button
-                    key={swatch.hex}
-                    type="button"
-                    aria-label={`${swatch.name} ${swatch.hex}`}
-                    aria-pressed={selected}
-                    className="h-11 w-11 rounded-lg border-2 transition-transform hover:scale-105 active:scale-[0.98]"
-                    style={{
-                      background: swatch.hex,
-                      borderColor: selected ? LEGACY_COLORS.text : "transparent",
-                    }}
-                    onClick={() => {
-                      setEditForm((f) => ({ ...f, color_hex: swatch.hex }));
-                      setColorInputError(null);
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </details>
+              <ChevronDown
+                className="h-4 w-4 transition-transform duration-150"
+                style={{ transform: isPaletteOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+              />
+            </button>
+            {isPaletteOpen && (
+              <div id="department-color-palette" className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-9">
+                {TAILWIND_PALETTE.map((swatch) => {
+                  const selected = editForm.color_hex.toLowerCase() === swatch.hex.toLowerCase();
+                  return (
+                    <button
+                      key={swatch.hex}
+                      type="button"
+                      aria-label={`${swatch.name} ${swatch.hex}`}
+                      aria-pressed={selected}
+                      className="h-11 w-11 rounded-lg border-2 transition-transform hover:scale-105 active:scale-[0.98]"
+                      style={{
+                        background: swatch.hex,
+                        borderColor: selected ? LEGACY_COLORS.text : "transparent",
+                      }}
+                      onClick={() => {
+                        setEditForm((f) => ({ ...f, color_hex: swatch.hex }));
+                        setColorInputError(null);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </DetailCardSlot>
 

@@ -42,7 +42,7 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
           <SelectInput
             value={form.role}
             onChange={(v) => setForm((f) => ({ ...f, role: v }))}
-            options={employeePositionOptions(form.role)}
+            options={employeePositionOptions()}
             triggerAriaLabel="직급"
           />
         </FieldRow>

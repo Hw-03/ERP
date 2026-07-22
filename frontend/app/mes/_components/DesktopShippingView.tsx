@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -27,6 +27,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { processTypeColor } from "@/lib/mes/process";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
 
 type SectionTab = "request" | "history";
@@ -60,8 +61,6 @@ type ConfirmAction =
 type NameValidationNotice = {
   id: number;
   message: string;
-  offsetX: number;
-  offsetY: number;
 };
 
 const EMPTY_STOCK_SHORTAGES: ShippingRequest["stock_shortages"] = [];
@@ -286,14 +285,10 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const nameValidationNoticeIdRef = useRef(0);
 
   const showNameValidationNotice = useCallback((message: string) => {
-    const target = document.querySelector<HTMLElement>('[data-testid="desktop-status-target"]');
-    const targetRect = target?.getBoundingClientRect();
     nameValidationNoticeIdRef.current += 1;
     setNameValidationNotice({
       id: nameValidationNoticeIdRef.current,
       message,
-      offsetX: targetRect ? targetRect.left + targetRect.width / 2 - window.innerWidth / 2 : 0,
-      offsetY: targetRect ? targetRect.top + targetRect.height / 2 - window.innerHeight / 2 : 0,
     });
   }, []);
 
@@ -1045,40 +1040,24 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       )}
 
       {nameValidationNotice && (
-        <ShippingNameValidationNotice
+        <StatusTargetNotice
           key={nameValidationNotice.id}
           notice={nameValidationNotice}
-          onArrive={() => {
+          icon={Pencil}
+          dataTestId="shipping-name-validation-notice"
+          style={{
+            background: "var(--c-popup-bg)",
+            borderColor: tint(LEGACY_COLORS.blue, 45),
+            color: LEGACY_COLORS.blue,
+            boxShadow: "var(--c-popup-shadow)",
+          }}
+          onArrive={(noticeId) => {
+            if (nameValidationNoticeIdRef.current !== noticeId) return;
             onStatusChange(nameValidationNotice.message);
-            setNameValidationNotice((current) => current?.id === nameValidationNotice.id ? null : current);
+            setNameValidationNotice((current) => current?.id === noticeId ? null : current);
           }}
         />
       )}
-    </div>
-  );
-}
-
-function ShippingNameValidationNotice({ notice, onArrive }: { notice: NameValidationNotice; onArrive: () => void }) {
-  const style = {
-    "--shipping-notice-x": `${notice.offsetX}px`,
-    "--shipping-notice-y": `${notice.offsetY}px`,
-    background: "var(--c-popup-bg)",
-    borderColor: tint(LEGACY_COLORS.blue, 45),
-    color: LEGACY_COLORS.blue,
-    boxShadow: "var(--c-popup-shadow)",
-  } as CSSProperties;
-
-  return (
-    <div
-      data-testid="shipping-name-validation-notice"
-      role="status"
-      aria-live="polite"
-      className="shipping-name-validation-notice pointer-events-none fixed left-1/2 top-1/2 z-[80] flex min-h-11 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-[16px] border px-5 py-3 text-sm font-black"
-      style={style}
-      onAnimationEnd={onArrive}
-    >
-      <Pencil className="h-5 w-5 shrink-0" aria-hidden="true" />
-      <span>{notice.message}</span>
     </div>
   );
 }

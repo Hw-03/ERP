@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { DepartmentMaster, Employee } from "@/lib/api";
 import { EmployeeDetailGrid } from "../EmployeeDetailGrid";
 import type { EmployeeEditForm } from "../../../_admin_hooks/useAdminEmployees";
+import { normalizeEmployeePosition } from "../employeeRoleLabels";
 
 const employee: Employee = {
   employee_id: "emp-001",
   employee_code: "E01",
   name: "김건호",
-  role: "팀장",
+  role: "튜브/주임",
   phone: "010-1234-5678",
   department: "조립",
   level: "staff",
@@ -25,13 +26,13 @@ const employee: Employee = {
 
 const form: EmployeeEditForm = {
   name: employee.name,
-  role: employee.role,
+  role: "주임",
   phone: employee.phone ?? "",
   department: employee.department,
   level: employee.level,
   warehouse_role: employee.warehouse_role,
   department_role: employee.department_role,
-  io_enabled: employee.io_enabled ?? true,
+  hidden_sidebar_tabs: employee.hidden_sidebar_tabs ?? [],
   assigned_model_slots: employee.assigned_model_slots ?? [],
 };
 
@@ -76,7 +77,11 @@ describe("EmployeeDetailGrid", () => {
     expect(screen.getByRole("button", { name: "직원 비활성화" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "직원 삭제" })).toBeInTheDocument();
   });
-  it("비표준 직급은 선택 목록에서 기존 직급으로 읽기 전용 보존한다", () => {
+  it("직급 정규화는 raw role 하나만 받는다", () => {
+    expect(normalizeEmployeePosition).toHaveLength(1);
+  });
+
+  it("직급 선택기는 기존 직급 옵션 없이 표준 직급만 표시한다", () => {
     render(
       <EmployeeDetailGrid
         employee={employee}
@@ -90,11 +95,48 @@ describe("EmployeeDetailGrid", () => {
       />,
     );
 
-    const selectors = screen.getAllByRole("combobox");
-    expect(selectors).toHaveLength(4);
-    expect(screen.getByRole("combobox", { name: "직급" })).toBe(selectors[0]);
+    fireEvent.click(screen.getByRole("combobox", { name: "직급" }));
 
-    fireEvent.click(selectors[0]);
-    expect(screen.getByRole("option", { name: "기존 직급: 팀장" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("option", { name: "기존 직급: 튜브/주임" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "주임" })).toBeInTheDocument();
+  });
+
+  it("PIN 상태와 마지막 변경일을 제목 보조 영역에 표시하고 본문에는 초기화 버튼만 둔다", () => {
+    render(
+      <EmployeeDetailGrid
+        employee={{ ...employee, pin_last_changed: "2026-07-01T00:00:00Z" }}
+        form={form}
+        setForm={vi.fn()}
+        departments={departments}
+        productModels={[]}
+        onRequestPinReset={vi.fn()}
+        onToggle={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const header = screen.getByText("PIN").parentElement;
+    expect(header).not.toBeNull();
+    expect(within(header!).getByText("기본 PIN (0000)")).toBeInTheDocument();
+    expect(within(header!).getByText(/마지막 변경:/)).toBeInTheDocument();
+    expect(header!.nextElementSibling).toBe(screen.getByRole("button", { name: "PIN 초기화 (0000)" }));
+  });
+
+  it("PIN과 위험 작업 카드는 각각 내용 높이만 사용한다", () => {
+    render(
+      <EmployeeDetailGrid
+        employee={employee}
+        form={form}
+        setForm={vi.fn()}
+        departments={departments}
+        productModels={[]}
+        onRequestPinReset={vi.fn()}
+        onToggle={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const dangerCard = screen.getByText("계정 상태 및 위험 작업").parentElement?.parentElement;
+    expect(dangerCard?.parentElement).toHaveClass("items-start");
   });
 });

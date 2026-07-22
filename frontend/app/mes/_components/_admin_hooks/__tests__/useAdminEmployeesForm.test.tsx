@@ -41,4 +41,22 @@ describe("useAdminEmployeesForm", () => {
 
     expect(result.current.dirty).toBe(true);
   });
+
+  it.each([
+    ["튜브/주임", true, "주임"],
+    ["연구소/책임", true, "책임연구원"],
+    ["진공/퇴사", false, "사원"],
+    ["주임", false, "주임"],
+    ["책임연구원", false, "책임연구원"],
+  ])("정규화한 직급 %s을 초기 선택값으로 사용하며 dirty로 표시하지 않는다", async (role, is_active, expectedRole) => {
+    const emp = employee({ role, is_active });
+    const { result } = renderHook(() => useAdminEmployeesForm([emp]));
+
+    await act(async () => {
+      result.current.setSelectedEmployee(emp);
+    });
+
+    expect(result.current.editForm.role).toBe(expectedRole);
+    expect(result.current.dirty).toBe(false);
+  });
 });

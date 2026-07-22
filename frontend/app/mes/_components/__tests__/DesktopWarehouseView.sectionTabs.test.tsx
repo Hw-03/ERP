@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { DesktopWarehouseView } from "../DesktopWarehouseView";
 
 vi.mock("@/app/mes/_components/_warehouse_hooks/useWarehouseData", () => ({
@@ -33,7 +33,7 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
 
 vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
   IoComposeView: ({ onItemConversionFocusChange }: { onItemConversionFocusChange: (focused: boolean) => void }) => (
-    <button type="button" onClick={() => onItemConversionFocusChange(true)}>
+    <button type="button" data-testid="item-conversion-focus" onClick={() => onItemConversionFocusChange(true)}>
       품목 전환 포커스
     </button>
   ),
@@ -70,6 +70,17 @@ describe("DesktopWarehouseView", () => {
     tabs.forEach((tab) => expect(tab).toBeVisible());
   });
 
+  it("keeps the section-tab container from shrinking under a long Mine list", () => {
+    const { container } = render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveClass("shrink-0");
+  });
+
   it("요청 작성의 품목 전환 포커스에서는 상단 탭을 숨긴다", () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse");
     const { container } = render(
@@ -82,6 +93,47 @@ describe("DesktopWarehouseView", () => {
     fireEvent.click(screen.getByRole("button", { name: "품목 전환 포커스" }));
 
     expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("clears item conversion focus when leaving for Mine", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse");
+    const { container } = render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("item-conversion-focus"));
+    fireEvent.click(screen.getAllByRole("tab", { hidden: true })[2]);
+
+    expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveAttribute("aria-hidden", "false");
+    fireEvent.click(screen.getAllByRole("tab")[0]);
+
+    expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveAttribute("aria-hidden", "false");
+  });
+
+  it("clears item conversion focus when popstate moves from compose to Mine", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse");
+    const { container } = render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("item-conversion-focus"));
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=mine");
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveAttribute("aria-hidden", "false");
+    const mineTabs = screen.getAllByRole("tab");
+    expect(mineTabs).toHaveLength(3);
+    mineTabs.forEach((tab) => expect(tab).toBeVisible());
+    fireEvent.click(mineTabs[0]);
+    expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveAttribute("aria-hidden", "false");
   });
 
   it("clears a cart step before restoring another draft", () => {

@@ -54,4 +54,18 @@ describe("ItemFormFields", () => {
     expect(screen.getByRole("option", { name: "불용" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "기타" })).toBeInTheDocument();
   });
+
+  it("keeps the generated MES code preview without rendering the current prefix badge", () => {
+    const { container } = render(
+      <ItemFormFields
+        form={baseForm({ model_slots: [1] })}
+        setForm={vi.fn()}
+        showMesCode
+        productModels={[{ slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false }]}
+      />,
+    );
+
+    expect(screen.getAllByText(/A-TR-/).some((element) => element.getAttribute("aria-readonly") === "true")).toBe(true);
+    expect(container.querySelector("strong")).not.toBeInTheDocument();
+  });
 });

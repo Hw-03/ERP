@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
+import { normalizeEmployeePosition } from "../_admin_sections/_employee_parts/employeeRoleLabels";
 
 /**
  * Round-15 (#2) 추출 — useAdminEmployees 의 form/selection 부분.
@@ -41,7 +42,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
 function toEditForm(emp: Employee): EmployeeEditForm {
   return {
     name: emp.name,
-    role: emp.role,
+    role: normalizeEmployeePosition(emp.role),
     phone: emp.phone ?? "",
     department: emp.department,
     level: (emp.level ?? "staff") as EmployeeLevel,

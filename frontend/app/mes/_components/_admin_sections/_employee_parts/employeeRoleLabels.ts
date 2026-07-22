@@ -15,14 +15,18 @@ export const EMPLOYEE_POSITION_OPTIONS = [
   "책임연구원",
 ] as const;
 
-export function employeePositionOptions(
-  currentRole: string,
-): { value: string; label: string; disabled?: boolean }[] {
-  const standardOptions = EMPLOYEE_POSITION_OPTIONS.map((role) => ({ value: role, label: role }));
-  if (!currentRole || EMPLOYEE_POSITION_OPTIONS.includes(currentRole as typeof EMPLOYEE_POSITION_OPTIONS[number])) {
-    return standardOptions;
+export function employeePositionOptions(): { value: string; label: string }[] {
+  return EMPLOYEE_POSITION_OPTIONS.map((role) => ({ value: role, label: role }));
+}
+
+export function normalizeEmployeePosition(rawRole: string): string {
+  const position = rawRole.split("/").pop()?.trim() ?? "";
+  if (EMPLOYEE_POSITION_OPTIONS.includes(position as typeof EMPLOYEE_POSITION_OPTIONS[number])) {
+    return position;
   }
-  return [{ value: currentRole, label: `기존 직급: ${currentRole}`, disabled: true }, ...standardOptions];
+  if (position === "퇴사") return "사원";
+  if (position === "책임") return "책임연구원";
+  return "사원";
 }
 
 export const WAREHOUSE_ROLE_LABEL: Record<WarehouseRole, { label: string; hint: string; tone: string }> = {

@@ -455,9 +455,9 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
         className="rounded-[14px] border p-4"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+        <div data-model-edit-fields className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_7rem]">
           {/* 모델명 — 편집 */}
-          <div className="col-span-2">
+          <div className="min-w-0">
             <EditFieldRow label="모델명">
               <input
                 value={editForm.model_name}

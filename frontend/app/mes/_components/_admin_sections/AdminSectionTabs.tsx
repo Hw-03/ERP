@@ -61,15 +61,19 @@ export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
         boxShadow: "var(--c-card-shadow)",
       }}
     >
-      <div className="flex min-w-max items-center gap-2">
+      <div className="flex min-w-[880px] flex-1 items-center gap-2 lg:min-w-0">
         {SECTION_GROUPS.map((group, index) => (
           <div
             key={group.label}
             data-admin-tab-group
             role="group"
             aria-label={group.label}
-            className={`flex flex-col gap-1 ${index > 0 ? "ml-2 border-l pl-4" : ""}`}
-            style={index > 0 ? { borderColor: LEGACY_COLORS.border } : undefined}
+            className={`flex min-w-0 flex-col gap-1 ${index > 0 ? "ml-2 border-l pl-4" : ""}`}
+            style={{
+              flexBasis: 0,
+              flexGrow: group.tabs.length,
+              ...(index > 0 ? { borderColor: LEGACY_COLORS.border } : {}),
+            }}
           >
             <span
               className="pointer-events-none select-none text-[12px] font-black tracking-[0.08em]"
@@ -88,7 +92,7 @@ export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
                     type="button"
                     onClick={() => onSelect(tab.id)}
                     aria-current={active ? "page" : undefined}
-                    className="flex h-11 items-center gap-2 rounded-[12px] px-3 text-[14px] font-bold transition-colors hover:brightness-105 active:scale-[0.98]"
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[12px] px-3 text-[14px] font-bold transition-colors hover:brightness-105 active:scale-[0.98]"
                     style={{
                       background: active
                         ? `color-mix(in srgb, ${tone} 14%, transparent)`

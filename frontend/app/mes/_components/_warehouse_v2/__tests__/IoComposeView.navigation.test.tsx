@@ -26,6 +26,18 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+vi.mock("../IoBundleCart", () => ({
+  IoBundleCart: ({ onAdvance }: { onAdvance: () => void }) => (
+    <button type="button" data-testid="draft-step-advance" onClick={onAdvance}>advance</button>
+  ),
+}));
+
+vi.mock("../IoConfirmStep", () => ({
+  IoConfirmStep: ({ onSaveDraft }: { onSaveDraft: () => void }) => (
+    <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
+  ),
+}));
+
 const operator = {
   employee_id: "op-1",
   name: "operator",
@@ -121,6 +133,69 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("waits to publish draft status until the success notice reaches the status target", async () => {
+    const onStatusChange = vi.fn();
+    vi.mocked(api.saveDraft).mockResolvedValue({ batch_id: "draft-save" } as never);
+
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={operator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={onStatusChange}
+        restoreDraft={{
+          batch_id: "draft-save",
+          work_type: "warehouse_io",
+          sub_type: "warehouse_to_dept",
+          from_department: "조립",
+          to_department: "조립",
+          bundles: [{
+            bundle_id: "bundle-1",
+            source_kind: "direct_item",
+            title: "test",
+            source_item_id: "item-1",
+            source_mes_code: "ITEM-1",
+            quantity: 1,
+            expanded_level: 0,
+            lines: [{
+              line_id: "line-1",
+              item_id: "item-1",
+              item_name: "test",
+              mes_code: "ITEM-1",
+              unit: "EA",
+              direction: "out",
+              from_bucket: "warehouse",
+              from_department: null,
+              to_bucket: "production",
+              to_department: "조립",
+              quantity: 1,
+              bom_expected: null,
+              included: true,
+              origin: "direct",
+              edited: false,
+              has_children: false,
+              shortage: 0,
+              exclusion_note: null,
+            }],
+          }],
+        } as never}
+      />,
+    );
+
+    await screen.findByTestId("draft-step-advance");
+    onStatusChange.mockClear();
+    fireEvent.click(screen.getByTestId("draft-step-advance"));
+    fireEvent.click(await screen.findByTestId("draft-save"));
+
+    const notice = await screen.findByTestId("io-draft-save-notice");
+    expect(onStatusChange).not.toHaveBeenCalled();
+    fireEvent.animationEnd(notice);
+    expect(onStatusChange).toHaveBeenCalledWith(expect.stringMatching(/^저장됨 · \d{2}:\d{2}$/));
+  });
+
   it("AS 작업자에게 독립 사용출고 카드를 보이고 품목 전환은 숨긴다", async () => {
     renderCompose([], { ...operator, department: "AS" });
     await waitFor(() => {

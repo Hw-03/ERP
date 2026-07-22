@@ -102,25 +102,9 @@ function MesCodeSection({
   form: ItemFormData;
   models: ProductModel[];
 }) {
-  const prefix = previewCodePrefix(form.model_slots, form.process_type_code, models);
-
   return (
     <div>
       <FieldLabel label="품목 코드" />
-      {prefix && (
-        <div className="mb-2 flex items-center gap-2 flex-wrap">
-          <span
-            className="rounded-[10px] px-3 py-1 text-sm font-mono"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 12%, transparent)`,
-              color: LEGACY_COLORS.purple,
-              border: `1px solid color-mix(in srgb, ${LEGACY_COLORS.purple} 30%, transparent)`,
-            }}
-          >
-            현재 코드 prefix: <strong>{prefix}</strong>
-          </span>
-        </div>
-      )}
       <div
         className="w-full rounded-[18px] border px-4 py-3 text-base font-mono"
         style={{

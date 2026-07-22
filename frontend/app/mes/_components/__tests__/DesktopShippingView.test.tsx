@@ -1160,6 +1160,9 @@ describe("DesktopShippingView", () => {
     onStatusChange.mockClear();
     fireEvent.click(nextButton);
     const validationNotice = screen.getByTestId("shipping-name-validation-notice");
+    expect(validationNotice).toHaveClass("status-target-notice");
+    expect(validationNotice).toHaveAttribute("role", "status");
+    expect(validationNotice).toHaveAttribute("aria-live", "polite");
     expect(validationNotice).toHaveTextContent("새 PA/PF 품명을 수정하세요.");
     expect(onStatusChange).not.toHaveBeenCalled();
     expect(screen.getByTestId("shipping-wizard-step-3")).toBeInTheDocument();
