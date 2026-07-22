@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MobileAssemblyChecklistScreen } from "../MobileAssemblyChecklistScreen";
 
-function renderChecklistScreen() {
-  render(<MobileAssemblyChecklistScreen />);
+function renderChecklistScreen(onExit?: () => void) {
+  render(<MobileAssemblyChecklistScreen onExit={onExit} />);
 }
 
 describe("MobileAssemblyChecklistScreen", () => {
@@ -13,6 +13,16 @@ describe("MobileAssemblyChecklistScreen", () => {
     expect(screen.getByRole("heading", { name: "조립 체크리스트" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "DX3000 체크리스트 열기" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ADX6000 체크리스트 열기" })).toBeInTheDocument();
+  });
+
+  it("returns to the More menu from the product selection screen", () => {
+    const onExit = vi.fn();
+
+    renderChecklistScreen(onExit);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기 메뉴로 돌아가기" }));
+
+    expect(onExit).toHaveBeenCalledTimes(1);
   });
 
   it("shows DX3000 power-off and power-on sections as a read-only list", () => {

@@ -50,14 +50,34 @@ vi.mock("../screens", () => ({
   MobileWarehouseScreen: () => <div>warehouse screen</div>,
   MobileDefectScreen: () => <div>defect screen</div>,
   MobileHistoryScreen: () => <div>history screen</div>,
-  MobileWeeklyScreen: () => <div>weekly screen</div>,
+  MobileWeeklyScreen: ({ onExit }: { onExit?: () => void }) => (
+    <>
+      <div>weekly screen</div>
+      <button type="button" onClick={onExit}>back from weekly</button>
+    </>
+  ),
   MobileWarehouseMapScreen: () => <div>map screen</div>,
   MobileShippingScreen: () => <div>shipping screen</div>,
-  MobileAssemblyChecklistScreen: () => <div>assembly checklist screen</div>,
-  MobileMoreScreen: ({ onChecklist }: { onChecklist?: () => void }) => (
-    <button type="button" onClick={onChecklist}>
-      open checklist
-    </button>
+  MobileAssemblyChecklistScreen: ({ onExit }: { onExit?: () => void }) => (
+    <>
+      <div>assembly checklist screen</div>
+      <button type="button" onClick={onExit}>back from checklist</button>
+    </>
+  ),
+  MobileMoreScreen: ({
+    onChecklist,
+    onWeekly,
+    visibleEntries,
+  }: {
+    onChecklist?: () => void;
+    onWeekly?: () => void;
+    visibleEntries?: string[];
+  }) => (
+    <>
+      <div data-testid="more-entry-order">{visibleEntries?.join(",")}</div>
+      <button type="button" onClick={onChecklist}>open checklist</button>
+      <button type="button" onClick={onWeekly}>open weekly</button>
+    </>
   ),
 }));
 
@@ -116,6 +136,24 @@ describe("MobileShell layout", () => {
 
     expect(screen.getByText("assembly checklist screen")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "체크리스트" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("orders More entries and returns checklist and weekly screens to More", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+
+    expect(screen.getByTestId("more-entry-order")).toHaveTextContent("assemblyChecklist,shipping,weekly,warehouseMap");
+
+    fireEvent.click(screen.getByRole("button", { name: "open checklist" }));
+    fireEvent.click(screen.getByRole("button", { name: "back from checklist" }));
+
+    expect(screen.getByRole("button", { name: "open checklist" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "open weekly" }));
+    fireEvent.click(screen.getByRole("button", { name: "back from weekly" }));
+
+    expect(screen.getByRole("button", { name: "open weekly" })).toBeInTheDocument();
   });
 
   it("logs top-level mobile tab changes once", () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MobileMoreScreen } from "../MobileMoreScreen";
 
@@ -47,7 +47,7 @@ describe("MobileMoreScreen", () => {
     expect(screen.getByText("Kim")).toBeInTheDocument();
   });
 
-  it("renders a large notification target and the checklist-first entries as one full-width menu list", () => {
+  it("fills the available menu space with checklist, shipping, weekly, and warehouse-map entries in order", () => {
     const onChecklist = vi.fn();
     const onWeekly = vi.fn();
     const onShipping = vi.fn();
@@ -66,13 +66,22 @@ describe("MobileMoreScreen", () => {
     );
 
     expect(screen.getByTestId("mobile-more-notification-target")).toHaveClass("h-16");
-    expect(screen.getByTestId("mobile-more-menu-list")).toBeInTheDocument();
-    expect(screen.getByTestId("mobile-more-menu-list").querySelector("button")).toHaveTextContent("체크리스트");
+    const menuList = screen.getByTestId("mobile-more-menu-list");
+    const menuButtons = within(menuList).getAllByRole("button");
+
+    expect(menuList).toHaveClass("flex-1");
+    expect(menuButtons.map((button) => button.textContent)).toEqual([
+      expect.stringContaining("체크리스트"),
+      expect.stringContaining("출하"),
+      expect.stringContaining("주간보고"),
+      expect.stringContaining("창고 지도"),
+    ]);
+    menuButtons.forEach((button) => expect(button).toHaveClass("flex-1"));
 
     fireEvent.click(screen.getByRole("button", { name: /체크리스트/ }));
 
-    fireEvent.click(screen.getByRole("button", { name: /주간보고/ }));
     fireEvent.click(screen.getByRole("button", { name: /출하/ }));
+    fireEvent.click(screen.getByRole("button", { name: /주간보고/ }));
     fireEvent.click(screen.getByRole("button", { name: /창고 지도/ }));
 
     expect(onChecklist).toHaveBeenCalledTimes(1);

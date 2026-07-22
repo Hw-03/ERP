@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
+import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
 import type {
@@ -47,7 +48,15 @@ function Kpi({ label, tone }: { label: string; tone?: string }) {
   );
 }
 
-export function MobileWeeklyScreen({ weekMon, onWeekChange }: { weekMon: Date; onWeekChange?: (date: Date) => void }) {
+export function MobileWeeklyScreen({
+  weekMon,
+  onWeekChange,
+  onExit,
+}: {
+  weekMon: Date;
+  onWeekChange?: (date: Date) => void;
+  onExit?: () => void;
+}) {
   const [data, setData] = useState<WeeklyReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +114,20 @@ export function MobileWeeklyScreen({ weekMon, onWeekChange }: { weekMon: Date; o
             className="sticky top-0 z-20 -mx-3 border-b px-3 py-2"
             style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
           >
-            <WeeklyWeekPicker weekMon={weekMon} onChange={onWeekChange} />
+            <div data-testid="mobile-weekly-header" className="relative flex min-h-11 items-center justify-center">
+              {onExit && (
+                <button
+                  type="button"
+                  aria-label="더보기 메뉴로 돌아가기"
+                  onClick={onExit}
+                  className="absolute left-0 flex h-11 w-11 items-center justify-center rounded-full border transition-[transform] active:scale-[0.94]"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+              )}
+              <WeeklyWeekPicker weekMon={weekMon} onChange={onWeekChange} />
+            </div>
           </div>
         )}
         <AsyncState

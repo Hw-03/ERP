@@ -37,10 +37,7 @@ import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 import { MobileDirtyLeaveSheet } from "./warehouse/MobileDirtyLeaveSheet";
 import type { MobileMoreEntryId } from "./screens/MobileMoreScreen";
-import {
-  MOBILE_MORE_ENTRY_TAB_IDS,
-  isSidebarTabVisible,
-} from "../tabAccess";
+import { isSidebarTabVisible } from "../tabAccess";
 import { MobileViewportFrame } from "./MobileViewportFrame";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
@@ -69,6 +66,7 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
 
 // 하단 탭바에 노출되는 5탭. 더보기는 전폭 화면(출하·주간보고·창고지도)으로 진입한다.
 const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "more"];
+const MORE_ENTRY_ORDER: MobileMoreEntryId[] = ["assemblyChecklist", "shipping", "weekly", "warehouseMap"];
 
 // 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합. 알 수 없는 값(예: admin)이
 // 들어오면 무시되어 기본 dashboard 가 유지된다.
@@ -201,8 +199,7 @@ export function MobileShell() {
   const fallbackTab = visibleTabs[0] ?? "dashboard";
   const visibleMoreEntries = useMemo<MobileMoreEntryId[]>(
     () => [
-      "assemblyChecklist",
-      ...MOBILE_MORE_ENTRY_TAB_IDS.filter((tab) => isSidebarTabVisible(tab, operator)),
+      ...MORE_ENTRY_ORDER.filter((tab) => tab === "assemblyChecklist" || isSidebarTabVisible(tab, operator)),
     ],
     [operator],
   );
@@ -344,10 +341,10 @@ export function MobileShell() {
       return <MobileShippingScreen key={key} />;
     }
     if (activeTab === "assemblyChecklist") {
-      return <MobileAssemblyChecklistScreen key={key} />;
+      return <MobileAssemblyChecklistScreen key={key} onExit={() => handleTabChange("more")} />;
     }
     if (activeTab === "weekly") {
-      return <MobileWeeklyScreen key={key} weekMon={weekMon} onWeekChange={setWeekMon} />;
+      return <MobileWeeklyScreen key={key} weekMon={weekMon} onWeekChange={setWeekMon} onExit={() => handleTabChange("more")} />;
     }
     if (activeTab === "warehouseMap") {
       return (

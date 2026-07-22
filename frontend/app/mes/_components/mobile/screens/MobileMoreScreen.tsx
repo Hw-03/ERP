@@ -50,7 +50,7 @@ export function MobileMoreScreen({
   onWeekly,
   onShipping,
   onWarehouseMap,
-  visibleEntries = ["assemblyChecklist", "weekly", "shipping", "warehouseMap"],
+  visibleEntries = ["assemblyChecklist", "shipping", "weekly", "warehouseMap"],
 }: {
   operator: Operator | null;
   unreadCount?: number;
@@ -100,7 +100,7 @@ export function MobileMoreScreen({
       {entries.length > 0 && (
         <div
           data-testid="mobile-more-menu-list"
-          className="overflow-hidden rounded-[18px] border"
+          className={`overflow-hidden rounded-[18px] border${entries.length === 4 ? " flex min-h-0 flex-1 flex-col" : ""}`}
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           {entries.map((entry, index) => (
@@ -112,6 +112,7 @@ export function MobileMoreScreen({
               accent={entry.accent}
               onClick={entry.onClick}
               divided={index > 0}
+              fill={entries.length === 4}
             />
           ))}
         </div>
@@ -127,6 +128,7 @@ function MenuRow({
   accent,
   onClick,
   divided,
+  fill,
 }: {
   icon: LucideIcon;
   label: string;
@@ -134,12 +136,13 @@ function MenuRow({
   accent: string;
   onClick: () => void;
   divided: boolean;
+  fill: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[92px] w-full items-center gap-5 border-t-0 px-4 py-4 text-left transition-[transform] active:scale-[0.99]"
+      className={`flex min-h-[92px] w-full items-center gap-5 border-t-0 px-4 py-4 text-left transition-[transform] active:scale-[0.99]${fill ? " flex-1" : ""}`}
       style={{
         borderTop: divided ? `1px solid ${LEGACY_COLORS.border}` : "none",
         color: LEGACY_COLORS.text,

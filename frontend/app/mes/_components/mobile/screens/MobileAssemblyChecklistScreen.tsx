@@ -12,7 +12,7 @@ const CARD_STYLE = {
   boxShadow: "var(--c-card-shadow)",
 } as const;
 
-export function MobileAssemblyChecklistScreen() {
+export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void }) {
   const [selectedProductId, setSelectedProductId] = useState<AssemblyChecklistProductId | null>(null);
   const selectedProduct = ASSEMBLY_CHECKLISTS.find((product) => product.id === selectedProductId);
 
@@ -21,6 +21,17 @@ export function MobileAssemblyChecklistScreen() {
       <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
         <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
           <div className="flex items-center gap-3">
+            {onExit && (
+              <button
+                type="button"
+                aria-label="더보기 메뉴로 돌아가기"
+                onClick={onExit}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-[transform] active:scale-[0.94]"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
             <span
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
               style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 20%, transparent)` }}
