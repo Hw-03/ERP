@@ -31,6 +31,7 @@ describe("MobileMoreScreen", () => {
         unreadCount={7}
         onProfile={onProfile}
         onNotificationNavigate={() => {}}
+        onChecklist={() => {}}
         onWeekly={() => {}}
         onShipping={() => {}}
         onWarehouseMap={() => {}}
@@ -46,7 +47,8 @@ describe("MobileMoreScreen", () => {
     expect(screen.getByText("Kim")).toBeInTheDocument();
   });
 
-  it("renders a large notification target and the three entries as one full-width menu list", () => {
+  it("renders a large notification target and the checklist-first entries as one full-width menu list", () => {
+    const onChecklist = vi.fn();
     const onWeekly = vi.fn();
     const onShipping = vi.fn();
     const onWarehouseMap = vi.fn();
@@ -56,6 +58,7 @@ describe("MobileMoreScreen", () => {
         operator={operator}
         onProfile={() => {}}
         onNotificationNavigate={() => {}}
+        onChecklist={onChecklist}
         onWeekly={onWeekly}
         onShipping={onShipping}
         onWarehouseMap={onWarehouseMap}
@@ -64,11 +67,15 @@ describe("MobileMoreScreen", () => {
 
     expect(screen.getByTestId("mobile-more-notification-target")).toHaveClass("h-16");
     expect(screen.getByTestId("mobile-more-menu-list")).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-more-menu-list").querySelector("button")).toHaveTextContent("체크리스트");
+
+    fireEvent.click(screen.getByRole("button", { name: /체크리스트/ }));
 
     fireEvent.click(screen.getByRole("button", { name: /주간보고/ }));
     fireEvent.click(screen.getByRole("button", { name: /출하/ }));
     fireEvent.click(screen.getByRole("button", { name: /창고 지도/ }));
 
+    expect(onChecklist).toHaveBeenCalledTimes(1);
     expect(onWeekly).toHaveBeenCalledTimes(1);
     expect(onShipping).toHaveBeenCalledTimes(1);
     expect(onWarehouseMap).toHaveBeenCalledTimes(1);

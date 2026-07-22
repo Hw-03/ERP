@@ -1,11 +1,11 @@
 "use client";
 
-import { BarChart2, MapPinned, PackageCheck, type LucideIcon } from "lucide-react";
+import { BarChart2, ClipboardCheck, MapPinned, PackageCheck, type LucideIcon } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { Operator } from "../../login/useCurrentOperator";
 import { NotificationBell } from "../../notifications/NotificationBell";
 
-export type MobileMoreEntryId = "weekly" | "shipping" | "warehouseMap";
+export type MobileMoreEntryId = "assemblyChecklist" | "weekly" | "shipping" | "warehouseMap";
 
 const MORE_ENTRIES: Record<
   MobileMoreEntryId,
@@ -16,6 +16,12 @@ const MORE_ENTRIES: Record<
     accent: string;
   }
 > = {
+  assemblyChecklist: {
+    icon: ClipboardCheck,
+    label: "체크리스트",
+    description: "제품별 조립 확인 목록",
+    accent: LEGACY_COLORS.blue,
+  },
   weekly: {
     icon: BarChart2,
     label: "주간보고",
@@ -40,21 +46,24 @@ export function MobileMoreScreen({
   operator,
   onProfile,
   onNotificationNavigate,
+  onChecklist,
   onWeekly,
   onShipping,
   onWarehouseMap,
-  visibleEntries = ["weekly", "shipping", "warehouseMap"],
+  visibleEntries = ["assemblyChecklist", "weekly", "shipping", "warehouseMap"],
 }: {
   operator: Operator | null;
   unreadCount?: number;
   onProfile: () => void;
   onNotificationNavigate: (tab: string, section: string | null) => void;
+  onChecklist: () => void;
   onWeekly: () => void;
   onShipping: () => void;
   onWarehouseMap: () => void;
   visibleEntries?: MobileMoreEntryId[];
 }) {
   const handlers: Record<MobileMoreEntryId, () => void> = {
+    assemblyChecklist: onChecklist,
     weekly: onWeekly,
     shipping: onShipping,
     warehouseMap: onWarehouseMap,

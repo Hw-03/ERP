@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BarChart2,
   Boxes,
+  ClipboardCheck,
   History as HistoryIcon,
   MapPinned,
   MoreHorizontal,
@@ -22,6 +23,7 @@ import {
   MobileWarehouseMapScreen,
   MobileMoreScreen,
   MobileShippingScreen,
+  MobileAssemblyChecklistScreen,
 } from "./screens";
 import { getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
@@ -38,7 +40,6 @@ import type { MobileMoreEntryId } from "./screens/MobileMoreScreen";
 import {
   MOBILE_MORE_ENTRY_TAB_IDS,
   isSidebarTabVisible,
-  mobileMoreHasVisibleEntries,
 } from "../tabAccess";
 import { MobileViewportFrame } from "./MobileViewportFrame";
 
@@ -51,7 +52,8 @@ export type MobileTabId =
   | "more"
   | "weekly"
   | "warehouseMap"
-  | "shipping";
+  | "shipping"
+  | "assemblyChecklist";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
@@ -59,6 +61,7 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   defect: { label: "불량", icon: AlertTriangle },
   history: { label: "내역", icon: HistoryIcon },
   more: { label: "더보기", icon: MoreHorizontal },
+  assemblyChecklist: { label: "체크리스트", icon: ClipboardCheck },
   shipping: { label: "출하", icon: PackageCheck },
   weekly: { label: "주간보고", icon: BarChart2 },
   warehouseMap: { label: "창고지도", icon: MapPinned },
@@ -78,6 +81,7 @@ const VALID_TAB_IDS: MobileTabId[] = [
   "weekly",
   "warehouseMap",
   "shipping",
+  "assemblyChecklist",
 ];
 
 // 항목 3-1 — 데스크톱 상단바와 동일한 기본 브랜드 상태 텍스트.
@@ -186,7 +190,7 @@ export function MobileShell() {
 
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
-    if (tab === "more") return mobileMoreHasVisibleEntries(operator);
+    if (tab === "more" || tab === "assemblyChecklist") return true;
     return isSidebarTabVisible(tab, operator);
   }, [operator]);
 
@@ -195,8 +199,11 @@ export function MobileShell() {
     [canOpenMobileTab],
   );
   const fallbackTab = visibleTabs[0] ?? "dashboard";
-  const visibleMoreEntries = useMemo(
-    () => MOBILE_MORE_ENTRY_TAB_IDS.filter((tab) => isSidebarTabVisible(tab, operator)) as MobileMoreEntryId[],
+  const visibleMoreEntries = useMemo<MobileMoreEntryId[]>(
+    () => [
+      "assemblyChecklist",
+      ...MOBILE_MORE_ENTRY_TAB_IDS.filter((tab) => isSidebarTabVisible(tab, operator)),
+    ],
     [operator],
   );
 
@@ -262,7 +269,7 @@ export function MobileShell() {
   // 항목 2-9 — weekly/warehouseMap 은 '더보기' 탭으로 진입한 하위 화면이라 TAB_BAR_IDS 에 없다.
   // 하단 네비에선 '더보기' 슬롯을 활성으로 매핑해 pill·강조가 더보기에 붙도록 한다.
   const isMoreSubScreen =
-    activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping";
+    activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping" || activeTab === "assemblyChecklist";
   const effectiveNavTab: MobileTabId = isMoreSubScreen ? "more" : activeTab;
   const activeIndex = visibleTabs.indexOf(effectiveNavTab);
 
@@ -325,6 +332,7 @@ export function MobileShell() {
           unreadCount={unreadNotifications}
           onProfile={() => setUserMenuOpen(true)}
           onNotificationNavigate={handleNotificationNavigate}
+          onChecklist={() => handleTabChange("assemblyChecklist")}
           onWeekly={() => handleTabChange("weekly")}
           onShipping={() => handleTabChange("shipping")}
           onWarehouseMap={() => handleTabChange("warehouseMap")}
@@ -334,6 +342,9 @@ export function MobileShell() {
     }
     if (activeTab === "shipping") {
       return <MobileShippingScreen key={key} />;
+    }
+    if (activeTab === "assemblyChecklist") {
+      return <MobileAssemblyChecklistScreen key={key} />;
     }
     if (activeTab === "weekly") {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} onWeekChange={setWeekMon} />;

@@ -25,7 +25,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getProductionCapacity: vi.fn(() => Promise.resolve(null)),
+    getProductionCapacity: vi.fn(() => new Promise<null>(() => {})),
   },
 }));
 
@@ -53,7 +53,12 @@ vi.mock("../screens", () => ({
   MobileWeeklyScreen: () => <div>weekly screen</div>,
   MobileWarehouseMapScreen: () => <div>map screen</div>,
   MobileShippingScreen: () => <div>shipping screen</div>,
-  MobileMoreScreen: () => <div>more screen</div>,
+  MobileAssemblyChecklistScreen: () => <div>assembly checklist screen</div>,
+  MobileMoreScreen: ({ onChecklist }: { onChecklist?: () => void }) => (
+    <button type="button" onClick={onChecklist}>
+      open checklist
+    </button>
+  ),
 }));
 
 import { MobileShell } from "../MobileShell";
@@ -63,6 +68,7 @@ describe("MobileShell layout", () => {
   beforeEach(() => {
     window.history.pushState({}, "", "/mes");
     state.notifications = { items: [], unread_count: 0 };
+    state.operator.hidden_sidebar_tabs = [];
     vi.mocked(sendClientEvent).mockClear();
   });
 
@@ -86,12 +92,30 @@ describe("MobileShell layout", () => {
     expect(screen.getByRole("button", { name: "더보기" })).toHaveTextContent("3");
   });
 
+  it("keeps More visible when the checklist is the only available entry", () => {
+    state.operator.hidden_sidebar_tabs = ["weekly", "shipping", "warehouseMap"];
+
+    render(<MobileShell />);
+
+    expect(screen.getByRole("button", { name: "더보기" })).toBeInTheDocument();
+  });
+
   it("does not show mobile status messages as floating notifications", () => {
     render(<MobileShell />);
 
     fireEvent.click(screen.getByRole("button", { name: "dashboard screen" }));
 
     expect(screen.queryByText("item added")).not.toBeInTheDocument();
+  });
+
+  it("opens the checklist from More while keeping the More slot active", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "open checklist" }));
+
+    expect(screen.getByText("assembly checklist screen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "체크리스트" })).toHaveAttribute("aria-current", "page");
   });
 
   it("logs top-level mobile tab changes once", () => {

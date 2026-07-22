@@ -6,3 +6,4 @@ export { MobileWeeklyScreen } from "./MobileWeeklyScreen";
 export { MobileWarehouseMapScreen } from "./MobileWarehouseMapScreen";
 export { MobileMoreScreen } from "./MobileMoreScreen";
 export { MobileShippingScreen } from "./MobileShippingScreen";
+export { MobileAssemblyChecklistScreen } from "./MobileAssemblyChecklistScreen";
