@@ -37,11 +37,18 @@ describe("DeptDetailView", () => {
     const toggle = screen.getByRole("button", { name: "전체 색상 보기" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveAttribute("aria-controls", "department-color-palette");
+    expect(toggle).not.toHaveClass("active:scale-[0.98]");
     expect(screen.queryByRole("button", { name: /blue-500/i })).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /blue-500/i })).toBeInTheDocument();
+    const blueSwatch = screen.getByRole("button", { name: /blue-500/i });
+    expect(blueSwatch).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(blueSwatch);
+
+    expect(blueSwatch).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "색상 코드" })).toHaveValue("#3b82f6");
   });
 });

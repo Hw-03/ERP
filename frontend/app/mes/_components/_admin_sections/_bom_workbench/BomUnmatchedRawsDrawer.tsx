@@ -27,7 +27,7 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
   return (
     <div
       className="rounded-2xl border"
-      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
     >
       <button
         type="button"
@@ -62,7 +62,7 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
       {open && !isEmpty && (
         <div
           className="max-h-[30vh] overflow-y-auto"
-          style={{ borderTop: `1px solid ${LEGACY_COLORS.border}` }}
+          style={{ background: LEGACY_COLORS.bg, borderTop: `1px solid ${LEGACY_COLORS.border}` }}
         >
           {unmatched.map((i) => (
             <div

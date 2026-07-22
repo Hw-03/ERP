@@ -62,7 +62,7 @@ export function EmployeeDetailGrid({
     }));
   };
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
       {/* 카드 1: 기본 정보 */}
       <DetailCardSlot title="기본 정보">
         <div className="grid grid-cols-2 gap-3">
@@ -174,7 +174,7 @@ export function EmployeeDetailGrid({
         </div>
       </DetailCardSlot>
 
-      <div className="grid items-start gap-3 lg:col-span-2 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <div className="grid items-start gap-3 lg:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1">
         <DetailCardSlot
           title="PIN"
           headerAccessory={(
@@ -242,7 +242,7 @@ export function EmployeeDetailGrid({
 
       {/* 카드 5: 담당 모델 — 조립 부서일 때만 노출. 입출고 화면에서 조립 그룹 내 정렬 우선순위로 사용. */}
       {form.department === ASSEMBLY_DEPT ? (
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 xl:col-span-3">
           <DetailCardSlot title="담당 모델 (우선순위 순)">
             <AssignedModelsEditor
               models={productModels}

@@ -21,6 +21,39 @@ function baseForm(overrides: Partial<ItemFormData> = {}): ItemFormData {
 }
 
 describe("ItemFormFields", () => {
+  it("places the MES code preview after the product block and shows selected symbols inline with its label", () => {
+    render(
+      <ItemFormFields
+        form={baseForm({ model_slots: [1] })}
+        setForm={vi.fn()}
+        showMesCode
+        productModels={[{ slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false }]}
+      />,
+    );
+
+    const productLabel = screen.getByText("사용 제품");
+    const selectedSymbol = screen.getByText(/제품 기호:/);
+    const codePreview = screen.getAllByText(/A-TR-/).find((element) => element.getAttribute("aria-readonly") === "true");
+
+    expect(productLabel.parentElement).toContainElement(selectedSymbol);
+    expect(productLabel.closest("div")?.parentElement?.compareDocumentPosition(codePreview!))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(codePreview?.parentElement?.nextElementSibling).toBeNull();
+  });
+
+  it("keeps the no-product guidance beneath the product chips", () => {
+    render(
+      <ItemFormFields
+        form={baseForm()}
+        setForm={vi.fn()}
+        showMesCode
+        productModels={[{ slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false }]}
+      />,
+    );
+
+    expect(screen.getByText(/사용 제품이 지정되지 않았습니다/)).toBeInTheDocument();
+  });
+
   it("offers warehouse as an initial stock location", () => {
     const setForm = vi.fn();
     render(

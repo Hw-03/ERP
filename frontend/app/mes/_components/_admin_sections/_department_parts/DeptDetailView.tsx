@@ -192,7 +192,7 @@ export function DeptDetailView({
               aria-expanded={isPaletteOpen}
               aria-controls="department-color-palette"
               onClick={() => setIsPaletteOpen((open) => !open)}
-              className="flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[12px] font-bold transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 active:scale-[0.98]"
+              className="flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[12px] font-bold transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
               style={{
                 background: isPaletteOpen
                   ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`

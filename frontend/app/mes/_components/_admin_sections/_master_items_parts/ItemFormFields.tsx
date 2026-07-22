@@ -266,10 +266,6 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         </div>
       ))}
 
-      {showMesCode && (
-        <MesCodeSection form={form} models={productModels} />
-      )}
-
       {/* 카테고리 */}
       <div>
         <FieldLabel label="카테고리" badge="필수" />
@@ -296,7 +292,18 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
 
       {/* 사용 제품 (모델 슬롯) */}
       <div>
-        <FieldLabel label="사용 제품" />
+        <div className="flex flex-wrap items-center gap-x-2">
+          <FieldLabel label="사용 제품" />
+          {form.model_slots.length > 0 && (
+            <div className="mb-2 text-xs" style={{ color: LEGACY_COLORS.purple }}>
+              제품 기호:{" "}
+              {productModels.filter((m) => form.model_slots.includes(m.slot))
+                .map((m) => m.symbol)
+                .sort()
+                .join("")}
+            </div>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           {productModels.map(({ slot, model_name, symbol }) => {
             const checked = form.model_slots.includes(slot);
@@ -324,21 +331,16 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
             );
           })}
         </div>
-        {form.model_slots.length > 0 ? (
-          <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.purple }}>
-            제품 기호:{" "}
-            {productModels.filter((m) => form.model_slots.includes(m.slot))
-              .map((m) => m.symbol)
-              .sort()
-              .join("")}
-          </div>
-        ) : (
+        {form.model_slots.length === 0 && (
           <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             사용 제품이 지정되지 않았습니다. 위 칩을 클릭해 모델 슬롯을 선택하세요.
           </div>
         )}
       </div>
 
+      {showMesCode && (
+        <MesCodeSection form={form} models={productModels} />
+      )}
     </>
   );
 }

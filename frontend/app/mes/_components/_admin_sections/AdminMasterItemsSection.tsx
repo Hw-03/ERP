@@ -19,13 +19,12 @@ import { AddItemForm } from "./_master_items_parts/AddItemForm";
 import { EditItemForm } from "./_master_items_parts/EditItemForm";
 import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 
-type DetailTab = "info" | "stock" | "bom" | "history";
+type DetailTab = "info" | "stock" | "bom";
 
 const DETAIL_TABS: { id: DetailTab; label: string }[] = [
   { id: "info", label: "기본 정보" },
   { id: "stock", label: "재고 정보" },
   { id: "bom", label: "BOM / 사용처" },
-  { id: "history", label: "변경 이력 (준비 중)" },
 ];
 
 interface Props {
@@ -398,7 +397,6 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     </div>
   );
 }
-
 function ItemDetailTabs({
   item,
   tab,
@@ -417,7 +415,7 @@ function ItemDetailTabs({
   if (tab === "bom") {
     return <ItemBomTab item={item} allBomRows={allBomRows} />;
   }
-  return <ItemHistoryTab item={item} />;
+  return null;
 }
 
 function ItemStockTab({ item }: { item: Item }) {
@@ -437,7 +435,6 @@ function ItemStockTab({ item }: { item: Item }) {
     </div>
   );
 }
-
 function StockStat({
   label,
   value,
@@ -473,7 +470,6 @@ function StockStat({
     </div>
   );
 }
-
 function ItemBomTab({
   item,
   allBomRows,
@@ -515,7 +511,6 @@ function ItemBomTab({
     </div>
   );
 }
-
 function BomList({
   title,
   rows,
@@ -589,46 +584,6 @@ function BomList({
   );
 }
 
-function ItemHistoryTab({ item }: { item: Item }) {
-  return (
-    <div
-      className="rounded-[14px] border p-4"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-    >
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <HistoryRow label="등록일" value={formatDateTime(item.created_at)} />
-        <HistoryRow label="최종 수정일" value={formatDateTime(item.updated_at)} />
-      </div>
-      <div
-        className="mt-4 rounded-[10px] border px-3 py-2 text-[12px]"
-        style={{
-          background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
-          borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 25%, transparent)`,
-          color: LEGACY_COLORS.muted2,
-        }}
-      >
-        품목별 상세 변경 이력은 향후 거래 로그(transactions)와 연결될 예정입니다.
-      </div>
-    </div>
-  );
-}
-
-function HistoryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div
-        className="text-[12px] font-bold tracking-[0.06em]"
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        {label}
-      </div>
-      <div className="text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function ItemEmptyHint({ onAdd }: { onAdd: () => void }) {
   return (
     <EmptyState
@@ -638,20 +593,4 @@ function ItemEmptyHint({ onAdd }: { onAdd: () => void }) {
       action={{ label: "+ 품목 추가", onClick: onAdd }}
     />
   );
-}
-
-function formatDateTime(iso: string): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mi = String(d.getMinutes()).padStart(2, "0");
-    return `${yyyy}.${mm}.${dd} ${hh}:${mi}`;
-  } catch {
-    return iso;
-  }
 }

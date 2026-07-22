@@ -449,13 +449,14 @@ interface ModelDetailViewProps {
 
 function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEditForm, onRequestDelete }: ModelDetailViewProps) {
   return (
-    <div className="flex flex-col gap-5">
+    <div data-model-detail-layout className="flex flex-col gap-3">
       {/* 편집 가능 필드 */}
       <div
-        className="rounded-[14px] border p-4"
+        data-model-edit-card
+        className="rounded-[14px] border p-3"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        <div data-model-edit-fields className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_7rem]">
+        <div data-model-edit-fields className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
           {/* 모델명 — 편집 */}
           <div className="min-w-0">
             <EditFieldRow label="모델명">
@@ -490,48 +491,50 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <SummaryStat
-          label="연결 품목 수"
-          value={linkedItems.length}
-          hint="이 모델로 지정된 품목"
-          tone={LEGACY_COLORS.blue}
-        />
-        <SummaryStat
-          label="연결 BOM 수"
-          value={linkedBomCount}
-          hint="이 모델 품목을 부모로 가진 BOM"
-          tone={LEGACY_COLORS.purple}
-        />
-      </div>
-
-      {linkedItems.length > 0 && (
-        <div>
-          <div className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            연결 품목 미리보기
-          </div>
-          <div
-            className="flex flex-col gap-1.5 rounded-[14px] border p-3"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-          >
-            {linkedItems.slice(0, 6).map((it) => (
-              <div key={it.item_id} className="flex items-center justify-between gap-2 text-[14px]">
-                <div className="min-w-0 flex-1 truncate" style={{ color: LEGACY_COLORS.text }}>
-                  {it.item_name}
-                </div>
-                <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {it.mes_code ?? "—"}
-                </span>
-              </div>
-            ))}
-            {linkedItems.length > 6 && (
-              <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                외 {linkedItems.length - 6}건
-              </div>
-            )}
-          </div>
+      <div data-model-linked-layout className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.2fr)] xl:items-start xl:gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <SummaryStat
+            label="연결 품목 수"
+            value={linkedItems.length}
+            hint="이 모델로 지정된 품목"
+            tone={LEGACY_COLORS.blue}
+          />
+          <SummaryStat
+            label="연결 BOM 수"
+            value={linkedBomCount}
+            hint="이 모델 품목을 부모로 가진 BOM"
+            tone={LEGACY_COLORS.purple}
+          />
         </div>
-      )}
+
+        {linkedItems.length > 0 && (
+          <div>
+            <div className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              연결 품목 미리보기
+            </div>
+            <div
+              className="flex flex-col gap-1.5 rounded-[14px] border p-3"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              {linkedItems.slice(0, 6).map((it) => (
+                <div key={it.item_id} className="flex items-center justify-between gap-2 text-[14px]">
+                  <div className="min-w-0 flex-1 truncate" style={{ color: LEGACY_COLORS.text }}>
+                    {it.item_name}
+                  </div>
+                  <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    {it.mes_code ?? "—"}
+                  </span>
+                </div>
+              ))}
+              {linkedItems.length > 6 && (
+                <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  외 {linkedItems.length - 6}건
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* 모델 삭제 — 전폭 하단 버튼. ConfirmModal + PIN 인증으로 보호됨. */}
       <button

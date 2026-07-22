@@ -77,6 +77,51 @@ describe("EmployeeDetailGrid", () => {
     expect(screen.getByRole("button", { name: "직원 비활성화" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "직원 삭제" })).toBeInTheDocument();
   });
+
+  it("xl에서는 기본 정보·권한·PIN 및 위험 작업을 세 번째 열에 배치한다", () => {
+    render(
+      <EmployeeDetailGrid
+        employee={employee}
+        form={form}
+        setForm={vi.fn()}
+        departments={departments}
+        productModels={[]}
+        onRequestPinReset={vi.fn()}
+        onToggle={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const layout = screen.getByText("기본 정보").parentElement?.parentElement?.parentElement;
+    const basicCard = screen.getByText("기본 정보").parentElement?.parentElement;
+    const permissionsCard = screen.getByText("권한").parentElement?.parentElement;
+    const dangerCard = screen.getByText("계정 상태 및 위험 작업").parentElement?.parentElement;
+    const actionArea = dangerCard?.parentElement;
+
+    expect(layout).toHaveClass("xl:grid-cols-3");
+    expect(basicCard?.parentElement).toBe(layout);
+    expect(permissionsCard?.parentElement).toBe(layout);
+    expect(actionArea?.parentElement).toBe(layout);
+    expect(actionArea).toHaveClass("xl:col-start-3", "xl:row-start-1");
+  });
+
+  it("조립 부서의 담당 모델 카드는 xl에서 세 열 전체를 사용한다", () => {
+    render(
+      <EmployeeDetailGrid
+        employee={employee}
+        form={{ ...form, department: "조립" }}
+        setForm={vi.fn()}
+        departments={departments}
+        productModels={[]}
+        onRequestPinReset={vi.fn()}
+        onToggle={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const assignedModelsCard = screen.getByText("담당 모델 (우선순위 순)").parentElement?.parentElement;
+    expect(assignedModelsCard?.parentElement).toHaveClass("xl:col-span-3");
+  });
   it("직급 정규화는 raw role 하나만 받는다", () => {
     expect(normalizeEmployeePosition).toHaveLength(1);
   });

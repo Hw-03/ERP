@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminModelsSection } from "../AdminModelsSection";
@@ -25,6 +25,47 @@ vi.mock("../AdminModelsContext", () => ({
 }));
 
 describe("AdminModelsSection", () => {
+  it("compresses the xl detail layout while retaining six linked-item previews and the delete path", async () => {
+    const linkedItems = Array.from({ length: 7 }, (_, index) => ({
+      item_id: `item-${index + 1}`,
+      item_name: `linked item ${index + 1}`,
+      mes_code: `A-TR-${String(index + 1).padStart(4, "0")}`,
+      model_slots: [1],
+    }));
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminModelsSection items={linkedItems} allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    await screen.findByText("linked item 1");
+
+    expect(container.querySelector("[data-model-detail-layout]")).toHaveClass("gap-3");
+    expect(container.querySelector("[data-model-edit-card]")).toHaveClass("p-3");
+    expect(container.querySelector("[data-model-linked-layout]")).toHaveClass("flex", "flex-col", "xl:grid", "xl:gap-3");
+    expect(screen.getAllByText(/linked item [1-6]$/)).toHaveLength(6);
+    expect(screen.queryByText("linked item 7")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "이 모델 삭제" })).toBeInTheDocument();
+  });
+
+  it("keeps the model delete button connected to its confirmation handler", async () => {
+    context.deleteModel.mockClear();
+    render(
+      <DirtyGuardProvider>
+        <AdminModelsSection items={[]} allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "이 모델 삭제" }));
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getAllByRole("button")[1]);
+
+    await waitFor(() => {
+      expect(context.deleteModel).toHaveBeenCalledWith(1);
+    });
+  });
+
   it("keeps the model code in the list and header only", async () => {
     render(
       <DirtyGuardProvider>

@@ -300,7 +300,7 @@ export function BomWorkbench({
   const completedCount = completedSet.size;
 
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <AdminPageHeader
         icon={Network}
         title="BOM 관리"
@@ -398,7 +398,7 @@ export function BomWorkbench({
             : "minmax(280px, 0.78fr) minmax(0, 1.22fr)",
         }}
       >
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           <BomParentList
             dept={dept}
             items={items}

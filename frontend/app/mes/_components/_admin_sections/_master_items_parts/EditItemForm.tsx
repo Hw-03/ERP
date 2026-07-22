@@ -18,8 +18,6 @@ export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
 
   return (
     <div className="space-y-4">
-      <div className="text-base font-bold">{selectedItem.item_name}</div>
-
       <ItemFormFields
         form={editForm as unknown as ItemFormData & { mes_code: string }}
         setForm={handleSetForm}

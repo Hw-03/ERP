@@ -22,6 +22,7 @@ import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 import { EmployeeAddInline } from "./_employee_parts/EmployeeAddInline";
 import { EmployeeDetailGrid } from "./_employee_parts/EmployeeDetailGrid";
+import { normalizeEmployeePosition } from "./_employee_parts/employeeRoleLabels";
 
 export function AdminEmployeesSection() {
   const ctx = useAdminEmployeesContext();
@@ -180,7 +181,12 @@ export function AdminEmployeesSection() {
             }
             renderItem={(employee) => {
               const active = selectedEmployee?.employee_id === employee.employee_id;
-              const deptName = normalizeDepartment(employee.department);
+              const deptName = normalizeDepartment(active ? editForm.department : employee.department);
+              const position = active
+                ? normalizeEmployeePosition(editForm.role)
+                : employee.role
+                  ? normalizeEmployeePosition(employee.role)
+                  : "";
               const deptColor = resolveDepartmentColor(departments, deptName);
               return (
                 <button
@@ -212,7 +218,7 @@ export function AdminEmployeesSection() {
                       style={{ color: LEGACY_COLORS.muted2 }}
                     >
                       {deptName}
-                      {employee.role ? ` · ${employee.role}` : ""}
+                      {position ? ` · ${position}` : ""}
                     </div>
                   </div>
                   <StatusPill
@@ -236,8 +242,8 @@ export function AdminEmployeesSection() {
             }
             subtitle={
               !empAddMode && selectedEmployee
-                ? `${normalizeDepartment(selectedEmployee.department)}${
-                    selectedEmployee.role ? ` · ${selectedEmployee.role}` : ""
+                ? `${normalizeDepartment(editForm.department)}${
+                    editForm.role ? ` · ${normalizeEmployeePosition(editForm.role)}` : ""
                   }`
                 : undefined
             }
