@@ -16,9 +16,13 @@ const RAIL = tint(LEGACY_COLORS.muted2, 30); // depth 무관 단일 중립 연�
 const RAIL_W = 1.5;
 
 /** 조상 컬럼: 세로선이 계속 이어지면 풀높이 라인, 아니면 빈 칸 */
-function Rail({ show }: { show: boolean }) {
+function Rail({ show, stretch = false }: { show: boolean; stretch?: boolean }) {
   return (
-    <span className="relative shrink-0" style={{ width: GUIDE_W, height: ROW_H }}>
+    <span
+      data-testid={stretch ? "bom-modal-rail" : undefined}
+      className={`relative shrink-0${stretch ? " self-stretch" : ""}`}
+      style={{ width: GUIDE_W, height: stretch ? undefined : ROW_H }}
+    >
       {show && (
         <span
           className="absolute left-1/2 top-0 bottom-0 -translate-x-1/2"
@@ -30,18 +34,28 @@ function Rail({ show }: { show: boolean }) {
 }
 
 /** 현재 노드 엘보(├ 또는 └) */
-function Connector({ isLast }: { isLast: boolean }) {
+function Connector({ isLast, stretch = false }: { isLast: boolean; stretch?: boolean }) {
   return (
-    <span className="relative shrink-0" style={{ width: GUIDE_W, height: ROW_H }}>
+    <span
+      data-testid={stretch ? "bom-modal-connector" : undefined}
+      className={`relative shrink-0${stretch ? " self-stretch" : ""}`}
+      style={{ width: GUIDE_W, height: stretch ? undefined : ROW_H }}
+    >
       {/* 세로: top → 중앙 (위로 연결) */}
       <span
+        data-testid={stretch ? "bom-modal-connector-line" : undefined}
         className="absolute left-1/2 -translate-x-1/2"
-        style={{ top: 0, height: isLast ? ROW_H / 2 : ROW_H, width: RAIL_W, background: RAIL }}
+        style={{
+          top: 0,
+          height: stretch ? isLast ? "50%" : "100%" : isLast ? ROW_H / 2 : ROW_H,
+          width: RAIL_W,
+          background: RAIL,
+        }}
       />
       {/* 가로: 중앙 → 우측 끝 */}
       <span
         className="absolute -translate-y-1/2"
-        style={{ top: ROW_H / 2, left: "50%", right: 0, height: RAIL_W, background: RAIL }}
+        style={{ top: stretch ? "50%" : ROW_H / 2, left: "50%", right: 0, height: RAIL_W, background: RAIL }}
       />
     </span>
   );
@@ -54,6 +68,7 @@ function BomTreeItem({
   compact = false,
   tapToExpandName = false,
   stock = false,
+  modal = false,
 }: {
   node: BOMTreeNode;
   rails: boolean[];
@@ -62,11 +77,12 @@ function BomTreeItem({
   /** 항목 2-1 (모바일 전용) — 이름 행을 탭하면 풀네임 펼침. 데스크톱 호출처는 미전달(기본 false). */
   tapToExpandName?: boolean;
   stock?: boolean;
+  modal?: boolean;
 }) {
   const getDeptColor = useDeptColorLookup();
   const [open, setOpen] = useState(false);
   // 항목 2-1 — 이름 탭 펼침 상태(모바일 전용). tapToExpandName=false 면 항상 false 라 데스크톱 영향 없음.
-  const [nameExpanded, setNameExpanded] = useState(stock);
+  const [nameExpanded, setNameExpanded] = useState(stock && !modal);
   const hasKids = node.children.length > 0;
   const deptBadge = node.mes_code ? mesCodeDeptBadge(node.mes_code, getDeptColor) : null;
   const qty = node.required_quantity;
@@ -117,17 +133,19 @@ function BomTreeItem({
   return (
     <li>
       <div
-        className={`flex ${tapToExpandName && nameExpanded ? "items-start" : "items-center"} transition-colors duration-150 hover:bg-[var(--c-s4)]`}
+        data-testid={modal ? "bom-modal-row" : undefined}
+        className={`flex ${modal ? "w-full items-start rounded-[14px] border px-3" : tapToExpandName && nameExpanded ? "items-start" : "items-center"} transition-colors duration-150 hover:bg-[var(--c-s4)]`}
         style={{
-          height: tapToExpandName && nameExpanded ? undefined : ROW_H,
+          height: modal || tapToExpandName && nameExpanded ? undefined : ROW_H,
           minHeight: ROW_H,
+          ...(modal ? { background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border } : {}),
         }}
       >
         {/* 가이드 레일 + 엘보 */}
         {rails.map((show, i) => (
-          <Rail key={i} show={show} />
+          <Rail key={i} show={show} stretch={modal} />
         ))}
-        <Connector isLast={isLast} />
+        <Connector isLast={isLast} stretch={modal} />
 
         {/* chevron(자식 보유) 또는 정렬용 spacer(잎) */}
         {hasKids ? (
@@ -148,10 +166,49 @@ function BomTreeItem({
           <span className="h-5 w-5 shrink-0" />
         )}
 
-        {/* 품목명 + 우측 메타 — 항목 2-1: 모바일(tapToExpandName)에서 이름 탭 시 풀네임을 행 전폭으로
-            펼치고 메타(부서·코드·×수량)를 이름 아래 줄로 reflow. 데스크톱/비펼침은 기존 1줄 그대로(무변경).
-            메타 정렬: col1=부서 · col2=코드 · col4=수량(실행후) — compact 는 컴팩트 flex, 데스크톱(lg)은 34rem 5열 그리드. */}
-        {tapToExpandName && nameExpanded ? (
+        {modal ? (
+          <div className="ml-2 flex min-w-0 flex-1 flex-wrap items-start gap-x-4 gap-y-1 py-2 pr-4">
+            <span
+              className="min-w-[12rem] flex-1 break-words text-sm font-semibold leading-snug"
+              style={{ color: LEGACY_COLORS.text }}
+            >
+              {node.item_name}
+            </span>
+            <span
+              data-testid="bom-modal-row-meta"
+              className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:ml-auto sm:w-auto sm:min-w-[18.25rem] sm:shrink-0 sm:grid-cols-[4.5rem_minmax(0,1fr)_3.5rem_8rem]"
+            >
+              <span className="flex min-w-0 justify-start">
+                {deptBadge && (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
+                    style={{ color: deptBadge.color, background: deptBadge.bg }}
+                  >
+                    {deptBadge.label}
+                  </span>
+                )}
+              </span>
+              <span
+                className="min-w-0 truncate whitespace-nowrap text-right font-mono text-[11px] tracking-tight"
+                style={{ color: tint(LEGACY_COLORS.muted2, 70) }}
+                title={node.mes_code ?? undefined}
+              >
+                {node.mes_code || ""}
+              </span>
+              <span
+                className="text-center text-xs tabular-nums leading-none"
+                style={{ color: qty > 1 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, fontWeight: qty > 1 ? 800 : 600 }}
+              >
+                <span className="mr-px text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>×</span>
+                {qty}
+              </span>
+              <span className="text-right text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+                현재 재고 {formatQty(node.current_stock)} {node.unit}
+              </span>
+            </span>
+          </div>
+        ) : (
+        tapToExpandName && nameExpanded ? (
           <button
             type="button"
             disabled={stock}
@@ -197,6 +254,7 @@ function BomTreeItem({
               {metaChildren}
             </span>
           </>
+        )
         )}
       </div>
 
@@ -211,6 +269,7 @@ function BomTreeItem({
               compact={compact}
               tapToExpandName={tapToExpandName}
               stock={stock}
+              modal={modal}
             />
           ))}
         </ul>
@@ -335,17 +394,38 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
           <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             하위 품목이 없습니다.
           </div>
-        ) : <ul className="py-1">
-          {tree.children.map((child, index) => <BomTreeItem
-            key={child.item_id}
-            node={child}
-            rails={[]}
-            isLast={index === tree.children.length - 1}
-            compact={compact}
-            tapToExpandName={modal || tapToExpandName}
-            stock={modal}
-          />)}
-        </ul>}
+        ) : modal ? (
+          <div
+            data-testid="bom-modal-tree-list"
+            className="w-full overflow-hidden rounded-[18px] border p-2"
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          >
+            <ul className="space-y-1">
+              {tree.children.map((child, index) => <BomTreeItem
+                key={child.item_id}
+                node={child}
+                rails={[]}
+                isLast={index === tree.children.length - 1}
+                compact={compact}
+                tapToExpandName={modal || tapToExpandName}
+                stock={modal}
+                modal={modal}
+              />)}
+            </ul>
+          </div>
+        ) : (
+          <ul className="py-1">
+            {tree.children.map((child, index) => <BomTreeItem
+              key={child.item_id}
+              node={child}
+              rails={[]}
+              isLast={index === tree.children.length - 1}
+              compact={compact}
+              tapToExpandName={tapToExpandName}
+              stock={false}
+            />)}
+          </ul>
+        )}
       </>}
     </div>
   );

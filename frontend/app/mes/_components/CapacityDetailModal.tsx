@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertCircle, CheckCircle2, X } from "lucide-react";
 import type {
   ProductionCapacity,
   ProductionCapacityAfBlock,
@@ -19,13 +19,16 @@ import {
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 
+const DESKTOP_CAPACITY_GRID =
+  "grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]";
+
+const DESKTOP_PF_GRID =
+  "sm:grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]";
+
 const SHARED_HINT_LINES = [
-  "※ 공용 자재가 겹치는 모델은 표시 수량을 모두 동시에 생산할 수 없습니다.",
+  "공용 자재가 겹치는 모델은 표시 수량을 모두 동시에 생산할 수 없습니다.",
   "한 모델에 자재를 사용하면 다른 모델의 생산 가능 수량은 줄어들 수 있습니다.",
 ];
-
-const DESKTOP_CAPACITY_GRID =
-  "grid-cols-[20px_minmax(0,1fr)_72px_minmax(0,1fr)_84px_84px_84px]";
 
 /**
  * 생산 가능수량 상세 모달 — AF(조립 완제품) 기준.
@@ -64,11 +67,14 @@ export function CapacityDetailModal({
             </div>
             <button
               onClick={onClose}
-              className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xl leading-none transition-colors hover:bg-red-500/20"
-              style={{ color: "#ef4444" }}
+              className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+              style={{
+                background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
+                color: LEGACY_COLORS.red,
+              }}
               aria-label="닫기"
             >
-              ✕
+              <X className="h-4 w-4" />
             </button>
           </div>
           <div className="mt-2 space-y-1 sm:mt-3 sm:space-y-1.5">
@@ -86,13 +92,12 @@ export function CapacityDetailModal({
             </div>
           </div>
           <div
-            className="mt-2 flex items-start gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold sm:mt-3 sm:inline-flex sm:items-center sm:rounded-full sm:py-1 sm:text-base"
+            className="mt-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold sm:mt-3 sm:inline-flex sm:rounded-full sm:py-1 sm:text-base"
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`,
               color: LEGACY_COLORS.yellow,
             }}
           >
-            <AlertTriangle className="h-3 w-3 mt-[2px] shrink-0 sm:mt-0" />
             <span className="flex flex-col">
               {SHARED_HINT_LINES.map((line) => <span key={line}>{line}</span>)}
             </span>
@@ -247,10 +252,10 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                     type="button"
                     disabled={isPinLoading}
                     onClick={() => setUnpinTarget(group.key)}
-                    className="shrink-0 rounded-full px-1.5 py-0.5 text-sm font-bold"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
                     style={{
-                      background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)`,
-                      color: LEGACY_COLORS.cyan,
+                      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
+                      color: LEGACY_COLORS.red,
                     }}
                     aria-label="기준 PF 해제"
                   >
@@ -335,7 +340,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                   </button>
                   {expanded && (
                     <div
-                      className="border-t px-5 py-3"
+                      className="border-t px-4 py-3"
                       style={{
                         borderColor: LEGACY_COLORS.border,
                         background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
@@ -442,7 +447,11 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       type="button"
                       disabled={isPinLoading}
                       onClick={(e) => { e.stopPropagation(); setUnpinTarget(group.key); }}
-                      className="ml-0.5"
+                      className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                      style={{
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
+                        color: LEGACY_COLORS.red,
+                      }}
                       aria-label="기준 PF 해제"
                     >
                       <X className="h-3 w-3" />
@@ -491,9 +500,9 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                     ) : (
                       <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
                     )}
-                    <div className="min-w-0 pr-2">
+                    <div className="col-span-3 min-w-0 pr-4">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate text-base" style={{ color: LEGACY_COLORS.text }}>
+                        <span className="text-base leading-5" style={{ color: LEGACY_COLORS.text }}>
                           {it.af_name}
                         </span>
                         {it.bom_status === "incomplete" && (
@@ -504,13 +513,11 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         )}
                       </div>
                       {it.af_code && (
-                        <div className="truncate text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                        <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
                           {it.af_code}
                         </div>
                       )}
                     </div>
-                    <span />
-                    <span />
                     <QtyCell value={it.ship_ready} color={LEGACY_COLORS.cyan} />
                     <QtyCell value={it.fast_production} color={LEGACY_COLORS.blue} />
                     <QtyCell value={it.total_production} color={LEGACY_COLORS.purple} />
@@ -518,7 +525,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
 
                   {expanded && (
                     <div
-                      className="border-t px-5 py-3"
+                      className="border-t px-4 py-3"
                       style={{
                         borderColor: LEGACY_COLORS.border,
                         background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
@@ -620,18 +627,7 @@ function PfVariants({
   return (
     <div className="space-y-1">
       <div className="mb-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        출하 변형(PF)별 출하 준비 가능 — 특정 주문 기준
-      </div>
-      <div
-        className="grid grid-cols-[minmax(0,1fr)_72px_72px_72px_64px_28px] gap-2 px-2 pb-1 text-sm font-bold uppercase tracking-[0.12em]"
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        <span>출하 완제품 · 병목</span>
-        <span className="text-right">출하 대기</span>
-        <span className="text-right">빠른 생산</span>
-        <span className="text-right">총생산</span>
-        <span />
-        <span />
+        출고처별 출하 준비 가능
       </div>
       {variants.map((v) => {
         const ok = v.ship_ready > 0 || v.fast_production > 0;
@@ -639,7 +635,7 @@ function PfVariants({
         return (
           <div
             key={v.pf_item_id}
-            className="grid grid-cols-[minmax(0,1fr)_72px_72px_72px_64px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
+            className={`grid grid-cols-[minmax(0,1fr)_72px_72px_72px_64px_28px] ${DESKTOP_PF_GRID} items-center gap-2 rounded-[8px] px-2 py-1.5 sm:gap-0 sm:px-0`}
             style={{
               background: isPinned
                 ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 10%, transparent)`
@@ -649,20 +645,57 @@ function PfVariants({
               outline: isPinned ? `1.5px solid color-mix(in srgb, ${LEGACY_COLORS.cyan} 40%, transparent)` : undefined,
             }}
           >
-            <div className="min-w-0">
-              <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>
-                {v.pf_name}
-                {v.pf_code && (
-                  <span className="ml-1.5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                    ({v.pf_code})
-                  </span>
-                )}
-              </div>
-              {v.fast_production_limiting_item && (
-                <div className="truncate text-sm" style={{ color: LEGACY_COLORS.yellow }}>
-                  빠른 생산 병목: {v.fast_production_limiting_item}
+            <div className="min-w-0 sm:col-span-4">
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="break-words text-sm leading-5" style={{ color: LEGACY_COLORS.text }}>
+                    {v.pf_name}
+                    {v.pf_code && (
+                      <span className="ml-1.5" style={{ color: LEGACY_COLORS.muted2 }}>
+                        ({v.pf_code})
+                      </span>
+                    )}
+                  </div>
+                  {v.fast_production_limiting_item && (
+                    <div className="break-words text-sm leading-5" style={{ color: LEGACY_COLORS.yellow }}>
+                      빠른 생산 병목: {v.fast_production_limiting_item}
+                    </div>
+                  )}
                 </div>
-              )}
+                <div className="flex shrink-0 items-center gap-1">
+                  {isPinned ? (
+                    <button
+                      type="button"
+                      disabled={isPinLoading}
+                      onClick={onUnpin}
+                      className="rounded-full px-1.5 py-0.5 text-sm font-bold"
+                      style={{
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 18%, transparent)`,
+                        color: LEGACY_COLORS.cyan,
+                      }}
+                    >
+                      기준
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isPinLoading}
+                      onClick={() => onPin?.(v.pf_item_id)}
+                      className="rounded-full px-1.5 py-0.5 text-sm font-semibold"
+                      style={{ color: LEGACY_COLORS.muted2 }}
+                    >
+                      지정
+                    </button>
+                  )}
+                  <span className="flex" aria-label={ok ? "생산 가능" : "생산 제한"}>
+                    {ok ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.green }} />
+                    ) : (
+                      <AlertCircle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.yellow }} />
+                    )}
+                  </span>
+                </div>
+              </div>
             </div>
             <div
               className="text-right text-base font-bold"
@@ -681,39 +714,6 @@ function PfVariants({
               style={{ color: v.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
             >
               {formatQty(v.total_production)}
-            </div>
-            <div className="flex justify-end">
-              {isPinned ? (
-                <button
-                  type="button"
-                  disabled={isPinLoading}
-                  onClick={onUnpin}
-                  className="rounded-full px-1.5 py-0.5 text-sm font-bold"
-                  style={{
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 18%, transparent)`,
-                    color: LEGACY_COLORS.cyan,
-                  }}
-                >
-                  기준
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isPinLoading}
-                  onClick={() => onPin?.(v.pf_item_id)}
-                  className="rounded-full px-1.5 py-0.5 text-sm font-semibold"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                >
-                  지정
-                </button>
-              )}
-            </div>
-            <div className="flex justify-end">
-              {ok ? (
-                <CheckCircle2 className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.green }} />
-              ) : (
-                <AlertCircle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.yellow }} />
-              )}
             </div>
           </div>
         );

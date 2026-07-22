@@ -56,6 +56,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
           boxShadow: "var(--c-card-shadow)",
+          minHeight: "min(500px, 84vh)",
         }}
         onClick={(event) => event.stopPropagation()}
       >

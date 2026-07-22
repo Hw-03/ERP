@@ -332,32 +332,25 @@ export function InventoryDetailPanel({
             ["in", "입고", LEGACY_COLORS.blue, inboundChoices(canReceive)],
             ["out", "출고", LEGACY_COLORS.red, outboundChoices],
           ] as const).map(([direction, label, accent, choices]) => (
-            <div
-              key={direction}
-              data-testid={`quick-action-group-${direction}`}
-              className="flex flex-col gap-1 rounded-[18px] border p-1.5"
-              style={{
-                borderColor: mix(accent, 32, LEGACY_COLORS.border),
-                background: mix(accent, 7, LEGACY_COLORS.s2),
-              }}
-            >
+            <div key={direction} className="flex flex-col gap-1">
               <button
                 type="button"
                 onClick={() => setIoMenu((menu) => menu === direction ? null : direction)}
                 className="w-full rounded-[18px] border px-4 py-3 text-sm font-bold transition-opacity hover:opacity-90"
                 style={{
-                  background: LEGACY_COLORS.s1,
-                  borderColor: LEGACY_COLORS.border,
-                  color: LEGACY_COLORS.text,
+                  background: mix(accent, 14),
+                  borderColor: mix(accent, 42, LEGACY_COLORS.border),
+                  color: accent,
                 }}
               >
                 {label}
               </button>
               {ioMenu === direction && <div
+                data-testid="quick-action-choices"
                 className={`flex w-[calc(200%+0.5rem)] flex-col gap-2 rounded-[14px] border p-3${direction === "out" ? " -translate-x-[calc(50%+0.25rem)]" : ""}`}
                 style={{
-                  borderColor: LEGACY_COLORS.border,
-                  background: LEGACY_COLORS.s1,
+                  borderColor: mix(accent, 32, LEGACY_COLORS.border),
+                  background: mix(accent, 7, LEGACY_COLORS.s2),
                 }}
               >
                 {choices.map((choice) => <button
@@ -369,9 +362,8 @@ export function InventoryDetailPanel({
                   }}
                   className="flex min-h-[64px] flex-col items-start justify-center rounded-[10px] border px-3 py-3 text-left transition-colors hover:opacity-80"
                   style={{
-                    background: LEGACY_COLORS.s1,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.text,
+                    background: mix(accent, 10),
+                    borderColor: mix(accent, 32, LEGACY_COLORS.border),
                   }}
                 >
                   <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>{choice.label}</span>

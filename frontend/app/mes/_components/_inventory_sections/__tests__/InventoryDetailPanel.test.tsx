@@ -79,45 +79,51 @@ afterEach(() => {
 });
 
 describe("InventoryDetailPanel desktop quick actions", () => {
-  it("keeps pastel color on each quick-action group while expanded actions stay neutral", () => {
+  it("uses directional buttons without outer group cards and keeps choices full-width", () => {
     render(
       <DesktopRightPanel title="테스트 항목">
         <InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} />
       </DesktopRightPanel>,
     );
 
-    expect(screen.getByTestId("quick-action-group-in")).toHaveStyle({
-      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 7%, ${LEGACY_COLORS.s2})`,
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 32%, ${LEGACY_COLORS.border})`,
-    });
-    expect(screen.getByTestId("quick-action-group-out")).toHaveStyle({
-      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 7%, ${LEGACY_COLORS.s2})`,
-      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 32%, ${LEGACY_COLORS.border})`,
-    });
+    expect(screen.queryByTestId("quick-action-group-in")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quick-action-group-out")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "입고" })).toHaveStyle({
-      background: LEGACY_COLORS.s1,
-      borderColor: LEGACY_COLORS.border,
-      color: LEGACY_COLORS.text,
+      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 42%, ${LEGACY_COLORS.border})`,
+      color: LEGACY_COLORS.blue,
     });
     expect(screen.getByRole("button", { name: "출고" })).toHaveStyle({
-      background: LEGACY_COLORS.s1,
-      borderColor: LEGACY_COLORS.border,
-      color: LEGACY_COLORS.text,
+      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 42%, ${LEGACY_COLORS.border})`,
+      color: LEGACY_COLORS.red,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "입고" }));
+    expect(screen.getByTestId("quick-action-choices")).toHaveClass("w-[calc(200%+0.5rem)]");
     expect(screen.getByRole("button", { name: /부서 입고/ })).toHaveStyle({
-      background: LEGACY_COLORS.s1,
-      borderColor: LEGACY_COLORS.border,
-      color: LEGACY_COLORS.text,
+      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 32%, ${LEGACY_COLORS.border})`,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "출고" }));
+    expect(screen.getByTestId("quick-action-choices")).toHaveClass("w-[calc(200%+0.5rem)]");
     expect(screen.getByRole("button", { name: /부서 출고/ })).toHaveStyle({
-      background: LEGACY_COLORS.s1,
-      borderColor: LEGACY_COLORS.border,
-      color: LEGACY_COLORS.text,
+      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 32%, ${LEGACY_COLORS.border})`,
     });
+  });
+
+  it("passes the selected desktop quick action intent and closes its choice menu", () => {
+    const onGoToWarehouse = vi.fn();
+    const item = makeItem();
+    render(<InventoryDetailPanel item={item} onGoToWarehouse={onGoToWarehouse} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "입고" }));
+    fireEvent.click(screen.getByRole("button", { name: /부서 입고/ }));
+
+    expect(onGoToWarehouse).toHaveBeenCalledWith(item, { workType: "process", direction: "in" });
+    expect(screen.queryByTestId("quick-action-choices")).not.toBeInTheDocument();
   });
 
   it("renders available stock before pending approval quantity", () => {
@@ -175,6 +181,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(dialog).toHaveTextContent("현재 재고 10 EA");
     expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
     expect(screen.getByTestId("bom-detail-modal-panel")).toHaveClass("w-[calc(100vw-128px)]", "max-h-[84vh]");
+    expect(screen.getByTestId("bom-detail-modal-panel")).toHaveStyle({ minHeight: "min(500px, 84vh)" });
     expect(screen.getByRole("button", { name: "하위 구성 보기" }).querySelector("svg.lucide-chevron-right")).toBeNull();
     expect(within(dialog).queryByText("닫기")).not.toBeInTheDocument();
     expect(dialog.querySelector("footer")).toBeNull();
@@ -309,15 +316,44 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(screen.getByText("최신 구성품")).toBeInTheDocument();
   });
 
-  it("uses the responsive BOM tree layout inside the modal", async () => {
-    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+  it("uses a full-width modal-only BOM tree row with wrapped names and aligned metadata", async () => {
+    const longItemName = "긴 품목명도 오른쪽 메타데이터를 밀지 않고 여러 줄로 표시되는 구성품";
+    const nestedTree = {
+      ...bomTree,
+      children: [{
+        ...bomTree.children[0], item_name: longItemName,
+        children: [{ ...bomTree.children[0], item_id: "component-2", item_name: "하위 구성품" }],
+      }, {
+        ...bomTree.children[0], item_id: "component-3", item_name: "별도 최상위 구성품",
+      }],
+    };
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(nestedTree);
     render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
 
     fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
     await screen.findByRole("dialog", { name: "BOM 구성 보기" });
 
-    expect(await screen.findByText("구성품 A")).toHaveClass("break-words");
-    expect(screen.getByText("현재 재고 10 EA")).toBeInTheDocument();
+    await screen.findByText(longItemName);
+    const row = screen.getAllByTestId("bom-modal-row").find((candidate) =>
+      within(candidate).queryByText(longItemName),
+    );
+    expect(row).toBeDefined();
+    const rowContext = within(row!);
+    expect(rowContext.getByText(longItemName)).toBeInTheDocument();
+    expect(rowContext.getByText("조립")).toBeInTheDocument();
+    expect(rowContext.getByText("46-AA-0081")).toBeInTheDocument();
+    expect(rowContext.getByText("2")).toBeInTheDocument();
+    expect(rowContext.getByText("현재 재고 10 EA")).toBeInTheDocument();
+    expect(rowContext.getByTestId("bom-modal-row-meta")).toHaveClass(
+      "w-full",
+      "grid-cols-[minmax(0,1fr)_auto]",
+      "sm:grid-cols-[4.5rem_minmax(0,1fr)_3.5rem_8rem]",
+      "sm:min-w-[18.25rem]",
+    );
+    expect(rowContext.getByTestId("bom-modal-connector")).toHaveClass("self-stretch");
+    expect(rowContext.getByTestId("bom-modal-connector-line")).toHaveStyle({ height: "100%" });
+    fireEvent.click(rowContext.getByRole("button", { expanded: false }));
+    expect(await screen.findByText("하위 구성품")).toBeInTheDocument();
   });
 });
 
