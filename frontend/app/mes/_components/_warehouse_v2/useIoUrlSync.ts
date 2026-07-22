@@ -30,6 +30,7 @@ export type UseIoUrlSyncArgs = {
   router: Router;
   searchParams: SearchParamsLike;
   pathname: string;
+  suppressInitialSync?: boolean;
   /**
    * 지정 시 step push 마다 `tab` 을 이 값으로 강제한다.
    * 대시보드→창고 교차 진입 순간 React searchParams 가 아직 직전 탭(tab=dashboard)으로
@@ -49,7 +50,7 @@ export type UseIoUrlSyncApi = {
 };
 
 export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
-  const { step, goTo, canAdvance, router, searchParams, pathname, tabParam } = args;
+  const { step, goTo, canAdvance, router, searchParams, pathname, tabParam, suppressInitialSync = false } = args;
 
   const urlStep = useMemo<IoStep>(() => {
     const raw = Number(searchParams.get("step"));
@@ -58,26 +59,40 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
 
   // URL→state 동기화 직후 state→URL effect 가 다시 push 하는 것을 1회 차단.
   const skipNextPushRef = useRef(false);
+  const suppressInitialSyncRef = useRef(suppressInitialSync);
+  const forceInitialStepPushRef = useRef(false);
   // step 을 2 단계 이상 점프할 때(예: 3 → 5) 중간 단계도 history 에 쌓기 위한 deferred target.
   const pendingFinalStepRef = useRef<IoStep | null>(null);
 
   // state.step 변경 → URL push
   useEffect(() => {
+    if (suppressInitialSyncRef.current) {
+      if (step === 1) return;
+      suppressInitialSyncRef.current = false;
+      forceInitialStepPushRef.current = true;
+    }
     if (skipNextPushRef.current) {
       skipNextPushRef.current = false;
       return;
     }
-    if (urlStep === step) return;
-    const next = new URLSearchParams(searchParams.toString());
+    const forceInitialStepPush = forceInitialStepPushRef.current;
+    if (!forceInitialStepPush && urlStep === step) return;
+    const next = new URLSearchParams(
+      forceInitialStepPush && typeof window !== "undefined"
+        ? window.location.search
+        : searchParams.toString(),
+    );
     next.set("step", String(step));
     // lagged searchParams 로 인한 stale tab 보존을 차단 — 위저드가 속한 탭으로 고정.
     if (tabParam) next.set("tab", tabParam);
     router.push(`${pathname}?${next.toString()}`, { scroll: false });
+    forceInitialStepPushRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   // URL step 변경 (뒤로/앞으로) → state.goTo (도달 불가 step 은 clamp)
   useEffect(() => {
+    if (suppressInitialSyncRef.current) return;
     if (urlStep === step) {
       // URL 이 state 를 따라잡았을 때 — 보류된 다음 단계가 있으면 advance.
       if (pendingFinalStepRef.current != null && pendingFinalStepRef.current !== step) {

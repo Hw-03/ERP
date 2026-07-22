@@ -161,6 +161,7 @@ export function IoComposeView({
     pathname,
     // step push 시 tab 을 항상 warehouse 로 고정 — 대시보드→창고 진입 순간 lagged searchParams 의
     // stale tab(=dashboard) 을 보존해 셸이 대시보드로 되돌리는 튕김을 차단한다.
+    suppressInitialSync: draftToRestore != null,
     tabParam: "warehouse",
   });
 

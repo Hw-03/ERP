@@ -17,7 +17,18 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseHeader", () => ({
 }));
 
 vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () => ({
-  WarehouseDraftPanelTabs: () => <div />,
+  WarehouseDraftPanelTabs: ({
+    onContinueIoDraft,
+  }: {
+    onContinueIoDraft?: (draft: never) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onContinueIoDraft?.({ batch_id: "draft-2" } as never)}
+    >
+      continue draft
+    </button>
+  ),
 }));
 
 vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
@@ -71,5 +82,21 @@ describe("DesktopWarehouseView", () => {
     fireEvent.click(screen.getByRole("button", { name: "품목 전환 포커스" }));
 
     expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("clears a cart step before restoring another draft", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart&step=4");
+    render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "continue draft" }));
+
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("section")).toBeNull();
+    expect(params.get("step")).toBeNull();
   });
 });

@@ -136,4 +136,31 @@ describe("useIoUrlSync", () => {
     expect(goTo).toHaveBeenCalledWith(5);
     expect(pendingRef!.current).toBeNull();
   });
+
+  it("skips a stale URL step while a draft restore initializes", () => {
+    window.history.replaceState(null, "", "/wh?tab=warehouse");
+    const goTo = vi.fn();
+    const push = vi.fn();
+    const { rerender } = renderHook(
+      ({ step }: { step: IoStep }) =>
+        useIoUrlSync({
+          step,
+          goTo,
+          canAdvance: ALL_TRUE,
+          router: { push },
+          searchParams: makeSearchParams("tab=warehouse&step=4"),
+          pathname: "/wh",
+          suppressInitialSync: true,
+        }),
+      { initialProps: { step: 1 as IoStep } },
+    );
+
+    expect(goTo).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+
+    rerender({ step: 4 as IoStep });
+
+    expect(goTo).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/wh?tab=warehouse&step=4", { scroll: false });
+  });
 });

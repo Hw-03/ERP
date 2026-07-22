@@ -161,6 +161,7 @@ export function DesktopWarehouseView({
     params.set("tab", "warehouse");
     if (next === "compose") {
       params.delete("section");
+      params.delete("step");
     } else {
       params.set("section", next);
     }
@@ -213,7 +214,7 @@ export function DesktopWarehouseView({
           onContinueIoDraft={(draft) => {
             setRestoreIoDraft(draft);
             setRestoreNonce((n) => n + 1);
-            setSectionTab("compose");
+            handleSectionTabChange("compose");
           }}
           bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
           onSubmitSuccess={onSubmitSuccess}
