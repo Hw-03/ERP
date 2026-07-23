@@ -32,6 +32,9 @@ export const adminApi = {
   downloadAuditFile: (month: string, format: "csv" | "xlsx"): Promise<Blob> =>
     fetchBlob(toApiUrl(`/api/admin/audit-csv/${month}.${format}`)),
 
+  downloadF704Ledger: (year: number): Promise<Blob> =>
+    fetchBlob(toApiUrl(`/api/admin/audit-ledger/f704-02.xlsx?year=${year}`)),
+
   triggerAuditCsvBackfill: () =>
     postJson<AuditCsvBackfillResult>(toApiUrl("/api/admin/audit-csv/backfill")),
 };
