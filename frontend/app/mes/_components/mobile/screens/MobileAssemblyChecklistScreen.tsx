@@ -9,12 +9,49 @@ import { TYPO } from "../tokens";
 const CARD_STYLE = {
   background: LEGACY_COLORS.s1,
   borderColor: LEGACY_COLORS.border,
-  boxShadow: "var(--c-card-shadow)",
 } as const;
+
+function getChecklistItemKey(productId: AssemblyChecklistProductId, sectionIndex: number, itemIndex: number): string {
+  return `${productId}:${sectionIndex}:${itemIndex}`;
+}
 
 export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void }) {
   const [selectedProductId, setSelectedProductId] = useState<AssemblyChecklistProductId | null>(null);
+  const [completedItemKeys, setCompletedItemKeys] = useState<Set<string>>(() => new Set());
   const selectedProduct = ASSEMBLY_CHECKLISTS.find((product) => product.id === selectedProductId);
+  const hasCompletedSelectedProductItem = selectedProduct?.sections.some((section, sectionIndex) =>
+    section.items.some((_item, itemIndex) => completedItemKeys.has(getChecklistItemKey(selectedProduct.id, sectionIndex, itemIndex))),
+  ) ?? false;
+
+  const toggleChecklistItem = (itemKey: string) => {
+    setCompletedItemKeys((currentKeys) => {
+      const nextKeys = new Set(currentKeys);
+
+      if (nextKeys.has(itemKey)) {
+        nextKeys.delete(itemKey);
+      } else {
+        nextKeys.add(itemKey);
+      }
+
+      return nextKeys;
+    });
+  };
+
+  const clearSelectedProductItems = () => {
+    if (!selectedProduct) return;
+
+    setCompletedItemKeys((currentKeys) => {
+      const nextKeys = new Set(currentKeys);
+
+      selectedProduct.sections.forEach((section, sectionIndex) => {
+        section.items.forEach((_item, itemIndex) => {
+          nextKeys.delete(getChecklistItemKey(selectedProduct.id, sectionIndex, itemIndex));
+        });
+      });
+
+      return nextKeys;
+    });
+  };
 
   if (!selectedProduct) {
     return (
@@ -105,22 +142,56 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
             </h3>
           )}
           <ol aria-label={`${section.title ?? selectedProduct.label} 체크리스트`} className="flex list-none flex-col gap-2 p-0">
-            {section.items.map((item, itemIndex) => (
-              <li key={item} className="flex gap-3 rounded-[14px] border px-3 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                <span
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
-                  style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
-                >
-                  {itemIndex + 1}
-                </span>
-                <p className={`${TYPO.body} whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
-                  {item}
-                </p>
-              </li>
-            ))}
+            {section.items.map((item, itemIndex) => {
+              const itemKey = getChecklistItemKey(selectedProduct.id, sectionIndex, itemIndex);
+              const isCompleted = completedItemKeys.has(itemKey);
+
+              return (
+                <li key={itemKey}>
+                  <button
+                    type="button"
+                    aria-pressed={isCompleted}
+                    onClick={() => toggleChecklistItem(itemKey)}
+                    className="flex min-h-11 w-full gap-3 rounded-[14px] border px-3 py-3 text-left transition-colors"
+                    style={{ borderColor: isCompleted ? LEGACY_COLORS.green : LEGACY_COLORS.border }}
+                  >
+                    <span
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                      style={{
+                        background: isCompleted
+                          ? `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, transparent)`
+                          : LEGACY_COLORS.s2,
+                        color: isCompleted
+                          ? `color-mix(in srgb, ${LEGACY_COLORS.green} 60%, ${LEGACY_COLORS.text})`
+                          : LEGACY_COLORS.muted2,
+                      }}
+                    >
+                      {itemIndex + 1}
+                    </span>
+                    <span className={`${TYPO.body} whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
+                      {item}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         </section>
       ))}
+
+      <button
+        type="button"
+        onClick={clearSelectedProductItems}
+        disabled={!hasCompletedSelectedProductItem}
+        className="min-h-11 w-full rounded-[12px] border px-3 py-2 text-sm font-black disabled:opacity-45"
+        style={{
+          background: `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)`,
+          borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 45%, transparent)`,
+          color: LEGACY_COLORS.green,
+        }}
+      >
+        전체 해제
+      </button>
     </div>
   );
 }

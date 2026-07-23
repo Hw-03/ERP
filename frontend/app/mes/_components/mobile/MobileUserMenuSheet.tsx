@@ -95,6 +95,7 @@ export function MobileUserMenuSheet({
 
   const warehouseLabel = WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null;
   const deptLabel = DEPARTMENT_ROLE_LABEL[operator.department_role] ?? null;
+  const jobTitle = (operator.role ?? "").split("/").pop()?.trim() ?? "";
 
   return (
     <BottomSheet open={open} onClose={handleClose} ariaLabel="사용자 메뉴">
@@ -105,7 +106,7 @@ export function MobileUserMenuSheet({
         </div>
         <div className={`${TYPO.caption} mt-0.5`} style={{ color: LEGACY_COLORS.muted2 }}>
           {normalizeDepartment(operator.department)}
-          {operator.level ? ` · ${operator.level}` : ""}
+          {jobTitle ? ` · ${jobTitle}` : ""}
         </div>
         {(warehouseLabel || deptLabel) && (
           <div className="mt-2 flex flex-wrap gap-1.5">

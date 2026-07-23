@@ -13,6 +13,7 @@ import { getClientEventSource } from "@/lib/operator-log-context";
 export interface Operator {
   employee_id: string;
   name: string;
+  role: string;
   department: Department;
   level: EmployeeLevel;
   employee_code: string;
@@ -64,6 +65,7 @@ function readOperator(): Operator | null {
     return {
       employee_id: parsed.employee_id,
       name: parsed.name,
+      role: typeof parsed.role === "string" ? parsed.role : "",
       department: parsed.department as Department,
       level: parsed.level as EmployeeLevel,
       employee_code: parsed.employee_code as string,

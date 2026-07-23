@@ -44,6 +44,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
       const op: Operator = {
         employee_id: emp.employee_id,
         name: emp.name,
+        role: emp.role,
         department: emp.department,
         level: emp.level,
         employee_code: emp.employee_code,

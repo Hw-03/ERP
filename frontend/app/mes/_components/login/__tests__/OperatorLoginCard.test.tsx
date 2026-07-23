@@ -121,4 +121,18 @@ describe("OperatorLoginCard", () => {
     });
     expect(state.markLoginNotificationPopupPending).not.toHaveBeenCalled();
   });
+
+  it("preserves the employee role in the stored operator", async () => {
+    state.verifyEmployeePin.mockResolvedValue(makeEmployee({ role: "조립/사원" }));
+
+    render(<OperatorLoginCard onLogin={() => {}} />);
+    await submitLogin();
+
+    await waitFor(() => {
+      expect(state.setCurrentOperator).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "조립/사원" }),
+        "boot-1",
+      );
+    });
+  });
 });

@@ -16,6 +16,7 @@ vi.mock("@/lib/client-events", () => ({
 const baseOperator: Operator = {
   employee_id: "emp-1",
   name: "Tester",
+  role: "조립/사원",
   department: "조립",
   level: "staff",
   employee_code: "E1",
@@ -50,6 +51,13 @@ describe("useCurrentOperator storage", () => {
     const { loginPopupEnabled: _loginPopupEnabled, ...legacyOperator } = baseOperator;
     window.localStorage.setItem("dexcowin_mes_operator", JSON.stringify(legacyOperator));
     expect(readCurrentOperator()?.loginPopupEnabled).toBe(true);
+  });
+
+  it("defaults a legacy operator without role to an empty string", () => {
+    const { role: _role, ...legacyOperator } = baseOperator;
+    window.localStorage.setItem("dexcowin_mes_operator", JSON.stringify(legacyOperator));
+
+    expect(readCurrentOperator()?.role).toBe("");
   });
   it("marks and consumes a pending login notification popup once", () => {
     markLoginNotificationPopupPending("emp-1");
