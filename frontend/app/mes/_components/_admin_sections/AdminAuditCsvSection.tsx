@@ -26,6 +26,20 @@ function formatMonthLabel(month: string): string {
   return `${y}년 ${Number(m)}월`;
 }
 
+function downloadBlob(blob: Blob, fileName: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = fileName;
+  try {
+    document.body.appendChild(a);
+    a.click();
+  } finally {
+    if (a.parentNode) a.parentNode.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export function AdminAuditCsvSection() {
   const { data: files = [], isLoading: loading, error: qError, refetch: refetchFiles } = useAuditCsvListQuery();
   const backfillMutation = useTriggerAuditBackfillMutation();
@@ -34,6 +48,8 @@ export function AdminAuditCsvSection() {
   const [lastBackfill, setLastBackfill] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<Set<string>>(() => new Set());
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [ledgerYear, setLedgerYear] = useState(() => new Date().getFullYear());
+  const [ledgerDownloading, setLedgerDownloading] = useState(false);
 
   const stats = useMemo(() => {
     const total = files.reduce((s, f) => s + f.row_count, 0);
@@ -68,17 +84,7 @@ export function AdminAuditCsvSection() {
     setDownloadError(null);
     try {
       const blob = await adminApi.downloadAuditFile(month, format);
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = fileName;
-      try {
-        document.body.appendChild(a);
-        a.click();
-      } finally {
-        if (a.parentNode) a.parentNode.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
-      }
+      downloadBlob(blob, fileName);
     } catch (downloadFailure) {
       setDownloadError(
         downloadFailure instanceof Error
@@ -94,14 +100,76 @@ export function AdminAuditCsvSection() {
     }
   }
 
+  async function handleF704LedgerDownload(): Promise<void> {
+    if (ledgerDownloading) return;
+    setLedgerDownloading(true);
+    setDownloadError(null);
+    try {
+      const blob = await adminApi.downloadF704Ledger(ledgerYear);
+      downloadBlob(blob, `F704-02 (R01) ${ledgerYear}년 자재 입출고관리대장.xlsx`);
+    } catch (downloadFailure) {
+      setDownloadError(
+        downloadFailure instanceof Error
+          ? downloadFailure.message
+          : "대장 다운로드에 실패했습니다.",
+      );
+    } finally {
+      setLedgerDownloading(false);
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-col">
       <AdminPageHeader
         icon={FileArchive}
-        title="외부 제출용 입출고 로그"
+        title="입출고 로그"
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+        <div
+          className="flex flex-col gap-3 rounded-[16px] border p-4 lg:flex-row lg:items-center lg:justify-between"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+        >
+          <div className="flex-1">
+            <div className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+              F704-02 연간 자재 입출고관리대장
+            </div>
+            <div className="mt-1 text-[12px] leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+              선택한 연도의 실제 창고 입·출고만 F704-02 원본 양식으로 생성합니다. 담당자 칸에는 처리자가 아닌 요청자가 표시됩니다.
+            </div>
+          </div>
+          <div className="flex shrink-0 items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="f704-ledger-year" className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                대장 연도
+              </label>
+              <input
+                id="f704-ledger-year"
+                type="number"
+                min={2000}
+                max={2100}
+                value={ledgerYear}
+                onChange={(event) => {
+                  const year = Number(event.currentTarget.value);
+                  if (Number.isInteger(year)) setLedgerYear(year);
+                }}
+                className="h-11 w-24 rounded-[10px] border px-3 text-[13px] font-bold tabular-nums outline-none"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleF704LedgerDownload()}
+              disabled={ledgerDownloading}
+              className="flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-4 py-2.5 text-[12px] font-bold text-white transition-opacity disabled:opacity-50"
+              style={{ background: LEGACY_COLORS.green }}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              {ledgerDownloading ? "대장 생성 중..." : "F704-02 대장 다운로드"}
+            </button>
+          </div>
+        </div>
+
         {/* 안내 + 백필 */}
         <div
           className="flex flex-col gap-3 rounded-[16px] border p-4 lg:flex-row lg:items-center lg:justify-between"
@@ -109,11 +177,11 @@ export function AdminAuditCsvSection() {
         >
           <div className="flex-1">
             <div className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
-              자동 누적 — 별도 작업 불필요
+              시스템 원본 로그 — 내부 확인용
             </div>
             <div className="mt-1 text-[12px] leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-              입고·출고·부서이동·폐기·조정·반품 등 자재 이동 거래가 확정될 때마다 해당 월 CSV 에 한 줄씩 추가됩니다.
-              심사 공지가 오면 아래 목록에서 해당 월을 받아 제출하세요. DB 와 어긋날 일은 거의 없지만, 만약 누락이 의심되면 “백필 재실행”으로 즉시 정합성을 회복할 수 있습니다.
+              시스템이 기록하는 원본 로그입니다. 월별 CSV/XLSX 파일은 내부 확인용으로 유지되며, 외부 심사에는 위 F704-02 대장을 사용하세요.
+              필요하면 “백필 재실행”으로 DB 기준의 월별 원본 로그를 다시 만들 수 있습니다.
             </div>
             {lastBackfill && (
               <div className="mt-1.5 text-[12px]" style={{ color: LEGACY_COLORS.green }}>
@@ -145,7 +213,7 @@ export function AdminAuditCsvSection() {
           <div className="mb-3 flex items-center justify-between">
             <div>
               <div className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                월별 파일
+                시스템 원본 로그 (월별)
               </div>
               <div className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 {stats.months}개 파일 · {stats.total.toLocaleString()}행 · {stats.sizeMb.toFixed(2)} MB
@@ -257,7 +325,7 @@ export function AdminAuditCsvSection() {
           }}
         >
           <details>
-            <summary className="cursor-pointer font-bold">컬럼 구성 (11)</summary>
+            <summary className="cursor-pointer font-bold">시스템 원본 컬럼 구성 (11)</summary>
             <div className="mt-2">
               일시 · 거래유형 · 품목코드 · 품목명 · 수량 · 변경전 재고 · 변경후 재고 · 참조번호 · 처리자 · 비고 · 거래ID
             </div>

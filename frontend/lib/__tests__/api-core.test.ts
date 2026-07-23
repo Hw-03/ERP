@@ -268,6 +268,28 @@ describe("fetcher / write helpers", () => {
     await expect(adminApi.downloadAuditFile("2026-05", "xlsx")).resolves.toBe(blob);
   });
 
+  it("adminApi.downloadF704Ledger requests the selected annual F704-02 workbook", async () => {
+    const blob = new Blob(["f704 workbook"]);
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, statusText: "OK", blob: () => Promise.resolve(blob) }),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(adminApi.downloadF704Ledger(2026)).resolves.toBe(blob);
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/admin/audit-ledger/f704-02.xlsx?year=2026");
+  });
+
+  it("adminApi.downloadF705ProductionLog requests the selected annual F705-02 workbook", async () => {
+    const blob = new Blob(["f705 workbook"]);
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, statusText: "OK", blob: () => Promise.resolve(blob) }),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(adminApi.downloadF705ProductionLog(2026)).resolves.toBe(blob);
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/admin/production-log/f705-02.xlsx?year=2026");
+  });
+
   it("fetchBlob converts a network error into the fetcher connection guidance", async () => {
     const url = "/api/admin/audit-csv/2026-05.csv";
     globalThis.fetch = vi.fn(() => Promise.reject(new Error("network unavailable"))) as unknown as typeof fetch;

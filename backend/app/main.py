@@ -35,6 +35,8 @@ from app.services import integrity as integrity_svc
 from app.routers import (
     admin_audit,
     admin_audit_csv,
+    admin_audit_ledger,
+    admin_production_log,
     bom,
     client_events,
     codes,
@@ -286,6 +288,8 @@ app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(admin_audit_ledger.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(admin_production_log.router, prefix="/api/admin", tags=["Admin Export"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(handover.router, prefix="/api/handovers", tags=["Handover"])

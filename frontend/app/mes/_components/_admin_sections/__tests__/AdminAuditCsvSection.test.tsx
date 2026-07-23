@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   downloadAuditFile: vi.fn(),
+  downloadF704Ledger: vi.fn(),
   refetch: vi.fn(),
   backfill: vi.fn(),
 }));
@@ -10,6 +11,7 @@ const state = vi.hoisted(() => ({
 vi.mock("@/lib/api/admin", () => ({
   adminApi: {
     downloadAuditFile: state.downloadAuditFile,
+    downloadF704Ledger: state.downloadF704Ledger,
   },
 }));
 
@@ -41,6 +43,7 @@ describe("AdminAuditCsvSection audit downloads", () => {
 
   beforeEach(() => {
     state.downloadAuditFile.mockReset();
+    state.downloadF704Ledger.mockReset();
     state.refetch.mockReset();
     state.backfill.mockReset();
   });
@@ -65,6 +68,23 @@ describe("AdminAuditCsvSection audit downloads", () => {
     await waitFor(() => {
       expect(state.downloadAuditFile).toHaveBeenLastCalledWith("2026-05", "csv");
     });
+  });
+
+  it("downloads the selected year as an F704-02 annual ledger", async () => {
+    const createObjectURL = vi.fn(() => "blob:f704-ledger");
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    state.downloadF704Ledger.mockResolvedValue(new Blob(["f704"]));
+    render(<AdminAuditCsvSection />);
+
+    expect(screen.getByText("시스템 원본 로그 (월별)")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("대장 연도"), { target: { value: "2025" } });
+    fireEvent.click(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
+
+    await waitFor(() => {
+      expect(state.downloadF704Ledger).toHaveBeenCalledWith(2025);
+    });
+    expect(createObjectURL).toHaveBeenCalledOnce();
   });
 
   it("keeps the CSV button disabled until its own concurrent download finishes", async () => {

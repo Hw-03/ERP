@@ -1,6 +1,7 @@
-"""외부 심사 대응용 입출고 CSV 미러.
+"""시스템 원본 입출고 CSV 미러.
 
 DB 의 `TransactionLog` 가 source-of-truth 이고, 이 모듈은 그 미러를 디스크에 떨군다.
+외부 심사용 F704-02 양식은 DB 이력에서 별도로 생성한다.
 - 자재 이동 거래(RECEIVE/SHIP/TRANSFER_*/ADJUST/SUPPLIER_RETURN/
   MARK_DEFECTIVE/DISASSEMBLE/INTERNAL_USE) 만 기록한다. 생산 내부 소비(PRODUCE/BACKFLUSH)는 제외.
 - 월별 CSV (`inout_YYYY-MM.csv`) 에 거래 1건 = 1줄로 append.
