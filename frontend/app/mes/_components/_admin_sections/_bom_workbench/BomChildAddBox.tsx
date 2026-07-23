@@ -4,10 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Check, X } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { TruncatedText } from "@/lib/ui";
-import { BomBadge } from "./BomBadge";
 import { BomSearchInput } from "./BomSearchInput";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
+import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 
 /**
@@ -183,6 +182,11 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
         className="min-h-0 flex-1 overflow-y-auto"
         style={{ borderTop: `1px solid ${LEGACY_COLORS.border}` }}
       >
+        <BomTableHeader
+          variant="candidate"
+          gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
+          background={LEGACY_COLORS.s2}
+        />
         {candidates.length === 0 ? (
           <EmptyState variant="no-search-result" compact />
         ) : (
@@ -192,42 +196,25 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
             const busy = busyId === c.item_id;
             return (
               <div key={c.item_id} style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-                <button
-                  type="button"
+                <BomTableItemRow
+                  item={c}
+                  gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
                   disabled={already}
                   onClick={() => (expanded ? closeRow() : openRow(c.item_id))}
-                  className="grid w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{
-                    gridTemplateColumns: "auto 1fr auto",
-                    background: expanded
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`
-                      : "transparent",
-                  }}
-                >
-                  <BomBadge processTypeCode={c.process_type_code} small />
-                  <div className="min-w-0">
-                    <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
-                      {c.item_name}
-                    </TruncatedText>
-                    {c.mes_code && (
-                      <TruncatedText className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                        {c.mes_code}
-                      </TruncatedText>
-                    )}
-                  </div>
-                  {already ? (
+                  background={expanded ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : "transparent"}
+                  trailing={already ? (
                     <span
-                      className="inline-flex items-center gap-1 text-[12px] font-semibold"
+                      className="inline-flex justify-self-end items-center gap-1 text-[12px] font-semibold"
                       style={{ color: LEGACY_COLORS.green }}
                     >
                       <Check size={12} /> 등록됨
                     </span>
                   ) : (
-                    <span style={{ color: LEGACY_COLORS.blue }}>
+                    <span className="justify-self-end" style={{ color: LEGACY_COLORS.blue }}>
                       {expanded ? <X size={14} /> : <Plus size={14} />}
                     </span>
                   )}
-                </button>
+                />
 
                 {expanded && !already && (
                   <div

@@ -64,7 +64,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
     <div
       className="grid items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-[var(--c-s4)]"
       style={{
-        gridTemplateColumns: "auto 1fr 140px 40px",
+        gridTemplateColumns: "52px minmax(0, 1fr) minmax(0, 0.82fr) 140px 40px",
         borderBottom: `1px solid ${LEGACY_COLORS.border}`,
       }}
     >
@@ -79,12 +79,10 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
         >
           {childName}
         </TruncatedText>
-        {mesCode && (
-          <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {mesCode}
-          </TruncatedText>
-        )}
       </div>
+      <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        {mesCode || "—"}
+      </TruncatedText>
       <div className="flex justify-end">
         {editing ? (
           <input

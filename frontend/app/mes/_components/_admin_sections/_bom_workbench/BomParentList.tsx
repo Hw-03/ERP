@@ -3,11 +3,10 @@
 import { useMemo, useState } from "react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { TruncatedText } from "@/lib/ui";
-import { BomBadge } from "./BomBadge";
 import { BomSearchInput } from "./BomSearchInput";
 import { BOM_STATUS_META, bomStatusOf, stageOf, type BomDeptFilter, type StageLetter } from "./bomDept";
 import type { StatusFilter } from "./BomStatsRow";
+import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 
 /**
@@ -43,6 +42,8 @@ const STAGE_FILTERS_WHEREUSED: { id: "ALL" | StageLetter; label: string }[] = [
   { id: "A", label: "중간공정" },
   { id: "F", label: "공정완료" },
 ];
+
+const WHERE_USED_LIST_GRID_TEMPLATE = "52px minmax(0, 1fr) minmax(0, 0.82fr)";
 
 export function BomParentList({
   dept,
@@ -127,6 +128,11 @@ export function BomParentList({
 
       {/* 리스트 */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <BomTableHeader
+          variant={mode === "edit" ? "parent" : "whereused"}
+          gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
+          background={LEGACY_COLORS.s1}
+        />
         {list.length === 0 ? (
           <EmptyState variant="no-search-result" compact />
         ) : (
@@ -135,34 +141,17 @@ export function BomParentList({
             const status = bomStatusOf(i.item_id, completedSet, childCountMap);
             const meta = BOM_STATUS_META[status];
             return (
-              <button
+              <BomTableItemRow
                 key={i.item_id}
-                type="button"
+                item={i}
+                gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
                 onClick={() => onSelect(i.item_id)}
-                aria-pressed={isSelected}
-                className="grid w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)]"
-                style={{
-                  gridTemplateColumns: "auto 1fr auto",
-                  borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-                  background: isSelected
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
-                    : undefined,
-                }}
-              >
-                <BomBadge processTypeCode={i.process_type_code} small />
-                <div className="min-w-0">
-                  <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
-                    {i.item_name}
-                  </TruncatedText>
-                  {i.mes_code && (
-                    <TruncatedText className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {i.mes_code}
-                    </TruncatedText>
-                  )}
-                </div>
-                {mode === "edit" ? (
+                pressed={isSelected}
+                borderBottom
+                background={isSelected ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)` : undefined}
+                trailing={mode === "edit" ? (
                   <span
-                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-bold"
+                    className="inline-flex justify-self-end items-center rounded px-1.5 py-0.5 text-[12px] font-bold"
                     style={{
                       background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
                       color: meta.color,
@@ -171,7 +160,7 @@ export function BomParentList({
                     {meta.label}
                   </span>
                 ) : null}
-              </button>
+              />
             );
           })
         )}
