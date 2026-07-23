@@ -156,6 +156,66 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         </div>
       ))}
 
+      {/* 카테고리 */}
+      <div>
+        <FieldLabel label="카테고리" badge="필수" />
+        <AppSelect
+          value={form.process_type_code}
+          onChange={(v) => setForm((f) => ({ ...f, process_type_code: v }))}
+          size="lg"
+          triggerStyle={{ background: LEGACY_COLORS.s1 }}
+          options={PROCESS_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+        />
+      </div>
+
+      {/* 사용 제품 (모델 슬롯) */}
+      <div>
+        <div className="flex flex-wrap items-center gap-x-2">
+          <FieldLabel label="사용 제품" />
+          {form.model_slots.length > 0 && (
+            <div className="mb-2 text-xs" style={{ color: LEGACY_COLORS.purple }}>
+              제품 기호:{" "}
+              {productModels.filter((m) => form.model_slots.includes(m.slot))
+                .map((m) => m.symbol)
+                .sort()
+                .join("")}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {productModels.map(({ slot, model_name, symbol }) => {
+            const checked = form.model_slots.includes(slot);
+            return (
+              <button
+                key={slot}
+                type="button"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    model_slots: checked
+                      ? f.model_slots.filter((s) => s !== slot)
+                      : [...f.model_slots, slot].sort(),
+                  }))
+                }
+                className="rounded-full border px-3 py-1.5 text-sm font-bold transition-colors"
+                style={{
+                  background: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.s1,
+                  borderColor: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+                  color: checked ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+                }}
+              >
+                {model_name ?? symbol} <span style={{ opacity: 0.7 }}>({symbol})</span>
+              </button>
+            );
+          })}
+        </div>
+        {form.model_slots.length === 0 && (
+          <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            사용 제품이 지정되지 않았습니다. 위 칩을 클릭해 모델 슬롯을 선택하세요.
+          </div>
+        )}
+      </div>
+
       {showInitialLocations && (
         <div>
           <FieldLabel label="초기 재고 위치" badge="선택" />
@@ -248,8 +308,8 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
       </div>
 
       {([
-        { key: "supplier",         label: "공급사",   type: "text",   placeholder: "예: 삼성특수금속" },
         { key: "min_stock",        label: "안전재고", type: "number", placeholder: "0" },
+        { key: "supplier",         label: "공급사",   type: "text",   placeholder: "예: 삼성특수금속" },
       ] as const).map(({ key, label, type, placeholder }) => (
         <div key={key}>
           <FieldLabel label={label} badge="선택" />
@@ -266,18 +326,6 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         </div>
       ))}
 
-      {/* 카테고리 */}
-      <div>
-        <FieldLabel label="카테고리" badge="필수" />
-        <AppSelect
-          value={form.process_type_code}
-          onChange={(v) => setForm((f) => ({ ...f, process_type_code: v }))}
-          size="lg"
-          triggerStyle={{ background: LEGACY_COLORS.s1 }}
-          options={PROCESS_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-        />
-      </div>
-
       {/* 단위 */}
       <div>
         <FieldLabel label="단위" badge="선택" />
@@ -288,54 +336,6 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
           triggerStyle={{ background: LEGACY_COLORS.s1 }}
           options={UNIT_OPTIONS.map((u) => ({ value: u, label: u }))}
         />
-      </div>
-
-      {/* 사용 제품 (모델 슬롯) */}
-      <div>
-        <div className="flex flex-wrap items-center gap-x-2">
-          <FieldLabel label="사용 제품" />
-          {form.model_slots.length > 0 && (
-            <div className="mb-2 text-xs" style={{ color: LEGACY_COLORS.purple }}>
-              제품 기호:{" "}
-              {productModels.filter((m) => form.model_slots.includes(m.slot))
-                .map((m) => m.symbol)
-                .sort()
-                .join("")}
-            </div>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {productModels.map(({ slot, model_name, symbol }) => {
-            const checked = form.model_slots.includes(slot);
-            return (
-              <button
-                key={slot}
-                type="button"
-                onClick={() =>
-                  setForm((f) => ({
-                    ...f,
-                    model_slots: checked
-                      ? f.model_slots.filter((s) => s !== slot)
-                      : [...f.model_slots, slot].sort(),
-                  }))
-                }
-                className="rounded-full border px-3 py-1.5 text-sm font-bold transition-colors"
-                style={{
-                  background: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.s1,
-                  borderColor: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
-                  color: checked ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-                }}
-              >
-                {model_name ?? symbol} <span style={{ opacity: 0.7 }}>({symbol})</span>
-              </button>
-            );
-          })}
-        </div>
-        {form.model_slots.length === 0 && (
-          <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            사용 제품이 지정되지 않았습니다. 위 칩을 클릭해 모델 슬롯을 선택하세요.
-          </div>
-        )}
       </div>
 
       {showMesCode && (

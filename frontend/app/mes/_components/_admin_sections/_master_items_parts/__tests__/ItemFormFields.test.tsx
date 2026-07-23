@@ -21,6 +21,24 @@ function baseForm(overrides: Partial<ItemFormData> = {}): ItemFormData {
 }
 
 describe("ItemFormFields", () => {
+  it("기본 정보 필드를 업무 입력 순서로 렌더링한다", () => {
+    render(
+      <ItemFormFields
+        form={baseForm({ model_slots: [1] })}
+        setForm={vi.fn()}
+        showMesCode
+        productModels={[{ slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false }]}
+      />,
+    );
+
+    const labels = ["품목명", "카테고리", "사용 제품", "자재분류", "안전재고", "공급사", "단위", "품목 코드"]
+      .map((label) => screen.getByText(label, { selector: "div" }));
+
+    for (let index = 0; index < labels.length - 1; index += 1) {
+      expect(labels[index].compareDocumentPosition(labels[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
   it("places the MES code preview after the product block and shows selected symbols inline with its label", () => {
     render(
       <ItemFormFields
@@ -64,7 +82,7 @@ describe("ItemFormFields", () => {
       />,
     );
 
-    const locationSelect = screen.getAllByRole("combobox")[0];
+    const locationSelect = screen.getByRole("combobox", { name: "초기 재고 위치" });
     fireEvent.click(locationSelect);
 
     expect(screen.getByRole("option", { name: "창고" })).toBeInTheDocument();
