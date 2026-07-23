@@ -35,6 +35,9 @@ export const adminApi = {
   downloadF704Ledger: (year: number): Promise<Blob> =>
     fetchBlob(toApiUrl(`/api/admin/audit-ledger/f704-02.xlsx?year=${year}`)),
 
+  downloadF705ProductionLog: (year: number): Promise<Blob> =>
+    fetchBlob(toApiUrl(`/api/admin/production-log/f705-02.xlsx?year=${year}`)),
+
   triggerAuditCsvBackfill: () =>
     postJson<AuditCsvBackfillResult>(toApiUrl("/api/admin/audit-csv/backfill")),
 };

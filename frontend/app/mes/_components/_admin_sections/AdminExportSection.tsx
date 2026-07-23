@@ -9,6 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common";
 import { FilterChip } from "../common/FilterChip";
@@ -95,6 +96,21 @@ function downloadBlob(content: string, fileName: string, type: string): number {
   return Math.round((blob.size / 1024) * 10) / 10;
 }
 
+function downloadBinaryBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+
+  try {
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Props) {
   const [recent, setRecent] = useState<ExportRecord[]>([]);
   const [preset, setPreset] = useState<RangePreset>("30d");
@@ -102,6 +118,9 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
   const [includeHeader, setIncludeHeader] = useState(true);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [f705Year, setF705Year] = useState(() => new Date().getFullYear());
+  const [f705Downloading, setF705Downloading] = useState(false);
+  const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     setRecent(loadRecent());
@@ -158,6 +177,25 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
         status: "success",
       });
     }, 300);
+  }
+
+  async function handleF705Download(): Promise<void> {
+    if (f705Downloading) return;
+    if (!Number.isInteger(f705Year) || f705Year < 2000 || f705Year > 2099) {
+      setF705DownloadError("연도는 2000~2099 사이로 입력하세요.");
+      return;
+    }
+
+    setF705Downloading(true);
+    setF705DownloadError(null);
+    try {
+      const blob = await adminApi.downloadF705ProductionLog(f705Year);
+      downloadBinaryBlob(blob, `F705-02 (R01) ${f705Year} 생산일지.xlsx`);
+    } catch (error) {
+      setF705DownloadError(error instanceof Error ? error.message : "생산일지 다운로드에 실패했습니다.");
+    } finally {
+      setF705Downloading(false);
+    }
   }
 
   async function handleCsvSelected() {
@@ -285,6 +323,69 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+        <section
+          aria-label="F705-02 연간 생산일지"
+          className="rounded-[16px] border p-5"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
+                  color: LEGACY_COLORS.green,
+                }}
+              >
+                <FileSpreadsheet className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                  F705-02 연간 생산일지
+                </div>
+                <p className="mt-1 text-[12px] leading-snug" style={{ color: LEGACY_COLORS.muted2 }}>
+                  선택 연도의 MES 생산 이력을 원본 F705-02 서식으로 내려받습니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label className="flex flex-col gap-1.5 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                F705-02 연도
+                <input
+                  aria-label="F705-02 연도"
+                  type="number"
+                  min={2000}
+                  max={2099}
+                  value={f705Year}
+                  onChange={(event) => setF705Year(Number(event.target.value))}
+                  className="h-11 w-28 rounded-[10px] border px-3 text-[14px] font-bold outline-none"
+                  style={{
+                    background: LEGACY_COLORS.s2,
+                    borderColor: LEGACY_COLORS.border,
+                    color: LEGACY_COLORS.text,
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleF705Download}
+                disabled={f705Downloading}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-4 py-2.5 text-[14px] font-bold text-white transition-opacity disabled:opacity-50"
+                style={{ background: LEGACY_COLORS.green }}
+              >
+                <Download className="h-4 w-4" />
+                {f705Downloading ? "생산일지 생성 중..." : "F705-02 생산일지 다운로드"}
+              </button>
+            </div>
+          </div>
+          {f705DownloadError && (
+            <p role="alert" className="mt-3 text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>
+              {f705DownloadError}
+            </p>
+          )}
+        </section>
+
         <div className="grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <ExportCard
             tone={LEGACY_COLORS.green}
