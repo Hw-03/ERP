@@ -152,8 +152,14 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     });
   }
 
+  function handleItemRowKeyDown(event: React.KeyboardEvent<HTMLDivElement>, item: Item, isSelected: boolean) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    handleSelectItem(item, isSelected);
+  }
+
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <AdminPageHeader
         icon={Box}
         title="품목 관리"
@@ -183,6 +189,20 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           searchValue={itemSearch}
           searchPlaceholder="품목명, 코드 검색"
           onSearchChange={setItemSearch}
+          listRole="grid"
+          listAriaLabel="품목 목록"
+          listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+          listHeader={
+            <div
+              role="row"
+              className="grid grid-cols-[minmax(0,1fr)_110px_80px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
+              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+            >
+              <span role="columnheader">품목명</span>
+              <span role="columnheader" className="text-center">품목 코드</span>
+              <span role="columnheader" className="text-center">상태</span>
+            </div>
+          }
           items={visibleItems}
           emptyState={
             <EmptyState
@@ -201,72 +221,70 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             const isDragging = dragId === item.item_id;
             const isDropTarget =
               dragId !== null && dropTargetId === item.item_id && dragId !== item.item_id;
+            const rowStatus = isDeleted
+              ? { label: "삭제됨", tone: "danger" as const, maxWidth: 90 }
+              : zeroStock
+                ? { label: "품절", tone: "danger" as const, maxWidth: 70 }
+                : lowStock
+                  ? { label: "부족", tone: "warning" as const, maxWidth: 70 }
+                  : { label: "정상", tone: "success" as const, maxWidth: 70 };
             return (
               <div
                 key={item.item_id}
                 data-item-id={item.item_id}
-                className="relative"
-                style={{ opacity: isDragging ? 0.4 : isDeleted ? 0.5 : 1 }}
+                role="row"
+                aria-selected={isSelected}
+                tabIndex={0}
+                onClick={() => handleSelectItem(item, isSelected)}
+                onKeyDown={(event) => handleItemRowKeyDown(event, item, isSelected)}
+                className="relative grid w-full grid-cols-[minmax(0,1fr)_110px_80px] items-center border-b border-l-[3px] py-2 pl-2 pr-3 text-left hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+                style={{
+                  opacity: isDragging ? 0.4 : isDeleted ? 0.5 : 1,
+                  background: isSelected
+                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                    : undefined,
+                  borderBottomColor: LEGACY_COLORS.border,
+                  borderLeftColor: isSelected ? LEGACY_COLORS.blue : "transparent",
+                }}
               >
                 {isDropTarget && (
                   <div
+                    aria-hidden
                     className="pointer-events-none absolute inset-x-0 -top-1 h-0.5 rounded-full"
                     style={{ background: LEGACY_COLORS.blue }}
                   />
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleSelectItem(item, isSelected)}
-                  aria-pressed={isSelected}
-                  className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors duration-150 bg-[var(--c-s2)] hover:bg-[var(--c-s4)]"
-                  style={{
-                    background: isSelected
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                      : undefined,
-                    borderColor: isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                  }}
-                >
-                  <GripVertical
-                    className="h-4 w-4 shrink-0 cursor-grab"
-                    style={{ color: LEGACY_COLORS.muted2, touchAction: "none" }}
-                    aria-label="드래그 핸들"
-                    onPointerDown={(e) => handleGripPointerDown(e, item.item_id)}
-                    onPointerMove={(e) => handleGripPointerMove(e, item.item_id)}
-                    onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
-                  />
-                  <span
-                    className="min-w-0 flex-1 truncate text-[14px] font-semibold"
+                <div role="gridcell" className="flex min-w-0 items-center gap-2">
+                    <GripVertical
+                      className="h-4 w-4 shrink-0 cursor-grab"
+                      style={{ color: LEGACY_COLORS.muted2, touchAction: "none" }}
+                      aria-label="드래그 핸들"
+                      onPointerDown={(e) => handleGripPointerDown(e, item.item_id)}
+                      onPointerMove={(e) => handleGripPointerMove(e, item.item_id)}
+                      onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
+                    />
+                    <span
+                      className="min-w-0 flex-1 truncate text-[14px] font-semibold"
+                      style={{
+                        color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                        textDecoration: isDeleted ? "line-through" : "none",
+                      }}
+                    >
+                      {item.item_name}
+                    </span>
+                  </div>
+                  <div
+                    role="gridcell"
+                    className="truncate text-center font-mono text-[12px] font-semibold tabular-nums"
                     style={{
-                      color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
-                      textDecoration: isDeleted ? "line-through" : "none",
+                      color: LEGACY_COLORS.muted,
                     }}
                   >
-                    {item.item_name}
-                  </span>
-                  <span
-                    className="shrink-0 font-mono text-[12px] font-semibold tabular-nums"
-                    style={{ color: LEGACY_COLORS.muted }}
-                  >
                     {item.mes_code ?? "—"}
-                  </span>
-                  {isDeleted ? (
-                    <div className="shrink-0">
-                      <StatusPill label="삭제됨" tone="danger" showDot maxWidth={90} />
-                    </div>
-                  ) : zeroStock ? (
-                    <div className="shrink-0">
-                      <StatusPill label="품절" tone="danger" showDot maxWidth={70} />
-                    </div>
-                  ) : lowStock ? (
-                    <div className="shrink-0">
-                      <StatusPill label="부족" tone="warning" showDot maxWidth={70} />
-                    </div>
-                  ) : (
-                    <div className="shrink-0">
-                      <StatusPill label="정상" tone="success" showDot maxWidth={70} />
-                    </div>
-                  )}
-                </button>
+                  </div>
+                  <div role="gridcell" className="flex justify-center">
+                    <StatusPill {...rowStatus} showDot />
+                  </div>
               </div>
             );
           }}
@@ -277,68 +295,21 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             addMode
               ? "새 품목 추가"
               : selectedItem
-                ? selectedItem.item_name
+                ? undefined
                 : "품목을 선택하세요"
           }
           subtitle={
             addMode
               ? "필요한 항목을 채우고 추가 버튼을 눌러주세요."
-              : selectedItem
-                ? selectedItem.mes_code ?? undefined
-                : undefined
-          }
-          status={
-            !addMode && selectedItem ? (
-              selectedItem.quantity == null ? (
-                <StatusPill label="재고 미설정" tone="neutral" />
-              ) : Number(selectedItem.quantity) <= 0 ? (
-                <StatusPill label="품절" tone="danger" />
-              ) : selectedItem.min_stock != null &&
-                Number(selectedItem.quantity) < Number(selectedItem.min_stock) ? (
-                <StatusPill label="안전재고 부족" tone="warning" />
-              ) : (
-                <StatusPill label="정상" tone="success" />
-              )
-            ) : null
+              : undefined
           }
           actions={
             !addMode &&
             selectedItem &&
-            tab === "info" &&
-            !selectedItem.deleted_at &&
-            !deleteConfirm ? (
-              <button
-                type="button"
-                onClick={() => setDeleteConfirm(true)}
-                className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
-                style={{
-                  background: LEGACY_COLORS.s2,
-                  color: LEGACY_COLORS.red,
-                  border: `1px solid ${LEGACY_COLORS.red as string}`,
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                삭제
-              </button>
-            ) : null
-          }
-          tabs={!addMode && selectedItem ? DETAIL_TABS : undefined}
-          activeTab={tab}
-          onTabChange={(id) => setTab(id as DetailTab)}
-          footer={
-            !addMode && selectedItem ? (
-              selectedItem.deleted_at ? (
-                <button
-                  type="button"
-                  onClick={() => void restoreItem(selectedItem.item_id)}
-                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.green }}
-                >
-                  복구
-                </button>
-              ) : deleteConfirm ? (
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 text-[12px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
+            !selectedItem.deleted_at ? (
+              deleteConfirm ? (
+                <>
+                  <span className="text-[12px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
                     정말 삭제하시겠습니까?
                   </span>
                   <button
@@ -360,7 +331,38 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   >
                     삭제 확인
                   </button>
-                </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(true)}
+                  className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                  style={{
+                    background: LEGACY_COLORS.s2,
+                    color: LEGACY_COLORS.red,
+                    border: `1px solid ${LEGACY_COLORS.red as string}`,
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  삭제
+                </button>
+              )
+            ) : null
+          }
+          tabs={!addMode && selectedItem ? DETAIL_TABS : undefined}
+          activeTab={tab}
+          onTabChange={(id) => setTab(id as DetailTab)}
+          footer={
+            !addMode && selectedItem ? (
+              selectedItem.deleted_at ? (
+                <button
+                  type="button"
+                  onClick={() => void restoreItem(selectedItem.item_id)}
+                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.green }}
+                >
+                  복구
+                </button>
               ) : tab === "info" ? (
                 <button
                   type="button"
@@ -371,17 +373,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   <Save className="h-3.5 w-3.5" />
                   저장
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setDeleteConfirm(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.red, border: `1px solid ${LEGACY_COLORS.red as string}` }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  삭제
-                </button>
-              )
+              ) : null
             ) : null
           }
         >
@@ -427,7 +419,7 @@ function ItemStockTab({ item }: { item: Item }) {
       ? { label: "안전재고 부족", tone: LEGACY_COLORS.red }
       : { label: "정상", tone: LEGACY_COLORS.green };
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid h-full min-h-[9rem] grid-cols-2 grid-rows-2 gap-3">
       <StockStat label="현재 재고" value={current} unit={item.unit ?? "EA"} tone={LEGACY_COLORS.blue} />
       <StockStat label="창고 보관" value={warehouse} unit={item.unit ?? "EA"} tone={LEGACY_COLORS.cyan} />
       <StockStat label="안전 재고" value={safety} unit={item.unit ?? "EA"} tone={LEGACY_COLORS.yellow} />
@@ -448,7 +440,7 @@ function StockStat({
 }) {
   return (
     <div
-      className="rounded-[14px] border px-4 py-4"
+      className="h-full rounded-[14px] border px-4 py-4"
       style={{
         background: `color-mix(in srgb, ${tone} 8%, transparent)`,
         borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
@@ -487,7 +479,7 @@ function ItemBomTab({
   );
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex h-full min-h-[12rem] flex-col gap-5">
       <BomList
         title="구성품 (이 품목이 부모인 BOM)"
         rows={composition.map((r) => ({
@@ -526,12 +518,12 @@ function BomList({
   const remaining = rows.length - PAGE;
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
         {title}
       </div>
       <div
-        className="overflow-hidden rounded-[12px] border"
+        className="min-h-0 flex-1 overflow-y-auto rounded-[12px] border"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         {rows.length === 0 ? (

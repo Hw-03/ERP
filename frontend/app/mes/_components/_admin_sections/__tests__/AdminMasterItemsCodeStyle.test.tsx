@@ -58,9 +58,8 @@ describe("AdminMasterItemsSection", () => {
       </DirtyGuardProvider>,
     );
 
-    const code = screen.getAllByText("46-AA-0080").find((element) => element.tagName === "SPAN");
-    expect(code).toBeDefined();
-    expect(code?.getAttribute("style")).toContain("var(--c-muted)");
-    expect(code?.getAttribute("style")).not.toContain("var(--c-blue)");
+    const code = screen.getByRole("gridcell", { name: "46-AA-0080" });
+    expect(code.getAttribute("style")).toContain("var(--c-muted)");
+    expect(code.getAttribute("style")).not.toContain("var(--c-blue)");
   });
 });
