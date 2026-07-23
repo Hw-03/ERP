@@ -19,9 +19,6 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   const [selectedProductId, setSelectedProductId] = useState<AssemblyChecklistProductId | null>(null);
   const [completedItemKeys, setCompletedItemKeys] = useState<Set<string>>(() => new Set());
   const selectedProduct = ASSEMBLY_CHECKLISTS.find((product) => product.id === selectedProductId);
-  const hasCompletedSelectedProductItem = selectedProduct?.sections.some((section, sectionIndex) =>
-    section.items.some((_item, itemIndex) => completedItemKeys.has(getChecklistItemKey(selectedProduct.id, sectionIndex, itemIndex))),
-  ) ?? false;
 
   const toggleChecklistItem = (itemKey: string) => {
     setCompletedItemKeys((currentKeys) => {
@@ -37,16 +34,15 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
     });
   };
 
-  const clearSelectedProductItems = () => {
+  const clearChecklistSection = (sectionIndex: number) => {
     if (!selectedProduct) return;
 
     setCompletedItemKeys((currentKeys) => {
       const nextKeys = new Set(currentKeys);
+      const section = selectedProduct.sections[sectionIndex];
 
-      selectedProduct.sections.forEach((section, sectionIndex) => {
-        section.items.forEach((_item, itemIndex) => {
-          nextKeys.delete(getChecklistItemKey(selectedProduct.id, sectionIndex, itemIndex));
-        });
+      section.items.forEach((_item, itemIndex) => {
+        nextKeys.delete(getChecklistItemKey(selectedProduct.id, sectionIndex, itemIndex));
       });
 
       return nextKeys;
@@ -134,7 +130,12 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
         </h2>
       </div>
 
-      {selectedProduct.sections.map((section, sectionIndex) => (
+      {selectedProduct.sections.map((section, sectionIndex) => {
+        const hasCompletedSectionItem = section.items.some((_item, itemIndex) =>
+          completedItemKeys.has(getChecklistItemKey(selectedProduct.id, sectionIndex, itemIndex)),
+        );
+
+        return (
         <section key={section.title ?? sectionIndex} className="rounded-[20px] border p-4" style={CARD_STYLE}>
           {section.title && (
             <h3 className={`${TYPO.overline} mb-3`} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -153,7 +154,12 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
                     aria-pressed={isCompleted}
                     onClick={() => toggleChecklistItem(itemKey)}
                     className="flex min-h-11 w-full gap-3 rounded-[14px] border px-3 py-3 text-left transition-colors"
-                    style={{ borderColor: isCompleted ? LEGACY_COLORS.green : LEGACY_COLORS.border }}
+                    style={{
+                      background: isCompleted ? `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)` : undefined,
+                      borderColor: isCompleted
+                        ? `color-mix(in srgb, ${LEGACY_COLORS.green} 45%, transparent)`
+                        : LEGACY_COLORS.border,
+                    }}
                   >
                     <span
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
@@ -176,22 +182,22 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
               );
             })}
           </ol>
+          <button
+            type="button"
+            onClick={() => clearChecklistSection(sectionIndex)}
+            disabled={!hasCompletedSectionItem}
+            className="mt-3 min-h-11 w-full rounded-[12px] border px-3 py-2 text-sm font-black disabled:opacity-45"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 45%, transparent)`,
+              color: LEGACY_COLORS.green,
+            }}
+          >
+            전체 해제
+          </button>
         </section>
-      ))}
-
-      <button
-        type="button"
-        onClick={clearSelectedProductItems}
-        disabled={!hasCompletedSelectedProductItem}
-        className="min-h-11 w-full rounded-[12px] border px-3 py-2 text-sm font-black disabled:opacity-45"
-        style={{
-          background: `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)`,
-          borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 45%, transparent)`,
-          color: LEGACY_COLORS.green,
-        }}
-      >
-        전체 해제
-      </button>
+        );
+      })}
     </div>
   );
 }

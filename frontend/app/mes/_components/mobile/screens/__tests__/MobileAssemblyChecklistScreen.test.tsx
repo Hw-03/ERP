@@ -43,50 +43,43 @@ describe("MobileAssemblyChecklistScreen", () => {
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
-  it("toggles a DX3000 item and clears only the selected product checklist", () => {
+  it("uses the pale-green clear-button treatment and clears each section independently", () => {
     renderChecklistScreen();
 
     fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
 
-    const firstItem = screen.getByRole("button", { name: /손잡이 나사 고정 상태 양호/ });
-    const clearButton = screen.getByRole("button", { name: "전체 해제" });
+    const [powerOffList, powerOnList] = screen.getAllByRole("list");
+    const [firstPowerOffItem] = within(powerOffList).getAllByRole("button");
+    const [firstPowerOnItem] = within(powerOnList).getAllByRole("button");
+    const [powerOffClearButton, powerOnClearButton] = screen.getAllByRole("button", { name: "전체 해제" });
 
-    expect(firstItem).toHaveAttribute("aria-pressed", "false");
-    expect(clearButton).toBeDisabled();
+    expect(firstPowerOffItem).toHaveAttribute("aria-pressed", "false");
+    expect(powerOffClearButton).toBeDisabled();
+    expect(powerOnClearButton).toBeDisabled();
 
-    fireEvent.click(firstItem);
+    fireEvent.click(firstPowerOffItem);
 
-    expect(firstItem).toHaveAttribute("aria-pressed", "true");
-    expect(firstItem).toHaveStyle({ borderColor: "var(--c-green)" });
-    expect(within(firstItem).getByText("1")).toHaveStyle({
+    expect(firstPowerOffItem).toHaveAttribute("aria-pressed", "true");
+    expect(firstPowerOffItem).toHaveStyle({
+      background: "color-mix(in srgb, var(--c-green) 10%, transparent)",
+      borderColor: "color-mix(in srgb, var(--c-green) 45%, transparent)",
+    });
+    expect(within(firstPowerOffItem).getByText("1")).toHaveStyle({
       color: "color-mix(in srgb, var(--c-green) 60%, var(--c-text))",
     });
-    expect(clearButton).toBeEnabled();
+    expect(powerOffClearButton).toBeEnabled();
+    expect(powerOnClearButton).toBeDisabled();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 
-    fireEvent.click(clearButton);
+    fireEvent.click(firstPowerOnItem);
+    expect(powerOnClearButton).toBeEnabled();
 
-    expect(firstItem).toHaveAttribute("aria-pressed", "false");
-    expect(clearButton).toBeDisabled();
-  });
+    fireEvent.click(powerOffClearButton);
 
-  it("keeps the item background and body text color unchanged when toggled", () => {
-    renderChecklistScreen();
-
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
-
-    const firstItem = screen.getByRole("button", { name: /손잡이 나사 고정 상태 양호/ });
-    const itemText = within(firstItem).getByText("손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인");
-    const backgroundBeforeToggle = firstItem.style.background;
-    const textColorBeforeToggle = itemText.style.color;
-
-    expect(firstItem.className.split(/\s+/).some((className) => className.startsWith("bg-"))).toBe(false);
-
-    fireEvent.click(firstItem);
-
-    expect(firstItem.style.background).toBe(backgroundBeforeToggle);
-    expect(itemText.style.color).toBe(textColorBeforeToggle);
-    expect(firstItem.className.split(/\s+/).some((className) => className.startsWith("bg-"))).toBe(false);
+    expect(firstPowerOffItem).toHaveAttribute("aria-pressed", "false");
+    expect(powerOffClearButton).toBeDisabled();
+    expect(firstPowerOnItem).toHaveAttribute("aria-pressed", "true");
+    expect(powerOnClearButton).toBeEnabled();
   });
 
   it("keeps DX3000 and ADX6000 completion states independent while the screen stays mounted", () => {
@@ -109,7 +102,7 @@ describe("MobileAssemblyChecklistScreen", () => {
     const returnedDx3000Item = screen.getByRole("button", { name: /손잡이 나사 고정 상태 양호/ });
     expect(returnedDx3000Item).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("button", { name: "전체 해제" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "전체 해제" })[0]);
     expect(returnedDx3000Item).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(screen.getByRole("button", { name: "제품 선택으로 돌아가기" }));
@@ -137,7 +130,7 @@ describe("MobileAssemblyChecklistScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
     fireEvent.click(screen.getByRole("button", { name: /손잡이 나사 고정 상태 양호/ }));
-    expect(screen.getByRole("button", { name: "전체 해제" })).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "전체 해제" })[0]).toBeEnabled();
 
     firstRender.unmount();
     renderChecklistScreen();
@@ -145,7 +138,7 @@ describe("MobileAssemblyChecklistScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
 
     expect(screen.getByRole("button", { name: /손잡이 나사 고정 상태 양호/ })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "전체 해제" })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "전체 해제" })[0]).toBeDisabled();
   });
 
   it("returns to product selection from a checklist", () => {

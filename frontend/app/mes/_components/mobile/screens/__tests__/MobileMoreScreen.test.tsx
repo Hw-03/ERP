@@ -22,6 +22,22 @@ const operator = {
 };
 
 describe("MobileMoreScreen", () => {
+  it("does not apply a card shadow to the More-screen profile area", () => {
+    const { container } = render(
+      <MobileMoreScreen
+        operator={operator}
+        onProfile={() => {}}
+        onNotificationNavigate={() => {}}
+        onChecklist={() => {}}
+        onWeekly={() => {}}
+        onShipping={() => {}}
+        onWarehouseMap={() => {}}
+      />,
+    );
+
+    expect(container.querySelector(".card")).toBeNull();
+  });
+
   it("combines profile and notification into one top card", () => {
     const onProfile = vi.fn();
 

@@ -73,7 +73,8 @@ export function MobileMoreScreen({
   return (
     <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
       <div
-        className="card flex items-center gap-2 rounded-[18px] p-2"
+        className="flex items-center gap-2 rounded-[18px] border p-2"
+        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         {operator && (
           <button
