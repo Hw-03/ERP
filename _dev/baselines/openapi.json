@@ -10208,6 +10208,79 @@
         ]
       }
     },
+    "/api/admin/audit-ledger/f704-02.xlsx": {
+      "get": {
+        "description": "선택한 KST 연도의 실제 창고 입출고를 F704-02 원본 양식으로 내보낸다.",
+        "operationId": "download_f704_02_api_admin_audit_ledger_f704_02_xlsx_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download F704 02",
+        "tags": [
+          "Admin Audit"
+        ]
+      }
+    },
     "/api/admin/audit-logs": {
       "get": {
         "description": "최근 감사로그 조회. 관리자 PIN 잠금 화면에서만 호출 (현재 별도 인증 미적용).",

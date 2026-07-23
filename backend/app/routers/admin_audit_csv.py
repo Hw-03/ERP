@@ -1,6 +1,7 @@
-"""외부 심사 대응용 입출고 CSV 다운로드 API.
+"""시스템 원본 입출고 CSV/XLSX 다운로드 API.
 
-`app.services.audit_csv` 가 자동으로 떨군 월별 CSV 를 관리자가 받아 제출하는 용도.
+`app.services.audit_csv` 가 자동으로 떨군 월별 CSV 를 내부 확인용으로 제공한다.
+외부 심사용 F704-02 양식은 ``admin_audit_ledger``에서 별도로 생성한다.
 - 목록 조회 / CSV 원본 / XLSX 변환 / 수동 백필 4종.
 - 권한: 화면단에서 관리자 PIN 잠금이 보호 (admin_audit 라우터와 동일 패턴).
 """
