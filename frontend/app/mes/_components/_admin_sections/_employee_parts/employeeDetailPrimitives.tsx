@@ -6,14 +6,16 @@ export function DetailCardSlot({
   title,
   headerAccessory,
   children,
+  className,
 }: {
   title: string;
   headerAccessory?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <div
-      className="rounded-[14px] border p-4"
+      className={`rounded-[14px] border p-4 ${className ?? ""}`}
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">

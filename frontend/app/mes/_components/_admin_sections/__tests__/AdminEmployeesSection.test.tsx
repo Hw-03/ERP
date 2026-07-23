@@ -74,6 +74,16 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 describe("AdminEmployeesSection", () => {
+  it("passes the available detail height into the employee workspace", () => {
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminEmployeesSection />
+      </DirtyGuardProvider>,
+    );
+
+    expect(container.querySelector(".flex.min-h-0.flex-1.flex-col")).toHaveClass("min-h-0", "flex-1");
+  });
+
   it("legacy 부서/직급은 목록과 선택 헤더에서 표준 직급으로 표시한다", () => {
     const legacyEmployee = {
       ...context.employees[0],

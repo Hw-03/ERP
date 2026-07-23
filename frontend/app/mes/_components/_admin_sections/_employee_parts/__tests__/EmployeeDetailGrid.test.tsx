@@ -167,7 +167,7 @@ describe("EmployeeDetailGrid", () => {
     expect(header!.nextElementSibling).toBe(screen.getByRole("button", { name: "PIN 초기화 (0000)" }));
   });
 
-  it("PIN과 위험 작업 카드는 각각 내용 높이만 사용한다", () => {
+  it("데스크톱 카드가 공통 가용 높이를 채우고 위험 작업을 우측 열 하단까지 배치한다", () => {
     render(
       <EmployeeDetailGrid
         employee={employee}
@@ -181,7 +181,16 @@ describe("EmployeeDetailGrid", () => {
       />,
     );
 
+    const layout = screen.getByText("기본 정보").parentElement?.parentElement?.parentElement;
+    const basicCard = screen.getByText("기본 정보").parentElement?.parentElement;
+    const permissionsCard = screen.getByText("권한").parentElement?.parentElement;
     const dangerCard = screen.getByText("계정 상태 및 위험 작업").parentElement?.parentElement;
-    expect(dangerCard?.parentElement).toHaveClass("items-start");
+    const actionArea = dangerCard?.parentElement;
+
+    expect(layout).toHaveClass("h-full", "min-h-0", "xl:items-stretch");
+    expect(basicCard).toHaveClass("h-full");
+    expect(permissionsCard).toHaveClass("h-full");
+    expect(actionArea).toHaveClass("h-full", "grid-rows-[auto_minmax(0,1fr)]");
+    expect(dangerCard).toHaveClass("h-full");
   });
 });

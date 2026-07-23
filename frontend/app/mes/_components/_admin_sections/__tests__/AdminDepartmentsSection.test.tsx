@@ -24,6 +24,16 @@ vi.mock("../../DepartmentsContext", () => ({
 }));
 
 describe("AdminDepartmentsSection", () => {
+  it("passes the available detail height into the department workspace", () => {
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+      </DirtyGuardProvider>,
+    );
+
+    expect(container.querySelector(".flex.min-h-0.flex-1.flex-col")).toHaveClass("min-h-0", "flex-1");
+  });
+
   it("counts related items from their process type instead of their legacy department field", () => {
     render(
       <DirtyGuardProvider>

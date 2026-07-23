@@ -174,7 +174,7 @@ export function AdminDepartmentsSection({
 
   return (
     <>
-      <div className="flex min-h-0 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <AdminPageHeader
           icon={Building2}
           title="부서 관리"

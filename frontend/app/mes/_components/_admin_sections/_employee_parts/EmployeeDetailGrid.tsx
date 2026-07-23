@@ -62,9 +62,9 @@ export function EmployeeDetailGrid({
     }));
   };
   return (
-    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+    <div className="grid h-full min-h-0 gap-3 lg:grid-cols-2 xl:grid-cols-3 xl:items-stretch">
       {/* 카드 1: 기본 정보 */}
-      <DetailCardSlot title="기본 정보">
+      <DetailCardSlot title="기본 정보" className="h-full">
         <div className="grid grid-cols-2 gap-3">
           <FieldRow label="사번">
             <div
@@ -113,7 +113,7 @@ export function EmployeeDetailGrid({
       </DetailCardSlot>
 
       {/* 카드 2: 권한 */}
-      <DetailCardSlot title="권한">
+      <DetailCardSlot title="권한" className="h-full">
         <div className="flex flex-col gap-3">
           <FieldRow label="창고 결재 역할">
             <SelectInput
@@ -174,7 +174,7 @@ export function EmployeeDetailGrid({
         </div>
       </DetailCardSlot>
 
-      <div className="grid items-start gap-3 lg:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1">
+      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1">
         <DetailCardSlot
           title="PIN"
           headerAccessory={(
@@ -213,7 +213,7 @@ export function EmployeeDetailGrid({
           </button>
         </DetailCardSlot>
 
-        <DetailCardSlot title="계정 상태 및 위험 작업">
+        <DetailCardSlot title="계정 상태 및 위험 작업" className="h-full">
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
