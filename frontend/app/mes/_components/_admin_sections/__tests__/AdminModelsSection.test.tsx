@@ -24,8 +24,32 @@ vi.mock("../AdminModelsContext", () => ({
   useAdminModelsContext: () => context,
 }));
 
+function findByClasses(container: HTMLElement, ...classes: string[]) {
+  return [...container.querySelectorAll<HTMLElement>("div")].find((element) =>
+    classes.every((className) => element.classList.contains(className)),
+  );
+}
+
 describe("AdminModelsSection", () => {
-  it("compresses the xl detail layout while retaining six linked-item previews and the delete path", async () => {
+  it("keeps the narrow layout and uses a 2:8 list-detail split at xl", async () => {
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminModelsSection items={[]} allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    await screen.findByDisplayValue("DX3000");
+
+    expect(findByClasses(container, "xl:grid-cols-[minmax(0,1fr)_minmax(0,4fr)]")).toHaveClass(
+      "flex",
+      "gap-4",
+      "xl:grid",
+      "xl:grid-cols-[minmax(0,1fr)_minmax(0,4fr)]",
+    );
+    expect(findByClasses(container, "w-[288px]", "xl:w-auto")).toHaveClass("w-[288px]", "xl:w-auto");
+  });
+
+  it("가용 높이를 채우며 통계는 세로 스택, 삭제는 하단에 정렬한다", async () => {
     const linkedItems = Array.from({ length: 7 }, (_, index) => ({
       item_id: `item-${index + 1}`,
       item_name: `linked item ${index + 1}`,
@@ -40,12 +64,16 @@ describe("AdminModelsSection", () => {
 
     await screen.findByText("linked item 1");
 
-    expect(container.querySelector("[data-model-detail-layout]")).toHaveClass("gap-3");
-    expect(container.querySelector("[data-model-edit-card]")).toHaveClass("p-3");
-    expect(container.querySelector("[data-model-linked-layout]")).toHaveClass("flex", "flex-col", "xl:grid", "xl:gap-3");
+    expect(findByClasses(container, "h-full", "min-h-0", "flex-1", "flex-col", "gap-3")).toHaveClass("min-h-0", "flex-1", "gap-3");
+    expect(findByClasses(container, "p-3", "rounded-[14px]", "border")).toHaveClass("p-3");
+    expect(findByClasses(container, "xl:grid", "xl:items-stretch", "xl:gap-3")).toHaveClass("min-h-0", "flex-1", "xl:grid", "xl:gap-3");
+    expect(findByClasses(container, "shrink-0", "flex-col", "gap-3")).toHaveClass("min-h-0", "flex", "flex-col", "gap-3");
+    expect(screen.getByText("연결 품목 수").parentElement).toHaveClass("flex-1");
+    expect(screen.getByText("연결 BOM 수").parentElement).toHaveClass("flex-1");
+    expect(findByClasses(container, "min-h-0", "flex-1", "flex-col")).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
     expect(screen.getAllByText(/linked item [1-6]$/)).toHaveLength(6);
     expect(screen.queryByText("linked item 7")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "이 모델 삭제" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "이 모델 삭제" })).toHaveClass("mt-auto");
   });
 
   it("keeps the model delete button connected to its confirmation handler", async () => {
@@ -94,7 +122,7 @@ describe("AdminModelsSection", () => {
 
     const name = await screen.findByDisplayValue("DX3000");
     const symbol = screen.getByDisplayValue("A");
-    const fields = container.querySelector("[data-model-edit-fields]");
+    const fields = findByClasses(container, "grid-cols-1", "sm:grid-cols-[minmax(0,1fr)_7rem]");
 
     expect(fields).toHaveClass("grid-cols-1", "sm:grid-cols-[minmax(0,1fr)_7rem]");
 

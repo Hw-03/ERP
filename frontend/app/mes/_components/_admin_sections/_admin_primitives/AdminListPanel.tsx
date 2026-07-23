@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type AriaRole, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 
@@ -18,6 +18,10 @@ export interface AdminListPanelProps<T> {
   emptyState?: ReactNode;
   footer?: ReactNode;
   width?: number | string;
+  listHeader?: ReactNode;
+  listRole?: AriaRole;
+  listAriaLabel?: string;
+  listClassName?: string;
 }
 
 export function AdminListPanel<T>({
@@ -33,6 +37,10 @@ export function AdminListPanel<T>({
   emptyState,
   footer,
   width = 320,
+  listHeader,
+  listRole,
+  listAriaLabel,
+  listClassName,
 }: AdminListPanelProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -94,7 +102,13 @@ export function AdminListPanel<T>({
         </div>
       )}
       {filters && <div className="flex shrink-0 flex-wrap gap-1.5">{filters}</div>}
-      <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
+      <div
+        ref={scrollRef}
+        role={listRole}
+        aria-label={listAriaLabel}
+        className={listClassName ?? "flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5"}
+      >
+        {listHeader}
         {items.length === 0
           ? emptyState ?? <EmptyState variant="no-data" compact />
           : items.map((item) => renderItem(item))}

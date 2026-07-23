@@ -195,11 +195,12 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         }
       />
 
-      <div className="flex min-h-0 flex-1 gap-4">
+      <div className="flex min-h-0 flex-1 gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,4fr)]">
+        <div className="flex min-h-0 w-[288px] shrink-0 xl:w-auto">
         <AdminListPanel
           title="모델 목록"
           countLabel={`${productModels.length}건`}
-          width={288}
+          width="100%"
           action={
             <Button variant="primary" size="sm" iconLeft={<Plus className="h-3.5 w-3.5" />} onClick={handleStartAdd}>
               추가
@@ -279,6 +280,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             );
           }}
         />
+        </div>
 
         <AdminDetailCard
           title={
@@ -449,14 +451,13 @@ interface ModelDetailViewProps {
 
 function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEditForm, onRequestDelete }: ModelDetailViewProps) {
   return (
-    <div data-model-detail-layout className="flex flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
       {/* 편집 가능 필드 */}
       <div
-        data-model-edit-card
         className="rounded-[14px] border p-3"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        <div data-model-edit-fields className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
           {/* 모델명 — 편집 */}
           <div className="min-w-0">
             <EditFieldRow label="모델명">
@@ -491,8 +492,8 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
         </div>
       </div>
 
-      <div data-model-linked-layout className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.2fr)] xl:items-start xl:gap-3">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 xl:grid xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.2fr)] xl:items-stretch xl:gap-3">
+        <div className="flex min-h-0 shrink-0 flex-col gap-3">
           <SummaryStat
             label="연결 품목 수"
             value={linkedItems.length}
@@ -508,12 +509,12 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
         </div>
 
         {linkedItems.length > 0 && (
-          <div>
+          <div className="flex min-h-0 flex-1 flex-col">
             <div className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               연결 품목 미리보기
             </div>
             <div
-              className="flex flex-col gap-1.5 rounded-[14px] border p-3"
+              className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-[14px] border p-3"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               {linkedItems.slice(0, 6).map((it) => (
@@ -540,7 +541,7 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
       <button
         type="button"
         onClick={onRequestDelete}
-        className="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] border px-4 py-3 text-[14px] font-bold transition-colors hover:brightness-110"
+        className="mt-auto flex w-full items-center justify-center gap-2 rounded-[12px] border px-4 py-3 text-[14px] font-bold transition-colors hover:brightness-110"
         style={{
           background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
@@ -578,7 +579,7 @@ function SummaryStat({
 }) {
   return (
     <div
-      className="rounded-[14px] border px-4 py-3"
+      className="flex-1 rounded-[14px] border px-4 py-3"
       style={{
         background: `color-mix(in srgb, ${tone} 8%, transparent)`,
         borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
