@@ -55,4 +55,10 @@ describe("DesktopAdminView", () => {
     expect(screen.getByRole("navigation", { name: "관리자 섹션" })).toBeInTheDocument();
     expect(screen.getByText("관리자 본문")).toBeInTheDocument();
   });
+
+  it("요약 바의 상단 여백을 16px로 유지하도록 작업 영역에 4px 패딩을 적용한다", () => {
+    render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(screen.getByText("관리자 본문").closest("section")).toHaveClass("pt-1");
+  });
 });

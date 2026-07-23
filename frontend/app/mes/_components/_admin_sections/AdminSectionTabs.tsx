@@ -58,7 +58,6 @@ export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
       style={{
         background: LEGACY_COLORS.s1,
         borderColor: LEGACY_COLORS.border,
-        boxShadow: "var(--c-card-shadow)",
       }}
     >
       <div className="flex min-w-[880px] flex-1 items-center gap-2 lg:min-w-0">

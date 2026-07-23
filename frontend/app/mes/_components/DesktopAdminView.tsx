@@ -93,7 +93,7 @@ export function DesktopAdminView({
         />
 
         {/* 워크스페이스 */}
-        <section className="flex min-h-0 flex-1 flex-col overflow-auto pt-3 lg:overflow-hidden">
+        <section className="flex min-h-0 flex-1 flex-col overflow-auto pt-1 lg:overflow-hidden">
           {/* 섹션별 콘텐츠 */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AdminSectionContent

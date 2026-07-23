@@ -66,4 +66,22 @@ describe("AdminDetailCard", () => {
     expect(onTabChange).toHaveBeenLastCalledWith("info");
     expect(info).toHaveFocus();
   });
+
+  it("제목 없이 action만 있으면 확인 action을 한 줄 전체 폭으로 배치한다", () => {
+    render(
+      <AdminDetailCard
+        actions={
+          <>
+            <span>정말 삭제하시겠습니까?</span>
+            <button type="button">취소</button>
+            <button type="button">삭제 확인</button>
+          </>
+        }
+      >
+        content
+      </AdminDetailCard>,
+    );
+
+    expect(screen.getByRole("button", { name: "삭제 확인" }).parentElement).toHaveClass("w-full", "flex-nowrap");
+  });
 });

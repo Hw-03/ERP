@@ -79,6 +79,15 @@ describe("AdminSectionTabs", () => {
     });
   });
 
+  it("관리자 탭 바에 카드 그림자를 적용하지 않는다", () => {
+    render(<AdminSectionTabs section="models" onSelect={vi.fn()} />);
+
+    expect(screen.getByRole("navigation", { name: "관리자 섹션" })).not.toHaveAttribute(
+      "style",
+      expect.stringContaining("--c-card-shadow"),
+    );
+  });
+
   it("접근 가능한 이름으로 탭 그룹과 소속 탭을 연결한다", () => {
     render(<AdminSectionTabs section="models" onSelect={vi.fn()} />);
 

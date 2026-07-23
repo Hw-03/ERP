@@ -36,6 +36,7 @@ export function AdminDetailCard({
   const activeTabIndex = tabs?.findIndex((tab) => tab.id === activeTab) ?? -1;
   const selectedTabIndex = activeTabIndex >= 0 ? activeTabIndex : 0;
   const tabPanelId = `${tabInstanceId}-panel`;
+  const hasHeaderContent = Boolean(title || subtitle || status);
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (!tabs || tabs.length === 0) return;
@@ -60,27 +61,37 @@ export function AdminDetailCard({
         borderColor: LEGACY_COLORS.border,
       }}
     >
-      {(title || actions) && (
+      {(hasHeaderContent || actions) && (
         <div
           className="flex shrink-0 items-start justify-between gap-3 border-b px-5 py-4"
           style={{ borderColor: LEGACY_COLORS.border }}
         >
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {title && (
-                <div className="text-[18px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                  {title}
+          {hasHeaderContent && (
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {title && (
+                  <div className="text-[18px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                    {title}
+                  </div>
+                )}
+                {status}
+              </div>
+              {subtitle && (
+                <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {subtitle}
                 </div>
               )}
-              {status}
             </div>
-            {subtitle && (
-              <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {subtitle}
-              </div>
-            )}
-          </div>
-          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          )}
+          {actions && (
+            <div
+              className={hasHeaderContent
+                ? "flex max-w-[60%] flex-wrap items-center justify-end gap-2"
+                : "flex w-full flex-nowrap items-center justify-end gap-2 whitespace-nowrap"}
+            >
+              {actions}
+            </div>
+          )}
         </div>
       )}
       {hasTabs && (
