@@ -25,6 +25,11 @@ describe("BomWorkbench", () => {
     const root = container.firstElementChild as HTMLDivElement;
     expect(root).toHaveClass("flex", "flex-1", "min-h-0", "flex-col");
 
+    const threeColumnLayout = Array.from(container.querySelectorAll<HTMLDivElement>("div")).find(
+      (element) => element.style.gridTemplateColumns === "minmax(280px, 1fr) minmax(340px, 1fr) minmax(340px, 1fr)",
+    );
+    expect(threeColumnLayout).toBeDefined();
+
     const parentScrollRegion = Array.from(container.querySelectorAll<HTMLElement>("div")).find(
       (element) => element.classList.contains("overflow-y-auto"),
     );

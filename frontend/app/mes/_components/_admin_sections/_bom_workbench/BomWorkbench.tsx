@@ -394,7 +394,7 @@ export function BomWorkbench({
         className="grid min-h-0 flex-1 gap-3"
         style={{
           gridTemplateColumns: mode === "edit"
-            ? "minmax(280px, 0.78fr) minmax(340px, 1.1fr) minmax(340px, 1.1fr)"
+            ? "minmax(280px, 1fr) minmax(340px, 1fr) minmax(340px, 1fr)"
             : "minmax(280px, 0.78fr) minmax(0, 1.22fr)",
         }}
       >

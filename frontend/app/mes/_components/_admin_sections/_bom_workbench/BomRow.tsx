@@ -5,8 +5,13 @@ import { Trash2 } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
+import {
+  BOM_CURRENT_ROW_GRID_TEMPLATE,
+  BOM_ROW_SURFACE_CLASS_NAME,
+  BomRowTooltip,
+  bomRowSurfaceStyle,
+} from "./BomTablePrimitives";
 
 /**
  * BOM 그리드 한 행 — 자식 품목 정보 + 수량(인라인 편집) + 삭제.
@@ -61,29 +66,31 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
   const isDeleted = !!childItem?.deleted_at;
 
   return (
+    <BomRowTooltip itemName={childName}>
+      {({ nameRef, actionTooltipProps }) => (
     <div
-      className="grid items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-[var(--c-s4)]"
-      style={{
-        gridTemplateColumns: "52px minmax(0, 1fr) minmax(0, 0.82fr) 140px 40px",
-        borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-      }}
+      data-bom-row-surface
+      className={BOM_ROW_SURFACE_CLASS_NAME}
+      style={bomRowSurfaceStyle({ gridTemplateColumns: BOM_CURRENT_ROW_GRID_TEMPLATE })}
     >
       <BomBadge processTypeCode={childItem?.process_type_code} />
       <div className="min-w-0">
-        <TruncatedText
-          className="truncate text-sm font-semibold"
+        <span
+          ref={nameRef}
+          data-bom-row-label
+          className="block min-w-0 truncate text-sm font-semibold"
           style={{
             color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
             textDecoration: isDeleted ? "line-through" : "none",
           }}
         >
           {childName}
-        </TruncatedText>
+        </span>
       </div>
-      <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+      <span data-bom-row-code className="min-w-0 truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
         {mesCode || "—"}
-      </TruncatedText>
-      <div className="flex justify-end">
+      </span>
+      <div className="flex justify-center">
         {editing ? (
           <input
             ref={inputRef}
@@ -92,6 +99,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
             step="0.01"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            {...actionTooltipProps}
             onBlur={commit}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -113,6 +121,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
           <button
             type="button"
             onClick={() => setEditing(true)}
+            {...actionTooltipProps}
             className="rounded-md border px-3 py-1 text-sm font-semibold transition-colors hover:brightness-110"
             style={{
               background: LEGACY_COLORS.s1,
@@ -129,6 +138,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
         <button
           type="button"
           onClick={() => onRequestDelete(row, childName)}
+          {...actionTooltipProps}
           className="rounded-md p-1.5 transition-colors hover:brightness-110"
           style={{
             color: LEGACY_COLORS.red,
@@ -140,5 +150,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
         </button>
       </div>
     </div>
+      )}
+    </BomRowTooltip>
   );
 }

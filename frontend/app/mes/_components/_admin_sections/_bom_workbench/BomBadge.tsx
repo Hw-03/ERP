@@ -25,7 +25,7 @@ export function BomBadge({ processTypeCode, small = false }: Props) {
   if (!dept) {
     return (
       <span
-        className="inline-flex items-center rounded-md font-bold tracking-wider"
+        className="inline-flex items-center justify-self-center rounded-md font-bold tracking-wider"
         style={{
           fontSize,
           padding,
@@ -41,7 +41,7 @@ export function BomBadge({ processTypeCode, small = false }: Props) {
 
   return (
     <span
-      className="inline-flex items-center rounded-md font-bold tracking-wider"
+      className="inline-flex items-center justify-self-center rounded-md font-bold tracking-wider"
       style={{
         fontSize,
         padding,

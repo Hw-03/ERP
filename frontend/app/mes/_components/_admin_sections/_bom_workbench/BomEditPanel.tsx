@@ -4,7 +4,7 @@ import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { BomRow } from "./BomRow";
-import { BomTableHeader } from "./BomTablePrimitives";
+import { BOM_CURRENT_ROW_GRID_TEMPLATE, BomTableHeader } from "./BomTablePrimitives";
 
 /**
  * 우측 "현재 BOM 구성" 패널.
@@ -61,8 +61,7 @@ export function BomEditPanel({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <BomTableHeader
             variant="current"
-            gridTemplateColumns="52px minmax(0, 1fr) minmax(0, 0.82fr) 140px 40px"
-            background={LEGACY_COLORS.s1}
+            gridTemplateColumns={BOM_CURRENT_ROW_GRID_TEMPLATE}
           />
           {bomRows.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>

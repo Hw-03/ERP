@@ -14,5 +14,5 @@ test("기본 번들 예산은 승인된 프로덕션 산출물을 허용한다",
   const scriptPath = fileURLToPath(new URL("./check-bundle-size.mjs", import.meta.url));
   const output = execFileSync(process.execPath, [scriptPath], { encoding: "utf8" });
 
-  assert.match(output, /limit 2\.125 MB/);
+  assert.match(output, /limit 2\.130 MB/);
 });

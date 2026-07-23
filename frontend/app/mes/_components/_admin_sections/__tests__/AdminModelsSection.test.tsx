@@ -133,4 +133,45 @@ describe("AdminModelsSection", () => {
     });
     expect(name).toBeInTheDocument();
   });
+
+  it("renders models as selectable flat table rows with reorder handles and status cells", async () => {
+    context.productModels.push({ slot: 2, symbol: "B", model_name: null, is_reserved: false });
+    const { container, unmount } = render(
+      <DirtyGuardProvider>
+        <AdminModelsSection items={[]} allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    try {
+      await screen.findByDisplayValue("DX3000");
+
+      const grid = screen.getByRole("grid", { name: "모델 목록" });
+      expect(within(grid).getByRole("columnheader", { name: "정렬" })).toBeInTheDocument();
+      expect(within(grid).getByRole("columnheader", { name: "모델명" })).toBeInTheDocument();
+      expect(within(grid).getByRole("columnheader", { name: "모델 코드" })).toBeInTheDocument();
+      expect(within(grid).getByRole("columnheader", { name: "상태" })).toBeInTheDocument();
+
+      const activeRow = within(grid).getByRole("row", { name: /DX3000.*M-0001.*사용 중/ });
+      const idleRow = within(grid).getByRole("row", { name: /슬롯 2.*M-0002.*비활성/ });
+
+      expect(activeRow).toHaveAttribute("aria-selected", "true");
+      expect(idleRow).toHaveAttribute("aria-selected", "false");
+      expect(activeRow).toHaveAttribute("draggable", "true");
+      expect(activeRow).toHaveClass("grid", "grid-cols-[32px_minmax(0,1fr)_84px_76px]");
+      expect(within(activeRow).getByLabelText("드래그 핸들")).toBeInTheDocument();
+      expect(within(activeRow).getAllByRole("gridcell")).toHaveLength(4);
+      expect(activeRow.querySelector(".h-10.w-10.rounded-full")).not.toBeInTheDocument();
+
+      fireEvent.click(idleRow);
+      await waitFor(() => {
+        expect(within(grid).getByRole("row", { name: /슬롯 2.*M-0002.*비활성/ })).toHaveAttribute(
+          "aria-selected",
+          "true",
+        );
+      });
+    } finally {
+      unmount();
+      context.productModels.splice(1, 1);
+    }
+  });
 });

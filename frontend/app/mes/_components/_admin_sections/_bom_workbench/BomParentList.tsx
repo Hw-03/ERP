@@ -131,7 +131,6 @@ export function BomParentList({
         <BomTableHeader
           variant={mode === "edit" ? "parent" : "whereused"}
           gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
-          background={LEGACY_COLORS.s1}
         />
         {list.length === 0 ? (
           <EmptyState variant="no-search-result" compact />
@@ -147,8 +146,7 @@ export function BomParentList({
                 gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
                 onClick={() => onSelect(i.item_id)}
                 pressed={isSelected}
-                borderBottom
-                background={isSelected ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)` : undefined}
+                background={isSelected ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` : undefined}
                 trailing={mode === "edit" ? (
                   <span
                     className="inline-flex justify-self-end items-center rounded px-1.5 py-0.5 text-[12px] font-bold"

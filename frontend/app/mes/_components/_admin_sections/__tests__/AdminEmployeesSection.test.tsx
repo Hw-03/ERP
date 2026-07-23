@@ -74,6 +74,65 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 describe("AdminEmployeesSection", () => {
+  it("직원 목록을 이름·부서 직급·상태 열의 평평한 표 행으로 표시한다", () => {
+    const inactiveEmployee = {
+      ...defaultEmployee,
+      employee_id: "emp-2",
+      employee_code: "E02",
+      name: "김비활성",
+      is_active: false,
+    };
+    context.employees = [defaultEmployee, inactiveEmployee];
+    context.selectedEmployee = defaultEmployee;
+    context.editForm = {
+      name: defaultEmployee.name,
+      role: defaultEmployee.role,
+      phone: "",
+      department: defaultEmployee.department,
+      level: defaultEmployee.level,
+      warehouse_role: defaultEmployee.warehouse_role,
+      department_role: defaultEmployee.department_role,
+      hidden_sidebar_tabs: [],
+      assigned_model_slots: [],
+    };
+
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminEmployeesSection />
+      </DirtyGuardProvider>,
+    );
+
+    const header = container.querySelector("[data-admin-list-header='employees']");
+    expect(header).toHaveTextContent("이름");
+    expect(header).toHaveTextContent("부서·직급");
+    expect(header).toHaveTextContent("상태");
+    expect(container.querySelector("[data-admin-employee-row='emp-1']")).toHaveClass("grid", "border-b");
+    expect(container.querySelector("[data-admin-employee-row='emp-1']")).not.toHaveClass("rounded-[10px]");
+    expect(container.querySelector("[data-admin-employee-row='emp-1']")).toHaveAttribute("aria-selected", "true");
+    expect(container.querySelectorAll("svg[data-lucide='grip-vertical']")).toHaveLength(0);
+    expect(container.querySelector("[data-admin-employee-row='emp-1']")).toHaveTextContent("활성");
+    expect(container.querySelector("[data-admin-employee-row='emp-2']")).toHaveTextContent("비활성");
+  });
+
+  it("직원 표 행은 세 gridcell과 키보드 선택을 제공한다", () => {
+    const { container } = render(
+      <DirtyGuardProvider>
+        <AdminEmployeesSection />
+      </DirtyGuardProvider>,
+    );
+    const row = container.querySelector("[data-admin-employee-row='emp-1']");
+
+    expect(row).toHaveAttribute("role", "row");
+    expect(container.querySelector("button[data-admin-employee-row='emp-1']")).toBeNull();
+    expect(row?.querySelectorAll("[role='gridcell']")).toHaveLength(3);
+    fireEvent.keyDown(row!, { key: "Enter" });
+
+    expect(setSelectedEmployee).toHaveBeenCalledWith(defaultEmployee);
+    setSelectedEmployee.mockClear();
+    fireEvent.click(row!);
+    expect(setSelectedEmployee).toHaveBeenCalledWith(defaultEmployee);
+  });
+
   it("passes the available detail height into the employee workspace", () => {
     const { container } = render(
       <DirtyGuardProvider>
@@ -147,7 +206,7 @@ describe("AdminEmployeesSection", () => {
       </DirtyGuardProvider>,
     );
 
-    expect(screen.getByRole("button", { name: /영업 직원/ })).toHaveTextContent("영업 · 과장");
+    expect(screen.getByRole("row", { name: /영업 직원/ })).toHaveTextContent("영업 · 과장");
   });
 
   it("선택 직원의 부서와 직급 편집은 저장 전 목록과 헤더에 즉시 반영하고 저장하지 않는다", () => {
@@ -210,7 +269,7 @@ describe("AdminEmployeesSection", () => {
         <AdminEmployeesSection />
       </DirtyGuardProvider>,
     );
-    const employeeRow = screen.getByRole("button", { name: /김건호/ });
+    const employeeRow = screen.getByRole("row", { name: /김건호/ });
 
     expect(employeeRow.querySelector("span.h-2.w-2")).toHaveStyle({ background: "#c026d3" });
 

@@ -4,6 +4,7 @@ import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { BomChildAddBox } from "../BomChildAddBox";
 import { BomEditPanel } from "../BomEditPanel";
 import { BomParentList } from "../BomParentList";
+import { BOM_CURRENT_ROW_GRID_TEMPLATE, BOM_ROW_SURFACE_CLASS_NAME } from "../BomTablePrimitives";
 
 function item(overrides: Partial<Item> = {}): Item {
   return {
@@ -64,6 +65,7 @@ function expectStickyTableHeader(container: HTMLElement, gridTemplateColumns: st
   );
   expect(header).toHaveClass("sticky", "top-0");
   expect(header?.style.gridTemplateColumns).toBe(gridTemplateColumns);
+  expect(header).toHaveStyle({ background: "var(--c-popup-bg)" });
   expect(container.querySelector("[role='rowgroup'], [role='columnheader']")).toBeNull();
 }
 
@@ -71,6 +73,16 @@ function findTableRow(container: HTMLElement, gridTemplateColumns: string) {
   return [...container.querySelectorAll<HTMLElement>("button")].find(
     (element) => element.style.gridTemplateColumns === gridTemplateColumns,
   );
+}
+
+function setNameOverflow(element: HTMLElement, overflow: boolean) {
+  Object.defineProperties(element, {
+    clientWidth: { configurable: true, value: 120 },
+    scrollWidth: { configurable: true, value: overflow ? 240 : 120 },
+    clientHeight: { configurable: true, value: 20 },
+    scrollHeight: { configurable: true, value: 20 },
+  });
+  fireEvent(window, new Event("resize"));
 }
 
 describe("BOM 편집 표형 목록", () => {
@@ -88,14 +100,46 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const gridTemplateColumns = "52px minmax(0, 1fr) minmax(0, 0.82fr) 72px";
+    const gridTemplateColumns = "52px minmax(0, 1fr) 78px 44px";
     expectStickyTableHeader(container, gridTemplateColumns);
     const row = findTableRow(container, gridTemplateColumns);
     expect(row?.style.gridTemplateColumns).toBe(gridTemplateColumns);
+    const header = [...container.querySelectorAll<HTMLElement>("div")].find(
+      (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === gridTemplateColumns,
+    );
+    expect(header?.children.item(0)).toHaveClass("justify-self-center");
+    expect(header?.children.item(3)).toHaveClass("justify-self-end");
+    expect(row?.children.item(0)).toHaveClass("justify-self-center");
     expect(row?.children.item(3)).toHaveClass("justify-self-end");
-    expect(row?.querySelector("[data-bom-row-label]")).toHaveAttribute("title", "아주 긴 이름의 BOM 품목입니다");
-    expect(row?.querySelector("[title='BOM-001']")).toBeInTheDocument();
+    expect(row).toHaveClass("no-btn-inset", "px-3", "py-2", "hover:bg-[var(--c-s4)]");
+    expect(row).toHaveClass("border-b");
+    expect(row).not.toHaveClass("border-l-[3px]", "border-l-transparent");
+    expect(row?.style.borderBottom).toBe("1px solid var(--c-border)");
+    expect(row?.querySelector('[data-lucide="grip-vertical"]')).toBeNull();
+    expect(row?.querySelector("[data-bom-row-label]")).not.toHaveAttribute("title");
+    expect(row?.querySelector("[data-bom-row-code]")).not.toHaveAttribute("title");
     expect(row?.querySelector("button, [role='button'], [tabindex]")).toBeNull();
+  });
+
+  it("선택한 부모 행은 직원 목록처럼 파란 옅은 채움으로 구분하고 행 테두리를 두지 않는다", () => {
+    const { container } = render(
+      <BomParentList
+        dept="A"
+        items={[item()]}
+        allBomRows={[detailRow]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId="item-1"
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    const selectedRow = findTableRow(container, "52px minmax(0, 1fr) 78px 44px")!;
+    expect(selectedRow).toHaveClass("border-b");
+    expect(selectedRow).not.toHaveClass("border-l-[3px]", "border-l-[var(--c-blue)]");
+    expect(selectedRow.style.background).toBe("color-mix(in srgb, var(--c-blue) 14%, transparent)");
+    expect(selectedRow.style.borderBottom).toBe("1px solid var(--c-border)");
   });
 
   it("하위 품목 추가 목록을 공정·품목명·품목 코드·추가 열의 sticky 표로 표시한다", () => {
@@ -108,13 +152,19 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const gridTemplateColumns = "52px minmax(0, 1fr) minmax(0, 0.82fr) 72px";
+    const gridTemplateColumns = "52px minmax(0, 1fr) 78px 44px";
     expectStickyTableHeader(container, gridTemplateColumns);
     const row = findTableRow(container, gridTemplateColumns);
     expect(row?.style.gridTemplateColumns).toBe(gridTemplateColumns);
     expect(row?.children.item(3)).toHaveClass("justify-self-end");
-    expect(row?.querySelector("[data-bom-row-label]")).toHaveAttribute("title", "추가할 품목");
-    expect(row?.querySelector("[title='CHILD-001']")).toBeInTheDocument();
+    const candidateHeader = [...container.querySelectorAll<HTMLElement>("div")].find(
+      (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === gridTemplateColumns,
+    );
+    expect(candidateHeader?.children.item(3)).toHaveClass("justify-self-end");
+    expect(row).toHaveClass("px-3", "py-2", "hover:bg-[var(--c-s4)]");
+    expect(row?.querySelector("[data-bom-row-label]")).not.toHaveAttribute("title");
+    expect(row?.querySelector("[data-bom-row-code]")).not.toHaveAttribute("title");
+    expect(row).not.toHaveStyle({ background: "transparent" });
   });
 
   it("현재 구성 목록을 공정·품목명·품목 코드·수량·삭제 열의 sticky 표로 표시한다", () => {
@@ -128,8 +178,142 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    expectStickyTableHeader(container, "52px minmax(0, 1fr) minmax(0, 0.82fr) 140px 40px");
+    expect(BOM_CURRENT_ROW_GRID_TEMPLATE).toBe("52px minmax(0, 1fr) 78px 72px 28px");
+    expectStickyTableHeader(container, BOM_CURRENT_ROW_GRID_TEMPLATE);
     expect(screen.getByText("CHILD-001")).toHaveClass("truncate");
+    expect(screen.getByText("등록된 품목")).not.toHaveAttribute("title");
+    const currentSurface = screen.getByText("등록된 품목").closest("[data-bom-row-surface]")!;
+    expect(currentSurface).toHaveClass(...BOM_ROW_SURFACE_CLASS_NAME.split(" "));
+    expect(currentSurface.style.gridTemplateColumns).toBe(BOM_CURRENT_ROW_GRID_TEMPLATE);
+    expect(currentSurface.style.borderBottom).toBe("1px solid var(--c-border)");
+    expect(currentSurface.children.item(3)).toHaveClass("justify-center");
+    const currentHeader = [...container.querySelectorAll<HTMLElement>("div")].find(
+      (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === BOM_CURRENT_ROW_GRID_TEMPLATE,
+    );
+    expect(currentHeader?.children.item(3)).toHaveClass("justify-self-center");
+  });
+
+  it("does not show the row tooltip while a current-row action is hovered or focused", () => {
+    const { container } = render(
+      <BomEditPanel
+        parent={item()}
+        bomRows={[bomRow]}
+        items={[item(), item({ item_id: "item-2", item_name: "current child with a very long name" })]}
+        onSaveQty={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const surface = container.querySelector("[data-bom-row-surface]")!;
+    setNameOverflow(surface.querySelector("[data-bom-row-label]")!, true);
+    const quantityAction = surface.querySelector("button[title]")!;
+    fireEvent.mouseEnter(surface.parentElement!);
+    fireEvent.mouseEnter(quantityAction);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    fireEvent.focus(quantityAction);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(quantityAction).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("does not describe a current-row action when focus begins on the action", () => {
+    const { container } = render(
+      <BomEditPanel
+        parent={item()}
+        bomRows={[bomRow]}
+        items={[item(), item({ item_id: "item-2", item_name: "current child with a very long name" })]}
+        onSaveQty={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const surface = container.querySelector("[data-bom-row-surface]")!;
+    setNameOverflow(surface.querySelector("[data-bom-row-label]")!, true);
+    const quantityAction = surface.querySelector("button[title]")!;
+    fireEvent.focus(quantityAction);
+
+    expect(quantityAction).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("restores the row tooltip after a quantity input loses focus", async () => {
+    const { container } = render(
+      <BomEditPanel
+        parent={item()}
+        bomRows={[bomRow]}
+        items={[item(), item({ item_id: "item-2", item_name: "current child with a very long name" })]}
+        onSaveQty={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const surface = container.querySelector("[data-bom-row-surface]")!;
+    setNameOverflow(surface.querySelector("[data-bom-row-label]")!, true);
+    const quantityAction = surface.querySelector("button[title]")!;
+    fireEvent.focus(quantityAction);
+    fireEvent.click(quantityAction);
+    const quantityInput = screen.getByRole("spinbutton");
+    fireEvent.focus(quantityInput);
+    fireEvent.blur(quantityInput);
+    fireEvent.mouseEnter(surface.parentElement!);
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("current child with a very long name");
+  });
+
+  it("shows the full item name when a truncated current row is hovered", async () => {
+    const { container } = render(
+      <BomEditPanel
+        parent={item()}
+        bomRows={[bomRow]}
+        items={[item(), item({ item_id: "item-2", item_name: "current child with a very long name" })]}
+        onSaveQty={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const surface = container.querySelector("[data-bom-row-surface]")!;
+    setNameOverflow(surface.querySelector("[data-bom-row-label]")!, true);
+    fireEvent.mouseEnter(surface.parentElement!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("current child with a very long name");
+  });
+
+  it("shows the full item name when a truncated parent row is hovered", async () => {
+    const { container } = render(
+      <BomParentList
+        dept="A"
+        items={[item()]}
+        allBomRows={[detailRow]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    const row = findTableRow(container, "52px minmax(0, 1fr) 78px 44px")!;
+    setNameOverflow(row.querySelector("[data-bom-row-label]")!, true);
+    fireEvent.mouseEnter(row.parentElement!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("아주 긴 이름의 BOM 품목입니다");
+  });
+
+  it("does not show a tooltip when the parent row name fits", () => {
+    const { container } = render(
+      <BomParentList
+        dept="A"
+        items={[item({ item_name: "short item" })]}
+        allBomRows={[detailRow]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    const row = findTableRow(container, "52px minmax(0, 1fr) 78px 44px")!;
+    setNameOverflow(row.querySelector("[data-bom-row-label]")!, false);
+    fireEvent.mouseEnter(row.parentElement!);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("추가 후보의 중복 비활성화와 Escape 수량 입력 취소를 유지한다", () => {

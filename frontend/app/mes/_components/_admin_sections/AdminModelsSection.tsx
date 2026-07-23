@@ -207,6 +207,21 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             </Button>
           }
           items={productModels}
+          listRole="grid"
+          listAriaLabel="모델 목록"
+          listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+          listHeader={
+            <div
+              role="row"
+              className="sticky top-0 z-10 grid grid-cols-[32px_minmax(0,1fr)_84px_76px] items-center border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
+              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+            >
+              <span role="columnheader" className="text-center">정렬</span>
+              <span role="columnheader">모델명</span>
+              <span role="columnheader" className="text-center">모델 코드</span>
+              <span role="columnheader" className="text-center">상태</span>
+            </div>
+          }
           emptyState={<EmptyState variant="no-data" compact title="등록된 모델이 없습니다." />}
           renderItem={(model) => {
             const active = selected?.slot === model.slot;
@@ -217,13 +232,30 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             return (
               <div
                 key={model.slot}
+                role="row"
+                aria-selected={active}
+                aria-label={`${model.model_name ?? `슬롯 ${model.slot}`} M-${String(model.slot).padStart(4, "0")} ${used ? "사용 중" : "비활성"}`}
+                tabIndex={0}
                 draggable
                 onDragStart={(e) => handleDragStart(e, model.slot)}
                 onDragOver={(e) => handleDragOver(e, model.slot)}
                 onDrop={(e) => handleDrop(e, model.slot)}
                 onDragEnd={handleDragEnd}
-                className="relative"
-                style={{ opacity: isDragging ? 0.4 : 1 }}
+                onClick={() => handleSelectModel(model.slot)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  handleSelectModel(model.slot);
+                }}
+                className="relative grid w-full grid-cols-[32px_minmax(0,1fr)_84px_76px] items-center border-b border-l-[3px] py-2 pl-2 pr-3 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+                style={{
+                  opacity: isDragging ? 0.4 : 1,
+                  background: active
+                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                    : undefined,
+                  borderBottomColor: LEGACY_COLORS.border,
+                  borderLeftColor: active ? LEGACY_COLORS.blue : "transparent",
+                }}
               >
                 {isDropTarget && (
                   <div
@@ -231,51 +263,30 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                     style={{ background: LEGACY_COLORS.blue }}
                   />
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleSelectModel(model.slot)}
-                  aria-pressed={active}
-                  className="flex w-full items-center gap-3 rounded-[12px] border px-3 py-2.5 text-left transition-colors duration-150 bg-[var(--c-s2)] hover:bg-[var(--c-s4)]"
-                  style={{
-                    background: active
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                      : undefined,
-                    borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                  }}
-                >
+                <div role="gridcell" className="flex justify-center">
                   <GripVertical
                     className="h-4 w-4 shrink-0 cursor-grab"
                     style={{ color: LEGACY_COLORS.muted2 }}
                     aria-label="드래그 핸들"
                   />
-                  {/* 기호 배지 */}
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-black"
-                    style={{
-                      background: used ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
-                      color: used ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-                    }}
-                  >
-                    {model.symbol ?? "?"}
-                  </div>
-                  {/* 텍스트 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-                      {model.model_name ?? `슬롯 ${model.slot}`}
-                    </div>
-                    <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      M-{String(model.slot).padStart(4, "0")}
-                    </div>
-                  </div>
-                  {/* 상태 배지 */}
-                  <div className="shrink-0">
-                    <StatusPill
-                      label={used ? "사용 중" : "비활성"}
-                      tone={used ? "success" : "neutral"}
-                      showDot
-                    />
-                  </div>
-                </button>
+                </div>
+                <div role="gridcell" className="min-w-0 truncate text-[14px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                  {model.model_name ?? `슬롯 ${model.slot}`}
+                </div>
+                <div
+                  role="gridcell"
+                  className="truncate text-center font-mono text-[12px] font-semibold tabular-nums"
+                  style={{ color: LEGACY_COLORS.muted }}
+                >
+                  M-{String(model.slot).padStart(4, "0")}
+                </div>
+                <div role="gridcell" className="flex justify-center">
+                  <StatusPill
+                    label={used ? "사용 중" : "비활성"}
+                    tone={used ? "success" : "neutral"}
+                    showDot
+                  />
+                </div>
               </div>
             );
           }}

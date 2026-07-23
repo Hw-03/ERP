@@ -185,7 +185,6 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
         <BomTableHeader
           variant="candidate"
           gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
-          background={LEGACY_COLORS.s2}
         />
         {candidates.length === 0 ? (
           <EmptyState variant="no-search-result" compact />
@@ -195,13 +194,13 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
             const expanded = expandedId === c.item_id;
             const busy = busyId === c.item_id;
             return (
-              <div key={c.item_id} style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+            <div key={c.item_id}>
                 <BomTableItemRow
                   item={c}
                   gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
                   disabled={already}
                   onClick={() => (expanded ? closeRow() : openRow(c.item_id))}
-                  background={expanded ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : "transparent"}
+                  background={expanded ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : undefined}
                   trailing={already ? (
                     <span
                       className="inline-flex justify-self-end items-center gap-1 text-[12px] font-semibold"

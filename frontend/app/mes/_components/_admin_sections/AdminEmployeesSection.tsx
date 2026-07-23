@@ -171,6 +171,21 @@ export function AdminEmployeesSection() {
                 triggerStyle={{ background: LEGACY_COLORS.s2 }}
               />
             }
+            listRole="grid"
+            listAriaLabel="직원 목록"
+            listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+            listHeader={
+              <div
+                data-admin-list-header="employees"
+                role="row"
+                className="sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+              >
+                <span role="columnheader">이름</span>
+                <span role="columnheader">부서·직급</span>
+                <span role="columnheader" className="text-center">상태</span>
+              </div>
+            }
             items={filteredEmployees}
             emptyState={
               <EmptyState
@@ -189,45 +204,55 @@ export function AdminEmployeesSection() {
                   : "";
               const deptColor = resolveDepartmentColor(departments, deptName);
               return (
-                <button
+                <div
                   key={employee.employee_id}
-                  type="button"
+                  role="row"
+                  data-admin-employee-row={employee.employee_id}
                   onClick={() => handleSelectEmployee(employee)}
-                  aria-pressed={active}
-                  className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left transition-colors duration-150 bg-[var(--c-s2)] hover:bg-[var(--c-s4)]"
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    handleSelectEmployee(employee);
+                  }}
+                  aria-selected={active}
+                  tabIndex={0}
+                  className="grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] items-center border-b px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
                   style={{
                     background: active
                       ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
                       : undefined,
-                    borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                    borderColor: LEGACY_COLORS.border,
                   }}
                 >
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: deptColor }}
-                  />
-                  <div className="min-w-0 flex-1">
+                  <div role="gridcell" className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: deptColor }}
+                    />
                     <div
-                      className="truncate text-[14px] font-bold"
+                      className="min-w-0 truncate text-[14px] font-bold"
                       style={{ color: LEGACY_COLORS.text }}
                     >
                       {employee.name}
                     </div>
-                    <div
-                      className="truncate text-[12px]"
-                      style={{ color: LEGACY_COLORS.muted2 }}
-                    >
-                      {deptName}
-                      {position ? ` · ${position}` : ""}
-                    </div>
                   </div>
+                  <div
+                    role="gridcell"
+                    className="truncate text-[12px]"
+                    style={{ color: LEGACY_COLORS.muted2 }}
+                  >
+                    {deptName}
+                    {position ? ` · ${position}` : ""}
+                  </div>
+                  <div role="gridcell" className="flex justify-center">
                   <StatusPill
                     label={employee.is_active ? "활성" : "비활성"}
                     tone={employee.is_active ? "success" : "neutral"}
                     showDot
                     maxWidth={70}
                   />
-                </button>
+                  </div>
+                </div>
               );
             }}
           />

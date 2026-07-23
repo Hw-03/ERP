@@ -210,6 +210,21 @@ export function AdminDepartmentsSection({
                 <FilterChip active={statusFilter === "inactive"} label="비활성" onClick={() => setStatusFilter("inactive")} size="sm" />
               </>
             }
+            listRole="grid"
+            listAriaLabel="부서 목록"
+            listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
+            listHeader={
+              <div
+                data-admin-list-header="departments"
+                role="row"
+                className="sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+              >
+                <span role="columnheader">부서명</span>
+                <span role="columnheader">코드·소속 직원</span>
+                <span role="columnheader" className="text-center">상태</span>
+              </div>
+            }
             items={filteredDepartments}
             emptyState={
               <EmptyState
@@ -223,34 +238,43 @@ export function AdminDepartmentsSection({
               const color = deptColor(dept);
               const empCount = empCountByDept.get(normalizeDepartment(dept.name)) ?? 0;
               return (
-                <button
+                <div
                   key={dept.id}
-                  type="button"
+                  role="row"
+                  data-admin-department-row={dept.id}
                   onClick={() => handleSelect(dept)}
-                  aria-pressed={active}
-                  className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-left transition-colors duration-150 bg-[var(--c-s2)] hover:bg-[var(--c-s4)]"
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    handleSelect(dept);
+                  }}
+                  aria-selected={active}
+                  tabIndex={0}
+                  className="grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] items-center border-b px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
                   style={{
                     background: active
                       ? `color-mix(in srgb, ${color} 14%, transparent)`
                       : undefined,
-                    borderColor: active ? color : LEGACY_COLORS.border,
+                    borderColor: LEGACY_COLORS.border,
                     opacity: dept.is_active ? 1 : 0.65,
                   }}
                 >
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ background: color }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  <div role="gridcell" className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: color }}
+                    />
+                    <div className="min-w-0 truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
                       {dept.name}
                     </div>
-                    <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      DPT-{String(dept.id).padStart(2, "0")} · {empCount}명
-                    </div>
                   </div>
-                  {!dept.is_active && <StatusPill label="비활성" tone="neutral" maxWidth={60} />}
-                </button>
+                  <div role="gridcell" className="truncate text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    DPT-{String(dept.id).padStart(2, "0")} · {empCount}명
+                  </div>
+                  <div role="gridcell" className="flex justify-center">
+                    <StatusPill label={dept.is_active ? "사용 중" : "비활성"} tone={dept.is_active ? "success" : "neutral"} showDot maxWidth={70} />
+                  </div>
+                </div>
               );
             }}
           />
