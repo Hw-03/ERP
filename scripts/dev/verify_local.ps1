@@ -55,7 +55,7 @@ function Get-ChangedFiles {
         $rest = $rest.Trim().Trim('"')
         if ($rest) { $paths.Add($rest) }
     }
-    return ,$paths.ToArray()
+    return $paths.ToArray()
 }
 
 function Get-Category {
@@ -104,7 +104,7 @@ function Get-Category {
 }
 
 function Resolve-Scope {
-    $files = Get-ChangedFiles
+    $files = @(Get-ChangedFiles)
     if ($files.Count -eq 0) {
         return @{ Scope = 'none'; Reason = 'no changes'; Files = @() }
     }
