@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     DepartmentEnum,
     Employee,
+    Inventory,
     InventoryLocation,
     Item,
     LocationStatusEnum,
@@ -123,7 +124,7 @@ def _bucket_available(
     department: Optional[str],
 ) -> Decimal:
     if bucket == "warehouse":
-        inv = inventory_svc.get_or_create_inventory(db, item_id)
+        inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
         # 가용 정의(warehouse - pending)는 stock_math 단일 소스를 따른다.
         return stock_math.figures_from_inventory(inv).warehouse_available
     if bucket == "production" and department:

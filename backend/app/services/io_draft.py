@@ -6,6 +6,7 @@ io_persist 의 _load_requester / _persist_batch / _batch_to_payload 를 재사�
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -15,6 +16,8 @@ from datetime import datetime
 from app.models import IoBatch
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
+    _bucket_available,
+    _d,
     validate_internal_use_operation,
     validate_internal_use_requester,
     validate_operation_sources,
@@ -25,6 +28,24 @@ from app.services.io_persist import (
     _load_requester,
     _persist_batch,
 )
+
+
+def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
+    """저장 내용은 보존하고 부족 수량만 현재 출발 위치 재고로 계산한다."""
+    payload = _batch_to_payload(batch)
+    for bundle in payload["bundles"]:
+        for line in bundle["lines"]:
+            if not line["included"] or line["from_bucket"] == "none":
+                line["shortage"] = Decimal("0")
+                continue
+            available = _bucket_available(
+                db,
+                item_id=line["item_id"],
+                bucket=line["from_bucket"],
+                department=line["from_department"],
+            )
+            line["shortage"] = max(Decimal("0"), _d(line["quantity"]) - available)
+    return payload
 
 
 def save_draft(db: Session, payload) -> dict:
@@ -96,7 +117,7 @@ def get_draft(
     if sub_type:
         query = query.filter(IoBatch.sub_type == sub_type)
     batch = query.order_by(IoBatch.updated_at.desc()).first()
-    return _batch_to_payload(batch) if batch else None
+    return _draft_to_current_stock_payload(db, batch) if batch else None
 
 
 def list_drafts(db: Session, *, requester_employee_id: uuid.UUID) -> list[dict]:
@@ -109,7 +130,7 @@ def list_drafts(db: Session, *, requester_employee_id: uuid.UUID) -> list[dict]:
         .order_by(IoBatch.updated_at.desc())
         .all()
     )
-    return [_batch_to_payload(row) for row in rows]
+    return [_draft_to_current_stock_payload(db, row) for row in rows]
 
 
 def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uuid.UUID) -> None:

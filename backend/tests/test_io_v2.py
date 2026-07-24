@@ -1257,6 +1257,126 @@ def _put_receive_draft(client, requester, bundles, batch_id=None):
     return client.put("/api/io/draft", json=body)
 
 
+def test_io_draft_reads_recalculate_shortage_from_current_inventory(
+    client, db_session, make_item, make_location, make_bom
+):
+    """작성 중 응답은 저장 당시 부족값이 아니라 현재 출발 위치 재고를 사용한다."""
+    parent = make_item(name="Draft live stock parent", process_type_code="AF")
+    component = make_item(name="Draft live stock component", process_type_code="TR")
+    make_bom(parent.item_id, component.item_id, Decimal("1"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(parent.item_id),
+                    "quantity": "2",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    bundles = preview.json()["bundles"]
+    preview_component = next(
+        line
+        for bundle in bundles
+        for line in bundle["lines"]
+        if line["item_id"] == str(component.item_id)
+    )
+    assert preview_component["from_department"] == DepartmentEnum.TUBE.value
+    assert preview_component["shortage"] == 2
+
+    saved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": bundles,
+        },
+    )
+    assert saved.status_code == 200, saved.json()
+    batch_id = saved.json()["batch_id"]
+    saved_line_id = preview_component["line_id"]
+    saved_updated_at = (
+        db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one().updated_at
+    )
+
+    location = make_location(
+        component.item_id,
+        department=DepartmentEnum.TUBE,
+        quantity=Decimal("2"),
+    )
+    component_inventory = (
+        db_session.query(Inventory).filter(Inventory.item_id == component.item_id).one()
+    )
+    component_inventory.quantity = Decimal("2")
+    db_session.commit()
+
+    drafts = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}"
+    )
+    assert drafts.status_code == 200, drafts.json()
+    listed_line = next(
+        line
+        for draft in drafts.json()
+        if draft["batch_id"] == batch_id
+        for bundle in draft["bundles"]
+        for line in bundle["lines"]
+        if line["line_id"] == saved_line_id
+    )
+    assert listed_line["shortage"] == 0
+
+    draft = client.get(
+        "/api/io/draft",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+        },
+    )
+    assert draft.status_code == 200, draft.json()
+    fetched_line = next(
+        line
+        for bundle in draft.json()["bundles"]
+        for line in bundle["lines"]
+        if line["line_id"] == saved_line_id
+    )
+    assert fetched_line["shortage"] == 0
+
+    db_session.expire_all()
+    persisted_line = db_session.query(IoLine).filter(IoLine.line_id == saved_line_id).one()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one()
+    assert persisted_line.shortage == Decimal("2")
+    assert persisted_batch.updated_at == saved_updated_at
+
+    location.quantity = Decimal("0")
+    component_inventory.quantity = Decimal("0")
+    db_session.commit()
+    depleted = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}"
+    )
+    assert depleted.status_code == 200, depleted.json()
+    depleted_line = next(
+        line
+        for draft_row in depleted.json()
+        if draft_row["batch_id"] == batch_id
+        for bundle in draft_row["bundles"]
+        for line in bundle["lines"]
+        if line["line_id"] == saved_line_id
+    )
+    assert depleted_line["shortage"] == 2
+
+
 def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
     """batch_id 없이 저장하면 같은 (work_type, sub_type)라도 새 슬롯이 누적된다."""
     item_a = make_item(name="Draft A", warehouse_qty=Decimal("0"))
