@@ -43,6 +43,10 @@ export const queryKeys = {
     requests: (params?: { status?: string }) =>
       ["shipping", "requests", params ?? {}] as const,
   },
+  assemblyChecklists: {
+    all: ["assemblyChecklists"] as const,
+    list: () => ["assemblyChecklists", "list"] as const,
+  },
   weekly: {
     all: ["weekly"] as const,
     report: (weekStart: string, weekEnd: string) =>

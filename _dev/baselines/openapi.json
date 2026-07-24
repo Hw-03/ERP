@@ -270,6 +270,161 @@
         "title": "AdminPinVerifyRequest",
         "type": "object"
       },
+      "AssemblyChecklistCreate": {
+        "properties": {
+          "model_slot": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Model Slot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_slot"
+        ],
+        "title": "AssemblyChecklistCreate",
+        "type": "object"
+      },
+      "AssemblyChecklistItemCreate": {
+        "properties": {
+          "content": {
+            "maxLength": 2000,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "AssemblyChecklistItemCreate",
+        "type": "object"
+      },
+      "AssemblyChecklistItemReorder": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "title": "AssemblyChecklistItemReorder",
+        "type": "object"
+      },
+      "AssemblyChecklistItemResponse": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "content",
+          "sort_order"
+        ],
+        "title": "AssemblyChecklistItemResponse",
+        "type": "object"
+      },
+      "AssemblyChecklistResponse": {
+        "properties": {
+          "checklist_id": {
+            "format": "uuid",
+            "title": "Checklist Id",
+            "type": "string"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_slot": {
+            "title": "Model Slot",
+            "type": "integer"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/AssemblyChecklistSectionResponse"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "checklist_id",
+          "model_slot",
+          "model_name",
+          "sections"
+        ],
+        "title": "AssemblyChecklistResponse",
+        "type": "object"
+      },
+      "AssemblyChecklistSectionCreate": {
+        "properties": {
+          "title": {
+            "maxLength": 80,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "AssemblyChecklistSectionCreate",
+        "type": "object"
+      },
+      "AssemblyChecklistSectionResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AssemblyChecklistItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "section_id",
+          "sort_order",
+          "items"
+        ],
+        "title": "AssemblyChecklistSectionResponse",
+        "type": "object"
+      },
       "AuditCsvFile": {
         "properties": {
           "file_name": {
@@ -10505,6 +10660,277 @@
         "summary": "App Session",
         "tags": [
           "System"
+        ]
+      }
+    },
+    "/api/assembly-checklists": {
+      "get": {
+        "description": "List only MES models that have been added as mobile checklist templates.",
+        "operationId": "list_assembly_checklists_api_assembly_checklists_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                  },
+                  "title": "Response List Assembly Checklists Api Assembly Checklists Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "조립 체크리스트 목록",
+        "tags": [
+          "Assembly Checklists"
+        ]
+      },
+      "post": {
+        "description": "Attach one template to a non-reserved MES model without creating a model.",
+        "operationId": "create_assembly_checklist_api_assembly_checklists_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssemblyChecklistCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "기존 MES 모델에 체크리스트 추가",
+        "tags": [
+          "Assembly Checklists"
+        ]
+      }
+    },
+    "/api/assembly-checklists/items/{item_id}": {
+      "delete": {
+        "description": "Delete one item and keep the remaining section order contiguous.",
+        "operationId": "delete_assembly_checklist_item_api_assembly_checklists_items__item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "체크리스트 항목 삭제",
+        "tags": [
+          "Assembly Checklists"
+        ]
+      }
+    },
+    "/api/assembly-checklists/sections/{section_id}/items": {
+      "post": {
+        "description": "Append one non-empty instruction to the selected checklist section.",
+        "operationId": "create_assembly_checklist_item_api_assembly_checklists_sections__section_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssemblyChecklistItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "체크리스트 항목 추가",
+        "tags": [
+          "Assembly Checklists"
+        ]
+      }
+    },
+    "/api/assembly-checklists/sections/{section_id}/items/reorder": {
+      "put": {
+        "description": "Persist an exact same-section item permutation; cross-section IDs are rejected.",
+        "operationId": "reorder_assembly_checklist_items_api_assembly_checklists_sections__section_id__items_reorder_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssemblyChecklistItemReorder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "박스 안 체크리스트 항목 순서 저장",
+        "tags": [
+          "Assembly Checklists"
+        ]
+      }
+    },
+    "/api/assembly-checklists/{model_slot}/sections": {
+      "post": {
+        "description": "Add one non-empty named section to an existing checklist.",
+        "operationId": "create_assembly_checklist_section_api_assembly_checklists__model_slot__sections_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_slot",
+            "required": true,
+            "schema": {
+              "title": "Model Slot",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssemblyChecklistSectionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "체크리스트 박스 추가",
+        "tags": [
+          "Assembly Checklists"
         ]
       }
     },

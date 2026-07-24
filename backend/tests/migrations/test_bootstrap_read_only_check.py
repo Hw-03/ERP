@@ -16,7 +16,7 @@ from bootstrap.schema import SchemaCheckResult, SchemaState, ensure_schema
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-HEAD_REVISION = "20260720_0003"
+HEAD_REVISION = "20260724_0004"
 
 
 def _upgrade_head(path: Path) -> None:

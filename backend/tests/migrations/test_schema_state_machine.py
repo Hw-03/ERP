@@ -32,7 +32,7 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260720_0003"
+HEAD_REVISION = "20260724_0004"
 
 
 def test_schema_state_exposes_explicit_legacy_onboarding_state():
@@ -594,7 +594,7 @@ def test_registered_legacy_schema_rejects_stored_fingerprint_tampering(
     )
 
 
-def test_registered_legacy_schema_rejects_known_profile_id_swap(
+def test_registered_legacy_schema_keeps_known_profile_label_after_upgrade(
     tmp_path: Path,
     head_database: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -627,16 +627,14 @@ def test_registered_legacy_schema_rejects_known_profile_id_swap(
                 (other.profile_id,),
             )
         check = check_schema(engine=engine)
-        with pytest.raises(SchemaMismatchError, match="does not match approved baseline"):
-            ensure_schema(engine=engine)
+        result = ensure_schema(engine=engine)
     finally:
         engine.dispose()
 
-    assert check.ready is False
-    assert check.differences == (
-        "schema state profile does not match approved baseline: "
-        f"profile={other.profile_id} revision={HEAD_REVISION}",
-    )
+    assert check.ready is True
+    assert check.differences == ()
+    assert result.profile_id == other.profile_id
+    assert result.changed is False
 
 
 def test_current_sqlite_revision_without_schema_state_is_not_ready(

@@ -36,6 +36,13 @@ VERSION_TABLE = "alembic_version"
 SCHEMA_STATE_TABLE = "alembic_schema_state"
 LEGACY_PROFILE_REVISION = "20260720_0003"
 LEGACY_PROFILE_STAMP_REVISION = "20260720_0002"
+ASSEMBLY_CHECKLIST_TABLES = frozenset(
+    {
+        "assembly_checklists",
+        "assembly_checklist_sections",
+        "assembly_checklist_items",
+    }
+)
 SCHEMA_STATE_METADATA = sa.MetaData()
 SCHEMA_STATE = sa.Table(
     SCHEMA_STATE_TABLE,
@@ -555,6 +562,19 @@ def validate_unversioned_data(connection: Connection) -> None:
         )
 
 
+def _is_pre_assembly_checklist_schema(
+    tables: set[str],
+    differences: tuple[str, ...],
+) -> bool:
+    """Recognize the exact pre-checklist schema for safe Alembic onboarding."""
+
+    missing_tables = set(Base.metadata.tables) - tables
+    return (
+        missing_tables == ASSEMBLY_CHECKLIST_TABLES
+        and all("assembly_checklist" in str(difference) for difference in differences)
+    )
+
+
 def inspect_schema(connection: Connection) -> SchemaInspection:
     """Classify a database without changing schema or data."""
     head, known_revisions = _revision_contract(connection)
@@ -613,6 +633,13 @@ def inspect_schema(connection: Connection) -> SchemaInspection:
 
     differences = schema_differences(connection)
     if differences:
+        if _is_pre_assembly_checklist_schema(tables, differences):
+            validate_unversioned_data(connection)
+            return SchemaInspection(
+                SchemaState.UNVERSIONED_CURRENT,
+                profile_id="canonical",
+                schema_fingerprint=_sqlite_schema_fingerprint(connection),
+            )
         profile = legacy_profiles.find_sqlite_legacy_profile(connection)
         if profile is not None:
             return SchemaInspection(

@@ -184,7 +184,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260720_0003"
+            ) == "20260724_0004"
             connection.execute(
                 sa.text(
                     "INSERT INTO system_settings (setting_key, setting_value) "

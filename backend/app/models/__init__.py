@@ -76,6 +76,11 @@ from app.models.warehouse import (
     WarehouseSpecialZoneAudit,
 )
 from app.models.employee_item_order import EmployeeItemOrder
+from app.models.assembly_checklist import (
+    AssemblyChecklist,
+    AssemblyChecklistItem,
+    AssemblyChecklistSection,
+)
 
 __all__ = [
     # Base / 공통
@@ -141,4 +146,8 @@ __all__ = [
     "BoxSizeEnum",
     # employee item order
     "EmployeeItemOrder",
+    # assembly checklists
+    "AssemblyChecklist",
+    "AssemblyChecklistSection",
+    "AssemblyChecklistItem",
 ]
