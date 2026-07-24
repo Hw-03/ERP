@@ -1,4 +1,5 @@
 import type { Item } from "@/lib/api";
+import { matchesSearchText } from "@/lib/searchText";
 
 // 품목 검색 공용 헬퍼.
 // 김건호 피드백 5·6 반영:
@@ -7,16 +8,7 @@ import type { Item } from "@/lib/api";
 //  6) 정밀도 — 검색 대상 필드를 item_name·mes_code 두 가지로 좁힌다.
 //     (legacy_part·location·supplier 는 무관 품목 혼입을 유발해 제외.)
 
-/** 소문자화 + 모든 공백 제거. */
-function normalize(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, "");
-}
-
-/** item_name·mes_code 만 합쳐 무공백·소문자 비교한다. keyword 는 이미 소문자/trim 되어 있어도 무방(멱등). */
+/** item_name·mes_code만 대상으로 공백·하이픈·점·슬래시를 무시해 비교한다. */
 export function matchesItemSearch(item: Item, keyword: string): boolean {
-  if (!keyword) return true;
-  const needle = normalize(keyword);
-  if (!needle) return true;
-  const haystack = normalize([item.item_name, item.mes_code ?? ""].join(" "));
-  return haystack.includes(needle);
+  return matchesSearchText([item.item_name, item.mes_code ?? ""].join(" "), keyword);
 }

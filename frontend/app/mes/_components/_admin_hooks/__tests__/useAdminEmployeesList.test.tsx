@@ -60,4 +60,13 @@ describe("useAdminEmployeesList", () => {
     expect(result.current.visibleItems).toHaveLength(1);
     expect(result.current.visibleItems[0]!.name).toBe("A");
   });
+
+  it("search ignores hyphens and dots while preserving its existing fields and order", () => {
+    const employees = [E("1", "A.B", "Assembly-Team"), E("2", "Other", "Other")];
+    const { result } = renderHook(() => useAdminEmployeesList({ employees }));
+    act(() => {
+      result.current.setSearch("assemblyteam");
+    });
+    expect(result.current.visibleItems.map((employee) => employee.name)).toEqual(["A.B"]);
+  });
 });

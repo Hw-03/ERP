@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { Item, ProductModel, TransactionLog, TransactionType } from "@/lib/api";
+import { matchesSearchText } from "@/lib/searchText";
 
 export interface HistoryFilters {
   date: string;
@@ -113,11 +114,7 @@ export function useHistoryDerivations(
       if (filters.model !== "ALL" && (itemModelMap.get(log.item_id) ?? "공용") !== filters.model)
         return false;
       if (start && parseUtc(log.created_at) < start) return false;
-      if (filters.search.trim()) {
-        const k = filters.search.trim().toLowerCase();
-        const hay = `${log.item_name} ${log.mes_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
-        if (!hay.includes(k)) return false;
-      }
+      if (!matchesSearchText(`${log.item_name} ${log.mes_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`, filters.search)) return false;
       return true;
     });
   }, [logs, filters, itemModelMap]);

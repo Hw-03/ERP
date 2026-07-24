@@ -10,6 +10,7 @@ import { FloorStage, FrontStage } from "../../_warehouse_map_sections/WarehouseS
 import { WarehouseJariPanel } from "../../_warehouse_map_sections/WarehouseJariPanel";
 import { InlineSearch } from "../primitives";
 import { TYPO } from "../tokens";
+import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 
 interface CellHit {
   angleId: number;
@@ -121,15 +122,14 @@ export function MobileWarehouseMapScreen({
   const curAngle = angles.find((a) => a.id === curAngleId) ?? null;
 
   const searchResults = useMemo<CellHit[]>(() => {
-    const q = search.trim().toLowerCase();
-    if (!q || !map) return [];
+    if (!normalizeSearchText(search) || !map) return [];
     const byCell = new Map<
       string,
       { angleId: number; row: number; layer: number; names: Set<string> }
     >();
     for (const b of map.boxes) {
       for (const it of b.items) {
-        if (it.item_name.toLowerCase().includes(q) || (it.mes_code ?? "").toLowerCase().includes(q)) {
+        if (matchesSearchText(it.item_name, search) || matchesSearchText(it.mes_code, search)) {
           const k = cellKey(b.angle_id, b.row_no, b.layer_no);
           let e = byCell.get(k);
           if (!e) {

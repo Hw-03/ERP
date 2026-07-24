@@ -425,6 +425,22 @@ def test_summary_search_filter_applies(client, db_session, make_item):
     assert body["adjust_count"] == 0
 
 
+def test_summary_search_ignores_spaces_and_separators(client, db_session, make_item):
+    matching = make_item(name="Summary- Item/01", warehouse_qty=Decimal("0"))
+    other = make_item(name="Other summary item", warehouse_qty=Decimal("0"))
+    _seed_log(db_session, matching, TransactionTypeEnum.RECEIVE, Decimal("1"))
+    _seed_log(db_session, other, TransactionTypeEnum.RECEIVE, Decimal("1"))
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/summary",
+        params={"search": "summaryitem01"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 1
+
+
 def test_summary_transaction_types_filter(client, db_session, make_item):
     """transaction_types 쉼표 필터 — 지정된 타입만 카운트."""
     item = make_item(name="타입필터품", warehouse_qty=Decimal("0"))

@@ -8,6 +8,7 @@ import { BomSearchInput } from "./BomSearchInput";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
 import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
+import { matchesSearchText } from "@/lib/searchText";
 
 /**
  * 가운데 하위품목 추가 패널.
@@ -56,7 +57,6 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
   }, [expandedId]);
 
   const candidates = useMemo(() => {
-    const kw = search.trim().toLowerCase();
     return items
       .filter((i) => i.item_id !== parent.item_id)
       .filter((i) => {
@@ -68,8 +68,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
         return stageOf(i.process_type_code) === stageFilter;
       })
       .filter((i) => {
-        if (!kw) return true;
-        return `${i.item_name} ${i.mes_code ?? ""}`.toLowerCase().includes(kw);
+        return matchesSearchText(`${i.item_name} ${i.mes_code ?? ""}`, search);
       });
   }, [items, parent.item_id, search, deptFilter, stageFilter]);
 

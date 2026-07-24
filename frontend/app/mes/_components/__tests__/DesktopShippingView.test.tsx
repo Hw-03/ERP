@@ -1074,6 +1074,24 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
+  it("finds PF, BOM, and companion items without MES code delimiters", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+
+    fireEvent.change(await screen.findByTestId("shipping-pf-search"), { target: { value: "PF001" } });
+    fireEvent.click(await screen.findByTestId("shipping-pf-option-pf-1"));
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    fireEvent.change(await screen.findByTestId("shipping-bom-search-pa"), { target: { value: "RBR" } });
+    expect(await screen.findByTestId("shipping-bom-add-pa-bracket-1")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("shipping-companion-search"), { target: { value: "RBOX" } });
+    expect(await screen.findByTestId("shipping-companion-add-carton-1")).toBeInTheDocument();
+  });
+
     await openNewRequest(container);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));

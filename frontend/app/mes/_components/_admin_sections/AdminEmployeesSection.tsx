@@ -23,6 +23,7 @@ import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 import { EmployeeAddInline } from "./_employee_parts/EmployeeAddInline";
 import { EmployeeDetailGrid } from "./_employee_parts/EmployeeDetailGrid";
 import { normalizeEmployeePosition } from "./_employee_parts/employeeRoleLabels";
+import { matchesSearchText } from "@/lib/searchText";
 
 export function AdminEmployeesSection() {
   const ctx = useAdminEmployeesContext();
@@ -79,15 +80,13 @@ export function AdminEmployeesSection() {
   }, [employees]);
 
   const filteredEmployees = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return employees
       .filter((e) => deptFilter === "ALL" || normalizeDepartment(e.department) === deptFilter)
       .filter(
         (e) =>
-          !q ||
-          e.name.toLowerCase().includes(q) ||
-          normalizeDepartment(e.department).toLowerCase().includes(q) ||
-          (e.role ?? "").toLowerCase().includes(q),
+          matchesSearchText(e.name, search) ||
+          matchesSearchText(normalizeDepartment(e.department), search) ||
+          matchesSearchText(e.role, search),
       )
       .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [employees, search, deptFilter]);

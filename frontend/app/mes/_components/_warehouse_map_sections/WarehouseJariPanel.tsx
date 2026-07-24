@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { WarehouseAngle, WarehouseBox } from "@/lib/api/warehouse-map";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { JARI_CAPACITY, SIZE_LABEL, boxColor, cellKey, jariStacks, rowLabel, stackUnits } from "./helpers";
+import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 
 interface Props {
   angle: WarehouseAngle;
@@ -37,7 +38,7 @@ export function WarehouseJariPanel({
   const isPlainAngle = angle.angle_type === "angle";
   const stacks = jariStacks(cellIndex.get(cellKey(angle.id, row, layer)), angle.jaris_per_cell);
   const anyContent = stacks.some((s) => s.length > 0);
-  const lq = (matchQuery || "").toLowerCase();
+  const hasMatchQuery = Boolean(normalizeSearchText(matchQuery ?? ""));
 
   return (
     <div
@@ -161,7 +162,7 @@ export function WarehouseJariPanel({
 
                           {/* 품목명 — 주인공 */}
                           {box.items.map((it) => {
-                            const match = lq && it.item_name.toLowerCase().includes(lq);
+                            const match = hasMatchQuery && matchesSearchText(it.item_name, matchQuery ?? "");
                             return (
                               <div
                                 key={it.item_id}

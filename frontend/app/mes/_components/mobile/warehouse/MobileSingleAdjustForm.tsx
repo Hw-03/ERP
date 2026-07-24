@@ -9,6 +9,7 @@ import { formatQty } from "@/lib/mes/format";
 import type { IoBundle, IoLine, IoSubType, Item } from "@/lib/api";
 import { InlineSearch, IconButton, Stepper, PrimaryActionButton } from "../primitives";
 import { TYPO } from "../tokens";
+import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 
 /**
  * 단품 입출고(adjust_in/adjust_out) 전용 인라인 빠른 폼.
@@ -58,13 +59,12 @@ export function MobileSingleAdjustForm({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const results = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
+    if (!normalizeSearchText(search)) return [];
     return items
       .filter(
         (it) =>
-          it.item_name.toLowerCase().includes(q) ||
-          (it.mes_code ?? "").toLowerCase().includes(q),
+          matchesSearchText(it.item_name, search) ||
+          matchesSearchText(it.mes_code, search),
       )
       .slice(0, 20);
   }, [items, search]);

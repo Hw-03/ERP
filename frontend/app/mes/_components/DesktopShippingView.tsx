@@ -41,6 +41,7 @@ type RequestWizardStep = 1 | 2 | 3 | 4 | 5;
 type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM" };
 type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit: string };
 type PendingAction =
+import { matchesSearchText } from "@/lib/searchText";
   | "load"
   | "save"
   | "send"
@@ -152,12 +153,10 @@ function itemLabel(item: Item | undefined) {
   return `${item.mes_code ?? item.process_type_code ?? "-"} · ${item.item_name}`;
 }
 function filterItems(items: Item[], query: string) {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return items;
   return items.filter((item) =>
     [item.mes_code, item.process_type_code, item.item_name]
       .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(needle)),
+      .some((value) => matchesSearchText(String(value), query)),
   );
 }
 

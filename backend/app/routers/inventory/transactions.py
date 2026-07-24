@@ -40,6 +40,7 @@ from app.schemas import (
 from app.services import transaction_actions as transaction_actions_svc
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
+from app.utils.search import build_normalized_search_filter
 from app._actor import set_actor
 from app.routers.inventory._tx_filters import (
     _SUMMARY_WAREHOUSE_TYPES,
@@ -739,18 +740,17 @@ def export_transactions_csv(
 
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                TransactionLog.reference_no.ilike(pattern),
-                TransactionLog.notes.ilike(pattern),
-                TransactionLog.produced_by.ilike(pattern),
-                IoBatch.requester_name.ilike(pattern),
-            )
-        )
+    search_filter = build_normalized_search_filter(
+        search,
+        Item.item_name,
+        Item.mes_code,
+        TransactionLog.reference_no,
+        TransactionLog.notes,
+        TransactionLog.produced_by,
+        IoBatch.requester_name,
+    )
+    if search_filter is not None:
+        query = query.filter(search_filter)
 
     _enforce_export_limit(query.count())
     rows = query.order_by(TransactionLog.created_at.desc()).all()
@@ -834,18 +834,17 @@ def export_transactions_xlsx(
     )
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                TransactionLog.reference_no.ilike(pattern),
-                TransactionLog.notes.ilike(pattern),
-                TransactionLog.produced_by.ilike(pattern),
-                IoBatch.requester_name.ilike(pattern),
-            )
-        )
+    search_filter = build_normalized_search_filter(
+        search,
+        Item.item_name,
+        Item.mes_code,
+        TransactionLog.reference_no,
+        TransactionLog.notes,
+        TransactionLog.produced_by,
+        IoBatch.requester_name,
+    )
+    if search_filter is not None:
+        query = query.filter(search_filter)
 
     _enforce_export_limit(query.count())
     rows = query.order_by(TransactionLog.created_at.desc()).all()

@@ -86,6 +86,31 @@ function setNameOverflow(element: HTMLElement, overflow: boolean) {
 }
 
 describe("BOM 편집 표형 목록", () => {
+  it("parent and child searches ignore hyphens, dots, and slashes", () => {
+    const searched = item({ item_name: "Search Item", mes_code: "6-AF/01.2" });
+    const { rerender } = render(
+      <BomParentList
+        dept="A"
+        items={[searched]}
+        allBomRows={[]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "6AF012" } });
+    expect(screen.getByText("Search Item")).toBeInTheDocument();
+
+    rerender(
+      <BomChildAddBox parent={item({ item_id: "parent" })} bomRows={[]} items={[searched]} onAdd={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "6AF012" } });
+    expect(screen.getByText("Search Item")).toBeInTheDocument();
+  });
+
   it("부모 목록을 공정·품목명·품목 코드·상태 열의 sticky 표로 표시한다", () => {
     const { container } = render(
       <BomParentList

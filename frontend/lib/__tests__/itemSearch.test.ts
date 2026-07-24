@@ -54,6 +54,11 @@ describe("matchesItemSearch", () => {
     expect(matchesItemSearch(item, "6-af-0001")).toBe(true);
   });
 
+  it("공백·하이픈·점·슬래시를 무시해 코드 부분 일치", () => {
+    const item = makeItem({ item_name: "콘덴서", mes_code: "6-AF/01.2" });
+    expect(matchesItemSearch(item, "6AF012")).toBe(true);
+  });
+
   it("legacy_part 는 검색 대상에서 제외 (무관품 혼입 방지)", () => {
     const item = makeItem({ item_name: "콘덴서", legacy_part: "조립용 브라켓" });
     expect(matchesItemSearch(item, "조립")).toBe(false);

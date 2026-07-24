@@ -8,7 +8,6 @@ from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import or_
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from sqlalchemy import func
@@ -32,6 +31,7 @@ from app.utils.mes_code import (
     next_serial_no,
     slots_to_model_symbol,
 )
+from app.utils.search import build_normalized_search_filter
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
@@ -269,15 +269,14 @@ def list_items(
     if legacy_item_type:
         query = query.filter(Item.legacy_item_type == legacy_item_type)
 
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                Inventory.location.ilike(pattern),
-            )
-        )
+    search_filter = build_normalized_search_filter(
+        search,
+        Item.item_name,
+        Item.mes_code,
+        Inventory.location,
+    )
+    if search_filter is not None:
+        query = query.filter(search_filter)
 
     rows = query.order_by(
         Item.deleted_at.is_(None).desc(),
@@ -401,15 +400,14 @@ def export_items_xlsx(
     query = _build_item_query(db)
     if process_type_code:
         query = query.filter(Item.process_type_code == process_type_code)
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                Inventory.location.ilike(pattern),
-            )
-        )
+    search_filter = build_normalized_search_filter(
+        search,
+        Item.item_name,
+        Item.mes_code,
+        Inventory.location,
+    )
+    if search_filter is not None:
+        query = query.filter(search_filter)
     rows = query.order_by(Item.process_type_code, Item.mes_code).all()
 
     # 가용수량 계산: stock_math 를 한 번 bulk 로 불러 경로별 재구현을 피한다.

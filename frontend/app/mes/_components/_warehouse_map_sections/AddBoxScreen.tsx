@@ -5,6 +5,7 @@ import { Check, ChevronLeft, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { Item } from "@/lib/api";
 import { Button } from "@/lib/ui/Button";
+import { matchesSearchText } from "@/lib/searchText";
 import { rowLabel, SIZE_LABEL, SIZE_UNIT } from "./helpers";
 import {
   warehouseMapApi,
@@ -74,10 +75,7 @@ export function AddBoxScreen({
   const overflow = isEdit ? false : (SIZE_UNIT[size] ?? 1) > remaining;
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    return q
-      ? items.filter((it) => it.item_name.toLowerCase().includes(q) || (it.mes_code ?? "").toLowerCase().includes(q))
-      : items;
+    return items.filter((it) => matchesSearchText(it.item_name, search) || matchesSearchText(it.mes_code, search));
   }, [items, search]);
 
   function toggleItem(it: Item) {

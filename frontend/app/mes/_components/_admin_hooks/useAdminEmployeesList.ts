@@ -7,6 +7,7 @@
 import { useMemo, useState } from "react";
 import type { Employee } from "@/lib/api";
 import { normalizeDepartment } from "@/lib/mes/department";
+import { matchesSearchText } from "@/lib/searchText";
 
 export type EmployeeFilter = {
   search: string;
@@ -43,15 +44,13 @@ export function useAdminEmployeesList({
   }, [employees]);
 
   const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return employees
       .filter((e) => deptFilter === "ALL" || normalizeDepartment(e.department) === deptFilter)
       .filter(
         (e) =>
-          !q ||
-          e.name.toLowerCase().includes(q) ||
-          normalizeDepartment(e.department).toLowerCase().includes(q) ||
-          (e.role ?? "").toLowerCase().includes(q),
+          matchesSearchText(e.name, search) ||
+          matchesSearchText(normalizeDepartment(e.department), search) ||
+          matchesSearchText(e.role, search),
       )
       .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [employees, search, deptFilter]);

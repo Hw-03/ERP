@@ -14,6 +14,7 @@ import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
+import { matchesSearchText } from "@/lib/searchText";
 import { FilterChip } from "../common/FilterChip";
 import { StatusPill } from "../common/StatusPill";
 import {
@@ -95,14 +96,13 @@ export function AdminDepartmentsSection({
   }, [items]);
 
   const filteredDepartments = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return departments
       .filter((d) => {
         if (statusFilter === "active" && !d.is_active) return false;
         if (statusFilter === "inactive" && d.is_active) return false;
         return true;
       })
-      .filter((d) => !q || d.name.toLowerCase().includes(q));
+      .filter((d) => matchesSearchText(d.name, search));
   }, [departments, statusFilter, search]);
 
   const stats = useMemo(() => {

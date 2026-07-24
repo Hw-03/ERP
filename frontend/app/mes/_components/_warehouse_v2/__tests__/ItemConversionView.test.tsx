@@ -119,6 +119,19 @@ afterEach(() => {
 });
 
 describe("ItemConversionView", () => {
+  it("finds conversion candidates when code punctuation is omitted", () => {
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "3AF0001" } });
+    expect(screen.getByTestId("item-conversion-source-option-af-1")).toBeInTheDocument();
+  });
+
   it("does not inject decorative arrows into conversion text", () => {
     const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
 

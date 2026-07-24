@@ -6,6 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Tooltip } from "@/lib/ui";
 import { SIZE_UNIT, SIZE_LABEL, JARI_CAPACITY, boxColor, stackUnits } from "./helpers";
 import styles from "./warehouseMap.module.css";
+import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 
 /** 정면도 한정: 선두 모델코드 토큰(예: "DX3000", "DX3000M")을 생략해 좁은 셀에서 핵심 품명을 노출.
  *  툴팁·상세패널·줄확대에는 풀네임 유지. 모델코드가 없으면 원본 그대로. */
@@ -41,7 +42,7 @@ export function JariColumn({
   const used = stackUnits(boxes);
   const empty = JARI_CAPACITY - used;
   const isFront = scale === "front";
-  const lq = (matchQuery ?? "").toLowerCase().trim();
+  const hasMatchQuery = Boolean(normalizeSearchText(matchQuery ?? ""));
   const [dropHint, setDropHint] = useState<{ boxId: string; place: "above" | "below" } | null>(null);
 
   return (
@@ -60,11 +61,11 @@ export function JariColumn({
       {[...boxes].reverse().map((box) => {
         const color = boxColor(box) ?? LEGACY_COLORS.muted2;
         const matched =
-          lq &&
+          hasMatchQuery &&
           box.items.some(
             (it) =>
-              it.item_name.toLowerCase().includes(lq) ||
-              (it.mes_code ?? "").toLowerCase().includes(lq),
+              matchesSearchText(it.item_name, matchQuery ?? "") ||
+              matchesSearchText(it.mes_code, matchQuery ?? ""),
           );
         const first = box.items[0];
         const extra = box.items.length > 1 ? ` +${box.items.length - 1}` : "";

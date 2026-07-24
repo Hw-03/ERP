@@ -127,6 +127,59 @@ def test_display_groups_applies_existing_search_filter_and_sort(client, db_sessi
     ]
 
 
+def test_transaction_common_search_ignores_spaces_and_separators(client, db_session, make_item):
+    item = make_item(name="Transaction- Item/01")
+    log = _add_log(db_session, item, created_at=datetime(2026, 7, 15, 12, 0, 0))
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions", params={"search": "transactionitem01"})
+
+    assert response.status_code == 200, response.text
+    assert [row["log_id"] for row in response.json()] == [str(log.log_id)]
+
+
+def test_display_groups_search_ignores_spaces_and_separators(client, db_session, make_item):
+    item = make_item(name="Display- Group/01")
+    other = make_item(name="Other display group")
+    log = _add_log(db_session, item, created_at=datetime(2026, 7, 15, 12, 0, 0))
+    _add_log(db_session, other, created_at=datetime(2026, 7, 15, 13, 0, 0))
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/display-groups",
+        params={"search": "displaygroup01"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert [row["log_id"] for group in response.json()["groups"] for row in group["logs"]] == [str(log.log_id)]
+
+
+def test_reference_summaries_search_ignores_spaces_and_separators(client, db_session, make_item):
+    item = make_item(name="Reference- Summary/01")
+    other = make_item(name="Other reference summary")
+    _add_log(
+        db_session,
+        item,
+        created_at=datetime(2026, 7, 15, 12, 0, 0),
+        reference_no="REF-001",
+    )
+    _add_log(
+        db_session,
+        other,
+        created_at=datetime(2026, 7, 15, 13, 0, 0),
+        reference_no="REF-OTHER",
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/reference-summaries",
+        params={"search": "referencesummary01"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert [row["reference_no"] for row in response.json()] == ["REF-001"]
+
+
 def test_display_groups_apply_parent_operation_keys_visibility_and_request_date(
     client, db_session, make_item
 ):

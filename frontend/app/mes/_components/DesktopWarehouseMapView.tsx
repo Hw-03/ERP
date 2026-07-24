@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 import { SlidePanel } from "./common/SlidePanel";
 import { LoadingSkeleton } from "./common/LoadingSkeleton";
 import {
@@ -426,8 +427,7 @@ export function DesktopWarehouseMapView({
   function runSearch(q: string) {
     setQuery(q);
     setPulse(null);
-    const lq = q.trim().toLowerCase();
-    if (!lq || !map) {
+    if (!normalizeSearchText(q) || !map) {
       setItemMatches(null);
       setSelectedItem(null);
       setHitAngles(null);
@@ -440,8 +440,8 @@ export function DesktopWarehouseMapView({
     for (const b of map.boxes) {
       for (const it of b.items) {
         if (
-          it.item_name.toLowerCase().includes(lq) ||
-          (it.mes_code || "").toLowerCase().includes(lq)
+          matchesSearchText(it.item_name, q) ||
+          matchesSearchText(it.mes_code, q)
         ) {
           let g = byItem.get(it.item_id);
           if (!g) {

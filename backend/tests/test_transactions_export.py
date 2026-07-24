@@ -111,6 +111,17 @@ def test_export_csv_search_matches_requester_name(client, db_session):
     assert "ExportItem" in resp.text  # requester_name 검색으로 매칭됨
 
 
+def test_export_csv_search_ignores_spaces_and_separators(client, db_session):
+    item = _seed_batch_transaction(db_session)
+    db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one().reference_no = "TX- 12/3"
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/transactions/export.csv?search=tx123&{_range()}")
+
+    assert response.status_code == 200, response.text
+    assert "ExportItem" in response.text
+
+
 def test_export_csv_includes_requester_and_approver_from_stock_request_reference(client, db_session):
     requester = _emp(db_session, "EXP_DREQ", "DirectRequester")
     approver = _emp(db_session, "EXP_DAPP", "DirectApprover")
@@ -159,6 +170,36 @@ def test_export_xlsx_ok(client, db_session):
     assert resp.headers["content-type"].startswith(
         "application/vnd.openxmlformats"
     )
+
+
+def test_export_xlsx_search_ignores_spaces_and_separators(client, db_session):
+    item = _seed_batch_transaction(db_session)
+    db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one().reference_no = "XLSX- 45/6"
+    other = Item(
+        item_name="OtherExportItem",
+        process_type_code="TR",
+        model_symbol="9",
+        serial_no=2,
+    )
+    db_session.add(other)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=other.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=Decimal("1"),
+            reference_no="OTHER-999",
+            created_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/transactions/export.xlsx?search=xlsx456&{_range()}")
+
+    assert response.status_code == 200, response.text
+    workbook = load_workbook(BytesIO(response.content), read_only=True)
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert [(row[3], row[8]) for row in rows[1:]] == [("ExportItem", "XLSX- 45/6")]
 
 
 def test_export_xlsx_uses_dynamic_internal_use_label(client, db_session):

@@ -9,6 +9,7 @@ import {
   type ItemConversionResult,
 } from "@/lib/api";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { matchesSearchText } from "@/lib/searchText";
 
 interface WorkProps {
   items: Item[];
@@ -64,13 +65,8 @@ function conversionModeLabel(mode: ItemConversionMode | null): string {
 }
 
 function filterCandidates(candidates: Item[], query: string): Item[] {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return candidates;
   return candidates.filter((item) => {
-    const name = item.item_name.toLowerCase();
-    const code = (item.mes_code ?? "").toLowerCase();
-    const process = (item.process_type_code ?? "").toLowerCase();
-    return name.includes(normalized) || code.includes(normalized) || process.includes(normalized);
+    return matchesSearchText(item.item_name, query) || matchesSearchText(item.mes_code, query) || matchesSearchText(item.process_type_code, query);
   });
 }
 

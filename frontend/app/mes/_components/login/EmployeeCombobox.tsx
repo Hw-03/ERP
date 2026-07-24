@@ -12,6 +12,7 @@ import {
 import { ChevronDown, User as UserIcon } from "lucide-react";
 import type { Employee } from "@/lib/api";
 import { toChosung, toHangul, toQwerty } from "@/lib/hangul";
+import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 
 const isHangulChar = (c: string) => /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(c);
 
@@ -47,15 +48,15 @@ export function EmployeeCombobox({
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeSearchText(query);
     const raw = rawRef.current.trim();
     if (!q) return sortedEmployees;
     return sortedEmployees.filter(
       (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.department.toLowerCase().includes(q) ||
-        e.employee_code.toLowerCase().includes(q) ||
-        e.employee_code.toLowerCase().includes(raw) ||
+        matchesSearchText(e.name, query) ||
+        matchesSearchText(e.department, query) ||
+        matchesSearchText(e.employee_code, query) ||
+        matchesSearchText(e.employee_code, raw) ||
         // 초성검색: q 가 초성 자모열("ㄱㄱㅎ")일 때만 이름 초성("김건호"→"ㄱㄱㅎ")에 매칭.
         toChosung(e.name).includes(q),
     );

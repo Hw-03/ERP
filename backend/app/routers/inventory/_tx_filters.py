@@ -23,6 +23,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.schemas import TransactionLogResponse
+from app.utils.search import build_normalized_search_filter
 
 
 # /transactions/summary 카테고리 — 프론트 historyShared.ts 의 scope 멤버와 일치.
@@ -392,19 +393,17 @@ def _apply_common_filters(
         query = query.filter(request_date_expr <= datetime.combine(date_to, time.max))
     if not include_archived:
         query = query.filter(TransactionLog.archived_at.is_(None))
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                TransactionLog.reference_no.ilike(pattern),
-                TransactionLog.notes.ilike(pattern),
-                TransactionLog.produced_by.ilike(pattern),
-                # 화면에 우선 표시되는 요청자(IoBatch.requester_name) 도 검색 대상.
-                IoBatch.requester_name.ilike(pattern),
-            )
-        )
+    search_filter = build_normalized_search_filter(
+        search,
+        Item.item_name,
+        Item.mes_code,
+        TransactionLog.reference_no,
+        TransactionLog.notes,
+        TransactionLog.produced_by,
+        IoBatch.requester_name,
+    )
+    if search_filter is not None:
+        query = query.filter(search_filter)
     return query
 
 
