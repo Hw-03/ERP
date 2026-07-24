@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 
@@ -12,11 +12,18 @@ interface QuantityStepperProps {
   disabled?: boolean;
   decrementDisabled?: boolean;
   incrementDisabled?: boolean;
+  min?: number;
+  step?: number | "any";
+  inputRef?: Ref<HTMLInputElement>;
   className?: string;
 }
 
-function safeQuantity(value: number) {
+function safeMinimum(value: number) {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function safeQuantity(value: number, min: number) {
+  return Number.isFinite(value) ? Math.max(min, value) : min;
 }
 
 export function QuantityStepper({
@@ -27,18 +34,22 @@ export function QuantityStepper({
   disabled = false,
   decrementDisabled = false,
   incrementDisabled = false,
+  min = 0,
+  step = "any",
+  inputRef,
   className = "",
 }: QuantityStepperProps) {
-  const current = safeQuantity(Number(value) || 0);
-  const minusDisabled = disabled || decrementDisabled;
+  const minimum = safeMinimum(min);
+  const current = safeQuantity(Number(value), minimum);
+  const minusDisabled = disabled || decrementDisabled || current <= minimum;
   const plusDisabled = disabled || incrementDisabled;
 
   function changeBy(delta: number) {
-    onChange(safeQuantity(current + delta));
+    onChange(safeQuantity(current + delta, minimum));
   }
 
   function changeInput(nextValue: string) {
-    onChange(safeQuantity(Number(nextValue)));
+    onChange(safeQuantity(Number(nextValue), minimum));
   }
 
   return (
@@ -59,9 +70,10 @@ export function QuantityStepper({
         <input
           aria-label={label}
           type="number"
-          min={0}
-          step="any"
+          min={minimum}
+          step={step}
           value={current}
+          ref={inputRef}
           disabled={disabled}
           title={inputTitle}
           onChange={(event) => changeInput(event.target.value)}

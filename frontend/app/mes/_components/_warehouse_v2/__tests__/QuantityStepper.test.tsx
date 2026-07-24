@@ -1,3 +1,4 @@
+import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { QuantityStepper } from "../QuantityStepper";
@@ -42,5 +43,34 @@ describe("QuantityStepper", () => {
       "min-h-[44px]",
     );
     expect(screen.getByRole("button", { name: "-1" })).toHaveClass("min-h-[44px]");
+  });
+
+  it("enforces a supplied minimum and exposes its input ref", () => {
+    const onChange = vi.fn();
+    const inputRef = createRef<HTMLInputElement>();
+
+    render(
+      <QuantityStepper
+        value={1}
+        onChange={onChange}
+        label="출하 수량"
+        min={1}
+        step={1}
+        inputRef={inputRef}
+      />,
+    );
+
+    const input = screen.getByRole("spinbutton", { name: "출하 수량" });
+    expect(inputRef.current).toBe(input);
+    expect(input).toHaveAttribute("min", "1");
+    expect(input).toHaveAttribute("step", "1");
+    expect(screen.getByRole("button", { name: "-10" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "-1" })).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: "0" } });
+    fireEvent.change(input, { target: { value: "-4" } });
+
+    expect(onChange).toHaveBeenNthCalledWith(1, 1);
+    expect(onChange).toHaveBeenNthCalledWith(2, 1);
   });
 });

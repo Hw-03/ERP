@@ -453,20 +453,28 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByTestId("shipping-wizard-step-4")).not.toBeInTheDocument();
   });
 
-  it("clears a zero shipping quantity on focus so typing replaces it", async () => {
+  it("uses a minimum-one stepper for shipping quantity", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
     await openNewRequest(container);
 
-    const quantityInput = await screen.findByTestId("shipping-request-quantity");
+    const quantityInput = await screen.findByRole("spinbutton", { name: "출하 수량" });
+    expect(screen.getByRole("button", { name: "-10" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "-1" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "+1" }));
+    expect(quantityInput).toHaveValue(2);
+    fireEvent.click(screen.getByRole("button", { name: "+10" }));
+    expect(quantityInput).toHaveValue(12);
+    fireEvent.click(screen.getByRole("button", { name: "-10" }));
+    expect(quantityInput).toHaveValue(2);
+    fireEvent.click(screen.getByRole("button", { name: "-1" }));
+    expect(quantityInput).toHaveValue(1);
+
     fireEvent.change(quantityInput, { target: { value: "0" } });
-    expect(quantityInput).toHaveValue(0);
-
-    fireEvent.focus(quantityInput);
-
-    expect(quantityInput).toHaveValue(null);
+    expect(quantityInput).toHaveValue(1);
   });
 
   it("moves through PF, BOM, match, request info, and final send steps", async () => {
@@ -1033,7 +1041,7 @@ describe("DesktopShippingView", () => {
     expect(tabs).toHaveClass("gap-1");
     expect(screen.getByTestId("shipping-wizard-content-frame")).not.toHaveClass("border");
     expect(screen.getByTestId("shipping-wizard-step-1")).not.toHaveClass("border");
-    expect(actionBar).toContainElement(screen.getByTestId("shipping-request-quantity"));
+    expect(actionBar).toContainElement(screen.getByRole("spinbutton", { name: "출하 수량" }));
     expect(actionBar).not.toHaveTextContent("기준 PF를 먼저 선택하세요.");
   });
 
@@ -1096,7 +1104,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("shipping-quantity-change"));
     expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("shipping-request-quantity")).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("spinbutton", { name: "출하 수량" })).toHaveFocus());
   });
 
   it("prefills required PA/PF naming from the base items in the matching action bar", async () => {
@@ -1386,6 +1394,7 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
     await openNewRequest(container);
+    fireEvent.click(await screen.findByRole("button", { name: "+1" }));
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
@@ -1406,7 +1415,7 @@ describe("DesktopShippingView", () => {
     expect(shipmentName).toHaveClass("shrink", "truncate");
     expect(shipmentName.nextElementSibling).toBe(shipmentCode);
     expect(shipmentCode).toHaveClass("flex", "items-center", "whitespace-nowrap");
-    expect(screen.getByTestId("shipping-final-action-quantity")).toHaveTextContent("출하 수량 1대");
+    expect(screen.getByTestId("shipping-final-action-quantity")).toHaveTextContent("출하 수량 2대");
     expect(hero).toHaveTextContent("Custom PF");
     expect(hero).not.toHaveTextContent("Standard PF");
     expect(finalSummary).toHaveTextContent("Standard PA");
@@ -1419,6 +1428,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-final-line-pa-acc-1")).toHaveClass("flex", "items-center");
     expect(screen.getByTestId("shipping-final-code-pa-acc-1-kind")).toHaveTextContent("PR");
     expect(screen.getByTestId("shipping-final-quantity-pa-acc-1")).toHaveClass("self-center", "tabular-nums");
+    expect(screen.getByTestId("shipping-final-quantity-pa-acc-1")).toHaveTextContent("4 EA");
     expect(screen.getByTestId("shipping-final-line-companion-carton-1")).toHaveTextContent("Carton Box");
   });
 

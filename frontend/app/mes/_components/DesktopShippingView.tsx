@@ -29,6 +29,7 @@ import { processTypeColor } from "@/lib/mes/process";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
+import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
 
 type SectionTab = "request" | "history";
 type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "historyList" | "historyWork";
@@ -1627,28 +1628,17 @@ function RequestSection(props: {
           <button type="button" onClick={goPrev} disabled={props.wizardStep === 1 || props.pending !== null} className="inline-flex min-h-11 items-center justify-center rounded-[12px] border px-4 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>이전</button>
           <div data-testid="shipping-wizard-action-center" className="min-w-0">
             {props.wizardStep === 1 ? (
-              <label data-testid="shipping-request-quantity-field" className="mx-auto flex min-h-11 w-full max-w-[280px] items-center gap-3">
-              <span className="shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</span>
-              <input
-                ref={requestQuantityRef}
-                data-testid="shipping-request-quantity"
-                aria-label="출하 수량"
-                type="number"
-                min={1}
-                step={1}
-                value={props.requestQuantity}
-                disabled={locked || props.pending !== null}
-                onFocus={() => {
-                  if (Number(props.requestQuantity) < 1) props.onRequestQuantity("");
-                }}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  props.onRequestQuantity(value === "" ? "" : Number(value));
-                }}
-                className="h-11 min-w-0 flex-1 rounded-[12px] border px-3 text-center text-sm font-black outline-none focus-visible:ring-2"
-                style={{ background: LEGACY_COLORS.bg, borderColor: validRequestQuantity ? LEGACY_COLORS.border : LEGACY_COLORS.red, color: LEGACY_COLORS.text }}
-              />
-              </label>
+              <div data-testid="shipping-request-quantity-field" className="mx-auto w-fit">
+                <QuantityStepper
+                  value={requestQty}
+                  onChange={props.onRequestQuantity}
+                  label="출하 수량"
+                  min={1}
+                  step={1}
+                  inputRef={requestQuantityRef}
+                  disabled={locked || props.pending !== null}
+                />
+              </div>
             ) : props.wizardStep === 3 && (requiresPaName || requiresPfName) ? (
               <div data-testid="shipping-match-name-inputs" className={`grid min-w-0 gap-2 ${requiresPaName && requiresPfName ? "md:grid-cols-2" : ""}`}>
               {requiresPaName && (
