@@ -51,6 +51,7 @@ from app.models.shipping import (
     ShippingRequestChecklistLine,
     ShippingRequestCompanionLine,
     ShippingRequestEvent,
+    ShippingRequestRevision,
     ShippingRequestStatusEnum,
 )
 from app.models.stock_request import (
@@ -114,6 +115,7 @@ __all__ = [
     "ShippingRequestChecklistLine",
     "ShippingRequestCompanionLine",
     "ShippingRequestEvent",
+    "ShippingRequestRevision",
     "ShippingRequestStatusEnum",
     # stock requests
     "StockRequest",

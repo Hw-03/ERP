@@ -23,6 +23,7 @@ class ItemCreate(BaseModel):
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[int] = None
+    sales_review_required: bool = False
     initial_quantity: Optional[int] = Field(None, description="초기 재고 수량 (기본 0)")
     model_slots: List[int] = Field(default=[], description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
     initial_locations: Optional[List[InitialLocationInput]] = Field(
@@ -38,6 +39,7 @@ class ItemUpdate(BaseModel):
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[int] = None
+    sales_review_required: Optional[bool] = None
     mes_code: Optional[str] = Field(None, max_length=40)
     model_slots: Optional[List[int]] = None
 
@@ -52,6 +54,7 @@ class ItemResponse(BaseModel):
     legacy_item_type: Optional[str] = None
     supplier: Optional[str] = None
     min_stock: Optional[int] = None
+    sales_review_required: bool = False
     # item code fields
     mes_code: Optional[str] = None
     model_symbol: Optional[str] = None

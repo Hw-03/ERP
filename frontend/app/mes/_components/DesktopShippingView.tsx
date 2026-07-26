@@ -20,8 +20,19 @@ import {
   XCircle,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, type Item, type ShippingBomLineInput, type ShippingBomMatchResponse, type ShippingCompanionLineInput, type ShippingRequest, type ShippingRequestStatus } from "@/lib/api";
-import { useShippingRequestsQuery } from "@/lib/queries/useShippingQuery";
+import {
+  api,
+  type Item,
+  type ShippingBomLineInput,
+  type ShippingBomMatchResponse,
+  type ShippingCompanionLineInput,
+  type ShippingHistoryMonth,
+  type ShippingHistoryParams,
+  type ShippingHistoryStatus,
+  type ShippingRequest,
+  type ShippingRequestStatus,
+} from "@/lib/api";
+import { useShippingRequestsQuery, useShippingRevisionsQuery } from "@/lib/queries/useShippingQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -30,6 +41,7 @@ import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
+import { matchesSearchText } from "@/lib/searchText";
 
 type SectionTab = "request" | "history";
 type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "historyList" | "historyWork";
@@ -41,7 +53,6 @@ type RequestWizardStep = 1 | 2 | 3 | 4 | 5;
 type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM" };
 type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit: string };
 type PendingAction =
-import { matchesSearchText } from "@/lib/searchText";
   | "load"
   | "save"
   | "send"
@@ -71,6 +82,7 @@ const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
   PREPARING: "준비 중",
   PREPARED: "준비 완료",
   PICKED_UP: "픽업 완료",
+  CANCELLED: "요청 취소",
 };
 
 const STATUS_TONE: Record<ShippingRequestStatus, string> = {
@@ -78,6 +90,7 @@ const STATUS_TONE: Record<ShippingRequestStatus, string> = {
   PREPARING: LEGACY_COLORS.green,
   PREPARED: LEGACY_COLORS.yellow,
   PICKED_UP: LEGACY_COLORS.purple,
+  CANCELLED: LEGACY_COLORS.red,
 };
 const TX_TYPE_LABEL: Record<string, string> = {
   BACKFLUSH: "자재 차감",
@@ -158,6 +171,20 @@ function filterItems(items: Item[], query: string) {
       .filter(Boolean)
       .some((value) => matchesSearchText(String(value), query)),
   );
+}
+
+const KST_YEAR_MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "numeric",
+});
+
+function kstYearMonth(value: string): { year: number; month: number } {
+  const parts = KST_YEAR_MONTH_FORMATTER.formatToParts(new Date(value));
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+  };
 }
 
 const SHIPPING_BOM_DEPARTMENT_ORDER: Record<string, number> = { T: 0, H: 1, V: 2, N: 3, A: 4, P: 5 };
@@ -272,6 +299,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [selectedPrepId, setSelectedPrepId] = useState<string | null>(null);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [basePfId, setBasePfId] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
   const [requestQuantity, setRequestQuantity] = useState<number | "">(1);
   const [customPaName, setCustomPaName] = useState("");
@@ -282,6 +310,20 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [companionDraft, setCompanionDraft] = useState<CompanionDraftLine[]>([]);
   const [nameValidationNotice, setNameValidationNotice] = useState<NameValidationNotice | null>(null);
+  const [historyStatus, setHistoryStatus] = useState<ShippingHistoryStatus>("PICKED_UP");
+  const [historyMonths, setHistoryMonths] = useState<ShippingHistoryMonth[]>([]);
+  const [historyYear, setHistoryYear] = useState<number | null>(null);
+  const [historyMonth, setHistoryMonth] = useState<number | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyAppliedSearch, setHistoryAppliedSearch] = useState("");
+  const [historyRows, setHistoryRows] = useState<ShippingRequest[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyDetailError, setHistoryDetailError] = useState<string | null>(null);
+  const historyLoadedStatusRef = useRef<ShippingHistoryStatus | null>(null);
+  const historyRequestGenerationRef = useRef(0);
   const nameValidationNoticeIdRef = useRef(0);
 
   const showNameValidationNotice = useCallback((message: string) => {
@@ -302,12 +344,18 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   }, [items, pfItems]);
   const itemById = useMemo(() => new Map(displayItems.map((item) => [item.item_id, item])), [displayItems]);
   const lineItemOptions = useMemo(() => items.filter((item) => !item.deleted_at), [items]);
-  const activeRequests = useMemo(() => requests.filter((req) => req.status !== "PICKED_UP"), [requests]);
+  const activeRequests = useMemo(
+    () => requests.filter((req) => req.status !== "PICKED_UP" && req.status !== "CANCELLED"),
+    [requests],
+  );
   const prepRequests = useMemo(
     () => requests.filter((req) => req.status === "PREPARING" || req.status === "PREPARED"),
     [requests],
   );
-  const history = useMemo(() => requests.filter((req) => req.status === "PICKED_UP"), [requests]);
+  const historyCount = useMemo(
+    () => requests.filter((req) => req.status === "PICKED_UP" || req.status === "CANCELLED").length,
+    [requests],
+  );
   const selectedRequest = useMemo(
     () => (editingId ? requests.find((req) => req.request_id === editingId) ?? null : null),
     [editingId, requests],
@@ -316,30 +364,45 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     () => prepRequests.find((req) => req.request_id === selectedPrepId) ?? prepRequests[0] ?? null,
     [prepRequests, selectedPrepId],
   );
-  const selectedHistory = useMemo(
-    () => history.find((req) => req.request_id === selectedHistoryId) ?? history[0] ?? null,
-    [history, selectedHistoryId],
-  );
+  const selectedHistory = useMemo(() => {
+    const fallback = requests.find((req) => req.request_id === selectedHistoryId && (req.status === "PICKED_UP" || req.status === "CANCELLED"));
+    const exact = historyRows.find((req) => req.request_id === selectedHistoryId) ?? fallback;
+    if (exact) return exact;
+    return view === "historyWork" && selectedHistoryId ? null : historyRows[0] ?? null;
+  }, [historyRows, requests, selectedHistoryId, view]);
   const canEditDraft = !selectedRequest || selectedRequest.status === "REQUESTED" || selectedRequest.status === "PREPARING";
   const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "historyWork";
   const saveShippingWork = useCallback(() => {}, []);
   useRegisterDirty("shipping-work", shippingWorkDirty, saveShippingWork, undefined, { mode: "confirm-only" });
-  function buildShippingUrl(nextView: ViewMode, requestId?: string | null) {
+  function buildShippingUrl(
+    nextView: ViewMode,
+    requestId?: string | null,
+    historyStatusOverride?: ShippingHistoryStatus,
+  ) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", "shipping");
     if (nextView === "hub") {
       params.delete("shippingView");
       params.delete("shippingRequestId");
+      params.delete("shippingHistoryStatus");
     } else {
       params.set("shippingView", nextView);
       if (requestId) params.set("shippingRequestId", requestId);
       else params.delete("shippingRequestId");
+      if (nextView === "historyList" || nextView === "historyWork") {
+        params.set("shippingHistoryStatus", historyStatusOverride ?? historyStatus);
+      }
+      else params.delete("shippingHistoryStatus");
     }
     return `?${params.toString()}`;
   }
 
-  function navigateView(nextView: ViewMode, requestId?: string | null) {
-    const url = buildShippingUrl(nextView, requestId);
+  function navigateView(
+    nextView: ViewMode,
+    requestId?: string | null,
+    historyStatusOverride?: ShippingHistoryStatus,
+  ) {
+    const url = buildShippingUrl(nextView, requestId, historyStatusOverride);
     pendingUrlSearchRef.current = url.startsWith("?") ? url.slice(1) : url;
     setView(nextView);
     router.push(url, { scroll: false });
@@ -351,6 +414,12 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       return [next, ...rest];
     });
   }, [setRequests]);
+
+  const handleInvoiceSaved = useCallback((next: ShippingRequest) => {
+    upsertRequest(next);
+    setHistoryRows((current) => current.map((row) => row.request_id === next.request_id ? next : row));
+    setInvoiceNumber(next.invoice_number ?? "");
+  }, [upsertRequest]);
 
   const ensureItemsLoaded = useCallback(async (): Promise<Item[] | null> => {
     if (items.length > 0) return items;
@@ -393,19 +462,206 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     }
   }, [pfItems.length, pfItemsLoaded, pfItemsLoading, onStatusChange]);
 
+  async function loadHistoryPage(
+    params: ShippingHistoryParams,
+    append = false,
+    generation?: number,
+  ) {
+    const requestGeneration = generation ?? ++historyRequestGenerationRef.current;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const page = await api.getShippingHistory({ ...params, limit: 50 });
+      if (requestGeneration !== historyRequestGenerationRef.current) return;
+      setHistoryRows((current) => append
+        ? [...current, ...page.requests.filter((row) => !current.some((item) => item.request_id === row.request_id))]
+        : (() => {
+          const directSelection = view === "historyWork" && selectedHistoryId
+            ? current.find((row) => row.request_id === selectedHistoryId)
+            : null;
+          return directSelection && !page.requests.some((row) => row.request_id === directSelection.request_id)
+            ? [directSelection, ...page.requests]
+            : page.requests;
+        })(),
+      );
+      setHistoryNextCursor(page.next_cursor);
+      setHistoryHasMore(page.has_more);
+      if (!append) {
+        setSelectedHistoryId((current) =>
+          view === "historyWork" && current
+            ? current
+            : page.requests.some((row) => row.request_id === current) ? current : page.requests[0]?.request_id ?? null,
+        );
+      }
+    } catch (err) {
+      if (requestGeneration !== historyRequestGenerationRef.current) return;
+      const msg = err instanceof Error ? err.message : "출하 이력을 불러오지 못했습니다.";
+      setHistoryError(msg);
+      onStatusChange(msg);
+    } finally {
+      if (requestGeneration === historyRequestGenerationRef.current) setHistoryLoading(false);
+    }
+  }
+
+  async function loadHistoryOverview(status: ShippingHistoryStatus) {
+    const requestGeneration = ++historyRequestGenerationRef.current;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistoryAppliedSearch("");
+    try {
+      const months = await api.getShippingHistoryMonths({ status });
+      if (requestGeneration !== historyRequestGenerationRef.current) return;
+      setHistoryMonths(months);
+      const latest = months[0] ?? null;
+      setHistoryYear(latest?.year ?? null);
+      setHistoryMonth(latest?.month ?? null);
+      if (!latest) {
+        setHistoryRows((current) => view === "historyWork" && selectedHistoryId
+          ? current.filter((row) => row.request_id === selectedHistoryId)
+          : [],
+        );
+        setHistoryNextCursor(null);
+        setHistoryHasMore(false);
+        return;
+      }
+      await loadHistoryPage({ status, year: latest.year, month: latest.month }, false, requestGeneration);
+    } catch (err) {
+      if (requestGeneration !== historyRequestGenerationRef.current) return;
+      const msg = err instanceof Error ? err.message : "출하 이력 월 목록을 불러오지 못했습니다.";
+      setHistoryError(msg);
+      onStatusChange(msg);
+    } finally {
+      if (requestGeneration === historyRequestGenerationRef.current) setHistoryLoading(false);
+    }
+  }
+
+  function selectHistoryStatus(status: ShippingHistoryStatus) {
+    if (status === historyStatus) return;
+    historyRequestGenerationRef.current += 1;
+    historyLoadedStatusRef.current = null;
+    setHistoryStatus(status);
+    setHistorySearch("");
+    setHistoryAppliedSearch("");
+    setHistoryRows([]);
+    if (view === "historyList" || view === "historyWork") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("shippingHistoryStatus", status);
+      const url = `?${params.toString()}`;
+      pendingUrlSearchRef.current = params.toString();
+      router.replace(url, { scroll: false });
+    }
+  }
+
+  function selectHistoryMonth(year: number, month: number) {
+    setHistoryYear(year);
+    setHistoryMonth(month);
+    setHistorySearch("");
+    setHistoryAppliedSearch("");
+    void loadHistoryPage({ status: historyStatus, year, month });
+  }
+
+  function searchHistory() {
+    const q = historySearch.trim();
+    if (!q) {
+      void loadHistoryOverview(historyStatus);
+      return;
+    }
+    setHistoryAppliedSearch(q);
+    setHistoryYear(null);
+    setHistoryMonth(null);
+    void loadHistoryPage({ status: historyStatus, q });
+  }
+
+  function loadMoreHistory() {
+    if (!historyNextCursor || historyLoading) return;
+    const params: ShippingHistoryParams = historyAppliedSearch
+      ? { status: historyStatus, q: historyAppliedSearch, cursor: historyNextCursor }
+      : { status: historyStatus, year: historyYear ?? undefined, month: historyMonth ?? undefined, cursor: historyNextCursor };
+    void loadHistoryPage(params, true, historyRequestGenerationRef.current);
+  }
+
   // 초기 요청 로드 중 목록 flicker 방지: 실제 목록은 useShippingRequestsQuery가 관리한다.
   // 이 effect는 첫 데이터가 들어온 뒤 선택 id 기본값만 맞춘다.
   useEffect(() => {
     if (shippingRequestsQuery.isLoading) return;
     const data = shippingRequestsQuery.data ?? [];
     setSelectedPrepId((current) => current ?? data.find((req) => req.status === "PREPARING" || req.status === "PREPARED")?.request_id ?? null);
-    setSelectedHistoryId((current) => current ?? data.find((req) => req.status === "PICKED_UP")?.request_id ?? null);
+    setSelectedHistoryId((current) => current ?? data.find((req) => req.status === "PICKED_UP" || req.status === "CANCELLED")?.request_id ?? null);
     if (shippingRequestsQuery.error) {
       const msg = shippingRequestsQuery.error instanceof Error ? shippingRequestsQuery.error.message : "출하 데이터를 불러오지 못했습니다.";
       onStatusChange(msg);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shippingRequestsQuery.data, shippingRequestsQuery.isLoading, shippingRequestsQuery.error]);
+  useEffect(() => {
+    if (view !== "historyWork" || !selectedHistoryId || shippingRequestsQuery.isLoading) return;
+    const existing = historyRows.find((request) => request.request_id === selectedHistoryId)
+      ?? requests.find((request) => request.request_id === selectedHistoryId);
+    if (existing) {
+      setHistoryDetailError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+    setHistoryDetailError(null);
+    void api.getShippingRequest(selectedHistoryId, { signal: controller.signal })
+      .then((request) => {
+        if (!active) return;
+        if (request.status !== "PICKED_UP" && request.status !== "CANCELLED") {
+          setHistoryDetailError("완료 또는 취소된 출하 이력이 아닙니다.");
+          return;
+        }
+        historyLoadedStatusRef.current = null;
+        setHistoryRows((current) => [request, ...current.filter((row) => row.request_id !== request.request_id)]);
+      })
+      .catch((err) => {
+        if (!active || controller.signal.aborted) return;
+        setHistoryDetailError(err instanceof Error ? err.message : "출하 이력을 불러오지 못했습니다.");
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [historyRows, requests, selectedHistoryId, shippingRequestsQuery.isLoading, view]);
+  useEffect(() => {
+    if (view !== "historyList" && view !== "historyWork") return;
+    if (view === "historyWork") {
+      const selectedRequest = historyRows.find((request) => request.request_id === selectedHistoryId)
+        ?? requests.find((request) => request.request_id === selectedHistoryId);
+      const selectedStatus = selectedRequest?.status;
+      const actualStatus: ShippingHistoryStatus | null = selectedStatus === "PICKED_UP" || selectedStatus === "CANCELLED"
+        ? selectedStatus
+        : null;
+      if (!actualStatus && shippingRequestsQuery.isLoading) return;
+      if (!selectedRequest && selectedHistoryId) return;
+
+      if (actualStatus) {
+        const urlStatus = searchParams.get("shippingHistoryStatus");
+        if (urlStatus !== actualStatus) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("shippingHistoryStatus", actualStatus);
+          const normalizedSearch = params.toString();
+          if (pendingUrlSearchRef.current !== normalizedSearch) {
+            pendingUrlSearchRef.current = normalizedSearch;
+            router.replace(`?${normalizedSearch}`, { scroll: false });
+          }
+        }
+      }
+      if (actualStatus && actualStatus !== historyStatus) {
+        historyRequestGenerationRef.current += 1;
+        historyLoadedStatusRef.current = null;
+        setHistoryStatus(actualStatus);
+        return;
+      }
+    }
+    if (historyLoadedStatusRef.current === historyStatus) return;
+    historyLoadedStatusRef.current = historyStatus;
+    void loadHistoryOverview(historyStatus);
+    // Local search and folder actions load explicitly; this effect restores entry/status navigation only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, historyStatus, historyRows, requests, searchParams, selectedHistoryId, shippingRequestsQuery.isLoading]);
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") return;
     const currentSearch = searchParams.toString();
@@ -421,6 +677,16 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     lastUrlSearchRef.current = currentSearch;
     const nextView = isShippingViewMode(searchParams.get("shippingView")) ? searchParams.get("shippingView") as ViewMode : "hub";
     const requestId = searchParams.get("shippingRequestId");
+    const urlHistoryStatus = searchParams.get("shippingHistoryStatus");
+    if (
+      nextView === "historyList"
+      && (urlHistoryStatus === "PICKED_UP" || urlHistoryStatus === "CANCELLED")
+      && urlHistoryStatus !== historyStatus
+    ) {
+      historyRequestGenerationRef.current += 1;
+      historyLoadedStatusRef.current = null;
+      setHistoryStatus(urlHistoryStatus);
+    }
 
     if (nextView === "hub") {
       setView("hub");
@@ -462,6 +728,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       if (found) {
         setEditingId(found.request_id);
         setBasePfId(found.base_pf_item_id);
+        setInvoiceNumber(found.invoice_number ?? "");
         setRequestedBy(found.requested_by_name ?? "");
         setCustomPaName(found.custom_pa_name ?? "");
         setCustomPfName(found.custom_pf_name ?? "");
@@ -478,19 +745,21 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       return;
     }
     setEditingId(null);
+    setInvoiceNumber("");
     setRequestWizardStep(1);
     setRequestQuantity(1);
     setCompanionDraft([]);
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
-  }, [searchParams, requests, loading, view, ensurePfItemsLoaded, ensureItemsLoaded]);
+  }, [searchParams, requests, loading, view, historyStatus, ensurePfItemsLoaded, ensureItemsLoaded]);
 
   function clearDraft() {
     navigateView("requestWork");
     setRequestWizardStep(1);
     setEditingId(null);
     setBasePfId("");
+    setInvoiceNumber("");
     setRequestedBy(operator?.name ?? "");
     setRequestQuantity(1);
     setCompanionDraft([]);
@@ -505,6 +774,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork", syncUrl = true) {
     setEditingId(req.request_id);
     setBasePfId(req.base_pf_item_id);
+    setInvoiceNumber(req.invoice_number ?? "");
     setRequestedBy(req.requested_by_name ?? "");
     setCustomPaName(req.custom_pa_name ?? "");
     setCustomPfName(req.custom_pf_name ?? "");
@@ -579,6 +849,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   function draftPayload() {
     return {
       request_quantity: toPositiveInt(requestQuantity),
+      invoice_number: invoiceNumber.trim() || null,
       requested_by_name: (editingId ? requestedBy.trim() : operator?.name?.trim() || requestedBy.trim()) || null,
       custom_pa_name: customPaName.trim() || null,
       custom_pf_name: customPfName.trim() || null,
@@ -614,6 +885,9 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
         ? await api.updateShippingRequest(editingId, payload)
         : await api.createShippingRequest({ base_pf_item_id: basePfId, ...payload });
       upsertRequest(saved);
+      if (editingId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(saved.request_id) });
+      }
       setEditingId(saved.request_id);
       onStatusChange(editingId ? "출하 요청을 수정했습니다." : "출하 요청을 생성했습니다.");
       if (saved.status === "PREPARING") {
@@ -778,8 +1052,10 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
       } else {
         const next = await api.completeShippingPickup(action.request.request_id);
         upsertRequest(next);
+        setHistoryStatus("PICKED_UP");
+        setHistoryRows((current) => [next, ...current.filter((row) => row.request_id !== next.request_id)]);
         setSelectedHistoryId(next.request_id);
-        navigateView("historyWork", next.request_id);
+        navigateView("historyWork", next.request_id, "PICKED_UP");
         onStatusChange("픽업 완료 처리했습니다.");
       }
       setConfirmAction(null);
@@ -864,7 +1140,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
   function renderActiveView() {
     const counts = {
       request: activeRequests.length,
-      history: history.length,
+      history: historyCount,
     };
 
     if (view === "hub") {
@@ -892,6 +1168,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
           onDelete={deleteRequest}
           onPrepareCancel={cancelPrepare}
           onPickup={completePickup}
+          onInvoiceSaved={handleInvoiceSaved}
           pending={pending}
         />
       );
@@ -911,6 +1188,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             itemById={itemById}
             itemOptions={lineItemOptions}
             basePfId={basePfId}
+            invoiceNumber={invoiceNumber}
             requestedBy={editingId ? requestedBy : operator?.name ?? requestedBy}
             requestQuantity={requestQuantity}
             companionDraft={companionDraft}
@@ -926,6 +1204,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             onNew={clearDraft}
             onSelectRequest={(req) => loadRequestIntoDraft(req, "requestDetail")}
             onBasePfChange={(value) => void handleBasePfChange(value)}
+            onInvoiceNumber={setInvoiceNumber}
             onRequestedBy={setRequestedBy}
             onRequestQuantity={setRequestQuantity}
             onCustomPaName={setCustomPaName}
@@ -981,6 +1260,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             onOpenPrepare={(req) => void completePrepare(req)}
             onCancel={(req) => void cancelPrepare(req)}
             onPickup={(req) => void completePickup(req)}
+            onInvoiceSaved={handleInvoiceSaved}
           />
         </div>
       );
@@ -989,11 +1269,25 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     if (view === "historyList") {
       return (
         <HistoryListEntry
-          rows={history}
+          rows={historyRows}
+          status={historyStatus}
+          months={historyMonths}
+          selectedYear={historyYear}
+          selectedMonth={historyMonth}
+          search={historySearch}
+          appliedSearch={historyAppliedSearch}
+          loading={historyLoading}
+          error={historyError}
+          hasMore={historyHasMore}
           onBack={() => navigateView("hub")}
+          onStatus={selectHistoryStatus}
+          onMonth={selectHistoryMonth}
+          onSearchChange={setHistorySearch}
+          onSearch={searchHistory}
+          onLoadMore={loadMoreHistory}
           onOpen={(req) => {
             setSelectedHistoryId(req.request_id);
-            navigateView("historyWork", req.request_id);
+            navigateView("historyWork", req.request_id, req.status === "CANCELLED" ? "CANCELLED" : "PICKED_UP");
           }}
         />
       );
@@ -1002,7 +1296,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
     return (
       <div className="grid gap-3">
         <ViewHeader title="출하 상세 이력" subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다." onBack={() => navigateView("historyList")} />
-        <HistorySection rows={history} selected={selectedHistory} onSelect={(req) => setSelectedHistoryId(req.request_id)} showList={false} />
+        <HistorySection rows={historyRows} selected={selectedHistory} emptyBody={historyDetailError ?? undefined} onSelect={(req) => setSelectedHistoryId(req.request_id)} onInvoiceSaved={handleInvoiceSaved} showList={false} />
       </div>
     );
   }
@@ -1162,7 +1456,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
 }
 
 
-function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareCancel, onPickup, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; pending: PendingAction }) {
+function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareCancel, onPickup, onInvoiceSaved, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
       <div className={SHIPPING_FLEX_COL_CLASS}>
@@ -1222,6 +1516,11 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
 
         {request.notes && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
 
+        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <InvoiceNumberEditor request={request} onSaved={onInvoiceSaved} />
+          <RevisionHistory request={request} />
+        </div>
+
         <div className="mt-3 min-h-0 flex-1"><LineSummary request={request} /></div>
 
         <div data-testid="shipping-detail-actions" className="mt-3 flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
@@ -1233,6 +1532,186 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
         </div>
       </Panel>
     </div>
+  );
+}
+
+function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; onSaved: (request: ShippingRequest) => void }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(request.invoice_number ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setValue(request.invoice_number ?? "");
+    setError(null);
+  }, [request.request_id, request.invoice_number]);
+
+  async function saveInvoice() {
+    const normalizedInput = value.trim();
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await api.updateShippingInvoice(request.request_id, normalizedInput || null);
+      setValue(saved.invoice_number ?? "");
+      onSaved(saved);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(request.request_id) });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "인보이스 번호를 저장하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const unchanged = value.trim() === (request.invoice_number ?? "");
+  const hasPreparationHistory = request.status === "PREPARED"
+    || request.status === "PICKED_UP"
+    || Boolean(request.prepared_at)
+    || request.events.some((event) => event.event_type === "PREPARED");
+  const cannotClearExisting = Boolean(request.invoice_number) && !value.trim() && hasPreparationHistory;
+  return (
+    <section data-testid="shipping-invoice-editor" className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: request.invoice_number ? LEGACY_COLORS.border : tint(LEGACY_COLORS.yellow, 42) }}>
+      <Field label="인보이스 번호">
+        <div className="flex min-w-0 gap-2">
+          <input
+            aria-label="인보이스 번호"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className={`${SHIPPING_TEXT_INPUT_CLASS} min-w-0 flex-1`}
+            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            placeholder="인보이스 번호 입력"
+          />
+          <button
+            type="button"
+            aria-label="인보이스 번호 저장"
+            onClick={() => void saveInvoice()}
+            disabled={saving || unchanged || cannotClearExisting}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[12px] border px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
+            style={{ background: tint(LEGACY_COLORS.blue, 14), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}
+          >
+            {saving ? "저장 중" : "저장"}
+          </button>
+        </div>
+      </Field>
+      {cannotClearExisting ? (
+        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+          준비 완료 이력이 있어 기존 인보이스 번호를 비울 수 없습니다.
+        </div>
+      ) : !request.invoice_number && (
+        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.yellow }}>
+          인보이스 번호를 입력해야 준비 완료 처리를 진행할 수 있습니다.
+        </div>
+      )}
+      {error && <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{error}</div>}
+    </section>
+  );
+}
+
+const REVISION_FIELD_LABELS: Record<string, string> = {
+  invoice_number: "인보이스 번호",
+  base_pf_item_id: "기준 PF",
+  request_quantity: "출하 수량",
+  requested_by_name: "요청자",
+  custom_pa_name: "PA 품명",
+  custom_pf_name: "PF 품명",
+  notes: "요청 메모",
+  bom_lines: "BOM 구성",
+  companion_lines: "동반 출하품",
+};
+
+function revisionSummary(changes: Array<{ field: string }>): string {
+  const labels = Array.from(new Set(changes.map((change) => REVISION_FIELD_LABELS[change.field] ?? change.field)));
+  return labels.length > 0 ? `${labels.join(" · ")} 수정` : "출하 요청 수정";
+}
+
+function revisionValue(value: unknown, request: ShippingRequest): string {
+  if (value === null || value === undefined || value === "") return "없음";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "없음";
+    return value.map((raw) => {
+      if (!raw || typeof raw !== "object") return String(raw);
+      const line = raw as Record<string, unknown>;
+      const itemId = String(line.child_item_id ?? line.item_id ?? "");
+      const currentLine = request.bom_lines.find((item) => item.child_item_id === itemId)
+        ?? request.companion_lines.find((item) => item.item_id === itemId);
+      const hasSnapshotName = Object.prototype.hasOwnProperty.call(line, "item_name");
+      const hasSnapshotCode = Object.prototype.hasOwnProperty.call(line, "mes_code");
+      const snapshotName = typeof line.item_name === "string" && line.item_name.trim() ? line.item_name.trim() : null;
+      const snapshotCode = typeof line.mes_code === "string" && line.mes_code.trim() ? line.mes_code.trim() : null;
+      const itemName = hasSnapshotName ? snapshotName : currentLine?.item_name ?? null;
+      const mesCode = hasSnapshotCode ? snapshotCode : currentLine?.mes_code ?? null;
+      const itemLabel = itemName ? `${itemName}${mesCode ? ` (${mesCode})` : ""}` : itemId || "품목";
+      const stage = typeof line.parent_stage === "string" ? `${line.parent_stage} · ` : "";
+      const quantity = line.quantity === undefined ? "" : ` × ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`;
+      const inclusion = line.included === false ? " · 제외" : "";
+      return `${stage}${itemLabel}${quantity}${inclusion}`;
+    }).join(", ");
+  }
+  return JSON.stringify(value);
+}
+
+function RevisionHistory({ request }: { request: ShippingRequest }) {
+  const revisionsQuery = useShippingRevisionsQuery(request.request_id);
+  const [openRevisionIds, setOpenRevisionIds] = useState<string[]>([]);
+  const revisions = revisionsQuery.data ?? [];
+
+  return (
+    <section data-testid="shipping-revision-history" className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>수정 이력</div>
+          <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>누가 무엇을 바꿨는지 펼쳐서 확인합니다.</div>
+        </div>
+        <span className="rounded-full px-2 py-1 text-xs font-black" style={{ background: tint(LEGACY_COLORS.purple, 14), color: LEGACY_COLORS.purple }}>
+          {revisions.length}건
+        </span>
+      </div>
+      {revisionsQuery.isLoading ? (
+        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>수정 이력을 불러오는 중입니다.</div>
+      ) : revisionsQuery.error ? (
+        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>수정 이력을 불러오지 못했습니다.</div>
+      ) : revisions.length === 0 ? (
+        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기록된 수정 이력이 없습니다.</div>
+      ) : (
+        <div className="mt-2 grid max-h-[240px] gap-2 overflow-y-auto pr-1">
+          {revisions.map((revision) => {
+            const expanded = openRevisionIds.includes(revision.revision_id);
+            const summary = revisionSummary(revision.changes);
+            return (
+              <div key={revision.revision_id} className="rounded-[11px] border" style={{ background: LEGACY_COLORS.bg, borderColor: revision.affects_preparation ? tint(LEGACY_COLORS.yellow, 42) : LEGACY_COLORS.border }}>
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-label={`${summary} · ${revision.edited_by_name}`}
+                  onClick={() => setOpenRevisionIds((current) => expanded
+                    ? current.filter((id) => id !== revision.revision_id)
+                    : [...current, revision.revision_id])}
+                  className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{summary}</span>
+                    <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{revision.edited_by_name} · {formatDate(revision.created_at)}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-black" style={{ color: revision.affects_preparation ? LEGACY_COLORS.yellow : LEGACY_COLORS.purple }}>
+                    {expanded ? "접기" : revision.affects_preparation ? "준비 영향 · 펼치기" : "펼치기"}
+                  </span>
+                </button>
+                {expanded && (
+                  <div className="grid gap-1 border-t px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+                    {revision.changes.map((change, index) => (
+                      <div key={`${change.field}-${index}`} className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+                        <span className="font-black" style={{ color: LEGACY_COLORS.muted2 }}>{REVISION_FIELD_LABELS[change.field] ?? change.field}</span>
+                        <span>{` · ${revisionValue(change.before, request)} → ${revisionValue(change.after, request)}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1264,27 +1743,185 @@ function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest
 }
 
 
-function HistoryListEntry({ rows, onBack, onOpen }: { rows: ShippingRequest[]; onBack: () => void; onOpen: (request: ShippingRequest) => void }) {
+function HistoryListEntry({
+  rows,
+  status,
+  months,
+  selectedYear,
+  selectedMonth,
+  search,
+  appliedSearch,
+  loading,
+  error,
+  hasMore,
+  onBack,
+  onStatus,
+  onMonth,
+  onSearchChange,
+  onSearch,
+  onLoadMore,
+  onOpen,
+}: {
+  rows: ShippingRequest[];
+  status: ShippingHistoryStatus;
+  months: ShippingHistoryMonth[];
+  selectedYear: number | null;
+  selectedMonth: number | null;
+  search: string;
+  appliedSearch: string;
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  onBack: () => void;
+  onStatus: (status: ShippingHistoryStatus) => void;
+  onMonth: (year: number, month: number) => void;
+  onSearchChange: (value: string) => void;
+  onSearch: () => void;
+  onLoadMore: () => void;
+  onOpen: (request: ShippingRequest) => void;
+}) {
+  const years = useMemo(() => Array.from(new Set(months.map((row) => row.year))), [months]);
+  const searchGroups = useMemo(() => {
+    const groups = new Map<string, { year: number; month: number; rows: ShippingRequest[] }>();
+    rows.forEach((row) => {
+      const value = row.status === "CANCELLED" ? row.cancelled_at : row.picked_up_at;
+      if (!value) return;
+      const { year, month } = kstYearMonth(value);
+      const key = `${year}-${month}`;
+      const current = groups.get(key) ?? { year, month, rows: [] };
+      current.rows.push(row);
+      groups.set(key, current);
+    });
+    return Array.from(groups.values()).sort((left, right) => right.year - left.year || right.month - left.month);
+  }, [rows]);
+  const historyEmptyBody = status === "PICKED_UP"
+    ? "출하 완료 처리된 요청이 아직 없습니다."
+    : "요청 취소 처리된 이력이 아직 없습니다.";
+
+  const renderRows = (groupRows: ShippingRequest[]) => (
+    <div className="grid content-start gap-2 p-2">
+      {groupRows.map((request) => (
+        <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />
+      ))}
+    </div>
+  );
+
   return (
     <div className={SHIPPING_FLEX_COL_CLASS}>
       <Panel dataTestId="shipping-history-list" className={SHIPPING_FLEX_COL_CLASS}>
-        <div className={SHIPPING_ROW_CLASS}>
-          <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <PanelTitle icon={History} title="출하 완료 목록" subtitle={`완료 이력 ${rows.length}건 · 최종 PF, 동반 출하품, 연결 입출고 로그를 확인합니다.`} />
+        <div className={SHIPPING_TOP_ROW_CLASS}>
+          <div className={SHIPPING_ROW_CLASS}>
+            <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <PanelTitle icon={History} title="출하 이력" subtitle="상태와 연월 폴더로 찾거나 전체 기간을 검색합니다." />
+          </div>
+          <div className="flex min-h-11 rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            {([[
+              "PICKED_UP",
+              "출하 완료",
+            ], [
+              "CANCELLED",
+              "요청 취소",
+            ]] as const).map(([value, label]) => {
+              const active = status === value;
+              const tone = value === "PICKED_UP" ? LEGACY_COLORS.purple : LEGACY_COLORS.red;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onStatus(value)}
+                  className="min-h-11 rounded-[9px] px-4 text-sm font-black"
+                  style={{ background: active ? tint(tone, 16) : "transparent", color: active ? tone : LEGACY_COLORS.muted2 }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className={SHIPPING_MODAL_BODY_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {rows.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center">
-              <EmptyState title="출하 이력 없음" body="픽업 완료 처리된 요청이 아직 없습니다." />
-            </div>
+
+        <form
+          className="mt-3 flex min-w-0 gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSearch();
+          }}
+        >
+          <input
+            type="search"
+            aria-label="출하 이력 검색"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            className={`${SHIPPING_TEXT_INPUT_CLASS} min-w-0 flex-1`}
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            placeholder="인보이스 번호 또는 PF 품명 검색"
+          />
+          <button type="submit" className="min-h-11 rounded-[12px] border px-5 text-sm font-black" style={{ background: tint(LEGACY_COLORS.blue, 14), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}>
+            검색
+          </button>
+        </form>
+
+        <div className={`${SHIPPING_MODAL_BODY_CLASS} overflow-y-auto`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          {error ? (
+            <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력을 불러오지 못했습니다" body={error} /></div>
+          ) : loading && rows.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력을 불러오는 중입니다" body="잠시만 기다려주세요." /></div>
+          ) : appliedSearch ? (
+            searchGroups.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center"><EmptyState title="검색 결과 없음" body="인보이스 번호 또는 PF 품명을 확인하세요." /></div>
+            ) : (
+              <div className="grid flex-1 content-start gap-2">
+                {Array.from(new Set(searchGroups.map((group) => group.year))).map((year, yearIndex) => (
+                  <details key={year} open={yearIndex === 0} className="rounded-[14px] border" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                    <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{year}년</summary>
+                    <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
+                      {searchGroups.filter((group) => group.year === year).map((group) => (
+                        <details key={`${group.year}-${group.month}`} open className="rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black" style={{ color: LEGACY_COLORS.purple }}>{group.month}월 · {group.rows.length}건</summary>
+                          {renderRows(group.rows)}
+                        </details>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )
+          ) : years.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력 없음" body={historyEmptyBody} /></div>
           ) : (
-            <div className="grid flex-1 content-start gap-2 overflow-y-auto pr-1">
-              {rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)}
+            <div className="grid flex-1 content-start gap-2">
+              {years.map((year, yearIndex) => (
+                <details key={year} open={year === selectedYear || yearIndex === 0} className="rounded-[14px] border" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                  <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{year}년</summary>
+                  <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
+                    {months.filter((row) => row.year === year).map((row) => {
+                      const selected = selectedYear === row.year && selectedMonth === row.month;
+                      return (
+                        <details key={`${row.year}-${row.month}`} open={selected} className="rounded-[12px] border" style={{ background: selected ? tint(LEGACY_COLORS.purple, 8) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.purple, 38) : LEGACY_COLORS.border }}>
+                          <summary
+                            className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black"
+                            style={{ color: selected ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
+                            onClick={() => onMonth(row.year, row.month)}
+                          >
+                            {row.month}월 · {row.count}건
+                          </summary>
+                          {selected && renderRows(rows)}
+                        </details>
+                      );
+                    })}
+                  </div>
+                </details>
+              ))}
             </div>
           )}
         </div>
+        {hasMore && (
+          <button type="button" onClick={onLoadMore} disabled={loading} className="mt-3 min-h-11 rounded-[12px] border text-sm font-black disabled:opacity-45" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+            {loading ? "불러오는 중" : "더 보기"}
+          </button>
+        )}
       </Panel>
     </div>
   );
@@ -1302,6 +1939,7 @@ function RequestSection(props: {
   itemById: Map<string, Item>;
   itemOptions: Item[];
   basePfId: string;
+  invoiceNumber: string;
   requestedBy: string;
   requestQuantity: number | "";
   companionDraft: CompanionDraftLine[];
@@ -1317,6 +1955,7 @@ function RequestSection(props: {
   onNew: () => void;
   onSelectRequest: (req: ShippingRequest) => void;
   onBasePfChange: (value: string) => void;
+  onInvoiceNumber: (value: string) => void;
   onRequestedBy: (value: string) => void;
   onRequestQuantity: (value: number | "") => void;
   onCustomPaName: (value: string) => void;
@@ -1488,6 +2127,18 @@ function RequestSection(props: {
           {props.wizardStep === 1 && (
             <WorkStep number={1} title="기준 PF 선택" body="PF·수량" dataTestId="shipping-wizard-step-1" showHeader={false}>
               <div className="flex h-full min-h-0 flex-col gap-3">
+                <Field label="인보이스 번호">
+                  <input
+                    data-testid="shipping-invoice-number"
+                    aria-label="인보이스 번호"
+                    value={props.invoiceNumber}
+                    disabled={locked || props.pending !== null}
+                    onChange={(event) => props.onInvoiceNumber(event.target.value)}
+                    className={SHIPPING_TEXT_INPUT_CLASS}
+                    style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                    placeholder="인보이스 번호 입력"
+                  />
+                </Field>
                 <Field label="PF 검색">
                   <input
                     data-testid="shipping-pf-search"
@@ -1747,6 +2398,7 @@ function PrepSection({
   onOpenPrepare,
   onCancel,
   onPickup,
+  onInvoiceSaved,
 }: {
   showList?: boolean;
   requests: ShippingRequest[];
@@ -1756,6 +2408,7 @@ function PrepSection({
   onOpenPrepare: (req: ShippingRequest) => void;
   onCancel: (req: ShippingRequest) => void;
   onPickup: (req: ShippingRequest) => void;
+  onInvoiceSaved: (request: ShippingRequest) => void;
 }) {
   const requestQty = selected?.request_quantity ?? 1;
   const paLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PA") ?? [];
@@ -1793,6 +2446,11 @@ function PrepSection({
 
             {selected.notes && <Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={selected.notes} />}
 
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+              <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
+              <RevisionHistory request={selected} />
+            </div>
+
             {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} kindByItemId={shortageKindByItemId} />}
 
             <div className="grid gap-3 md:grid-cols-3">
@@ -1809,7 +2467,7 @@ function PrepSection({
 
             <div data-testid="shipping-prep-actions" className="flex shrink-0 flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
               {selected.status === "PREPARING" && (
-                <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onOpenPrepare(selected)} disabled={pending !== null} />
+                <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onOpenPrepare(selected)} disabled={pending !== null || !selected.invoice_number?.trim()} />
               )}
               {selected.status === "PREPARED" && (
                 <>
@@ -1997,7 +2655,7 @@ function CompanionPrepList({
   );
 }
 
-function HistorySection({ showList = true, rows, selected, onSelect }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; onSelect: (req: ShippingRequest) => void }) {
+function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; onSelect: (req: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[420px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
       {showList && (
@@ -2016,12 +2674,20 @@ function HistorySection({ showList = true, rows, selected, onSelect }: { showLis
       )}
       <Panel dataTestId="shipping-history-detail">
         {!selected ? (
-          <EmptyState title="선택된 이력 없음" body="왼쪽에서 완료 이력을 선택하세요." />
+          <EmptyState title="선택된 이력 없음" body={emptyBody ?? "왼쪽에서 완료 이력을 선택하세요."} />
         ) : (
           <div className="grid gap-4">
             <div className={SHIPPING_TOP_ROW_CLASS}>
-              <PanelTitle icon={PackageCheck} title={selected.final_pf_item_name ?? selected.base_pf_item_name} subtitle={`픽업 완료 ${formatDate(selected.picked_up_at)}`} />
+              <PanelTitle
+                icon={PackageCheck}
+                title={selected.final_pf_item_name ?? selected.base_pf_item_name}
+                subtitle={`${selected.status === "CANCELLED" ? "요청 취소" : "출하 완료"} ${formatDate(selected.status === "CANCELLED" ? selected.cancelled_at ?? null : selected.picked_up_at)}`}
+              />
               <StatusBadge status={selected.status} />
+            </div>
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+              <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
+              <RevisionHistory request={selected} />
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <Metric label="최종 PA" value={selected.final_pa_item_name ?? "-"} />
@@ -2138,10 +2804,20 @@ function CompanionEditor({
         ) : (
           lines.map((line) => {
             const item = itemById.get(line.item_id);
+            const needsSalesReview = Boolean(item?.sales_review_required);
             return (
-              <div key={line.key} data-testid={`shipping-companion-line-${line.item_id}`} className="grid min-w-0 items-stretch gap-2 overflow-hidden rounded-[10px] border p-2 lg:grid-cols-[minmax(0,1fr)_90px_104px]" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+              <div
+                key={line.key}
+                data-testid={`shipping-companion-line-${line.item_id}`}
+                data-sales-review={String(needsSalesReview)}
+                className="grid min-w-0 items-stretch gap-2 overflow-hidden rounded-[10px] border p-2 lg:grid-cols-[minmax(0,1fr)_90px_104px]"
+                style={{ background: needsSalesReview ? tint(LEGACY_COLORS.yellow, 9) : LEGACY_COLORS.s1, borderColor: needsSalesReview ? tint(LEGACY_COLORS.yellow, 48) : LEGACY_COLORS.border }}
+              >
                 <div className="min-w-0 lg:contents">
-                  <div className="line-clamp-2 break-words text-sm font-black leading-snug lg:col-start-1 lg:row-start-1" style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
+                  <div className="line-clamp-2 break-words text-sm font-black leading-snug lg:col-start-1 lg:row-start-1" style={{ color: LEGACY_COLORS.text }}>
+                    {item?.item_name ?? "품목 없음"}
+                    {needsSalesReview && <span className="ml-2 inline-flex"><SalesReviewBadge /></span>}
+                  </div>
                   <div className="mt-0.5 truncate text-xs font-bold lg:col-start-1 lg:row-start-2" style={{ color: LEGACY_COLORS.muted2 }}>
                     <SummaryCode code={item?.mes_code ?? "코드 없음"} testId={`shipping-companion-code-${line.item_id}`} />
                   </div>
@@ -2214,6 +2890,7 @@ function BomEditor({
         ) : (
           lines.map((line) => {
             const item = itemById.get(line.child_item_id);
+            const needsSalesReview = Boolean(item?.sales_review_required);
             const isCustom = line.origin === "CUSTOM";
             const isExcluded = !line.included;
             const badgeTone = isExcluded ? LEGACY_COLORS.red : isCustom ? LEGACY_COLORS.cyan : LEGACY_COLORS.green;
@@ -2230,8 +2907,12 @@ function BomEditor({
                 data-bom-line-child={line.child_item_id}
                 data-bom-line-included={String(line.included)}
                 data-bom-line-origin={line.origin}
+                data-sales-review={String(needsSalesReview)}
                 className="grid min-w-0 items-stretch gap-2 rounded-[10px] border p-2 lg:grid-cols-[minmax(0,1fr)_90px_104px]"
-                style={{ background: isExcluded ? tint(LEGACY_COLORS.red, 8) : LEGACY_COLORS.s1, borderColor: isExcluded ? tint(LEGACY_COLORS.red, 36) : LEGACY_COLORS.border }}
+                style={{
+                  background: isExcluded ? tint(LEGACY_COLORS.red, 8) : needsSalesReview ? tint(LEGACY_COLORS.yellow, 9) : LEGACY_COLORS.s1,
+                  borderColor: isExcluded ? tint(LEGACY_COLORS.red, 36) : needsSalesReview ? tint(LEGACY_COLORS.yellow, 48) : LEGACY_COLORS.border,
+                }}
               >
                 <div className="grid min-w-0 gap-1 lg:contents">
                   <div data-testid="shipping-bom-readonly-item" className="min-h-9 min-w-0 rounded-[9px] border px-3 py-2 lg:col-start-1 lg:row-start-1" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: isExcluded ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}>
@@ -2240,6 +2921,7 @@ function BomEditor({
                   <div data-testid="shipping-bom-line-meta" className="flex items-center gap-1.5 lg:col-start-1 lg:row-start-2 [&>span:last-child]:hidden">
                     <SummaryCode code={item?.mes_code ?? "-"} testId={`shipping-bom-code-${line.child_item_id}`} className="order-2" />
                     <span className="rounded-full px-2 py-0.5 text-[11px] font-black" style={{ background: tint(badgeTone, 18), color: badgeTone }}>{badgeLabel}</span>
+                    {needsSalesReview && <SalesReviewBadge />}
                     <span className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "품목 미선택"}</span>
                   </div>
                 </div>
@@ -2457,6 +3139,12 @@ function ShippingActionConfirmModal({
 
 function RequestRow({ request, active, onClick }: { request: ShippingRequest; active: boolean; onClick: () => void }) {
   const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
+  const dateLabel = request.status === "PICKED_UP" ? "출하 완료" : request.status === "CANCELLED" ? "요청 취소" : "생성";
+  const dateValue = request.status === "PICKED_UP"
+    ? request.picked_up_at
+    : request.status === "CANCELLED"
+      ? request.cancelled_at ?? null
+      : request.created_at;
   const baseLabel = request.final_pf_item_name && request.final_pf_item_name !== request.base_pf_item_name
     ? ` · 기준 ${request.base_pf_item_name}`
     : "";
@@ -2483,7 +3171,10 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
         <StatusBadge status={request.status} compact />
       </div>
       <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        생성 {formatDate(request.created_at)}{baseLabel}
+        {dateLabel} {formatDate(dateValue)}{baseLabel}
+      </div>
+      <div className="mt-1 truncate text-xs font-black" style={{ color: request.invoice_number ? LEGACY_COLORS.text : LEGACY_COLORS.yellow }}>
+        인보이스 번호 · {request.invoice_number ?? "미입력"}
       </div>
     </button>
   );
@@ -2577,13 +3268,15 @@ function BomChangeSummaryCard({
       <div data-testid={scrollListTestId} className={`grid min-h-0 gap-2 pr-1 ${finalLayout ? "h-[58px] grid-cols-2 overflow-x-hidden overflow-y-auto" : "max-h-[360px] overflow-y-auto xl:grid-cols-2"}`}>
         {lines.map((line) => {
           const item = itemById.get(line.child_item_id);
+          const needsSalesReview = Boolean(item?.sales_review_required);
           const label = !line.included ? "제외" : line.origin === "CUSTOM" ? "추가" : "포함";
           const tone = !line.included ? LEGACY_COLORS.red : line.origin === "CUSTOM" ? LEGACY_COLORS.cyan : LEGACY_COLORS.green;
           return (
-            <div key={line.key} data-testid="shipping-final-bom-change-row" className={`${SHIPPING_CELL_CLASS} ${finalLayout ? "h-[58px] overflow-hidden" : ""}`} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+            <div key={line.key} data-testid="shipping-final-bom-change-row" data-sales-review={String(needsSalesReview)} className={`${SHIPPING_CELL_CLASS} ${finalLayout ? "h-[58px] overflow-hidden" : ""}`} style={{ background: needsSalesReview ? tint(LEGACY_COLORS.yellow, 9) : LEGACY_COLORS.bg, borderColor: needsSalesReview ? tint(LEGACY_COLORS.yellow, 48) : LEGACY_COLORS.border }}>
               <div className="flex min-w-0 items-start justify-between gap-2">
                 <div className={`${finalLayout ? "truncate" : "line-clamp-2"} text-sm font-black leading-snug`} title={item?.item_name ?? "품목 없음"} style={{ color: LEGACY_COLORS.text }}>{item?.item_name ?? "품목 없음"}</div>
                 <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(tone, 14), color: tone }}>{label}</span>
+                {needsSalesReview && <SalesReviewBadge />}
               </div>
               <div className="mt-0.5 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 <SummaryCode code={item?.mes_code ?? "코드 없음"} testId={`shipping-bom-change-code-${line.child_item_id}`} />
@@ -2671,10 +3364,20 @@ function FinalRequirementGroup({
           const item = row.itemId ? itemById.get(row.itemId) : undefined;
           const itemName = row.itemName ?? item?.item_name ?? "품목 없음";
           const itemCode = row.code ?? item?.mes_code ?? "코드 없음";
+          const needsSalesReview = Boolean(item?.sales_review_required);
           return (
-            <div key={row.id} data-testid={row.testId} className={`${SHIPPING_CELL_CLASS} flex min-w-0 items-center justify-between gap-2`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            <div
+              key={row.id}
+              data-testid={row.testId}
+              data-sales-review={String(needsSalesReview)}
+              className={`${SHIPPING_CELL_CLASS} flex min-w-0 items-center justify-between gap-2`}
+              style={{ background: needsSalesReview ? tint(LEGACY_COLORS.yellow, 9) : LEGACY_COLORS.s2, borderColor: needsSalesReview ? tint(LEGACY_COLORS.yellow, 48) : LEGACY_COLORS.border }}
+            >
               <div className="min-w-0">
-                <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{itemName}</div>
+                <div className="line-clamp-2 text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>
+                  {itemName}
+                  {needsSalesReview && <span className="ml-2 inline-flex"><SalesReviewBadge /></span>}
+                </div>
                 <div data-testid={`shipping-final-code-meta-${row.id}`} className="mt-0.5 flex min-w-0 items-center gap-1 whitespace-nowrap text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                   <SummaryCode code={itemCode} testId={`shipping-final-code-${row.id}`} />
                 </div>
@@ -2770,6 +3473,14 @@ function StatusBadge({ status, compact = false }: { status: ShippingRequestStatu
       style={{ background: tint(STATUS_TONE[status], 20), color: STATUS_TONE[status] }}
     >
       {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+function SalesReviewBadge() {
+  return (
+    <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-black" style={{ background: tint(LEGACY_COLORS.yellow, 18), color: LEGACY_COLORS.yellow }}>
+      영업 확인
     </span>
   );
 }

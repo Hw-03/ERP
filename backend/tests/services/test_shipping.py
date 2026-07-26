@@ -8,6 +8,8 @@ from sqlalchemy import event
 from app.models import (
     BOM,
     DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
@@ -17,6 +19,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import shipping as shipping_svc
+from app.services import shipping_actions as shipping_actions_svc
 
 
 def _stock(db_session, item):
@@ -75,11 +78,43 @@ def _bom_line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
     }
 
 
+def _shipping_actor(db_session) -> Employee:
+    actor = Employee(
+        employee_code="SHIPPING-SERVICE-ACTOR",
+        name="Shipping service actor",
+        role="worker",
+        department=DepartmentEnum.SALES.value,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active=True,
+    )
+    db_session.add(actor)
+    db_session.flush()
+    return actor
+
+
 def test_companion_lines_do_not_map_bom_inclusion_flags():
     column_names = set(ShippingRequestCompanionLine.__table__.columns.keys())
 
     assert "included" not in column_names
     assert "origin" not in column_names
+
+
+def test_prepare_without_invoice_keeps_request_and_events_unchanged(db_session, make_item, make_bom):
+    af = make_item(name="Invoice guard AF", process_type_code="AF", model_symbol="3", serial_no=1)
+    pa = make_item(name="Invoice guard PA", process_type_code="PA", model_symbol="3", serial_no=2)
+    pf = make_item(name="Invoice guard PF", process_type_code="PF", model_symbol="3", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = shipping_svc.create_request(db_session, {"base_pf_item_id": pf.item_id})
+    shipping_svc.send_to_prep(db_session, request.request_id)
+    event_count = len(request.events)
+
+    with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
+        shipping_svc.prepare_complete(db_session, request.request_id)
+
+    assert request.status.value == "PREPARING"
+    assert len(request.events) == event_count
 
 
 def test_default_shipping_bom_lines_use_standard_child_order(db_session, make_item, make_bom):
@@ -201,6 +236,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         {
             "base_pf_item_id": base_pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "SERVICE-INV-001",
             "custom_pa_name": "Target PA with Cable",
             "custom_pf_name": "Target PF with Cable",
             "bom_lines": [_line(af), _line(cable)],
@@ -337,6 +373,7 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(db_sessio
         {
             "base_pf_item_id": base_pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "SERVICE-INV-002",
             "companion_lines": [{"item_id": carton.item_id, "quantity": 1, "unit": "EA"}],
         },
     )
@@ -356,6 +393,13 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(db_sessio
 
     shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
 
+    actor = _shipping_actor(db_session)
+    with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
+        shipping_svc.update_request(db_session, req.request_id, {"invoice_number": None}, actor)
+    with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
+        shipping_svc.update_invoice(db_session, req.request_id, None, actor)
+    assert req.invoice_number == "SERVICE-INV-002"
+
     assert req.final_pa_item_id == base_pa.item_id
     assert req.final_pf_item_id == base_pf.item_id
     assert _location_qty(db_session, base_pa, DepartmentEnum.SHIPPING) == 1
@@ -369,6 +413,59 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(db_sessio
     )
     assert cancelled
     assert all(log.cancelled for log in cancelled)
+
+
+def test_request_mutations_require_actor_before_writing(db_session, make_item):
+    af = make_item(name="Actor guard AF", process_type_code="AF", model_symbol="4", serial_no=1)
+    pa = make_item(name="Actor guard PA", process_type_code="PA", model_symbol="4", serial_no=2)
+    pf = make_item(name="Actor guard PF", process_type_code="PF", model_symbol="4", serial_no=3)
+    db_session.add(BOM(parent_item_id=pa.item_id, child_item_id=af.item_id, quantity=1, unit="EA"))
+    db_session.add(BOM(parent_item_id=pf.item_id, child_item_id=pa.item_id, quantity=1, unit="EA"))
+    db_session.commit()
+    request = shipping_svc.create_request(db_session, {"base_pf_item_id": pf.item_id})
+    event_count = len(request.events)
+
+    with pytest.raises(shipping_svc.ShippingError, match="작업자"):
+        shipping_svc.update_request(db_session, request.request_id, {"notes": "no actor"}, None)
+    with pytest.raises(shipping_svc.ShippingError, match="작업자"):
+        shipping_actions_svc.update_invoice(db_session, request.request_id, "ACTOR-INV", None)
+    with pytest.raises(shipping_svc.ShippingError, match="작업자"):
+        shipping_svc.delete_request(db_session, request.request_id, None)
+    inactive_actor = _shipping_actor(db_session)
+    inactive_actor.is_active = False
+    with pytest.raises(shipping_svc.ShippingError, match="비활성"):
+        shipping_svc.update_invoice(db_session, request.request_id, "INACTIVE-INV", inactive_actor)
+
+    assert request.notes is None
+    assert request.invoice_number is None
+    assert request.status.value == "REQUESTED"
+    assert len(request.events) == event_count
+
+
+def test_cancelled_without_history_can_clear_but_legacy_picked_up_cannot(db_session, make_item, make_bom):
+    af = make_item(name="Cancel clear AF", process_type_code="AF", model_symbol="4", serial_no=1)
+    pa = make_item(name="Cancel clear PA", process_type_code="PA", model_symbol="4", serial_no=2)
+    pf = make_item(name="Cancel clear PF", process_type_code="PF", model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    actor = _shipping_actor(db_session)
+    request = shipping_svc.create_request(
+        db_session,
+        {"base_pf_item_id": pf.item_id, "invoice_number": "CANCEL-CLEAR"},
+    )
+
+    shipping_svc.delete_request(db_session, request.request_id, actor)
+    updated = shipping_svc.update_invoice(db_session, request.request_id, None, actor)
+
+    assert updated.status.value == "CANCELLED"
+    assert updated.invoice_number is None
+
+    shipping_svc.update_invoice(db_session, request.request_id, "PICKED-LEGACY", actor)
+    request.status = shipping_svc.ShippingRequestStatusEnum.PICKED_UP
+    request.prepared_at = None
+    with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
+        shipping_svc.update_invoice(db_session, request.request_id, None, actor)
+    assert request.invoice_number == "PICKED-LEGACY"
 
 
 def test_same_bom_is_resolved_on_request_and_companion_lines_do_not_create_transaction_logs(
@@ -389,6 +486,7 @@ def test_same_bom_is_resolved_on_request_and_companion_lines_do_not_create_trans
         {
             "base_pf_item_id": pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "SERVICE-INV-003",
             "bom_lines": [_line(af)],
             "companion_lines": [{"item_id": carton.item_id, "quantity": 1, "unit": "EA"}],
         },
@@ -425,6 +523,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
         {
             "base_pf_item_id": pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "SERVICE-INV-004",
             "request_quantity": 3,
             "companion_lines": [{"item_id": carton.item_id, "quantity": 2, "unit": "EA"}],
         },
@@ -510,6 +609,7 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
         {
             "base_pf_item_id": pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "SERVICE-INV-005",
             "custom_pa_name": "Cable excluded PA",
             "custom_pf_name": "Cable excluded PF",
             "bom_lines": [
@@ -566,6 +666,7 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
         {
             "base_pf_item_id": pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "SERVICE-INV-006",
             "custom_pf_name": "Bracket PF",
             "bom_lines": bom_lines,
         },

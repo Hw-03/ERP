@@ -21,9 +21,11 @@ from app.models import (
     ShippingRequestChecklistLine,
     ShippingRequestCompanionLine,
     ShippingRequestEvent,
+    ShippingRequestRevision,
     ShippingRequestStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
+    Employee,
 )
 from app.repositories import item_repository
 from app.services import inv_effect
@@ -45,11 +47,20 @@ class ShippingError(ValueError):
     """Base shipping workflow error."""
 
 
+class ShippingConflictError(ShippingError):
+    """Shipping request uniqueness conflict."""
+
+
 def _get_request(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = db.query(ShippingRequest).filter(ShippingRequest.request_id == request_id).first()
     if req is None:
         raise ShippingError("출하 요청을 찾을 수 없습니다.")
     return req
+
+
+def get_request(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+    """상태와 무관하게 출하 요청 상세를 반환한다."""
+    return _get_request(db, request_id)
 
 
 def _get_item(db: Session, item_id: uuid.UUID) -> Item:
@@ -61,6 +72,119 @@ def _get_item(db: Session, item_id: uuid.UUID) -> Item:
 
 def _record_event(db: Session, req: ShippingRequest, event_type: str, message: str | None = None) -> None:
     db.add(ShippingRequestEvent(request_id=req.request_id, event_type=event_type, message=message))
+
+
+def _normalize_invoice_number(value: str | None) -> str | None:
+    normalized = (value or "").strip().upper()
+    return normalized or None
+
+
+def _require_actor(actor: Employee | None) -> Employee:
+    if actor is None:
+        raise ShippingError("작업자 정보가 필요합니다.")
+    if not actor.is_active:
+        raise ShippingError("비활성 작업자는 출하 요청을 변경할 수 없습니다.")
+    return actor
+
+
+def _has_preparation_history(req: ShippingRequest) -> bool:
+    """현재 상태와 무관하게 준비 완료가 있었던 요청인지 판별한다."""
+    return req.prepared_at is not None or any(event.event_type == "PREPARED" for event in req.events)
+
+
+def _ensure_invoice_can_be_cleared(req: ShippingRequest, invoice_number: str | None) -> None:
+    if invoice_number is None and (
+        req.status in {ShippingRequestStatusEnum.PREPARED, ShippingRequestStatusEnum.PICKED_UP}
+        or _has_preparation_history(req)
+    ):
+        raise ShippingError("준비 완료 이력이 있는 요청의 인보이스 번호는 비울 수 없습니다.")
+
+
+def _ensure_invoice_available(
+    db: Session,
+    invoice_number: str | None,
+    request_id: uuid.UUID | None = None,
+) -> None:
+    if invoice_number is None:
+        return
+    query = db.query(ShippingRequest).filter(ShippingRequest.invoice_number == invoice_number)
+    if request_id is not None:
+        query = query.filter(ShippingRequest.request_id != request_id)
+    if query.first() is not None:
+        raise ShippingConflictError("이미 사용 중인 인보이스 번호입니다.")
+
+
+def _revision_snapshot(req: ShippingRequest) -> dict:
+    return {
+        "request_quantity": int(req.request_quantity or 1),
+        "requested_by_name": req.requested_by_name,
+        "custom_pa_name": req.custom_pa_name,
+        "custom_pf_name": req.custom_pf_name,
+        "notes": req.notes,
+        "invoice_number": req.invoice_number,
+        "bom_lines": [
+            {
+                "parent_stage": line.parent_stage,
+                "child_item_id": str(line.child_item_id),
+                "item_name": line.child_item.item_name,
+                "mes_code": line.child_item.mes_code,
+                "quantity": int(line.quantity),
+                "unit": line.unit,
+                "included": bool(line.included),
+                "origin": line.origin,
+            }
+            for line in req.bom_lines
+        ],
+        "companion_lines": [
+            {
+                "item_id": str(line.item_id),
+                "item_name": line.item.item_name,
+                "mes_code": line.item.mes_code,
+                "quantity": int(line.quantity),
+                "unit": line.unit,
+            }
+            for line in req.companion_lines
+        ],
+    }
+
+
+_PREPARATION_REVISION_FIELDS = {
+    "request_quantity",
+    "custom_pa_name",
+    "custom_pf_name",
+    "notes",
+    "bom_lines",
+    "companion_lines",
+}
+
+
+def _snapshot_changes(before: dict, after: dict) -> list[dict]:
+    return [
+        {"field": field, "before": before[field], "after": after[field]}
+        for field in before
+        if before[field] != after[field]
+    ]
+
+
+def _record_revision(
+    db: Session,
+    req: ShippingRequest,
+    actor: Employee,
+    changes: list[dict],
+) -> None:
+    if not changes:
+        return
+    fields = [change["field"] for change in changes]
+    db.add(
+        ShippingRequestRevision(
+            request_id=req.request_id,
+            edited_by_employee_id=actor.employee_id,
+            edited_by_name=actor.name,
+            summary=f"출하 요청 수정: {', '.join(fields)}",
+            affects_preparation=any(field in _PREPARATION_REVISION_FIELDS for field in fields),
+            changes=changes,
+        )
+    )
 
 
 def _request_quantity(req: ShippingRequest) -> int:
@@ -256,6 +380,8 @@ def _sync_checklist(db: Session, req: ShippingRequest) -> None:
 
 
 def create_request(db: Session, payload: dict) -> ShippingRequest:
+    invoice_number = _normalize_invoice_number(payload.get("invoice_number"))
+    _ensure_invoice_available(db, invoice_number)
     base_pf = _get_item(db, payload["base_pf_item_id"])
     if base_pf.process_type_code != "PF":
         raise ShippingError("기준 품목은 PF여야 합니다.")
@@ -266,6 +392,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
         custom_pa_name=payload.get("custom_pa_name"),
         custom_pf_name=payload.get("custom_pf_name"),
         notes=payload.get("notes"),
+        invoice_number=invoice_number,
     )
     db.add(req)
     db.flush()
@@ -281,10 +408,17 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     return req
 
 
-def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> ShippingRequest:
+def update_request(
+    db: Session,
+    request_id: uuid.UUID,
+    payload: dict,
+    actor: Employee,
+) -> ShippingRequest:
+    actor = _require_actor(actor)
     req = _get_request(db, request_id)
     if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
         raise ShippingError("준비 완료된 요청은 먼저 준비 완료 취소 후 수정할 수 있습니다.")
+    before = _revision_snapshot(req)
     if "request_quantity" in payload:
         req.request_quantity = _payload_request_quantity(payload)
     if "requested_by_name" in payload:
@@ -295,14 +429,27 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
         req.custom_pf_name = payload.get("custom_pf_name")
     if "notes" in payload:
         req.notes = payload.get("notes")
+    if "invoice_number" in payload:
+        invoice_number = _normalize_invoice_number(payload.get("invoice_number"))
+        _ensure_invoice_can_be_cleared(req, invoice_number)
+        _ensure_invoice_available(db, invoice_number, req.request_id)
+        req.invoice_number = invoice_number
     if "bom_lines" in payload:
         _replace_bom_lines(db, req, _normalize_bom_lines(db, req.base_pf_item, payload.get("bom_lines")))
         db.refresh(req)
         _sync_checklist(db, req)
     if "companion_lines" in payload:
         _replace_companions(db, req, payload.get("companion_lines") or [])
+    db.flush()
     db.refresh(req)
     _resolve_final_items(db, req)
+    db.refresh(req)
+    after = _revision_snapshot(req)
+    changes = _snapshot_changes(before, after)
+    if not changes:
+        db.flush()
+        return req
+    _record_revision(db, req, actor, changes)
     req.updated_at = datetime.utcnow()
     _record_event(db, req, "REQUEST_UPDATED", "출하 요청 수정")
     db.flush()
@@ -310,12 +457,44 @@ def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> Shippin
 
 
 
-def delete_request(db: Session, request_id: uuid.UUID) -> None:
+def delete_request(
+    db: Session,
+    request_id: uuid.UUID,
+    actor: Employee,
+) -> None:
+    actor = _require_actor(actor)
     req = _get_request(db, request_id)
     if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
         raise ShippingError("요청 또는 준비 중 상태에서만 출하 요청을 취소할 수 있습니다.")
-    db.delete(req)
+    req.status = ShippingRequestStatusEnum.CANCELLED
+    req.cancelled_at = datetime.utcnow()
+    req.cancelled_by_employee_id = actor.employee_id
+    req.cancelled_by_name = actor.name
+    req.updated_at = datetime.utcnow()
+    _record_event(db, req, "CANCELLED", "출하 요청 취소")
     db.flush()
+
+
+def update_invoice(
+    db: Session,
+    request_id: uuid.UUID,
+    invoice_number: str | None,
+    actor: Employee,
+) -> ShippingRequest:
+    actor = _require_actor(actor)
+    req = _get_request(db, request_id)
+    normalized = _normalize_invoice_number(invoice_number)
+    _ensure_invoice_can_be_cleared(req, normalized)
+    _ensure_invoice_available(db, normalized, req.request_id)
+    before = _revision_snapshot(req)
+    req.invoice_number = normalized
+    changes = _snapshot_changes(before, _revision_snapshot(req))
+    if changes:
+        req.updated_at = datetime.utcnow()
+        _record_revision(db, req, actor, changes)
+        _record_event(db, req, "INVOICE_UPDATED", "인보이스 번호 수정")
+    db.flush()
+    return req
 
 def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
@@ -1201,6 +1380,8 @@ def _consume_companion_allocations(db: Session, req: ShippingRequest) -> None:
 
 def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
+    if req.invoice_number is None:
+        raise ShippingError("준비 완료 전에 인보이스 번호를 입력해야 합니다.")
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 요청에서만 준비 완료할 수 있습니다.")
     request_qty = _request_quantity(req)

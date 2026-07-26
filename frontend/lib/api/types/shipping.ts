@@ -1,6 +1,7 @@
 import type { TransactionType } from "./shared";
 
-export type ShippingRequestStatus = "REQUESTED" | "PREPARING" | "PREPARED" | "PICKED_UP";
+export type ShippingRequestStatus = "REQUESTED" | "PREPARING" | "PREPARED" | "PICKED_UP" | "CANCELLED";
+export type ShippingHistoryStatus = "PICKED_UP" | "CANCELLED";
 export type ShippingBomParentStage = "PA" | "PF";
 export type ShippingBomLineOrigin = "DEFAULT" | "CUSTOM";
 
@@ -21,6 +22,7 @@ export interface ShippingCompanionLineInput {
 
 export interface ShippingRequestCreatePayload {
   base_pf_item_id: string;
+  invoice_number?: string | null;
   request_quantity?: number;
   requested_by_name?: string | null;
   custom_pa_name?: string | null;
@@ -31,6 +33,7 @@ export interface ShippingRequestCreatePayload {
 }
 
 export interface ShippingRequestUpdatePayload {
+  invoice_number?: string | null;
   request_quantity?: number;
   requested_by_name?: string | null;
   custom_pa_name?: string | null;
@@ -155,6 +158,23 @@ export interface ShippingAllocation {
   released_reason: string | null;
 }
 
+export interface ShippingRequestRevisionChange {
+  field: string;
+  before: unknown;
+  after: unknown;
+}
+
+export interface ShippingRequestRevision {
+  revision_id: string;
+  request_id: string;
+  edited_by_employee_id: string;
+  edited_by_name: string;
+  summary: string;
+  affects_preparation: boolean;
+  changes: ShippingRequestRevisionChange[];
+  created_at: string;
+}
+
 export interface ShippingStockShortage {
   item_id: string;
   item_name: string;
@@ -206,18 +226,44 @@ export interface ShippingRequest {
   custom_pa_name: string | null;
   custom_pf_name: string | null;
   notes: string | null;
+  invoice_number?: string | null;
   prepared_at: string | null;
   picked_up_at: string | null;
+  cancelled_at?: string | null;
+  cancelled_by_employee_id?: string | null;
+  cancelled_by_name?: string | null;
   created_at: string;
   updated_at: string;
   bom_lines: ShippingBomLine[];
   companion_lines: ShippingCompanionLine[];
   checklist_lines: ShippingChecklistLine[];
   events: ShippingEvent[];
+  latest_preparation_revision?: ShippingRequestRevision | null;
   transactions: ShippingTransactionLog[];
   allocations: ShippingAllocation[];
   stock_shortages: ShippingStockShortage[];
   transaction_count: number;
+}
+
+export interface ShippingHistoryPage {
+  requests: ShippingRequest[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface ShippingHistoryMonth {
+  year: number;
+  month: number;
+  count: number;
+}
+
+export interface ShippingHistoryParams {
+  status?: ShippingHistoryStatus;
+  year?: number;
+  month?: number;
+  q?: string;
+  cursor?: string;
+  limit?: number;
 }
 
 export interface ShippingBomMatchResponse {

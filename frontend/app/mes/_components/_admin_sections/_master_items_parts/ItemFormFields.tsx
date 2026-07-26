@@ -15,6 +15,7 @@ export type ItemFormData = {
   process_type_code: string;
   unit: string;
   model_slots: number[];
+  sales_review_required: boolean;
   initial_quantity?: string;
   mes_code?: string;
   initial_locations?: { department: string; quantity: string }[];
@@ -155,6 +156,35 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
           />
         </div>
       ))}
+
+      <label
+        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[18px] border px-4 py-3"
+        style={{
+          background: form.sales_review_required
+            ? `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, ${LEGACY_COLORS.s1})`
+            : LEGACY_COLORS.s1,
+          borderColor: form.sales_review_required ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
+        }}
+      >
+        <input
+          type="checkbox"
+          aria-label="영업 확인 필요"
+          checked={form.sales_review_required}
+          onChange={(event) => {
+            const checked = event.target.checked;
+            setForm((current) => ({ ...current, sales_review_required: checked }));
+          }}
+          className="h-5 w-5 shrink-0 accent-[var(--c-yellow)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+            영업 확인 필요
+          </span>
+          <span className="block text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            출하 요청 작성 시 강조하여 영업 확인이 필요한 품목임을 알립니다.
+          </span>
+        </span>
+      </label>
 
       {/* 카테고리 */}
       <div>

@@ -320,6 +320,7 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
             "request_quantity": 1,
             "requested_by_name": plan.actor.name,
             "notes": f"{marker} 출하",
+            "invoice_number": f"HISTORY-{uuid.uuid4().hex[:12].upper()}",
         },
     )
     shipping_svc.send_to_prep(db, request.request_id)

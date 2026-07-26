@@ -32,7 +32,7 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260724_0004"
+HEAD_REVISION = "20260724_0005"
 
 
 def test_schema_state_exposes_explicit_legacy_onboarding_state():
@@ -171,6 +171,7 @@ def _create_independent_legacy_items_database(path: Path) -> None:
                 legacy_item_type VARCHAR(50),
                 supplier VARCHAR(200),
                 min_stock INTEGER,
+                sales_review_required BOOLEAN DEFAULT 0 NOT NULL,
                 model_symbol VARCHAR(20) NOT NULL,
                 process_type_code VARCHAR(2) NOT NULL,
                 serial_no INTEGER NOT NULL,
@@ -232,6 +233,7 @@ def _create_independent_legacy_items_database(path: Path) -> None:
         assert "model_symbol VARCHAR(20) NOT NULL" in items_sql
         assert "process_type_code VARCHAR(2) NOT NULL" in items_sql
         assert "serial_no INTEGER NOT NULL" in items_sql
+        assert "sales_review_required BOOLEAN DEFAULT 0 NOT NULL" in items_sql
         assert "ck_items_serial_no_positive" not in items_sql
         pins_sql = db.execute(
             "SELECT sql FROM sqlite_master "

@@ -17,6 +17,7 @@ const I = (over: Partial<any> = {}): any => ({
   process_type_code: "TR",
   unit: "EA",
   model_slots: [],
+  sales_review_required: false,
   ...over,
 });
 
@@ -41,12 +42,13 @@ describe("useAdminMasterItemsForm", () => {
   });
 
   it("selectedItem 주어지면 form 자동 채워짐, dirty=false", () => {
-    const item = I();
+    const item = I({ sales_review_required: true });
     const { result } = renderHook(() =>
       useAdminMasterItemsForm(baseArgs({ selectedItem: item })),
     );
     expect(result.current.form.item_name).toBe("프로브");
     expect(result.current.form.mes_code).toBe("P-001");
+    expect(result.current.form.sales_review_required).toBe(true);
     expect(result.current.dirty).toBe(false);
   });
 
@@ -55,7 +57,7 @@ describe("useAdminMasterItemsForm", () => {
       useAdminMasterItemsForm(baseArgs({ selectedItem: I() })),
     );
     act(() => {
-      result.current.setForm((f) => ({ ...f, item_name: "변경됨" }));
+      result.current.setForm((f) => ({ ...f, item_name: "변경됨", sales_review_required: true }));
     });
     expect(result.current.dirty).toBe(true);
   });
@@ -74,7 +76,7 @@ describe("useAdminMasterItemsForm", () => {
     const args = baseArgs({ selectedItem: I() });
     const { result } = renderHook(() => useAdminMasterItemsForm(args));
     act(() => {
-      result.current.setForm((f) => ({ ...f, item_name: "변경됨" }));
+      result.current.setForm((f) => ({ ...f, item_name: "변경됨", sales_review_required: true }));
     });
     expect(result.current.dirty).toBe(true);
     await act(async () => {
@@ -83,6 +85,7 @@ describe("useAdminMasterItemsForm", () => {
     await waitFor(() => expect(result.current.dirty).toBe(false));
     expect(args.setItems).toHaveBeenCalled();
     expect(args.setSelectedItem).toHaveBeenCalledWith(updated);
+    expect(updateItemMock).toHaveBeenCalledWith("1", expect.objectContaining({ sales_review_required: true }));
   });
 
   it("emits item-change event after save success", async () => {

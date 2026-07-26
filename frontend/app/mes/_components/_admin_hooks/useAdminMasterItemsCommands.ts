@@ -66,6 +66,7 @@ export function useAdminMasterItemsCommands({
         process_type_code: addForm.process_type_code || undefined,
         unit: addForm.unit || "EA",
         model_slots: addForm.model_slots.length > 0 ? addForm.model_slots : undefined,
+        sales_review_required: addForm.sales_review_required,
         legacy_item_type: addForm.legacy_item_type || undefined,
         supplier: addForm.supplier || undefined,
         min_stock: addForm.min_stock ? Number(addForm.min_stock) : undefined,

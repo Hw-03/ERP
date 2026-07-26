@@ -43,6 +43,16 @@ ASSEMBLY_CHECKLIST_TABLES = frozenset(
         "assembly_checklist_items",
     }
 )
+SHIPPING_SALES_WORKFLOW_TABLES = frozenset({"shipping_request_revisions"})
+POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
+    "assembly_checklist",
+    "shipping_request_revisions",
+    "sales_review_required",
+    "invoice_number",
+    "cancelled_at",
+    "cancelled_by_employee_id",
+    "cancelled_by_name",
+)
 SCHEMA_STATE_METADATA = sa.MetaData()
 SCHEMA_STATE = sa.Table(
     SCHEMA_STATE_TABLE,
@@ -566,12 +576,26 @@ def _is_pre_assembly_checklist_schema(
     tables: set[str],
     differences: tuple[str, ...],
 ) -> bool:
-    """Recognize the exact pre-checklist schema for safe Alembic onboarding."""
+    """Recognize the approved pre-additive-migration schema for onboarding."""
 
     missing_tables = set(Base.metadata.tables) - tables
+    expected_missing_tables = (
+        ASSEMBLY_CHECKLIST_TABLES | SHIPPING_SALES_WORKFLOW_TABLES
+    )
+
+    def is_expected_addition(difference: str) -> bool:
+        if not any(
+            marker in difference for marker in POST_LEGACY_ADDITIVE_SCHEMA_MARKERS
+        ):
+            return False
+        return difference.startswith("Alembic metadata diff: ('add_") or (
+            difference.startswith("foreign key mismatch: shipping_requests ")
+            and "cancelled_by_employee_id" in difference
+        )
+
     return (
-        missing_tables == ASSEMBLY_CHECKLIST_TABLES
-        and all("assembly_checklist" in str(difference) for difference in differences)
+        missing_tables == expected_missing_tables
+        and all(is_expected_addition(str(difference)) for difference in differences)
     )
 
 

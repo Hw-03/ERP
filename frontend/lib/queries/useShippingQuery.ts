@@ -20,12 +20,48 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
-export function useShippingRequestsQuery(params?: Parameters<typeof api.getShippingRequests>[0]) {
+type ShippingRequestsQueryOptions = {
+  live?: boolean;
+};
+
+export function useShippingRequestsQuery(
+  params?: Parameters<typeof api.getShippingRequests>[0],
+  options: ShippingRequestsQueryOptions = {},
+) {
+  const live = options.live === true;
   return useQuery({
     queryKey: queryKeys.shipping.requests(params),
     queryFn: ({ signal }) => api.getShippingRequests(params, { signal }),
+    placeholderData: [],
+    ...(live
+      ? {
+          refetchOnMount: "always" as const,
+          refetchOnWindowFocus: false,
+          refetchInterval: STALE_TIME.VOLATILE,
+          staleTime: STALE_TIME.VOLATILE,
+        }
+      : {}),
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useShippingHistoryQuery(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.shipping.history(),
+    queryFn: () => api.getShippingHistory(),
+    enabled,
+    placeholderData: [],
+  });
+}
+
+export function useShippingRevisionsQuery(requestId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.shipping.revisions(requestId ?? ""),
+    queryFn: ({ signal }) => api.getShippingRevisions(requestId!, { signal }),
+    enabled: Boolean(requestId) && enabled,
     placeholderData: [],
   });
 }

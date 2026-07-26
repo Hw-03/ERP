@@ -15,6 +15,7 @@ function baseForm(overrides: Partial<ItemFormData> = {}): ItemFormData {
     process_type_code: "TR",
     unit: "EA",
     model_slots: [],
+    sales_review_required: false,
     initial_locations: [],
     ...overrides,
   };
@@ -118,5 +119,18 @@ describe("ItemFormFields", () => {
 
     expect(screen.getAllByText(/A-TR-/).some((element) => element.getAttribute("aria-readonly") === "true")).toBe(true);
     expect(container.querySelector("strong")).not.toBeInTheDocument();
+  });
+
+  it("renders a semantic sales-review checkbox with guidance", () => {
+    const setForm = vi.fn();
+    render(<ItemFormFields form={baseForm()} setForm={setForm} />);
+
+    const checkbox = screen.getByRole("checkbox", { name: "영업 확인 필요" });
+    expect(checkbox).not.toBeChecked();
+    expect(screen.getByText(/출하 요청 작성 시 강조/)).toBeInTheDocument();
+
+    fireEvent.click(checkbox);
+    const updater = setForm.mock.calls[0][0] as (form: ItemFormData) => ItemFormData;
+    expect(updater(baseForm()).sales_review_required).toBe(true);
   });
 });

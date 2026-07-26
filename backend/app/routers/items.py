@@ -101,6 +101,7 @@ def _to_item_with_inventory(
         legacy_item_type=item.legacy_item_type,
         supplier=item.supplier,
         min_stock=item.min_stock,
+        sales_review_required=bool(item.sales_review_required),
         mes_code=item.mes_code,
         model_symbol=item.model_symbol,
         model_slots=model_slots,
@@ -172,6 +173,7 @@ def create_item(
         legacy_item_type=payload.legacy_item_type,
         supplier=payload.supplier,
         min_stock=payload.min_stock,
+        sales_review_required=payload.sales_review_required,
         process_type_code=pt,
         model_symbol=model_sym,
         serial_no=serial,
@@ -500,6 +502,9 @@ def update_item(
         if new_val is not None and getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
+    if payload.sales_review_required is not None and item.sales_review_required != payload.sales_review_required:
+        item.sales_review_required = payload.sales_review_required
+        changed.append("sales_review_required")
 
     # 모델·카테고리 변경은 mes_code 재계산 트리거.
     # 의도: 사용자는 모델·카테고리만 바꾸고 mes_code 는 자동 부여.

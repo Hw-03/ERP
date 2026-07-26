@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Callable
 
@@ -11,6 +12,7 @@ from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
+    ShippingRequest,
     ShippingRequestStatusEnum,
     TransactionLog,
 )
@@ -47,6 +49,20 @@ def _employee(
     db_session.add(employee)
     db_session.flush()
     return employee
+
+
+@pytest.fixture(autouse=True)
+def _shipping_actor_header(client, db_session):
+    actor = _employee(
+        db_session,
+        code="shipping-test-actor",
+        name="출하 테스트 작업자",
+        department=DepartmentEnum.ASSEMBLY,
+    )
+    db_session.commit()
+    client.headers["X-MES-Employee-Code"] = actor.employee_code
+    yield
+    client.headers.pop("X-MES-Employee-Code", None)
 
 
 def _component_change_payload(
@@ -183,9 +199,10 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     create = client.post(
         "/api/shipping/requests",
         json={
-            "base_pf_item_id": str(base_pf.item_id),
-            "requested_by_name": "shipping-user",
-            "custom_pa_name": "Base PF with Pouch PA",
+                "base_pf_item_id": str(base_pf.item_id),
+                "requested_by_name": "shipping-user",
+                "invoice_number": "workflow-001",
+                "custom_pa_name": "Base PF with Pouch PA",
             "custom_pf_name": "Base PF with Pouch",
             "request_quantity": 2,
             "companion_lines": [{"item_id": str(carton.item_id), "quantity": 2, "unit": "EA"}],
@@ -267,20 +284,21 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     history = client.get("/api/shipping/history")
     assert history.status_code == 200, history.text
-    assert history.json()[0]["request_id"] == request_id
-    assert history.json()[0]["transaction_count"] >= 2
-    assert history.json()[0]["transaction_count"] == len(history.json()[0]["transactions"])
+    history_row = history.json()["requests"][0]
+    assert history_row["request_id"] == request_id
+    assert history_row["transaction_count"] >= 2
+    assert history_row["transaction_count"] == len(history_row["transactions"])
     assert any(
         log["shipping_phase"] == "COMPONENT_CHANGE"
-        for log in history.json()[0]["transactions"]
+        for log in history_row["transactions"]
     )
     assert any(
         log["shipping_phase"] == "PREPARE" and log["cancelled"]
-        for log in history.json()[0]["transactions"]
+        for log in history_row["transactions"]
     )
     assert any(
         log["shipping_phase"] == "PICKUP" and log["transaction_type"] == "SHIP"
-        for log in history.json()[0]["transactions"]
+        for log in history_row["transactions"]
     )
 
     clear_after_pickup = client.post(f"/api/shipping/requests/{request_id}/checklist/clear")
@@ -334,6 +352,7 @@ def test_shipping_request_component_change_requires_employee_header(
         make_location,
     )
 
+    client.headers.pop("X-MES-Employee-Code")
     response = client.post(f"/api/shipping/requests/{request_id}/component-change", json=payload)
 
     assert response.status_code == 400, response.text
@@ -628,6 +647,7 @@ def test_component_change_preview_requires_requester_employee_id(client, path, p
 def test_component_change_api_requires_employee_header(client, db_session, make_item, make_bom, make_location):
     payload = _component_change_payload(db_session, make_item, make_bom, make_location)
 
+    client.headers.pop("X-MES-Employee-Code")
     response = client.post("/api/shipping/component-change", json=payload)
 
     assert response.status_code == 400, response.text
@@ -1067,7 +1087,7 @@ def test_shipping_mobile_list_is_read_only_shape(client, db_session, make_item, 
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
+            json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "prepared-delete-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1157,7 +1177,7 @@ def test_requested_and_preparing_shipping_requests_can_be_deleted(client, db_ses
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
+            json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "shortage-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1197,7 +1217,7 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "prepared-delete-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1225,7 +1245,7 @@ def test_shipping_prepare_complete_requires_process_department_stock(client, db_
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "shortage-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1273,3 +1293,252 @@ def test_shipping_preparing_response_includes_stock_shortages(client, db_session
         "Companion Box": 2,
     }
     assert all(line["phase"] == "PREPARE" for line in shortages)
+
+
+def test_shipping_invoice_revision_and_cancel_are_attributed_and_retained(client, db_session, make_item, make_bom):
+    actor = _employee(
+        db_session,
+        code="shipping-sales-actor",
+        name="영업 담당자",
+        department=DepartmentEnum.SALES,
+    )
+    af = make_item(name="Invoice AF", process_type_code="AF", model_symbol="4", serial_no=1)
+    pa = make_item(name="Invoice PA", process_type_code="PA", model_symbol="4", serial_no=2)
+    pf = make_item(name="Invoice PF", process_type_code="PF", model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+    headers = {"X-MES-Employee-Code": actor.employee_code}
+
+    created = client.post(
+        "/api/shipping/requests",
+        headers=headers,
+        json={"base_pf_item_id": str(pf.item_id), "invoice_number": " inv-001 "},
+    )
+
+    assert created.status_code == 201, created.text
+    request_id = created.json()["request_id"]
+    assert created.json()["invoice_number"] == "INV-001"
+
+    changed = client.patch(
+        f"/api/shipping/requests/{request_id}",
+        headers=headers,
+        json={"notes": "출하 메모"},
+    )
+    assert changed.status_code == 200, changed.text
+
+    revisions = client.get(f"/api/shipping/requests/{request_id}/revisions")
+    assert revisions.status_code == 200, revisions.text
+    assert revisions.json()[0]["edited_by_employee_id"] == str(actor.employee_id)
+    assert revisions.json()[0]["affects_preparation"] is True
+    assert revisions.json()[0]["changes"] == [
+        {"field": "notes", "before": None, "after": "출하 메모"}
+    ]
+
+    invoice = client.patch(
+        f"/api/shipping/requests/{request_id}/invoice",
+        headers=headers,
+        json={"invoice_number": "inv-002"},
+    )
+    assert invoice.status_code == 200, invoice.text
+    assert invoice.json()["invoice_number"] == "INV-002"
+    assert invoice.json()["latest_preparation_revision"]["affects_preparation"] is True
+    revisions_after_invoice = client.get(f"/api/shipping/requests/{request_id}/revisions").json()
+    assert revisions_after_invoice[0]["affects_preparation"] is False
+
+    no_op = client.patch(
+        f"/api/shipping/requests/{request_id}/invoice",
+        headers=headers,
+        json={"invoice_number": "INV-002"},
+    )
+    assert no_op.status_code == 200, no_op.text
+    assert len(client.get(f"/api/shipping/requests/{request_id}/revisions").json()) == 2
+
+    cancelled = client.delete(f"/api/shipping/requests/{request_id}", headers=headers)
+    assert cancelled.status_code == 204, cancelled.text
+    active = client.get("/api/shipping/requests")
+    assert request_id not in {row["request_id"] for row in active.json()}
+    duplicate = client.post(
+        "/api/shipping/requests",
+        headers=headers,
+        json={"base_pf_item_id": str(pf.item_id), "invoice_number": "inv-002"},
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    history = client.get("/api/shipping/history", params={"q": "inv-002"})
+    assert history.status_code == 200, history.text
+    assert history.json()["requests"][0]["status"] == "CANCELLED"
+
+    second = client.post(
+        "/api/shipping/requests",
+        headers=headers,
+        json={"base_pf_item_id": str(pf.item_id), "invoice_number": "inv-003"},
+    )
+    assert second.status_code == 201, second.text
+    assert client.delete(f"/api/shipping/requests/{second.json()['request_id']}", headers=headers).status_code == 204
+    paged = client.get("/api/shipping/history", params={"q": "INV-", "limit": 1})
+    assert paged.status_code == 200, paged.text
+    assert paged.json()["has_more"] is True
+    next_page = client.get("/api/shipping/history", params={"q": "INV-", "limit": 1, "cursor": paged.json()["next_cursor"]})
+    assert next_page.status_code == 200, next_page.text
+    assert len(next_page.json()["requests"]) == 1
+    months = client.get("/api/shipping/history/months", params={"status": "CANCELLED"})
+    assert months.status_code == 200, months.text
+    assert sum(row["count"] for row in months.json()) == 2
+
+
+def test_shipping_actor_header_rejects_missing_unknown_and_inactive(client, db_session, make_item, make_bom):
+    af = make_item(name="Actor AF", process_type_code="AF", model_symbol="4", serial_no=1)
+    pa = make_item(name="Actor PA", process_type_code="PA", model_symbol="4", serial_no=2)
+    pf = make_item(name="Actor PF", process_type_code="PF", model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+    client.headers.pop("X-MES-Employee-Code")
+    created = client.post(
+        "/api/shipping/requests",
+        json={"base_pf_item_id": str(pf.item_id), "invoice_number": "ACTOR-HEADER"},
+    )
+    assert created.status_code == 201, created.text
+    path = f"/api/shipping/requests/{created.json()['request_id']}"
+
+    assert client.patch(path, json={"notes": "missing"}).status_code == 400
+    assert client.patch(
+        path,
+        headers={"X-MES-Employee-Code": "unknown-actor"},
+        json={"notes": "unknown"},
+    ).status_code == 404
+    inactive = _employee(
+        db_session,
+        code="inactive-shipping-actor",
+        name="Inactive actor",
+        is_active=False,
+    )
+    db_session.commit()
+    assert client.patch(
+        path,
+        headers={"X-MES-Employee-Code": inactive.employee_code},
+        json={"notes": "inactive"},
+    ).status_code == 403
+
+
+def test_shipping_history_uses_kst_month_boundaries(client, db_session, make_item, make_bom):
+    af = make_item(name="KST AF", process_type_code="AF", model_symbol="4", serial_no=1)
+    pa = make_item(name="KST PA", process_type_code="PA", model_symbol="4", serial_no=2)
+    pf = make_item(name="KST PF", process_type_code="PF", model_symbol="4", serial_no=3)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    created_ids = []
+    for invoice in ("KST-JAN", "KST-FEB"):
+        response = client.post(
+            "/api/shipping/requests",
+            json={"base_pf_item_id": str(pf.item_id), "invoice_number": invoice},
+        )
+        assert response.status_code == 201, response.text
+        created_ids.append(response.json()["request_id"])
+    rows = [db_session.get(ShippingRequest, request_id) for request_id in created_ids]
+    rows[0].status = ShippingRequestStatusEnum.CANCELLED
+    rows[0].cancelled_at = datetime(2026, 1, 31, 14, 59)
+    rows[1].status = ShippingRequestStatusEnum.CANCELLED
+    rows[1].cancelled_at = datetime(2026, 1, 31, 15, 0)
+    db_session.commit()
+
+    months = client.get("/api/shipping/history/months", params={"year": 2026, "status": "CANCELLED"})
+    assert months.status_code == 200, months.text
+    assert months.json() == [
+        {"year": 2026, "month": 2, "count": 1},
+        {"year": 2026, "month": 1, "count": 1},
+    ]
+    february = client.get("/api/shipping/history", params={"year": 2026, "month": 2})
+    assert february.status_code == 200, february.text
+    assert [row["invoice_number"] for row in february.json()["requests"]] == ["KST-FEB"]
+
+
+def test_shipping_history_search_ignores_spaces_and_separators(client, db_session, make_item):
+    pf = make_item(name="Base History PF", process_type_code="PF", model_symbol="4", serial_no=1)
+    request = ShippingRequest(
+        base_pf_item_id=pf.item_id,
+        status=ShippingRequestStatusEnum.CANCELLED,
+        invoice_number="INV- 12/3",
+        custom_pf_name="History- PF/01",
+        cancelled_at=datetime.utcnow(),
+    )
+    db_session.add(request)
+    db_session.commit()
+
+    invoice_response = client.get("/api/shipping/history", params={"q": "inv123"})
+    pf_name_response = client.get("/api/shipping/history", params={"q": "historypf01"})
+
+    assert invoice_response.status_code == 200, invoice_response.text
+    assert [row["request_id"] for row in invoice_response.json()["requests"]] == [str(request.request_id)]
+    assert pf_name_response.status_code == 200, pf_name_response.text
+    assert [row["request_id"] for row in pf_name_response.json()["requests"]] == [str(request.request_id)]
+
+
+def test_shipping_revision_snapshots_item_identity_and_detail_endpoint_restores_cancelled_request(
+    client, db_session, make_item, make_bom
+):
+    af = make_item(name="Snapshot AF", process_type_code="AF", model_symbol="4", serial_no=1)
+    pa = make_item(name="Snapshot PA", process_type_code="PA", model_symbol="4", serial_no=2)
+    pf = make_item(name="Snapshot PF", process_type_code="PF", model_symbol="4", serial_no=3)
+    companion = make_item(name="Snapshot Box", process_type_code="PR", model_symbol="4", serial_no=4)
+    extra = make_item(name="Snapshot Extra", process_type_code="PR", model_symbol="4", serial_no=5)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+    created = client.post(
+        "/api/shipping/requests",
+        json={
+            "base_pf_item_id": str(pf.item_id),
+            "invoice_number": "DETAIL-RESTORE",
+            "companion_lines": [{"item_id": str(companion.item_id), "quantity": 1, "unit": "EA"}],
+        },
+    )
+    assert created.status_code == 201, created.text
+    request_id = created.json()["request_id"]
+
+    companion.item_name = "Snapshot Box Renamed"
+    af.item_name = "Snapshot AF Renamed"
+    db_session.commit()
+    no_op = client.patch(
+        f"/api/shipping/requests/{request_id}",
+        json={"companion_lines": [{"item_id": str(companion.item_id), "quantity": 1, "unit": "EA"}]},
+    )
+    assert no_op.status_code == 200, no_op.text
+    assert client.get(f"/api/shipping/requests/{request_id}/revisions").json() == []
+
+    changed = client.patch(
+        f"/api/shipping/requests/{request_id}",
+        json={
+            "custom_pa_name": "Snapshot custom PA",
+            "custom_pf_name": "Snapshot custom PF",
+            "bom_lines": [
+                {"parent_stage": "PF", "child_item_id": str(pa.item_id), "quantity": 1, "unit": "EA"},
+                {"parent_stage": "PA", "child_item_id": str(af.item_id), "quantity": 1, "unit": "EA"},
+                {"parent_stage": "PA", "child_item_id": str(extra.item_id), "quantity": 1, "unit": "EA"},
+            ],
+            "companion_lines": [],
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    revision = client.get(f"/api/shipping/requests/{request_id}/revisions").json()[0]
+    changes = {change["field"]: change for change in revision["changes"]}
+    bom_before = next(line for line in changes["bom_lines"]["before"] if line["child_item_id"] == str(af.item_id))
+    bom_after = next(line for line in changes["bom_lines"]["after"] if line["child_item_id"] == str(extra.item_id))
+    companion_before = changes["companion_lines"]["before"][0]
+    assert bom_before["item_name"] == "Snapshot AF Renamed"
+    assert bom_before["mes_code"] == af.mes_code
+    assert bom_after["item_name"] == "Snapshot Extra"
+    assert bom_after["mes_code"] == extra.mes_code
+    assert companion_before["item_name"] == "Snapshot Box Renamed"
+    assert companion_before["mes_code"] == companion.mes_code
+
+    cancelled = client.delete(f"/api/shipping/requests/{request_id}")
+    assert cancelled.status_code == 204, cancelled.text
+    detail = client.get(f"/api/shipping/requests/{request_id}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["status"] == "CANCELLED"
+    assert detail.json()["latest_preparation_revision"]["revision_id"] == revision["revision_id"]
+    missing = client.get(f"/api/shipping/requests/{uuid.uuid4()}")
+    assert missing.status_code == 404, missing.text

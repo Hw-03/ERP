@@ -22,7 +22,7 @@ def seed_symbol(db_session):
 
 
 def _create_item(client, *, name="테스트품목", process_type_code="HR",
-                 initial_quantity=None, initial_locations=None):
+                 initial_quantity=None, initial_locations=None, sales_review_required=None):
     payload = {
         "item_name": name,
         "process_type_code": process_type_code,
@@ -32,6 +32,8 @@ def _create_item(client, *, name="테스트품목", process_type_code="HR",
         payload["initial_quantity"] = initial_quantity
     if initial_locations is not None:
         payload["initial_locations"] = initial_locations
+    if sales_review_required is not None:
+        payload["sales_review_required"] = sales_review_required
     return client.post("/api/items", headers=ADMIN_HEADERS, json=payload)
 
 
@@ -54,6 +56,16 @@ def test_create_no_locations_all_warehouse(client, seed_symbol):
     assert body["warehouse_qty"] == 2000
     assert body["production_total"] == 0
     assert body["locations"] == []
+
+
+def test_create_item_sets_sales_review_required_and_defaults_false(client, seed_symbol):
+    flagged = _create_item(client, name="Sales review", sales_review_required=True)
+    assert flagged.status_code == 201, flagged.text
+    assert _get_item(client, flagged.json()["item_id"]).json()["sales_review_required"] is True
+
+    defaulted = _create_item(client, name="No sales review")
+    assert defaulted.status_code == 201, defaulted.text
+    assert _get_item(client, defaulted.json()["item_id"]).json()["sales_review_required"] is False
 
 
 def test_create_two_departments_split(client, seed_symbol):

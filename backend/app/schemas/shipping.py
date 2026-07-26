@@ -33,6 +33,7 @@ class ShippingRequestCreate(BaseModel):
     custom_pa_name: Optional[str] = Field(None, max_length=200)
     custom_pf_name: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
+    invoice_number: Optional[str] = Field(None, max_length=100)
     bom_lines: Optional[list[ShippingBomLineInput]] = None
     companion_lines: Optional[list[ShippingCompanionLineInput]] = None
 
@@ -43,6 +44,7 @@ class ShippingRequestUpdate(BaseModel):
     custom_pa_name: Optional[str] = Field(None, max_length=200)
     custom_pf_name: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
+    invoice_number: Optional[str] = Field(None, max_length=100)
     bom_lines: Optional[list[ShippingBomLineInput]] = None
     companion_lines: Optional[list[ShippingCompanionLineInput]] = None
 
@@ -58,6 +60,10 @@ class ShippingChecklistUpdate(BaseModel):
 
 class ShippingPrepareCompleteRequest(BaseModel):
     companion_lines: list[ShippingCompanionLineInput] = []
+
+
+class ShippingInvoiceUpdate(BaseModel):
+    invoice_number: Optional[str] = Field(None, max_length=100)
 
 
 class ShippingPrepareCancelRequest(BaseModel):
@@ -182,6 +188,23 @@ class ShippingEventResponse(BaseModel):
     message: Optional[str] = None
     created_at: UtcDatetime
 
+
+class ShippingRequestRevisionChangeResponse(BaseModel):
+    field: str
+    before: Any = None
+    after: Any = None
+
+
+class ShippingRequestRevisionResponse(BaseModel):
+    revision_id: uuid.UUID
+    request_id: uuid.UUID
+    edited_by_employee_id: uuid.UUID
+    edited_by_name: str
+    summary: str
+    affects_preparation: bool
+    changes: list[ShippingRequestRevisionChangeResponse]
+    created_at: UtcDatetime
+
 class ShippingAllocationResponse(BaseModel):
     allocation_id: uuid.UUID
     request_id: uuid.UUID
@@ -258,15 +281,32 @@ class ShippingRequestResponse(BaseModel):
     custom_pa_name: Optional[str] = None
     custom_pf_name: Optional[str] = None
     notes: Optional[str] = None
+    invoice_number: Optional[str] = None
     prepared_at: Optional[UtcDatetime] = None
     picked_up_at: Optional[UtcDatetime] = None
+    cancelled_at: Optional[UtcDatetime] = None
+    cancelled_by_employee_id: Optional[uuid.UUID] = None
+    cancelled_by_name: Optional[str] = None
     created_at: UtcDatetime
     updated_at: UtcDatetime
     bom_lines: list[ShippingBomLineResponse] = []
     companion_lines: list[ShippingCompanionLineResponse] = []
     checklist_lines: list[ShippingChecklistLineResponse] = []
     events: list[ShippingEventResponse] = []
+    latest_preparation_revision: Optional[ShippingRequestRevisionResponse] = None
     transactions: list[ShippingTransactionLogResponse] = []
     allocations: list[ShippingAllocationResponse] = []
     stock_shortages: list[ShippingStockShortageResponse] = []
     transaction_count: int = 0
+
+
+class ShippingHistoryPageResponse(BaseModel):
+    requests: list[ShippingRequestResponse]
+    next_cursor: Optional[str] = None
+    has_more: bool
+
+
+class ShippingHistoryMonthResponse(BaseModel):
+    year: int
+    month: int
+    count: int

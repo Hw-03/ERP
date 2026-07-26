@@ -13,6 +13,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -29,6 +30,7 @@ __all__ = [
     "ShippingRequestCompanionLine",
     "ShippingAllocation",
     "ShippingRequestEvent",
+    "ShippingRequestRevision",
     "ShippingRequestStatusEnum",
 ]
 
@@ -38,6 +40,7 @@ class ShippingRequestStatusEnum(str, enum.Enum):
     PREPARING = "PREPARING"
     PREPARED = "PREPARED"
     PICKED_UP = "PICKED_UP"
+    CANCELLED = "CANCELLED"
 
 
 class ShippingRequest(Base):
@@ -59,8 +62,16 @@ class ShippingRequest(Base):
     custom_pa_name = Column(String(200), nullable=True)
     custom_pf_name = Column(String(200), nullable=True)
     notes = Column(Text, nullable=True)
+    invoice_number = Column(String(100), nullable=True)
     prepared_at = Column(DateTime, nullable=True, index=True)
     picked_up_at = Column(DateTime, nullable=True, index=True)
+    cancelled_at = Column(DateTime, nullable=True, index=True)
+    cancelled_by_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    cancelled_by_name = Column(String(100), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
     updated_at = Column(
         DateTime,
@@ -102,6 +113,16 @@ class ShippingRequest(Base):
         back_populates="request",
         cascade="all, delete-orphan",
         order_by="ShippingRequestEvent.created_at",
+    )
+    revisions = relationship(
+        "ShippingRequestRevision",
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="ShippingRequestRevision.created_at.desc()",
+    )
+
+    __table_args__ = (
+        Index("uq_shipping_requests_invoice_number", "invoice_number", unique=True),
     )
 
 
@@ -198,3 +219,22 @@ class ShippingRequestEvent(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
 
     request = relationship("ShippingRequest", back_populates="events")
+
+
+class ShippingRequestRevision(Base):
+    __tablename__ = "shipping_request_revisions"
+
+    revision_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUIDString, ForeignKey("shipping_requests.request_id", ondelete="CASCADE"), nullable=False)
+    edited_by_employee_id = Column(UUIDString, ForeignKey("employees.employee_id", ondelete="RESTRICT"), nullable=False)
+    edited_by_name = Column(String(100), nullable=False)
+    summary = Column(String(300), nullable=False)
+    affects_preparation = Column(Boolean, nullable=False, default=False, server_default="0")
+    changes = Column(JSON, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+    request = relationship("ShippingRequest", back_populates="revisions")
+
+    __table_args__ = (
+        Index("ix_shipping_request_revisions_request_created", "request_id", "created_at"),
+    )

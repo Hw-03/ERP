@@ -42,6 +42,9 @@ export const queryKeys = {
     all: ["shipping"] as const,
     requests: (params?: { status?: string }) =>
       ["shipping", "requests", params ?? {}] as const,
+    revisions: (requestId: string) => ["shipping", "revisions", requestId] as const,
+    history: (params?: object) => ["shipping", "history", params ?? {}] as const,
+    historyMonths: (params?: object) => ["shipping", "historyMonths", params ?? {}] as const,
   },
   assemblyChecklists: {
     all: ["assemblyChecklists"] as const,

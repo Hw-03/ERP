@@ -4010,6 +4010,11 @@
             "description": "공정 코드 (TR/HR/.../PF 18개)",
             "title": "Process Type Code"
           },
+          "sales_review_required": {
+            "default": false,
+            "title": "Sales Review Required",
+            "type": "boolean"
+          },
           "supplier": {
             "anyOf": [
               {
@@ -4195,6 +4200,11 @@
             ],
             "title": "Process Type Code"
           },
+          "sales_review_required": {
+            "default": false,
+            "title": "Sales Review Required",
+            "type": "boolean"
+          },
           "serial_no": {
             "anyOf": [
               {
@@ -4324,6 +4334,17 @@
             ],
             "description": "공정 코드 (TR/HR/.../PF 18개)",
             "title": "Process Type Code"
+          },
+          "sales_review_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sales Review Required"
           },
           "supplier": {
             "anyOf": [
@@ -4544,6 +4565,11 @@
             ],
             "default": 0,
             "title": "Quantity"
+          },
+          "sales_review_required": {
+            "default": false,
+            "title": "Sales Review Required",
+            "type": "boolean"
           },
           "serial_no": {
             "anyOf": [
@@ -6736,6 +6762,79 @@
         "title": "ShippingEventResponse",
         "type": "object"
       },
+      "ShippingHistoryMonthResponse": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "month",
+          "count"
+        ],
+        "title": "ShippingHistoryMonthResponse",
+        "type": "object"
+      },
+      "ShippingHistoryPageResponse": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/ShippingRequestResponse"
+            },
+            "title": "Requests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requests",
+          "has_more"
+        ],
+        "title": "ShippingHistoryPageResponse",
+        "type": "object"
+      },
+      "ShippingInvoiceUpdate": {
+        "properties": {
+          "invoice_number": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          }
+        },
+        "title": "ShippingInvoiceUpdate",
+        "type": "object"
+      },
       "ShippingPrepareCancelRequest": {
         "properties": {
           "reason": {
@@ -6827,6 +6926,18 @@
             ],
             "title": "Custom Pf Name"
           },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          },
           "notes": {
             "anyOf": [
               {
@@ -6900,6 +7011,41 @@
             },
             "title": "Bom Lines",
             "type": "array"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By Employee Id"
+          },
+          "cancelled_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By Name"
           },
           "checklist_lines": {
             "default": [],
@@ -6998,6 +7144,27 @@
             ],
             "title": "Final Pf Item Name"
           },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          },
+          "latest_preparation_revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestRevisionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "notes": {
             "anyOf": [
               {
@@ -7095,12 +7262,87 @@
         "title": "ShippingRequestResponse",
         "type": "object"
       },
+      "ShippingRequestRevisionChangeResponse": {
+        "properties": {
+          "after": {
+            "title": "After"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ShippingRequestRevisionChangeResponse",
+        "type": "object"
+      },
+      "ShippingRequestRevisionResponse": {
+        "properties": {
+          "affects_preparation": {
+            "title": "Affects Preparation",
+            "type": "boolean"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ShippingRequestRevisionChangeResponse"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "edited_by_employee_id": {
+            "format": "uuid",
+            "title": "Edited By Employee Id",
+            "type": "string"
+          },
+          "edited_by_name": {
+            "title": "Edited By Name",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_id",
+          "request_id",
+          "edited_by_employee_id",
+          "edited_by_name",
+          "summary",
+          "affects_preparation",
+          "changes",
+          "created_at"
+        ],
+        "title": "ShippingRequestRevisionResponse",
+        "type": "object"
+      },
       "ShippingRequestStatusEnum": {
         "enum": [
           "REQUESTED",
           "PREPARING",
           "PREPARED",
-          "PICKED_UP"
+          "PICKED_UP",
+          "CANCELLED"
         ],
         "title": "ShippingRequestStatusEnum",
         "type": "string"
@@ -7158,6 +7400,18 @@
               }
             ],
             "title": "Custom Pf Name"
+          },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
           },
           "notes": {
             "anyOf": [
@@ -17668,23 +17922,199 @@
     "/api/shipping/history": {
       "get": {
         "operationId": "history_api_shipping_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2100,
+                  "minimum": 2020,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 12,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingHistoryPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/history/months": {
+      "get": {
+        "operationId": "history_months_api_shipping_history_months_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2100,
+                  "minimum": 2020,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/ShippingRequestResponse"
+                    "$ref": "#/components/schemas/ShippingHistoryMonthResponse"
                   },
-                  "title": "Response History Api Shipping History Get",
+                  "title": "Response History Months Api Shipping History Months Get",
                   "type": "array"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
-        "summary": "History",
+        "summary": "History Months",
         "tags": [
           "Shipping"
         ]
@@ -17813,6 +18243,47 @@
           }
         },
         "summary": "Delete Request",
+        "tags": [
+          "Shipping"
+        ]
+      },
+      "get": {
+        "operationId": "get_request_api_shipping_requests__request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Request",
         "tags": [
           "Shipping"
         ]
@@ -18102,6 +18573,59 @@
         ]
       }
     },
+    "/api/shipping/requests/{request_id}/invoice": {
+      "patch": {
+        "operationId": "update_invoice_api_shipping_requests__request_id__invoice_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingInvoiceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Invoice",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
     "/api/shipping/requests/{request_id}/pickup-complete": {
       "post": {
         "operationId": "pickup_complete_api_shipping_requests__request_id__pickup_complete_post",
@@ -18246,6 +18770,53 @@
           }
         },
         "summary": "Prepare Complete",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/{request_id}/revisions": {
+      "get": {
+        "operationId": "list_revisions_api_shipping_requests__request_id__revisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShippingRequestRevisionResponse"
+                  },
+                  "title": "Response List Revisions Api Shipping Requests  Request Id  Revisions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Revisions",
         "tags": [
           "Shipping"
         ]

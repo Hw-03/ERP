@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.models import ShippingRequest
+from app.models import Employee, ShippingRequest
 from app.services import shipping as shipping_svc
 from app.services._tx import transactional
 
@@ -17,16 +17,35 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
         return shipping_svc.create_request(db, payload)
 
 
-def update_request(db: Session, request_id: uuid.UUID, payload: dict) -> ShippingRequest:
+def update_request(
+    db: Session,
+    request_id: uuid.UUID,
+    payload: dict,
+    actor: Employee,
+) -> ShippingRequest:
     """출하 요청과 구성 변경 전체를 원자적으로 확정한다."""
     with transactional(db):
-        return shipping_svc.update_request(db, request_id, payload)
+        return shipping_svc.update_request(db, request_id, payload, actor)
 
 
-def delete_request(db: Session, request_id: uuid.UUID) -> None:
+def delete_request(
+    db: Session,
+    request_id: uuid.UUID,
+    actor: Employee,
+) -> None:
     """취소 가능한 출하 요청 삭제를 원자적으로 확정한다."""
     with transactional(db):
-        shipping_svc.delete_request(db, request_id)
+        shipping_svc.delete_request(db, request_id, actor)
+
+
+def update_invoice(
+    db: Session,
+    request_id: uuid.UUID,
+    invoice_number: str | None,
+    actor: Employee,
+) -> ShippingRequest:
+    with transactional(db):
+        return shipping_svc.update_invoice(db, request_id, invoice_number, actor)
 
 
 def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:

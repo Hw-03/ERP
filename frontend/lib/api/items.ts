@@ -52,6 +52,7 @@ export const itemsApi = {
     min_stock?: number;
     initial_quantity?: number;
     model_slots?: number[];
+    sales_review_required?: boolean;
     initial_locations?: { department: string; quantity: number }[];
   }) => postJson<Item>(toApiUrl("/api/items"), payload),
 
@@ -67,6 +68,7 @@ export const itemsApi = {
       min_stock?: number;
       mes_code?: string;
       model_slots?: number[];
+      sales_review_required?: boolean;
     },
   ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),
 

@@ -40,6 +40,21 @@ def _location_qty(db_session, item_id, department: DepartmentEnum) -> Decimal:
     return row.quantity if row else Decimal("0")
 
 
+def _active_shipping_actor(db_session) -> Employee:
+    actor = Employee(
+        employee_code="SHIPPING-ACTIONS-ACTOR",
+        name="Shipping actions actor",
+        role="worker",
+        department=DepartmentEnum.SALES.value,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active=True,
+    )
+    db_session.add(actor)
+    db_session.flush()
+    return actor
+
+
 def _spec_conversion_case(db_session, make_item, make_bom, make_location):
     requester = Employee(
         employee_code="IO-CONVERT",
@@ -325,6 +340,7 @@ def _make_prepared_request(
         {
             "base_pf_item_id": final_pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "ACTIONS-INV-001",
             "companion_lines": [
                 {"item_id": companion.item_id, "quantity": 1, "unit": "EA"}
             ],
@@ -412,8 +428,8 @@ def test_create_request_rolls_back_full_graph_when_event_fails(
                         "unit": "EA",
                     },
                 ],
-            },
-        )
+                },
+            )
 
     db_session.expire_all()
     with Session(bind=db_session.get_bind()) as verify_db:
@@ -509,6 +525,8 @@ def test_update_request_restores_graph_and_owned_item_boms_when_event_fails(
 
     boundaries = _count_session_boundaries(db_session, monkeypatch)
 
+    actor = _active_shipping_actor(db_session)
+
     def fail_event(*_args, **_kwargs):
         raise RuntimeError("update event failure")
 
@@ -541,6 +559,7 @@ def test_update_request_restores_graph_and_owned_item_boms_when_event_fails(
                     },
                 ],
             },
+            actor,
         )
 
     db_session.expire_all()
@@ -845,6 +864,16 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
     make_bom(final_pa.item_id, component.item_id, Decimal("1"))
     make_bom(final_pf.item_id, final_pa.item_id, Decimal("1"))
     make_location(final_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    actor = Employee(
+        employee_code="SHIPPING-ATOMIC",
+        name="Shipping atomic",
+        role="worker",
+        department=DepartmentEnum.ASSEMBLY.value,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active=True,
+    )
+    db_session.add(actor)
     db_session.commit()
 
     request = shipping_svc.create_request(
@@ -852,6 +881,7 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
         {
             "base_pf_item_id": final_pf.item_id,
             "requested_by_name": "shipping-user",
+            "invoice_number": "ACTIONS-INV-ATOMIC",
         },
     )
     shipping_svc.send_to_prep(db_session, request.request_id)
@@ -861,6 +891,7 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
         raise RuntimeError("shipping event failure")
 
     monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
+    client.headers["X-MES-Employee-Code"] = actor.employee_code
 
     with pytest.raises(RuntimeError, match="shipping event failure"):
         client.post(

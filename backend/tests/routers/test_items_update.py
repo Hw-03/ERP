@@ -119,3 +119,23 @@ json={},
     body = res.json()
     assert body["item_name"] == "원본유지"
     assert body["process_type_code"] == "PA"
+
+
+def test_update_item_can_clear_sales_review_required(client, make_item):
+    item = make_item(name="영업 검토 품목", process_type_code="PA")
+
+    enabled = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={"sales_review_required": True},
+    )
+    assert enabled.status_code == 200, enabled.text
+    assert enabled.json()["sales_review_required"] is True
+
+    cleared = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={"sales_review_required": False},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["sales_review_required"] is False

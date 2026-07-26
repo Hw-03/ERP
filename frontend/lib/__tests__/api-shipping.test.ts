@@ -54,9 +54,50 @@ describe("shippingApi", () => {
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     await shippingApi.getShippingRequests({ status: "PREPARING" });
-    await shippingApi.getShippingHistory();
+    await shippingApi.getShippingHistory({ status: "PICKED_UP", year: 2026, month: 7, q: "INV-", cursor: "next", limit: 50 });
 
     expect(String(fetchSpy.mock.calls[0][0])).toContain("status=PREPARING");
-    expect(String(fetchSpy.mock.calls[1][0])).toContain("/api/shipping/history");
+    const historyUrl = String(fetchSpy.mock.calls[1][0]);
+    expect(historyUrl).toContain("/api/shipping/history?");
+    expect(historyUrl).toContain("status=PICKED_UP");
+    expect(historyUrl).toContain("year=2026");
+    expect(historyUrl).toContain("month=7");
+    expect(historyUrl).toContain("q=INV-");
+    expect(historyUrl).toContain("cursor=next");
+    expect(historyUrl).toContain("limit=50");
+  });
+
+  it("reads one shipping request by id with an abort signal", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ request_id: "req-old" })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    await shippingApi.getShippingRequest("req-old", { signal: controller.signal });
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/shipping/requests/req-old");
+    expect(fetchSpy.mock.calls[0][1]).toEqual(expect.objectContaining({ signal: controller.signal }));
+  });
+
+  it("keeps the unfiltered history call compatible with the mobile row list", async () => {
+    const rows = [{ request_id: "hist-1" }];
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ requests: rows, next_cursor: null, has_more: false })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(shippingApi.getShippingHistory()).resolves.toEqual(rows);
+  });
+
+  it("updates invoice and reads revisions and history months", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await shippingApi.updateShippingInvoice("req-1", " inv-001 ");
+    await shippingApi.getShippingRevisions("req-1");
+    await shippingApi.getShippingHistoryMonths({ status: "CANCELLED", year: 2026 });
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/shipping/requests/req-1/invoice");
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)).toEqual({ invoice_number: " inv-001 " });
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("/api/shipping/requests/req-1/revisions");
+    expect(String(fetchSpy.mock.calls[2][0])).toContain("/api/shipping/history/months?status=CANCELLED&year=2026");
   });
 });

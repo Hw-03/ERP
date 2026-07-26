@@ -28,6 +28,7 @@ export interface Item {
   model_symbol: string | null;
   model_slots: number[];
   process_type_code: string | null;
+  sales_review_required?: boolean;
   has_bom?: boolean;
   serial_no: number | null;
   bom_completed_at: string | null;

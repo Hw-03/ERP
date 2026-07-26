@@ -70,13 +70,14 @@ describe("useAdminMasterItemsCommands", () => {
     const { result } = renderHook(() => useAdminMasterItemsCommands(args), { wrapper });
     act(() => {
       result.current.setAddMode(true);
-      result.current.setAddForm((f) => ({ ...f, item_name: "신규" }));
+      result.current.setAddForm((f) => ({ ...f, item_name: "신규", sales_review_required: true }));
     });
     await act(async () => {
       result.current.add();
     });
     await waitFor(() => expect(args.setItems).toHaveBeenCalled());
     expect(args.setSelectedItem).toHaveBeenCalled();
+    expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ sales_review_required: true }));
     expect(result.current.addMode).toBe(false);
   });
 

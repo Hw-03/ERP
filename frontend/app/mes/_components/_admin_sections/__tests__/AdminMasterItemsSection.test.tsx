@@ -38,6 +38,7 @@ const context: any = {
     process_type_code: "TR",
     unit: "EA",
     model_slots: [],
+    sales_review_required: false,
   },
   setEditForm: vi.fn(),
   productModels: [],
@@ -170,5 +171,17 @@ describe("AdminMasterItemsSection", () => {
     context.deleteItem.mockClear();
     fireEvent.click(within(detailHeader!).getByRole("button", { name: "삭제 확인" }));
     expect(context.deleteItem).toHaveBeenCalledWith(item.item_id);
+  });
+
+  it("기본 정보에서 영업 확인 필요 설정을 보여준다", () => {
+    context.selectedItem = { ...item, sales_review_required: false };
+    render(
+      <DirtyGuardProvider>
+        <AdminMasterItemsSection allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "영업 확인 필요" })).not.toBeChecked();
+    expect(screen.getByText(/출하 요청 작성 시 강조/)).toBeInTheDocument();
   });
 });
