@@ -127,7 +127,7 @@ $schemaPatterns = @(
 )
 $backendDryRun = robocopy "$DevRoot\backend" $EmpBackend /L /MIR `
     /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" `
-    /XD __pycache__ .git data logs .pytest_cache _backup `
+    /XD __pycache__ .git .venv data logs .pytest_cache _backup `
     /NJH /NDL /NP /NC 2>&1 | Out-String -Stream
 $schemaHits = $backendDryRun | Where-Object {
     $line = $_
@@ -273,7 +273,7 @@ foreach ($batName in @("start.bat", "watch.bat", "stop.bat", "status.bat")) {
 Write-Host "[sync] 백엔드 동기화 중..."
 robocopy "$DevRoot\backend" $EmpBackend /MIR `
     /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" `
-    /XD __pycache__ .git data logs .pytest_cache _backup `
+    /XD __pycache__ .git .venv data logs .pytest_cache _backup `
     /NJH /NDL /NP /NS /NC | Out-Null
 $backendExit = $LASTEXITCODE
 if ($backendExit -ge 8) {
