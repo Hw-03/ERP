@@ -1953,7 +1953,7 @@ describe("DesktopShippingView", () => {
 
   it("loads endpoint-backed history by status, month, search, and cursor", async () => {
     const picked = request({ request_id: "hist-picked", status: "PICKED_UP", invoice_number: "INV-P", picked_up_at: "2026-06-26T01:00:00Z" });
-    const cancelled = request({ request_id: "hist-cancelled", status: "CANCELLED", invoice_number: "INV-C", cancelled_at: "2026-06-30T15:30:00Z" });
+    const cancelled = request({ request_id: "hist-cancelled", status: "CANCELLED", invoice_number: "INV-C", cancelled_at: "2026-07-01T15:30:00Z" });
     vi.mocked(api.getShippingHistoryMonths).mockImplementation(async (params?: any) =>
       params?.status === "CANCELLED" ? [{ year: 2026, month: 7, count: 1 }] : [{ year: 2026, month: 6, count: 2 }],
     );

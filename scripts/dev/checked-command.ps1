@@ -13,7 +13,16 @@ function Invoke-CheckedExternalCommand {
             Push-Location -LiteralPath $WorkingDirectory
             $pushed = $true
         }
-        $output = @(& $FilePath @ArgumentList 2>&1)
+        # Alembic 등 정상 도구도 진행 정보를 stderr로 남긴다. 호출자의 Stop 정책이
+        # 이를 NativeCommandError로 승격하지 않도록, 종료 코드는 아래에서 판정한다.
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = @(& $FilePath @ArgumentList 2>&1)
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
         $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int] $LASTEXITCODE }
         return [pscustomobject] @{
             Success     = ($exitCode -eq 0)
