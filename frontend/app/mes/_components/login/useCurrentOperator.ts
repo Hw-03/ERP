@@ -1,5 +1,5 @@
 /**
- * 현재 로그인된 작업자 정보를 localStorage에서 관리하는 훅.
+ * 현재 로그인된 작업자 정보를 sessionStorage에서 관리하는 훅.
  *
  * 작업자 식별용 — 실제 보안 인증이 아님.
  * 로그인된 작업자 정보는 입출고/수정 작업의 produced_by 기본값으로 사용된다.
@@ -36,13 +36,19 @@ const OPERATOR_KEY = "dexcowin_mes_operator";
 const BOOT_KEY = "dexcowin_mes_boot_id";
 const LOGIN_NOTIFICATION_POPUP_PENDING_KEY = "dexcowin_mes_login_popup_pending";
 // 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
-// localStorage `storage` 이벤트는 다른 탭에만 발화하므로 별도 CustomEvent 필요.
+// storage 이벤트는 변경을 일으킨 탭에 발화하지 않으므로 별도 CustomEvent가 필요하다.
 const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
+
+function clearLegacyPersistentOperator(): void {
+  window.localStorage.removeItem(OPERATOR_KEY);
+  window.localStorage.removeItem(BOOT_KEY);
+}
 
 function readOperator(): Operator | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(OPERATOR_KEY);
+    clearLegacyPersistentOperator();
+    const raw = window.sessionStorage.getItem(OPERATOR_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Operator> & {
       warehouse_role?: string | null;
@@ -82,20 +88,22 @@ function readOperator(): Operator | null {
   }
 }
 
-/** localStorage에서 현재 작업자를 동기 읽기. SSR-safe (서버에서는 null). */
+/** sessionStorage에서 현재 작업자를 동기 읽기. SSR-safe (서버에서는 null). */
 export function readCurrentOperator(): Operator | null {
   return readOperator();
 }
 
 export function getStoredBootId(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(BOOT_KEY);
+  clearLegacyPersistentOperator();
+  return window.sessionStorage.getItem(BOOT_KEY);
 }
 
 export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
-  if (bootId) window.localStorage.setItem(BOOT_KEY, bootId);
+  clearLegacyPersistentOperator();
+  window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
+  if (bootId) window.sessionStorage.setItem(BOOT_KEY, bootId);
   sendClientEvent({ event: "ui_login", source: getClientEventSource() });
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
@@ -103,8 +111,10 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
 export function clearCurrentOperator(): void {
   if (typeof window === "undefined") return;
   sendClientEvent({ event: "ui_logout", source: getClientEventSource() });
-  window.localStorage.removeItem(OPERATOR_KEY);
-  window.localStorage.removeItem(BOOT_KEY);
+  window.sessionStorage.removeItem(OPERATOR_KEY);
+  window.sessionStorage.removeItem(BOOT_KEY);
+  window.sessionStorage.removeItem(LOGIN_NOTIFICATION_POPUP_PENDING_KEY);
+  clearLegacyPersistentOperator();
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 

@@ -1,9 +1,9 @@
 /**
  * 모바일 평가 스크립트 공용 — 작업자 세션 시딩.
  *
- * 앱은 localStorage 의 작업자 정보(`dexcowin_mes_operator`)가 없으면 로그인
+ * 앱은 sessionStorage 의 작업자 정보(`dexcowin_mes_operator`)가 없으면 로그인
  * 게이트만 렌더한다. 평가(스크린샷/a11y)는 실제 화면을 봐야 하므로,
- * 페이지 로드 전에 백엔드의 실제 직원/boot_id 를 가져와 localStorage 에
+ * 페이지 로드 전에 백엔드의 실제 직원/boot_id 를 가져와 sessionStorage 에
  * 주입한다(MesLoginGate 의 boot_id 검증 통과용).
  */
 
@@ -66,10 +66,10 @@ export async function seedOperator(context, baseUrl) {
     await context.addInitScript(
       ([opKey, bootKey, op, bootId]) => {
         try {
-          window.localStorage.setItem(opKey, JSON.stringify(op));
-          window.localStorage.setItem(bootKey, bootId);
+          window.sessionStorage.setItem(opKey, JSON.stringify(op));
+          window.sessionStorage.setItem(bootKey, bootId);
         } catch {
-          /* localStorage 불가 환경 무시 */
+          /* sessionStorage 불가 환경 무시 */
         }
       },
       [OPERATOR_KEY, BOOT_KEY, operator, session.boot_id],

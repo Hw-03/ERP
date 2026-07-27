@@ -130,6 +130,7 @@ describe("fetcher / write helpers", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     window.localStorage.clear();
+    window.sessionStorage.clear();
     registerAdminPinProvider(() => null);
     vi.useRealTimers();
   });
@@ -216,7 +217,7 @@ describe("fetcher / write helpers", () => {
   });
 
   it("fetcher attaches the current operator code as a log-only header", async () => {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       "dexcowin_mes_operator",
       JSON.stringify({ employee_id: "emp-1", name: "Kim", employee_code: "E22" }),
     );

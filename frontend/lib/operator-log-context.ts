@@ -5,7 +5,7 @@ export type ClientEventSource = "desktop" | "mobile";
 export function readCurrentEmployeeCodeForLog(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(OPERATOR_STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(OPERATOR_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { employee_code?: unknown };
     const code = typeof parsed.employee_code === "string" ? parsed.employee_code.trim() : "";

@@ -176,10 +176,10 @@ function LoginNotificationDialog({
 
 export function NotificationBell({
   onNavigate,
-  suppressLoginDialog = true,
+  loginDialogEnabled,
 }: {
   onNavigate?: (tab: string, section: string | null) => void;
-  suppressLoginDialog?: boolean;
+  loginDialogEnabled: boolean;
 }) {
   const operator = useCurrentOperator();
   const employeeId = operator?.employee_id;
@@ -206,13 +206,13 @@ export function NotificationBell({
   }, [open]);
 
   useEffect(() => {
-    if (!employeeId || !operator?.loginPopupEnabled || !data || unread <= 0) return;
+    if (!employeeId || !data) return;
     if (!isVisibleInMountedTree(ref.current)) return;
     if (!consumeLoginNotificationPopupPending(employeeId)) return;
-    if (suppressLoginDialog) return;
+    if (!loginDialogEnabled || !operator?.loginPopupEnabled || unread <= 0) return;
     setOpen(false);
     setLoginDialogOpen(true);
-  }, [data, employeeId, operator?.loginPopupEnabled, suppressLoginDialog, unread]);
+  }, [data, employeeId, loginDialogEnabled, operator?.loginPopupEnabled, unread]);
 
   if (!employeeId) return null;
 
@@ -300,7 +300,7 @@ export function NotificationBell({
           onToggleLoginPopup={() => void handleToggleLoginPopup()}
         />
       )}
-      {false && (
+      {loginDialogOpen && unreadItems.length > 0 && (
         <LoginNotificationDialog
           items={unreadItems}
           unread={unread}

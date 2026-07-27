@@ -8,10 +8,11 @@ describe("client event logging", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it("sends allowed UI events with the current employee code", () => {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       "dexcowin_mes_operator",
       JSON.stringify({ employee_id: "emp-1", name: "Kim", employee_code: "E22" }),
     );

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
 
@@ -86,15 +86,69 @@ describe("NotificationBell", () => {
     state.setCurrentOperator.mockClear();
   });
 
-  it("does not show automatic notification dialogs while keeping the notification panel available", async () => {
+  it("shows the desktop login dialog once when unread notifications exist", async () => {
     window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
 
-    render(<NotificationBell />);
+    render(<NotificationBell loginDialogEnabled />);
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
+  });
+
+  it("does not show the login dialog for a restored session without a pending marker", async () => {
+    render(<NotificationBell loginDialogEnabled />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("consumes the pending marker when login has no unread notifications", async () => {
+    state.notifications = { items: [], unread_count: 0 };
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+
+    const { rerender } = render(<NotificationBell loginDialogEnabled />);
+
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
+    });
+
+    state.notifications = { items: [notification()], unread_count: 1 };
+    rerender(<NotificationBell loginDialogEnabled />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not show the login dialog when disabled for the mounted surface", async () => {
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+
+    render(<NotificationBell loginDialogEnabled={false} />);
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
     });
+  });
+
+  it("does not show the login dialog when the operator disabled the preference", async () => {
+    state.operator.loginPopupEnabled = false;
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+
+    render(<NotificationBell loginDialogEnabled />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
+    });
+  });
+
+  it("keeps the notification panel available after a disabled automatic dialog", async () => {
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+
+    render(<NotificationBell loginDialogEnabled={false} />);
+    await waitFor(() => expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull());
 
     fireEvent.click(screen.getByRole("button"));
 
@@ -106,7 +160,7 @@ describe("NotificationBell", () => {
 
     render(
       <div style={{ display: "none" }}>
-        <NotificationBell />
+        <NotificationBell loginDialogEnabled />
       </div>,
     );
 
@@ -121,7 +175,7 @@ describe("NotificationBell", () => {
     state.notifications.items = [notification({ target_tab: "history", target_section: "detail" })];
     state.notifications.unread_count = 1;
 
-    render(<NotificationBell onNavigate={onNavigate} />);
+    render(<NotificationBell onNavigate={onNavigate} loginDialogEnabled={false} />);
 
     fireEvent.click(screen.getByRole("button"));
     fireEvent.click(screen.getByText("Approval done"));
@@ -131,5 +185,48 @@ describe("NotificationBell", () => {
       notification_ids: ["n-1"],
     });
     expect(onNavigate).toHaveBeenCalledWith("history", "detail");
+  });
+
+  it("marks every notification read from the login dialog", async () => {
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+
+    render(<NotificationBell loginDialogEnabled />);
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "\uBAA8\uB450 \uC77D\uC74C" }));
+
+    expect(state.markRead).toHaveBeenCalledWith({ recipient_employee_id: "emp-1" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("opens the notification panel from the login dialog", async () => {
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+
+    render(<NotificationBell loginDialogEnabled />);
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "\uC54C\uB9BC \uBCF4\uAE30" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("New handover")).toBeInTheDocument();
+  });
+
+  it("marks and navigates when an item is selected from the login dialog", async () => {
+    const onNavigate = vi.fn();
+    state.notifications.items = [notification({ target_tab: "history", target_section: "detail" })];
+    state.notifications.unread_count = 1;
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+
+    render(<NotificationBell onNavigate={onNavigate} loginDialogEnabled />);
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByText("Approval done"));
+
+    expect(state.markRead).toHaveBeenCalledWith({
+      recipient_employee_id: "emp-1",
+      notification_ids: ["n-1"],
+    });
+    expect(onNavigate).toHaveBeenCalledWith("history", "detail");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

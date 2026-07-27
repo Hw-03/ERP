@@ -4,13 +4,20 @@ import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopTopbar } from "../DesktopTopbar";
 
+const notificationBellState = vi.hoisted(() => ({
+  loginDialogEnabled: undefined as boolean | undefined,
+}));
+
 vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => null,
   clearCurrentOperator: vi.fn(),
 }));
 
 vi.mock("../notifications/NotificationBell", () => ({
-  NotificationBell: () => null,
+  NotificationBell: ({ loginDialogEnabled }: { loginDialogEnabled: boolean }) => {
+    notificationBellState.loginDialogEnabled = loginDialogEnabled;
+    return null;
+  },
 }));
 
 describe("DesktopTopbar", () => {
@@ -44,5 +51,18 @@ describe("DesktopTopbar", () => {
     );
 
     expect(screen.getByTestId("desktop-status-target")).toHaveTextContent("DEXCOWIN MES System");
+  });
+
+  it("enables the login notification dialog for the desktop top bar", () => {
+    render(
+      <DesktopTopbar
+        title="Dashboard"
+        icon={AlertTriangle}
+        iconColor={LEGACY_COLORS.blue}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(notificationBellState.loginDialogEnabled).toBe(true);
   });
 });

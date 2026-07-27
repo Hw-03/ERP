@@ -2,8 +2,8 @@
  * e2e 공용 헬퍼.
  *
  * loginAsOperator — MesLoginGate 우회. 게이트는 3중 검증을 하므로 고정값 inject 로는 부족하다:
- *   1) localStorage.dexcowin_mes_operator (employee_id·name 필수)
- *   2) localStorage.dexcowin_mes_boot_id == GET /api/app-session 의 boot_id
+ *   1) sessionStorage.dexcowin_mes_operator (employee_id·name 필수)
+ *   2) sessionStorage.dexcowin_mes_boot_id == GET /api/app-session 의 boot_id
  *   3) employee_id ∈ GET /api/employees?active_only=true (실재 활성 직원)
  * → 런타임에 두 API 를 조회해 실재 직원 + 현재 boot_id 를 inject 한다.
  */
@@ -36,7 +36,7 @@ function toOperator(emp: any): OperatorLike {
 }
 
 /**
- * 로그인 게이트를 통과하도록 localStorage 를 inject 한다. page.goto 전에 호출할 것.
+ * 로그인 게이트를 통과하도록 sessionStorage 를 inject 한다. page.goto 전에 호출할 것.
  * @param opts.role "warehouse" | "department" — 해당 역할 primary(없으면 deputy) 직원 우선 선택.
  * @param opts.code 특정 employee_code 직원으로 로그인(2-세션 결재 테스트용). role 보다 우선.
  */
@@ -63,8 +63,8 @@ export async function loginAsOperator(
   const op = toOperator(emp);
   await page.addInitScript(
     ([o, bootId]) => {
-      localStorage.setItem("dexcowin_mes_operator", JSON.stringify(o));
-      localStorage.setItem("dexcowin_mes_boot_id", bootId as string);
+      sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify(o));
+      sessionStorage.setItem("dexcowin_mes_boot_id", bootId as string);
     },
     [op, session.boot_id] as [OperatorLike, string],
   );

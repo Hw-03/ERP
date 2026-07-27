@@ -216,7 +216,7 @@ export function DesktopTopbar({
           </div>
         )}
 
-        <NotificationBell onNavigate={onNavigate} />
+        <NotificationBell onNavigate={onNavigate} loginDialogEnabled />
 
         <button
           onClick={onRefresh}

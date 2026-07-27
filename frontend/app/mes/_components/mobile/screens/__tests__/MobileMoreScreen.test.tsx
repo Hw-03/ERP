@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { MobileMoreScreen } from "../MobileMoreScreen";
 
 vi.mock("../../../notifications/NotificationBell", () => ({
-  NotificationBell: () => <button type="button">notification bell</button>,
+  NotificationBell: ({ loginDialogEnabled }: { loginDialogEnabled: boolean }) => (
+    <button type="button" data-login-dialog-enabled={String(loginDialogEnabled)}>
+      notification bell
+    </button>
+  ),
 }));
 
 const operator = {
@@ -59,7 +63,10 @@ describe("MobileMoreScreen", () => {
     expect(onProfile).toHaveBeenCalledTimes(1);
     expect(screen.getByText("프로필")).toBeInTheDocument();
     expect(screen.queryByText(/알림.*7건/)).toBeNull();
-    expect(screen.getByRole("button", { name: "notification bell" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "notification bell" })).toHaveAttribute(
+      "data-login-dialog-enabled",
+      "false",
+    );
     expect(screen.getByText("Kim")).toBeInTheDocument();
   });
 

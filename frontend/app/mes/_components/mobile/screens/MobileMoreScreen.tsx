@@ -94,7 +94,7 @@ export function MobileMoreScreen({
           data-testid="mobile-more-notification-target"
           className="flex h-16 w-14 shrink-0 items-center justify-center [&_button]:h-12 [&_button]:w-12"
         >
-          <NotificationBell onNavigate={onNotificationNavigate} suppressLoginDialog />
+          <NotificationBell onNavigate={onNotificationNavigate} loginDialogEnabled={false} />
         </div>
       </div>
 
