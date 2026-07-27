@@ -116,6 +116,7 @@ export function IoComposeView({
   onSubmitSuccess,
   onItemConversionFocusChange,
 }: IoComposeViewProps) {
+  const shippingPrepare = entryIntent?.shippingPrepare ?? null;
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
   const [error, setError] = useState<string | null>(null);
@@ -397,6 +398,7 @@ export function IoComposeView({
         toDepartment: state.toDepartment,
         referenceNo: state.referenceNo,
         notes: state.notes,
+        shippingRequestId: shippingPrepare?.shippingRequestId,
         batchId: autosaveBatchIdRef.current,
         bundles: state.bundles,
       });
@@ -464,6 +466,10 @@ export function IoComposeView({
   }
 
   function handleWorkTypeChange(next: IoWorkType) {
+    if (shippingPrepare && next !== "process") {
+      setError("출하 준비 연결 작업에서는 생산 등록 또는 재작업만 선택할 수 있습니다.");
+      return;
+    }
     state.setWorkType(next);
     setError(null);
     beginNewCompositionSlot();
@@ -522,6 +528,7 @@ export function IoComposeView({
         toDepartment: state.toDepartment,
         referenceNo: state.referenceNo,
         notes: state.notes,
+        shippingRequestId: shippingPrepare?.shippingRequestId,
         batchId: autosaveBatchIdRef.current,
         bundles: state.bundles,
       });
@@ -621,6 +628,7 @@ export function IoComposeView({
         toDepartment: state.toDepartment,
         referenceNo: state.referenceNo,
         notes: state.notes,
+        shippingRequestId: shippingPrepare?.shippingRequestId,
         bundles: state.bundles,
       });
       // 서버가 멱등 응답(409 → 기존 batch)이든 신규 처리든 동일한 IoSubmitResponse 모양 → 같은 흐름.
@@ -676,7 +684,7 @@ export function IoComposeView({
   const includedCount = state.includedLines.length;
   const excludedCount = state.excludedLines.length;
   // 항목 7 — 생산(produce)·출고(disassemble) 4단계에서 '창고에서 가져오기' 노출. (데스크톱 전용)
-  const pullEnabled = state.subType === "produce" || state.subType === "disassemble";
+  const pullEnabled = !shippingPrepare && (state.subType === "produce" || state.subType === "disassemble");
   // 버튼 라벨 개수 — 선택이 있으면 선택 수, 없으면 부족 라인 전체 수.
   const pullCount = pullEnabled
     ? pullSelected.size > 0
@@ -931,6 +939,23 @@ export function IoComposeView({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      {shippingPrepare && (
+        <div
+          data-testid="io-shipping-prepare-context"
+          className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-[12px] border px-4 py-3 text-sm"
+          style={{
+            background: tint(LEGACY_COLORS.cyan, 10),
+            borderColor: tint(LEGACY_COLORS.cyan, 38),
+            color: LEGACY_COLORS.text,
+          }}
+        >
+          <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.cyan }} />
+          <span className="font-black" style={{ color: LEGACY_COLORS.cyan }}>출하 준비 연결</span>
+          <span className="font-black">{shippingPrepare.requestLabel}</span>
+          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>생산 등록·재작업 결과가 이 요청에 연결됩니다.</span>
+        </div>
+      )}
+
       {error && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
@@ -965,7 +990,7 @@ export function IoComposeView({
             selectedWorkType={step > 1 ? state.workType : null}
             operator={operator}
             onWorkTypeChange={handleWorkTypeChange}
-            onItemConversion={openItemConversion}
+            onItemConversion={shippingPrepare ? undefined : openItemConversion}
           />
         </WizardStepCard>
       </div>

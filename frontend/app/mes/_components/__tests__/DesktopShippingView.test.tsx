@@ -619,6 +619,28 @@ describe("DesktopShippingView", () => {
     expect(container.querySelector('[data-shipping-hub-card="prep"]')).not.toBeInTheDocument();
   });
 
+  it("starts a linked IO task from a preparing shipping request", async () => {
+    navigationMock.search = "tab=shipping&shippingView=prepWork&shippingRequestId=req-1";
+    const onStartPrepareWork = vi.fn();
+    render(
+      <DesktopShippingView
+        onStatusChange={() => {}}
+        onStartPrepareWork={onStartPrepareWork}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "준비 작업 시작" }));
+
+    expect(onStartPrepareWork).toHaveBeenCalledWith(expect.objectContaining({
+      workType: "process",
+      direction: "in",
+      shippingPrepare: expect.objectContaining({
+        shippingRequestId: "req-1",
+        requestLabel: "Standard PF",
+      }),
+    }));
+  });
+
   it("shows stock shortages in prep detail without hiding prep actions", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([
       request({

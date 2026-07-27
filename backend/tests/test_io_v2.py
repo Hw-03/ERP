@@ -22,6 +22,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.services import shipping as shipping_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -111,6 +112,124 @@ def _approve_stock_request(client, request_id, approver: Employee):
         f"/api/stock-requests/{request_id}/approve",
         json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
     )
+
+
+def test_shipping_linked_process_submission_marks_batch_and_every_log(
+    client, db_session, make_bom, make_item, make_location
+):
+    af = make_item(name="Shipping linked AF", process_type_code="AF", model_symbol="7", serial_no=1)
+    pa = make_item(name="Shipping linked PA", process_type_code="PA", model_symbol="7", serial_no=1)
+    pf = make_item(name="Shipping linked PF", process_type_code="PF", model_symbol="7", serial_no=2)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    requester = _make_employee(db_session, code="SHIP-LINKED-IO")
+    request = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "invoice_number": "SHIP-LINKED-IO-001",
+        },
+    )
+    shipping_svc.send_to_prep(db_session, request.request_id)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(pf.item_id),
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "shipping_request_id": str(request.request_id),
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    batch = submitted.json()["batch"]
+    assert batch["shipping_request_id"] == str(request.request_id)
+    assert batch["reference_no"] == f"SHIP-PREP-{request.request_id.hex[:8]}"
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.operation_batch_id == batch["batch_id"])
+        .all()
+    )
+    assert logs
+    assert all(log.shipping_request_id == request.request_id for log in logs)
+    assert all(log.shipping_phase == "PREPARE" for log in logs)
+    assert all(log.reference_no == batch["reference_no"] for log in logs)
+
+
+def test_shipping_context_rejects_non_preparing_request(
+    client, db_session, make_bom, make_item, make_location
+):
+    af = make_item(name="Shipping context AF", process_type_code="AF", model_symbol="7", serial_no=3)
+    pa = make_item(name="Shipping context PA", process_type_code="PA", model_symbol="7", serial_no=4)
+    pf = make_item(name="Shipping context PF", process_type_code="PF", model_symbol="7", serial_no=5)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    requester = _make_employee(db_session, code="SHIP-CONTEXT-STATE")
+    request = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "invoice_number": "SHIP-CONTEXT-STATE-001",
+        },
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(pf.item_id),
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "shipping_request_id": str(request.request_id),
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert submitted.status_code == 422, submitted.text
+    assert "준비 중" in submitted.text
 
 
 @pytest.mark.parametrize(

@@ -47,6 +47,12 @@ class IoBatch(Base):
     to_department = Column(String(50), nullable=True)
     requires_approval = Column(Boolean, nullable=False, default=False)
     stock_request_id = Column(UUIDString, nullable=True, index=True)
+    shipping_request_id = Column(
+        UUIDString,
+        ForeignKey("shipping_requests.request_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     reference_no = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
     client_request_id = Column(String(64), nullable=True, unique=True, index=True)

@@ -12,6 +12,7 @@ export function useIoDraft() {
     toDepartment?: string | null;
     referenceNo?: string | null;
     notes?: string | null;
+    shippingRequestId?: string | null;
     batchId?: string | null;
     bundles: IoBundle[];
   }) {
@@ -25,6 +26,7 @@ export function useIoDraft() {
         to_department: payload.toDepartment || null,
         reference_no: payload.referenceNo || null,
         notes: payload.notes || null,
+        shipping_request_id: payload.shippingRequestId ?? null,
         batch_id: payload.batchId ?? null,
         bundles: payload.bundles,
       });

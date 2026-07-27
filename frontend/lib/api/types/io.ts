@@ -85,6 +85,8 @@ export interface IoDraftPayload {
   to_department?: Department | string | null;
   reference_no?: string | null;
   notes?: string | null;
+  /** 출하 준비에서 시작한 process 작업의 연결 대상. */
+  shipping_request_id?: string | null;
   client_request_id?: string | null;
   // 이어 작업 중인 draft의 batch_id. 있으면 갱신, 없으면 새 슬롯 생성.
   batch_id?: string | null;
@@ -106,6 +108,8 @@ export interface IoBatch {
   to_department: Department | string | null;
   requires_approval: boolean;
   stock_request_id: string | null;
+  /** 구 버전 응답과의 호환을 위해 optional로 읽는다. */
+  shipping_request_id?: string | null;
   reference_no: string | null;
   notes: string | null;
   created_at: string;

@@ -41,6 +41,7 @@ import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
+import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { matchesSearchText } from "@/lib/searchText";
 
 type SectionTab = "request" | "history";
@@ -99,7 +100,7 @@ const TX_TYPE_LABEL: Record<string, string> = {
 };
 
 const PHASE_LABEL: Record<string, string> = {
-  PREPARE: "준비 완료",
+  PREPARE: "출하 준비",
   PICKUP: "픽업 완료",
 };
 
@@ -261,7 +262,11 @@ function companionPayload(lines: CompanionDraftLine[], itemById: Map<string, Ite
     }));
 }
 
-export function DesktopShippingView({ onStatusChange, operator = null }: { onStatusChange: (status: string) => void; operator?: Operator | null }) {
+export function DesktopShippingView({ onStatusChange, operator = null, onStartPrepareWork }: {
+  onStatusChange: (status: string) => void;
+  operator?: Operator | null;
+  onStartPrepareWork?: (intent: IoEntryIntent) => void;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lastUrlSearchRef = useRef(searchParams.toString());
@@ -1261,6 +1266,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: { onSta
             onCancel={(req) => void cancelPrepare(req)}
             onPickup={(req) => void completePickup(req)}
             onInvoiceSaved={handleInvoiceSaved}
+            onStartPrepareWork={onStartPrepareWork}
           />
         </div>
       );
@@ -2399,6 +2405,7 @@ function PrepSection({
   onCancel,
   onPickup,
   onInvoiceSaved,
+  onStartPrepareWork,
 }: {
   showList?: boolean;
   requests: ShippingRequest[];
@@ -2409,6 +2416,7 @@ function PrepSection({
   onCancel: (req: ShippingRequest) => void;
   onPickup: (req: ShippingRequest) => void;
   onInvoiceSaved: (request: ShippingRequest) => void;
+  onStartPrepareWork?: (intent: IoEntryIntent) => void;
 }) {
   const requestQty = selected?.request_quantity ?? 1;
   const paLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PA") ?? [];
@@ -2466,6 +2474,23 @@ function PrepSection({
             </div>
 
             <div data-testid="shipping-prep-actions" className="flex shrink-0 flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              {selected.status === "PREPARING" && onStartPrepareWork && (
+                <ActionButton
+                  icon={PackageCheck}
+                  label="준비 작업 시작"
+                  tone={LEGACY_COLORS.blue}
+                  onClick={() => onStartPrepareWork({
+                    workType: "process",
+                    direction: "in",
+                    shippingPrepare: {
+                      shippingRequestId: selected.request_id,
+                      requestLabel: selected.final_pf_item_name ?? selected.base_pf_item_name,
+                    },
+                  })}
+                  disabled={pending !== null}
+                  dataTestId="shipping-start-prepare-work"
+                />
+              )}
               {selected.status === "PREPARING" && (
                 <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onOpenPrepare(selected)} disabled={pending !== null || !selected.invoice_number?.trim()} />
               )}
@@ -3085,9 +3110,9 @@ function ShippingActionConfirmModal({
   const tone = action.kind === "prepare" ? LEGACY_COLORS.green : action.kind === "cancel" ? LEGACY_COLORS.yellow : action.kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
   const requestQty = action.request.request_quantity ?? 1;
   const description = action.kind === "prepare"
-    ? "요청 수량만큼 하위 자재를 반영하고 최종 PA/PF 생산 로그를 남깁니다. 동반 출하품은 요청에 저장된 항목을 사용합니다."
+    ? "연결된 생산 등록의 최종 PF 수량을 확인하고 동반 출하품을 예약합니다. 재고를 추가로 변동하지 않습니다."
     : action.kind === "cancel"
-      ? "준비 완료 때 생성된 입출고 로그를 역재생해 재고를 원복합니다."
+      ? "기존 자동 출하 준비 이력만 원복합니다. 연결된 입출고 작업의 재고는 유지됩니다."
       : action.kind === "delete"
         ? action.request.status === "PREPARING"
           ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."

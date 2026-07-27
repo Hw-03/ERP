@@ -168,6 +168,13 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
     assert logs
     assert all(log.inventory_effect is not None for log in logs)
     assert all(result.marker in (log.reference_no or "") for log in logs)
+    shipping_prepare_logs = [log for log in logs if log.shipping_phase == "PREPARE"]
+    assert any(
+        log.transaction_type.value == "PRODUCE"
+        and log.operation_batch_id is not None
+        and log.shipping_request_id is not None
+        for log in shipping_prepare_logs
+    )
 
 
 def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_session, make_item, make_location, make_bom):

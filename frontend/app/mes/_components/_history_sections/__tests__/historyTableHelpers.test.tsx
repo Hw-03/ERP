@@ -116,6 +116,48 @@ describe("HistoryTable server groups", () => {
 
     expect(screen.getByRole("button", { name: "묶음 펼치기" })).toBeInTheDocument();
   });
+
+  it("selects the DISASSEMBLE parent when a legacy rework group is headed by a newer child log", () => {
+    const onSelectLog = vi.fn();
+    const child = makeLog({
+      log_id: "rework-child",
+      item_id: "RECOVERED",
+      item_name: "회수 구성품",
+      transaction_type: "RECEIVE",
+      reference_no: "defect-disassemble:rework-1",
+    });
+    const parent = makeLog({
+      log_id: "rework-parent",
+      item_id: "PARENT",
+      item_name: "재작업 대상",
+      transaction_type: "DISASSEMBLE",
+      reference_no: child.reference_no,
+    });
+
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[]}
+        displayGroups={[{
+          type: "batch",
+          refKey: "defect-disassemble:rework-1::",
+          refNo: "defect-disassemble:rework-1",
+          logs: [child, parent],
+        }]}
+        selection={null}
+        onSelectLog={onSelectLog}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("재작업 대상 재작업").closest("tr")!);
+    expect(onSelectLog).toHaveBeenCalledWith(expect.objectContaining({ log_id: "rework-parent" }));
+  });
 });
 
 describe("history table helper rendering policies", () => {

@@ -167,7 +167,7 @@ def test_unversioned_onboarding_stamps_0002_then_runs_department_backfill(
     tmp_path,
 ):
     path = tmp_path / "unversioned.db"
-    command.upgrade(_config(path), "20260720_0002")
+    command.upgrade(_config(path), "head")
     with sa.create_engine(f"sqlite:///{path.as_posix()}").begin() as connection:
         connection.execute(
             sa.text(
@@ -212,7 +212,7 @@ def test_unversioned_onboarding_stamps_0002_then_runs_department_backfill(
             ) == "창고"
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260724_0005"
+            ) == "20260727_0006"
         assert result.business_data_unchanged is True
     finally:
         engine.dispose()

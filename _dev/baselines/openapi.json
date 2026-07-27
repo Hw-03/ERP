@@ -3239,6 +3239,18 @@
             "title": "Requires Approval",
             "type": "boolean"
           },
+          "shipping_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Request Id"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -3442,6 +3454,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "shipping_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Request Id"
           },
           "sub_type": {
             "title": "Sub Type",
@@ -3794,6 +3818,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "shipping_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Request Id"
           },
           "sub_type": {
             "title": "Sub Type",

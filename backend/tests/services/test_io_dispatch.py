@@ -27,6 +27,8 @@ from app.models import (
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
+    ShippingRequest,
+    ShippingRequestStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -782,6 +784,73 @@ def test_execute_batch_after_dept_approval_applies_inventory(
     assert mapped.approver_name == approver.name
     # operator_name 은 승인자 기준으로 기록.
     assert log.produced_by == approver.name
+
+
+def test_shipping_linked_department_approval_rechecks_request_is_preparing(
+    make_item, make_location, db_session
+):
+    """결재 대기 중 출하가 완료되면 승인 시 재고를 다시 반영하지 않는다."""
+    pf_item = make_item(name="출하 연결 결재 PF", process_type_code="PF")
+    make_location(pf_item.item_id, department=ASSEMBLY, quantity=D("0"))
+    requester = _make_employee(db_session, department_role="none")
+    approver = _make_employee(
+        db_session,
+        code="SHIP-APPR",
+        name="출하 결재자",
+        department_role="primary",
+    )
+    shipping_request = ShippingRequest(
+        base_pf_item_id=pf_item.item_id,
+        status=ShippingRequestStatusEnum.PREPARED,
+    )
+    db_session.add(shipping_request)
+    db_session.flush()
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        to_department=ASSEMBLY.value,
+        lines=[
+            {
+                "item_id": pf_item.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY.value,
+                "quantity": D("1"),
+                "origin": "manual",
+            }
+        ],
+    )
+    batch.shipping_request_id = shipping_request.request_id
+    request = StockRequest(
+        request_id=uuid.uuid4(),
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department.value,
+        request_type=svc.StockRequestTypeEnum.MANUAL_ADJUSTMENT,
+        request_code="SR-SHIP-PREP-STALE",
+        status=StockRequestStatusEnum.SUBMITTED,
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+        department_approved_by_employee_id=approver.employee_id,
+        department_approved_by_name=approver.name,
+        operation_batch_id=batch.batch_id,
+    )
+    db_session.add(request)
+    db_session.flush()
+
+    with pytest.raises(ValueError, match="준비 중"):
+        svc.execute_batch_after_dept_approval(
+            db_session,
+            request=request,
+            approver=approver,
+        )
+
+    assert batch.stock_request_id is None
+    assert batch.reference_no is None
+    assert _prod_qty(db_session, pf_item.item_id) == D("0")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_execute_batch_after_dept_approval_missing_batch_raises(db_session):

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
@@ -133,6 +134,37 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("keeps the linked shipping request visible while composing a process task", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <IoComposeView
+          globalSearch=""
+          operator={operator}
+          employees={[]}
+          items={[]}
+          productModels={[]}
+          setItems={() => {}}
+          onStatusChange={() => {}}
+          entryIntent={{
+            workType: "process",
+            direction: "in",
+            shippingPrepare: {
+              shippingRequestId: "req-1",
+              requestLabel: "Standard PF",
+            },
+          } as never}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByTestId("io-shipping-prepare-context")).toHaveTextContent("Standard PF");
+    expect(screen.getByTestId("io-shipping-prepare-context")).toHaveTextContent("생산 등록·재작업");
+  });
+
   it("waits to publish draft status until the success notice reaches the status target", async () => {
     const onStatusChange = vi.fn();
     vi.mocked(api.saveDraft).mockResolvedValue({ batch_id: "draft-save" } as never);

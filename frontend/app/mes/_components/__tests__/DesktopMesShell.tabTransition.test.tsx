@@ -38,7 +38,7 @@ vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => null,
 }));
 
-const sidebarTabs: DesktopTabId[] = ["dashboard", "history", "weekly", "warehouseMap"];
+const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "history", "weekly", "warehouseMap"];
 
 vi.mock("../DesktopSidebar", () => ({
   DESKTOP_TAB_ICON_COLORS: {
@@ -78,8 +78,46 @@ vi.mock("../DesktopTopbar", () => ({
 }));
 
 vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => <main>dashboard content</main> }));
-vi.mock("../DesktopWarehouseView", () => ({ DesktopWarehouseView: () => <main>warehouse content</main> }));
-vi.mock("../DesktopShippingView", () => ({ DesktopShippingView: () => <main>shipping content</main> }));
+vi.mock("../DesktopWarehouseView", () => ({
+  DesktopWarehouseView: ({
+    entryIntent,
+    onSubmitSuccess,
+  }: {
+    entryIntent?: { shippingPrepare?: { shippingRequestId: string } } | null;
+    onSubmitSuccess?: () => void;
+  }) => (
+    <main>
+      <output data-testid="warehouse-shipping-request">
+        {entryIntent?.shippingPrepare?.shippingRequestId ?? "none"}
+      </output>
+      <button type="button" onClick={() => onSubmitSuccess?.()}>warehouse submit</button>
+    </main>
+  ),
+}));
+vi.mock("../DesktopShippingView", () => ({
+  DesktopShippingView: ({
+    onStartPrepareWork,
+  }: {
+    onStartPrepareWork?: (intent: {
+      workType: "process";
+      direction: "in";
+      shippingPrepare: { shippingRequestId: string; requestLabel: string };
+    }) => void;
+  }) => (
+    <main>
+      <button
+        type="button"
+        onClick={() => onStartPrepareWork?.({
+          workType: "process",
+          direction: "in",
+          shippingPrepare: { shippingRequestId: "request-1", requestLabel: "PF" },
+        })}
+      >
+        start linked work
+      </button>
+    </main>
+  ),
+}));
 vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <main>defect content</main> }));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <main>history content</main> }));
 vi.mock("../DesktopWeeklyReportView", () => ({ DesktopWeeklyReportView: () => <main>weekly content</main> }));
@@ -152,5 +190,30 @@ describe("DesktopMesShell tab transition", () => {
         expect.objectContaining({ dateFrom: expect.any(String) }),
       ],
     }));
+  });
+
+  it("clears a shipping preparation context after warehouse submission", () => {
+    render(<DesktopMesShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "shipping" }));
+    fireEvent.click(screen.getByRole("button", { name: "start linked work" }));
+    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("request-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "warehouse submit" }));
+
+    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("none");
+  });
+
+  it("clears a shipping preparation context when leaving the warehouse", () => {
+    render(<DesktopMesShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "shipping" }));
+    fireEvent.click(screen.getByRole("button", { name: "start linked work" }));
+    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("request-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "history" }));
+    fireEvent.click(screen.getByRole("button", { name: "warehouse" }));
+
+    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("none");
   });
 });

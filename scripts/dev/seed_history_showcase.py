@@ -324,6 +324,31 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
         },
     )
     shipping_svc.send_to_prep(db, request.request_id)
+    _final_pa, final_pf = shipping_svc._require_final_items(db, request)
+    batch, bundle = _new_batch(db, plan, marker, "shipping_prepare_produce", final_pf)
+    batch.work_type = "process"
+    batch.sub_type = "produce"
+    batch.shipping_request_id = request.request_id
+    batch.reference_no = f"SHIP-PREP-{request.request_id.hex[:8]}"
+    line = IoLine(
+        bundle_id=bundle.bundle_id,
+        item_id=final_pf.item_id,
+        item_name_snapshot=final_pf.item_name,
+        mes_code_snapshot=final_pf.mes_code,
+        unit=final_pf.unit or "EA",
+        direction="in",
+        from_bucket="none",
+        to_bucket="production",
+        to_department=DepartmentEnum.SHIPPING.value,
+        quantity=DEMO_QUANTITY,
+        origin="history_demo",
+    )
+    db.add(line)
+    db.flush()
+    io_dispatch._apply_line(db, batch=batch, line=line, requester=plan.actor)
+    batch.status = "completed"
+    batch.completed_at = datetime.now(UTC).replace(tzinfo=None)
+    db.flush()
     shipping_svc.prepare_complete(db, request.request_id)
     shipping_svc.pickup_complete(db, request.request_id)
     logs = db.query(TransactionLog).filter(TransactionLog.shipping_request_id == request.request_id).all()

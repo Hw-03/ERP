@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
@@ -12,6 +14,7 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
+    IoBatch,
     LocationStatusEnum,
     ShippingAllocation,
     ShippingRequestCompanionLine,
@@ -20,6 +23,9 @@ from app.models import (
 )
 from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
+from app.services import io as io_svc
+from app.services import io_actions as io_actions_svc
+from app.schemas.io import IoPreviewTarget, IoSubmitRequest
 
 
 def _stock(db_session, item):
@@ -93,6 +99,110 @@ def _shipping_actor(db_session) -> Employee:
     return actor
 
 
+def _add_linked_prepare_log(
+    db_session,
+    *,
+    request,
+    item,
+    quantity: int,
+    actor: Employee,
+) -> TransactionLog:
+    batch = IoBatch(
+        batch_id=uuid.uuid4(),
+        work_type="process",
+        sub_type="produce",
+        status="completed",
+        requester_employee_id=actor.employee_id,
+        requester_name=actor.name,
+        requester_department=getattr(actor.department, "value", actor.department),
+        requires_approval=False,
+        shipping_request_id=request.request_id,
+        reference_no=f"SHIP-PREP-{request.request_id.hex[:8]}",
+    )
+    db_session.add(batch)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.PRODUCE,
+        quantity_change=quantity,
+        quantity_before=0,
+        quantity_after=quantity,
+        operation_batch_id=batch.batch_id,
+        shipping_request_id=request.request_id,
+        shipping_phase="PREPARE",
+        reference_no=batch.reference_no,
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        inventory_effect=[],
+    )
+    db_session.add(log)
+    db_session.flush()
+    return log
+
+
+def _submit_linked_final_pf_production(
+    db_session,
+    *,
+    request,
+    actor: Employee,
+    quantity: int | None = None,
+) -> dict:
+    final_pf = request.final_pf_item
+    assert final_pf is not None
+    produced_quantity = quantity or int(request.request_quantity or 1)
+    preview = io_svc.preview(
+        db_session,
+        work_type="process",
+        sub_type="produce",
+        to_department=DepartmentEnum.SHIPPING.value,
+        targets=[
+            IoPreviewTarget(
+                source_kind="direct_item",
+                item_id=final_pf.item_id,
+                quantity=produced_quantity,
+            )
+        ],
+    )
+    return io_actions_svc.submit(
+        db_session,
+        IoSubmitRequest(
+            requester_employee_id=actor.employee_id,
+            work_type="process",
+            sub_type="produce",
+            to_department=DepartmentEnum.SHIPPING.value,
+            shipping_request_id=request.request_id,
+            bundles=preview["bundles"],
+        ),
+    )
+
+
+def _simulate_legacy_prepare(db_session, request) -> None:
+    request_quantity = shipping_svc._request_quantity(request)
+    final_pa, final_pf = shipping_svc._require_final_items(db_session, request)
+    reference_no = f"SHIP-PREP-{request.request_id.hex[:8]}"
+    shipping_svc._backflush_item_location(
+        db_session,
+        request,
+        final_pa,
+        request_quantity,
+        reference_no,
+        "legacy prepare test",
+    )
+    shipping_svc._produce_pf_to_item_location(
+        db_session,
+        request,
+        final_pf,
+        request_quantity,
+        reference_no,
+    )
+    shipping_svc._reserve_companions(db_session, request, reference_no)
+    request.status = shipping_svc.ShippingRequestStatusEnum.PREPARED
+    request.prepared_at = datetime.utcnow()
+    request.updated_at = datetime.utcnow()
+    shipping_svc._record_event(db_session, request, "PREPARED", "legacy prepare test")
+    db_session.flush()
+
+
 def test_companion_lines_do_not_map_bom_inclusion_flags():
     column_names = set(ShippingRequestCompanionLine.__table__.columns.keys())
 
@@ -115,6 +225,99 @@ def test_prepare_without_invoice_keeps_request_and_events_unchanged(db_session, 
 
     assert request.status.value == "PREPARING"
     assert len(request.events) == event_count
+
+
+def test_prepare_complete_requires_linked_final_pf_output_without_new_inventory_logs(
+    db_session, make_item, make_bom
+):
+    af = make_item(name="Linked prepare AF", process_type_code="AF", model_symbol="8", serial_no=1)
+    pa = make_item(name="Linked prepare PA", process_type_code="PA", model_symbol="8", serial_no=1)
+    pf = make_item(name="Linked prepare PF", process_type_code="PF", model_symbol="8", serial_no=2)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "invoice_number": "LINKED-PREPARE-001",
+            "request_quantity": 2,
+        },
+    )
+    shipping_svc.send_to_prep(db_session, request.request_id)
+    actor = _shipping_actor(db_session)
+    _add_linked_prepare_log(
+        db_session,
+        request=request,
+        item=pf,
+        quantity=2,
+        actor=actor,
+    )
+    before_log_count = db_session.query(TransactionLog).count()
+
+    prepared = shipping_svc.prepare_complete(db_session, request.request_id)
+
+    assert prepared.status.value == "PREPARED"
+    assert db_session.query(TransactionLog).count() == before_log_count
+
+
+def test_prepare_complete_rejects_insufficient_linked_final_pf_output(
+    db_session, make_item, make_bom
+):
+    af = make_item(name="Insufficient prepare AF", process_type_code="AF", model_symbol="8", serial_no=3)
+    pa = make_item(name="Insufficient prepare PA", process_type_code="PA", model_symbol="8", serial_no=3)
+    pf = make_item(name="Insufficient prepare PF", process_type_code="PF", model_symbol="8", serial_no=4)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "invoice_number": "LINKED-PREPARE-002",
+            "request_quantity": 2,
+        },
+    )
+    shipping_svc.send_to_prep(db_session, request.request_id)
+    _add_linked_prepare_log(
+        db_session,
+        request=request,
+        item=pf,
+        quantity=1,
+        actor=_shipping_actor(db_session),
+    )
+
+    with pytest.raises(shipping_svc.ShippingError, match="최종 PF"):
+        shipping_svc.prepare_complete(db_session, request.request_id)
+
+    assert request.status.value == "PREPARING"
+
+
+def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_item, make_bom):
+    af = make_item(name="Linked cancel AF", process_type_code="AF", model_symbol="8", serial_no=5)
+    pa = make_item(name="Linked cancel PA", process_type_code="PA", model_symbol="8", serial_no=5)
+    pf = make_item(name="Linked cancel PF", process_type_code="PF", model_symbol="8", serial_no=6)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "invoice_number": "LINKED-CANCEL-001",
+        },
+    )
+    shipping_svc.send_to_prep(db_session, request.request_id)
+    linked_log = _add_linked_prepare_log(
+        db_session,
+        request=request,
+        item=pf,
+        quantity=1,
+        actor=_shipping_actor(db_session),
+    )
+    shipping_svc.prepare_complete(db_session, request.request_id)
+
+    shipping_svc.prepare_cancel(db_session, request.request_id, reason="retry")
+
+    assert request.status.value == "PREPARING"
+    assert linked_log.cancelled is False
 
 
 def test_default_shipping_bom_lines_use_standard_child_order(db_session, make_item, make_bom):
@@ -283,6 +486,11 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     assert any(log.item_id == final_pa.item_id and log.quantity_change == 1 for log in component_logs)
     assert any(log.item_id == cable.item_id and log.quantity_change == -1 for log in component_logs)
 
+    _submit_linked_final_pf_production(
+        db_session,
+        request=req,
+        actor=_shipping_actor(db_session),
+    )
     prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
     assert prepared.final_pa_item_id == final_pa.item_id
@@ -380,7 +588,7 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(db_sessio
     assert req.final_pa_item_id == base_pa.item_id
     assert req.final_pf_item_id == base_pf.item_id
     shipping_svc.send_to_prep(db_session, req.request_id)
-    shipping_svc.prepare_complete(db_session, req.request_id)
+    _simulate_legacy_prepare(db_session, req)
 
     with pytest.raises(shipping_svc.ShippingError):
         shipping_svc.update_checklist(db_session, req.request_id, {})
@@ -497,6 +705,11 @@ def test_same_bom_is_resolved_on_request_and_companion_lines_do_not_create_trans
     assert db_session.query(TransactionLog).filter(TransactionLog.item_id == carton.item_id).count() == 0
 
     shipping_svc.send_to_prep(db_session, req.request_id)
+    _submit_linked_final_pf_production(
+        db_session,
+        request=req,
+        actor=_shipping_actor(db_session),
+    )
     shipping_svc.prepare_complete(db_session, req.request_id)
 
     assert db_session.query(TransactionLog).filter(TransactionLog.item_id == carton.item_id).count() == 0
@@ -515,6 +728,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     make_bom(pf.item_id, pouch.item_id, Decimal("1"))
     make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("3"))
+    make_location(pouch.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("3"))
     make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     db_session.commit()
 
@@ -529,6 +743,11 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
         },
     )
     shipping_svc.send_to_prep(db_session, req.request_id)
+    _submit_linked_final_pf_production(
+        db_session,
+        request=req,
+        actor=_shipping_actor(db_session),
+    )
 
     prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
@@ -548,13 +767,14 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     )
     assert any(log.item_id == pa.item_id and log.quantity_change == -3 for log in prepare_logs)
     assert any(log.item_id == pf.item_id and log.quantity_change == 3 for log in prepare_logs)
-    assert all(log.item_id not in {af.item_id, pouch.item_id, carton.item_id} for log in prepare_logs)
+    assert any(log.item_id == pouch.item_id and log.quantity_change == -3 for log in prepare_logs)
+    assert all(log.item_id != carton.item_id for log in prepare_logs)
 
     shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
     assert req.status.value == "PREPARING"
     assert len(req.companion_lines) == 1
-    assert _location_qty(db_session, pa, DepartmentEnum.SHIPPING) == 3
-    assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, pa, DepartmentEnum.SHIPPING) == 0
+    assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 3
     assert _active_allocation_qty(db_session, req.request_id, carton) == 0
 
     shipping_svc.prepare_complete(db_session, req.request_id)
@@ -627,6 +847,11 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
     make_location(req.final_pa_item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
 
     shipping_svc.send_to_prep(db_session, req.request_id)
+    _submit_linked_final_pf_production(
+        db_session,
+        request=req,
+        actor=_shipping_actor(db_session),
+    )
     prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
     assert prepared.final_pa_item.item_name == "Cable excluded PA"
@@ -675,6 +900,11 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
     assert req.final_pf_item.item_name == "Bracket PF"
 
     shipping_svc.send_to_prep(db_session, req.request_id)
+    _submit_linked_final_pf_production(
+        db_session,
+        request=req,
+        actor=_shipping_actor(db_session),
+    )
     prepared = shipping_svc.prepare_complete(db_session, req.request_id)
 
     assert prepared.final_pa_item_id == pa.item_id

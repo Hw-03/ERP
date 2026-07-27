@@ -68,6 +68,7 @@ class IoDraftUpsert(BaseModel):
     sub_type: str
     from_department: Optional[str] = None
     to_department: Optional[str] = None
+    shipping_request_id: Optional[uuid.UUID] = None
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     client_request_id: Optional[str] = Field(None, max_length=64)
@@ -96,6 +97,7 @@ class IoBatchResponse(BaseModel):
     to_department: Optional[str] = None
     requires_approval: bool
     stock_request_id: Optional[uuid.UUID] = None
+    shipping_request_id: Optional[uuid.UUID] = None
     reference_no: Optional[str] = None
     notes: Optional[str] = None
     created_at: UtcDatetime

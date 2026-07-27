@@ -15,6 +15,7 @@ export function useIoSubmit() {
     toDepartment?: string | null;
     referenceNo?: string | null;
     notes?: string | null;
+    shippingRequestId?: string | null;
     bundles: IoBundle[];
   }) {
     setSubmitting(true);
@@ -31,6 +32,7 @@ export function useIoSubmit() {
         to_department: payload.toDepartment || null,
         reference_no: payload.referenceNo || null,
         notes: payload.notes || null,
+        shipping_request_id: payload.shippingRequestId ?? null,
         client_request_id: clientRequestIdRef.current,
         bundles: payload.bundles,
       });

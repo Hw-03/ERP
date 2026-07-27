@@ -267,6 +267,50 @@ describe("buildHistoryDetailSummary", () => {
     expect(summary.operationLabel).toBe("재작업");
   });
 
+  it("uses the disassembly parent and actual defect-to-assembly flow for a legacy rework reference", () => {
+    const parent = makeLog({
+      log_id: "rework-parent",
+      item_id: "parent-item",
+      item_name: "재작업 대상",
+      mes_code: "PARENT-001",
+      transaction_type: "DISASSEMBLE",
+      quantity_change: -4,
+      reference_no: "defect-disassemble:rework-1",
+      inventory_effect: [
+        { scope: "location", department: "조립", status: "DEFECTIVE", delta: -4 },
+      ],
+    });
+    const child = makeLog({
+      log_id: "rework-recovered",
+      item_id: "recovered-item",
+      item_name: "회수 구성품",
+      mes_code: "RECOVER-001",
+      transaction_type: "RECEIVE",
+      quantity_change: 4,
+      reference_no: parent.reference_no,
+      inventory_effect: [
+        { scope: "location", department: "조립", status: "PRODUCTION", delta: 4 },
+      ],
+    });
+
+    const summary = buildHistoryDetailSummary([child, parent], null);
+
+    expect(summary.target).toEqual({
+      itemId: "parent-item",
+      itemName: "재작업 대상",
+      mesCode: "PARENT-001",
+    });
+    expect(summary.operationLabel).toBe("재작업");
+    expect(summary.flow).toEqual({
+      label: "불량 재고 → 조립 재고",
+      from: "불량 재고",
+      to: "조립 재고",
+    });
+    expect(summary.impactGroups.map((group) => group.label)).toEqual(
+      expect.arrayContaining(["불량 재고", "조립 재고"]),
+    );
+  });
+
   it("uses the first bundle source item as the primary target for multiple outputs", () => {
     const secondaryOutput = makeLog({
       log_id: "secondary-output",

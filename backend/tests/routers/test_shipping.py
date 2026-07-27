@@ -51,6 +51,46 @@ def _employee(
     return employee
 
 
+def _submit_linked_final_pf_production(
+    client,
+    *,
+    requester_employee_id: str,
+    request_id: str,
+    final_pf_item_id: str,
+    quantity: int,
+) -> dict:
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": requester_employee_id,
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.SHIPPING.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": final_pf_item_id,
+                    "quantity": quantity,
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": requester_employee_id,
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.SHIPPING.value,
+            "shipping_request_id": request_id,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    return submitted.json()
+
+
 @pytest.fixture(autouse=True)
 def _shipping_actor_header(client, db_session):
     actor = _employee(
@@ -255,6 +295,14 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     checked_line = [line for line in checked.json()["checklist_lines"] if line["item_id"] == checklist_id][0]
     assert checked_line["checked"] is True
 
+    _submit_linked_final_pf_production(
+        client,
+        requester_employee_id=str(component_change_actor.employee_id),
+        request_id=request_id,
+        final_pf_item_id=create.json()["final_pf_item_id"],
+        quantity=2,
+    )
+
     prepared = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
         json={},
@@ -293,7 +341,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
         for log in history_row["transactions"]
     )
     assert any(
-        log["shipping_phase"] == "PREPARE" and log["cancelled"]
+        log["shipping_phase"] == "PREPARE" and not log["cancelled"]
         for log in history_row["transactions"]
     )
     assert any(
@@ -1222,6 +1270,14 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
     assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
+    requester = db_session.query(Employee).filter(Employee.employee_code == "shipping-test-actor").one()
+    _submit_linked_final_pf_production(
+        client,
+        requester_employee_id=str(requester.employee_id),
+        request_id=request_id,
+        final_pf_item_id=create.json()["final_pf_item_id"],
+        quantity=1,
+    )
     prepared = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={"companion_lines": []})
     assert prepared.status_code == 200, prepared.text
 
@@ -1255,9 +1311,8 @@ def test_shipping_prepare_complete_requires_process_department_stock(client, db_
 
     assert prepared.status_code == 422, prepared.text
     body = prepared.text
-    assert pa.mes_code in body
-    assert "Base PA" in body
-    assert DepartmentEnum.SHIPPING.value in body
+    assert "최종 PF" in body
+    assert "생산 0" in body
     assert "0" in body
     assert "1" in body
 

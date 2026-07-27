@@ -184,7 +184,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260724_0005"
+            ) == "20260727_0006"
             connection.execute(
                 sa.text(
                     "INSERT INTO system_settings (setting_key, setting_value) "
@@ -251,6 +251,80 @@ def test_shipping_sales_upgrade_keeps_existing_child_rows_on_sqlite(tmp_path):
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT COUNT(*) FROM shipping_request_bom_lines").fetchone()[0] == 1
         assert db.execute("SELECT shipping_request_id FROM transaction_logs WHERE log_id = 'log-1'").fetchone()[0] == "request-1"
+
+
+def test_shipping_io_context_upgrade_keeps_existing_io_dependents_on_sqlite(tmp_path):
+    """Adding the shipping FK must not lose draft bundles during SQLite rebuild."""
+    path = tmp_path / "shipping-io-context.db"
+    with sqlite3.connect(path) as db:
+        db.executescript(
+            """
+            PRAGMA foreign_keys = ON;
+            CREATE TABLE shipping_requests (request_id UUID PRIMARY KEY);
+            CREATE TABLE io_batches (
+                batch_id UUID PRIMARY KEY,
+                reference_no TEXT
+            );
+            CREATE TABLE io_bundles (
+                bundle_id UUID PRIMARY KEY,
+                batch_id UUID NOT NULL,
+                FOREIGN KEY (batch_id) REFERENCES io_batches(batch_id) ON DELETE CASCADE
+            );
+            CREATE TABLE io_lines (
+                line_id UUID PRIMARY KEY,
+                bundle_id UUID NOT NULL,
+                FOREIGN KEY (bundle_id) REFERENCES io_bundles(bundle_id) ON DELETE CASCADE
+            );
+            CREATE TABLE transaction_logs (
+                log_id UUID PRIMARY KEY,
+                operation_batch_id UUID,
+                FOREIGN KEY (operation_batch_id) REFERENCES io_batches(batch_id) ON DELETE SET NULL
+            );
+            CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL);
+            INSERT INTO shipping_requests (request_id) VALUES ('request-1');
+            INSERT INTO io_batches (batch_id, reference_no) VALUES ('batch-1', 'IO-1');
+            INSERT INTO io_bundles (bundle_id, batch_id) VALUES ('bundle-1', 'batch-1');
+            INSERT INTO io_lines (line_id, bundle_id) VALUES ('line-1', 'bundle-1');
+            INSERT INTO transaction_logs (log_id, operation_batch_id) VALUES ('log-1', 'batch-1');
+            INSERT INTO alembic_version (version_num) VALUES ('20260724_0005');
+            """
+        )
+
+    engine = sa.create_engine(f"sqlite:///{path.as_posix()}")
+
+    @sa.event.listens_for(engine, "connect")
+    def enable_foreign_keys(dbapi_connection, _connection_record):
+        dbapi_connection.execute("PRAGMA foreign_keys = ON")
+
+    try:
+        with engine.begin() as connection:
+            config = _config(f"sqlite:///{path.as_posix()}")
+            config.attributes["connection"] = connection
+            command.upgrade(config, "20260727_0006")
+    finally:
+        engine.dispose()
+
+    with sqlite3.connect(path) as db:
+        db.execute("PRAGMA foreign_keys = ON")
+        assert db.execute("SELECT COUNT(*) FROM io_bundles").fetchone()[0] == 1
+        assert db.execute(
+            "SELECT batch_id FROM io_bundles WHERE bundle_id = 'bundle-1'"
+        ).fetchone() == ("batch-1",)
+        assert db.execute(
+            "SELECT bundle_id FROM io_lines WHERE line_id = 'line-1'"
+        ).fetchone() == ("bundle-1",)
+        assert db.execute(
+            "SELECT operation_batch_id FROM transaction_logs WHERE log_id = 'log-1'"
+        ).fetchone() == ("batch-1",)
+        db.execute(
+            "UPDATE io_batches SET shipping_request_id = 'request-1' "
+            "WHERE batch_id = 'batch-1'"
+        )
+        db.execute("DELETE FROM shipping_requests WHERE request_id = 'request-1'")
+        assert db.execute(
+            "SELECT shipping_request_id FROM io_batches WHERE batch_id = 'batch-1'"
+        ).fetchone() == (None,)
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
 def test_empty_sqlite_upgrade_accepts_supplied_connection(tmp_path):

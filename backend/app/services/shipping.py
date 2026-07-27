@@ -1377,6 +1377,27 @@ def _consume_companion_allocations(db: Session, req: ShippingRequest) -> None:
     db.flush()
 
 
+def _linked_final_pf_produced_quantity(
+    db: Session,
+    req: ShippingRequest,
+    final_pf: Item,
+) -> Decimal:
+    produced = (
+        db.query(func.coalesce(func.sum(TransactionLog.quantity_change), 0))
+        .filter(
+            TransactionLog.shipping_request_id == req.request_id,
+            TransactionLog.shipping_phase == PREPARE_PHASE,
+            TransactionLog.operation_batch_id.is_not(None),
+            TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE,
+            TransactionLog.item_id == final_pf.item_id,
+            TransactionLog.quantity_change > 0,
+            TransactionLog.cancelled.is_(False),
+        )
+        .scalar()
+    )
+    return Decimal(str(produced or 0))
+
+
 
 def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
@@ -1385,19 +1406,15 @@ def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 요청에서만 준비 완료할 수 있습니다.")
     request_qty = _request_quantity(req)
-    final_pa, final_pf = _require_final_items(db, req)
-    _require_item_location_available(db, final_pa, request_qty)
+    _final_pa, final_pf = _require_final_items(db, req)
+    produced_quantity = _linked_final_pf_produced_quantity(db, req, final_pf)
+    if produced_quantity < request_qty:
+        raise ShippingError(
+            f"연결된 작업의 최종 PF 생산 수량이 부족합니다. "
+            f"생산 {int(produced_quantity)} / 요청 {request_qty}"
+        )
     reference_no = f"SHIP-PREP-{req.request_id.hex[:8]}"
 
-    _backflush_item_location(
-        db,
-        req,
-        final_pa,
-        request_qty,
-        reference_no,
-        f"출하 준비 final PA 차감: {final_pa.item_name} x {request_qty}",
-    )
-    _produce_pf_to_item_location(db, req, final_pf, request_qty, reference_no)
     _reserve_companions(db, req, reference_no)
 
     req.status = ShippingRequestStatusEnum.PREPARED
@@ -1422,9 +1439,8 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
         .order_by(TransactionLog.created_at.desc(), TransactionLog.log_id.desc())
         .all()
     )
-    if not logs:
-        raise ShippingError("취소할 준비 완료 로그가 없습니다.")
-    for log in logs:
+    legacy_logs = [log for log in logs if log.operation_batch_id is None]
+    for log in legacy_logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
         inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
         if inv is not None:

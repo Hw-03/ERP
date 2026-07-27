@@ -418,7 +418,7 @@ export function HistoryTable({
                   const controlsId = historyGroupPanelId(groupKey);
                   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
                   const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
-                  const isSelected = selectedLogId === group.logs[0]?.log_id;
+                  const isSelected = selectedLogId === parentLog.log_id;
                   return (
                     <Fragment key={`ref-${groupKey}`}>
                       <ReworkBatchHeader
@@ -427,7 +427,7 @@ export function HistoryTable({
                         onToggle={() => toggleGroup(groupKey)}
                         selected={isSelected}
                         onSelect={() => {
-                          onSelectLog(group.logs[0]);
+                          onSelectLog(parentLog);
                           if (isSelected && expanded) collapseGroup(groupKey);
                           else expandGroup(groupKey);
                         }}

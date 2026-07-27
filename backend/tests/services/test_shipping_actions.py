@@ -25,6 +25,9 @@ from app.models import (
 )
 from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
+from app.services import io as io_svc
+from app.services import io_actions as io_actions_svc
+from app.schemas.io import IoPreviewTarget, IoSubmitRequest
 
 
 def _location_qty(db_session, item_id, department: DepartmentEnum) -> Decimal:
@@ -53,6 +56,40 @@ def _active_shipping_actor(db_session) -> Employee:
     db_session.add(actor)
     db_session.flush()
     return actor
+
+
+def _submit_linked_final_pf_production(
+    db_session,
+    *,
+    request: ShippingRequest,
+    actor: Employee,
+) -> None:
+    final_pf = request.final_pf_item
+    assert final_pf is not None
+    preview = io_svc.preview(
+        db_session,
+        work_type="process",
+        sub_type="produce",
+        to_department=DepartmentEnum.SHIPPING.value,
+        targets=[
+            IoPreviewTarget(
+                source_kind="direct_item",
+                item_id=final_pf.item_id,
+                quantity=int(request.request_quantity or 1),
+            )
+        ],
+    )
+    io_actions_svc.submit(
+        db_session,
+        IoSubmitRequest(
+            requester_employee_id=actor.employee_id,
+            work_type="process",
+            sub_type="produce",
+            to_department=DepartmentEnum.SHIPPING.value,
+            shipping_request_id=request.request_id,
+            bundles=preview["bundles"],
+        ),
+    )
 
 
 def _spec_conversion_case(db_session, make_item, make_bom, make_location):
@@ -347,6 +384,11 @@ def _make_prepared_request(
         },
     )
     shipping_actions_svc.send_to_prep(db_session, request.request_id)
+    _submit_linked_final_pf_production(
+        db_session,
+        request=request,
+        actor=_active_shipping_actor(db_session),
+    )
     shipping_actions_svc.prepare_complete(db_session, request.request_id)
     return (
         request.request_id,
@@ -887,6 +929,12 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
     shipping_svc.send_to_prep(db_session, request.request_id)
     db_session.commit()
 
+    _submit_linked_final_pf_production(
+        db_session,
+        request=request,
+        actor=actor,
+    )
+
     def fail_event(*_args, **_kwargs):
         raise RuntimeError("shipping event failure")
 
@@ -900,8 +948,8 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
         )
 
     db_session.expire_all()
-    assert _location_qty(db_session, final_pa.item_id, DepartmentEnum.SHIPPING) == Decimal("1")
-    assert _location_qty(db_session, final_pf.item_id, DepartmentEnum.SHIPPING) == Decimal("0")
+    assert _location_qty(db_session, final_pa.item_id, DepartmentEnum.SHIPPING) == Decimal("0")
+    assert _location_qty(db_session, final_pf.item_id, DepartmentEnum.SHIPPING) == Decimal("1")
     assert (
         db_session.query(TransactionLog)
         .filter(
@@ -909,7 +957,7 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
             TransactionLog.shipping_phase == "PREPARE",
         )
         .count()
-        == 0
+        == 2
     )
     refreshed = (
         db_session.query(ShippingRequest)

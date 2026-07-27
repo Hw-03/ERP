@@ -224,7 +224,9 @@ export function getReferenceBatchPresentation(
   const titlePrefix = phaseOperationLabel ?? (shipment ? "출하 구성" : outbound ? "출고 구성" : "묶음");
   const homogeneous = logs.length > 0 && logs.every((log) => log.item_id === first.item_id);
   const phaseFlow = isComponentChangePhase(phase) ? "재고 위치" : getShippingPhaseFlowLabel(phase);
-  const flowLabel = getLocationFlowLabel(logs, phaseFlow);
+  const flowLabel = phase === "PREPARE"
+    ? phaseFlow
+    : getLocationFlowLabel(logs, phaseFlow);
   const movementVerb = isComponentChangePhase(phase)
     ? "변경"
     : phase
@@ -338,7 +340,7 @@ function getHistoryOperationPresentationLabel(
   batch?: IoBatch | null,
 ): string {
   const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);
-  if (!batch && phaseLabel) return phaseLabel;
+  if (phaseLabel) return phaseLabel;
   if (!batch && log.transaction_type === "SHIP" && isShippingReference(log)) return "출하";
   return getHistoryDisplayLabel(log, batch);
 }
@@ -460,12 +462,10 @@ function getFlowPresentation(
   batch: IoBatch | null | undefined,
   hint?: string,
 ): HistoryFlowPresentation {
+  const phaseFlowLabel = getShippingPhaseFlowLabel(log.shipping_phase);
+  if (phaseFlowLabel) return { label: phaseFlowLabel };
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
   if (batchContext) return { label: batchContext };
-  const phaseFlowLabel = getShippingPhaseFlowLabel(log.shipping_phase);
-  if (!batch && phaseFlowLabel) {
-    return { label: log.department?.trim() || phaseFlowLabel };
-  }
   if (!batch && log.transaction_type === "SHIP" && isShippingReference(log)) {
     return { label: "출하" };
   }

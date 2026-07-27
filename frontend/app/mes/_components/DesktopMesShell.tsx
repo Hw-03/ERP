@@ -280,6 +280,13 @@ function DesktopMesShellInner() {
 
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
+  const clearWarehouseEntry = useCallback(() => {
+    setWarehousePreselected(null);
+    setWarehouseIntent(null);
+  }, []);
+  useEffect(() => {
+    if (activeTab !== "warehouse") clearWarehouseEntry();
+  }, [activeTab, clearWarehouseEntry]);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(() => {
     // 초기 URL 에 defect_dept 쿼리가 있으면 읽어 둔다
     return searchParams.get("defect_dept");
@@ -290,7 +297,8 @@ function DesktopMesShellInner() {
 
   const activeMeta = TAB_META[activeTab];
 
-  const canReceive = canSeeWorkType("receive", operator) && canOpenTab("warehouse");
+  const canOpenWarehouse = canOpenTab("warehouse");
+  const canReceive = canSeeWorkType("receive", operator) && canOpenWarehouse;
 
   const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
     if (!canOpenTab("warehouse")) return;
@@ -299,6 +307,13 @@ function DesktopMesShellInner() {
     commitDesktopTab("warehouse");
     // tab 만 전환 — step 은 위저드(useIoUrlSync)가 tab=warehouse 와 함께 기록한다.
   }, [canOpenTab, commitDesktopTab]);
+
+  const handleStartPrepareWork = useCallback((intent: IoEntryIntent) => {
+    if (!canOpenWarehouse) return;
+    setWarehousePreselected(null);
+    setWarehouseIntent(intent);
+    commitDesktopTab("warehouse");
+  }, [canOpenWarehouse, commitDesktopTab]);
 
   const content = useMemo(() => {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
@@ -325,12 +340,22 @@ function DesktopMesShellInner() {
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
           entryIntent={warehouseIntent}
-          onSubmitSuccess={() => { void refetchCapacity(); }}
+          onSubmitSuccess={() => {
+            clearWarehouseEntry();
+            void refetchCapacity();
+          }}
         />
       );
     }
     if (activeTab === "shipping") {
-      return <DesktopShippingView key={key} operator={operator} onStatusChange={handleStatusChange} />;
+      return (
+        <DesktopShippingView
+          key={key}
+          operator={operator}
+          onStatusChange={handleStatusChange}
+          onStartPrepareWork={canOpenWarehouse ? handleStartPrepareWork : undefined}
+        />
+      );
     }
     if (activeTab === "warehouseMap") {
       return (
@@ -363,7 +388,7 @@ function DesktopMesShellInner() {
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
+  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, handleStartPrepareWork, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
 
   return (
     <>

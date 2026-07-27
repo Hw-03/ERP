@@ -210,8 +210,27 @@ function getItemConversion(logs: TransactionLog[]): HistoryDetailSummary["conver
     : null;
 }
 
+function isLegacyReworkReference(logs: TransactionLog[]): boolean {
+  return logs.some((log) => log.reference_no?.startsWith("defect-disassemble:"));
+}
+
+function getLegacyReworkFlow(logs: TransactionLog[]): HistoryDetailSummary["flow"] {
+  if (!isLegacyReworkReference(logs)) return null;
+
+  const effects = effectsFromLogs(logs);
+  const defectSource = effects.find((effect) => effect.status === "DEFECTIVE" && effect.delta < 0);
+  const productionTarget = effects.find((effect) => effect.status === "PRODUCTION" && effect.delta > 0);
+  const recoveredLog = logs.find((log) => log.transaction_type === "RECEIVE" && log.quantity_change > 0);
+  const from = defectSource?.label ?? "불량 재고";
+  const to = productionTarget?.label
+    ?? (recoveredLog?.department?.trim() ? `${recoveredLog.department.trim()} 재고` : null);
+
+  if (!to) return { label: from, from, to: null };
+  return { label: `${from} → ${to}`, from, to };
+}
+
 function getPrimaryLog(logs: TransactionLog[], batch: IoBatch | null): TransactionLog {
-  if (batch?.sub_type === "disassemble") {
+  if (batch?.sub_type === "disassemble" || isLegacyReworkReference(logs)) {
     return logs.find((log) => log.transaction_type === "DISASSEMBLE") ?? logs[0];
   }
   if (batch?.sub_type === "produce") {
@@ -252,6 +271,7 @@ export function buildHistoryDetailSummary(
 ): HistoryDetailSummary {
   const primary = getPrimaryLog(logs, batch);
   const presentation = getHistoryRowPresentation(primary, batch);
+  const reworkFlow = getLegacyReworkFlow(logs);
 
   return {
     target: {
@@ -267,13 +287,13 @@ export function buildHistoryDetailSummary(
       name: batch?.requester_name?.trim() || presentation.people.requester,
       at: batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
     },
-    flow: presentation.flow.label
+    flow: reworkFlow ?? (presentation.flow.label
       ? {
         label: presentation.flow.label,
         from: presentation.flow.from ?? null,
         to: presentation.flow.to ?? null,
       }
-      : null,
+      : null),
     composition: batch ? getBatchLineStats(batch) : null,
     impactIdentity: logs.map((log) => log.log_id).sort().join(":"),
   };

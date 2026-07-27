@@ -192,6 +192,26 @@ describe("historyPresentation", () => {
     expect(getHistoryRowPresentation(recovered, batch).operation.label).toBe("재작업");
   });
 
+  it("prioritizes 출하 준비 for a linked IO batch while retaining its batch details", () => {
+    const batch = makeBatch({
+      work_type: "process",
+      sub_type: "produce",
+      to_department: "출하",
+    });
+    const row = getHistoryRowPresentation(
+      makeLog({
+        transaction_type: "PRODUCE",
+        operation_batch_id: batch.batch_id,
+        shipping_phase: "PREPARE",
+      }),
+      batch,
+    );
+
+    expect(row.operation.label).toBe("출하 준비");
+    expect(row.flow.label).toBe("출하 준비");
+    expect(row.batchStats).not.toBeNull();
+  });
+
   it("uses the complete reference summary instead of the loaded page subset", () => {
     const presentation = Reflect.apply(getReferenceBatchPresentation, undefined, [
       [makeLog({ transaction_type: "SHIP", reference_no: "REF-ALL", quantity_change: -1, transfer_qty: 1 })],
@@ -614,7 +634,7 @@ describe("shipping phase history presentation", () => {
     ]);
 
     expect(prepare.operationLabel).toBe("\uCD9C\uD558 \uC900\uBE44");
-    expect(prepare.flowLabel).toBe("\uC870\uB9BD");
+    expect(prepare.flowLabel).toBe("\uCD9C\uD558 \uC900\uBE44");
     expect(prepare.targetTitle).toBe("\uCD5C\uC885 PF");
     expect(prepare.targetCode).toBe("3-PF-0002");
     expect(prepare.movement.parts[0]?.label).toContain("\uC900\uBE44");
