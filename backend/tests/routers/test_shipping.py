@@ -305,10 +305,11 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     prepared = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
-        json={},
+        json={"serial_numbers": "  SN-001\nSN-002  "},
     )
     assert prepared.status_code == 200, prepared.text
     assert prepared.json()["status"] == ShippingRequestStatusEnum.PREPARED.value
+    assert prepared.json()["serial_numbers"] == "SN-001\nSN-002"
     assert prepared.json()["final_pf_item_name"] == "Base PF with Pouch"
     assert prepared.json()["companion_lines"][0]["item_name"] == "Carton"
 
@@ -318,13 +319,15 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     )
     assert cancel.status_code == 200, cancel.text
     assert cancel.json()["status"] == ShippingRequestStatusEnum.PREPARING.value
+    assert cancel.json()["serial_numbers"] == "SN-001\nSN-002"
     assert cancel.json()["final_pa_item_name"] == "Base PF with Pouch PA"
 
     prepared_again = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
-        json={},
+        json={"serial_numbers": "SN-003"},
     )
     assert prepared_again.status_code == 200, prepared_again.text
+    assert prepared_again.json()["serial_numbers"] == "SN-003"
 
     pickup = client.post(f"/api/shipping/requests/{request_id}/pickup-complete")
     assert pickup.status_code == 200, pickup.text
@@ -1278,7 +1281,7 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
         final_pf_item_id=create.json()["final_pf_item_id"],
         quantity=1,
     )
-    prepared = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={"companion_lines": []})
+    prepared = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={"serial_numbers": "SN-001", "companion_lines": []})
     assert prepared.status_code == 200, prepared.text
 
     delete_prepared = client.delete(f"/api/shipping/requests/{request_id}")
@@ -1307,7 +1310,7 @@ def test_shipping_prepare_complete_requires_final_pf_shipping_department_stock(c
     request_id = create.json()["request_id"]
     assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
 
-    prepared = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={"companion_lines": []})
+    prepared = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={"serial_numbers": "SN-001", "companion_lines": []})
 
     assert prepared.status_code == 422, prepared.text
     body = prepared.text
@@ -1337,7 +1340,7 @@ def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department
 
     prepared = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
-        json={},
+        json={"serial_numbers": "SN-001"},
     )
 
     assert prepared.status_code == 200, prepared.text
@@ -1349,6 +1352,43 @@ def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department
         and allocation["status"] == "RESERVED"
         for allocation in body["allocations"]
     )
+
+
+def test_shipping_prepare_complete_requires_nonblank_serial_numbers_without_state_changes(
+    client, db_session, make_item, make_bom
+):
+    af = make_item(name="SN API AF", process_type_code="AF", model_symbol="4", serial_no=5)
+    pa = make_item(name="SN API PA", process_type_code="PA", model_symbol="4", serial_no=6)
+    pf = make_item(name="SN API PF", process_type_code="PF", model_symbol="4", serial_no=7)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={"base_pf_item_id": str(pf.item_id), "invoice_number": "SN-API-001"},
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
+    before = db_session.query(ShippingRequest).filter(ShippingRequest.request_id == request_id).one()
+    event_count = len(before.events)
+
+    missing = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={})
+    assert missing.status_code == 422, missing.text
+    assert "serial_numbers" in missing.text
+    blank = client.post(
+        f"/api/shipping/requests/{request_id}/prepare-complete",
+        json={"serial_numbers": " \n\t "},
+    )
+    assert blank.status_code == 422, blank.text
+    assert "SN" in blank.text
+
+    db_session.expire_all()
+    reloaded = db_session.query(ShippingRequest).filter(ShippingRequest.request_id == request_id).one()
+    assert reloaded.status is ShippingRequestStatusEnum.PREPARING
+    assert len(reloaded.events) == event_count
+    assert reloaded.serial_numbers is None
 
 
 def test_shipping_preparing_response_includes_stock_shortages(client, db_session, make_item, make_bom):
@@ -1452,7 +1492,8 @@ def test_shipping_invoice_revision_and_cancel_are_attributed_and_retained(client
         headers=headers,
         json={"base_pf_item_id": str(pf.item_id), "invoice_number": "inv-002"},
     )
-    assert duplicate.status_code == 409, duplicate.text
+    assert duplicate.status_code == 201, duplicate.text
+    assert duplicate.json()["invoice_number"] == "INV-002"
     history = client.get("/api/shipping/history", params={"q": "inv-002"})
     assert history.status_code == 200, history.text
     assert history.json()["requests"][0]["status"] == "CANCELLED"
@@ -1463,6 +1504,13 @@ def test_shipping_invoice_revision_and_cancel_are_attributed_and_retained(client
         json={"base_pf_item_id": str(pf.item_id), "invoice_number": "inv-003"},
     )
     assert second.status_code == 201, second.text
+    duplicate_update = client.patch(
+        f"/api/shipping/requests/{second.json()['request_id']}",
+        headers=headers,
+        json={"invoice_number": " inv-002 "},
+    )
+    assert duplicate_update.status_code == 200, duplicate_update.text
+    assert duplicate_update.json()["invoice_number"] == "INV-002"
     assert client.delete(f"/api/shipping/requests/{second.json()['request_id']}", headers=headers).status_code == 204
     paged = client.get("/api/shipping/history", params={"q": "INV-", "limit": 1})
     assert paged.status_code == 200, paged.text

@@ -1020,6 +1020,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onStartPr
   }
 
   function completePrepare(req: ShippingRequest) {
+    setError(null);
     setConfirmAction({ kind: "prepare", request: req });
   }
 
@@ -1032,14 +1033,14 @@ export function DesktopShippingView({ onStatusChange, operator = null, onStartPr
     setConfirmAction({ kind: "pickup", request: req });
   }
 
-  async function executeConfirmedAction() {
+  async function executeConfirmedAction(serialNumbers: string) {
     if (!confirmAction) return;
     const action = confirmAction;
     setPending(action.kind === "prepare" ? "prepare" : action.kind === "cancel" ? "cancel" : action.kind === "delete" ? "delete" : "pickup");
     setError(null);
     try {
       if (action.kind === "prepare") {
-        const next = await api.prepareShippingComplete(action.request.request_id);
+        const next = await api.prepareShippingComplete(action.request.request_id, { serial_numbers: serialNumbers });
         upsertRequest(next);
         setSelectedPrepId(next.request_id);
         onStatusChange("출하 준비 완료 처리했습니다.");
@@ -1171,6 +1172,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onStartPr
           onEdit={(req) => loadRequestIntoDraft(req, "requestWork")}
           onSendToPrep={(req) => void sendExistingToPrep(req)}
           onDelete={deleteRequest}
+          onPrepareComplete={completePrepare}
           onPrepareCancel={cancelPrepare}
           onPickup={completePickup}
           onInvoiceSaved={handleInvoiceSaved}
@@ -1334,8 +1336,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onStartPr
         <ShippingActionConfirmModal
           action={confirmAction}
           pending={pending === "prepare" || pending === "cancel" || pending === "pickup" || pending === "delete"}
+          error={error}
           onClose={() => setConfirmAction(null)}
-          onConfirm={() => void executeConfirmedAction()}
+          onConfirm={executeConfirmedAction}
         />
       )}
 
@@ -1462,7 +1465,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
 }
 
 
-function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareCancel, onPickup, onInvoiceSaved, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; pending: PendingAction }) {
+function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareComplete, onPrepareCancel, onPickup, onInvoiceSaved, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareComplete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
       <div className={SHIPPING_FLEX_COL_CLASS}>
@@ -1483,6 +1486,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
   const editable = request.status === "REQUESTED" || request.status === "PREPARING";
   const canSend = request.status === "REQUESTED";
   const canDelete = request.status === "REQUESTED" || request.status === "PREPARING";
+  const canPrepareComplete = request.status === "PREPARING";
   const canCancelPrepared = request.status === "PREPARED";
   const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
   const titleSubtitle = [
@@ -1527,12 +1531,15 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
           <RevisionHistory request={request} />
         </div>
 
+        {request.status === "PREPARED" && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(request.serial_numbers)} /></div>}
+
         <div className="mt-3 min-h-0 flex-1"><LineSummary request={request} /></div>
 
         <div data-testid="shipping-detail-actions" className="mt-3 flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {canSend && <ActionButton icon={Send} label={pending === "send" ? "요청 중" : "출하 요청"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
           {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
           {canDelete && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
+          {canPrepareComplete && <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onPrepareComplete(request)} disabled={pending !== null || !request.invoice_number?.trim()} dataTestId="shipping-prepare-from-detail" />}
           {canCancelPrepared && <ActionButton icon={Truck} label={pending === "pickup" ? "처리 중" : "픽업 완료"} tone={LEGACY_COLORS.purple} onClick={() => onPickup(request)} disabled={pending !== null} dataTestId="shipping-pickup-from-detail" />}
           {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
         </div>
@@ -2458,7 +2465,6 @@ function PrepSection({
               <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
               <RevisionHistory request={selected} />
             </div>
-
             {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} kindByItemId={shortageKindByItemId} />}
 
             <div className="grid gap-3 md:grid-cols-3">
@@ -2714,6 +2720,7 @@ function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, 
               <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
               <RevisionHistory request={selected} />
             </div>
+            {selected.status === "PICKED_UP" && <Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(selected.serial_numbers)} />}
             <div className="grid gap-3 md:grid-cols-3">
               <Metric label="최종 PA" value={selected.final_pa_item_name ?? "-"} />
               <Metric label="최종 PF" value={selected.final_pf_item_name ?? "-"} />
@@ -3096,48 +3103,52 @@ function CompanionSummary({ lines }: { lines: SummaryDisplayLine[] }) {
 }
 
 function ShippingActionConfirmModal({
-  action,
+  action: { kind, request },
   pending,
+  error,
   onClose,
   onConfirm,
 }: {
   action: ConfirmAction;
   pending: boolean;
+  error: string | null;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (serialNumbers: string) => void;
 }) {
-  const title = action.kind === "prepare" ? "준비 완료 확인" : action.kind === "cancel" ? "준비 완료 취소 확인" : action.kind === "delete" ? "요청 취소 확인" : "픽업 완료 확인";
-  const tone = action.kind === "prepare" ? LEGACY_COLORS.green : action.kind === "cancel" ? LEGACY_COLORS.yellow : action.kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
-  const requestQty = action.request.request_quantity ?? 1;
-  const description = action.kind === "prepare"
+  const isPrepare = kind === "prepare";
+  const [serialNumbers, setSerialNumbers] = useState(request.serial_numbers || "");
+  const title = isPrepare ? "준비 완료 확인" : kind === "cancel" ? "준비 완료 취소 확인" : kind === "delete" ? "요청 취소 확인" : "픽업 완료 확인";
+  const tone = isPrepare ? LEGACY_COLORS.green : kind === "cancel" ? LEGACY_COLORS.yellow : kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
+  const requestQty = request.request_quantity ?? 1;
+  const description = isPrepare
     ? "최종 PF와 동반 출하품의 품목별 부서 재고를 확인한 뒤 대기 예약합니다. 재고를 추가로 변동하지 않습니다."
-    : action.kind === "cancel"
+    : kind === "cancel"
       ? "대기 예약을 해제합니다. 작업자가 처리한 BOM 입출고 재고는 변경하지 않습니다."
-      : action.kind === "delete"
-        ? action.request.status === "PREPARING"
+      : kind === "delete"
+        ? request.status === "PREPARING"
           ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."
           : "요청 상태의 출하 요청을 목록에서 삭제합니다. 이력은 남지 않습니다."
         : "최종 PF와 동반 출하품을 출하 처리합니다. v1에서는 픽업 완료 후 취소 기능이 없습니다.";
-  const lines = action.kind === "prepare"
+  const lines = isPrepare
     ? [
-        ...action.request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} · 1대 ${line.quantity}${line.unit ? ` ${line.unit}` : ""} / 총 ${line.quantity * requestQty}${line.unit ? ` ${line.unit}` : ""}`),
-        ...action.request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`),
+        ...request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} · 1대 ${line.quantity}${line.unit ? ` ${line.unit}` : ""} / 총 ${line.quantity * requestQty}${line.unit ? ` ${line.unit}` : ""}`),
+        ...request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`),
       ]
-    : action.kind === "cancel"
-      ? action.request.transactions.filter((log) => log.shipping_phase === "PREPARE" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
-      : action.kind === "delete"
-        ? [`기준 PF · ${action.request.base_pf_item_name}`]
+    : kind === "cancel"
+      ? request.transactions.filter((log) => log.shipping_phase === "PREPARE" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
+      : kind === "delete"
+        ? [`기준 PF · ${request.base_pf_item_name}`]
         : [
-          `최종 PF · ${action.request.final_pf_item_name ?? action.request.base_pf_item_name} x ${requestQty}`,
-          ...action.request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}`),
+          `최종 PF · ${request.final_pf_item_name ?? request.base_pf_item_name} x ${requestQty}`,
+          ...request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}`),
         ];
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "color-mix(in srgb, var(--c-bg) 72%, transparent)" }}>
       <div className="w-full max-w-xl rounded-[18px] border p-5 shadow-xl" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
         <div className={SHIPPING_TOP_ROW_CLASS}>
-          <PanelTitle icon={PackageCheck} title={title} subtitle={action.request.base_pf_item_name} />
-          <StatusBadge status={action.request.status} />
+          <PanelTitle icon={PackageCheck} title={title} subtitle={request.base_pf_item_name} />
+          <StatusBadge status={request.status} />
         </div>
         <div className="mt-4 rounded-[12px] border px-3 py-2 text-sm font-bold" style={{ background: tint(tone, 10), borderColor: tint(tone, 35), color: LEGACY_COLORS.text }}>
           {description}
@@ -3151,15 +3162,32 @@ function ShippingActionConfirmModal({
             ))
           )}
         </div>
+        {isPrepare && (
+          <div className="mt-3">
+            <Field label={SERIAL_NUMBERS_LABEL}>
+              <textarea
+                aria-label={SERIAL_NUMBERS_LABEL}
+                value={serialNumbers}
+                onChange={(event) => setSerialNumbers(event.target.value)}
+                className={`${SHIPPING_TEXT_INPUT_CLASS} sn-i`}
+              />
+            </Field>
+          </div>
+        )}
+        {error && <div role="alert" className="sn-e">{error}</div>}
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={onClose} disabled={pending} className="rounded-[11px] border px-3 py-2 text-sm font-black disabled:opacity-45" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
             닫기
           </button>
-          <ActionButton icon={CheckCircle2} label={pending ? "처리 중" : "확인 후 실행"} tone={tone} onClick={onConfirm} disabled={pending} dataTestId="shipping-confirm-action" />
+          <ActionButton icon={CheckCircle2} label={pending ? "처리 중" : "확인 후 실행"} tone={tone} onClick={() => onConfirm(serialNumbers)} disabled={pending || (isPrepare && !serialNumbers.trim())} />
         </div>
       </div>
     </div>
   );
+}
+
+function serialNumberText(value: string | null) {
+  return value?.trim() || "미입력";
 }
 
 function RequestRow({ request, active, onClick }: { request: ShippingRequest; active: boolean; onClick: () => void }) {
@@ -3240,7 +3268,7 @@ function Notice({ tone, title, body }: { tone: string; title: string; body: stri
   return (
     <div className={SHIPPING_CELL_CLASS} style={{ background: tint(tone, 10), borderColor: tint(tone, 45) }}>
       <div className="text-sm font-black" style={{ color: tone }}>{title}</div>
-      <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{body}</div>
+      <div className="sn-b text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{body}</div>
     </div>
   );
 }
@@ -3600,3 +3628,4 @@ const SHIPPING_ROW_CLASS = "flex min-w-0 items-center gap-3";
 const SHIPPING_TOP_ROW_CLASS = "flex flex-wrap items-start justify-between gap-3";
 const SHIPPING_CELL_CLASS = "rounded-[12px] border px-3 py-2";
 const SHIPPING_MODAL_BODY_CLASS = "mt-4 flex min-h-0 flex-1 rounded-[18px] border p-3";
+const SERIAL_NUMBERS_LABEL = "완제품 SN";

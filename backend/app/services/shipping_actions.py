@@ -118,10 +118,14 @@ def execute_component_change(
         )
 
 
-def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+def prepare_complete(
+    db: Session,
+    request_id: uuid.UUID,
+    serial_numbers: str,
+) -> ShippingRequest:
     """준비 완료의 재고·원장·배정·상태를 원자적으로 확정한다."""
     with transactional(db):
-        return shipping_svc.prepare_complete(db, request_id)
+        return shipping_svc.prepare_complete(db, request_id, serial_numbers)
 
 
 def prepare_cancel(

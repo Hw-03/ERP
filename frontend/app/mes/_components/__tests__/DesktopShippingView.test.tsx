@@ -104,6 +104,7 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
     custom_pf_name: null,
     notes: "urgent",
     invoice_number: null,
+    serial_numbers: null,
     prepared_at: null,
     picked_up_at: null,
     cancelled_at: null,
@@ -812,7 +813,7 @@ describe("DesktopShippingView", () => {
     await openRequestById(container, "requested-1");
 
     fireEvent.click(await screen.findByTestId("shipping-delete-request"));
-    fireEvent.click(await screen.findByTestId("shipping-confirm-action"));
+    fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
 
     await waitFor(() => {
       expect(api.deleteShippingRequest).toHaveBeenCalledWith("requested-1");
@@ -862,7 +863,7 @@ describe("DesktopShippingView", () => {
     await openHubCard(container, "request");
     await openRequestById(container, "prepared-1");
     fireEvent.click(await screen.findByTestId("shipping-pickup-from-detail"));
-    fireEvent.click(await screen.findByTestId("shipping-confirm-action"));
+    fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
 
     await waitFor(() => expect(api.completeShippingPickup).toHaveBeenCalledWith("prepared-1"));
     const detailUrls = navigationMock.push.mock.calls
@@ -1002,6 +1003,98 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-pickup-from-detail")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-prepare-cancel-from-detail")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-delete-request")).not.toBeInTheDocument();
+  });
+
+  it("completes preparation from a preparing request detail when an invoice exists", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({ invoice_number: "DEX" }),
+    ]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const prepareButton = await screen.findByTestId("shipping-prepare-from-detail");
+    expect(prepareButton).toBeEnabled();
+    fireEvent.click(prepareButton);
+    fireEvent.change(await screen.findByLabelText("완제품 SN"), { target: { value: "DETAIL-SN" } });
+    fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
+
+    await waitFor(() => {
+      expect(api.prepareShippingComplete).toHaveBeenCalledWith("req-1", { serial_numbers: "DETAIL-SN" });
+    });
+  });
+
+  it("requires a non-blank product serial number and sends multiline input from preparation work", async () => {
+    navigationMock.search = "tab=shipping&shippingView=prepWork&shippingRequestId=req-1";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([request({ invoice_number: "INV-READY" })]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "준비 완료" }));
+    const serialNumbers = await screen.findByLabelText("완제품 SN");
+    const confirm = screen.getByRole("button", { name: "확인 후 실행" });
+    expect(confirm).toBeDisabled();
+
+    fireEvent.change(serialNumbers, { target: { value: "SN-001\nSN-002" } });
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(api.prepareShippingComplete).toHaveBeenCalledWith("req-1", {
+      serial_numbers: "SN-001\nSN-002",
+    }));
+  });
+
+  it("prefills an existing serial number and sends its edited replacement", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({ invoice_number: "INV-READY", serial_numbers: "OLD-SN" }),
+    ]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("shipping-prepare-from-detail"));
+    const serialNumbers = await screen.findByLabelText("완제품 SN");
+    expect(serialNumbers).toHaveValue("OLD-SN");
+    fireEvent.change(serialNumbers, { target: { value: "NEW-SN" } });
+    fireEvent.click(screen.getByRole("button", { name: "확인 후 실행" }));
+
+    await waitFor(() => expect(api.prepareShippingComplete).toHaveBeenCalledWith("req-1", {
+      serial_numbers: "NEW-SN",
+    }));
+  });
+
+  it("shows product serial numbers in prepared and picked-up details, with a legacy fallback", async () => {
+    const prepared = request({ request_id: "prepared-sn", status: "PREPARED", serial_numbers: "SN-A\nSN-B" });
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-sn";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([prepared]);
+
+    const { unmount } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByText(/SN-A\s+SN-B/)).toBeInTheDocument();
+
+    const picked = request({ request_id: "picked-legacy-sn", status: "PICKED_UP", serial_numbers: null, picked_up_at: "2026-07-27T01:00:00Z" });
+    unmount();
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=picked-legacy-sn&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([picked]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [picked], next_cursor: null, has_more: false });
+    vi.mocked(api.getShippingRequest).mockResolvedValue(picked);
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByText("미입력")).toBeInTheDocument();
+  });
+
+  it("shows a preparation failure inside the confirmation modal", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([request({ invoice_number: "INV-READY" })]);
+    vi.mocked(api.prepareShippingComplete).mockRejectedValue(new Error("SN 저장에 실패했습니다."));
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("shipping-prepare-from-detail"));
+    fireEvent.change(await screen.findByLabelText("완제품 SN"), { target: { value: "SN-ERROR" } });
+    fireEvent.click(screen.getByRole("button", { name: "확인 후 실행" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("SN 저장에 실패했습니다.");
   });
 
   it("uses the final PF as the request detail title and hides change-only BOM decoration", async () => {
@@ -1942,19 +2035,24 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(api.updateShippingInvoice).toHaveBeenCalledWith("cancelled-before-prepared", null));
   });
 
-  it("shows the server invoice error message without replacing it", async () => {
+  it("allows saving an invoice number already used by another request", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=requested-1";
     vi.mocked(api.getShippingRequests).mockResolvedValue([
       request({ request_id: "requested-1", status: "REQUESTED", invoice_number: "OLD-1" }),
     ]);
-    vi.mocked(api.updateShippingInvoice).mockRejectedValue(new Error("이미 사용 중인 인보이스 번호입니다."));
+    vi.mocked(api.updateShippingInvoice).mockResolvedValue(
+      request({ request_id: "requested-1", status: "REQUESTED", invoice_number: "DUPLICATE" }),
+    );
 
     render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    fireEvent.change(await screen.findByRole("textbox", { name: "인보이스 번호" }), { target: { value: "DUPLICATE" } });
+    const input = await screen.findByRole("textbox", { name: "인보이스 번호" });
+    fireEvent.change(input, { target: { value: "DUPLICATE" } });
     fireEvent.click(screen.getByRole("button", { name: "인보이스 번호 저장" }));
 
-    expect(await screen.findByText("이미 사용 중인 인보이스 번호입니다.")).toBeInTheDocument();
+    await waitFor(() => expect(api.updateShippingInvoice).toHaveBeenCalledWith("requested-1", "DUPLICATE"));
+    expect(input).toHaveValue("DUPLICATE");
+    expect(screen.queryByText("이미 사용 중인 인보이스 번호입니다.")).not.toBeInTheDocument();
   });
 
   it("blocks preparation without an invoice and enables it after invoice save", async () => {

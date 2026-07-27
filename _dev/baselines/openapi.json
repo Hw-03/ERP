@@ -6898,8 +6898,16 @@
             },
             "title": "Companion Lines",
             "type": "array"
+          },
+          "serial_numbers": {
+            "minLength": 1,
+            "title": "Serial Numbers",
+            "type": "string"
           }
         },
+        "required": [
+          "serial_numbers"
+        ],
         "title": "ShippingPrepareCompleteRequest",
         "type": "object"
       },
@@ -7256,6 +7264,17 @@
               }
             ],
             "title": "Requested By Name"
+          },
+          "serial_numbers": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial Numbers"
           },
           "status": {
             "$ref": "#/components/schemas/ShippingRequestStatusEnum"

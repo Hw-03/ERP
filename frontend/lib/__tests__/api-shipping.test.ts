@@ -36,17 +36,20 @@ describe("shippingApi", () => {
     expect(body.companion_lines).toEqual([{ item_id: "carton-1", quantity: 3, unit: "EA" }]);
   });
 
-  it("updates checklist and completes preparation without companion payload", async () => {
+  it("updates checklist and sends serial numbers when completing preparation", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     await shippingApi.updateShippingChecklist("req-1", {
       checks: [{ item_id: "item-1", checked: true }],
     });
-    await shippingApi.prepareShippingComplete("req-1");
+    await shippingApi.prepareShippingComplete("req-1", { serial_numbers: "SN-001\nSN-002" });
 
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/shipping/requests/req-1/checklist");
     expect(String(fetchSpy.mock.calls[1][0])).toContain("/api/shipping/requests/req-1/prepare-complete");
+    expect(JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string)).toEqual({
+      serial_numbers: "SN-001\nSN-002",
+    });
   });
 
   it("lists history and filters request status", async () => {

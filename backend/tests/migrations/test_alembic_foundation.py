@@ -184,7 +184,15 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260727_0006"
+            ) == "20260727_0007"
+            shipping_columns = {
+                column["name"]: column
+                for column in inspector.get_columns("shipping_requests")
+            }
+            assert shipping_columns["serial_numbers"]["nullable"] is True
+            assert "uq_shipping_requests_invoice_number" not in {
+                index["name"] for index in inspector.get_indexes("shipping_requests")
+            }
             connection.execute(
                 sa.text(
                     "INSERT INTO system_settings (setting_key, setting_value) "

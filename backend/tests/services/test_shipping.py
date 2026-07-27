@@ -227,10 +227,65 @@ def test_prepare_without_invoice_keeps_request_and_events_unchanged(db_session, 
     event_count = len(request.events)
 
     with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
-        shipping_svc.prepare_complete(db_session, request.request_id)
+        shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
     assert request.status.value == "PREPARING"
     assert len(request.events) == event_count
+
+
+def test_prepare_complete_rejects_blank_serial_numbers_before_state_or_events(
+    db_session, make_item, make_bom
+):
+    af = make_item(name="SN guard AF", process_type_code="AF", model_symbol="3", serial_no=4)
+    pa = make_item(name="SN guard PA", process_type_code="PA", model_symbol="3", serial_no=5)
+    pf = make_item(name="SN guard PF", process_type_code="PF", model_symbol="3", serial_no=6)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = shipping_svc.create_request(
+        db_session,
+        {"base_pf_item_id": pf.item_id, "invoice_number": "SN-GUARD-001"},
+    )
+    shipping_svc.send_to_prep(db_session, request.request_id)
+    event_count = len(request.events)
+
+    with pytest.raises(shipping_svc.ShippingError, match="SN"):
+        shipping_svc.prepare_complete(db_session, request.request_id, " \n\t ")
+
+    assert request.status.value == "PREPARING"
+    assert len(request.events) == event_count
+    assert request.serial_numbers is None
+
+
+def test_prepare_complete_stores_trimmed_multiline_serial_numbers_and_overwrites_after_cancel(
+    db_session, make_item, make_bom, make_location
+):
+    af = make_item(name="SN store AF", process_type_code="AF", model_symbol="3", serial_no=7)
+    pa = make_item(name="SN store PA", process_type_code="PA", model_symbol="3", serial_no=8)
+    pf = make_item(name="SN store PF", process_type_code="PF", model_symbol="3", serial_no=9)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = shipping_svc.create_request(
+        db_session,
+        {"base_pf_item_id": pf.item_id, "invoice_number": "SN-STORE-001"},
+    )
+    shipping_svc.send_to_prep(db_session, request.request_id)
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+
+    prepared = shipping_svc.prepare_complete(
+        db_session,
+        request.request_id,
+        "  SN-001\nSN-002  ",
+    )
+
+    assert prepared.serial_numbers == "SN-001\nSN-002"
+    db_session.expire_all()
+    reloaded = shipping_svc._get_request(db_session, request.request_id)
+    assert reloaded.serial_numbers == "SN-001\nSN-002"
+
+    cancelled = shipping_svc.prepare_cancel(db_session, request.request_id, reason="retry")
+    assert cancelled.serial_numbers == "SN-001\nSN-002"
+    prepared_again = shipping_svc.prepare_complete(db_session, request.request_id, "SN-003")
+    assert prepared_again.serial_numbers == "SN-003"
 
 
 def test_prepare_complete_reserves_final_pf_from_shipping_stock_without_linked_output(
@@ -253,7 +308,7 @@ def test_prepare_complete_reserves_final_pf_from_shipping_stock_without_linked_o
     make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     before_log_count = db_session.query(TransactionLog).count()
 
-    prepared = shipping_svc.prepare_complete(db_session, request.request_id)
+    prepared = shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
     assert prepared.status.value == "PREPARED"
     assert db_session.query(TransactionLog).count() == before_log_count
@@ -293,9 +348,10 @@ def test_prepare_complete_rejects_insufficient_shipping_pf_stock_even_with_linke
     )
 
     with pytest.raises(shipping_svc.ShippingError, match="출하 준비 재고 부족"):
-        shipping_svc.prepare_complete(db_session, request.request_id)
+        shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
     assert request.status.value == "PREPARING"
+    assert request.serial_numbers is None
     assert _active_allocation_qty(db_session, request.request_id, pf) == 0
 
 
@@ -320,10 +376,10 @@ def test_prepare_complete_reserves_final_pf_against_another_prepared_request(
     shipping_svc.send_to_prep(db_session, first.request_id)
     shipping_svc.send_to_prep(db_session, second.request_id)
 
-    shipping_svc.prepare_complete(db_session, first.request_id)
+    shipping_svc.prepare_complete(db_session, first.request_id, "SN-001")
 
     with pytest.raises(shipping_svc.ShippingError, match="출하 준비 재고 부족"):
-        shipping_svc.prepare_complete(db_session, second.request_id)
+        shipping_svc.prepare_complete(db_session, second.request_id, "SN-002")
 
     assert _active_allocation_qty(db_session, first.request_id, pf) == 1
     assert second.status.value == "PREPARING"
@@ -351,7 +407,7 @@ def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_it
         actor=_shipping_actor(db_session),
     )
     make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
-    shipping_svc.prepare_complete(db_session, request.request_id)
+    shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
     shipping_svc.prepare_cancel(db_session, request.request_id, reason="retry")
 
@@ -530,7 +586,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         request=req,
         actor=_shipping_actor(db_session),
     )
-    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.final_pa_item_id == final_pa.item_id
     assert prepared.final_pf_item_id == final_pf.item_id
@@ -749,7 +805,7 @@ def test_same_bom_is_resolved_on_request_and_companion_lines_do_not_create_trans
         request=req,
         actor=_shipping_actor(db_session),
     )
-    shipping_svc.prepare_complete(db_session, req.request_id)
+    shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert db_session.query(TransactionLog).filter(TransactionLog.item_id == carton.item_id).count() == 0
     assert _active_allocation_qty(db_session, req.request_id, carton) == 1
@@ -788,7 +844,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
         actor=_shipping_actor(db_session),
     )
 
-    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.request_quantity == 3
     assert len(prepared.companion_lines) == 1
@@ -818,7 +874,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     assert _active_allocation_qty(db_session, req.request_id, pf) == 0
     assert _active_allocation_qty(db_session, req.request_id, carton) == 0
 
-    shipping_svc.prepare_complete(db_session, req.request_id)
+    shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
     shipping_svc.pickup_complete(db_session, req.request_id)
 
     assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 0
@@ -893,7 +949,7 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
         request=req,
         actor=_shipping_actor(db_session),
     )
-    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.final_pa_item.item_name == "Cable excluded PA"
     assert _warehouse_qty(db_session, af) == 1
@@ -946,7 +1002,7 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
         request=req,
         actor=_shipping_actor(db_session),
     )
-    prepared = shipping_svc.prepare_complete(db_session, req.request_id)
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.final_pa_item_id == pa.item_id
     assert prepared.final_pf_item.item_name == "Bracket PF"

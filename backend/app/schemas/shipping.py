@@ -59,6 +59,7 @@ class ShippingChecklistUpdate(BaseModel):
 
 
 class ShippingPrepareCompleteRequest(BaseModel):
+    serial_numbers: str = Field(..., min_length=1)
     companion_lines: list[ShippingCompanionLineInput] = []
 
 
@@ -282,6 +283,7 @@ class ShippingRequestResponse(BaseModel):
     custom_pf_name: Optional[str] = None
     notes: Optional[str] = None
     invoice_number: Optional[str] = None
+    serial_numbers: Optional[str] = None
     prepared_at: Optional[UtcDatetime] = None
     picked_up_at: Optional[UtcDatetime] = None
     cancelled_at: Optional[UtcDatetime] = None

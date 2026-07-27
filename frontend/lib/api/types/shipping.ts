@@ -48,7 +48,7 @@ export interface ShippingChecklistUpdatePayload {
 }
 
 export interface ShippingPrepareCompletePayload {
-  companion_lines?: ShippingCompanionLineInput[];
+  serial_numbers: string;
 }
 
 export interface ShippingPrepareCancelPayload {
@@ -227,6 +227,7 @@ export interface ShippingRequest {
   custom_pf_name: string | null;
   notes: string | null;
   invoice_number?: string | null;
+  serial_numbers: string | null;
   prepared_at: string | null;
   picked_up_at: string | null;
   cancelled_at?: string | null;

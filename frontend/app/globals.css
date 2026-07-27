@@ -232,10 +232,30 @@
     @apply rounded-xl px-4 py-2 font-medium text-white transition-colors duration-150 focus:outline-none;
   }
 
-  .btn-secondary {
-    background: var(--c-s2);
+ .btn-secondary {
+   background: var(--c-s2);
+   color: var(--c-text);
+   @apply rounded-xl px-4 py-2 font-medium transition-colors duration-150 focus:outline-none;
+ }
+
+  .sn-i {
+    min-height: 7rem;
+    resize: vertical;
+    background: var(--c-bg);
+    border-color: var(--c-border);
     color: var(--c-text);
-    @apply rounded-xl px-4 py-2 font-medium transition-colors duration-150 focus:outline-none;
+  }
+
+  .sn-e {
+    margin-top: .75rem;
+    color: var(--c-red);
+    font-size: .875rem;
+    font-weight: 700;
+  }
+
+  .sn-b {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
   }
 
   /* 전역 button 시그널 — 라이트는 검은 계열, 다크는 흰 계열 (배경 대비 잘 보이도록) */

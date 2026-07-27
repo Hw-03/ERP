@@ -175,6 +175,10 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
         and log.shipping_request_id is not None
         for log in shipping_prepare_logs
     )
+    shipping_request = db_session.query(module.ShippingRequest).filter(
+        module.ShippingRequest.notes.contains(result.marker)
+    ).one()
+    assert shipping_request.serial_numbers == f"DEMO-SN-{shipping_request.request_id.hex[:8].upper()}"
 
 
 def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_session, make_item, make_location, make_bom):

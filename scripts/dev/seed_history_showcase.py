@@ -349,7 +349,11 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
     batch.status = "completed"
     batch.completed_at = datetime.now(UTC).replace(tzinfo=None)
     db.flush()
-    shipping_svc.prepare_complete(db, request.request_id)
+    shipping_svc.prepare_complete(
+        db,
+        request.request_id,
+        f"DEMO-SN-{request.request_id.hex[:8].upper()}",
+    )
     shipping_svc.pickup_complete(db, request.request_id)
     logs = db.query(TransactionLog).filter(TransactionLog.shipping_request_id == request.request_id).all()
     for log in logs:

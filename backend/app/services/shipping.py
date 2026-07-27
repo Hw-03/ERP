@@ -49,7 +49,7 @@ class ShippingError(ValueError):
 
 
 class ShippingConflictError(ShippingError):
-    """Shipping request uniqueness conflict."""
+    """Shipping request conflict."""
 
 
 def _get_request(db: Session, request_id: uuid.UUID) -> ShippingRequest:
@@ -99,20 +99,6 @@ def _ensure_invoice_can_be_cleared(req: ShippingRequest, invoice_number: str | N
         or _has_preparation_history(req)
     ):
         raise ShippingError("준비 완료 이력이 있는 요청의 인보이스 번호는 비울 수 없습니다.")
-
-
-def _ensure_invoice_available(
-    db: Session,
-    invoice_number: str | None,
-    request_id: uuid.UUID | None = None,
-) -> None:
-    if invoice_number is None:
-        return
-    query = db.query(ShippingRequest).filter(ShippingRequest.invoice_number == invoice_number)
-    if request_id is not None:
-        query = query.filter(ShippingRequest.request_id != request_id)
-    if query.first() is not None:
-        raise ShippingConflictError("이미 사용 중인 인보이스 번호입니다.")
 
 
 def _revision_snapshot(req: ShippingRequest) -> dict:
@@ -382,7 +368,6 @@ def _sync_checklist(db: Session, req: ShippingRequest) -> None:
 
 def create_request(db: Session, payload: dict) -> ShippingRequest:
     invoice_number = _normalize_invoice_number(payload.get("invoice_number"))
-    _ensure_invoice_available(db, invoice_number)
     base_pf = _get_item(db, payload["base_pf_item_id"])
     if base_pf.process_type_code != "PF":
         raise ShippingError("기준 품목은 PF여야 합니다.")
@@ -433,7 +418,6 @@ def update_request(
     if "invoice_number" in payload:
         invoice_number = _normalize_invoice_number(payload.get("invoice_number"))
         _ensure_invoice_can_be_cleared(req, invoice_number)
-        _ensure_invoice_available(db, invoice_number, req.request_id)
         req.invoice_number = invoice_number
     if "bom_lines" in payload:
         _replace_bom_lines(db, req, _normalize_bom_lines(db, req.base_pf_item, payload.get("bom_lines")))
@@ -486,7 +470,6 @@ def update_invoice(
     req = _get_request(db, request_id)
     normalized = _normalize_invoice_number(invoice_number)
     _ensure_invoice_can_be_cleared(req, normalized)
-    _ensure_invoice_available(db, normalized, req.request_id)
     before = _revision_snapshot(req)
     req.invoice_number = normalized
     changes = _snapshot_changes(before, _revision_snapshot(req))
@@ -1449,7 +1432,14 @@ def _consume_pickup_allocations(
     db.flush()
 
 
-def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+def prepare_complete(
+    db: Session,
+    request_id: uuid.UUID,
+    serial_numbers: str,
+) -> ShippingRequest:
+    normalized_serial_numbers = serial_numbers.strip()
+    if not normalized_serial_numbers:
+        raise ShippingError("출하 SN을 입력해야 합니다.")
     req = _get_request(db, request_id)
     if req.invoice_number is None:
         raise ShippingError("준비 완료 전에 인보이스 번호를 입력해야 합니다.")
@@ -1460,7 +1450,7 @@ def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     reference_no = f"SHIP-PREP-{req.request_id.hex[:8]}"
 
     _reserve_pickup_items(db, req, final_pf, request_qty, reference_no)
-
+    req.serial_numbers = normalized_serial_numbers
     req.status = ShippingRequestStatusEnum.PREPARED
     req.prepared_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
@@ -1492,7 +1482,7 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
         log.cancelled = True
         log.cancel_reason = reason or "출하 준비 취소"
         log.cancelled_at = datetime.utcnow()
-    _release_companion_allocations(db, req, reason)
+    _release_pickup_allocations(db, req, reason)
     req.status = ShippingRequestStatusEnum.PREPARING
     req.prepared_at = None
     req.updated_at = datetime.utcnow()

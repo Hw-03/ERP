@@ -389,7 +389,7 @@ def _make_prepared_request(
         request=request,
         actor=_active_shipping_actor(db_session),
     )
-    shipping_actions_svc.prepare_complete(db_session, request.request_id)
+    shipping_actions_svc.prepare_complete(db_session, request.request_id, "SN-001")
     return (
         request.request_id,
         final_pa.item_id,
@@ -944,7 +944,7 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
     with pytest.raises(RuntimeError, match="shipping event failure"):
         client.post(
             f"/api/shipping/requests/{request.request_id}/prepare-complete",
-            json={"companion_lines": []},
+            json={"serial_numbers": "SN-001", "companion_lines": []},
         )
 
     db_session.expire_all()

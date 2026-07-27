@@ -63,6 +63,7 @@ class ShippingRequest(Base):
     custom_pf_name = Column(String(200), nullable=True)
     notes = Column(Text, nullable=True)
     invoice_number = Column(String(100), nullable=True)
+    serial_numbers = Column(Text, nullable=True)
     prepared_at = Column(DateTime, nullable=True, index=True)
     picked_up_at = Column(DateTime, nullable=True, index=True)
     cancelled_at = Column(DateTime, nullable=True, index=True)
@@ -120,11 +121,6 @@ class ShippingRequest(Base):
         cascade="all, delete-orphan",
         order_by="ShippingRequestRevision.created_at.desc()",
     )
-
-    __table_args__ = (
-        Index("uq_shipping_requests_invoice_number", "invoice_number", unique=True),
-    )
-
 
 class ShippingRequestBomLine(Base):
     __tablename__ = "shipping_request_bom_lines"

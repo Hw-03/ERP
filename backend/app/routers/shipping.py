@@ -183,6 +183,7 @@ def _to_response(
         custom_pf_name=req.custom_pf_name,
         notes=req.notes,
         invoice_number=req.invoice_number,
+        serial_numbers=req.serial_numbers,
         prepared_at=req.prepared_at,
         picked_up_at=req.picked_up_at,
         cancelled_at=req.cancelled_at,
@@ -543,7 +544,12 @@ def component_change(
 
 @router.post("/requests/{request_id}/prepare-complete", response_model=ShippingRequestResponse)
 def prepare_complete(request_id: uuid.UUID, payload: ShippingPrepareCompleteRequest, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.prepare_complete, request_id)
+    req = _action_or_422(
+        db,
+        shipping_actions_svc.prepare_complete,
+        request_id,
+        payload.serial_numbers,
+    )
     return _to_response(db, req)
 
 
