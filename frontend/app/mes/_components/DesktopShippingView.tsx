@@ -3110,9 +3110,9 @@ function ShippingActionConfirmModal({
   const tone = action.kind === "prepare" ? LEGACY_COLORS.green : action.kind === "cancel" ? LEGACY_COLORS.yellow : action.kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
   const requestQty = action.request.request_quantity ?? 1;
   const description = action.kind === "prepare"
-    ? "연결된 생산 등록의 최종 PF 수량을 확인하고 동반 출하품을 예약합니다. 재고를 추가로 변동하지 않습니다."
+    ? "최종 PF와 동반 출하품의 품목별 부서 재고를 확인한 뒤 대기 예약합니다. 재고를 추가로 변동하지 않습니다."
     : action.kind === "cancel"
-      ? "기존 자동 출하 준비 이력만 원복합니다. 연결된 입출고 작업의 재고는 유지됩니다."
+      ? "대기 예약을 해제합니다. 작업자가 처리한 BOM 입출고 재고는 변경하지 않습니다."
       : action.kind === "delete"
         ? action.request.status === "PREPARING"
           ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."

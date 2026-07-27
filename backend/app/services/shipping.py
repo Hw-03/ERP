@@ -40,6 +40,7 @@ COMPONENT_CHANGE_PHASE = "COMPONENT_CHANGE"
 ALLOCATION_RESERVED = "RESERVED"
 ALLOCATION_RELEASED = "RELEASED"
 ALLOCATION_CONSUMED = "CONSUMED"
+FINAL_PF_ALLOCATION_SUFFIX = ":PF"
 ITEM_CONVERSION_ALLOWED_PROCESS_TYPES = {"PA", "AF", "AA"}
 
 
@@ -1332,27 +1333,66 @@ def execute_component_change(
     return req
 
 
-def _reserve_companions(db: Session, req: ShippingRequest, reference_no: str) -> None:
-    for line in req.companion_lines:
-        qty = int(line.quantity or 0)
-        if qty <= 0:
+def _final_pf_allocation_reference(reference_no: str) -> str:
+    """Distinguish the final-PF reservation from companion reservations without a schema change."""
+    return f"{reference_no}{FINAL_PF_ALLOCATION_SUFFIX}"
+
+
+def _reserve_pickup_items(
+    db: Session,
+    req: ShippingRequest,
+    final_pf: Item,
+    request_qty: int,
+    reference_no: str,
+) -> None:
+    """Validate and reserve the pre-produced final PF with every companion item."""
+    reservations: list[tuple[Item, int, str, str]] = [
+        (
+            final_pf,
+            request_qty,
+            final_pf.unit or "EA",
+            _final_pf_allocation_reference(reference_no),
+        )
+    ]
+    reservations.extend(
+        (
+            line.item,
+            int(line.quantity or 0),
+            line.unit or line.item.unit or "EA",
+            reference_no,
+        )
+        for line in req.companion_lines
+    )
+
+    required_by_item: dict[uuid.UUID, int] = {}
+    item_by_id: dict[uuid.UUID, Item] = {}
+    for item, quantity, _unit, _item_reference in reservations:
+        if quantity <= 0:
             continue
-        dept = _require_item_location_available(db, line.item, qty)
+        item_by_id[item.item_id] = item
+        required_by_item[item.item_id] = required_by_item.get(item.item_id, 0) + quantity
+    departments = {
+        item_id: _require_item_location_available(db, item_by_id[item_id], quantity)
+        for item_id, quantity in required_by_item.items()
+    }
+    for item, quantity, unit, item_reference in reservations:
+        if quantity <= 0:
+            continue
         db.add(
             ShippingAllocation(
                 request_id=req.request_id,
-                item_id=line.item_id,
-                quantity=qty,
-                unit=line.unit or line.item.unit or "EA",
-                department=dept.value,
+                item_id=item.item_id,
+                quantity=quantity,
+                unit=unit,
+                department=departments[item.item_id].value,
                 status=ALLOCATION_RESERVED,
-                reference_no=reference_no,
+                reference_no=item_reference,
             )
         )
     db.flush()
 
 
-def _release_companion_allocations(db: Session, req: ShippingRequest, reason: str | None) -> None:
+def _release_pickup_allocations(db: Session, req: ShippingRequest, reason: str | None) -> None:
     now = datetime.utcnow()
     for allocation in _active_allocations_for_request(db, req):
         allocation.status = ALLOCATION_RELEASED
@@ -1361,42 +1401,52 @@ def _release_companion_allocations(db: Session, req: ShippingRequest, reason: st
     db.flush()
 
 
-def _consume_companion_allocations(db: Session, req: ShippingRequest) -> None:
-    allocations = _active_allocations_for_request(db, req)
-    if not allocations:
-        for line in req.companion_lines:
-            _ship_from_item_location(db, req, line.item, int(line.quantity), f"동반 출하: {line.item.item_name}")
-        return
-    now = datetime.utcnow()
-    for allocation in allocations:
-        item = allocation.item
-        qty = int(allocation.quantity or 0)
-        _ship_from_item_location(db, req, item, qty, f"동반 출하: {item.item_name}")
-        allocation.status = ALLOCATION_CONSUMED
-        allocation.consumed_at = now
-    db.flush()
-
-
-def _linked_final_pf_produced_quantity(
+def _consume_pickup_allocations(
     db: Session,
     req: ShippingRequest,
     final_pf: Item,
-) -> Decimal:
-    produced = (
-        db.query(func.coalesce(func.sum(TransactionLog.quantity_change), 0))
-        .filter(
-            TransactionLog.shipping_request_id == req.request_id,
-            TransactionLog.shipping_phase == PREPARE_PHASE,
-            TransactionLog.operation_batch_id.is_not(None),
-            TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE,
-            TransactionLog.item_id == final_pf.item_id,
-            TransactionLog.quantity_change > 0,
-            TransactionLog.cancelled.is_(False),
-        )
-        .scalar()
-    )
-    return Decimal(str(produced or 0))
+    request_qty: int,
+) -> None:
+    """Deduct reserved pickup items, with a direct-deduction fallback for legacy requests."""
+    allocations = _active_allocations_for_request(db, req)
+    if not allocations:
+        _ship_from_item_location(db, req, final_pf, request_qty, f"출하 픽업: {final_pf.item_name} x {request_qty}")
+        for line in req.companion_lines:
+            _ship_from_item_location(db, req, line.item, int(line.quantity), f"동반 출하: {line.item.item_name}")
+        return
 
+    final_pf_reference = _final_pf_allocation_reference(f"SHIP-PREP-{req.request_id.hex[:8]}")
+    final_pf_allocations = [
+        allocation for allocation in allocations if allocation.reference_no == final_pf_reference
+    ]
+    now = datetime.utcnow()
+    if final_pf_allocations:
+        for allocation in final_pf_allocations:
+            _ship_from_item_location(
+                db,
+                req,
+                allocation.item,
+                int(allocation.quantity or 0),
+                f"출하 픽업: {allocation.item.item_name} x {int(allocation.quantity or 0)}",
+            )
+            allocation.status = ALLOCATION_CONSUMED
+            allocation.consumed_at = now
+    else:
+        _ship_from_item_location(db, req, final_pf, request_qty, f"출하 픽업: {final_pf.item_name} x {request_qty}")
+
+    for allocation in allocations:
+        if allocation.reference_no == final_pf_reference:
+            continue
+        _ship_from_item_location(
+            db,
+            req,
+            allocation.item,
+            int(allocation.quantity or 0),
+            f"동반 출하: {allocation.item.item_name}",
+        )
+        allocation.status = ALLOCATION_CONSUMED
+        allocation.consumed_at = now
+    db.flush()
 
 
 def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
@@ -1407,15 +1457,9 @@ def prepare_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
         raise ShippingError("준비 중 요청에서만 준비 완료할 수 있습니다.")
     request_qty = _request_quantity(req)
     _final_pa, final_pf = _require_final_items(db, req)
-    produced_quantity = _linked_final_pf_produced_quantity(db, req, final_pf)
-    if produced_quantity < request_qty:
-        raise ShippingError(
-            f"연결된 작업의 최종 PF 생산 수량이 부족합니다. "
-            f"생산 {int(produced_quantity)} / 요청 {request_qty}"
-        )
     reference_no = f"SHIP-PREP-{req.request_id.hex[:8]}"
 
-    _reserve_companions(db, req, reference_no)
+    _reserve_pickup_items(db, req, final_pf, request_qty, reference_no)
 
     req.status = ShippingRequestStatusEnum.PREPARED
     req.prepared_at = datetime.utcnow()
@@ -1484,8 +1528,7 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     if req.final_pf_item is None:
         raise ShippingError("최종 PF가 생성되지 않았습니다.")
     request_qty = _request_quantity(req)
-    _ship_from_item_location(db, req, req.final_pf_item, request_qty, f"출하 픽업: {req.final_pf_item.item_name} x {request_qty}")
-    _consume_companion_allocations(db, req)
+    _consume_pickup_allocations(db, req, req.final_pf_item, request_qty)
     req.status = ShippingRequestStatusEnum.PICKED_UP
     req.picked_up_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()

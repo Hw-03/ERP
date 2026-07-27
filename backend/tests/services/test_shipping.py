@@ -195,7 +195,13 @@ def _simulate_legacy_prepare(db_session, request) -> None:
         request_quantity,
         reference_no,
     )
-    shipping_svc._reserve_companions(db_session, request, reference_no)
+    shipping_svc._reserve_pickup_items(
+        db_session,
+        request,
+        final_pf,
+        request_quantity,
+        reference_no,
+    )
     request.status = shipping_svc.ShippingRequestStatusEnum.PREPARED
     request.prepared_at = datetime.utcnow()
     request.updated_at = datetime.utcnow()
@@ -227,8 +233,8 @@ def test_prepare_without_invoice_keeps_request_and_events_unchanged(db_session, 
     assert len(request.events) == event_count
 
 
-def test_prepare_complete_requires_linked_final_pf_output_without_new_inventory_logs(
-    db_session, make_item, make_bom
+def test_prepare_complete_reserves_final_pf_from_shipping_stock_without_linked_output(
+    db_session, make_item, make_bom, make_location
 ):
     af = make_item(name="Linked prepare AF", process_type_code="AF", model_symbol="8", serial_no=1)
     pa = make_item(name="Linked prepare PA", process_type_code="PA", model_symbol="8", serial_no=1)
@@ -244,28 +250,28 @@ def test_prepare_complete_requires_linked_final_pf_output_without_new_inventory_
         },
     )
     shipping_svc.send_to_prep(db_session, request.request_id)
-    actor = _shipping_actor(db_session)
-    _add_linked_prepare_log(
-        db_session,
-        request=request,
-        item=pf,
-        quantity=2,
-        actor=actor,
-    )
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     before_log_count = db_session.query(TransactionLog).count()
 
     prepared = shipping_svc.prepare_complete(db_session, request.request_id)
 
     assert prepared.status.value == "PREPARED"
     assert db_session.query(TransactionLog).count() == before_log_count
+    assert _active_allocation_qty(db_session, request.request_id, pf) == 2
 
 
-def test_prepare_complete_rejects_insufficient_linked_final_pf_output(
-    db_session, make_item, make_bom
+def test_prepare_complete_rejects_insufficient_shipping_pf_stock_even_with_linked_output(
+    db_session, make_item, make_bom, make_location
 ):
     af = make_item(name="Insufficient prepare AF", process_type_code="AF", model_symbol="8", serial_no=3)
     pa = make_item(name="Insufficient prepare PA", process_type_code="PA", model_symbol="8", serial_no=3)
-    pf = make_item(name="Insufficient prepare PF", process_type_code="PF", model_symbol="8", serial_no=4)
+    pf = make_item(
+        name="Insufficient prepare PF",
+        process_type_code="PF",
+        warehouse_qty=Decimal("50"),
+        model_symbol="8",
+        serial_no=4,
+    )
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     request = shipping_svc.create_request(
@@ -277,21 +283,53 @@ def test_prepare_complete_rejects_insufficient_linked_final_pf_output(
         },
     )
     shipping_svc.send_to_prep(db_session, request.request_id)
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     _add_linked_prepare_log(
         db_session,
         request=request,
         item=pf,
-        quantity=1,
+        quantity=2,
         actor=_shipping_actor(db_session),
     )
 
-    with pytest.raises(shipping_svc.ShippingError, match="최종 PF"):
+    with pytest.raises(shipping_svc.ShippingError, match="출하 준비 재고 부족"):
         shipping_svc.prepare_complete(db_session, request.request_id)
 
     assert request.status.value == "PREPARING"
+    assert _active_allocation_qty(db_session, request.request_id, pf) == 0
 
 
-def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_item, make_bom):
+def test_prepare_complete_reserves_final_pf_against_another_prepared_request(
+    db_session, make_item, make_bom, make_location
+):
+    af = make_item(name="Reserved PF AF", process_type_code="AF", model_symbol="8", serial_no=7)
+    pa = make_item(name="Reserved PF PA", process_type_code="PA", model_symbol="8", serial_no=7)
+    pf = make_item(name="Reserved PF", process_type_code="PF", model_symbol="8", serial_no=8)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+
+    first = shipping_svc.create_request(
+        db_session,
+        {"base_pf_item_id": pf.item_id, "invoice_number": "RESERVED-PF-001"},
+    )
+    second = shipping_svc.create_request(
+        db_session,
+        {"base_pf_item_id": pf.item_id, "invoice_number": "RESERVED-PF-002"},
+    )
+    shipping_svc.send_to_prep(db_session, first.request_id)
+    shipping_svc.send_to_prep(db_session, second.request_id)
+
+    shipping_svc.prepare_complete(db_session, first.request_id)
+
+    with pytest.raises(shipping_svc.ShippingError, match="출하 준비 재고 부족"):
+        shipping_svc.prepare_complete(db_session, second.request_id)
+
+    assert _active_allocation_qty(db_session, first.request_id, pf) == 1
+    assert second.status.value == "PREPARING"
+
+
+def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_item, make_bom, make_location):
     af = make_item(name="Linked cancel AF", process_type_code="AF", model_symbol="8", serial_no=5)
     pa = make_item(name="Linked cancel PA", process_type_code="PA", model_symbol="8", serial_no=5)
     pf = make_item(name="Linked cancel PF", process_type_code="PF", model_symbol="8", serial_no=6)
@@ -312,6 +350,7 @@ def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_it
         quantity=1,
         actor=_shipping_actor(db_session),
     )
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     shipping_svc.prepare_complete(db_session, request.request_id)
 
     shipping_svc.prepare_cancel(db_session, request.request_id, reason="retry")
@@ -758,6 +797,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     assert _location_qty(db_session, pa, DepartmentEnum.SHIPPING) == 0
     assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 3
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 2
+    assert _active_allocation_qty(db_session, req.request_id, pf) == 3
     assert _active_allocation_qty(db_session, req.request_id, carton) == 2
     prepare_logs = (
         db_session.query(TransactionLog)
@@ -775,6 +815,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     assert len(req.companion_lines) == 1
     assert _location_qty(db_session, pa, DepartmentEnum.SHIPPING) == 0
     assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 3
+    assert _active_allocation_qty(db_session, req.request_id, pf) == 0
     assert _active_allocation_qty(db_session, req.request_id, carton) == 0
 
     shipping_svc.prepare_complete(db_session, req.request_id)

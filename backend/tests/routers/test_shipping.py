@@ -1291,10 +1291,10 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
     assert delete_picked_up.status_code == 422, delete_picked_up.text
 
 
-def test_shipping_prepare_complete_requires_process_department_stock(client, db_session, make_item, make_bom):
+def test_shipping_prepare_complete_requires_final_pf_shipping_department_stock(client, db_session, make_item, make_bom):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("5"), model_symbol="4", serial_no=1)
     pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
-    pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
+    pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("5"), model_symbol="4", serial_no=3)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     db_session.commit()
@@ -1311,10 +1311,44 @@ def test_shipping_prepare_complete_requires_process_department_stock(client, db_
 
     assert prepared.status_code == 422, prepared.text
     body = prepared.text
-    assert "최종 PF" in body
-    assert "생산 0" in body
-    assert "0" in body
-    assert "1" in body
+    assert "출하 준비 재고 부족" in body
+    assert pf.mes_code in body
+    assert DepartmentEnum.SHIPPING.value in body
+
+
+def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department(
+    client, db_session, make_item, make_bom, make_location
+):
+    af = make_item(name="Shipping stock AF", process_type_code="AF", model_symbol="4", serial_no=8)
+    pa = make_item(name="Shipping stock PA", process_type_code="PA", model_symbol="4", serial_no=9)
+    pf = make_item(name="Shipping stock PF", process_type_code="PF", model_symbol="4", serial_no=10)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "shipping-stock-001"},
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
+
+    prepared = client.post(
+        f"/api/shipping/requests/{request_id}/prepare-complete",
+        json={},
+    )
+
+    assert prepared.status_code == 200, prepared.text
+    body = prepared.json()
+    assert body["status"] == ShippingRequestStatusEnum.PREPARED.value
+    assert any(
+        allocation["item_id"] == str(pf.item_id)
+        and allocation["quantity"] == 1
+        and allocation["status"] == "RESERVED"
+        for allocation in body["allocations"]
+    )
 
 
 def test_shipping_preparing_response_includes_stock_shortages(client, db_session, make_item, make_bom):
