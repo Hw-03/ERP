@@ -19,6 +19,15 @@ class AssemblyChecklistItemCreate(BaseModel):
     content: str = Field(..., max_length=2000)
 
 
+class AssemblyChecklistItemUpdate(BaseModel):
+    content: str = Field(..., max_length=2000)
+
+
+class AssemblyChecklistItemMove(BaseModel):
+    target_section_id: uuid.UUID
+    target_index: int = Field(..., ge=0)
+
+
 class AssemblyChecklistItemReorder(BaseModel):
     item_ids: list[uuid.UUID] = Field(..., min_length=1)
 

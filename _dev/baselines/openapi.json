@@ -299,6 +299,26 @@
         "title": "AssemblyChecklistItemCreate",
         "type": "object"
       },
+      "AssemblyChecklistItemMove": {
+        "properties": {
+          "target_index": {
+            "minimum": 0.0,
+            "title": "Target Index",
+            "type": "integer"
+          },
+          "target_section_id": {
+            "format": "uuid",
+            "title": "Target Section Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_section_id",
+          "target_index"
+        ],
+        "title": "AssemblyChecklistItemMove",
+        "type": "object"
+      },
       "AssemblyChecklistItemReorder": {
         "properties": {
           "item_ids": {
@@ -339,6 +359,20 @@
           "sort_order"
         ],
         "title": "AssemblyChecklistItemResponse",
+        "type": "object"
+      },
+      "AssemblyChecklistItemUpdate": {
+        "properties": {
+          "content": {
+            "maxLength": 2000,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "AssemblyChecklistItemUpdate",
         "type": "object"
       },
       "AssemblyChecklistResponse": {
@@ -11220,6 +11254,112 @@
           }
         },
         "summary": "체크리스트 항목 삭제",
+        "tags": [
+          "Assembly Checklists"
+        ]
+      },
+      "put": {
+        "description": "Trim and persist one existing item message, returning its latest checklist.",
+        "operationId": "update_assembly_checklist_item_api_assembly_checklists_items__item_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssemblyChecklistItemUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "체크리스트 항목 문구 수정",
+        "tags": [
+          "Assembly Checklists"
+        ]
+      }
+    },
+    "/api/assembly-checklists/items/{item_id}/move": {
+      "put": {
+        "description": "Move an item within its checklist and persist contiguous source and target orders atomically.",
+        "operationId": "move_assembly_checklist_item_api_assembly_checklists_items__item_id__move_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssemblyChecklistItemMove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyChecklistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "체크리스트 항목 이동",
         "tags": [
           "Assembly Checklists"
         ]

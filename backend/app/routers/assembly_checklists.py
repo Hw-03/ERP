@@ -19,7 +19,9 @@ from app.routers._errors import ErrorCode, http_error
 from app.schemas.assembly_checklist import (
     AssemblyChecklistCreate,
     AssemblyChecklistItemCreate,
+    AssemblyChecklistItemMove,
     AssemblyChecklistItemReorder,
+    AssemblyChecklistItemUpdate,
     AssemblyChecklistResponse,
     AssemblyChecklistSectionCreate,
 )
@@ -84,6 +86,17 @@ def _get_item(db: Session, item_id: uuid.UUID) -> AssemblyChecklistItem:
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "체크리스트 항목을 찾을 수 없습니다.")
     return item
+
+
+def _ordered_section_items(db: Session, section_id: uuid.UUID) -> list[AssemblyChecklistItem]:
+    """Return one section's items in the deterministic persisted display order."""
+
+    return (
+        db.query(AssemblyChecklistItem)
+        .filter(AssemblyChecklistItem.section_id == section_id)
+        .order_by(AssemblyChecklistItem.sort_order.asc(), AssemblyChecklistItem.item_id.asc())
+        .all()
+    )
 
 
 def _latest_checklist(db: Session, model_slot: int) -> AssemblyChecklist:
@@ -203,6 +216,71 @@ def create_assembly_checklist_item(
     )
     db.commit()
     return _serialize(_latest_checklist(db, section.checklist.model_slot))
+
+
+@router.put(
+    "/items/{item_id}",
+    response_model=AssemblyChecklistResponse,
+    summary="체크리스트 항목 문구 수정",
+)
+def update_assembly_checklist_item(
+    item_id: uuid.UUID,
+    payload: AssemblyChecklistItemUpdate,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Trim and persist one existing item message, returning its latest checklist."""
+
+    content = payload.content.strip()
+    if not content:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "체크 항목을 입력하세요.")
+    item = _get_item(db, item_id)
+    model_slot = item.section.checklist.model_slot
+    item.content = content
+    db.commit()
+    return _serialize(_latest_checklist(db, model_slot))
+
+
+@router.put(
+    "/items/{item_id}/move",
+    response_model=AssemblyChecklistResponse,
+    summary="체크리스트 항목 이동",
+)
+def move_assembly_checklist_item(
+    item_id: uuid.UUID,
+    payload: AssemblyChecklistItemMove,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Move an item within its checklist and persist contiguous source and target orders atomically."""
+
+    item = _get_item(db, item_id)
+    source_section = item.section
+    target_section = _get_section(db, payload.target_section_id)
+    if source_section.checklist_id != target_section.checklist_id:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "같은 체크리스트 안에서만 항목을 이동할 수 있습니다.")
+
+    source_items = _ordered_section_items(db, source_section.section_id)
+    if source_section.section_id == target_section.section_id:
+        reordered_items = [candidate for candidate in source_items if candidate.item_id != item.item_id]
+        if payload.target_index > len(reordered_items):
+            raise http_error(422, ErrorCode.UNPROCESSABLE, "이동할 위치가 범위를 벗어났습니다.")
+        reordered_items.insert(payload.target_index, item)
+        for sort_order, reordered_item in enumerate(reordered_items):
+            reordered_item.sort_order = sort_order
+    else:
+        target_items = _ordered_section_items(db, target_section.section_id)
+        if payload.target_index > len(target_items):
+            raise http_error(422, ErrorCode.UNPROCESSABLE, "이동할 위치가 범위를 벗어났습니다.")
+        source_items = [candidate for candidate in source_items if candidate.item_id != item.item_id]
+        target_items.insert(payload.target_index, item)
+        item.section_id = target_section.section_id
+        for sort_order, source_item in enumerate(source_items):
+            source_item.sort_order = sort_order
+        for sort_order, target_item in enumerate(target_items):
+            target_item.sort_order = sort_order
+
+    model_slot = source_section.checklist.model_slot
+    db.commit()
+    return _serialize(_latest_checklist(db, model_slot))
 
 
 @router.delete(

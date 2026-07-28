@@ -162,3 +162,190 @@ def test_assembly_checklist_item_delete_returns_the_latest_section_items(client,
         {"item_id": deleted.json()["sections"][0]["items"][0]["item_id"], "content": "두 번째 항목", "sort_order": 0}
     ]
     assert client.delete(f"/api/assembly-checklists/items/{uuid.uuid4()}").status_code == 404
+
+
+def test_assembly_checklist_item_update_persists_trimmed_content(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    section = client.post(
+        "/api/assembly-checklists/1/sections", json={"title": "Power"}
+    ).json()["sections"][0]
+    item = client.post(
+        f"/api/assembly-checklists/sections/{section['section_id']}/items",
+        json={"content": "Original instruction"},
+    ).json()["sections"][0]["items"][0]
+
+    updated = client.put(
+        f"/api/assembly-checklists/items/{item['item_id']}",
+        json={"content": "  Updated instruction  "},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["sections"][0]["items"] == [
+        {"item_id": item["item_id"], "content": "Updated instruction", "sort_order": 0}
+    ]
+    assert client.get("/api/assembly-checklists").json()[0]["sections"][0]["items"] == [
+        {"item_id": item["item_id"], "content": "Updated instruction", "sort_order": 0}
+    ]
+
+
+def test_assembly_checklist_item_update_rejects_blank_content_and_missing_item(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    section = client.post(
+        "/api/assembly-checklists/1/sections", json={"title": "Power"}
+    ).json()["sections"][0]
+    item = client.post(
+        f"/api/assembly-checklists/sections/{section['section_id']}/items",
+        json={"content": "Original instruction"},
+    ).json()["sections"][0]["items"][0]
+
+    blank_update = client.put(
+        f"/api/assembly-checklists/items/{item['item_id']}", json={"content": "   "}
+    )
+    assert blank_update.status_code == 422
+    assert client.get("/api/assembly-checklists").json()[0]["sections"][0]["items"] == [
+        {"item_id": item["item_id"], "content": "Original instruction", "sort_order": 0}
+    ]
+    assert client.put(
+        f"/api/assembly-checklists/items/{uuid.uuid4()}", json={"content": "Updated"}
+    ).status_code == 404
+
+
+def test_assembly_checklist_item_move_between_sections_persists_order_and_content(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    response = client.post("/api/assembly-checklists/1/sections", json={"title": "A"}).json()
+    source = response["sections"][0]
+    response = client.post("/api/assembly-checklists/1/sections", json={"title": "B"}).json()
+    target = response["sections"][1]
+    first_source = client.post(
+        f"/api/assembly-checklists/sections/{source['section_id']}/items", json={"content": "A1"}
+    ).json()["sections"][0]["items"][0]
+    moved_item = client.post(
+        f"/api/assembly-checklists/sections/{source['section_id']}/items", json={"content": "A2"}
+    ).json()["sections"][0]["items"][1]
+    first_target = client.post(
+        f"/api/assembly-checklists/sections/{target['section_id']}/items", json={"content": "B1"}
+    ).json()["sections"][1]["items"][0]
+    second_target = client.post(
+        f"/api/assembly-checklists/sections/{target['section_id']}/items", json={"content": "B2"}
+    ).json()["sections"][1]["items"][1]
+
+    moved = client.put(
+        f"/api/assembly-checklists/items/{moved_item['item_id']}/move",
+        json={"target_section_id": target["section_id"], "target_index": 1},
+    )
+
+    assert moved.status_code == 200
+    assert moved.json()["sections"][0]["items"] == [
+        {"item_id": first_source["item_id"], "content": "A1", "sort_order": 0}
+    ]
+    assert moved.json()["sections"][1]["items"] == [
+        {"item_id": first_target["item_id"], "content": "B1", "sort_order": 0},
+        {"item_id": moved_item["item_id"], "content": "A2", "sort_order": 1},
+        {"item_id": second_target["item_id"], "content": "B2", "sort_order": 2},
+    ]
+    assert client.get("/api/assembly-checklists").json()[0] == moved.json()
+
+    moved_to_front = client.put(
+        f"/api/assembly-checklists/items/{first_source['item_id']}/move",
+        json={"target_section_id": target["section_id"], "target_index": 0},
+    )
+
+    assert moved_to_front.status_code == 200
+    assert moved_to_front.json()["sections"][0]["items"] == []
+    assert moved_to_front.json()["sections"][1]["items"] == [
+        {"item_id": first_source["item_id"], "content": "A1", "sort_order": 0},
+        {"item_id": first_target["item_id"], "content": "B1", "sort_order": 1},
+        {"item_id": moved_item["item_id"], "content": "A2", "sort_order": 2},
+        {"item_id": second_target["item_id"], "content": "B2", "sort_order": 3},
+    ]
+    assert client.get("/api/assembly-checklists").json()[0] == moved_to_front.json()
+
+
+def test_assembly_checklist_item_move_into_empty_section(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    source = client.post("/api/assembly-checklists/1/sections", json={"title": "A"}).json()["sections"][0]
+    target = client.post("/api/assembly-checklists/1/sections", json={"title": "B"}).json()["sections"][1]
+    item = client.post(
+        f"/api/assembly-checklists/sections/{source['section_id']}/items", json={"content": "A1"}
+    ).json()["sections"][0]["items"][0]
+
+    moved = client.put(
+        f"/api/assembly-checklists/items/{item['item_id']}/move",
+        json={"target_section_id": target["section_id"], "target_index": 0},
+    )
+
+    assert moved.status_code == 200
+    assert moved.json()["sections"][0]["items"] == []
+    assert moved.json()["sections"][1]["items"] == [
+        {"item_id": item["item_id"], "content": "A1", "sort_order": 0}
+    ]
+
+
+def test_assembly_checklist_item_move_within_section_reorders_after_removal(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    section = client.post("/api/assembly-checklists/1/sections", json={"title": "A"}).json()["sections"][0]
+    items = [
+        client.post(
+            f"/api/assembly-checklists/sections/{section['section_id']}/items", json={"content": content}
+        ).json()["sections"][0]["items"][-1]
+        for content in ("A1", "A2", "A3")
+    ]
+
+    moved = client.put(
+        f"/api/assembly-checklists/items/{items[0]['item_id']}/move",
+        json={"target_section_id": section["section_id"], "target_index": 2},
+    )
+
+    assert moved.status_code == 200
+    assert moved.json()["sections"][0]["items"] == [
+        {"item_id": items[1]["item_id"], "content": "A2", "sort_order": 0},
+        {"item_id": items[2]["item_id"], "content": "A3", "sort_order": 1},
+        {"item_id": items[0]["item_id"], "content": "A1", "sort_order": 2},
+    ]
+    assert client.get("/api/assembly-checklists").json()[0] == moved.json()
+
+
+def test_assembly_checklist_item_move_rejects_invalid_target_sections_and_indices(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    _model(db_session, slot=2, name="ADX4000W", symbol="4")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    assert client.post("/api/assembly-checklists", json={"model_slot": 2}).status_code == 201
+    source = client.post("/api/assembly-checklists/1/sections", json={"title": "A"}).json()["sections"][0]
+    target = client.post("/api/assembly-checklists/1/sections", json={"title": "B"}).json()["sections"][1]
+    other = client.post("/api/assembly-checklists/2/sections", json={"title": "C"}).json()["sections"][0]
+    item = client.post(
+        f"/api/assembly-checklists/sections/{source['section_id']}/items", json={"content": "A1"}
+    ).json()["sections"][0]["items"][0]
+    client.post(
+        f"/api/assembly-checklists/sections/{target['section_id']}/items", json={"content": "B1"}
+    )
+    client.post(
+        f"/api/assembly-checklists/sections/{other['section_id']}/items", json={"content": "C1"}
+    )
+    snapshot = client.get("/api/assembly-checklists").json()
+
+    different_checklist = client.put(
+        f"/api/assembly-checklists/items/{item['item_id']}/move",
+        json={"target_section_id": other["section_id"], "target_index": 0},
+    )
+    assert different_checklist.status_code == 422
+    assert client.get("/api/assembly-checklists").json() == snapshot
+
+    out_of_range = client.put(
+        f"/api/assembly-checklists/items/{item['item_id']}/move",
+        json={"target_section_id": target["section_id"], "target_index": 2},
+    )
+    assert out_of_range.status_code == 422
+    assert client.get("/api/assembly-checklists").json() == snapshot
+
+    missing_target = client.put(
+        f"/api/assembly-checklists/items/{item['item_id']}/move",
+        json={"target_section_id": str(uuid.uuid4()), "target_index": 0},
+    )
+    assert missing_target.status_code == 404
+    assert client.get("/api/assembly-checklists").json() == snapshot

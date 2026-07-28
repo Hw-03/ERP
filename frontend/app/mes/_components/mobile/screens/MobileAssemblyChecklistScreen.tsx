@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ClipboardCheck, GripVertical, Settings2, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { ProductModel } from "@/lib/api";
@@ -15,11 +15,13 @@ import {
   useCreateAssemblyChecklistMutation,
   useCreateAssemblyChecklistSectionMutation,
   useDeleteAssemblyChecklistItemMutation,
+  useMoveAssemblyChecklistItemMutation,
   useReorderAssemblyChecklistItemsMutation,
+  useUpdateAssemblyChecklistItemMutation,
 } from "@/lib/queries/useAssemblyChecklistsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
-import { useItemOrderDrag } from "../../_warehouse_v2/useItemOrderDrag";
 import { TYPO } from "../tokens";
+import { useAssemblyChecklistItemDrag, type UseAssemblyChecklistItemDragResult } from "./useAssemblyChecklistItemDrag";
 
 const CARD_STYLE = {
   background: LEGACY_COLORS.s1,
@@ -28,8 +30,8 @@ const CARD_STYLE = {
 
 type ScreenMode = "browse" | "manage" | "manageDetail";
 
-function checklistItemKey(sectionId: string, itemId: string): string {
-  return `${sectionId}:${itemId}`;
+function checklistItemKey(itemId: string): string {
+  return itemId;
 }
 
 function ErrorText({ message }: { message: string | null }) {
@@ -90,12 +92,9 @@ function ProductCard({
       >
         <ClipboardCheck className="h-6 w-6" style={{ color: LEGACY_COLORS.blue }} />
       </span>
-      <span className="min-w-0">
-        <span className="block text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
+      <span className="min-w-0 flex-1">
+        <span className="block text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
           {checklist.model_name}
-        </span>
-        <span className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-          조립 체크리스트
         </span>
       </span>
     </button>
@@ -120,7 +119,7 @@ function BrowseDetail({
       <Header title={checklist.model_name} onBack={onBack} backLabel="제품 선택으로 돌아가기" />
 
       {checklist.sections.map((section) => {
-        const hasCompletedItem = section.items.some((item) => completedItemKeys.has(checklistItemKey(section.section_id, item.item_id)));
+        const hasCompletedItem = section.items.some((item) => completedItemKeys.has(checklistItemKey(item.item_id)));
         return (
           <section key={section.section_id} className="rounded-[20px] border p-4" style={CARD_STYLE}>
             {section.title && (
@@ -130,7 +129,7 @@ function BrowseDetail({
             )}
             <ol aria-label={`${section.title ?? checklist.model_name} 체크리스트`} className="flex list-none flex-col gap-2 p-0">
               {section.items.map((item, itemIndex) => {
-                const itemKey = checklistItemKey(section.section_id, item.item_id);
+                const itemKey = checklistItemKey(item.item_id);
                 const isCompleted = completedItemKeys.has(itemKey);
                 return (
                   <li key={item.item_id}>
@@ -191,20 +190,36 @@ function ManagedSection({
   section,
   onAddItem,
   onDeleteItem,
-  onReorder,
+  onUpdateItem,
   pending,
+  drag,
 }: {
   section: AssemblyChecklistSection;
   onAddItem: (sectionId: string, content: string) => Promise<void>;
   onDeleteItem: (itemId: string) => Promise<void>;
-  onReorder: (sectionId: string, itemIds: string[]) => Promise<void>;
+  onUpdateItem: (itemId: string, content: string) => Promise<void>;
   pending: boolean;
+  drag: UseAssemblyChecklistItemDragResult;
 }) {
   const [itemDraft, setItemDraft] = useState("");
-  const { dragId, dropTargetId, makeHandlers } = useItemOrderDrag(section.items, (items) => {
-    void onReorder(section.section_id, items.map((item) => item.item_id));
-  });
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const focusRestoreItemId = useRef<string | null>(null);
   const label = section.title ?? "기본 항목";
+  const isEmptyDropTarget = drag.dropTargetSectionId === section.section_id && !drag.dropTargetItemId;
+
+  useEffect(() => {
+    if (editingItemId) {
+      textareaRef.current?.focus();
+      return;
+    }
+    const itemId = focusRestoreItemId.current;
+    if (!itemId) return;
+    editButtonRefs.current.get(itemId)?.focus();
+    focusRestoreItemId.current = null;
+  }, [editingItemId]);
 
   const submit = async () => {
     const content = itemDraft.trim();
@@ -213,8 +228,29 @@ function ManagedSection({
     setItemDraft("");
   };
 
+  const saveEdit = async (itemId: string) => {
+    const content = editDraft.trim();
+    if (!content) return;
+    try {
+      await onUpdateItem(itemId, content);
+      focusRestoreItemId.current = itemId;
+      setEditingItemId(null);
+      setEditDraft("");
+    } catch {
+      // ManageDetail displays the mutation failure while this row stays editable.
+    }
+  };
+
   return (
-    <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
+    <section
+      data-checklist-section-id={section.section_id}
+      className="rounded-[20px] border p-4"
+      style={{
+        ...CARD_STYLE,
+        background: isEmptyDropTarget ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : CARD_STYLE.background,
+        borderColor: isEmptyDropTarget ? LEGACY_COLORS.blue : CARD_STYLE.borderColor,
+      }}
+    >
       <h3 className={TYPO.title} style={{ color: LEGACY_COLORS.text }}>{label}</h3>
       <div className="mt-3 flex gap-2">
         <input
@@ -241,12 +277,17 @@ function ManagedSection({
       </div>
       <ol className="mt-3 flex list-none flex-col gap-2 p-0" aria-label={`${label} 관리 항목`}>
         {section.items.map((item, index) => {
-          const isDragTarget = dragId === item.item_id || dropTargetId === item.item_id;
-          const dragHandlers = makeHandlers(item.item_id);
+          const isEditing = editingItemId === item.item_id;
+          const interactionDisabled = pending || editingItemId !== null;
+          const isDragTarget = drag.dragId === item.item_id
+            || (drag.dropTargetSectionId === section.section_id && drag.dropTargetItemId === item.item_id);
+          const dragHandlers = drag.makeHandlers(section.section_id, item.item_id);
           return (
             <li
               key={item.item_id}
               data-item-id={item.item_id}
+              data-checklist-section-id={section.section_id}
+              data-checklist-item-id={item.item_id}
               className="flex min-h-11 items-center gap-2 rounded-[14px] border px-2 py-2"
               style={{
                 background: isDragTarget ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : LEGACY_COLORS.s2,
@@ -256,26 +297,86 @@ function ManagedSection({
               <button
                 type="button"
                 aria-label={`${item.content} 순서 변경`}
-                className="no-btn-inset flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
+                disabled={interactionDisabled}
+                className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-45"
                 {...dragHandlers}
                 style={{ ...dragHandlers.style, color: LEGACY_COLORS.muted2 }}
               >
                 <GripVertical className="h-5 w-5" />
               </button>
               <span className="w-5 shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>{index + 1}</span>
-              <span className={`${TYPO.body} min-w-0 flex-1 whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
-                {item.content}
-              </span>
+              {isEditing ? (
+                <div className="min-w-0 flex-1">
+                  <textarea
+                    aria-label={`${item.content} 문구`}
+                    ref={textareaRef}
+                    value={editDraft}
+                    onChange={(event) => setEditDraft(event.target.value)}
+                    disabled={pending}
+                    rows={3}
+                    className={`${TYPO.body} min-h-20 w-full resize-y rounded-[12px] border px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45`}
+                    style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  />
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      aria-label="항목 수정 취소"
+                      disabled={pending}
+                      onClick={() => {
+                        focusRestoreItemId.current = item.item_id;
+                        setEditingItemId(null);
+                        setEditDraft("");
+                      }}
+                      className="min-h-11 rounded-[12px] border px-3 text-sm font-black disabled:opacity-45"
+                      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="항목 수정 저장"
+                      onClick={() => void saveEdit(item.item_id)}
+                      disabled={pending || !editDraft.trim()}
+                      className="min-h-11 rounded-[12px] border px-3 text-sm font-black disabled:opacity-45"
+                      style={{
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
+                        borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 45%, transparent)`,
+                        color: LEGACY_COLORS.blue,
+                      }}
+                    >
+                      저장
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={`${item.content} 수정`}
+                  onClick={() => {
+                    setEditingItemId(item.item_id);
+                    setEditDraft(item.content);
+                  }}
+                  disabled={pending}
+                  ref={(element) => {
+                    if (element) editButtonRefs.current.set(item.item_id, element);
+                    else editButtonRefs.current.delete(item.item_id);
+                  }}
+                  className={`${TYPO.body} no-btn-inset min-h-11 min-w-0 flex-1 whitespace-pre-line text-left disabled:opacity-45`}
+                  style={{ color: LEGACY_COLORS.text }}
+                >
+                  {item.content}
+                </button>
+              )}
               <button
                 type="button"
                 aria-label={`${item.content} 삭제`}
-                disabled={pending}
+                disabled={interactionDisabled}
                 onClick={() => {
                   if (window.confirm("이 체크리스트 항목을 삭제할까요?")) {
                     void onDeleteItem(item.item_id);
                   }
                 }}
-                className="no-btn-inset flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-45"
+                className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-45"
                 style={{ color: LEGACY_COLORS.red }}
               >
                 <Trash2 className="h-4 w-4" />
@@ -302,7 +403,9 @@ function ManageDetail({
   const createSection = useCreateAssemblyChecklistSectionMutation();
   const createItem = useCreateAssemblyChecklistItemMutation();
   const deleteItem = useDeleteAssemblyChecklistItemMutation();
+  const moveItem = useMoveAssemblyChecklistItemMutation();
   const reorderItems = useReorderAssemblyChecklistItemsMutation();
+  const updateItem = useUpdateAssemblyChecklistItemMutation();
 
   const saveSection = async () => {
     const title = sectionTitle.trim();
@@ -343,7 +446,32 @@ function ManageDetail({
     }
   };
 
-  const pending = createSection.isPending || createItem.isPending || deleteItem.isPending || reorderItems.isPending;
+  const saveUpdatedItem = async (itemId: string, content: string) => {
+    try {
+      setErrorMessage(null);
+      onLatest(await updateItem.mutateAsync({ itemId, content }));
+    } catch (error) {
+      setErrorMessage("항목 문구를 저장하지 못했습니다.");
+      throw error;
+    }
+  };
+
+  const saveMove = async ({ itemId, targetSectionId, targetIndex }: { itemId: string; targetSectionId: string; targetIndex: number }) => {
+    try {
+      setErrorMessage(null);
+      onLatest(await moveItem.mutateAsync({ itemId, targetSectionId, targetIndex }));
+    } catch {
+      setErrorMessage("항목을 다른 박스로 이동하지 못했습니다.");
+    }
+  };
+
+  const drag = useAssemblyChecklistItemDrag(
+    checklist.sections,
+    (sectionId, itemIds) => { void saveOrder(sectionId, itemIds); },
+    (input) => { void saveMove(input); },
+  );
+  const pending = createSection.isPending || createItem.isPending || deleteItem.isPending
+    || moveItem.isPending || reorderItems.isPending || updateItem.isPending;
   return (
     <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
       <Header title={checklist.model_name} onBack={onBack} backLabel="체크리스트 관리 목록으로 돌아가기" />
@@ -380,8 +508,9 @@ function ManageDetail({
           section={section}
           onAddItem={saveItem}
           onDeleteItem={removeItem}
-          onReorder={saveOrder}
+          onUpdateItem={saveUpdatedItem}
           pending={pending}
+          drag={drag}
         />
       ))}
     </div>
@@ -459,19 +588,33 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   const [selectedModelSlot, setSelectedModelSlot] = useState<number | null>(null);
   const [completedItemKeys, setCompletedItemKeys] = useState<Set<string>>(() => new Set());
   const [latestChecklist, setLatestChecklist] = useState<AssemblyChecklist | null>(null);
+  const latestChecklistQueryRef = useRef<AssemblyChecklist[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { data: checklists = [], isLoading, error } = useAssemblyChecklistsQuery();
   const { data: models = [] } = useModelsQuery();
   const createChecklist = useCreateAssemblyChecklistMutation();
 
+  useEffect(() => {
+    if (latestChecklist && latestChecklistQueryRef.current !== checklists) {
+      setLatestChecklist(null);
+      latestChecklistQueryRef.current = null;
+    }
+  }, [checklists, latestChecklist]);
+
   const selectedChecklist = selectedModelSlot === null
     ? null
-    : checklists.find((checklist) => checklist.model_slot === selectedModelSlot)
-      ?? (latestChecklist?.model_slot === selectedModelSlot ? latestChecklist : null);
+    : (latestChecklist?.model_slot === selectedModelSlot ? latestChecklist : null)
+      ?? checklists.find((checklist) => checklist.model_slot === selectedModelSlot);
 
   const openChecklist = (checklist: AssemblyChecklist) => {
     setSelectedModelSlot(checklist.model_slot);
     setLatestChecklist(null);
+    latestChecklistQueryRef.current = null;
+  };
+
+  const applyLatestChecklist = (latest: AssemblyChecklist) => {
+    latestChecklistQueryRef.current = checklists;
+    setLatestChecklist(latest);
   };
 
   const toggleChecklistItem = (itemKey: string) => {
@@ -486,7 +629,7 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   const clearChecklistSection = (section: AssemblyChecklistSection) => {
     setCompletedItemKeys((currentKeys) => {
       const nextKeys = new Set(currentKeys);
-      section.items.forEach((item) => nextKeys.delete(checklistItemKey(section.section_id, item.item_id)));
+      section.items.forEach((item) => nextKeys.delete(checklistItemKey(item.item_id)));
       return nextKeys;
     });
   };
@@ -495,7 +638,7 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
     try {
       setErrorMessage(null);
       const latest = await createChecklist.mutateAsync({ modelSlot: model.slot });
-      setLatestChecklist(latest);
+      applyLatestChecklist(latest);
       setSelectedModelSlot(latest.model_slot);
       setMode("manageDetail");
     } catch {
@@ -524,7 +667,7 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
           setLatestChecklist(null);
           setMode("manage");
         }}
-        onLatest={setLatestChecklist}
+        onLatest={applyLatestChecklist}
       />
     );
   }
@@ -569,10 +712,9 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
           >
             <ClipboardCheck className="h-6 w-6" style={{ color: LEGACY_COLORS.blue }} />
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-xl font-black" style={{ color: LEGACY_COLORS.text }}>조립 체크리스트</span>
-            <span className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>제품을 선택하세요.</span>
-          </span>
+          <h2 className={`${TYPO.display} min-w-0 flex-1 truncate leading-tight`} style={{ color: LEGACY_COLORS.text }}>
+            조립 체크리스트
+          </h2>
           <button
             type="button"
             aria-label="체크리스트 관리"
