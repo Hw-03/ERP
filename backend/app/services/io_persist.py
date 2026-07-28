@@ -18,8 +18,6 @@ from app.models import (
     IoBatch,
     IoBundle,
     IoLine,
-    ShippingRequest,
-    ShippingRequestStatusEnum,
     StockRequest,
     StockRequestStatusEnum,
 )
@@ -33,34 +31,22 @@ from app.services.io_preview import (
 )
 
 
-SHIPPING_PREPARE_PHASE = "PREPARE"
+LEGACY_SHIPPING_LINK_READ_ONLY_MESSAGE = "폐기된 출하 준비 연결 작업은 조회만 가능합니다."
 
 
-def _shipping_prepare_reference(request_id: uuid.UUID) -> str:
-    return f"SHIP-PREP-{request_id.hex[:8]}"
+def ensure_batch_is_mutable(batch: IoBatch) -> None:
+    """과거 출하 연결 배치는 이력 조회 외의 변경을 차단한다."""
+    if batch.shipping_request_id is not None:
+        raise ValueError(LEGACY_SHIPPING_LINK_READ_ONLY_MESSAGE)
 
 
-def _resolve_shipping_prepare_context(
-    db: Session,
-    *,
-    shipping_request_id: uuid.UUID | None,
-    work_type: str,
-) -> tuple[uuid.UUID | None, str | None]:
-    """출하 준비에 연결된 입출고 작업만 준비 중 요청에서 생성되게 한다."""
-    if shipping_request_id is None:
-        return None, None
-    if work_type != "process":
-        raise ValueError("출하 준비 연결은 process 작업에서만 허용됩니다.")
-    request = (
-        db.query(ShippingRequest)
-        .filter(ShippingRequest.request_id == shipping_request_id)
-        .first()
-    )
-    if request is None:
-        raise ValueError("연결할 출하 요청을 찾을 수 없습니다.")
-    if request.status != ShippingRequestStatusEnum.PREPARING:
-        raise ValueError("출하 준비 연결은 준비 중 요청에서만 시작할 수 있습니다.")
-    return request.request_id, _shipping_prepare_reference(request.request_id)
+def ensure_stock_request_batch_is_mutable(db: Session, request: StockRequest) -> None:
+    batch_id = getattr(request, "operation_batch_id", None)
+    if batch_id is None:
+        return
+    batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
+    if batch is not None:
+        ensure_batch_is_mutable(batch)
 
 
 def _line_to_dict(line: IoLine) -> dict:
@@ -211,11 +197,6 @@ def _persist_batch(
     status: str,
     submitted_at: Optional[datetime] = None,
 ) -> IoBatch:
-    shipping_request_id, shipping_reference_no = _resolve_shipping_prepare_context(
-        db,
-        shipping_request_id=getattr(payload, "shipping_request_id", None),
-        work_type=payload.work_type,
-    )
     validate_internal_use_requester(
         requester,
         work_type=payload.work_type,
@@ -239,8 +220,7 @@ def _persist_batch(
         from_department=payload.from_department,
         to_department=payload.to_department,
         requires_approval=payload.sub_type in APPROVAL_SUB_TYPES,
-        shipping_request_id=shipping_request_id,
-        reference_no=shipping_reference_no or payload.reference_no,
+        reference_no=payload.reference_no,
         notes=payload.notes,
         client_request_id=getattr(payload, "client_request_id", None),
         submitted_at=submitted_at,

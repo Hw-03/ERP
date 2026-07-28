@@ -2,7 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
+  downloadAuditFile: vi.fn(),
+  downloadF704Ledger: vi.fn(),
   downloadF705ProductionLog: vi.fn(),
+  refetchAuditFiles: vi.fn(),
+  triggerAuditBackfill: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -16,8 +20,20 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/api/admin", () => ({
   adminApi: {
+    downloadAuditFile: state.downloadAuditFile,
+    downloadF704Ledger: state.downloadF704Ledger,
     downloadF705ProductionLog: state.downloadF705ProductionLog,
   },
+}));
+
+vi.mock("@/lib/queries/useSettingsQuery", () => ({
+  useAuditCsvListQuery: () => ({
+    data: [{ month: "2026-05", file_name: "inout_2026-05.csv", row_count: 2, size_bytes: 128 }],
+    isLoading: false,
+    error: null,
+    refetch: state.refetchAuditFiles,
+  }),
+  useTriggerAuditBackfillMutation: () => ({ isPending: false, mutate: state.triggerAuditBackfill }),
 }));
 
 import { AdminExportSection } from "../AdminExportSection";
@@ -28,7 +44,11 @@ const transactionsExportUrl = "/api/transactions/export";
 describe("AdminExportSection CSV 작업 블록", () => {
   beforeEach(() => {
     sessionStorage.clear();
+    state.downloadAuditFile.mockReset();
+    state.downloadF704Ledger.mockReset();
     state.downloadF705ProductionLog.mockReset();
+    state.refetchAuditFiles.mockReset();
+    state.triggerAuditBackfill.mockReset();
   });
 
   afterEach(() => {
@@ -136,5 +156,20 @@ describe("AdminExportSection CSV 작업 블록", () => {
     fireEvent.click(screen.getByRole("button", { name: "F705-02 생산일지 다운로드" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("production log download failed");
+  });
+
+  it("embeds external submission logs after the data export controls", () => {
+    render(
+      <AdminExportSection
+        itemsExportUrl={itemsExportUrl}
+        transactionsExportUrl={transactionsExportUrl}
+      />,
+    );
+
+    const externalLogs = screen.getByRole("region", { name: "외부 제출용 로그" });
+
+    expect(externalLogs).toContainElement(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
+    expect(externalLogs).toHaveTextContent("시스템 원본 로그 (월별)");
+    expect(externalLogs).toHaveTextContent("백필 재실행");
   });
 });

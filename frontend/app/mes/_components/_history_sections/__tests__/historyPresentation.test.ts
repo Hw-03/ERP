@@ -421,6 +421,10 @@ describe("historyPresentation", () => {
       "shipment",
     ).label).toBe("동반 출하품");
     expect(getReferenceBatchLinePresentation(
+      makeLog({ transaction_type: "SHIP", notes: "동반 출하: PA 보드" }),
+      "shipment",
+    ).label).toBe("동반 출하품");
+    expect(getReferenceBatchLinePresentation(
       makeLog({ transaction_type: "PRODUCE" }),
       "shipment",
     ).label).toBe("출하품 준비");
@@ -428,6 +432,27 @@ describe("historyPresentation", () => {
       makeLog({ transaction_type: "BACKFLUSH" }),
       "shipment",
     ).label).toBe("구성품 차감");
+  });
+
+  it("uses the prepare completer as the shipping history actor", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "SHIP",
+      produced_by: "준비 완료자 B",
+      requester_name: "요청자 A",
+      notes: "동반 출하: PA 보드",
+    }));
+
+    expect(row.people.requester).toBe("준비 완료자 B");
+  });
+
+  it("labels a legacy shipment without any recorded actor", () => {
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "SHIP",
+      produced_by: null,
+      requester_name: null,
+    }));
+
+    expect(row.people.requester).toBe("담당자 미기록");
   });
 });
 

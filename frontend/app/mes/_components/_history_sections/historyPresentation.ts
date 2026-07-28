@@ -12,6 +12,7 @@ import {
   getHistoryFlowLabel,
   getHistoryMovementSummary,
   getHistoryWorkTypeLabel,
+  isShippingCompanionNote,
   getSingleLogMovement,
   parseTransactionNotes,
   type MovementSummary,
@@ -304,7 +305,7 @@ function parseShippingPickupNote(notes: string | null | undefined): string | nul
 }
 
 function isShippingCompanionLog(log: TransactionLog): boolean {
-  return /^출하\s+동반\s+품목/.test(log.notes?.trim() ?? "");
+  return isShippingCompanionNote(log.notes);
 }
 
 function summarizeReferenceLogs(
@@ -417,6 +418,7 @@ function isItemConversionLog(log: TransactionLog): boolean {
 }
 
 function getRequesterPresentation(log: TransactionLog, batch?: IoBatch | null): string {
+  if (log.transaction_type === "SHIP") return getHistoryActor(log).trim() || "-";
   const batchRequester = batch?.requester_name?.trim();
   if (batchRequester) return batchRequester;
   const actor = getHistoryActor(log).trim();
@@ -551,7 +553,7 @@ function getStatusChips(
   const editCount = log.edit_count ?? 0;
   if (editCount > 0) chips.push({ label: `수정 ${editCount}`, tone: "warning" });
 
-  const memo = parseTransactionNotes(batch?.notes ?? log.notes).userMemo;
+  const memo = parseTransactionNotes(batch?.notes ?? log.notes, log.transaction_type).userMemo;
   if (memo) chips.push({ label: "메모", tone: "primary", title: memo });
   const defectReason = formatDefectReason(log);
   if (defectReason) chips.push({ label: "\uC0AC\uC720", tone: "warning", title: defectReason });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { BomChildAddBox } from "../BomChildAddBox";
@@ -86,6 +86,103 @@ function setNameOverflow(element: HTMLElement, overflow: boolean) {
 }
 
 describe("BOM 편집 표형 목록", () => {
+  it("상위 품목 목록에 선택 제목을 표시한다", () => {
+    render(
+      <BomParentList
+        dept="A"
+        items={[item()]}
+        allBomRows={[]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    expect(screen.getByText("상위 품목 선택")).toBeInTheDocument();
+  });
+
+  it("상위 단계 필터를 건수와 함께 한 줄 compact 칩으로 정렬한다", () => {
+    render(
+      <BomParentList
+        dept="A"
+        items={[item()]}
+        allBomRows={[]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    const count = screen.getByText("1건");
+    const filterRow = count.parentElement;
+    expect(filterRow).toHaveClass("flex-nowrap", "items-center", "gap-1.5");
+    expect(count).toHaveClass("ml-auto");
+    for (const button of within(filterRow!).getAllByRole("button")) {
+      expect(button).toHaveClass("whitespace-nowrap", "px-2", "py-1", "text-xs");
+    }
+  });
+
+  it("하위 품목 추가 제목 옆에 검색을 두고 후보 수를 노출하지 않는다", () => {
+    render(
+      <BomChildAddBox
+        parent={item()}
+        bomRows={[]}
+        items={[item(), item({ item_id: "item-2", item_name: "추가 후보" })]}
+        onAdd={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByText("하위 품목 추가");
+    expect(title.parentElement).toContainElement(screen.getByRole("textbox"));
+    expect(screen.queryByText("1개 후보")).not.toBeInTheDocument();
+  });
+
+  it("하위 후보를 단계 왼쪽·공정 오른쪽 필터의 교집합으로 표시한다", () => {
+    render(
+      <BomChildAddBox
+        parent={item({ item_id: "parent" })}
+        bomRows={[]}
+        items={[
+          item({ item_id: "tube-raw", item_name: "튜브 원자재", process_type_code: "TR" }),
+          item({ item_id: "tube-wip", item_name: "튜브 중간공정", process_type_code: "TA" }),
+          item({ item_id: "high-raw", item_name: "고압 원자재", process_type_code: "HR" }),
+        ]}
+        onAdd={vi.fn()}
+      />,
+    );
+
+    const stageFilters = screen.getByRole("group", { name: "단계 필터" });
+    const processFilters = screen.getByRole("group", { name: "공정 필터" });
+    expect(stageFilters.compareDocumentPosition(processFilters)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(stageFilters).toHaveClass("gap-1.5");
+    expect(processFilters).toHaveClass("gap-1.5", "border-l", "ml-1.5", "pl-3");
+    expect(processFilters.parentElement).toHaveClass("shrink-0");
+    expect(processFilters.parentElement).not.toHaveClass("ml-auto");
+    expect(stageFilters.parentElement).toHaveClass("w-max", "min-w-full", "gap-1");
+    expect(stageFilters.parentElement?.parentElement).toHaveClass("overflow-x-auto");
+    for (const button of [
+      ...within(stageFilters).getAllByRole("button"),
+      ...within(processFilters).getAllByRole("button"),
+    ]) {
+      expect(button).toHaveClass("whitespace-nowrap", "px-2", "py-1", "text-xs");
+    }
+    expect(within(processFilters).getByRole("button", { name: "전체" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(processFilters).getByRole("button", { name: "튜브" })).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(within(stageFilters).getByRole("button", { name: "원자재" }));
+    fireEvent.click(within(processFilters).getByRole("button", { name: "튜브" }));
+
+    expect(within(processFilters).getByRole("button", { name: "전체" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(processFilters).getByRole("button", { name: "튜브" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("튜브 원자재")).toBeInTheDocument();
+    expect(screen.queryByText("튜브 중간공정")).not.toBeInTheDocument();
+    expect(screen.queryByText("고압 원자재")).not.toBeInTheDocument();
+  });
+
   it("parent and child searches ignore hyphens, dots, and slashes", () => {
     const searched = item({ item_name: "Search Item", mes_code: "6-AF/01.2" });
     const { rerender } = render(

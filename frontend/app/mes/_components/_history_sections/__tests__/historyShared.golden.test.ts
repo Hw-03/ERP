@@ -99,6 +99,16 @@ function makeBatch(overrides: Partial<IoBatch> & { bundles?: IoBundle[] } = {}):
 }
 
 describe("parseTransactionNotes", () => {
+  it("treats the current companion-shipment note as system generated", () => {
+    expect(parseTransactionNotes("동반 출하: SOLO 카톤 박스", "SHIP")).toEqual({ userMemo: null });
+  });
+
+  it("preserves the same text when it was written on a non-shipping transaction", () => {
+    expect(parseTransactionNotes("동반 출하: 현장 전달 사항", "RECEIVE")).toEqual({
+      userMemo: "동반 출하: 현장 전달 사항",
+    });
+  });
+
   it("treats a rework child note as system generated", () => {
     expect(parseTransactionNotes("[rework:scrap_child]")).toEqual({ userMemo: null });
   });

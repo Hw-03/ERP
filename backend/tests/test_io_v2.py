@@ -15,6 +15,8 @@ from app.models import (
     IoBundle,
     IoLine,
     LocationStatusEnum,
+    ShippingRequest,
+    ShippingRequestStatusEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -114,7 +116,7 @@ def _approve_stock_request(client, request_id, approver: Employee):
     )
 
 
-def test_shipping_linked_process_submission_marks_batch_and_every_log(
+def test_shipping_request_id_is_rejected_for_new_io_submission_and_draft(
     client, db_session, make_bom, make_item, make_location
 ):
     af = make_item(name="Shipping linked AF", process_type_code="AF", model_symbol="7", serial_no=1)
@@ -152,34 +154,26 @@ def test_shipping_linked_process_submission_marks_batch_and_every_log(
     )
     assert preview.status_code == 200, preview.text
 
-    submitted = client.post(
-        "/api/io/submit",
-        json={
-            "requester_employee_id": str(requester.employee_id),
-            "work_type": "process",
-            "sub_type": "produce",
-            "to_department": DepartmentEnum.ASSEMBLY.value,
-            "shipping_request_id": str(request.request_id),
-            "bundles": preview.json()["bundles"],
-        },
-    )
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": "produce",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+        "shipping_request_id": str(request.request_id),
+        "bundles": preview.json()["bundles"],
+    }
+    submitted = client.post("/api/io/submit", json=payload)
+    drafted = client.put("/api/io/draft", json=payload)
 
-    assert submitted.status_code == 201, submitted.text
-    batch = submitted.json()["batch"]
-    assert batch["shipping_request_id"] == str(request.request_id)
-    assert batch["reference_no"] == f"SHIP-PREP-{request.request_id.hex[:8]}"
-    logs = (
-        db_session.query(TransactionLog)
-        .filter(TransactionLog.operation_batch_id == batch["batch_id"])
-        .all()
-    )
-    assert logs
-    assert all(log.shipping_request_id == request.request_id for log in logs)
-    assert all(log.shipping_phase == "PREPARE" for log in logs)
-    assert all(log.reference_no == batch["reference_no"] for log in logs)
+    assert submitted.status_code == 422, submitted.text
+    assert "shipping_request_id" in submitted.text
+    assert drafted.status_code == 422, drafted.text
+    assert "shipping_request_id" in drafted.text
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
 
 
-def test_shipping_context_rejects_non_preparing_request(
+def test_shipping_request_id_is_rejected_regardless_of_request_status(
     client, db_session, make_bom, make_item, make_location
 ):
     af = make_item(name="Shipping context AF", process_type_code="AF", model_symbol="7", serial_no=3)
@@ -229,7 +223,79 @@ def test_shipping_context_rejects_non_preparing_request(
     )
 
     assert submitted.status_code == 422, submitted.text
-    assert "준비 중" in submitted.text
+    assert "shipping_request_id" in submitted.text
+    assert "폐기" in submitted.text
+
+
+def test_legacy_shipping_linked_draft_is_readable_but_cannot_be_updated_submitted_or_deleted(
+    client, db_session, make_item
+):
+    pf = make_item(name="Legacy linked draft PF", process_type_code="PF")
+    requester = _make_employee(db_session, code="LEGACY-LINKED-DRAFT")
+    shipping_request = ShippingRequest(
+        base_pf_item_id=pf.item_id,
+        status=ShippingRequestStatusEnum.PREPARING,
+    )
+    db_session.add(shipping_request)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.SHIPPING.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(pf.item_id),
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": "produce",
+        "to_department": DepartmentEnum.SHIPPING.value,
+        "bundles": preview.json()["bundles"],
+    }
+    saved = client.put("/api/io/draft", json=payload)
+    assert saved.status_code == 200, saved.text
+    batch_id = saved.json()["batch_id"]
+    batch = db_session.query(IoBatch).filter(IoBatch.batch_id == uuid.UUID(batch_id)).one()
+    batch.shipping_request_id = shipping_request.request_id
+    db_session.commit()
+
+    readable = client.get(f"/api/io/{batch_id}")
+    assert readable.status_code == 200, readable.text
+    assert readable.json()["shipping_request_id"] == str(shipping_request.request_id)
+
+    update_payload = {**payload, "batch_id": batch_id}
+    updated = client.put("/api/io/draft", json=update_payload)
+    assert updated.status_code == 422, updated.text
+    assert "조회만" in updated.text
+
+    submitted = client.post(
+        f"/api/io/draft/{batch_id}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert submitted.status_code == 422, submitted.text
+    assert "조회만" in submitted.text
+
+    deleted = client.delete(
+        f"/api/io/draft/{batch_id}",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert deleted.status_code == 422, deleted.text
+    assert "조회만" in deleted.text
+
+    db_session.refresh(batch)
+    assert batch.status == "draft"
+    assert db_session.query(TransactionLog).count() == 0
 
 
 @pytest.mark.parametrize(

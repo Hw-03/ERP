@@ -25,7 +25,10 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
+    IoBatch,
     LocationStatusEnum,
+    ShippingRequest,
+    ShippingRequestStatusEnum,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
@@ -397,6 +400,50 @@ def test_department_reject_rejects_unauthorized(db_session, make_item):
 
 
 # ════════════ cancel_open_stock_requests ════════════
+
+
+def test_cancel_open_requests_rejects_legacy_shipping_link_before_any_state_change(
+    db_session, make_item
+):
+    normal_item = make_item(name="COQ-NORMAL", process_type_code="PR", warehouse_qty=D("10"))
+    item = make_item(name="COQ-LEGACY-SHIP", process_type_code="PF", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="COQ-LEGACY-SHIP")
+    normal_req = _make_reserved_request(db_session, requester, normal_item, qty=D("2"))
+    req = _make_reserved_request(db_session, requester, item, qty=D("3"))
+    shipping_request = ShippingRequest(
+        base_pf_item_id=item.item_id,
+        status=ShippingRequestStatusEnum.PREPARING,
+    )
+    db_session.add(shipping_request)
+    db_session.flush()
+    batch = IoBatch(
+        work_type="process",
+        sub_type="produce",
+        status="submitted",
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=ASSEMBLY.value,
+        requires_approval=True,
+        stock_request_id=req.request_id,
+        shipping_request_id=shipping_request.request_id,
+    )
+    db_session.add(batch)
+    db_session.flush()
+    req.operation_batch_id = batch.batch_id
+    db_session.flush()
+
+    with pytest.raises(ValueError, match="조회만"):
+        svc.cancel_open_stock_requests(db_session, reason="시스템 정리")
+
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert req.cancelled_at is None
+    assert all(line.status == StockRequestStatusEnum.RESERVED for line in req.lines)
+    assert batch.status == "submitted"
+    assert _inv(db_session, item.item_id).pending_quantity == D("3")
+    assert normal_req.status == StockRequestStatusEnum.RESERVED
+    assert normal_req.cancelled_at is None
+    assert all(line.status == StockRequestStatusEnum.RESERVED for line in normal_req.lines)
+    assert _inv(db_session, normal_item.item_id).pending_quantity == D("2")
 
 
 def test_cancel_open_requests_pending_zero_safe(db_session, make_item):

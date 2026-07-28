@@ -67,7 +67,7 @@ describe("AdminSectionTabs", () => {
     expect(row).toHaveClass("min-w-[880px]", "lg:min-w-0", "flex-1");
     expect(groups[0]).toHaveStyle({ flexGrow: "4" });
     expect(groups[1]).toHaveStyle({ flexGrow: "1" });
-    expect(groups[2]).toHaveStyle({ flexGrow: "3" });
+    expect(groups[2]).toHaveStyle({ flexGrow: "2" });
     expect(groups[0]).toHaveStyle({ flexBasis: "0px" });
     expect(groups[1]).toHaveStyle({ flexBasis: "0px" });
     expect(groups[2]).toHaveStyle({ flexBasis: "0px" });
@@ -77,6 +77,17 @@ describe("AdminSectionTabs", () => {
         expect(tab).toHaveClass("flex-1", "justify-center");
       });
     });
+  });
+
+  it("keeps only the merged export tab in the system group and marks the navigation scope", () => {
+    render(<AdminSectionTabs section="export" onSelect={vi.fn()} />);
+
+    const navigation = screen.getByRole("navigation", { name: "관리자 섹션" });
+    const systemGroup = within(navigation).getByRole("group", { name: "시스템" });
+
+    expect(navigation).toHaveAttribute("data-admin-section-tabs");
+    expect(within(systemGroup).getByRole("button", { name: "내보내기" })).toHaveAttribute("aria-current", "page");
+    expect(within(systemGroup).queryByRole("button", { name: "외부 제출용 로그" })).not.toBeInTheDocument();
   });
 
   it("관리자 탭 바에 카드 그림자를 적용하지 않는다", () => {

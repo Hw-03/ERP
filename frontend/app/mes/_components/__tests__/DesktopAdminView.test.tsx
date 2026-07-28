@@ -1,10 +1,21 @@
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
 import { DesktopAdminView } from "../DesktopAdminView";
 
+const state = vi.hoisted(() => ({
+  sectionParam: null as string | null,
+  searchString: "tab=admin",
+  selectSection: vi.fn(),
+  routerReplace: vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: state.routerReplace }),
+  useSearchParams: () => ({
+    get: (key: string) => (key === "section" ? state.sectionParam : null),
+    toString: () => state.searchString,
+  }),
 }));
 
 vi.mock("@/lib/ui/dirty-guard", () => ({
@@ -23,7 +34,7 @@ vi.mock("../_admin_hooks/useAdminViewState", () => ({
     selectedDept: null,
     setSelectedDept: vi.fn(),
     unlock: vi.fn(),
-    selectSection: vi.fn(),
+    selectSection: state.selectSection,
   }),
 }));
 
@@ -49,6 +60,13 @@ vi.mock("../_admin_sections/AdminSectionContent", () => ({
 }));
 
 describe("DesktopAdminView", () => {
+  beforeEach(() => {
+    state.sectionParam = null;
+    state.searchString = "tab=admin";
+    state.selectSection.mockReset();
+    state.routerReplace.mockReset();
+  });
+
   it("고정 관리자 사이드 메뉴 대신 상단 섹션 탭을 렌더링한다", () => {
     render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
 
@@ -60,5 +78,31 @@ describe("DesktopAdminView", () => {
     render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
 
     expect(screen.getByText("관리자 본문").closest("section")).toHaveClass("pt-1");
+  });
+
+  it("기존 audit 섹션 주소는 내보내기로 정규화한다", async () => {
+    state.sectionParam = "audit";
+    state.searchString = "tab=admin&section=audit";
+
+    const { rerender } = render(
+      <DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />,
+    );
+
+    await waitFor(() => {
+      expect(state.selectSection).toHaveBeenCalledWith("export");
+      expect(state.routerReplace).toHaveBeenCalledWith(
+        "?tab=admin&section=export",
+        { scroll: false },
+      );
+    });
+
+    expect(state.routerReplace).toHaveBeenCalledTimes(1);
+    state.sectionParam = "export";
+    state.searchString = "tab=admin&section=export";
+    rerender(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(state.routerReplace).toHaveBeenCalledTimes(1);
+    });
   });
 });

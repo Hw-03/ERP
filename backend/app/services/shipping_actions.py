@@ -122,10 +122,19 @@ def prepare_complete(
     db: Session,
     request_id: uuid.UUID,
     serial_numbers: str,
+    *,
+    prepared_by_employee_id: uuid.UUID | None = None,
+    prepared_by_name: str | None = None,
 ) -> ShippingRequest:
     """준비 완료의 재고·원장·배정·상태를 원자적으로 확정한다."""
     with transactional(db):
-        return shipping_svc.prepare_complete(db, request_id, serial_numbers)
+        return shipping_svc.prepare_complete(
+            db,
+            request_id,
+            serial_numbers,
+            prepared_by_employee_id=prepared_by_employee_id,
+            prepared_by_name=prepared_by_name,
+        )
 
 
 def prepare_cancel(

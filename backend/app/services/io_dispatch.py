@@ -39,11 +39,10 @@ from app.services.io_preview import (
     validate_internal_use_requester,
 )
 from app.services.io_persist import (
-    SHIPPING_PREPARE_PHASE,
     _batch_to_payload,
+    ensure_batch_is_mutable,
     _load_requester,
     _persist_batch,
-    _resolve_shipping_prepare_context,
 )
 
 
@@ -251,13 +250,7 @@ def execute_batch_after_dept_approval(
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("작업 묶음을 찾을 수 없습니다.")
-    _, shipping_reference_no = _resolve_shipping_prepare_context(
-        db,
-        shipping_request_id=batch.shipping_request_id,
-        work_type=batch.work_type,
-    )
-    if shipping_reference_no is not None:
-        batch.reference_no = shipping_reference_no
+    ensure_batch_is_mutable(batch)
     if not batch.stock_request_id:
         batch.stock_request_id = request.request_id
     if request.request_code and not batch.reference_no:
@@ -307,8 +300,6 @@ def _log_immediate(
             producer_employee_id=producer_employee_id,
             notes=batch.notes,
             operation_batch_id=batch.batch_id,
-            shipping_request_id=batch.shipping_request_id,
-            shipping_phase=(SHIPPING_PREPARE_PHASE if batch.shipping_request_id else None),
             inventory_effect=inventory_effect,
         )
     )
@@ -475,13 +466,7 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
 
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
-    _, shipping_reference_no = _resolve_shipping_prepare_context(
-        db,
-        shipping_request_id=batch.shipping_request_id,
-        work_type=batch.work_type,
-    )
-    if shipping_reference_no is not None:
-        batch.reference_no = shipping_reference_no
+    ensure_batch_is_mutable(batch)
     validate_internal_use_requester(
         requester,
         work_type=batch.work_type,
@@ -550,6 +535,7 @@ def submit_existing_draft(
         raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
     if batch.status != "draft":
         raise ValueError("임시저장 상태가 아닙니다.")
+    ensure_batch_is_mutable(batch)
     requester = _load_requester(db, requester_employee_id)
     batch.status = "submitted"
     batch.submitted_at = datetime.utcnow()

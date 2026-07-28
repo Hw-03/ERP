@@ -78,6 +78,7 @@ describe("buildHistoryDetailSummary", () => {
     expect(summary.operationLabel).toBe("생산");
     expect(summary.status).toEqual({ label: "완료", tone: "success", reason: null });
     expect(summary.requester).toEqual({
+      label: "요청자",
       name: "요청자 A",
       at: "2026-07-10T01:00:00Z",
     });
@@ -265,6 +266,37 @@ describe("buildHistoryDetailSummary", () => {
       mesCode: "PARENT-001",
     });
     expect(summary.operationLabel).toBe("재작업");
+  });
+
+  it("labels a shipment actor as 담당자 and keeps one companion inventory effect", () => {
+    const summary = buildHistoryDetailSummary([
+      makeLog({
+        transaction_type: "SHIP",
+        produced_by: "준비 완료자 B",
+        requester_name: "요청자 A",
+        notes: "동반 출하: SOLO 카톤 박스",
+        item_id: "carton-1",
+        item_name: "SOLO 카톤 박스",
+        quantity_change: -10,
+        inventory_effect: [
+          { scope: "location", department: "출하", status: "PRODUCTION", delta: -10 },
+        ],
+      }),
+    ], null);
+
+    expect(summary.requester).toEqual({
+      label: "담당자",
+      name: "준비 완료자 B",
+      at: "2026-07-10T01:00:00Z",
+    });
+    expect(summary.impactGroups.flatMap((group) => group.effects)).toEqual([
+      expect.objectContaining({
+        itemId: "carton-1",
+        itemName: "SOLO 카톤 박스",
+        label: "출하 재고",
+        delta: -10,
+      }),
+    ]);
   });
 
   it("uses the disassembly parent and actual defect-to-assembly flow for a legacy rework reference", () => {

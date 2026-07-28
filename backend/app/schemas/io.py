@@ -1,9 +1,9 @@
 """입출고(IO) 미리보기·draft·제출·배치 schema."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common import UtcDatetime
 
@@ -68,7 +68,6 @@ class IoDraftUpsert(BaseModel):
     sub_type: str
     from_department: Optional[str] = None
     to_department: Optional[str] = None
-    shipping_request_id: Optional[uuid.UUID] = None
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     client_request_id: Optional[str] = Field(None, max_length=64)
@@ -76,6 +75,13 @@ class IoDraftUpsert(BaseModel):
     # submit 경로(IoSubmitRequest)는 이 값을 무시한다.
     batch_id: Optional[uuid.UUID] = None
     bundles: List[IoBundlePayload] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_shipping_request_id(cls, value: Any) -> Any:
+        if isinstance(value, dict) and "shipping_request_id" in value:
+            raise ValueError("shipping_request_id 출하 준비 연결 기능은 폐기되었습니다.")
+        return value
 
 
 class IoSubmitRequest(IoDraftUpsert):

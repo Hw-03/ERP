@@ -5,7 +5,6 @@ import {
   Box,
   Building2,
   Download,
-  FileArchive,
   Layers,
   Network,
   ShieldCheck,
@@ -39,7 +38,6 @@ const SECTION_GROUPS: { label: string; tabs: AdminSectionTab[] }[] = [
     label: "시스템",
     tabs: [
       { id: "export", label: "내보내기", icon: Download },
-      { id: "audit", label: "외부 제출용 로그", icon: FileArchive },
       { id: "settings", label: "보안", icon: ShieldCheck, danger: true },
     ],
   },
@@ -54,6 +52,7 @@ export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
   return (
     <nav
       aria-label="관리자 섹션"
+      data-admin-section-tabs
       className="flex shrink-0 items-center gap-3 overflow-x-auto rounded-[20px] border px-3 py-2"
       style={{
         background: LEGACY_COLORS.s1,

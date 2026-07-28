@@ -72,8 +72,6 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
       });
   }, [items, parent.item_id, search, deptFilter, stageFilter]);
 
-  const availableCount = candidates.filter((c) => !childIdSet.has(c.item_id)).length;
-
   function openRow(id: string) {
     setExpandedId(id);
     setQtyDraft("1");
@@ -105,75 +103,83 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
       className="flex min-h-0 flex-1 flex-col rounded-2xl border"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
-      <div
-        className="flex items-center justify-between px-4 py-3"
-        style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
-      >
-        <div className="text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+        <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
           하위 품목 추가
         </div>
-        <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {availableCount}개 후보
+        <div className="min-w-0 flex-1">
+          <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 px-4 py-3">
-        <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
+      <div className="px-4 py-3">
+        <div className="overflow-x-auto">
+          <div className="flex min-w-full w-max items-center gap-1">
+            <div role="group" aria-label="단계 필터" className="flex shrink-0 gap-1.5">
+              {STAGE_FILTERS.map((f) => {
+                const active = stageFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setStageFilter(f.id)}
+                    aria-pressed={active}
+                    className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
+                    style={{
+                      background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+                      color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                      borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setDeptFilter("")}
-            className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
-            style={{
-              background: deptFilter === "" ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-              color: deptFilter === "" ? LEGACY_COLORS.white : LEGACY_COLORS.text,
-              borderColor: deptFilter === "" ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-            }}
-          >
-            전체
-          </button>
-          {DEPT_LETTERS.map((letter) => {
-            const active = deptFilter === letter;
-            const color = deptColor(letter);
-            return (
+            <div className="shrink-0">
+              <div
+                role="group"
+                aria-label="공정 필터"
+                className="ml-1.5 flex shrink-0 items-center gap-1.5 border-l pl-3"
+                style={{ borderColor: LEGACY_COLORS.border }}
+              >
               <button
-                key={letter}
                 type="button"
-                onClick={() => setDeptFilter(active ? "" : letter)}
-                className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
+                onClick={() => setDeptFilter("")}
+                aria-pressed={deptFilter === ""}
+                className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
                 style={{
-                  background: active ? color : LEGACY_COLORS.s1,
-                  color: active ? LEGACY_COLORS.white : color,
-                  borderColor: active ? color : `color-mix(in srgb, ${color} 35%, transparent)`,
+                  background: deptFilter === "" ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+                  color: deptFilter === "" ? LEGACY_COLORS.white : LEGACY_COLORS.text,
+                  borderColor: deptFilter === "" ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                 }}
               >
-                {DEPT_LETTER_TO_NAME[letter]}
+                전체
               </button>
-            );
-          })}
-        </div>
-
-        <div className="flex gap-1.5">
-          {STAGE_FILTERS.map((f) => {
-            const active = stageFilter === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setStageFilter(f.id)}
-                aria-pressed={active}
-                className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-                  color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                  borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                }}
-              >
-                {f.label}
-              </button>
-            );
-          })}
+              {DEPT_LETTERS.map((letter) => {
+                const active = deptFilter === letter;
+                const color = deptColor(letter);
+                return (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => setDeptFilter(active ? "" : letter)}
+                    aria-pressed={active}
+                    className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
+                    style={{
+                      background: active ? color : LEGACY_COLORS.s1,
+                      color: active ? LEGACY_COLORS.white : color,
+                      borderColor: active ? color : `color-mix(in srgb, ${color} 35%, transparent)`,
+                    }}
+                  >
+                    {DEPT_LETTER_TO_NAME[letter]}
+                  </button>
+                );
+              })}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

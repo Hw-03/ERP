@@ -308,13 +308,6 @@ function DesktopMesShellInner() {
     // tab 만 전환 — step 은 위저드(useIoUrlSync)가 tab=warehouse 와 함께 기록한다.
   }, [canOpenTab, commitDesktopTab]);
 
-  const handleStartPrepareWork = useCallback((intent: IoEntryIntent) => {
-    if (!canOpenWarehouse) return;
-    setWarehousePreselected(null);
-    setWarehouseIntent(intent);
-    commitDesktopTab("warehouse");
-  }, [canOpenWarehouse, commitDesktopTab]);
-
   const content = useMemo(() => {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
     if (activeTab === "dashboard") {
@@ -353,7 +346,6 @@ function DesktopMesShellInner() {
           key={key}
           operator={operator}
           onStatusChange={handleStatusChange}
-          onStartPrepareWork={canOpenWarehouse ? handleStartPrepareWork : undefined}
         />
       );
     }
@@ -388,7 +380,7 @@ function DesktopMesShellInner() {
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, handleStartPrepareWork, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
+  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
 
   return (
     <>

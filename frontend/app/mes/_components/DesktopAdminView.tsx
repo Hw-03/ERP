@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DesktopPinLock } from "./DesktopPinLock";
 import { AdminSectionTabs } from "./_admin_sections/AdminSectionTabs";
 import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
@@ -23,6 +23,7 @@ export function DesktopAdminView({
   onStatusChange: (status: string) => void;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     unlocked,
     adminPin,
@@ -36,6 +37,15 @@ export function DesktopAdminView({
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
   const confirmAdminNavigation = useConfirmNavigation();
+
+  useEffect(() => {
+    if (searchParams.get("section") !== "audit") return;
+
+    selectSection("export");
+    const normalizedParams = new URLSearchParams(searchParams.toString());
+    normalizedParams.set("section", "export");
+    router.replace(`?${normalizedParams.toString()}`, { scroll: false });
+  }, [router, searchParams, selectSection]);
 
   // 트리거 (b) — 사이드바 섹션 변경 가드
   const guardedSelectSection = (next: AdminSection) =>

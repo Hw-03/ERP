@@ -285,6 +285,8 @@ class ShippingRequestResponse(BaseModel):
     invoice_number: Optional[str] = None
     serial_numbers: Optional[str] = None
     prepared_at: Optional[UtcDatetime] = None
+    prepared_by_employee_id: Optional[uuid.UUID] = None
+    prepared_by_name: Optional[str] = None
     picked_up_at: Optional[UtcDatetime] = None
     cancelled_at: Optional[UtcDatetime] = None
     cancelled_by_employee_id: Optional[uuid.UUID] = None

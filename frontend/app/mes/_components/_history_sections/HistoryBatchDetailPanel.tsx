@@ -212,7 +212,7 @@ export function HistoryBatchDetailPanel({
             제외 {excludedLineCount}개
           </div>
         )}
-        <HistoryDetailMemo notes={first.notes} />
+        <HistoryDetailMemo notes={first.notes} transactionType={first.transaction_type} />
 
         <HistoryCancelAction
           panelOpen={panelOpen}
@@ -270,7 +270,7 @@ export function HistoryBatchDetailPanel({
             </div>
           )}
 
-          <HistoryDetailMemo notes={first.notes} />
+          <HistoryDetailMemo notes={first.notes} transactionType={first.transaction_type} />
           <HistoryMobileCancelConfirmation
             controller={controller}
             scope={cancellationActionScope}
@@ -358,7 +358,11 @@ function HistoryBatchHero({
     }
   }
 
-  const reqName = batch?.requester_name ?? getHistoryActor(first);
+  const isShipping = first.transaction_type === "SHIP";
+  const reqName = isShipping
+    ? getHistoryActor(first)
+    : batch?.requester_name ?? getHistoryActor(first);
+  const actorLabel = isShipping ? "담당자" : "요청자";
   const rawApproverName = (batch?.approver_name ?? first.approver_name ?? "").trim();
   const approverName = rawApproverName && rawApproverName !== reqName ? rawApproverName : null;
 
@@ -422,10 +426,10 @@ function HistoryBatchHero({
         </div>
       )}
 
-      {/* 4줄: 메타 — 요청자(시각) / 승인자(시각) */}
+      {/* 4줄: 메타 — 담당자 또는 요청자(시각) / 승인자(시각) */}
       <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
         <span>
-          요청자{" "}
+          {actorLabel}{" "}
           <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
             {reqName}
           </span>

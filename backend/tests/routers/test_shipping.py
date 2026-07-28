@@ -51,11 +51,10 @@ def _employee(
     return employee
 
 
-def _submit_linked_final_pf_production(
+def _submit_final_pf_production(
     client,
     *,
     requester_employee_id: str,
-    request_id: str,
     final_pf_item_id: str,
     quantity: int,
 ) -> dict:
@@ -83,7 +82,6 @@ def _submit_linked_final_pf_production(
             "work_type": "process",
             "sub_type": "produce",
             "to_department": DepartmentEnum.SHIPPING.value,
-            "shipping_request_id": request_id,
             "bundles": preview.json()["bundles"],
         },
     )
@@ -295,10 +293,9 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     checked_line = [line for line in checked.json()["checklist_lines"] if line["item_id"] == checklist_id][0]
     assert checked_line["checked"] is True
 
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         client,
         requester_employee_id=str(component_change_actor.employee_id),
-        request_id=request_id,
         final_pf_item_id=create.json()["final_pf_item_id"],
         quantity=2,
     )
@@ -343,10 +340,8 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
         log["shipping_phase"] == "COMPONENT_CHANGE"
         for log in history_row["transactions"]
     )
-    assert any(
-        log["shipping_phase"] == "PREPARE" and not log["cancelled"]
-        for log in history_row["transactions"]
-    )
+    assert not any(log["shipping_phase"] == "PREPARE" for log in history_row["transactions"])
+    assert any(log["shipping_phase"] == "PICKUP" for log in history_row["transactions"])
     assert any(
         log["shipping_phase"] == "PICKUP" and log["transaction_type"] == "SHIP"
         for log in history_row["transactions"]
@@ -1274,10 +1269,9 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
     request_id = create.json()["request_id"]
     assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
     requester = db_session.query(Employee).filter(Employee.employee_code == "shipping-test-actor").one()
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         client,
         requester_employee_id=str(requester.employee_id),
-        request_id=request_id,
         final_pf_item_id=create.json()["final_pf_item_id"],
         quantity=1,
     )
@@ -1352,6 +1346,135 @@ def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department
         and allocation["status"] == "RESERVED"
         for allocation in body["allocations"]
     )
+
+
+def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
+    client, db_session, make_item, make_bom, make_location
+):
+    af = make_item(name="Prepared actor AF", process_type_code="AF", model_symbol="4", serial_no=21)
+    pa = make_item(name="Prepared actor PA", process_type_code="PA", model_symbol="4", serial_no=22)
+    pf = make_item(name="Prepared actor PF", process_type_code="PF", model_symbol="4", serial_no=23)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    actor = (
+        db_session.query(Employee)
+        .filter(Employee.employee_code == "shipping-test-actor")
+        .one()
+    )
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={
+            "base_pf_item_id": str(pf.item_id),
+            "requested_by_name": "Different requester",
+            "invoice_number": "prepared-actor-001",
+        },
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
+
+    prepared = client.post(
+        f"/api/shipping/requests/{request_id}/prepare-complete",
+        json={"serial_numbers": "SN-ACTOR-001"},
+    )
+    assert prepared.status_code == 200, prepared.text
+    assert prepared.json()["prepared_by_employee_id"] == str(actor.employee_id)
+    assert prepared.json()["prepared_by_name"] == actor.name
+
+    cancelled = client.post(
+        f"/api/shipping/requests/{request_id}/prepare-cancel",
+        json={"reason": "prepare again"},
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["prepared_by_employee_id"] is None
+    assert cancelled.json()["prepared_by_name"] is None
+
+    prepared_again = client.post(
+        f"/api/shipping/requests/{request_id}/prepare-complete",
+        json={"serial_numbers": "SN-ACTOR-002"},
+    )
+    assert prepared_again.status_code == 200, prepared_again.text
+    picked_up = client.post(f"/api/shipping/requests/{request_id}/pickup-complete")
+    assert picked_up.status_code == 200, picked_up.text
+
+    pickup_logs = (
+        db_session.query(TransactionLog)
+        .filter(
+            TransactionLog.shipping_request_id == uuid.UUID(request_id),
+            TransactionLog.shipping_phase == "PICKUP",
+        )
+        .all()
+    )
+    assert pickup_logs
+    assert {log.produced_by for log in pickup_logs} == {actor.name}
+    assert {log.producer_employee_id for log in pickup_logs} == {actor.employee_id}
+
+
+@pytest.mark.parametrize(
+    ("actor_mode", "expected_status"),
+    [("missing", 400), ("inactive", 403)],
+)
+def test_shipping_prepare_complete_rejects_invalid_actor_without_state_changes(
+    client,
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+    actor_mode,
+    expected_status,
+):
+    af = make_item(name=f"Prepare guard {actor_mode} AF", process_type_code="AF", model_symbol="4", serial_no=31)
+    pa = make_item(name=f"Prepare guard {actor_mode} PA", process_type_code="PA", model_symbol="4", serial_no=32)
+    pf = make_item(name=f"Prepare guard {actor_mode} PF", process_type_code="PF", model_symbol="4", serial_no=33)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={
+            "base_pf_item_id": str(pf.item_id),
+            "invoice_number": f"prepare-guard-{actor_mode}",
+        },
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
+
+    if actor_mode == "missing":
+        client.headers.pop("X-MES-Employee-Code", None)
+    else:
+        inactive = _employee(
+            db_session,
+            code="inactive-prepare-actor",
+            name="Inactive prepare actor",
+            is_active=False,
+            department=DepartmentEnum.SHIPPING,
+        )
+        db_session.commit()
+        client.headers["X-MES-Employee-Code"] = inactive.employee_code
+
+    response = client.post(
+        f"/api/shipping/requests/{request_id}/prepare-complete",
+        json={"serial_numbers": "SN-GUARD-001"},
+    )
+    assert response.status_code == expected_status, response.text
+
+    db_session.expire_all()
+    request = (
+        db_session.query(ShippingRequest)
+        .filter(ShippingRequest.request_id == uuid.UUID(request_id))
+        .one()
+    )
+    assert request.status is ShippingRequestStatusEnum.PREPARING
+    assert request.prepared_at is None
+    assert request.prepared_by_employee_id is None
+    assert request.prepared_by_name is None
+    assert request.allocations == []
 
 
 def test_shipping_prepare_complete_requires_nonblank_serial_numbers_without_state_changes(

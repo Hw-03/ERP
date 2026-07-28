@@ -208,7 +208,7 @@ export function HistoryDetailPanel({
 
       <HistoryDetailReason log={selected} />
 
-      <HistoryDetailMemo notes={selected.notes} />
+      <HistoryDetailMemo notes={selected.notes} transactionType={selected.transaction_type} />
 
       {variant !== "desktop" && (
         <HistoryInventoryEffectPanel log={selected} />
@@ -538,8 +538,14 @@ function HistoryDetailReason({ log }: { log: TransactionLog }) {
     </div>
   );
 }
-export function HistoryDetailMemo({ notes }: { notes: string | null | undefined }) {
-  const { userMemo } = parseTransactionNotes(notes);
+export function HistoryDetailMemo({
+  notes,
+  transactionType,
+}: {
+  notes: string | null | undefined;
+  transactionType?: TransactionLog["transaction_type"];
+}) {
+  const { userMemo } = parseTransactionNotes(notes, transactionType);
   if (!userMemo) return null;
   return (
     <div

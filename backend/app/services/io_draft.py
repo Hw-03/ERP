@@ -25,9 +25,9 @@ from app.services.io_preview import (
 from app.services.io_persist import (
     _add_bundles_and_lines,
     _batch_to_payload,
+    ensure_batch_is_mutable,
     _load_requester,
     _persist_batch,
-    _resolve_shipping_prepare_context,
 )
 
 
@@ -83,26 +83,14 @@ def save_draft(db: Session, payload) -> dict:
             raise ValueError("임시저장 작업을 찾을 수 없습니다.")
         if batch.requester_employee_id != requester.employee_id:
             raise PermissionError("본인 임시저장 작업만 수정할 수 있습니다.")
-        requested_shipping_request_id = getattr(payload, "shipping_request_id", None)
-        if batch.shipping_request_id is None and requested_shipping_request_id is not None:
-            raise ValueError("기존 일반 작업을 출하 준비에 연결할 수 없습니다.")
-        if (
-            batch.shipping_request_id is not None
-            and requested_shipping_request_id not in {None, batch.shipping_request_id}
-        ):
-            raise ValueError("다른 출하 요청으로 연결을 변경할 수 없습니다.")
-        _, shipping_reference_no = _resolve_shipping_prepare_context(
-            db,
-            shipping_request_id=batch.shipping_request_id,
-            work_type=payload.work_type,
-        )
+        ensure_batch_is_mutable(batch)
         # 메타 갱신 + 자식 교체. client_request_id 는 보존(submit 멱등성).
         batch.work_type = payload.work_type
         batch.sub_type = payload.sub_type
         batch.from_department = payload.from_department
         batch.to_department = payload.to_department
         batch.requires_approval = payload.sub_type in APPROVAL_SUB_TYPES
-        batch.reference_no = shipping_reference_no or payload.reference_no
+        batch.reference_no = payload.reference_no
         batch.notes = payload.notes
         batch.updated_at = datetime.utcnow()
         # cascade='all, delete-orphan' — 비우고 flush 해서 기존 자식을 INSERT 전에 DELETE.
@@ -155,6 +143,7 @@ def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uui
         raise PermissionError("본인 임시저장 작업만 삭제할 수 있습니다.")
     if batch.status != "draft":
         raise ValueError("임시저장 상태가 아닙니다.")
+    ensure_batch_is_mutable(batch)
     db.delete(batch)
     db.flush()
 

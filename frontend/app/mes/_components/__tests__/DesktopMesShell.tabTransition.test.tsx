@@ -11,6 +11,7 @@ const routerReplace = vi.hoisted(() => vi.fn());
 const queryClientMock = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
 }));
+const shippingViewProps = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientMock,
@@ -79,44 +80,17 @@ vi.mock("../DesktopTopbar", () => ({
 
 vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => <main>dashboard content</main> }));
 vi.mock("../DesktopWarehouseView", () => ({
-  DesktopWarehouseView: ({
-    entryIntent,
-    onSubmitSuccess,
-  }: {
-    entryIntent?: { shippingPrepare?: { shippingRequestId: string } } | null;
-    onSubmitSuccess?: () => void;
-  }) => (
+  DesktopWarehouseView: ({ onSubmitSuccess }: { onSubmitSuccess?: () => void }) => (
     <main>
-      <output data-testid="warehouse-shipping-request">
-        {entryIntent?.shippingPrepare?.shippingRequestId ?? "none"}
-      </output>
       <button type="button" onClick={() => onSubmitSuccess?.()}>warehouse submit</button>
     </main>
   ),
 }));
 vi.mock("../DesktopShippingView", () => ({
-  DesktopShippingView: ({
-    onStartPrepareWork,
-  }: {
-    onStartPrepareWork?: (intent: {
-      workType: "process";
-      direction: "in";
-      shippingPrepare: { shippingRequestId: string; requestLabel: string };
-    }) => void;
-  }) => (
-    <main>
-      <button
-        type="button"
-        onClick={() => onStartPrepareWork?.({
-          workType: "process",
-          direction: "in",
-          shippingPrepare: { shippingRequestId: "request-1", requestLabel: "PF" },
-        })}
-      >
-        start linked work
-      </button>
-    </main>
-  ),
+  DesktopShippingView: (props: Record<string, unknown>) => {
+    shippingViewProps(props);
+    return <main>shipping content</main>;
+  },
 }));
 vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <main>defect content</main> }));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <main>history content</main> }));
@@ -136,6 +110,7 @@ describe("DesktopMesShell tab transition", () => {
     routerPush.mockClear();
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
+    shippingViewProps.mockClear();
     vi.mocked(sendClientEvent).mockClear();
   });
 
@@ -192,28 +167,12 @@ describe("DesktopMesShell tab transition", () => {
     }));
   });
 
-  it("clears a shipping preparation context after warehouse submission", () => {
+  it("does not wire the abolished shipping preparation entry into the shell", () => {
     render(<DesktopMesShell />);
 
     fireEvent.click(screen.getByRole("button", { name: "shipping" }));
-    fireEvent.click(screen.getByRole("button", { name: "start linked work" }));
-    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("request-1");
-
-    fireEvent.click(screen.getByRole("button", { name: "warehouse submit" }));
-
-    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("none");
-  });
-
-  it("clears a shipping preparation context when leaving the warehouse", () => {
-    render(<DesktopMesShell />);
-
-    fireEvent.click(screen.getByRole("button", { name: "shipping" }));
-    fireEvent.click(screen.getByRole("button", { name: "start linked work" }));
-    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("request-1");
-
-    fireEvent.click(screen.getByRole("button", { name: "history" }));
-    fireEvent.click(screen.getByRole("button", { name: "warehouse" }));
-
-    expect(screen.getByTestId("warehouse-shipping-request")).toHaveTextContent("none");
+    expect(shippingViewProps).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ onStartPrepareWork: expect.any(Function) }),
+    );
   });
 });

@@ -134,7 +134,7 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
-  it("keeps the linked shipping request visible while composing a process task", async () => {
+  it("ignores a legacy linked shipping request intent", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -161,8 +161,8 @@ describe("IoComposeView navigation chrome", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByTestId("io-shipping-prepare-context")).toHaveTextContent("Standard PF");
-    expect(screen.getByTestId("io-shipping-prepare-context")).toHaveTextContent("생산 등록·재작업");
+    expect(screen.queryByTestId("io-shipping-prepare-context")).not.toBeInTheDocument();
+    expect(screen.queryByText("출하 준비 연결")).not.toBeInTheDocument();
   });
 
   it("waits to publish draft status until the success notice reaches the status target", async () => {

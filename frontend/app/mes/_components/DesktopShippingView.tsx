@@ -41,7 +41,6 @@ import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
-import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { matchesSearchText } from "@/lib/searchText";
 
 type SectionTab = "request" | "history";
@@ -262,10 +261,9 @@ function companionPayload(lines: CompanionDraftLine[], itemById: Map<string, Ite
     }));
 }
 
-export function DesktopShippingView({ onStatusChange, operator = null, onStartPrepareWork }: {
+export function DesktopShippingView({ onStatusChange, operator = null }: {
   onStatusChange: (status: string) => void;
   operator?: Operator | null;
-  onStartPrepareWork?: (intent: IoEntryIntent) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1268,7 +1266,6 @@ export function DesktopShippingView({ onStatusChange, operator = null, onStartPr
             onCancel={(req) => void cancelPrepare(req)}
             onPickup={(req) => void completePickup(req)}
             onInvoiceSaved={handleInvoiceSaved}
-            onStartPrepareWork={onStartPrepareWork}
           />
         </div>
       );
@@ -2412,7 +2409,6 @@ function PrepSection({
   onCancel,
   onPickup,
   onInvoiceSaved,
-  onStartPrepareWork,
 }: {
   showList?: boolean;
   requests: ShippingRequest[];
@@ -2423,7 +2419,6 @@ function PrepSection({
   onCancel: (req: ShippingRequest) => void;
   onPickup: (req: ShippingRequest) => void;
   onInvoiceSaved: (request: ShippingRequest) => void;
-  onStartPrepareWork?: (intent: IoEntryIntent) => void;
 }) {
   const requestQty = selected?.request_quantity ?? 1;
   const paLines = selected?.bom_lines.filter((line) => line.included && line.parent_stage === "PA") ?? [];
@@ -2480,23 +2475,6 @@ function PrepSection({
             </div>
 
             <div data-testid="shipping-prep-actions" className="flex shrink-0 flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              {selected.status === "PREPARING" && onStartPrepareWork && (
-                <ActionButton
-                  icon={PackageCheck}
-                  label="준비 작업 시작"
-                  tone={LEGACY_COLORS.blue}
-                  onClick={() => onStartPrepareWork({
-                    workType: "process",
-                    direction: "in",
-                    shippingPrepare: {
-                      shippingRequestId: selected.request_id,
-                      requestLabel: selected.final_pf_item_name ?? selected.base_pf_item_name,
-                    },
-                  })}
-                  disabled={pending !== null}
-                  dataTestId="shipping-start-prepare-work"
-                />
-              )}
               {selected.status === "PREPARING" && (
                 <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onOpenPrepare(selected)} disabled={pending !== null || !selected.invoice_number?.trim()} />
               )}

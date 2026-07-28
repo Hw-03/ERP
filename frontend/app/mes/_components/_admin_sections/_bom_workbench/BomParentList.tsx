@@ -98,8 +98,11 @@ export function BomParentList({
     >
       {/* 검색 */}
       <div className="flex flex-col gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+        <div className="text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
+          상위 품목 선택
+        </div>
         <BomSearchInput value={search} onChange={setSearch} />
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-nowrap items-center gap-1.5">
           {filters.map((f) => {
             const active = stageFilter === f.id;
             return (
@@ -108,7 +111,7 @@ export function BomParentList({
                 type="button"
                 onClick={() => setStageFilter(f.id)}
                 aria-pressed={active}
-                className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
+                className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
                 style={{
                   background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
                   color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted,

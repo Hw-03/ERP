@@ -140,7 +140,7 @@ def _add_linked_prepare_log(
     return log
 
 
-def _submit_linked_final_pf_production(
+def _submit_final_pf_production(
     db_session,
     *,
     request,
@@ -170,7 +170,6 @@ def _submit_linked_final_pf_production(
             work_type="process",
             sub_type="produce",
             to_department=DepartmentEnum.SHIPPING.value,
-            shipping_request_id=request.request_id,
             bundles=preview["bundles"],
         ),
     )
@@ -581,7 +580,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     assert any(log.item_id == final_pa.item_id and log.quantity_change == 1 for log in component_logs)
     assert any(log.item_id == cable.item_id and log.quantity_change == -1 for log in component_logs)
 
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         db_session,
         request=req,
         actor=_shipping_actor(db_session),
@@ -601,12 +600,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         .filter(TransactionLog.shipping_phase == "PREPARE")
         .all()
     )
-    assert {log.transaction_type for log in prepare_logs} == {
-        TransactionTypeEnum.BACKFLUSH,
-        TransactionTypeEnum.PRODUCE,
-    }
-    assert {log.item_id for log in prepare_logs} == {final_pa.item_id, final_pf.item_id}
-    assert all(_effect_scopes(log) <= {"location"} for log in prepare_logs)
+    assert prepare_logs == []
 
     shipping_svc.pickup_complete(db_session, req.request_id)
 
@@ -623,6 +617,8 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         TransactionTypeEnum.SHIP,
         TransactionTypeEnum.SHIP,
     ]
+    assert {log.produced_by for log in pickup_logs} == {"shipping-user"}
+    assert all(log.producer_employee_id is None for log in pickup_logs)
 
 
 
@@ -800,7 +796,7 @@ def test_same_bom_is_resolved_on_request_and_companion_lines_do_not_create_trans
     assert db_session.query(TransactionLog).filter(TransactionLog.item_id == carton.item_id).count() == 0
 
     shipping_svc.send_to_prep(db_session, req.request_id)
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         db_session,
         request=req,
         actor=_shipping_actor(db_session),
@@ -838,7 +834,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
         },
     )
     shipping_svc.send_to_prep(db_session, req.request_id)
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         db_session,
         request=req,
         actor=_shipping_actor(db_session),
@@ -861,10 +857,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
         .filter(TransactionLog.shipping_phase == "PREPARE")
         .all()
     )
-    assert any(log.item_id == pa.item_id and log.quantity_change == -3 for log in prepare_logs)
-    assert any(log.item_id == pf.item_id and log.quantity_change == 3 for log in prepare_logs)
-    assert any(log.item_id == pouch.item_id and log.quantity_change == -3 for log in prepare_logs)
-    assert all(log.item_id != carton.item_id for log in prepare_logs)
+    assert prepare_logs == []
 
     shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
     assert req.status.value == "PREPARING"
@@ -944,7 +937,7 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
     make_location(req.final_pa_item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
 
     shipping_svc.send_to_prep(db_session, req.request_id)
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         db_session,
         request=req,
         actor=_shipping_actor(db_session),
@@ -997,7 +990,7 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
     assert req.final_pf_item.item_name == "Bracket PF"
 
     shipping_svc.send_to_prep(db_session, req.request_id)
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         db_session,
         request=req,
         actor=_shipping_actor(db_session),

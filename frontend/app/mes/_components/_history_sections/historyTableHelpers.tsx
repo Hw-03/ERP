@@ -22,6 +22,7 @@ import {
   getDisplayBundles,
   getHistoryDisplayTransactionType,
   getHistoryMovementSummary,
+  isShippingCompanionNote,
   parseTransactionNotes,
   type MovementSummary,
   type MovementTone,
@@ -561,8 +562,14 @@ function ActorCell({ name }: { name: string }) {
 
 /** 목록 메모 셀 — 사용자가 직접 입력한 메모만 알약으로 표시(시스템 자동 생성 노트는 제외).
  *  호버(title)로 사용자 메모 전문 노출. 사용자 메모 없으면 "-". */
-export function MemoCell({ notes }: { notes?: string | null }) {
-  const { userMemo } = parseTransactionNotes(notes);
+export function MemoCell({
+  notes,
+  transactionType,
+}: {
+  notes?: string | null;
+  transactionType?: TransactionLog["transaction_type"];
+}) {
+  const { userMemo } = parseTransactionNotes(notes, transactionType);
   if (!userMemo) {
     return <span className="block min-h-4" aria-label="메모 없음" />;
   }
@@ -1042,7 +1049,7 @@ function getReferenceBatchLineOrder(
   kind: ReturnType<typeof getReferenceBatchPresentation>["kind"],
 ): number {
   if (kind !== "shipment") return 0;
-  if (log.shipping_phase === "PICKUP") return log.transaction_type === "SHIP" && !/^출하\s+동반\s+품목/.test(log.notes?.trim() ?? "") ? 0 : 1;
+  if (log.shipping_phase === "PICKUP") return log.transaction_type === "SHIP" && !isShippingCompanionNote(log.notes) ? 0 : 1;
   if (log.shipping_phase === "PREPARE") return log.transaction_type === "PRODUCE" ? 0 : log.transaction_type === "BACKFLUSH" ? 1 : 2;
   if (log.shipping_phase === "COMPONENT_CHANGE") return getComponentChangeLineOrder(log);
   const line = getReferenceBatchLinePresentation(log, kind);

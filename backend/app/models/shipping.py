@@ -65,6 +65,12 @@ class ShippingRequest(Base):
     invoice_number = Column(String(100), nullable=True)
     serial_numbers = Column(Text, nullable=True)
     prepared_at = Column(DateTime, nullable=True, index=True)
+    prepared_by_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    prepared_by_name = Column(String(100), nullable=True)
     picked_up_at = Column(DateTime, nullable=True, index=True)
     cancelled_at = Column(DateTime, nullable=True, index=True)
     cancelled_by_employee_id = Column(

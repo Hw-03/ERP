@@ -3455,18 +3455,6 @@
             "title": "Requester Employee Id",
             "type": "string"
           },
-          "shipping_request_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shipping Request Id"
-          },
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
@@ -3818,18 +3806,6 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
-          },
-          "shipping_request_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shipping Request Id"
           },
           "sub_type": {
             "title": "Sub Type",
@@ -7243,6 +7219,29 @@
               }
             ],
             "title": "Prepared At"
+          },
+          "prepared_by_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prepared By Employee Id"
+          },
+          "prepared_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prepared By Name"
           },
           "request_id": {
             "format": "uuid",

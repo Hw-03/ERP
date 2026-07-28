@@ -19,7 +19,7 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services.dept_hierarchy import can_approve_department
-from app.services.io_persist import sync_batch_from_stock_request
+from app.services.io_persist import ensure_stock_request_batch_is_mutable, sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
 from app.services.sr_execution import _execute_all_lines, release_reservation
 from app.services.sr_validation import line_requires_pending
@@ -55,6 +55,7 @@ def approve_request(
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, approver)
+    ensure_stock_request_batch_is_mutable(db, request)
 
     # 이미 완료된 경우 멱등 반환 (중복 승인 클릭 / 동시 승인 2번째 요청)
     if request.status == StockRequestStatusEnum.COMPLETED:
@@ -133,6 +134,7 @@ def approve_request_department(
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, approver)
+    ensure_stock_request_batch_is_mutable(db, request)
 
     if request.status == StockRequestStatusEnum.COMPLETED:
         return request
@@ -242,6 +244,7 @@ def reject_request(
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, approver)
+    ensure_stock_request_batch_is_mutable(db, request)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
     # 이미 반려된 경우 멱등 반환
@@ -287,6 +290,7 @@ def reject_request_department(
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, approver)
+    ensure_stock_request_batch_is_mutable(db, request)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
 
@@ -329,6 +333,7 @@ def cancel_request(
     if not verify_pin(requester.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, requester)
+    ensure_stock_request_batch_is_mutable(db, request)
     # 이미 취소된 경우 멱등 반환
     if request.status == StockRequestStatusEnum.CANCELLED:
         return request
@@ -372,6 +377,9 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
         .filter(StockRequest.status.in_(open_statuses))
         .all()
     )
+    for req in open_requests:
+        ensure_stock_request_batch_is_mutable(db, req)
+
     now = datetime.utcnow()
     for req in open_requests:
         _release_pending_best_effort(db, req)

@@ -211,27 +211,35 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
 // 라벨 맵
 // ──────────────────────────────────────────────────────────────────
 
+export function isShippingCompanionNote(notes: string | null | undefined): boolean {
+  return /^(?:동반\s+출하|출하\s+동반\s+품목)\s*:/.test(notes?.trim() ?? "");
+}
+
 /**
  * TransactionLog.notes 파싱 — 시스템 자동 생성 메타와 사용자가 직접 입력한 메모를 분리.
  *
- * 백엔드가 자동으로 채우는 패턴(7 종):
+ * 백엔드가 자동으로 채우는 패턴(8 종):
  *   1·2. "요청 (승인|즉시) 처리: {code} / {from} → {to} / {qty}개 / 요청자 {name}" (stock_requests.py)
  *      3. 위 1·2 끝에 " / 비고: {사용자 입력}" 가 덧붙는 경우 — 비고만이 사용자 메모
  *      4. "[dept_adj:{sub}] {op}: {reason}" (dept_adjustment.py) — reason 이 사용자 입력
  *      5. "[defect_disassemble(:keep|:scrap)?] {note}" (dept_adjustment.py) — note 가 사용자 입력
  *      6. "[격리] {src} → {tgt}" / "[정상복귀] {dept}" (defects.py) — 사용자 입력 없음
  *      7. "[rework:{kind}]" (재작업 자동 생성) — 사용자 입력 없음
+ *      8. "동반 출하: {품목명}" / "출하 동반 품목: {품목명}" — 사용자 입력 없음
  *
- * 위 7 종 외엔 입출고 2.0 wizard 에서 사용자가 직접 입력한 비고(batch.notes 그대로) → 전체가 사용자 메모.
+ * 위 8 종 외엔 입출고 2.0 wizard 에서 사용자가 직접 입력한 비고(batch.notes 그대로) → 전체가 사용자 메모.
  *
  * 반환: `userMemo` (null 이면 사용자 메모 없음 — UI 에서 메모 카드/알약 미노출).
  */
-export function parseTransactionNotes(notes: string | null | undefined): {
+export function parseTransactionNotes(
+  notes: string | null | undefined,
+  transactionType?: TransactionType,
+): {
   userMemo: string | null;
 } {
   const text = notes?.trim();
   if (!text) return { userMemo: null };
-  if (isGeneratedHistorySystemNote(text)) return { userMemo: null };
+  if (isGeneratedHistorySystemNote(text, transactionType)) return { userMemo: null };
 
   // 1·2·3: 요청 (승인|즉시) 처리 — "/ 비고: ..." 가 있으면 그 부분만 사용자 메모.
   if (/^요청 (?:승인|즉시) 처리:/.test(text)) {
@@ -274,9 +282,10 @@ export function parseTransactionNotes(notes: string | null | undefined): {
   return { userMemo: text };
 }
 
-function isGeneratedHistorySystemNote(text: string): boolean {
+function isGeneratedHistorySystemNote(text: string, transactionType?: TransactionType): boolean {
   if (text.startsWith("??") || text.includes("\uFFFD")) return true;
   if (/^\[rework:[^\]]+\]/.test(text)) return true;
+  if (transactionType === "SHIP" && isShippingCompanionNote(text)) return true;
 
   const systemFragments = [
     "품목 전환 소스",
@@ -285,7 +294,6 @@ function isGeneratedHistorySystemNote(text: string): boolean {
     "품목 전환 회수 입고",
     "출하 준비",
     "출하 픽업",
-    "출하 동반",
     "final PF",
   ];
   return systemFragments.some((fragment) => text.includes(fragment));
@@ -455,14 +463,21 @@ export function getHistoryFlowLabel(
   }
 }
 
-/** 표시자: requester_name 우선, 없으면 produced_by 의 괄호 부분 제거. */
-export function getHistoryActor(log: { requester_name?: string | null; produced_by?: string | null }): string {
-  if (log.requester_name) return log.requester_name;
-  if (log.produced_by) {
-    const stripped = log.produced_by.split("(")[0]?.trim();
-    return stripped && stripped.length > 0 ? stripped : log.produced_by;
+/** 표시자: 출하는 실제 준비 완료자, 그 외 작업은 요청자를 우선한다. */
+export function getHistoryActor(log: {
+  transaction_type?: string | null;
+  requester_name?: string | null;
+  produced_by?: string | null;
+}): string {
+  const candidates = log.transaction_type === "SHIP"
+    ? [log.produced_by, log.requester_name]
+    : [log.requester_name, log.produced_by];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const stripped = candidate.split("(")[0]?.trim();
+    return stripped && stripped.length > 0 ? stripped : candidate;
   }
-  return "-";
+  return log.transaction_type === "SHIP" ? "담당자 미기록" : "-";
 }
 
 // ──────────────────────────────────────────────────────────────────

@@ -50,6 +50,7 @@ export type HistoryDetailSummary = {
     target: HistoryConversionEndpoint;
   } | null;
   requester: {
+    label: "요청자" | "담당자";
     name: string;
     at: string;
   };
@@ -284,7 +285,10 @@ export function buildHistoryDetailSummary(
     impactGroups: buildImpactGroups(logs, batch),
     conversion: getItemConversion(logs),
     requester: {
-      name: batch?.requester_name?.trim() || presentation.people.requester,
+      label: primary.transaction_type === "SHIP" ? "담당자" : "요청자",
+      name: primary.transaction_type === "SHIP"
+        ? presentation.people.requester
+        : batch?.requester_name?.trim() || presentation.people.requester,
       at: batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
     },
     flow: reworkFlow ?? (presentation.flow.label

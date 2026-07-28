@@ -40,7 +40,7 @@ function downloadBlob(blob: Blob, fileName: string): void {
   }
 }
 
-export function AdminAuditCsvSection() {
+export function AdminAuditCsvSection({ embedded = false }: { embedded?: boolean }) {
   const { data: files = [], isLoading: loading, error: qError, refetch: refetchFiles } = useAuditCsvListQuery();
   const backfillMutation = useTriggerAuditBackfillMutation();
   const busy = backfillMutation.isPending;
@@ -120,10 +120,10 @@ export function AdminAuditCsvSection() {
 
   return (
     <div className="flex min-h-0 flex-col">
-      <AdminPageHeader
+      {!embedded && <AdminPageHeader
         icon={FileArchive}
         title="입출고 로그"
-      />
+      />}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
         <div

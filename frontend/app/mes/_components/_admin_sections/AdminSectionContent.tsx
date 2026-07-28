@@ -11,7 +11,6 @@ import { AdminEmployeesProvider } from "./AdminEmployeesContext";
 import { AdminModelsProvider } from "./AdminModelsContext";
 import { AdminModelsSection } from "./AdminModelsSection";
 import { AdminExportSection } from "./AdminExportSection";
-import { AdminAuditCsvSection } from "./AdminAuditCsvSection";
 import { AdminDangerZone } from "./AdminDangerZone";
 import { AdminDepartmentsProvider } from "./AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
@@ -147,9 +146,6 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         transactionsExportUrl={api.getTransactionsExportUrl()}
       />
     );
-  }
-  if (section === "audit") {
-    return <AdminAuditCsvSection />;
   }
   if (section === "settings") {
     return (

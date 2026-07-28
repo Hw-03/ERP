@@ -58,7 +58,7 @@ def _active_shipping_actor(db_session) -> Employee:
     return actor
 
 
-def _submit_linked_final_pf_production(
+def _submit_final_pf_production(
     db_session,
     *,
     request: ShippingRequest,
@@ -86,7 +86,6 @@ def _submit_linked_final_pf_production(
             work_type="process",
             sub_type="produce",
             to_department=DepartmentEnum.SHIPPING.value,
-            shipping_request_id=request.request_id,
             bundles=preview["bundles"],
         ),
     )
@@ -384,7 +383,7 @@ def _make_prepared_request(
         },
     )
     shipping_actions_svc.send_to_prep(db_session, request.request_id)
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         db_session,
         request=request,
         actor=_active_shipping_actor(db_session),
@@ -663,7 +662,7 @@ def test_pickup_complete_restores_inventory_logs_allocation_and_status_when_even
     with Session(bind=db_session.get_bind()) as verify_db:
         before = _prepared_request_state(verify_db, request_id, item_ids)
     assert before["request"][0] == ShippingRequestStatusEnum.PREPARED
-    assert {row[2] for row in before["logs"]} == {"PREPARE"}
+    assert not before["logs"]
     assert {row[2] for row in before["allocations"]} == {"RESERVED"}
 
     boundaries = _count_session_boundaries(db_session, monkeypatch)
@@ -929,7 +928,7 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
     shipping_svc.send_to_prep(db_session, request.request_id)
     db_session.commit()
 
-    _submit_linked_final_pf_production(
+    _submit_final_pf_production(
         db_session,
         request=request,
         actor=actor,
@@ -952,12 +951,9 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
     assert _location_qty(db_session, final_pf.item_id, DepartmentEnum.SHIPPING) == Decimal("1")
     assert (
         db_session.query(TransactionLog)
-        .filter(
-            TransactionLog.shipping_request_id == request.request_id,
-            TransactionLog.shipping_phase == "PREPARE",
-        )
+        .filter(TransactionLog.shipping_request_id == request.request_id)
         .count()
-        == 2
+        == 0
     )
     refreshed = (
         db_session.query(ShippingRequest)
@@ -966,3 +962,5 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
     )
     assert refreshed.status == ShippingRequestStatusEnum.PREPARING
     assert refreshed.prepared_at is None
+    assert refreshed.prepared_by_employee_id is None
+    assert refreshed.prepared_by_name is None

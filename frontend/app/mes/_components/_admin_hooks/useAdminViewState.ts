@@ -19,7 +19,6 @@ export type AdminSection =
   | "models"
   | "bom"
   | "export"
-  | "audit"
   | "settings"
   | "departments";
 

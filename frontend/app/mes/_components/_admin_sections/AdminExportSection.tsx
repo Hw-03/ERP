@@ -14,6 +14,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common";
 import { FilterChip } from "../common/FilterChip";
 import { AdminPageHeader } from "./_admin_primitives";
+import { AdminAuditCsvSection } from "./AdminAuditCsvSection";
 
 type Props = {
   itemsExportUrl: string;
@@ -653,6 +654,22 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
           • CSV: 클라이언트에서 데이터를 받아 CSV로 변환합니다. (UTF-8 BOM 포함)<br />
           • 최근 기록은 현재 세션에서만 유지되며, 새로고침 시 초기화됩니다.
         </div>
+
+        <section
+          aria-labelledby="external-submission-logs-title"
+          className="flex flex-col gap-4 border-t pt-4"
+          style={{ borderColor: LEGACY_COLORS.border }}
+        >
+          <div>
+            <h3 id="external-submission-logs-title" className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
+              외부 제출용 로그
+            </h3>
+            <p className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              외부 심사용 F704-02 대장과 시스템 원본 로그를 관리합니다.
+            </p>
+          </div>
+          <AdminAuditCsvSection embedded />
+        </section>
       </div>
     </div>
   );

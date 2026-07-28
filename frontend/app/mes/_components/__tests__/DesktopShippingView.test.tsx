@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render as rtlRender, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactElement, ReactNode } from "react";
+import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingHistoryMonth, ShippingRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -620,26 +620,21 @@ describe("DesktopShippingView", () => {
     expect(container.querySelector('[data-shipping-hub-card="prep"]')).not.toBeInTheDocument();
   });
 
-  it("starts a linked IO task from a preparing shipping request", async () => {
+  it("does not expose the abolished linked IO action on a preparing shipping request", async () => {
     navigationMock.search = "tab=shipping&shippingView=prepWork&shippingRequestId=req-1";
     const onStartPrepareWork = vi.fn();
+    const legacyProps = {
+      onStatusChange: () => {},
+      onStartPrepareWork,
+    } as ComponentProps<typeof DesktopShippingView>;
     render(
-      <DesktopShippingView
-        onStatusChange={() => {}}
-        onStartPrepareWork={onStartPrepareWork}
-      />,
+      <DesktopShippingView {...legacyProps} />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "준비 작업 시작" }));
-
-    expect(onStartPrepareWork).toHaveBeenCalledWith(expect.objectContaining({
-      workType: "process",
-      direction: "in",
-      shippingPrepare: expect.objectContaining({
-        shippingRequestId: "req-1",
-        requestLabel: "Standard PF",
-      }),
-    }));
+    const detail = await screen.findByTestId("shipping-prep-detail");
+    await waitFor(() => expect(detail).toHaveTextContent("Standard PF"));
+    expect(screen.queryByRole("button", { name: "준비 작업 시작" })).not.toBeInTheDocument();
+    expect(onStartPrepareWork).not.toHaveBeenCalled();
   });
 
   it("shows stock shortages in prep detail without hiding prep actions", async () => {

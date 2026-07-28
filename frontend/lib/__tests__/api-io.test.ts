@@ -73,7 +73,6 @@ describe("ioApi.submit", () => {
       requester_employee_id: "e-1",
       work_type: "receive",
       sub_type: "receive_supplier",
-      shipping_request_id: "shipping-1",
       bundles: [],
     });
 
@@ -82,7 +81,7 @@ describe("ioApi.submit", () => {
     expect((init as RequestInit).method).toBe("POST");
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.requester_employee_id).toBe("e-1");
-    expect(body.shipping_request_id).toBe("shipping-1");
+    expect(body).not.toHaveProperty("shipping_request_id");
   });
 
   it("throws on 503 service unavailable", async () => {

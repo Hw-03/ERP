@@ -21,7 +21,6 @@ test.describe("관리자 상단 탭", () => {
       "부서 관리",
       "BOM 관리",
       "내보내기",
-      "외부 제출용 로그",
       "보안",
     ]) {
       const tab = navigation.getByRole("button", { name: label, exact: true });

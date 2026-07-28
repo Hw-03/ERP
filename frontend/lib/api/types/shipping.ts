@@ -229,6 +229,8 @@ export interface ShippingRequest {
   invoice_number?: string | null;
   serial_numbers: string | null;
   prepared_at: string | null;
+  prepared_by_employee_id?: string | null;
+  prepared_by_name?: string | null;
   picked_up_at: string | null;
   cancelled_at?: string | null;
   cancelled_by_employee_id?: string | null;

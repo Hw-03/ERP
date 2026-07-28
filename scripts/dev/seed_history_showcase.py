@@ -328,8 +328,6 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
     batch, bundle = _new_batch(db, plan, marker, "shipping_prepare_produce", final_pf)
     batch.work_type = "process"
     batch.sub_type = "produce"
-    batch.shipping_request_id = request.request_id
-    batch.reference_no = f"SHIP-PREP-{request.request_id.hex[:8]}"
     line = IoLine(
         bundle_id=bundle.bundle_id,
         item_id=final_pf.item_id,
@@ -353,6 +351,8 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
         db,
         request.request_id,
         f"DEMO-SN-{request.request_id.hex[:8].upper()}",
+        prepared_by_employee_id=plan.actor.employee_id,
+        prepared_by_name=plan.actor.name,
     )
     shipping_svc.pickup_complete(db, request.request_id)
     logs = db.query(TransactionLog).filter(TransactionLog.shipping_request_id == request.request_id).all()

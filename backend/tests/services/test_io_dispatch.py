@@ -786,10 +786,10 @@ def test_execute_batch_after_dept_approval_applies_inventory(
     assert log.produced_by == approver.name
 
 
-def test_shipping_linked_department_approval_rechecks_request_is_preparing(
+def test_shipping_linked_department_approval_is_read_only(
     make_item, make_location, db_session
 ):
-    """결재 대기 중 출하가 완료되면 승인 시 재고를 다시 반영하지 않는다."""
+    """과거 출하 연결 결재는 상태와 무관하게 재고를 다시 반영하지 않는다."""
     pf_item = make_item(name="출하 연결 결재 PF", process_type_code="PF")
     make_location(pf_item.item_id, department=ASSEMBLY, quantity=D("0"))
     requester = _make_employee(db_session, department_role="none")
@@ -840,7 +840,7 @@ def test_shipping_linked_department_approval_rechecks_request_is_preparing(
     db_session.add(request)
     db_session.flush()
 
-    with pytest.raises(ValueError, match="준비 중"):
+    with pytest.raises(ValueError, match="조회만"):
         svc.execute_batch_after_dept_approval(
             db_session,
             request=request,

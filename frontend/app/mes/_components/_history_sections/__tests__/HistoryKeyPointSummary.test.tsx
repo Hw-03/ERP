@@ -30,7 +30,7 @@ function summary(overrides: Partial<HistoryDetailSummary> = {}): HistoryDetailSu
     status: { label: "완료", tone: "success", reason: null },
     impactGroups: [{ key: "actual", label: null, effects: [effect()] }],
     conversion: null,
-    requester: { name: "요청자 A", at: "2026-07-10T01:00:00Z" },
+    requester: { label: "요청자", name: "요청자 A", at: "2026-07-10T01:00:00Z" },
     flow: null,
     composition: null,
     impactIdentity: "log-1",
@@ -60,6 +60,24 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.getByText("+1 EA")).toBeInTheDocument();
     expect(screen.getByText("완제품 A")).toBeInTheDocument();
     expect(screen.queryByText(/처리 전|처리 후|창고 401/)).not.toBeInTheDocument();
+  });
+
+  it("renders 담당자 for shipment history metadata", () => {
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          requester: {
+            label: "담당자",
+            name: "준비 완료자 B",
+            at: "2026-07-10T01:00:00Z",
+          } as HistoryDetailSummary["requester"],
+        })}
+      />,
+    );
+
+    expect(screen.getByText("담당자")).toBeInTheDocument();
+    expect(screen.getByText("준비 완료자 B")).toBeInTheDocument();
+    expect(screen.queryByText("요청자")).not.toBeInTheDocument();
   });
 
   it("groups production output and components without merging their rows", () => {

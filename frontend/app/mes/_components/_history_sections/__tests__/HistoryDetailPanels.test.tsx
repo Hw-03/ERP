@@ -313,6 +313,39 @@ describe("desktop history detail panels", () => {
     expect(screen.queryByText("[rework:scrap_child]")).not.toBeInTheDocument();
   });
 
+  it("shows the shipping prepare completer as the batch detail actor", () => {
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    const shippingLog = makeLog({
+      transaction_type: "SHIP",
+      operation_batch_id: "batch-1",
+      produced_by: "준비 완료자 B",
+      requester_name: "요청자 A",
+    });
+    const batch = makeBatch({ requester_name: "요청자 A" });
+
+    render(
+      <HistoryBatchDetailPanel
+        panelOpen
+        batchId={batch.batch_id}
+        logs={[shippingLog]}
+        batchCache={new Map([[batch.batch_id, batch]])}
+        setBatchCache={() => {}}
+        onBatchCancelled={() => {}}
+        variant="mobile"
+      />,
+    );
+
+    const actorName = screen.getByText("준비 완료자 B");
+    expect(actorName.parentElement).toHaveTextContent(/^담당자/);
+    expect(screen.queryByText("요청자 A")).not.toBeInTheDocument();
+  });
+
+  it("keeps a companion-like user memo on a non-shipping transaction", () => {
+    render(<HistoryDetailMemo notes="동반 출하: 현장 전달 사항" transactionType="RECEIVE" />);
+
+    expect(screen.getByText("동반 출하: 현장 전달 사항")).toBeInTheDocument();
+  });
+
   it("uses one key-point summary for a single log and puts cancel at the bottom", () => {
     render(
       <HistoryDetailPanel

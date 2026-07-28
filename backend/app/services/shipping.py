@@ -1436,6 +1436,9 @@ def prepare_complete(
     db: Session,
     request_id: uuid.UUID,
     serial_numbers: str,
+    *,
+    prepared_by_employee_id: uuid.UUID | None = None,
+    prepared_by_name: str | None = None,
 ) -> ShippingRequest:
     normalized_serial_numbers = serial_numbers.strip()
     if not normalized_serial_numbers:
@@ -1453,6 +1456,8 @@ def prepare_complete(
     req.serial_numbers = normalized_serial_numbers
     req.status = ShippingRequestStatusEnum.PREPARED
     req.prepared_at = datetime.utcnow()
+    req.prepared_by_employee_id = prepared_by_employee_id
+    req.prepared_by_name = prepared_by_name
     req.updated_at = datetime.utcnow()
     _record_event(db, req, "PREPARED", "출하 준비 완료")
     db.flush()
@@ -1485,6 +1490,8 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
     _release_pickup_allocations(db, req, reason)
     req.status = ShippingRequestStatusEnum.PREPARING
     req.prepared_at = None
+    req.prepared_by_employee_id = None
+    req.prepared_by_name = None
     req.updated_at = datetime.utcnow()
     _record_event(db, req, "PREPARE_CANCELLED", reason or "출하 준비 취소")
     db.flush()
@@ -1501,7 +1508,8 @@ def _ship_from_item_location(db: Session, req: ShippingRequest, item: Item, qty:
         quantity_change=-qty,
         quantity_before=int(qty_before),
         reference_no=reference_no,
-        produced_by=req.requested_by_name,
+        produced_by=req.prepared_by_name or req.requested_by_name,
+        producer_employee_id=req.prepared_by_employee_id,
         notes=notes,
         before_cells=before,
         request_id=req.request_id,
