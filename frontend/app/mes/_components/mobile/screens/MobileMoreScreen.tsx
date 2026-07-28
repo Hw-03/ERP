@@ -1,11 +1,11 @@
 "use client";
 
-import { BarChart2, ClipboardCheck, MapPinned, PackageCheck, type LucideIcon } from "lucide-react";
+import { BarChart2, ClipboardCheck, ClipboardList, MapPinned, PackageCheck, type LucideIcon } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { Operator } from "../../login/useCurrentOperator";
 import { NotificationBell } from "../../notifications/NotificationBell";
 
-export type MobileMoreEntryId = "assemblyChecklist" | "weekly" | "shipping" | "warehouseMap";
+export type MobileMoreEntryId = "assemblyChecklist" | "dailyReport" | "weekly" | "shipping" | "warehouseMap";
 
 const MORE_ENTRIES: Record<
   MobileMoreEntryId,
@@ -20,6 +20,12 @@ const MORE_ENTRIES: Record<
     icon: ClipboardCheck,
     label: "체크리스트",
     description: "제품별 조립 확인 목록",
+    accent: LEGACY_COLORS.blue,
+  },
+  dailyReport: {
+    icon: ClipboardList,
+    label: "일일 작업 일지",
+    description: "오늘 작업과 거래 활동 확인",
     accent: LEGACY_COLORS.blue,
   },
   weekly: {
@@ -47,16 +53,18 @@ export function MobileMoreScreen({
   onProfile,
   onNotificationNavigate,
   onChecklist,
+  onDailyReport,
   onWeekly,
   onShipping,
   onWarehouseMap,
-  visibleEntries = ["assemblyChecklist", "shipping", "weekly", "warehouseMap"],
+  visibleEntries = ["assemblyChecklist", "dailyReport", "shipping", "weekly", "warehouseMap"],
 }: {
   operator: Operator | null;
   unreadCount?: number;
   onProfile: () => void;
   onNotificationNavigate: (tab: string, section: string | null) => void;
   onChecklist: () => void;
+  onDailyReport: () => void;
   onWeekly: () => void;
   onShipping: () => void;
   onWarehouseMap: () => void;
@@ -64,6 +72,7 @@ export function MobileMoreScreen({
 }) {
   const handlers: Record<MobileMoreEntryId, () => void> = {
     assemblyChecklist: onChecklist,
+    dailyReport: onDailyReport,
     weekly: onWeekly,
     shipping: onShipping,
     warehouseMap: onWarehouseMap,
@@ -101,7 +110,7 @@ export function MobileMoreScreen({
       {entries.length > 0 && (
         <div
           data-testid="mobile-more-menu-list"
-          className={`overflow-hidden rounded-[18px] border${entries.length === 4 ? " flex min-h-0 flex-1 flex-col" : ""}`}
+          className={`overflow-hidden rounded-[18px] border${entries.length >= 4 ? " flex min-h-0 flex-1 flex-col" : ""}`}
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           {entries.map((entry, index) => (
@@ -113,7 +122,7 @@ export function MobileMoreScreen({
               accent={entry.accent}
               onClick={entry.onClick}
               divided={index > 0}
-              fill={entries.length === 4}
+              fill={entries.length >= 4}
             />
           ))}
         </div>

@@ -350,6 +350,18 @@ def test_employee_hidden_sidebar_tabs_reject_unknown_tab(db_session, client):
     assert resp.status_code == 422, resp.text
 
 
+def test_employee_hidden_sidebar_tabs_accept_daily_report_tab(db_session, client):
+    """일일 작업 일지는 직원별 탭 표시 제한 대상에 포함된다."""
+    resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="Daily report tab", hidden_sidebar_tabs=["dailyReport"]),
+    )
+
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["hidden_sidebar_tabs"] == ["dailyReport"]
+
+
 def test_employee_hidden_sidebar_tabs_reject_hiding_every_tab(db_session, client):
     """At least one desktop sidebar tab must remain visible for each employee."""
     all_tabs = [

@@ -19,3 +19,4 @@ from app.schemas.department import *  # noqa: F401,F403
 from app.schemas.warehouse import *  # noqa: F401,F403
 from app.schemas.shipping import *  # noqa: F401,F403
 from app.schemas.assembly_checklist import *  # noqa: F401,F403
+from app.schemas.daily_work_report import *  # noqa: F401,F403

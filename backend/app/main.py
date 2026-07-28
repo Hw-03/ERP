@@ -43,6 +43,7 @@ from app.routers import (
     codes,
     defects,
     departments,
+    daily_work_reports,
     dept_adjustment,
     employee_item_order,
     employees,
@@ -277,6 +278,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
+app.include_router(daily_work_reports.router, prefix="/api/daily-work-reports", tags=["Daily Work Reports"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(client_events.router, prefix="/api", tags=["Client Events"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])

@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ThemeToggle } from "./ThemeToggle";
 import type { DesktopTabId } from "./tabAccess";
@@ -18,6 +18,7 @@ export const DESKTOP_TAB_ICON_COLORS: Record<DesktopTabId, string> = {
   warehouseMap: LEGACY_COLORS.cyan,
   defect: LEGACY_COLORS.red,
   history: LEGACY_COLORS.purple,
+  dailyReport: LEGACY_COLORS.blue,
   weekly: LEGACY_COLORS.yellow,
   admin: LEGACY_COLORS.muted2,
 };
@@ -26,6 +27,7 @@ const MAIN_TABS: TabDef[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: DESKTOP_TAB_ICON_COLORS.dashboard },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: DESKTOP_TAB_ICON_COLORS.warehouse },
   { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History, color: DESKTOP_TAB_ICON_COLORS.history },
+  { id: "dailyReport", label: "일일 작업 일지", subtitle: "오늘 작업과 거래 활동", icon: ClipboardList, color: DESKTOP_TAB_ICON_COLORS.dailyReport },
   { id: "shipping", label: "출하", subtitle: "요청·준비·픽업 완료", icon: Truck, color: DESKTOP_TAB_ICON_COLORS.shipping },
   { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle, color: DESKTOP_TAB_ICON_COLORS.defect },
   { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned, color: DESKTOP_TAB_ICON_COLORS.warehouseMap },

@@ -1391,6 +1391,150 @@
         "title": "CapacityTopItem",
         "type": "object"
       },
+      "DailyWorkActivityResponse": {
+        "properties": {
+          "cancelled_count": {
+            "title": "Cancelled Count",
+            "type": "integer"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionDisplayGroupResponse"
+            },
+            "title": "Details",
+            "type": "array"
+          },
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "summary": {
+            "items": {
+              "$ref": "#/components/schemas/DailyWorkActivitySummary"
+            },
+            "title": "Summary",
+            "type": "array"
+          },
+          "work_date": {
+            "format": "date",
+            "title": "Work Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work_date",
+          "employee_id",
+          "summary",
+          "cancelled_count",
+          "details"
+        ],
+        "title": "DailyWorkActivityResponse",
+        "type": "object"
+      },
+      "DailyWorkActivitySummary": {
+        "properties": {
+          "operation_key": {
+            "title": "Operation Key",
+            "type": "string"
+          },
+          "operation_label": {
+            "title": "Operation Label",
+            "type": "string"
+          },
+          "quantity_by_unit": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Quantity By Unit",
+            "type": "object"
+          },
+          "work_count": {
+            "title": "Work Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operation_key",
+          "operation_label",
+          "work_count",
+          "quantity_by_unit"
+        ],
+        "title": "DailyWorkActivitySummary",
+        "type": "object"
+      },
+      "DailyWorkReportResponse": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "employee_name": {
+            "title": "Employee Name",
+            "type": "string"
+          },
+          "report_id": {
+            "format": "uuid",
+            "title": "Report Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "work_date": {
+            "format": "date",
+            "title": "Work Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "report_id",
+          "work_date",
+          "employee_id",
+          "employee_name",
+          "department",
+          "content",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DailyWorkReportResponse",
+        "type": "object"
+      },
+      "DailyWorkReportUpsertRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actor_employee_id",
+          "content"
+        ],
+        "title": "DailyWorkReportUpsertRequest",
+        "type": "object"
+      },
       "DefectActionResult": {
         "properties": {
           "item_id": {
@@ -11884,6 +12028,232 @@
         "summary": "제품기호 슬롯 수정",
         "tags": [
           "Codes"
+        ]
+      }
+    },
+    "/api/daily-work-reports": {
+      "get": {
+        "description": "선택한 날짜에 작성된 전 직원의 일지를 반환한다.",
+        "operationId": "list_daily_work_reports_api_daily_work_reports_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "work_date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Work Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DailyWorkReportResponse"
+                  },
+                  "title": "Response List Daily Work Reports Api Daily Work Reports Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Daily Work Reports",
+        "tags": [
+          "Daily Work Reports"
+        ]
+      }
+    },
+    "/api/daily-work-reports/{employee_id}/{work_date}": {
+      "get": {
+        "description": "미작성 일자는 null로 반환해 클라이언트가 작성 상태를 구분하게 한다.",
+        "operationId": "get_daily_work_report_api_daily_work_reports__employee_id___work_date__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "work_date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Work Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DailyWorkReportResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Daily Work Report Api Daily Work Reports  Employee Id   Work Date  Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Daily Work Report",
+        "tags": [
+          "Daily Work Reports"
+        ]
+      },
+      "put": {
+        "description": "본인만 오늘 또는 과거 일지를 작성·수정한다.",
+        "operationId": "upsert_daily_work_report_api_daily_work_reports__employee_id___work_date__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "work_date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Work Date",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyWorkReportUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyWorkReportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Daily Work Report",
+        "tags": [
+          "Daily Work Reports"
+        ]
+      }
+    },
+    "/api/daily-work-reports/{employee_id}/{work_date}/activity": {
+      "get": {
+        "description": "직원 ID로 귀속되는 KST 하루의 재고 활동을 표시 단위로 반환한다.",
+        "operationId": "get_daily_work_activity_api_daily_work_reports__employee_id___work_date__activity_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "work_date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Work Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyWorkActivityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Daily Work Activity",
+        "tags": [
+          "Daily Work Reports"
         ]
       }
     },

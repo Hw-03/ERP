@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Employee, EmployeeAssignedModel, ProductSymbol, StockRequest
+from app.models import DailyWorkReport, Employee, EmployeeAssignedModel, ProductSymbol, StockRequest
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     EmployeeCreate,
@@ -38,6 +38,7 @@ SIDEBAR_TAB_IDS: tuple[str, ...] = (
     "warehouseMap",
     "defect",
     "history",
+    "dailyReport",
     "weekly",
     "admin",
 )
@@ -452,8 +453,11 @@ def delete_employee(
     has_requests = db.query(StockRequest).filter(
         StockRequest.requester_employee_id == employee_id
     ).first() is not None
+    has_daily_work_reports = db.query(DailyWorkReport).filter(
+        DailyWorkReport.employee_id == employee_id
+    ).first() is not None
 
-    if has_requests:
+    if has_requests or has_daily_work_reports:
         employee.is_active = False
         employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
         audit.record(

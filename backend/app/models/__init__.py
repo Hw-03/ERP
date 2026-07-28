@@ -82,6 +82,7 @@ from app.models.assembly_checklist import (
     AssemblyChecklistItem,
     AssemblyChecklistSection,
 )
+from app.models.daily_work_report import DailyWorkReport
 
 __all__ = [
     # Base / 공통
@@ -152,4 +153,6 @@ __all__ = [
     "AssemblyChecklist",
     "AssemblyChecklistSection",
     "AssemblyChecklistItem",
+    # daily work reports
+    "DailyWorkReport",
 ]

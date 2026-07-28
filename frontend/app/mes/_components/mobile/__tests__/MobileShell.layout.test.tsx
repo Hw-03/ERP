@@ -143,7 +143,7 @@ describe("MobileShell layout", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "더보기" }));
 
-    expect(screen.getByTestId("more-entry-order")).toHaveTextContent("assemblyChecklist,shipping,weekly,warehouseMap");
+    expect(screen.getByTestId("more-entry-order")).toHaveTextContent("assemblyChecklist,dailyReport,shipping,weekly,warehouseMap");
 
     fireEvent.click(screen.getByRole("button", { name: "open checklist" }));
     fireEvent.click(screen.getByRole("button", { name: "back from checklist" }));

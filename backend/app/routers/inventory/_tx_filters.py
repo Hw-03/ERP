@@ -47,6 +47,12 @@ _SUMMARY_DEFECT_TYPES = [
     TransactionTypeEnum.DEFECT_SCRAP,
     TransactionTypeEnum.SUPPLIER_RETURN,
 ]
+LEGACY_DEFECT_REWORK_REFERENCE_PREFIX = "defect-disassemble:"
+
+
+def is_legacy_defect_rework_reference(reference_no: Optional[str]) -> bool:
+    """배치 없는 레거시 불량 재작업 묶음의 참조번호인지 판별한다."""
+    return bool(reference_no and reference_no.startswith(LEGACY_DEFECT_REWORK_REFERENCE_PREFIX))
 
 
 def _history_visibility_filter() -> ColumnElement:
@@ -270,7 +276,7 @@ def _legacy_defect_rework_filter() -> ColumnElement:
     return and_(
         TransactionLog.operation_batch_id.is_(None),
         TransactionLog.reference_no.isnot(None),
-        TransactionLog.reference_no.like("defect-disassemble:%"),
+        TransactionLog.reference_no.like(f"{LEGACY_DEFECT_REWORK_REFERENCE_PREFIX}%"),
     )
 
 
