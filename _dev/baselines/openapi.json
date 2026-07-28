@@ -4201,9 +4201,15 @@
             "title": "Process Type Code"
           },
           "sales_review_required": {
-            "default": false,
-            "title": "Sales Review Required",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sales Review Required"
           },
           "supplier": {
             "anyOf": [

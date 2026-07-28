@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Download,
@@ -11,6 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Button } from "@/lib/ui/Button";
 import { EmptyState } from "../common";
 import { FilterChip } from "../common/FilterChip";
 import { AdminPageHeader } from "./_admin_primitives";
@@ -122,6 +123,12 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
   const [f705Year, setF705Year] = useState(() => new Date().getFullYear());
   const [f705Downloading, setF705Downloading] = useState(false);
   const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const primaryExportsRef = useRef<HTMLElement>(null);
+  const recentExportsRef = useRef<HTMLElement>(null);
+  const originalLogsRef = useRef<HTMLDivElement>(null);
+  const selectedCsvRef = useRef<HTMLElement>(null);
+  const excelExportsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setRecent(loadRecent());
@@ -314,227 +321,262 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
     setRecent([]);
   }
 
-  const lastExport = recent[0] ?? null;
+  function handleQuickNavigation(targetRef: RefObject<HTMLElement>) {
+    const container = scrollContainerRef.current;
+    const target = targetRef.current;
+    if (!container || !target) return;
+
+    const top = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    container.scrollTo({ top, behavior });
+    target.focus({ preventScroll: true });
+  }
 
   return (
     <div className="flex min-h-0 flex-col">
       <AdminPageHeader
         icon={Download}
         title="내보내기"
+        summary={
+          <p className="text-sm leading-snug" style={{ color: LEGACY_COLORS.muted2 }}>
+            일반 데이터부터 공식 서식·원본 로그까지 목적별로 내려받습니다.
+          </p>
+        }
+        actions={
+          <nav aria-label="내보내기 바로가기" className="flex w-fit max-w-[calc(100vw-2rem)] flex-wrap justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(primaryExportsRef)} className="min-h-11">
+              주요 내보내기
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(originalLogsRef)} className="min-h-11">
+              원본 로그
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(selectedCsvRef)} className="min-h-11">
+              선택 CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(recentExportsRef)} className="min-h-11">
+              최근 내보내기
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(excelExportsRef)} className="min-h-11">
+              품목·입출고 Excel
+            </Button>
+          </nav>
+        }
       />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
-        <section
-          aria-label="F705-02 연간 생산일지"
-          className="rounded-[16px] border p-5"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex items-start gap-3">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
-                  color: LEGACY_COLORS.green,
-                }}
-              >
-                <FileSpreadsheet className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                  F705-02 연간 생산일지
-                </div>
-                <p className="mt-1 text-[12px] leading-snug" style={{ color: LEGACY_COLORS.muted2 }}>
-                  선택 연도의 MES 생산 이력을 원본 F705-02 서식으로 내려받습니다.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <label className="flex flex-col gap-1.5 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                F705-02 연도
-                <input
-                  aria-label="F705-02 연도"
-                  type="number"
-                  min={2000}
-                  max={2099}
-                  value={f705Year}
-                  onChange={(event) => setF705Year(Number(event.target.value))}
-                  className="h-11 w-28 rounded-[10px] border px-3 text-[14px] font-bold outline-none"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.text,
-                  }}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={handleF705Download}
-                disabled={f705Downloading}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-[12px] px-4 py-2.5 text-[14px] font-bold text-white transition-opacity disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.green }}
-              >
-                <Download className="h-4 w-4" />
-                {f705Downloading ? "생산일지 생성 중..." : "F705-02 생산일지 다운로드"}
-              </button>
-            </div>
-          </div>
-          {f705DownloadError && (
-            <p role="alert" className="mt-3 text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>
-              {f705DownloadError}
+      <div ref={scrollContainerRef} data-testid="export-scroll-container" className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+        <section ref={primaryExportsRef} tabIndex={-1} aria-labelledby="primary-exports-title" className="flex flex-col gap-3">
+          <div>
+            <h3 id="primary-exports-title" className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
+              주요 내보내기
+            </h3>
+            <p className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              자주 쓰는 서식과 데이터 내보내기를 한곳에서 실행합니다.
             </p>
-          )}
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <ExportSurface
+                ariaLabel="F705-02 연간 생산일지"
+                tone={LEGACY_COLORS.green}
+                icon={<FileSpreadsheet className="h-5 w-5" />}
+                title="F705-02 연간 생산일지"
+                description="선택 연도의 MES 생산 이력을 원본 F705-02 서식으로 내려받습니다."
+              >
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <label className="flex flex-col gap-1.5 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                    F705-02 연도
+                    <input
+                      aria-label="F705-02 연도"
+                      type="number"
+                      min={2000}
+                      max={2099}
+                      value={f705Year}
+                      onChange={(event) => setF705Year(Number(event.target.value))}
+                      className="h-11 w-28 rounded-[12px] border px-3 text-[14px] font-bold outline-none transition-colors focus-visible:border-[var(--c-green)] focus-visible:ring-2 focus-visible:ring-[color:var(--c-green)]/20"
+                      style={{
+                        background: LEGACY_COLORS.s2,
+                        borderColor: LEGACY_COLORS.border,
+                        color: LEGACY_COLORS.text,
+                      }}
+                    />
+                  </label>
+                  <Button
+                    size="md"
+                    iconLeft={<Download />}
+                    loading={f705Downloading}
+                    onClick={() => void handleF705Download()}
+                    className="min-h-11 w-full sm:w-auto"
+                    style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
+                  >
+                    {f705Downloading ? "생산일지 생성 중..." : "F705-02 생산일지 다운로드"}
+                  </Button>
+                </div>
+                {f705DownloadError && (
+                  <p role="alert" className="mt-3 text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>
+                    {f705DownloadError}
+                  </p>
+                )}
+            </ExportSurface>
+
+          </div>
         </section>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <ExportCard
-            tone={LEGACY_COLORS.green}
-            icon={<FileSpreadsheet className="h-6 w-6" />}
-            title="전체 데이터 내보내기 (Excel)"
-            description="시스템의 모든 데이터를 Excel 파일로 내보냅니다. 백업 및 전체 분석에 적합합니다."
-            actionLabel="전체 데이터 내보내기"
-            onClick={handleExcelAll}
-            disabled={busy}
-          />
-          <section
-            aria-label="선택 데이터 내보내기 (CSV)"
-            className="rounded-[16px] border p-5"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]"
-                style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`, color: LEGACY_COLORS.blue }}
-              >
-                <FileText className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                  선택 데이터 내보내기 (CSV)
-                </div>
-                <p className="mt-1 text-[12px] leading-snug" style={{ color: LEGACY_COLORS.muted2 }}>
-                  필요한 데이터 범위와 옵션을 선택해 CSV 파일로 내보냅니다.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <Label>데이터 범위</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {(["all", "items", "transactions", "employees", "bom"] as DataScope[]).map((s) => (
-                    <FilterChip
-                      key={s}
-                      active={scope === s}
-                      label={SCOPE_LABEL[s]}
-                      onClick={() => setScope(s)}
-                      size="sm"
-                    />
-                  ))}
-                </div>
-                <div
-                  data-testid="csv-scope-summary"
-                  className="mt-2 rounded-[10px] border px-3 py-2 text-[14px] font-bold"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                >
-                  {scopeSummary}
-                </div>
-              </div>
-
-              <div>
-                {includesTransactions && (
-                  <div data-testid="csv-period-settings">
-                    <Label>기간 선택</Label>
-                    <div
-                      className="rounded-[10px] border px-3 py-2 text-[14px]"
-                      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                    >
-                      {range.start} ~ {range.end}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {(["today", "7d", "30d", "90d"] as RangePreset[]).map((p) => (
-                        <FilterChip
-                          key={p}
-                          active={preset === p}
-                          label={p === "today" ? "오늘" : p === "7d" ? "7일" : p === "30d" ? "30일" : "90일"}
-                          onClick={() => setPreset(p)}
-                          size="sm"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className={includesTransactions ? "mt-4" : ""}>
-                  <Label>추가 옵션</Label>
-                  <div className="flex flex-col gap-1.5 text-[14px]" style={{ color: LEGACY_COLORS.text }}>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={includeHeader}
-                        onChange={(e) => setIncludeHeader(e.target.checked)}
-                      />
-                      헤더 포함
-                    </label>
-                    {includesEmployees && (
-                      <label data-testid="csv-inactive-option" className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={includeInactive}
-                          onChange={(e) => setIncludeInactive(e.target.checked)}
-                        />
-                        비활성 데이터 포함
-                      </label>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCsvSelected}
-              disabled={busy}
-              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-opacity disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.blue }}
-            >
-              <Download className="h-4 w-4" />
-              {busy ? "내보내는 중..." : "선택 데이터 내보내기"}
-            </button>
-          </section>
+        <div ref={originalLogsRef} tabIndex={-1} data-testid="original-logs-section">
+          <AdminAuditCsvSection embedded />
         </div>
 
-        {/* 하단: 최근 기록 + 마지막 내보내기 */}
-        <div className={`grid gap-3 ${lastExport ? "lg:grid-cols-[1fr_280px]" : ""}`}>
-          <div
-            className="rounded-[16px] border p-4"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                최근 내보내기 기록 (이번 세션)
-              </div>
-              {recent.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearRecent}
-                  className="min-h-11 px-2 text-[12px] font-bold transition-colors hover:underline"
-                  style={{ color: LEGACY_COLORS.muted2 }}
+        <ExportSurface
+          ref={selectedCsvRef}
+          tabIndex={-1}
+          ariaLabel="선택 데이터 내보내기 (CSV)"
+          tone={LEGACY_COLORS.blue}
+          icon={<FileText className="h-5 w-5" />}
+          title="선택 데이터 내보내기 (CSV)"
+          description="필요한 데이터 범위와 옵션을 선택해 CSV 파일로 내보냅니다."
+        >
+              <div className="mt-4 flex flex-col gap-4">
+                <div role="group" aria-label="CSV 데이터 범위">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>데이터 범위</Label>
+                    <div
+                      data-testid="csv-scope-summary"
+                      className="rounded-full border px-3 py-1 text-[12px] font-bold"
+                      style={{
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`,
+                        borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, transparent)`,
+                        color: LEGACY_COLORS.blue,
+                      }}
+                    >
+                      {scopeSummary}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["all", "items", "transactions", "employees", "bom"] as DataScope[]).map((s) => (
+                      <FilterChip
+                        key={s}
+                        active={scope === s}
+                        label={SCOPE_LABEL[s]}
+                        onClick={() => setScope(s)}
+                        size="sm"
+                        className="min-h-11"
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    {includesTransactions && (
+                      <div data-testid="csv-period-settings">
+                        <Label>기간 선택</Label>
+                        <div
+                          className="rounded-[12px] border px-3 py-2 text-[14px] font-medium"
+                          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                        >
+                          {range.start} ~ {range.end}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {(["today", "7d", "30d", "90d"] as RangePreset[]).map((p) => (
+                            <FilterChip
+                              key={p}
+                              active={preset === p}
+                              label={p === "today" ? "오늘" : p === "7d" ? "7일" : p === "30d" ? "30일" : "90일"}
+                              onClick={() => setPreset(p)}
+                              size="sm"
+                              className="min-h-11"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={!includesTransactions ? "md:col-span-2" : ""}>
+                    <Label>추가 옵션</Label>
+                    <div className="flex flex-col gap-2" style={{ color: LEGACY_COLORS.text }}>
+                      <label
+                        className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3 text-[14px] font-medium"
+                        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={includeHeader}
+                          onChange={(e) => setIncludeHeader(e.target.checked)}
+                          className="h-4 w-4 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--c-s2)]"
+                          style={{ accentColor: LEGACY_COLORS.blue }}
+                        />
+                        헤더 포함
+                      </label>
+                      {includesEmployees && (
+                        <label
+                          data-testid="csv-inactive-option"
+                          className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3 text-[14px] font-medium"
+                          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={includeInactive}
+                            onChange={(e) => setIncludeInactive(e.target.checked)}
+                            className="h-4 w-4 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--c-s2)]"
+                            style={{ accentColor: LEGACY_COLORS.blue }}
+                          />
+                          비활성 데이터 포함
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  size="md"
+                  iconLeft={<Download />}
+                  loading={busy}
+                  onClick={() => void handleCsvSelected()}
+                  className="min-h-11 w-full"
                 >
-                  기록 지우기
-                </button>
-              )}
+                  {busy ? "내보내는 중..." : "선택 데이터 내보내기"}
+                </Button>
+              </div>
+        </ExportSurface>
+
+        <section
+          ref={recentExportsRef}
+          tabIndex={-1}
+          aria-labelledby="recent-exports-title"
+          className="rounded-[20px] border p-4"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 id="recent-exports-title" className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                최근 내보내기
+              </h3>
+              <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                이번 세션 · 최대 {RECENT_LIMIT}개
+              </p>
             </div>
-            {recent.length === 0 ? (
-              <EmptyState
-                variant="no-data"
-                compact
-                title="아직 내보내기 기록이 없습니다"
-                description="내보내기 후 이 자리에 표시됩니다. 새로고침 시 초기화됩니다."
-              />
-            ) : (
-              <div className="overflow-hidden rounded-[10px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+            {recent.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearRecent}
+                className="min-h-11 px-2"
+              >
+                기록 지우기
+              </Button>
+            )}
+          </div>
+          {recent.length === 0 ? (
+            <EmptyState
+              variant="no-data"
+              compact
+              className="py-4"
+              title="아직 내보내기 기록이 없습니다"
+              description="내보내기 후 이 자리에 표시됩니다. 새로고침 시 초기화됩니다."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px] overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
                 <div
                   className="grid items-center gap-2 px-3 py-2 text-[12px] font-black uppercase tracking-[0.08em]"
                   style={{
@@ -550,9 +592,9 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                   <span className="text-right">크기</span>
                   <span className="text-right">상태</span>
                 </div>
-                {recent.map((r) => (
+                {recent.map((record) => (
                   <div
-                    key={r.id}
+                    key={record.id}
                     className="grid items-center gap-2 px-3 py-2 text-[12px]"
                     style={{
                       gridTemplateColumns: "120px 60px 100px 1fr 70px 70px",
@@ -560,23 +602,21 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                     }}
                   >
                     <span className="font-mono" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {formatDateTime(r.time)}
+                      {formatDateTime(record.time)}
                     </span>
-                    <span style={{ color: LEGACY_COLORS.text }}>{r.format}</span>
-                    <span style={{ color: LEGACY_COLORS.text }}>{SCOPE_LABEL[r.scope]}</span>
+                    <span style={{ color: LEGACY_COLORS.text }}>{record.format}</span>
+                    <span style={{ color: LEGACY_COLORS.text }}>{SCOPE_LABEL[record.scope]}</span>
                     <span className="truncate" style={{ color: LEGACY_COLORS.text }}>
-                      {r.fileName}
+                      {record.fileName}
                     </span>
                     <span className="text-right tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {r.sizeKb ? `${r.sizeKb} KB` : "—"}
+                      {record.sizeKb ? `${record.sizeKb} KB` : "—"}
                     </span>
                     <span
                       className="flex items-center justify-end gap-1 text-[12px] font-bold"
-                      style={{
-                        color: r.status === "success" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
-                      }}
+                      style={{ color: record.status === "success" ? LEGACY_COLORS.green : LEGACY_COLORS.red }}
                     >
-                      {r.status === "success" ? (
+                      {record.status === "success" ? (
                         <>
                           <CheckCircle2 className="h-3 w-3" />
                           완료
@@ -591,109 +631,82 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* 마지막 내보내기 */}
-          {lastExport && (
-            <div
-              className="rounded-[16px] border p-4"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-            <div className="mb-2 text-[12px] font-black uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-              마지막 내보내기
-            </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  {lastExport.format === "Excel" ? (
-                    <FileSpreadsheet className="h-5 w-5" style={{ color: LEGACY_COLORS.green }} />
-                  ) : (
-                    <FileText className="h-5 w-5" style={{ color: LEGACY_COLORS.blue }} />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-                      {lastExport.fileName}
-                    </div>
-                    <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {SCOPE_LABEL[lastExport.scope]} · {lastExport.format}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  className="rounded-[8px] border px-2.5 py-1.5 text-[12px]"
-                  style={{
-                    background: `color-mix(in srgb, ${
-                      lastExport.status === "success" ? LEGACY_COLORS.green : LEGACY_COLORS.red
-                    } 8%, transparent)`,
-                    borderColor: `color-mix(in srgb, ${
-                      lastExport.status === "success" ? LEGACY_COLORS.green : LEGACY_COLORS.red
-                    } 30%, transparent)`,
-                    color: lastExport.status === "success" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
-                  }}
-                >
-                  {lastExport.status === "success" ? "✓ 다운로드 성공" : `✗ ${lastExport.error ?? "실패"}`}
-                </div>
-                <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {formatDateTime(lastExport.time)}
-                  {lastExport.sizeKb ? ` · ${lastExport.sizeKb} KB` : ""}
-                </div>
-              </div>
             </div>
           )}
-        </div>
 
-        <div
-          className="rounded-[10px] border px-3 py-2 text-[12px]"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.muted2,
-          }}
-        >
-          • Excel: 백엔드에서 생성된 .xlsx 파일을 직접 다운로드합니다.<br />
-          • CSV: 클라이언트에서 데이터를 받아 CSV로 변환합니다. (UTF-8 BOM 포함)<br />
-          • 최근 기록은 현재 세션에서만 유지되며, 새로고침 시 초기화됩니다.
-        </div>
-
-        <section
-          aria-labelledby="external-submission-logs-title"
-          className="flex flex-col gap-4 border-t pt-4"
-          style={{ borderColor: LEGACY_COLORS.border }}
-        >
-          <div>
-            <h3 id="external-submission-logs-title" className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
-              외부 제출용 로그
-            </h3>
-            <p className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              외부 심사용 F704-02 대장과 시스템 원본 로그를 관리합니다.
-            </p>
-          </div>
-          <AdminAuditCsvSection embedded />
+          <details
+            className="mt-3 overflow-hidden rounded-[12px] border"
+            style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`, borderColor: LEGACY_COLORS.border }}
+          >
+            <summary className="flex min-h-11 cursor-pointer items-center px-3 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              파일 형식 및 기록 안내
+            </summary>
+            <div className="border-t px-3 py-2 text-[12px] leading-relaxed" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+              Excel은 백엔드에서 생성된 .xlsx 파일을 직접 다운로드합니다. CSV는 클라이언트에서 UTF-8 BOM 형식으로 변환하며, 최근 기록은 현재 세션에서만 유지됩니다.
+            </div>
+          </details>
         </section>
+
+        <ExportSurface
+          ref={excelExportsRef}
+          tabIndex={-1}
+          ariaLabel="품목·입출고 Excel"
+          tone={LEGACY_COLORS.green}
+          icon={<FileSpreadsheet className="h-5 w-5" />}
+          title="품목·입출고 Excel"
+          description="품목 전체와 최근 30일 입출고 내역을 Excel 2개 파일로 내려받습니다."
+        >
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
+                품목 전체
+              </span>
+              <span className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
+                최근 30일 입출고
+              </span>
+            </div>
+            <Button
+              size="md"
+              iconLeft={<Download />}
+              disabled={busy}
+              onClick={handleExcelAll}
+              className="min-h-11 w-full sm:w-auto"
+              style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
+            >
+              Excel 2개 다운로드
+            </Button>
+          </div>
+        </ExportSurface>
       </div>
     </div>
   );
 }
 
-interface ExportCardProps {
+interface ExportSurfaceProps {
+  tabIndex?: number;
+  ariaLabel: string;
   tone: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   description: string;
-  actionLabel: string;
-  onClick: () => void;
-  disabled?: boolean;
+  children: ReactNode;
 }
 
-function ExportCard({ tone, icon, title, description, actionLabel, onClick, disabled }: ExportCardProps) {
+const ExportSurface = forwardRef<HTMLElement, ExportSurfaceProps>(function ExportSurface(
+  { tabIndex, ariaLabel, tone, icon, title, description, children },
+  ref,
+) {
   return (
-    <div
-      className="rounded-[16px] border p-5"
+    <section
+      ref={ref}
+      tabIndex={tabIndex}
+      aria-label={ariaLabel}
+      className="rounded-[20px] border p-4"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="flex items-start gap-3">
         <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]"
           style={{
             background: `color-mix(in srgb, ${tone} 14%, transparent)`,
             color: tone,
@@ -702,7 +715,7 @@ function ExportCard({ tone, icon, title, description, actionLabel, onClick, disa
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
+          <div className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
             {title}
           </div>
           <div className="mt-1 text-[12px] leading-snug" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -710,19 +723,10 @@ function ExportCard({ tone, icon, title, description, actionLabel, onClick, disa
           </div>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-opacity disabled:opacity-50"
-        style={{ background: tone }}
-      >
-        <Download className="h-4 w-4" />
-        {actionLabel}
-      </button>
-    </div>
+      {children}
+    </section>
   );
-}
+});
 
 function Label({ children }: { children: React.ReactNode }) {
   return (

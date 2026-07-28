@@ -134,6 +134,11 @@ def create_item(
     pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
+    sales_review_required = (
+        payload.sales_review_required
+        if payload.sales_review_required is not None
+        else pt == "AF"
+    )
 
     # 모든 품목은 카테고리와 모델을 가진다(불변식) — mes_code 생성열 + 분해필드 NOT NULL 의 전제.
     if not (pt and model_sym):
@@ -173,7 +178,7 @@ def create_item(
         legacy_item_type=payload.legacy_item_type,
         supplier=payload.supplier,
         min_stock=payload.min_stock,
-        sales_review_required=payload.sales_review_required,
+        sales_review_required=sales_review_required,
         process_type_code=pt,
         model_symbol=model_sym,
         serial_no=serial,

@@ -100,14 +100,14 @@ describe("buildHistoryDetailSummary", () => {
     });
   });
 
-  it("shows the department-to-disposal flow for a direct defect scrap", () => {
+  it("shows quarantine-to-disposal for a direct defect scrap", () => {
     const summary = buildHistoryDetailSummary([
       makeLog({ transaction_type: "DEFECT_SCRAP", department: "조립" }),
     ], null);
 
     expect(summary.flow).toEqual({
-      label: "조립 → 폐기",
-      from: "조립",
+      label: "격리 → 폐기",
+      from: "격리",
       to: "폐기",
     });
   });
@@ -194,6 +194,29 @@ describe("buildHistoryDetailSummary", () => {
       ["item-a", -2],
       ["item-b", -3],
     ]);
+  });
+
+  it("keeps twelve shipping inventory effects in one shipping location group", () => {
+    const logs = Array.from({ length: 12 }, (_, index) => makeLog({
+      log_id: `shipping-${index + 1}`,
+      item_id: `shipping-item-${index + 1}`,
+      item_name: `Shipping item ${index + 1}`,
+      transaction_type: "SHIP",
+      quantity_change: -1,
+      inventory_effect: [
+        { scope: "location", department: "출하", status: "PRODUCTION", delta: -1 },
+      ],
+    }));
+
+    const summary = buildHistoryDetailSummary(logs, null);
+
+    expect(summary.impactGroups).toEqual([
+      expect.objectContaining({ label: "출하 재고", effects: expect.any(Array) }),
+    ]);
+    expect(summary.impactGroups[0].effects).toHaveLength(12);
+    expect(summary.impactGroups[0].effects).toEqual(
+      expect.arrayContaining([expect.objectContaining({ deltaLabel: "-1", unit: "EA" })]),
+    );
   });
 
   it("combines repeated effects only when every identity field matches", () => {

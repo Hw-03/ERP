@@ -431,6 +431,33 @@ describe("desktop history detail panels", () => {
     expect(screen.getByText("-2 EA")).toBeInTheDocument();
   });
 
+  it("keeps an expanded shipping impact row's signed EA quantity in the desktop detail", async () => {
+    const selected = makeLog({
+      log_id: "shipping-visible",
+      transaction_type: "SHIP",
+      reference_no: "shipping-impact-1",
+      operation_batch_id: null,
+      item_id: "shipping-item-1",
+      item_name: "Shipping item 1",
+      quantity_change: -1,
+      inventory_effect: [{ scope: "location", department: "출하", status: "PRODUCTION", delta: -1 }],
+    });
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected]);
+
+    render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={selected}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    expect(await screen.findByText("Shipping item 1")).toBeInTheDocument();
+    expect(screen.getByText("-1 EA")).toBeInTheDocument();
+  });
+
   it("shows the cancellation target count and inventory effects only after confirmation opens", () => {
     render(
       <HistoryDetailPanel
@@ -531,10 +558,10 @@ describe("desktop history detail panels", () => {
     expect(screen.getByText("취소 범위 확인 중...")).toBeInTheDocument();
 
     await act(async () => resolveScope([visible, hidden]));
-    expect(await screen.findByRole("button", { name: /assembly 재고.*1품목.*-7 EA/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "assembly 재고 · 1품목" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
 
-    expect(screen.getAllByRole("button", { name: /assembly 재고.*1품목.*-7 EA/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "assembly 재고 · 1품목" })).toHaveLength(1);
     expect(screen.getByText("hidden-component")).toBeInTheDocument();
   });
 
@@ -598,7 +625,7 @@ describe("desktop history detail panels", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getAllByRole("button", { name: /assembly 재고.*1품목.*-3 EA/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "assembly 재고 · 1품목" })).toHaveLength(1);
     expect(screen.getByText("reference-sibling")).toBeInTheDocument();
   });
 

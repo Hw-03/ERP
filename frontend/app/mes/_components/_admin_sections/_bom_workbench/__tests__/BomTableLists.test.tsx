@@ -103,7 +103,7 @@ describe("BOM 편집 표형 목록", () => {
     expect(screen.getByText("상위 품목 선택")).toBeInTheDocument();
   });
 
-  it("상위 단계 필터를 건수와 함께 한 줄 compact 칩으로 정렬한다", () => {
+  it("상위 단계 필터를 한 줄 compact 칩으로 정렬한다", () => {
     render(
       <BomParentList
         dept="A"
@@ -117,13 +117,42 @@ describe("BOM 편집 표형 목록", () => {
       />,
     );
 
-    const count = screen.getByText("1건");
-    const filterRow = count.parentElement;
+    const filterRow = screen.getAllByRole("button", { name: "전체" })[0].parentElement;
     expect(filterRow).toHaveClass("flex-nowrap", "items-center", "gap-1.5");
-    expect(count).toHaveClass("ml-auto");
+    expect(screen.queryByText(/^\d+건$/)).not.toBeInTheDocument();
     for (const button of within(filterRow!).getAllByRole("button")) {
       expect(button).toHaveClass("whitespace-nowrap", "px-2", "py-1", "text-xs");
     }
+  });
+
+  it("상위 단계 필터 선택 시 해당 단계만 표시하고 선택 상태를 전환한다", () => {
+    render(
+      <BomParentList
+        dept="A"
+        items={[
+          item({ item_id: "item-a", item_name: "중간 단계 품목", process_type_code: "AA" }),
+          item({ item_id: "item-f", item_name: "완료 단계 품목", process_type_code: "AF" }),
+        ]}
+        allBomRows={[]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    const allFilter = screen.getByRole("button", { name: "전체" });
+    const completedFilter = screen.getByRole("button", { name: "공정완료" });
+    expect(allFilter).toHaveAttribute("aria-pressed", "true");
+    expect(completedFilter).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(completedFilter);
+
+    expect(allFilter).toHaveAttribute("aria-pressed", "false");
+    expect(completedFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("중간 단계 품목")).not.toBeInTheDocument();
+    expect(screen.getByText("완료 단계 품목")).toBeInTheDocument();
   });
 
   it("하위 품목 추가 제목 옆에 검색을 두고 후보 수를 노출하지 않는다", () => {
@@ -486,5 +515,71 @@ describe("BOM 편집 표형 목록", () => {
 
     fireEvent.click(screen.getByTitle("삭제"));
     expect(onRequestDelete).toHaveBeenCalledWith(bomRow, "등록된 품목");
+  });
+});
+
+describe("BOM 레이아웃 높이 계약", () => {
+  it("상위 품목 제어부를 제목·검색과 단계 필터의 구분된 두 영역으로 나눈다", () => {
+    render(
+      <BomParentList
+        dept="A"
+        items={[item()]}
+        allBomRows={[]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+
+    const title = screen.getByText("상위 품목 선택");
+    const search = screen.getByRole("textbox");
+    const titleSection = title.parentElement!;
+    const filterSection = screen.getAllByRole("button", { name: "전체" })[0].parentElement!;
+
+    expect(titleSection).toHaveClass("flex", "items-center", "gap-3", "px-4", "py-3");
+    expect(titleSection).toContainElement(search);
+    expect(titleSection.style.borderBottom).toBe("1px solid var(--c-border)");
+    expect(filterSection).toHaveClass("flex", "flex-nowrap", "items-center", "gap-1.5", "px-4", "py-3");
+    expect(titleSection).not.toBe(filterSection);
+    expect(screen.queryByText(/^\d+건$/)).not.toBeInTheDocument();
+  });
+
+  it("현재 구성 제목과 전용 열 머리글에만 고정 높이를 둔다", () => {
+    const { container } = render(
+      <BomEditPanel
+        parent={item()}
+        bomRows={[bomRow]}
+        items={[item(), item({ item_id: "item-2", item_name: "등록된 품목", mes_code: "CHILD-001" })]}
+        onSaveQty={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const currentHeader = [...container.querySelectorAll<HTMLElement>("div")].find(
+      (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === BOM_CURRENT_ROW_GRID_TEMPLATE,
+    );
+    const currentTitle = screen.getByText(/현재 구성/);
+    expect(currentTitle).toHaveClass("h-[58px]", "flex", "items-center", "text-sm", "font-black");
+    expect(currentTitle).not.toHaveClass("uppercase", "tracking-widest");
+    expect(currentHeader).toHaveClass("h-[50px]");
+
+    const { container: parentContainer } = render(
+      <BomParentList
+        dept="A"
+        items={[item()]}
+        allBomRows={[]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId=""
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+    const parentHeader = [...parentContainer.querySelectorAll<HTMLElement>("div")].find(
+      (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === "52px minmax(0, 1fr) 78px 44px",
+    );
+    expect(parentHeader).not.toHaveClass("h-[50px]");
   });
 });

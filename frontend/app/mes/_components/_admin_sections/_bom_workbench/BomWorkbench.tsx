@@ -322,6 +322,7 @@ export function BomWorkbench({
             <Button
               variant="secondary"
               size="sm"
+              className="h-[42px]"
               iconLeft={<Download size={13} />}
               onClick={exportCompletedBom}
               disabled={completedCount === 0}
@@ -339,7 +340,7 @@ export function BomWorkbench({
               BOM 내보내기
             </Button>
             <div
-              className="flex items-center gap-1 rounded-full border p-1"
+              className="flex h-[42px] items-center gap-1 rounded-full border p-1"
               style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
             >
               <Button

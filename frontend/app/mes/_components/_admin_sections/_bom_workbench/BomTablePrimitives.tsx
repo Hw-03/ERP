@@ -115,7 +115,7 @@ interface BomTableHeaderProps {
 export function BomTableHeader({ variant, gridTemplateColumns }: BomTableHeaderProps) {
   return (
     <div
-      className="sticky top-0 z-10 grid items-center gap-3 px-3 py-2 text-[11px] font-bold uppercase tracking-[1.5px]"
+      className={`sticky top-0 z-10 grid items-center gap-3 px-3 py-2 text-[11px] font-bold uppercase tracking-[1.5px] ${variant === "current" ? "h-[50px]" : ""}`}
       style={{
         gridTemplateColumns,
         background: "var(--c-popup-bg)",

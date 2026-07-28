@@ -53,7 +53,7 @@ export function BomEditPanel({
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         <div
-          className="shrink-0 px-4 py-2.5 text-xs font-bold uppercase tracking-widest"
+          className="flex h-[58px] shrink-0 items-center px-4 text-sm font-black"
           style={{ color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
         >
           현재 구성 ({bomRows.length}건)

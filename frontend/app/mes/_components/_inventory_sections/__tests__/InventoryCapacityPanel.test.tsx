@@ -62,4 +62,50 @@ describe("InventoryCapacityPanel 모바일 표", () => {
     ]);
     expect(within(mobileTable).getByText("DX3000 조립 완제품")).toBeInTheDocument();
   });
+
+  it("renders AF and legacy model chips without leading dot separators", () => {
+    const afWithTwoModels = {
+      ...capacityData,
+      af: {
+        ...capacityData.af,
+        items: [
+          ...capacityData.af.items,
+          {
+            af_item_id: "af-dx2000",
+            af_code: "3-AF-0003",
+            af_name: "DX2000 assembly",
+            model_symbol: "DX2000",
+            ship_ready: 12,
+            fast_production: 7,
+            total_production: 20,
+            bom_status: "complete" as const,
+            has_direct_children: true,
+            has_pf_path: true,
+            marked_complete: true,
+          },
+        ],
+      },
+    } satisfies ProductionCapacity;
+    const legacyCapacity = {
+      immediate: 0,
+      maximum: 0,
+      limiting_item: null,
+      status: "producible" as const,
+      top_items: [],
+      representative_items: [
+        { item_id: "pf-1", item_name: "DX3000", mes_code: null, model_symbol: "DX3000", immediate: 10, maximum: 20 },
+        { item_id: "pf-2", item_name: "DX2000", mes_code: null, model_symbol: "DX2000", immediate: 5, maximum: 15 },
+      ],
+    } satisfies ProductionCapacity;
+
+    const { container, rerender } = render(<InventoryCapacityPanel capacityData={afWithTwoModels} />);
+    expect(container.querySelector(".sm\\:flex")).toHaveTextContent("DX3000");
+    expect(container.querySelector(".sm\\:flex")).toHaveTextContent("DX2000");
+    expect(container.querySelector(".sm\\:flex")?.textContent).not.toContain("·");
+
+    rerender(<InventoryCapacityPanel capacityData={legacyCapacity} />);
+    expect(container.textContent).toContain("DX3000");
+    expect(container.textContent).toContain("DX2000");
+    expect(container.textContent).not.toContain("·");
+  });
 });

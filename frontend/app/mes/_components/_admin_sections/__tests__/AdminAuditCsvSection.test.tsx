@@ -48,6 +48,22 @@ describe("AdminAuditCsvSection audit downloads", () => {
     state.backfill.mockReset();
   });
 
+  it("임베드 화면에서는 F704 대장과 원본 로그 작업을 하나의 작업 그룹으로 묶는다", () => {
+    render(<AdminAuditCsvSection embedded />);
+
+    const actionGroup = screen.getByRole("group", { name: "외부 로그 작업" });
+
+    expect(actionGroup).toContainElement(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
+    expect(actionGroup).toHaveTextContent("시스템 원본 로그 — 내부 확인용");
+    expect(screen.queryByRole("heading", { name: "입출고 로그" })).not.toBeInTheDocument();
+  });
+
+  it("시스템 원본 컬럼 구성 안내를 노출하지 않는다", () => {
+    render(<AdminAuditCsvSection embedded />);
+
+    expect(screen.queryByText("시스템 원본 컬럼 구성 (11)")).not.toBeInTheDocument();
+  });
+
   it("downloads XLSX and CSV through the authenticated API and shows a download error", async () => {
     state.downloadAuditFile
       .mockRejectedValueOnce(new Error("다운로드 서버 오류"))

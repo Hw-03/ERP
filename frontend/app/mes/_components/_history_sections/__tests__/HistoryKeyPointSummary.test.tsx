@@ -115,8 +115,8 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    const output = screen.getByRole("button", { name: /완제품.*1품목.*\+2 EA/ });
-    const components = screen.getByRole("button", { name: /부품.*2품목.*-5 EA/ });
+    const output = screen.getByRole("button", { name: "완제품 · 1품목" });
+    const components = screen.getByRole("button", { name: "부품 · 2품목" });
     expect(output).toHaveAttribute("aria-expanded", "false");
     expect(components).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(output);
@@ -209,8 +209,8 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    const warehouse = screen.getByRole("button", { name: /창고 재고.*1품목.*-10 EA/ });
-    const outbound = screen.getByRole("button", { name: /출하 재고.*1품목.*\+10 EA/ });
+    const warehouse = screen.getByRole("button", { name: "창고 재고 · 1품목" });
+    const outbound = screen.getByRole("button", { name: "출하 재고 · 1품목" });
     expect(warehouse).toHaveAttribute("aria-expanded", "false");
     expect(outbound).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("출하 품목")).not.toBeInTheDocument();
@@ -219,6 +219,33 @@ describe("HistoryKeyPointSummary", () => {
     expect(outbound).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("출하 품목")).toBeInTheDocument();
     expect(warehouse).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("shows only the location and item count in a collapsed shipping impact header", () => {
+    const shippingEffects = Array.from({ length: 12 }, (_, index) => effect({
+      key: `shipping-${index + 1}`,
+      itemId: `shipping-item-${index + 1}`,
+      itemName: `Shipping item ${index + 1}`,
+      label: "출하 재고",
+      delta: -1,
+      deltaLabel: "-1",
+    }));
+
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          impactGroups: [
+            { key: "warehouse", label: "창고 재고", effects: [effect({ label: "창고 재고" })] },
+            { key: "shipping", label: "출하 재고", effects: shippingEffects },
+          ],
+        })}
+      />,
+    );
+
+    const shipping = screen.getByRole("button", { name: "출하 재고 · 12품목" });
+    expect(shipping).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(shipping);
+    expect(screen.getAllByText("-1 EA")).toHaveLength(12);
   });
 
   it("does not truncate the requester timestamp", () => {

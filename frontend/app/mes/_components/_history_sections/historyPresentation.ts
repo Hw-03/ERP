@@ -472,10 +472,7 @@ function getFlowPresentation(
     return { label: "출하" };
   }
   if (!batch && log.transaction_type === "DEFECT_SCRAP") {
-    const department = log.department?.trim();
-    if (department) {
-      return { label: `${department} → 폐기`, from: department, to: "폐기" };
-    }
+    return { label: "격리 → 폐기", from: "격리", to: "폐기" };
   }
   if (batch) {
     const endpoints = getBatchFlowEndpoints(batch);

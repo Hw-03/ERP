@@ -212,8 +212,8 @@ function AfPanel({
       {showStats ? (
         <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 sm:flex">
           <ModelLegend />
-          {groups.map((g, idx) => (
-            <ModelChip key={g.key} group={g} showSep={idx > 0} pinned={getPinnedPfNumbers(g.key, pfPins, af)} />
+          {groups.map((g) => (
+            <ModelChip key={g.key} group={g} pinned={getPinnedPfNumbers(g.key, pfPins, af)} />
           ))}
         </div>
       ) : (
@@ -264,20 +264,13 @@ function ModelLegend() {
 // 모델별 칩: 모델명 + 출하/조립/총생산 3수량(색 구분).
 function ModelChip({
   group,
-  showSep,
   pinned,
 }: {
   group: ModelCapacityGroup;
-  showSep: boolean;
   pinned: { ship_ready: number; fast_production: number; total_production: number } | null;
 }) {
   return (
     <span className="inline-flex shrink-0 items-baseline gap-1 text-sm">
-      {showSep && (
-        <span aria-hidden style={{ color: LEGACY_COLORS.muted2 }}>
-          ·
-        </span>
-      )}
       <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
         {group.label}
       </span>
@@ -361,8 +354,8 @@ function LegacyPanel({
       </span>
       {status === "producible" && hasReps ? (
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-          {reps.map((rep, idx) => (
-            <RepresentativeChip key={rep.item_id} item={rep} showSep={idx > 0} />
+          {reps.map((rep) => (
+            <RepresentativeChip key={rep.item_id} item={rep} />
           ))}
         </div>
       ) : status === "producible" ? (
@@ -402,20 +395,13 @@ function LegacyPanel({
 
 function RepresentativeChip({
   item,
-  showSep,
 }: {
   item: ProductionCapacityItem;
-  showSep: boolean;
 }) {
   const label = getModelLabel(item.model_symbol, item.item_name) || item.item_name;
   const isZero = item.immediate === 0;
   return (
     <span className="inline-flex shrink-0 items-baseline gap-1 text-sm">
-      {showSep && (
-        <span aria-hidden style={{ color: LEGACY_COLORS.muted2 }}>
-          ·
-        </span>
-      )}
       <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
         {label}
       </span>

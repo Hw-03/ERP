@@ -72,36 +72,13 @@ export function DesktopPinLock({
   };
 
   return (
-    <div
-      className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6"
-      style={{ background: LEGACY_COLORS.bg }}
-    >
-      {/* 배경 데코: 옅은 브랜드 그라데이션 + 큰 원형 blur 도형 (시선이 카드로 모이게) */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage: `radial-gradient(circle at 28% 22%, color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent) 0%, transparent 42%), radial-gradient(circle at 78% 82%, color-mix(in srgb, ${LEGACY_COLORS.blue} 6%, transparent) 0%, transparent 48%)`,
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-24 top-12 h-[320px] w-[320px] rounded-full blur-3xl"
-        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)` }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-24 bottom-8 h-[360px] w-[360px] rounded-full blur-3xl"
-        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 8%, transparent)` }}
-      />
-
-      {/* 카드 */}
+    <div className="flex min-h-0 flex-1 items-center justify-center px-6">
       <div
         className="relative w-full max-w-[440px] rounded-[28px] border"
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
-          boxShadow: "var(--c-card-shadow)",
+          boxShadow: `0 0 24px color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`,
           padding: "40px 36px 32px",
         }}
       >
