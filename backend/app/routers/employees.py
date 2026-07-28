@@ -560,6 +560,7 @@ def reset_employee_pin(
     db: Session = Depends(get_db),
 ):
     """직원 PIN을 기본값(0000)으로 초기화 — 관리자 PIN 검증 필요."""
+    require_admin(db, payload.pin)
 
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:

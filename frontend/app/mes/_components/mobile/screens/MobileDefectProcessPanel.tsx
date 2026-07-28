@@ -371,8 +371,6 @@ export function MobileDefectProcessPanel({
           onClick={() => {
             if (action === "disassemble") {
               setStep(2);
-            } else if (action === "unquarantine") {
-              void handleSubmit();
             } else {
               setConfirmOpen(true);
             }
@@ -397,7 +395,7 @@ export function MobileDefectProcessPanel({
 
       <ConfirmModal
         open={confirmOpen}
-        title={action === "scrap" ? "폐기 확인" : "반품 확인"}
+        title={action === "unquarantine" ? "정상 복귀 확인" : action === "scrap" ? "폐기 확인" : "반품 확인"}
         tone="danger"
         cautionMessage="이 작업은 즉시 반영됩니다."
         confirmLabel="즉시 처리"
@@ -409,7 +407,9 @@ export function MobileDefectProcessPanel({
         }}
       >
         <span style={{ color: LEGACY_COLORS.text }}>
-          {action === "scrap"
+          {action === "unquarantine"
+            ? `${location.item_name} × ${processQty}개를 정상 재고로 복귀합니다.`
+            : action === "scrap"
             ? `${location.item_name} × ${processQty}개를 폐기합니다.`
             : `${location.item_name} × ${processQty}개를 반품합니다.`}
         </span>

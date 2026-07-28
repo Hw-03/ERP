@@ -29,6 +29,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/ui/dirty-guard", () => ({
   DirtyGuardProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useConfirmNavigation: () => (next: () => void) => next(),
+  useFlushDirtyEntries: () => async () => {},
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({
@@ -107,6 +108,7 @@ describe("DesktopMesShell tab transition", () => {
   const originalStartViewTransition = document.startViewTransition;
 
   beforeEach(() => {
+    window.history.replaceState({}, "", "/mes?tab=history");
     routerPush.mockClear();
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
@@ -167,6 +169,30 @@ describe("DesktopMesShell tab transition", () => {
     }));
   });
 
+  it("uses the current browser URL when a responsive remount sees stale App Router params", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/mes?tab=warehouse&section=compose&step=5&draftId=draft-1",
+    );
+
+    render(<DesktopMesShell />);
+
+    expect(screen.getByText("warehouse submit")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "warehouse" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("keeps the mounted desktop shell visible when a breakpoint switch is blocked", () => {
+    const { container } = render(<DesktopMesShell />);
+    const shell = container.querySelector(".h-screen");
+
+    expect(shell).toHaveClass("flex");
+    expect(shell).not.toHaveClass("hidden");
+  });
+
   it("does not wire the abolished shipping preparation entry into the shell", () => {
     render(<DesktopMesShell />);
 
@@ -175,4 +201,5 @@ describe("DesktopMesShell tab transition", () => {
       expect.not.objectContaining({ onStartPrepareWork: expect.any(Function) }),
     );
   });
+
 });

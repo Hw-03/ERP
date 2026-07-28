@@ -46,6 +46,16 @@ const SCOPE_LABEL: Record<DataScope, string> = {
 
 const STORAGE_KEY = "admin.export.recent";
 const RECENT_LIMIT = 5;
+const PAGE_SIZE = 2000;
+
+async function collectAllPages<T>(fetchPage: (skip: number) => Promise<T[]>): Promise<T[]> {
+  const rows: T[] = [];
+  for (let skip = 0; ; skip += PAGE_SIZE) {
+    const page = await fetchPage(skip);
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+}
 
 function loadRecent(): ExportRecord[] {
   if (typeof window === "undefined") return [];
@@ -243,7 +253,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
     stamp: string,
   ): Promise<{ csv: string; fileName: string }> {
     if (scope === "items") {
-      const items = await api.getItems({ limit: 5000 });
+      const items = await collectAllPages((skip) => api.getItems({ limit: PAGE_SIZE, skip }));
       // Item 타입에 is_active 필드가 없어 클라이언트 필터 불가 — 전체 반환
       const filtered = items;
       const headers = ["품목 코드", "품명", "단위", "현재고", "안전재고", "부서", "공급처"];
@@ -260,7 +270,14 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
       return { csv: lines.join("\n"), fileName: `items_${stamp}.csv` };
     }
     if (scope === "transactions") {
-      const tx = await api.getTransactions({ limit: 5000 });
+      const tx = await collectAllPages((skip) =>
+        api.getTransactions({
+          dateFrom: range.start,
+          dateTo: range.end,
+          limit: PAGE_SIZE,
+          skip,
+        }),
+      );
       const headers = ["거래일시", "구분", "품목명", "수량변화", "단위", "메모"];
       const rows = tx
         .filter((t) => {

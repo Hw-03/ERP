@@ -32,8 +32,7 @@ export function MobileSingleAdjustForm({
   onScan,
   onSaveDraft,
   saving,
-  onSubmit,
-  submitting,
+  onReview,
   busy,
   error,
 }: {
@@ -49,8 +48,7 @@ export function MobileSingleAdjustForm({
   onScan: () => void;
   onSaveDraft: () => void;
   saving: boolean;
-  onSubmit: () => void;
-  submitting: boolean;
+  onReview: () => void;
   busy: boolean;
   error: string | null;
 }) {
@@ -205,16 +203,15 @@ export function MobileSingleAdjustForm({
           intent="neutral"
           count={bundles.length || undefined}
           onClick={onSaveDraft}
-          disabled={bundles.length === 0 || saving || submitting}
+          disabled={bundles.length === 0 || saving}
           loadingText={saving ? "저장 중…" : undefined}
         />
         <PrimaryActionButton
-          label={isOut ? "단품 출고 제출" : "단품 입고 제출"}
+          label="최종 검토"
           intent={isOut ? "danger" : "primary"}
           count={bundles.length || undefined}
-          onClick={onSubmit}
-          disabled={bundles.length === 0 || submitting || saving}
-          loadingText={submitting ? "처리 중…" : undefined}
+          onClick={onReview}
+          disabled={bundles.length === 0 || saving}
         />
       </div>
     </div>

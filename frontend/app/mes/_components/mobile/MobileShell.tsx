@@ -34,6 +34,7 @@ import { useCurrentOperator } from "../login/useCurrentOperator";
 import { useNotificationsQuery } from "@/lib/queries/useNotificationsQuery";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
+import type { NotificationNavigationTarget } from "../notifications/NotificationBell";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 import { MobileDirtyLeaveSheet } from "./warehouse/MobileDirtyLeaveSheet";
 import type { MobileMoreEntryId } from "./screens/MobileMoreScreen";
@@ -138,11 +139,19 @@ function NavButton({
   );
 }
 
-export function MobileShell() {
+export function MobileShell({
+  onBeforeViewportSwitchChange,
+}: {
+  onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+}) {
   const operator = useCurrentOperator();
   const employeeId = operator?.employee_id;
   const { data: notificationsData } = useNotificationsQuery(employeeId);
-  const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
+  const [activeTab, setActiveTab] = useState<MobileTabId>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    return tab && (VALID_TAB_IDS as string[]).includes(tab) ? tab as MobileTabId : "dashboard";
+  });
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
@@ -152,26 +161,37 @@ export function MobileShell() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    const t = params.get("tab");
-    if (t && (VALID_TAB_IDS as string[]).includes(t)) setActiveTab(t as MobileTabId);
     const d = params.get("defect_dept");
     if (d) setDefectDeptFilter(d);
+    setWarehouseStockRequestId(params.get("stockRequestId"));
   }, []);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
+  const [warehouseStockRequestId, setWarehouseStockRequestId] = useState<string | null>(null);
   const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
   // 항목 16 — 입출고 작성 중(담은 묶음 있음) 하단 네비로 이탈 시 확인 시트.
   const [warehouseDirty, setWarehouseDirty] = useState(false);
-  const warehouseFlushRef = useRef<(() => void) | null>(null);
+  const warehouseFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
 
   const unreadNotifications = notificationsData?.unread_count ?? 0;
 
   const handleStatusChange = useCallback((_msg: string) => {}, []);
+
+  const flushBeforeViewportSwitch = useCallback(async () => {
+    if (activeTab !== "warehouse" || !warehouseDirty) return;
+    if (!warehouseFlushRef.current) throw new Error("작성 중인 입출고를 저장할 수 없습니다.");
+    await warehouseFlushRef.current();
+  }, [activeTab, warehouseDirty]);
+
+  useEffect(() => {
+    onBeforeViewportSwitchChange?.(flushBeforeViewportSwitch);
+    return () => onBeforeViewportSwitchChange?.(null);
+  }, [flushBeforeViewportSwitch, onBeforeViewportSwitchChange]);
 
   const commitMobileTab = useCallback((target: MobileTabId) => {
     if (target !== activeTab) {
@@ -183,6 +203,15 @@ export function MobileShell() {
         source: "mobile",
       });
     }
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", target);
+    if (target !== "warehouse") {
+      url.searchParams.delete("section");
+      url.searchParams.delete("step");
+      url.searchParams.delete("stockRequestId");
+      url.searchParams.delete("draftId");
+    }
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     setActiveTab(target);
   }, [activeTab]);
 
@@ -227,10 +256,18 @@ export function MobileShell() {
     commitMobileTab(target);
   }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, warehouseDirty]);
 
-  const handleNotificationNavigate = useCallback((tab: string, section: string | null) => {
+  const handleNotificationNavigate = useCallback(({ tab, section, relatedRequestId }: NotificationNavigationTarget) => {
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
     const target = tab as MobileTabId;
     if (!canOpenMobileTab(target)) return;
+    if (target === "warehouse") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", target);
+      if (section) url.searchParams.set("section", section);
+      if (relatedRequestId) url.searchParams.set("stockRequestId", relatedRequestId);
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      setWarehouseStockRequestId(relatedRequestId);
+    }
     handleTabChange(target);
     if (target === "defect" && section) setDefectDeptFilter(section);
   }, [canOpenMobileTab, handleTabChange]);
@@ -308,6 +345,7 @@ export function MobileShell() {
           globalSearch=""
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
+          stockRequestId={warehouseStockRequestId}
           entryIntent={warehouseIntent}
           onSubmitSuccess={loadCapacity}
           onComposeDirtyChange={setWarehouseDirty}
@@ -361,6 +399,7 @@ export function MobileShell() {
     refreshNonce,
     warehousePreselected,
     warehouseIntent,
+    warehouseStockRequestId,
     handleGoToWarehouse,
     handleStatusChange,
     canOpenMobileTab,
@@ -459,12 +498,16 @@ export function MobileShell() {
       <MobileDirtyLeaveSheet
         open={pendingNavTab !== null}
         onCancel={() => setPendingNavTab(null)}
-        onConfirm={() => {
-          warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
-          const next = pendingNavTab;
-          setPendingNavTab(null);
-          setWarehouseDirty(false);
-          if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
+        onConfirm={async () => {
+          try {
+            await warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+            const next = pendingNavTab;
+            setPendingNavTab(null);
+            setWarehouseDirty(false);
+            if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
+          } catch {
+            // 저장 오류는 위저드 안에 표시되고 현재 작성 화면을 유지한다.
+          }
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.

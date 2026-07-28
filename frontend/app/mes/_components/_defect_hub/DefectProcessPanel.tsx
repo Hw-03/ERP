@@ -417,13 +417,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           <button
             type="button"
             disabled={busy}
-            onClick={() => {
-              if (action === "unquarantine") {
-                void handleSubmit();
-              } else {
-                setConfirmOpen(true);
-              }
-            }}
+            onClick={() => setConfirmOpen(true)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: actionColor[action] }}
           >
@@ -434,7 +428,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
 
       <ConfirmModal
         open={confirmOpen}
-        title={action === "scrap" ? "폐기 확인" : "반품 확인"}
+        title={action === "unquarantine" ? "정상 복귀 확인" : action === "scrap" ? "폐기 확인" : "반품 확인"}
         tone="danger"
         cautionMessage="이 작업은 즉시 반영됩니다."
         confirmLabel="즉시 처리"
@@ -443,7 +437,9 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
         onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
       >
         <span style={{ color: LEGACY_COLORS.text }}>
-          {action === "scrap"
+          {action === "unquarantine"
+            ? `${location.item_name} × ${processQty}개를 정상 재고로 복귀합니다.`
+            : action === "scrap"
             ? `${location.item_name} × ${processQty}개를 폐기합니다.`
             : `${location.item_name} × ${processQty}개를 반품합니다.`}
         </span>

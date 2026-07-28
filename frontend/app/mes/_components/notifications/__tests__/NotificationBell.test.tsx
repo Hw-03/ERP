@@ -172,7 +172,7 @@ describe("NotificationBell", () => {
 
   it("marks an item read and navigates when an item is clicked in the notification panel", async () => {
     const onNavigate = vi.fn();
-    state.notifications.items = [notification({ target_tab: "history", target_section: "detail" })];
+    state.notifications.items = [notification({ target_tab: "warehouse", target_section: "queue", related_request_id: "request-1" })];
     state.notifications.unread_count = 1;
 
     render(<NotificationBell onNavigate={onNavigate} loginDialogEnabled={false} />);
@@ -184,7 +184,7 @@ describe("NotificationBell", () => {
       recipient_employee_id: "emp-1",
       notification_ids: ["n-1"],
     });
-    expect(onNavigate).toHaveBeenCalledWith("history", "detail");
+    expect(onNavigate).toHaveBeenCalledWith({ tab: "warehouse", section: "queue", relatedRequestId: "request-1" });
   });
 
   it("marks every notification read from the login dialog", async () => {
@@ -226,7 +226,7 @@ describe("NotificationBell", () => {
       recipient_employee_id: "emp-1",
       notification_ids: ["n-1"],
     });
-    expect(onNavigate).toHaveBeenCalledWith("history", "detail");
+    expect(onNavigate).toHaveBeenCalledWith({ tab: "history", section: "detail", relatedRequestId: null });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
 import { DESKTOP_TAB_ICON_COLORS, DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
+import type { NotificationNavigationTarget } from "./notifications/NotificationBell";
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
 import { DesktopShippingView } from "./DesktopShippingView";
@@ -30,7 +31,7 @@ import { queryKeys } from "@/lib/queries/keys";
 import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { sendClientEvent } from "@/lib/client-events";
 import { CapacityDetailModal } from "./CapacityDetailModal";
-import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
+import { DirtyGuardProvider, useConfirmNavigation, useFlushDirtyEntries } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { HISTORY_PAGE_SIZE } from "./_history_sections/historyConstants";
@@ -61,19 +62,28 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   admin: { title: "관리자", icon: Settings2 },
 };
 
-export function DesktopMesShell() {
+export function DesktopMesShell({
+  onBeforeViewportSwitchChange,
+}: {
+  onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+}) {
   return (
     <DirtyGuardProvider>
-      <DesktopMesShellInner />
+      <DesktopMesShellInner onBeforeViewportSwitchChange={onBeforeViewportSwitchChange} />
     </DirtyGuardProvider>
   );
 }
 
-function DesktopMesShellInner() {
+function DesktopMesShellInner({
+  onBeforeViewportSwitchChange,
+}: {
+  onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const confirmAdminNavigation = useConfirmNavigation();
+  const flushDirtyEntries = useFlushDirtyEntries();
   const operator = useCurrentOperator();
   const visibleTabs = useMemo(
     () => filterVisibleSidebarTabs(SIDEBAR_TAB_IDS, operator),
@@ -86,7 +96,10 @@ function DesktopMesShellInner() {
   );
 
   const initialTab = (() => {
-    const t = searchParams.get("tab") as DesktopTabId | null;
+    const params = typeof window === "undefined"
+      ? searchParams
+      : new URLSearchParams(window.location.search);
+    const t = params.get("tab") as DesktopTabId | null;
     return t && VALID_TABS.has(t) ? t : "dashboard";
   })();
 
@@ -97,6 +110,11 @@ function DesktopMesShellInner() {
   const [warehouseMapFullscreen, setWarehouseMapFullscreen] = useState(false);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
+
+  useEffect(() => {
+    onBeforeViewportSwitchChange?.(flushDirtyEntries);
+    return () => onBeforeViewportSwitchChange?.(null);
+  }, [flushDirtyEntries, onBeforeViewportSwitchChange]);
 
   const handleStatusChange = useCallback((msg: string) => {
     if (autoRevertTimerRef.current) clearTimeout(autoRevertTimerRef.current);
@@ -181,11 +199,14 @@ function DesktopMesShellInner() {
   }
 
   // 알림 클릭 딥링크 — 해당 탭(+섹션)으로 이동. section 은 입출고 섹션(queue/dept-queue/mine).
-  function handleNotificationNavigate(tab: string, section: string | null) {
+  function handleNotificationNavigate({ tab, section, relatedRequestId }: NotificationNavigationTarget) {
     if (!VALID_TABS.has(tab as DesktopTabId) || !canOpenTab(tab as DesktopTabId)) return;
     const target = tab as DesktopTabId;
     confirmAdminNavigation(() => {
-      const url = section ? `?tab=${target}&section=${section}` : `?tab=${target}`;
+      const params = new URLSearchParams({ tab: target });
+      if (section) params.set("section", section);
+      if (target === "warehouse" && relatedRequestId) params.set("stockRequestId", relatedRequestId);
+      const url = `?${params.toString()}`;
       if (target === activeTab) {
         // 같은 탭이면 리마운트를 강제해 섹션 초기화 로직(?section=)이 다시 실행되게 한다.
         pendingUrlTabRef.current = target;
@@ -201,8 +222,11 @@ function DesktopMesShellInner() {
   // defect_dept 쿼리도 함께 읽어 불량 탭 진입 시 부서 필터로 전달.
   // ?defect_dept= 만 있고 ?tab= 이 없으면(레거시 링크 호환) 불량 탭으로 재라우팅.
   useEffect(() => {
-    const t = searchParams.get("tab") as DesktopTabId | null;
-    const dept = searchParams.get("defect_dept");
+    // A responsive remount can briefly see the previous shell's App Router snapshot.
+    // The address-bar URL is authoritative for restoring the active desktop tab.
+    const currentParams = new URLSearchParams(window.location.search);
+    const t = currentParams.get("tab") as DesktopTabId | null;
+    const dept = currentParams.get("defect_dept");
     const targetFromUrl = t && VALID_TABS.has(t) ? t : !t && dept ? "defect" : null;
     const pendingUrlTab = pendingUrlTabRef.current;
 
@@ -390,7 +414,7 @@ function DesktopMesShellInner() {
           onClose={() => setCapacityModal(false)}
         />
       )}
-      <div className="hidden h-screen overflow-hidden lg:flex">
+      <div className="flex h-screen overflow-hidden">
         <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
           <DesktopSidebar
             activeTab={activeTab}

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
 
@@ -20,6 +20,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/ui/dirty-guard", () => ({
   DirtyGuardProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useConfirmNavigation: () => (next: () => void) => next(),
+  useFlushDirtyEntries: () => async () => {},
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({
@@ -79,6 +80,10 @@ vi.mock("../DesktopWarehouseMapTab", () => ({
 }));
 
 describe("DesktopMesShell warehouse map fullscreen", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/mes?tab=warehouseMap");
+  });
+
   it("re-renders the warehouse map tab when fullscreen changes", () => {
     render(<DesktopMesShell />);
 

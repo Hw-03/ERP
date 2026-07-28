@@ -12,6 +12,8 @@ const navigationMock = vi.hoisted(() => ({
   replace: vi.fn(),
   search: "tab=shipping",
 }));
+const dirtyGuardMock = vi.hoisted(() => vi.fn());
+const confirmNavigationMock = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -19,6 +21,10 @@ vi.mock("next/navigation", () => ({
     replace: navigationMock.replace,
   }),
   useSearchParams: () => new URLSearchParams(navigationMock.search),
+}));
+vi.mock("@/lib/ui/dirty-guard", () => ({
+  useRegisterDirty: dirtyGuardMock,
+  useConfirmNavigation: () => confirmNavigationMock,
 }));
 vi.mock("@/lib/api", () => ({
   api: {
@@ -207,6 +213,7 @@ function render(ui: ReactElement) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  confirmNavigationMock.mockImplementation((proceed: () => void) => proceed());
   navigationMock.search = "tab=shipping";
   vi.mocked(api.getItems).mockResolvedValue(items);
   vi.mocked(api.getShippingRequests).mockResolvedValue([
@@ -1305,6 +1312,7 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
     await openNewRequest(container);
+    fireEvent.change(await screen.findByRole("textbox", { name: "인보이스 번호" }), { target: { value: "INV-STEP-3" } });
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
     nextStep(container);
@@ -1315,6 +1323,22 @@ describe("DesktopShippingView", () => {
     fireEvent.click(screen.getByTestId("shipping-quantity-change"));
     expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("spinbutton", { name: "출하 수량" })).toHaveFocus());
+    expect(screen.getByRole("textbox", { name: "인보이스 번호" })).toHaveValue("INV-STEP-3");
+
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-3")).toBeInTheDocument();
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
+    nextStep(container);
+    expect(await screen.findByTestId("shipping-wizard-step-5")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ invoice_number: "INV-STEP-3" }),
+    ));
   });
 
   it("prefills required PA/PF naming from the base items in the matching action bar", async () => {
@@ -2028,6 +2052,86 @@ describe("DesktopShippingView", () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => expect(api.updateShippingInvoice).toHaveBeenCalledWith("cancelled-before-prepared", null));
+  });
+
+  it("does not register a clean completed-history detail as dirty", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=hist-clean&shippingHistoryStatus=PICKED_UP";
+    const completed = request({
+      request_id: "hist-clean",
+      status: "PICKED_UP",
+      invoice_number: "INV-CLEAN",
+      picked_up_at: "2026-07-20T01:00:00Z",
+    });
+    vi.mocked(api.getShippingRequests).mockResolvedValue([completed]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [completed], next_cursor: null, has_more: false });
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await screen.findByTestId("shipping-history-detail");
+    expect(dirtyGuardMock).toHaveBeenLastCalledWith(
+      "shipping-work",
+      false,
+      expect.any(Function),
+      undefined,
+      { mode: "confirm-only" },
+    );
+  });
+
+  it("guards the history back action after the invoice is edited", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=hist-dirty&shippingHistoryStatus=PICKED_UP";
+    const completed = request({
+      request_id: "hist-dirty",
+      status: "PICKED_UP",
+      invoice_number: "INV-OLD",
+      picked_up_at: "2026-07-20T01:00:00Z",
+    });
+    vi.mocked(api.getShippingRequests).mockResolvedValue([completed]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [completed], next_cursor: null, has_more: false });
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.change(await screen.findByRole("textbox", { name: "인보이스 번호" }), {
+      target: { value: "INV-NEW" },
+    });
+    confirmNavigationMock.mockImplementation(() => {});
+    fireEvent.click(screen.getByRole("button", { name: "이전 화면" }));
+
+    expect(confirmNavigationMock).toHaveBeenCalledTimes(1);
+    expect(navigationMock.push).not.toHaveBeenCalled();
+  });
+
+  it("restores the detail URL and guards browser history navigation after an invoice edit", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=hist-pop&shippingHistoryStatus=PICKED_UP";
+    const completed = request({
+      request_id: "hist-pop",
+      status: "PICKED_UP",
+      invoice_number: "INV-OLD",
+      picked_up_at: "2026-07-20T01:00:00Z",
+    });
+    vi.mocked(api.getShippingRequests).mockResolvedValue([completed]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [completed], next_cursor: null, has_more: false });
+    let proceed: (() => void) | undefined;
+    confirmNavigationMock.mockImplementation((next: () => void) => { proceed = next; });
+
+    const rendered = render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.change(await screen.findByRole("textbox", { name: "인보이스 번호" }), {
+      target: { value: "INV-NEW" },
+    });
+    navigationMock.push.mockClear();
+    navigationMock.replace.mockClear();
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    rendered.rerender(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(confirmNavigationMock).toHaveBeenCalledTimes(1));
+    expect(navigationMock.replace).toHaveBeenCalledWith(
+      "?tab=shipping&shippingView=historyWork&shippingRequestId=hist-pop&shippingHistoryStatus=PICKED_UP",
+      { scroll: false },
+    );
+
+    act(() => proceed?.());
+    expect(navigationMock.push).toHaveBeenCalledWith(
+      "?tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP",
+      { scroll: false },
+    );
   });
 
   it("allows saving an invoice number already used by another request", async () => {

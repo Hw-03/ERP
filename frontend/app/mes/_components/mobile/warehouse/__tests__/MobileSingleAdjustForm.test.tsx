@@ -74,10 +74,12 @@ function Harness({
   bundles = [],
   onAddItem = vi.fn(),
   onSaveDraft = vi.fn(),
+  onReview = vi.fn(),
 }: {
   bundles?: IoBundle[];
   onAddItem?: (item: Item) => void;
   onSaveDraft?: () => void;
+  onReview?: () => void;
 }) {
   const [search, setSearch] = useState("CTR");
 
@@ -95,8 +97,7 @@ function Harness({
       onScan={() => {}}
       onSaveDraft={onSaveDraft}
       saving={false}
-      onSubmit={() => {}}
-      submitting={false}
+      onReview={onReview}
       busy={false}
       error={null}
     />
@@ -119,11 +120,14 @@ describe("MobileSingleAdjustForm", () => {
 
   it("shows a visible draft save action beside the single submit action", () => {
     const onSaveDraft = vi.fn();
-    render(<Harness bundles={[makeBundle()]} onSaveDraft={onSaveDraft} />);
+    const onReview = vi.fn();
+    render(<Harness bundles={[makeBundle()]} onSaveDraft={onSaveDraft} onReview={onReview} />);
 
     fireEvent.click(screen.getByRole("button", { name: /작성 중 저장/ }));
 
-    expect(screen.getByRole("button", { name: /단품 출고 제출/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /최종 검토/ })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button").at(-1)!);
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onReview).toHaveBeenCalledTimes(1);
   });
 });

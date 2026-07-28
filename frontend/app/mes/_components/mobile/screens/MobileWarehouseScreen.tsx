@@ -12,9 +12,12 @@ import {
 import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraftPanelTabs";
 import { readCurrentOperator } from "../../login/useCurrentOperator";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
+import type { IoStep } from "../../_warehouse_v2/useIoWorkState";
 import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
 import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
 import panelStyles from "./mobileWarehousePanels.module.css";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { AsyncState } from "../primitives/AsyncState";
 
 // 인수인계 수신 부서 — DesktopWarehouseView 와 동일 도메인 상수(미export 라 동일값 복제).
 const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
@@ -36,6 +39,7 @@ export function MobileWarehouseScreen({
   globalSearch,
   onStatusChange,
   preselectedItem,
+  stockRequestId,
   entryIntent,
   onSubmitSuccess,
   onComposeDirtyChange,
@@ -44,12 +48,13 @@ export function MobileWarehouseScreen({
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
+  stockRequestId?: string | null;
   entryIntent?: IoEntryIntent | null;
   onSubmitSuccess?: () => void;
   // 항목 16 — 하단 네비 이탈 가드용. compose 작성 중 여부를 상위(MobileShell)에 보고하고,
   // 상위가 이탈 직전 draft flush 를 호출할 수 있게 ref 를 공유받는다.
   onComposeDirtyChange?: (dirty: boolean) => void;
-  flushDraftRef?: MutableRefObject<(() => void) | null>;
+  flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
@@ -58,7 +63,20 @@ export function MobileWarehouseScreen({
 
   const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
-  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
+  const urlDraftId = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("draftId");
+  const urlRestoreStep = typeof window === "undefined"
+    ? undefined
+    : parseIoStep(new URLSearchParams(window.location.search).get("step"));
+  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
+    if (typeof window === "undefined") return "compose";
+    const section = new URLSearchParams(window.location.search).get("section");
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue", "handover"];
+    return section && valid.includes(section as WarehouseSectionTab)
+      ? section as WarehouseSectionTab
+      : "compose";
+  });
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
     const eid = operator?.employee_id ?? "";
@@ -72,6 +90,10 @@ export function MobileWarehouseScreen({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  const [urlDraftPending, setUrlDraftPending] = useState(() => Boolean(urlDraftId));
+  const [urlDraftRestoreError, setUrlDraftRestoreError] = useState<string | null>(null);
+  const [urlDraftRestoreNonce, setUrlDraftRestoreNonce] = useState(0);
+  const restoredUrlDraftRef = useRef<string | null>(null);
   // '이어서 하기' 클릭마다 증가 — 같은 draft 재선택에도 복원이 재발동하도록.
   const [restoreNonce, setRestoreNonce] = useState(0);
   const [composeStep, setComposeStep] = useState(1);
@@ -82,7 +104,7 @@ export function MobileWarehouseScreen({
   const [composeDirty, setComposeDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<WarehouseSectionTab | null>(null);
   // 항목 16 — flush ref 는 상위(MobileShell)가 내려주면 공유, 없으면 로컬 사용(섹션 가드 단독 동작 보장).
-  const localFlushRef = useRef<(() => void) | null>(null);
+  const localFlushRef = useRef<(() => Promise<void>) | null>(null);
   const flushDraftRef = externalFlushRef ?? localFlushRef;
 
   // 작성 중 여부를 상위로 보고 → 하단 네비 탭 이탈 가드에 사용.
@@ -109,22 +131,70 @@ export function MobileWarehouseScreen({
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {
+    if (
+      (sectionTab === "queue" && !canSeeQueue)
+      || (sectionTab === "dept-queue" && !canSeeDeptQueue)
+      || (sectionTab === "handover" && !showHandover)
+    ) {
+      setSectionTab("compose");
+    }
+  }, [canSeeDeptQueue, canSeeQueue, sectionTab, showHandover]);
+
+  useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
   }, [operator, employeeId]);
 
   useEffect(() => {
     if (!operatorEmployeeId) return;
-    Promise.all([
-      api.listStockRequestDrafts(operatorEmployeeId),
-      api.listDrafts(operatorEmployeeId),
-    ])
-      .then(([legacyRows, ioRows]) => {
-        const n = legacyRows.length + ioRows.length;
+    let cancelled = false;
+    const legacyDraftsPromise = api.listStockRequestDrafts(operatorEmployeeId);
+    const ioDraftsPromise = api.listDrafts(operatorEmployeeId);
+
+    void Promise.allSettled([legacyDraftsPromise, ioDraftsPromise])
+      .then(([legacyResult, ioResult]) => {
+        if (cancelled) return;
+        const legacyCount = legacyResult.status === "fulfilled" ? legacyResult.value.length : 0;
+        const ioCount = ioResult.status === "fulfilled" ? ioResult.value.length : 0;
+        const n = legacyCount + ioCount;
         setCartCount(n);
         cartCountCache.set(operatorEmployeeId, n);
+      });
+
+    if (!urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
+      setUrlDraftPending(false);
+      setUrlDraftRestoreError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setUrlDraftPending(true);
+    setUrlDraftRestoreError(null);
+    void ioDraftsPromise
+      .then((ioRows) => {
+        if (cancelled) return;
+        const matchingDraft = ioRows.find((draft) => draft.batch_id === urlDraftId);
+        if (!matchingDraft) {
+          setUrlDraftRestoreError("저장한 작업을 찾을 수 없습니다.");
+          setUrlDraftPending(false);
+          return;
+        }
+        restoredUrlDraftRef.current = urlDraftId;
+        setRestoreIoDraft(matchingDraft);
+        setRestoreNonce((value) => value + 1);
+        setSectionTab("compose");
+        setUrlDraftPending(false);
       })
-      .catch(() => {});
-  }, [operatorEmployeeId, panelRefreshNonce]);
+      .catch(() => {
+        if (cancelled) return;
+        setUrlDraftRestoreError("저장한 작업을 불러오지 못했습니다.");
+        setUrlDraftPending(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [operatorEmployeeId, panelRefreshNonce, urlDraftId, urlDraftRestoreNonce]);
 
   useEffect(() => {
     if (!canSeeQueue) return;
@@ -168,6 +238,18 @@ export function MobileWarehouseScreen({
       setPendingTab(next);
       return;
     }
+    commitSection(next);
+  }
+
+  function commitSection(next: WarehouseSectionTab) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "warehouse");
+    url.searchParams.set("section", next);
+    if (next !== "compose") {
+      url.searchParams.delete("step");
+      url.searchParams.delete("draftId");
+    }
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     setSectionTab(next);
   }
 
@@ -196,7 +278,21 @@ export function MobileWarehouseScreen({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {sectionTab === "compose" ? (
+        {sectionTab === "compose" ? urlDraftPending ? (
+          <div className="flex h-full items-center justify-center px-4 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            저장한 작업을 불러오는 중입니다.
+          </div>
+        ) : urlDraftRestoreError ? (
+          <div role="alert" className="h-full overflow-y-auto px-4 py-6">
+            <AsyncState
+              loading={false}
+              error={`${urlDraftRestoreError} 현재 작업 위치를 유지했습니다.`}
+              onRetry={() => setUrlDraftRestoreNonce((value) => value + 1)}
+            >
+              {null}
+            </AsyncState>
+          </div>
+        ) : (
           <MobileIoComposeWizard
             globalSearch={globalSearch}
             operator={operator}
@@ -207,6 +303,7 @@ export function MobileWarehouseScreen({
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
             restoreNonce={restoreNonce}
+            restoreStep={urlRestoreStep}
             entryIntent={entryIntent}
             onDirtyChange={setComposeDirty}
             flushDraftRef={flushDraftRef}
@@ -219,6 +316,7 @@ export function MobileWarehouseScreen({
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
+            onDraftSaved={persistWarehouseDraftUrl}
           />
         ) : (
           <div className={`h-full overflow-y-auto px-3 pb-6 ${panelStyles.touchScope}`}>
@@ -237,11 +335,13 @@ export function MobileWarehouseScreen({
               onContinueIoDraft={(draft) => {
                 setRestoreIoDraft(draft);
                 setRestoreNonce((n) => n + 1);
-                setSectionTab("compose");
+                commitSection("compose");
+                persistWarehouseDraftUrl(draft.batch_id, defaultDraftStep(draft));
               }}
               bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
               onSubmitSuccess={onSubmitSuccess}
               resetDraftTracking={() => {}}
+              targetRequestId={stockRequestId}
               onCartCountChange={(n) => {
                 setCartCount(n);
                 if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
@@ -254,21 +354,43 @@ export function MobileWarehouseScreen({
       <MobileDirtyLeaveSheet
         open={pendingTab !== null}
         onCancel={() => setPendingTab(null)}
-        onConfirm={() => {
-          flushDraftRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
-          const next = pendingTab;
-          setPendingTab(null);
-          setComposeDirty(false);
-          if (next) setSectionTab(next);
+        onConfirm={async () => {
+          try {
+            await flushDraftRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+            const next = pendingTab;
+            setPendingTab(null);
+            setComposeDirty(false);
+            if (next) commitSection(next);
+          } catch {
+            // 저장 오류 시 현재 작성 화면과 확인 시트를 유지한다.
+          }
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 섹션 이동. compose 위저드는 언마운트되어 작성 내용이 폐기된다.
           const next = pendingTab;
           setPendingTab(null);
           setComposeDirty(false);
-          if (next) setSectionTab(next);
+          if (next) commitSection(next);
         }}
       />
     </div>
   );
+}
+
+function parseIoStep(raw: string | null): IoStep | undefined {
+  const step = Number(raw);
+  return step >= 1 && step <= 5 ? step as IoStep : undefined;
+}
+
+function persistWarehouseDraftUrl(batchId: string, step: IoStep): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("tab", "warehouse");
+  url.searchParams.set("section", "compose");
+  url.searchParams.set("step", String(step));
+  url.searchParams.set("draftId", batchId);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function defaultDraftStep(draft: IoBatch): IoStep {
+  return draft.sub_type === "adjust_in" || draft.sub_type === "adjust_out" ? 3 : 4;
 }

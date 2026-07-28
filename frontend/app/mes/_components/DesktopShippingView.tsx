@@ -37,7 +37,7 @@ import { queryKeys } from "@/lib/queries/keys";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { processTypeColor } from "@/lib/mes/process";
-import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { useConfirmNavigation, useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
@@ -269,6 +269,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
   const searchParams = useSearchParams();
   const lastUrlSearchRef = useRef(searchParams.toString());
   const pendingUrlSearchRef = useRef<string | null>(null);
+  const blockedHistorySearchRef = useRef<string | null>(null);
+  const authorizedHistorySearchRef = useRef<string | null>(null);
   const [view, setView] = useState<ViewMode>("hub");
   const [items, setItems] = useState<Item[]>([]);
   const [pfItems, setPfItems] = useState<Item[]>([]);
@@ -325,6 +327,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyDetailError, setHistoryDetailError] = useState<string | null>(null);
+  const [historyInvoiceDirty, setHistoryInvoiceDirty] = useState(false);
   const historyLoadedStatusRef = useRef<ShippingHistoryStatus | null>(null);
   const historyRequestGenerationRef = useRef(0);
   const nameValidationNoticeIdRef = useRef(0);
@@ -374,7 +377,8 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     return view === "historyWork" && selectedHistoryId ? null : historyRows[0] ?? null;
   }, [historyRows, requests, selectedHistoryId, view]);
   const canEditDraft = !selectedRequest || selectedRequest.status === "REQUESTED" || selectedRequest.status === "PREPARING";
-  const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "historyWork";
+  const shippingWorkDirty = view === "requestWork" || (view === "historyWork" && historyInvoiceDirty);
+  const confirmShippingNavigation = useConfirmNavigation();
   const saveShippingWork = useCallback(() => {}, []);
   useRegisterDirty("shipping-work", shippingWorkDirty, saveShippingWork, undefined, { mode: "confirm-only" });
   function buildShippingUrl(
@@ -405,10 +409,17 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     requestId?: string | null,
     historyStatusOverride?: ShippingHistoryStatus,
   ) {
-    const url = buildShippingUrl(nextView, requestId, historyStatusOverride);
-    pendingUrlSearchRef.current = url.startsWith("?") ? url.slice(1) : url;
-    setView(nextView);
-    router.push(url, { scroll: false });
+    const commitNavigation = () => {
+      const url = buildShippingUrl(nextView, requestId, historyStatusOverride);
+      pendingUrlSearchRef.current = url.startsWith("?") ? url.slice(1) : url;
+      setView(nextView);
+      router.push(url, { scroll: false });
+    };
+    if (view === "historyWork" && historyInvoiceDirty) {
+      confirmShippingNavigation(commitNavigation);
+      return;
+    }
+    commitNavigation();
   }
 
   const upsertRequest = useCallback((next: ShippingRequest) => {
@@ -422,6 +433,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     upsertRequest(next);
     setHistoryRows((current) => current.map((row) => row.request_id === next.request_id ? next : row));
     setInvoiceNumber(next.invoice_number ?? "");
+    setHistoryInvoiceDirty(false);
   }, [upsertRequest]);
 
   const ensureItemsLoaded = useCallback(async (): Promise<Item[] | null> => {
@@ -668,6 +680,11 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") return;
     const currentSearch = searchParams.toString();
+    const authorizedHistoryNavigation = authorizedHistorySearchRef.current === currentSearch;
+    if (authorizedHistoryNavigation) authorizedHistorySearchRef.current = null;
+    if (blockedHistorySearchRef.current && blockedHistorySearchRef.current !== currentSearch) {
+      blockedHistorySearchRef.current = null;
+    }
     if (pendingUrlSearchRef.current) {
       if (currentSearch === pendingUrlSearchRef.current) {
         pendingUrlSearchRef.current = null;
@@ -677,10 +694,26 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     }
     const hasSubview = searchParams.has("shippingView");
     if (!hasSubview && lastUrlSearchRef.current === currentSearch && view !== "hub") return;
-    lastUrlSearchRef.current = currentSearch;
     const nextView = isShippingViewMode(searchParams.get("shippingView")) ? searchParams.get("shippingView") as ViewMode : "hub";
     const requestId = searchParams.get("shippingRequestId");
     const urlHistoryStatus = searchParams.get("shippingHistoryStatus");
+    const leavesDirtyHistory = view === "historyWork"
+      && historyInvoiceDirty
+      && (nextView !== "historyWork" || requestId !== selectedHistoryId);
+    if (!authorizedHistoryNavigation && leavesDirtyHistory) {
+      if (blockedHistorySearchRef.current === currentSearch) return;
+      const restoreSearch = lastUrlSearchRef.current;
+      blockedHistorySearchRef.current = currentSearch;
+      pendingUrlSearchRef.current = restoreSearch;
+      router.replace(`?${restoreSearch}`, { scroll: false });
+      confirmShippingNavigation(() => {
+        authorizedHistorySearchRef.current = currentSearch;
+        pendingUrlSearchRef.current = currentSearch;
+        router.push(`?${currentSearch}`, { scroll: false });
+      });
+      return;
+    }
+    lastUrlSearchRef.current = currentSearch;
     if (
       nextView === "historyList"
       && (urlHistoryStatus === "PICKED_UP" || urlHistoryStatus === "CANCELLED")
@@ -755,7 +788,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
-  }, [searchParams, requests, loading, view, historyStatus, ensurePfItemsLoaded, ensureItemsLoaded]);
+  }, [searchParams, requests, loading, view, historyStatus, historyInvoiceDirty, selectedHistoryId, confirmShippingNavigation, router, ensurePfItemsLoaded, ensureItemsLoaded]);
 
   function clearDraft() {
     navigateView("requestWork");
@@ -1301,7 +1334,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     return (
       <div className="grid gap-3">
         <ViewHeader title="출하 상세 이력" subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다." onBack={() => navigateView("historyList")} />
-        <HistorySection rows={historyRows} selected={selectedHistory} emptyBody={historyDetailError ?? undefined} onSelect={(req) => setSelectedHistoryId(req.request_id)} onInvoiceSaved={handleInvoiceSaved} showList={false} />
+        <HistorySection rows={historyRows} selected={selectedHistory} emptyBody={historyDetailError ?? undefined} onSelect={(req) => setSelectedHistoryId(req.request_id)} onInvoiceSaved={handleInvoiceSaved} onInvoiceDirtyChange={setHistoryInvoiceDirty} showList={false} />
       </div>
     );
   }
@@ -1545,7 +1578,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
   );
 }
 
-function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; onSaved: (request: ShippingRequest) => void }) {
+function InvoiceNumberEditor({ request, onSaved, onDirtyChange }: { request: ShippingRequest; onSaved: (request: ShippingRequest) => void; onDirtyChange?: (dirty: boolean) => void }) {
   const queryClient = useQueryClient();
   const [value, setValue] = useState(request.invoice_number ?? "");
   const [saving, setSaving] = useState(false);
@@ -1573,6 +1606,9 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
   }
 
   const unchanged = value.trim() === (request.invoice_number ?? "");
+  useEffect(() => {
+    onDirtyChange?.(!unchanged);
+  }, [onDirtyChange, unchanged]);
   const hasPreparationHistory = request.status === "PREPARED"
     || request.status === "PICKED_UP"
     || Boolean(request.prepared_at)
@@ -2664,7 +2700,7 @@ function CompanionPrepList({
   );
 }
 
-function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; onSelect: (req: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
+function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, onInvoiceSaved, onInvoiceDirtyChange }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; onSelect: (req: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; onInvoiceDirtyChange: (dirty: boolean) => void }) {
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[420px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
       {showList && (
@@ -2695,7 +2731,7 @@ function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, 
               <StatusBadge status={selected.status} />
             </div>
             <div className="grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-              <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
+              <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} onDirtyChange={onInvoiceDirtyChange} />
               <RevisionHistory request={selected} />
             </div>
             {selected.status === "PICKED_UP" && <Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(selected.serial_numbers)} />}

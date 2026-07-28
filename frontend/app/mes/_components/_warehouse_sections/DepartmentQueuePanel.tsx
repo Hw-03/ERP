@@ -9,6 +9,7 @@ import {
   useDepartmentQueueQuery,
   useRejectStockRequestDepartmentMutation,
 } from "@/lib/queries/useStockRequestsQuery";
+import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
 
 /**
  * 부서 결재 정/부 전용 결재함 (낱개 IO + 듀얼 결재 케이스).
@@ -18,12 +19,13 @@ import {
  */
 
 interface Props {
+  targetRequestId?: string | null;
   approverEmployeeId: string;
   refreshNonce: number;
   onChanged: () => void;
 }
 
-export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChanged }: Props) {
+export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChanged, targetRequestId }: Props) {
   const { data: items = [], isLoading: loading, error: qError, refetch } =
     useDepartmentQueueQuery(approverEmployeeId);
   const approveMutation = useApproveStockRequestDepartmentMutation();
@@ -126,10 +128,11 @@ export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChang
       {!loading && items.length === 0 && !error && (
         <EmptyState variant="no-data" compact title="부서 결재 대기 요청이 없습니다." />
       )}
-      {items.map((req) => (
+      {prioritizeTargetRequest(items, targetRequestId).map((req) => (
         <WarehouseQueueRow
           key={req.request_id}
           req={req}
+          highlighted={req.request_id === targetRequestId}
           busyId={busyId}
           approvePinFor={approvePinFor}
           approvePin={approvePin}

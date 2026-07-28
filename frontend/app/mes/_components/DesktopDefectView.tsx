@@ -261,9 +261,13 @@ function DefectViewInner({
                 currentEmployee={employee}
                 defaultSource={defaultSourceForOp(operator)}
                 onCancel={() => window.history.back()}
-                onDone={() =>
+                onDone={(directAction) =>
                   handleProcessed(
-                    view.mode === "add" ? "새 불량 격리 완료" : "즉시 폐기 완료",
+                    view.mode === "add"
+                      ? "새 불량 격리 완료"
+                      : directAction === "rework"
+                        ? "즉시 재작업 완료"
+                        : "즉시 폐기 완료",
                   )
                 }
               />

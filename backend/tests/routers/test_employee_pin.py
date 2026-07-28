@@ -6,8 +6,8 @@
 from __future__ import annotations
 
 import pytest
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
-from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin
+from app.models import AdminAuditLog, DepartmentEnum, Employee, EmployeeLevelEnum
+from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
 
 
 def _make_employee(db, *, name="홍길동", code="E99", pin_hash=None, is_active="true"):
@@ -96,6 +96,7 @@ def test_reset_employee_pin_success(db_session, client):
     resp = client.post(
         f"/api/employees/{emp.employee_id}/reset-pin",
         json={"pin": "0000"},
+        headers={"X-Admin-Pin": "0000"},
     )
     assert resp.status_code == 204, resp.text
 
@@ -117,3 +118,27 @@ def test_reset_employee_pin_wrong_admin_pin_403(db_session, client):
         json={"pin": "9999"},
     )
     assert resp.status_code == 403, resp.text
+
+
+def test_reset_employee_pin_rejects_mismatched_body_pin_without_changes(db_session, client):
+    """헤더 인증 후에도 body PIN이 틀리면 초기화와 감사 기록을 남기지 않는다."""
+    original_pin = "2468"
+    emp = _make_employee(db_session, pin_hash=hash_pin(original_pin), code="E97")
+    employee_id = emp.employee_id
+    db_session.commit()
+    audit_count_before = db_session.query(AdminAuditLog).count()
+
+    resp = client.post(
+        f"/api/employees/{employee_id}/reset-pin",
+        json={"pin": "9999"},
+        headers={"X-Admin-Pin": "0000"},
+    )
+
+    db_session.expire_all()
+    stored_employee = db_session.query(Employee).filter(Employee.employee_id == employee_id).one()
+    audit_count_after = db_session.query(AdminAuditLog).count()
+    assert (
+        resp.status_code,
+        verify_pin(stored_employee.pin_hash, original_pin),
+        audit_count_after - audit_count_before,
+    ) == (403, True, 0), resp.text

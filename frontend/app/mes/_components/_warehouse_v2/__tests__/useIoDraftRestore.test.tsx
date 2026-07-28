@@ -29,7 +29,15 @@ function makeDraft(subType: IoSubType): IoBatch {
   };
 }
 
-function Harness({ subType, goTo }: { subType: IoSubType; goTo: (step: number) => void }) {
+function Harness({
+  subType,
+  goTo,
+  restoreStep,
+}: {
+  subType: IoSubType;
+  goTo: (step: number) => void;
+  restoreStep?: 1 | 2 | 3 | 4 | 5;
+}) {
   const restoredDraftRef = useRef<string | null>(null);
   const restoredNonceRef = useRef<number | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
@@ -55,6 +63,7 @@ function Harness({ subType, goTo }: { subType: IoSubType; goTo: (step: number) =
     autosaveBatchIdRef,
     state: state as never,
     onStatusChange: vi.fn(),
+    restoreStep,
   });
 
   return null;
@@ -73,5 +82,24 @@ describe("useIoDraftRestore", () => {
     render(<Harness subType="warehouse_to_dept" goTo={goTo} />);
 
     await waitFor(() => expect(goTo).toHaveBeenCalledWith(4));
+  });
+
+  it("restores the requested URL step after a responsive shell change", async () => {
+    const goTo = vi.fn();
+    render(<Harness subType="warehouse_to_dept" goTo={goTo} restoreStep={5} />);
+
+    await waitFor(() => expect(goTo).toHaveBeenCalledWith(5));
+  });
+
+  it("does not reapply an already restored draft when only the URL step changes", async () => {
+    const goTo = vi.fn();
+    const { rerender } = render(
+      <Harness subType="warehouse_to_dept" goTo={goTo} restoreStep={4} />,
+    );
+    await waitFor(() => expect(goTo).toHaveBeenCalledWith(4));
+
+    rerender(<Harness subType="warehouse_to_dept" goTo={goTo} restoreStep={5} />);
+
+    expect(goTo).toHaveBeenCalledTimes(1);
   });
 });

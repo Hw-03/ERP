@@ -11,6 +11,7 @@ import { useEffect, type MutableRefObject } from "react";
 import type { IoBatch } from "@/lib/api";
 import { deptIoDirectionOf } from "./ioWorkType";
 import type { useIoWorkState } from "./useIoWorkState";
+import type { IoStep } from "./useIoWorkState";
 
 type IoWorkStateApi = ReturnType<typeof useIoWorkState>;
 
@@ -25,6 +26,7 @@ export function useIoDraftRestore(params: {
   autosaveBatchIdRef: MutableRefObject<string | null>;
   state: IoWorkStateApi;
   onStatusChange: (status: string) => void;
+  restoreStep?: IoStep;
 }) {
   const {
     draftToRestore,
@@ -34,6 +36,7 @@ export function useIoDraftRestore(params: {
     autosaveBatchIdRef,
     state,
     onStatusChange,
+    restoreStep,
   } = params;
 
   useEffect(() => {
@@ -59,7 +62,10 @@ export function useIoDraftRestore(params: {
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
     state.setBundles(draftToRestore.bundles);
-    state.goTo(draftToRestore.sub_type === "adjust_in" || draftToRestore.sub_type === "adjust_out" ? 3 : 4);
+    state.goTo(
+      restoreStep
+        ?? (draftToRestore.sub_type === "adjust_in" || draftToRestore.sub_type === "adjust_out" ? 3 : 4),
+    );
     onStatusChange("임시저장 작업을 불러왔습니다.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftToRestore?.batch_id, restoreNonce]);

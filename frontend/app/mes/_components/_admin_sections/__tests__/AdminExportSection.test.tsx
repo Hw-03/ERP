@@ -5,16 +5,20 @@ const state = vi.hoisted(() => ({
   downloadAuditFile: vi.fn(),
   downloadF704Ledger: vi.fn(),
   downloadF705ProductionLog: vi.fn(),
+  getAllBOM: vi.fn(),
+  getEmployees: vi.fn(),
+  getItems: vi.fn(),
+  getTransactions: vi.fn(),
   refetchAuditFiles: vi.fn(),
   triggerAuditBackfill: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getItems: vi.fn(),
-    getTransactions: vi.fn(),
-    getEmployees: vi.fn(),
-    getAllBOM: vi.fn(),
+    getItems: state.getItems,
+    getTransactions: state.getTransactions,
+    getEmployees: state.getEmployees,
+    getAllBOM: state.getAllBOM,
   },
 }));
 
@@ -41,12 +45,66 @@ import { AdminExportSection } from "../AdminExportSection";
 const itemsExportUrl = "/api/items/export";
 const transactionsExportUrl = "/api/transactions/export";
 
+function itemRow(index: number) {
+  return {
+    item_id: `item-${index}`,
+    mes_code: `MES-${index}`,
+    item_name: `품목 ${index}`,
+    unit: "EA",
+    quantity: index,
+    min_stock: 0,
+    department: "조립",
+    supplier: "공급처",
+  };
+}
+
+function transactionRow(index: number) {
+  return {
+    log_id: `tx-${index}`,
+    created_at: new Date().toISOString(),
+    transaction_type: "RECEIVE",
+    item_name: `거래 품목 ${index}`,
+    quantity_change: index,
+    item_unit: "EA",
+    notes: "",
+  };
+}
+
+function captureCsvDownloads() {
+  const blobsByUrl = new Map<string, Blob>();
+  const downloads: Array<{ fileName: string; blob: Blob }> = [];
+  const createObjectURL = vi.fn((blob: Blob) => {
+    const url = `blob:csv-${blobsByUrl.size}`;
+    blobsByUrl.set(url, blob);
+    return url;
+  });
+  vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function click() {
+    const blob = blobsByUrl.get(this.href);
+    if (blob) downloads.push({ fileName: this.download, blob });
+  });
+  return downloads;
+}
+
+function readBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
+
 describe("AdminExportSection CSV 작업 블록", () => {
   beforeEach(() => {
     sessionStorage.clear();
     state.downloadAuditFile.mockReset();
     state.downloadF704Ledger.mockReset();
     state.downloadF705ProductionLog.mockReset();
+    state.getAllBOM.mockReset();
+    state.getEmployees.mockReset();
+    state.getItems.mockReset();
+    state.getTransactions.mockReset();
     state.refetchAuditFiles.mockReset();
     state.triggerAuditBackfill.mockReset();
   });
@@ -171,5 +229,81 @@ describe("AdminExportSection CSV 작업 블록", () => {
     expect(externalLogs).toContainElement(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
     expect(externalLogs).toHaveTextContent("시스템 원본 로그 (월별)");
     expect(externalLogs).toHaveTextContent("백필 재실행");
+  });
+
+  it("품목 2001건을 2000건씩 페이지 수집해 마지막 행까지 CSV에 포함한다", async () => {
+    state.getItems.mockImplementation(({ skip }: { skip?: number }) =>
+      Promise.resolve(skip === 0 ? Array.from({ length: 2000 }, (_, index) => itemRow(index)) : [itemRow(2000)]),
+    );
+    const downloads = captureCsvDownloads();
+    render(
+      <AdminExportSection
+        itemsExportUrl={itemsExportUrl}
+        transactionsExportUrl={transactionsExportUrl}
+      />,
+    );
+
+    const csvBlock = screen.getByRole("region", { name: "선택 데이터 내보내기 (CSV)" });
+    fireEvent.click(within(csvBlock).getByRole("button", { name: "품목" }));
+    fireEvent.click(within(csvBlock).getByRole("button", { name: "선택 데이터 내보내기" }));
+
+    await waitFor(() => expect(downloads).toHaveLength(1));
+    expect(state.getItems.mock.calls.map(([params]) => params)).toEqual([
+      { limit: 2000, skip: 0 },
+      { limit: 2000, skip: 2000 },
+    ]);
+    expect(await readBlob(downloads[0].blob)).toContain('"MES-2000","품목 2000"');
+  });
+
+  it("거래가 정확히 2000건이면 같은 기간으로 빈 다음 페이지까지 확인한다", async () => {
+    state.getTransactions.mockImplementation(({ skip }: { skip?: number }) =>
+      Promise.resolve(skip === 0 ? Array.from({ length: 2000 }, (_, index) => transactionRow(index)) : []),
+    );
+    const downloads = captureCsvDownloads();
+    render(
+      <AdminExportSection
+        itemsExportUrl={itemsExportUrl}
+        transactionsExportUrl={transactionsExportUrl}
+      />,
+    );
+
+    const csvBlock = screen.getByRole("region", { name: "선택 데이터 내보내기 (CSV)" });
+    fireEvent.click(within(csvBlock).getByRole("button", { name: "입출고" }));
+    fireEvent.click(within(csvBlock).getByRole("button", { name: "선택 데이터 내보내기" }));
+
+    await waitFor(() => expect(downloads).toHaveLength(1));
+    const calls = state.getTransactions.mock.calls.map(([params]) => params);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toEqual({
+      dateFrom: expect.any(String),
+      dateTo: expect.any(String),
+      limit: 2000,
+      skip: 0,
+    });
+    expect(calls[1]).toEqual({ ...calls[0], skip: 2000 });
+  });
+
+  it("전체 범위는 품목·입출고·직원·BOM CSV 네 파일을 모두 생성한다", async () => {
+    state.getItems.mockResolvedValue([]);
+    state.getTransactions.mockResolvedValue([]);
+    state.getEmployees.mockResolvedValue([]);
+    state.getAllBOM.mockResolvedValue([]);
+    const downloads = captureCsvDownloads();
+    render(
+      <AdminExportSection
+        itemsExportUrl={itemsExportUrl}
+        transactionsExportUrl={transactionsExportUrl}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "선택 데이터 내보내기" }));
+
+    await waitFor(() => expect(downloads).toHaveLength(4));
+    expect(downloads.map(({ fileName }) => fileName)).toEqual([
+      expect.stringMatching(/^items_.*\.csv$/),
+      expect.stringMatching(/^transactions_.*\.csv$/),
+      expect.stringMatching(/^employees_.*\.csv$/),
+      expect.stringMatching(/^bom_.*\.csv$/),
+    ]);
   });
 });

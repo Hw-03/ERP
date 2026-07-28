@@ -287,6 +287,7 @@ describe("DefectCartFlow", () => {
         expect.objectContaining({ item_id: "child-1", normal_qty: 1, defective_qty: 1, scrap_qty: 0 }),
       ],
     });
+    expect(onDone).toHaveBeenCalledWith("rework");
   });
   it("browser history forward restores Step 2 after returning to Step 1", () => {
     render(

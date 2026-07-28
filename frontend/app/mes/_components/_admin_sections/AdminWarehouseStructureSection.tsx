@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Save, Trash2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { AdminPageHeader } from "./_admin_primitives";
 import { warehouseMapApi, type WarehouseAngle, type WarehouseAngleType } from "@/lib/api/warehouse-map";
 
@@ -38,6 +39,11 @@ const ADD_LABEL = "\uCD94\uAC00";
 const EDIT_LABEL = "\uD3B8\uC9D1";
 const DELETE_STRUCTURE_LABEL = "\uAD6C\uC870 \uC0AD\uC81C";
 const STRUCTURE_HEADER_TITLE = "\uAD6C\uC870 \uD3B8\uC9D1";
+const DELETE_SUCCESS_MESSAGE: Record<WarehouseAngleType, string> = {
+  angle: "앵글을 삭제했습니다.",
+  aisle: "통로를 삭제했습니다.",
+  pallet: "PL을 삭제했습니다.",
+};
 
 function structureKind(angle: WarehouseAngle): WarehouseAngleType {
   return angle.angle_type ?? "angle";
@@ -62,6 +68,8 @@ function structureVisual(kind: WarehouseAngleType) {
 export function AdminWarehouseStructureSection({ onStatusChange, onError }: Props) {
   const [angles, setAngles] = useState<WarehouseAngle[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [pendingAddKind, setPendingAddKind] = useState<WarehouseAngleType | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WarehouseAngle | null>(null);
   const anglesRef = useRef<WarehouseAngle[]>([]);
   const dragRef = useRef<DragSession | null>(null);
   const dirtyRef = useRef<Set<number>>(new Set());
@@ -196,16 +204,29 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
     }
   }
 
-  async function deleteAngle() {
-    if (!selected) return;
+  async function deleteAngle(target: WarehouseAngle) {
     try {
-      await warehouseMapApi.deleteAngle(selected.id);
+      await warehouseMapApi.deleteAngle(target.id);
       setSelectedId(null);
       await load();
-      onStatusChange("앵글을 삭제했습니다.");
+      onStatusChange(DELETE_SUCCESS_MESSAGE[structureKind(target)]);
     } catch (e) {
       onError(e instanceof Error ? e.message : "삭제 실패 (박스가 남아 있으면 먼저 비워주세요)");
     }
+  }
+
+  async function confirmAddStructure() {
+    if (!pendingAddKind) return;
+    const kind = pendingAddKind;
+    setPendingAddKind(null);
+    await addStructure(kind);
+  }
+
+  async function confirmDeleteStructure() {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    await deleteAngle(target);
   }
 
   const inputStyle = {
@@ -228,14 +249,14 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
         title={STRUCTURE_HEADER_TITLE}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" onClick={() => void addStructure("angle")}>
+            <Button variant="secondary" onClick={() => setPendingAddKind("angle")}>
               <Plus size={14} /> {STRUCTURE_LABEL.angle} {ADD_LABEL}
             </Button>
-            <Button variant="secondary" onClick={() => void addStructure("aisle")}>
-              <Plus size={14} /> {STRUCTURE_LABEL.aisle}
+            <Button variant="secondary" onClick={() => setPendingAddKind("aisle")}>
+              <Plus size={14} /> {STRUCTURE_LABEL.aisle} {ADD_LABEL}
             </Button>
-            <Button variant="secondary" onClick={() => void addStructure("pallet")}>
-              <Plus size={14} /> PL
+            <Button variant="secondary" onClick={() => setPendingAddKind("pallet")}>
+              <Plus size={14} /> {STRUCTURE_LABEL.pallet} {ADD_LABEL}
             </Button>
           </div>
         }
@@ -362,7 +383,7 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
           ) : (
             <>
               <div className="text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-                {selected.label} 편집
+                {selected.label} {EDIT_LABEL}
               </div>
               <label className="flex flex-col gap-1 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 이름
@@ -391,13 +412,35 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
               <Button onClick={saveSelected}>
                 <Save size={14} /> 저장
               </Button>
-              <Button variant="danger" onClick={deleteAngle}>
-                <Trash2 size={14} /> 앵글 삭제
+              <Button variant="danger" onClick={() => setDeleteTarget(selected)}>
+                <Trash2 size={14} /> {STRUCTURE_LABEL[structureKind(selected)]} 삭제
               </Button>
             </>
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        open={pendingAddKind !== null}
+        title={`${pendingAddKind ? STRUCTURE_LABEL[pendingAddKind] : ""} ${ADD_LABEL}`}
+        confirmLabel={ADD_LABEL}
+        onClose={() => setPendingAddKind(null)}
+        onConfirm={confirmAddStructure}
+      >
+        선택한 구조를 추가하시겠습니까?
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={DELETE_STRUCTURE_LABEL}
+        tone="danger"
+        cautionMessage="이 작업은 되돌릴 수 없습니다."
+        confirmLabel="삭제"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDeleteStructure}
+      >
+        {deleteTarget ? `'${deleteTarget.label}' 구조를 삭제하시겠습니까?` : null}
+      </ConfirmModal>
     </div>
   );
 }

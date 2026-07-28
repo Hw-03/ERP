@@ -1,9 +1,22 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileWarehouseScreen } from "../MobileWarehouseScreen";
 
 const currentWizardProps = vi.hoisted(() => ({
-  value: null as null | { onStepChange?: (step: number) => void },
+  value: null as null | {
+    onStepChange?: (step: number) => void;
+    restoreDraft?: { batch_id: string } | null;
+    restoreStep?: number;
+  },
+}));
+
+const apiMocks = vi.hoisted(() => ({
+  listStockRequestDrafts: vi.fn(),
+  listDrafts: vi.fn(),
+}));
+
+vi.mock("@/lib/api", () => ({
+  api: apiMocks,
 }));
 
 vi.mock("../../../_warehouse_hooks/useWarehouseData", () => ({
@@ -55,13 +68,26 @@ vi.mock("../../warehouse/MobileDirtyLeaveSheet", () => ({
 }));
 
 vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
-  MobileIoComposeWizard: (props: { onStepChange?: (step: number) => void }) => {
+  MobileIoComposeWizard: (props: {
+    onStepChange?: (step: number) => void;
+    restoreDraft?: { batch_id: string } | null;
+    restoreStep?: number;
+  }) => {
     currentWizardProps.value = props;
     return <div data-testid="compose-wizard" />;
   },
 }));
 
 describe("MobileWarehouseScreen compact step header", () => {
+  beforeEach(() => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose");
+    apiMocks.listStockRequestDrafts.mockReset();
+    apiMocks.listDrafts.mockReset();
+    apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
+    apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
+    currentWizardProps.value = null;
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -101,5 +127,74 @@ describe("MobileWarehouseScreen compact step header", () => {
     fireEvent.click(screen.getByRole("button", { name: "cart" }));
     expect(screen.getByTestId("warehouse-section-tabs")).toBeInTheDocument();
     expect(screen.getByTestId("draft-panels")).toBeInTheDocument();
+  });
+
+  it("restores the URL draft and exact step after a responsive shell change", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/mes?tab=warehouse&section=compose&step=5&draftId=draft-1",
+    );
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-1" }]);
+
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    expect(screen.getByText("저장한 작업을 불러오는 중입니다.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("compose-wizard")).toBeInTheDocument());
+    expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-1");
+    expect(currentWizardProps.value?.restoreStep).toBe(5);
+  });
+
+  it("restores the URL draft even when the legacy draft count fails", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1",
+    );
+    apiMocks.listStockRequestDrafts.mockRejectedValue(new Error("legacy unavailable"));
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-1" }]);
+
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("compose-wizard")).toBeInTheDocument());
+    expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-1");
+    expect(currentWizardProps.value?.restoreStep).toBe(4);
+  });
+
+  it("keeps a URL draft restore error visible and retries instead of opening a blank compose", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/mes?tab=warehouse&section=compose&step=3&draftId=draft-1",
+    );
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts
+      .mockRejectedValueOnce(new Error("draft unavailable"))
+      .mockResolvedValueOnce([{ batch_id: "draft-1" }]);
+
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("저장한 작업을 불러오지 못했습니다.");
+    expect(screen.queryByTestId("compose-wizard")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-1"));
+    expect(apiMocks.listDrafts).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not open a blank compose when the URL draft no longer exists", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/mes?tab=warehouse&section=compose&step=2&draftId=missing",
+    );
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([]);
+
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("저장한 작업을 찾을 수 없습니다.");
+    expect(screen.queryByTestId("compose-wizard")).not.toBeInTheDocument();
   });
 });

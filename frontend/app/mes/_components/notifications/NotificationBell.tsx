@@ -28,6 +28,12 @@ const TONE: Record<string, string> = {
   handover_arrived: LEGACY_COLORS.purple,
 };
 
+export interface NotificationNavigationTarget {
+  tab: string;
+  section: string | null;
+  relatedRequestId: string | null;
+}
+
 function humanizeBody(body: string): string {
   return body
     .split(" · ")
@@ -178,7 +184,7 @@ export function NotificationBell({
   onNavigate,
   loginDialogEnabled,
 }: {
-  onNavigate?: (tab: string, section: string | null) => void;
+  onNavigate?: (target: NotificationNavigationTarget) => void;
   loginDialogEnabled: boolean;
 }) {
   const operator = useCurrentOperator();
@@ -225,7 +231,13 @@ export function NotificationBell({
     }
     setOpen(false);
     setLoginDialogOpen(false);
-    if (n.target_tab) onNavigate?.(n.target_tab, n.target_section ?? null);
+    if (n.target_tab) {
+      onNavigate?.({
+        tab: n.target_tab,
+        section: n.target_section ?? null,
+        relatedRequestId: n.related_request_id ?? null,
+      });
+    }
   }
 
   function handleMarkAll() {

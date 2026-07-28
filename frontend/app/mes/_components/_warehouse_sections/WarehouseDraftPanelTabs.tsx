@@ -32,6 +32,7 @@ export interface WarehouseDraftPanelTabsProps {
   onSubmitSuccess?: () => void;
   resetDraftTracking: () => void;
   onCartCountChange?: (n: number) => void;
+  targetRequestId?: string | null;
 }
 
 export function WarehouseDraftPanelTabs({
@@ -51,6 +52,7 @@ export function WarehouseDraftPanelTabs({
   onSubmitSuccess,
   resetDraftTracking,
   onCartCountChange,
+  targetRequestId,
 }: WarehouseDraftPanelTabsProps) {
   if (sectionTab === "cart") {
     return (
@@ -77,7 +79,8 @@ export function WarehouseDraftPanelTabs({
 
   if (sectionTab === "mine") {
     return (
-      <MyRequestsPanel
+        <MyRequestsPanel
+          targetRequestId={targetRequestId}
         employeeId={employeeId || operatorEmployeeId || null}
         refreshNonce={refreshNonce}
         onChanged={() => {
@@ -90,7 +93,8 @@ export function WarehouseDraftPanelTabs({
 
   if (sectionTab === "queue" && canSeeQueue && operatorEmployeeId) {
     return (
-      <WarehouseQueuePanel
+        <WarehouseQueuePanel
+          targetRequestId={targetRequestId}
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
         onChanged={async () => {
@@ -124,7 +128,8 @@ export function WarehouseDraftPanelTabs({
 
   if (sectionTab === "dept-queue" && canSeeDeptQueue && operatorEmployeeId) {
     return (
-      <DepartmentQueuePanel
+        <DepartmentQueuePanel
+          targetRequestId={targetRequestId}
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
         onChanged={async () => {

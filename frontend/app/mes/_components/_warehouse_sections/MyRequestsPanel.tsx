@@ -11,14 +11,16 @@ import {
   useMyStockRequestsQuery,
   useRevertToDraftMutation,
 } from "@/lib/queries/useStockRequestsQuery";
+import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
 
 interface Props {
+  targetRequestId?: string | null;
   employeeId: string | null;
   refreshNonce: number;
   onChanged: () => void;
 }
 
-export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) {
+export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetRequestId }: Props) {
   const { data: items = [], isLoading: loading, error: qError, refetch } =
     useMyStockRequestsQuery(employeeId ?? "");
   const cancelMutation = useCancelStockRequestMutation();
@@ -122,10 +124,11 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
       {!loading && items.length === 0 && !loadError && (
         <EmptyState variant="no-data" compact title="아직 제출한 요청이 없습니다." />
       )}
-      {items.map((req) => (
+      {prioritizeTargetRequest(items, targetRequestId).map((req) => (
         <MyRequestRow
           key={req.request_id}
           req={req}
+          highlighted={req.request_id === targetRequestId}
           onCancelRequest={() => openCancel(req)}
           onRevertToDraft={() => openRevert(req)}
         />

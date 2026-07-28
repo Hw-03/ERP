@@ -365,6 +365,46 @@ describe("MobileShippingScreen", () => {
     expect(queryClient.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())?.[0].checklist_lines[0].checked).toBe(false);
   });
 
+  it("PREPARED 요청의 체크리스트와 전체 해제는 읽기 전용이며 API를 호출하지 않는다", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({
+        status: "PREPARED",
+        checklist_lines: [{ ...request().checklist_lines[0], item_name: "Prepared Cable" }],
+      }),
+    ]);
+
+    renderScreen();
+
+    const checkbox = await screen.findByRole("checkbox", { name: /Prepared Cable/ });
+    expect(checkbox).toBeDisabled();
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole("button", { name: /전체 해제/ }));
+
+    expect(api.updateShippingChecklist).not.toHaveBeenCalled();
+    expect(api.clearShippingChecklist).not.toHaveBeenCalled();
+  });
+
+  it("한 PREPARING 카드의 체크리스트 오류는 해당 카드에만 표시하고 다른 카드를 유지한다", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({ request_id: "req-fail", base_pf_item_name: "Failing PF" }),
+      request({
+        request_id: "req-kept",
+        base_pf_item_name: "Kept PF",
+        checklist_lines: [{ ...request().checklist_lines[0], item_name: "Kept Cable" }],
+      }),
+    ]);
+    vi.mocked(api.updateShippingChecklist).mockRejectedValueOnce(new Error("422 checklist rejected"));
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Cable Set/ }));
+
+    expect(await screen.findByText("422 checklist rejected")).toBeInTheDocument();
+    expect(screen.getByText("Failing PF")).toBeInTheDocument();
+    expect(screen.getByText("Kept PF")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Kept Cable/ })).toBeInTheDocument();
+  });
+
   it("CANCELLED는 요청과 준비 목록에서 제외하고 history page 호환 목록에는 표시한다", async () => {
     const cancelled = request({ request_id: "cancelled-1", status: "CANCELLED", base_pf_item_name: "취소된 PF" });
     vi.mocked(api.getShippingRequests).mockResolvedValue([cancelled, request()]);

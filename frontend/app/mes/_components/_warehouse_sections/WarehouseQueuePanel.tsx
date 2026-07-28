@@ -6,14 +6,16 @@ import { PIN_LENGTH } from "@/lib/auth/constants";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import { useWarehouseQueueQuery, useApproveStockRequestMutation, useRejectStockRequestMutation } from "@/lib/queries/useStockRequestsQuery";
+import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
 
 interface Props {
+  targetRequestId?: string | null;
   approverEmployeeId: string;
   refreshNonce: number;
   onChanged: () => void;
 }
 
-export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged }: Props) {
+export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged, targetRequestId }: Props) {
   const { data: items = [], isLoading: loading, error: qError, refetch } = useWarehouseQueueQuery();
   const approveMutation = useApproveStockRequestMutation();
   const rejectMutation = useRejectStockRequestMutation();
@@ -102,10 +104,11 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
       {!loading && items.length === 0 && !error && (
         <EmptyState variant="no-data" compact title="승인 대기 중인 요청이 없습니다." />
       )}
-      {items.map((req) => (
+      {prioritizeTargetRequest(items, targetRequestId).map((req) => (
         <WarehouseQueueRow
           key={req.request_id}
           req={req}
+          highlighted={req.request_id === targetRequestId}
           busyId={busyId}
           approvePinFor={approvePinFor}
           approvePin={approvePin}

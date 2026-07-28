@@ -8,6 +8,7 @@ import type {
   Item,
   ProductModel,
 } from "@/lib/api";
+import type { IoStep } from "./useIoWorkState";
 
 export type { IoBundle, IoLine, IoSubType, IoWorkType, Item, ProductModel };
 
@@ -42,9 +43,11 @@ export interface IoComposeViewProps {
   /** '이어서 하기' 클릭마다 증가하는 토큰. 같은 draft 를 다시 골라도(batch_id 불변)
    *  nonce 가 바뀌면 복원 effect 가 재발동한다. */
   restoreNonce?: number;
+  restoreStep?: IoStep;
   defaultWorkType?: IoWorkType;
   entryIntent?: IoEntryIntent | null;
   onStatusChange: (status: string) => void;
   onSubmitSuccess?: () => void;
   onItemConversionFocusChange?: (focused: boolean) => void;
+  onDraftSaved?: (batchId: string, step: IoStep) => void;
 }

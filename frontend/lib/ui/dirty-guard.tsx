@@ -318,6 +318,24 @@ export function useConfirmNavigation(): (proceed: () => void) => void {
   );
 }
 
+export function useFlushDirtyEntries(): () => Promise<void> {
+  const ctx = useContext(DirtyGuardContext);
+  if (!ctx) {
+    throw new Error("useFlushDirtyEntries must be used inside <DirtyGuardProvider>");
+  }
+
+  return useCallback(async () => {
+    const dirtyEntries = Array.from(ctx.registryRef.current.values()).filter((entry) => entry.dirty);
+    if (dirtyEntries.some((entry) => entry.confirmOnly)) {
+      throw new Error("현재 작업은 자동 저장할 수 없습니다.");
+    }
+
+    for (const entry of dirtyEntries) {
+      await Promise.resolve(entry.save());
+    }
+  }, [ctx]);
+}
+
 export function useLocalDirtyGuard(
   dirty: boolean,
   save: () => Promise<void> | void,
