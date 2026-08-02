@@ -109,8 +109,16 @@ _attic/data/db_backups/
 # 2607 생산부 재고 매칭 작업(담당자 검토용, 진행 중 산출물) — 커밋 안 함
 _attic/data/2607 생산부 재고/
 _attic/backend-scripts/annotate_2607_matching.py
+# 2026년 07월 직원 개인 일일 업무 일보(진행 중 개인 산출물) — 커밋 안 함
+_attic/data/2026년 07월/
 # 모바일/MCP 화면 캡처 스크린샷 (앱 재실행으로 재생성 가능한 로컬 산출물)
 _attic/screenshots/
+# Office 문서 잠금파일 (자동 생성, 재생성 가능)
+~$*
+# 임시 파일
+*.tmp
+# 자동 검증/스프레드시트 검사 산출물 (재생성 가능한 로컬 산출물)
+outputs/
 # _attic/ 은 의도적으로 추적·커밋하되, 로컬 운영 산출물인 _attic/runtime/ 은 제외한다.
 
 # /understand 지식 그래프 산출물 (코드에서 재생성 가능한 로컬 파생물·머신 전용 경로 포함)
