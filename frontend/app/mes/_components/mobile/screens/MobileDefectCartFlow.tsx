@@ -277,7 +277,7 @@ export function MobileDefectCartFlow({
             </div>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex min-h-full flex-col gap-3">
             <MobileActionCard
               icon={Trash2}

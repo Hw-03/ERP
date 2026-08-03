@@ -41,6 +41,27 @@ vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
 }));
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("keeps 24px of content padding on the work-type step for the common tab-bar gap", () => {
+    const originalStep = wizardState.step;
+    wizardState.step = 1;
+    try {
+      render(
+        <MobileIoComposeWizard
+          globalSearch=""
+          operator={null}
+          items={[]}
+          setItems={vi.fn()}
+          onStatusChange={vi.fn()}
+        />,
+      );
+
+      const workTypeButton = screen.getByRole("button", { name: /부서 입출고/ });
+      expect(workTypeButton.parentElement?.parentElement).toHaveClass("pb-6");
+    } finally {
+      wizardState.step = originalStep;
+    }
+  });
+
   it("최종 확인에서는 본문 카드와 겹치는 하단 구분선을 렌더하지 않는다", () => {
     render(
       <MobileIoComposeWizard

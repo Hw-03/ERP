@@ -71,6 +71,25 @@ const location: DefectLocation = {
 };
 
 describe("mobile defect compact headers", () => {
+  it("keeps the direct action cards flush with the flow bottom for the common shell gap", () => {
+    render(
+      <MobileDefectCartFlow
+        mode="scrap"
+        items={[item]}
+        productModels={[]}
+        currentEmployee={employee}
+        onDone={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    const reworkButton = screen.getByRole("button", { name: /재작업/ });
+    const scrollPane = reworkButton.parentElement?.parentElement;
+
+    expect(scrollPane).toHaveClass("overflow-y-auto");
+    expect(scrollPane).not.toHaveClass("pb-3");
+  });
+
   it("uses a compact step header after choosing a direct defect action", () => {
     const { container } = render(
       <MobileDefectCartFlow

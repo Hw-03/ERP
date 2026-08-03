@@ -185,6 +185,54 @@ describe("MobileAssemblyChecklistScreen", () => {
     expect(screen.getByRole("textbox", { name: "항목 문구" })).toHaveValue(ITEM_CONTENT);
   });
 
+  it("renders the item-first management list with the section action after its cards", () => {
+    renderChecklistScreen();
+    openManageDetail();
+
+    const sectionHeading = screen.getByRole("heading", { name: "전원 OFF" });
+    const sectionCard = sectionHeading.closest("section");
+    const addSectionButton = screen.getByRole("button", { name: "박스 추가" });
+    const itemEditor = screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집` });
+
+    expect(screen.getByRole("button", { name: "전원 OFF 박스 편집" })).toHaveClass("h-11", "w-11");
+    expect(screen.queryByText("2개 항목")).not.toBeInTheDocument();
+    expect(itemEditor).toHaveClass("min-h-[52px]");
+    expect(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집 바로가기` })).toHaveClass("h-11", "w-11");
+    expect(sectionCard).not.toBeNull();
+    expect(sectionCard!.compareDocumentPosition(addSectionButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it("shows only the centered section add action when a checklist has no sections", () => {
+    const originalChecklist = state.checklists[0];
+    state.checklists[0] = { ...originalChecklist, sections: [] };
+    try {
+      renderChecklistScreen();
+      openManageDetail();
+
+      expect(screen.queryByRole("button", { name: "순서 변경" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "박스 추가" })).toHaveClass("min-h-11");
+    } finally {
+      state.checklists[0] = originalChecklist;
+    }
+  });
+
+  it("빈 박스에는 항목 추가 행만 표시한다", () => {
+    const originalChecklist = state.checklists[0];
+    state.checklists[0] = {
+      ...originalChecklist,
+      sections: [{ ...originalChecklist.sections[0], items: [] }],
+    };
+    try {
+      renderChecklistScreen();
+      openManageDetail();
+
+      expect(screen.getByRole("button", { name: "전원 OFF 항목 추가" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: `${ITEM_CONTENT} 항목 편집` })).not.toBeInTheDocument();
+    } finally {
+      state.checklists[0] = originalChecklist;
+    }
+  });
+
   it("박스와 항목을 각각 하단 시트에서 추가한다", async () => {
     state.createSection.mockResolvedValueOnce(state.checklists[0]);
     state.createItem.mockResolvedValueOnce(state.checklists[0]);
@@ -252,12 +300,12 @@ describe("MobileAssemblyChecklistScreen", () => {
     renderChecklistScreen();
     openManageDetail();
 
-    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 박스 메뉴" }));
+    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 박스 편집" }));
     fireEvent.change(screen.getByRole("textbox", { name: "박스 이름" }), { target: { value: "  전원 준비  " } });
     fireEvent.click(screen.getByRole("button", { name: "박스 이름 저장" }));
     await waitFor(() => expect(state.updateSection).toHaveBeenCalledWith({ sectionId: "dx-off", title: "전원 준비" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 박스 메뉴" }));
+    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 박스 편집" }));
     fireEvent.click(screen.getByRole("button", { name: "박스 삭제" }));
     expect(screen.getByText("2개 항목도 함께 삭제됩니다.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
@@ -275,8 +323,8 @@ describe("MobileAssemblyChecklistScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
 
     expect(screen.getByRole("heading", { name: "DX3000" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "순서 변경 완료" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "박스 추가" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "순서 변경" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "박스 추가" })).not.toBeInTheDocument();
 
     const source = screen.getByRole("button", { name: "전원 OFF 박스 순서 변경" });
     const target = document.querySelector('[data-checklist-section-sort-id="dx-on"]')!;
@@ -287,7 +335,7 @@ describe("MobileAssemblyChecklistScreen", () => {
       sectionIds: ["dx-on", "dx-off"],
     }));
     expect(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 순서 변경` })).toHaveClass("h-11", "w-11");
-    fireEvent.click(screen.getByRole("button", { name: "순서 변경 완료" }));
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
     expect(screen.queryByRole("button", { name: "전원 OFF 박스 순서 변경" })).not.toBeInTheDocument();
   });
 
@@ -324,9 +372,133 @@ describe("MobileAssemblyChecklistScreen", () => {
     renderChecklistScreen();
     openManageDetail();
 
-    expect(screen.getByRole("button", { name: "전원 OFF 박스 메뉴" })).toHaveClass("h-11", "w-11");
+    expect(screen.getByRole("button", { name: "전원 OFF 박스 편집" })).toHaveClass("h-11", "w-11");
     expect(screen.getByRole("button", { name: "전원 OFF 항목 추가" })).toHaveClass("min-h-11");
     fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
     expect(screen.getByRole("button", { name: "전원 OFF 박스 순서 변경" })).toHaveClass("h-11", "w-11");
+  });
+  it("keeps the sort label and hides edit controls while sorting", () => {
+    renderChecklistScreen();
+    openManageDetail();
+
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
+
+    expect(screen.getByRole("button", { name: "순서 변경" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "박스 추가" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "전원 OFF 박스 편집" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/길게 누르고 끌어/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "전원 OFF 박스 순서 변경" })).toBeInTheDocument();
+  });
+
+  it("keeps a changed item draft until the user explicitly discards it", () => {
+    renderChecklistScreen();
+    openManageDetail();
+
+    fireEvent.click(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집` }));
+    fireEvent.change(screen.getByRole("textbox", { name: "항목 문구" }), { target: { value: "수정 중인 항목" } });
+
+    expect(screen.getByTestId("checklist-item-save")).toHaveClass("sticky", "bottom-0");
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.getByRole("dialog", { name: "변경사항을 버릴까요?" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "계속 편집" }));
+    expect(screen.getByRole("textbox", { name: "항목 문구" })).toHaveValue("수정 중인 항목");
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "버리기" }));
+    expect(screen.queryByRole("dialog", { name: "항목 수정" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a changed section draft until the user explicitly discards it", () => {
+    renderChecklistScreen();
+    openManageDetail();
+
+    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 박스 편집" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "박스 이름" }), { target: { value: "수정 중인 박스" } });
+
+    expect(screen.getByTestId("checklist-section-save")).toHaveClass("sticky", "bottom-0");
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.getByRole("dialog", { name: "변경사항을 버릴까요?" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "계속 편집" }));
+    expect(screen.getByRole("textbox", { name: "박스 이름" })).toHaveValue("수정 중인 박스");
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "버리기" }));
+    expect(screen.queryByRole("dialog", { name: "박스 수정" })).not.toBeInTheDocument();
+  });
+
+  it("shows the moved section as saving and applies the optimistic order before the server responds", async () => {
+    let resolveSave: ((checklist: typeof state.checklists[number]) => void) | undefined;
+    state.reorderSections.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSave = resolve;
+    }));
+    renderChecklistScreen();
+    openManageDetail();
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
+
+    const source = screen.getByRole("button", { name: "전원 OFF 박스 순서 변경" });
+    const target = document.querySelector('[data-checklist-section-sort-id="dx-on"]')!;
+    preparePointer(source, target);
+
+    await waitFor(() => expect(screen.getByText("저장 중")).toBeInTheDocument());
+    expect(Array.from(document.querySelectorAll("[data-checklist-section-sort-id]")).map((element) => element.getAttribute("data-checklist-section-sort-id")))
+      .toEqual(["dx-on", "dx-off"]);
+
+    resolveSave?.(state.checklists[0]);
+    await waitFor(() => expect(screen.queryByText("저장 중")).not.toBeInTheDocument());
+  });
+
+  it("shows only the moved item as saving until its sort response arrives", async () => {
+    let resolveSave: ((checklist: typeof state.checklists[number]) => void) | undefined;
+    state.reorderItems.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSave = resolve;
+    }));
+    renderChecklistScreen();
+    openManageDetail();
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
+
+    const source = screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 순서 변경` });
+    const target = document.querySelector('[data-checklist-item-id="dx-off-2"]')!;
+    preparePointer(source, target);
+
+    await waitFor(() => expect(screen.getByText("저장 중")).toBeInTheDocument());
+    expect(Array.from(document.querySelectorAll('[data-checklist-section-sort-id="dx-off"] [data-checklist-item-id]'))
+      .map((element) => element.getAttribute("data-checklist-item-id")))
+      .toEqual(["dx-off-2", "dx-off-1"]);
+
+    resolveSave?.(state.checklists[0]);
+    await waitFor(() => expect(screen.queryByText("저장 중")).not.toBeInTheDocument());
+  });
+
+  it("restores the previous section order after a sort save fails", async () => {
+    state.reorderSections.mockRejectedValueOnce(new Error("save failed"));
+    renderChecklistScreen();
+    openManageDetail();
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
+
+    const source = screen.getByRole("button", { name: "전원 OFF 박스 순서 변경" });
+    const target = document.querySelector('[data-checklist-section-sort-id="dx-on"]')!;
+    preparePointer(source, target);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("박스 순서를 저장하지 못했습니다."));
+    expect(Array.from(document.querySelectorAll("[data-checklist-section-sort-id]")).map((element) => element.getAttribute("data-checklist-section-sort-id")))
+      .toEqual(["dx-off", "dx-on"]);
+  });
+
+  it("restores the previous item order after a sort save fails", async () => {
+    state.reorderItems.mockRejectedValueOnce(new Error("save failed"));
+    renderChecklistScreen();
+    openManageDetail();
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
+
+    const source = screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 순서 변경` });
+    const target = document.querySelector('[data-checklist-item-id="dx-off-2"]')!;
+    preparePointer(source, target);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("항목 순서를 저장하지 못했습니다."));
+    expect(Array.from(document.querySelectorAll('[data-checklist-section-sort-id="dx-off"] [data-checklist-item-id]'))
+      .map((element) => element.getAttribute("data-checklist-item-id")))
+      .toEqual(["dx-off-1", "dx-off-2"]);
   });
 });

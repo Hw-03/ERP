@@ -44,7 +44,7 @@ export type UseAssemblyChecklistItemDragResult = {
  */
 export function useAssemblyChecklistItemDrag(
   sections: AssemblyChecklistSection[],
-  onReorder: (sectionId: string, itemIds: string[]) => void,
+  onReorder: (sectionId: string, itemIds: string[], itemId: string) => void,
   onMove: (input: MoveInput) => void,
 ): UseAssemblyChecklistItemDragResult {
   const [dragId, setDragId] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export function useAssemblyChecklistItemDrag(
       const insertionIndex = target.itemId && target.position === "after" ? targetIndex + 1 : targetIndex;
       itemIds.splice(insertionIndex, 0, movedItemId);
       if (itemIds.every((itemId, index) => itemId === sourceSection.items[index]?.item_id)) return;
-      onReorder(source.sectionId, itemIds);
+      onReorder(source.sectionId, itemIds, source.itemId);
       return;
     }
 

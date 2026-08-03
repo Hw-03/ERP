@@ -119,4 +119,21 @@ describe("MobileMoreScreen", () => {
     expect(onShipping).toHaveBeenCalledTimes(1);
     expect(onWarehouseMap).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the common 32px visual gap above the frozen tab bar", () => {
+    render(
+      <MobileMoreScreen
+        operator={operator}
+        onProfile={() => {}}
+        onNotificationNavigate={() => {}}
+        onChecklist={() => {}}
+        onDailyReport={() => {}}
+        onWeekly={() => {}}
+        onShipping={() => {}}
+        onWarehouseMap={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("mobile-more-menu-list").parentElement).toHaveClass("pb-6");
+  });
 });

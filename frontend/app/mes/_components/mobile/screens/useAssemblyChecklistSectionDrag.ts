@@ -23,7 +23,7 @@ export type UseAssemblyChecklistSectionDragResult = {
 /** 정렬 모드에서 박스 순서를 한 번의 드롭으로 저장할 수 있게 한다. */
 export function useAssemblyChecklistSectionDrag(
   sections: AssemblyChecklistSection[],
-  onReorder: (sectionIds: string[]) => void,
+  onReorder: (sectionIds: string[], sectionId: string) => void,
 ): UseAssemblyChecklistSectionDragResult {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetSectionId, setDropTargetSectionId] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export function useAssemblyChecklistSectionDrag(
     const insertionIndex = target.position === "after" ? targetIndex + 1 : targetIndex;
     sectionIds.splice(insertionIndex, 0, movedSectionId);
     if (sectionIds.every((sectionId, index) => sectionId === sections[index]?.section_id)) return;
-    onReorder(sectionIds);
+    onReorder(sectionIds, sourceId);
   }
 
   function makeHandlers(sectionId: string): DragHandlers {
