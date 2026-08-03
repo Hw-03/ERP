@@ -31,7 +31,7 @@
 
 현재 BOM 검토 기준 모델은 `ADX4000W`다. 다른 제품은 BOM이 아직 완성되지 않았을 수 있으므로, 새 정의와 계산 검증은 우선 `ADX4000W`를 기준으로 한다.
 
-`backend/scripts/bom_family_graph.html` 같은 BOM 가계도 HTML은 이 기능을 눈으로 검토하기 위한 보조 도구다. 특히 `AF` 아래 어디까지를 빠른 조립 범위로 볼지 확인하는 데 사용한다.
+`_attic/runtime/reports/backend/bom_family_graph.html` 같은 BOM 가계도 HTML은 이 기능을 눈으로 검토하기 위한 보조 도구다. 특히 `AF` 아래 어디까지를 빠른 조립 범위로 볼지 확인하는 데 사용한다.
 
 ## 최종 용어
 

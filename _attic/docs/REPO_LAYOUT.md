@@ -7,6 +7,7 @@ moves.
 
 - Root guide: `README.md`
 - Active reference docs: `_attic/docs/`
+- Tool-managed plans and specs: `docs/superpowers/`
 - Shared AI context entry point: `_attic/ai/prompt_context.md`
 - Active task handoffs: `_attic/handoff/`
 - Historical AI snapshot: `_attic/ai/AI_HANDOVER.md`
@@ -28,8 +29,15 @@ Use these first when you need the current rules or structure:
 
 ## Archive Boundaries
 
-- There is no active root `docs/` folder.
-- There is no active `vault/` folder.
+- The only active root `docs/` content is tool-managed material under
+  `docs/superpowers/plans/` and `docs/superpowers/specs/`. All other docs
+  belong under `_attic/docs/`.
+- There is no tracked active `vault/` content. Ignored local `.obsidian`
+  settings may exist for the Obsidian workflow or the `vault-sync` branch.
+- `backend/scripts/` contains active maintenance and analysis tools used by
+  tests. Generated reports from those tools belong under `_attic/runtime/`.
+- `backend/data/audit_csv/` is an active application data path used by the
+  audit CSV service and is not a general document or report directory.
 - `_attic/ai/AI_HANDOVER.md` is archive-only historical context; use
   `_attic/ai/prompt_context.md` for the current AI entry point.
 - `research/`, one-off plans, and prototype files under `_attic/docs/` are
@@ -42,7 +50,8 @@ Older notes may still mention these paths:
 - `schema.sql` -> `backend/schema.sql`
 - `docker-compose.yml` -> `docker/docker-compose.yml`
 - `docker-compose.nas.yml` -> `docker/docker-compose.nas.yml`
-- `docs/...` -> `_attic/docs/...`
+- General `docs/...` -> `_attic/docs/...`
+- Tool-managed plans/specs -> `docs/superpowers/...`
 - `vault/...` -> archive-only historical reference
 
 ## Item-Code Rule Reminder

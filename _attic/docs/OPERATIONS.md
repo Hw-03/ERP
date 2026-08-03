@@ -53,7 +53,7 @@ scripts\ops\backup_db.bat
 - **백업 안전성**: Python `sqlite3.backup` 온라인 백업 API를 사용하고 `_verify_backup.py`가 통과해야만 성공으로 종료한다. 검증 실패 파일은 삭제하고 실패 코드를 반환한다.
 - **권장 주기**: 입출고가 많은 날 일과 종료 후 1회. 외부 디스크 보관이 필요하면 `_attic/runtime/backups/sqlite/`를 복사한다.
 - 기존 `backend/_backup/` 파일은 자동 이동·삭제하지 않으며 필요하면 복구 입력으로 직접 지정한다.
-- **루트 `mes.db` 와 `backend/mes.db` 가 둘 다 존재**할 수 있다. 운영 DB는 `backend/mes.db` 한 개만 사용한다(루트 파일은 손대지 말고, 정리는 다음 작업에서 별도로 진행 예정).
+- 운영 DB는 `backend/mes.db` 한 개만 사용한다. 루트나 하위 폴더에 생긴 0바이트 `mes.db`·`erp.db`는 활성 DB가 아니며 생성 원인을 확인한 뒤 제거한다.
 
 ### 백업 검증 (Phase 5.2)
 

@@ -412,7 +412,7 @@ python scripts/build_bom_graph_html.py
 목적:
 
 - 실제 개발 DB 기준으로 분석과 HTML 생성이 완료되는지 확인합니다.
-- 생성 파일 `backend/scripts/bom_family_graph.html`을 열어 정전개/역전개와 대량 노드 모드를 확인합니다.
+- 생성 파일 `_attic/runtime/reports/backend/bom_family_graph.html`을 열어 정전개/역전개와 대량 노드 모드를 확인합니다.
 
 ## 5. 동환님 답변 반영 구현 결정
 

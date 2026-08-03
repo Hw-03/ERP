@@ -21,6 +21,13 @@
 | `_attic/handoff/` | 활성 작업별 인수인계 위치 |
 | `_attic/_archive/`, `_attic/frontend/`, `_attic/backend/`, `_attic/outputs/` | 옛 코드·자산 (참고용) |
 
+## 도구·애플리케이션 필수 경로 예외
+
+- `docs/superpowers/plans/`, `docs/superpowers/specs/`: 작업 스킬이 자동 생성·참조하는 계획과 설계 문서만 둔다.
+- `backend/scripts/`: 테스트와 유지보수 절차가 직접 사용하는 활성 도구만 둔다. 생성 HTML·보고서는 `_attic/runtime/reports/`에 쓴다.
+- `backend/data/audit_csv/`: 감사 CSV 서비스가 직접 사용하는 활성 애플리케이션 데이터 경로다.
+- `vault/`, `_attic/vault/`: main에서는 추적하지 않으며 로컬 Obsidian 설정 또는 `vault-sync` 작업에만 사용한다.
+
 ## 보관 / 이동 기준
 
 `_attic/` 에 둘 것:

@@ -10,11 +10,14 @@
 실행:
     cd backend
     python scripts/build_bom_graph_html.py
+출력:
+    _attic/runtime/reports/backend/bom_family_graph.html
 """
 import json
 import os
 import sys
 import uuid
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,9 +34,10 @@ from scripts.bom_graph_data import (
 )
 
 MAX_DEPTH = 10
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-D3_PATH = os.path.join(SCRIPT_DIR, "vendor", "d3.v7.min.js")
-OUT_PATH = os.path.join(SCRIPT_DIR, "bom_family_graph.html")
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parents[1]
+D3_PATH = SCRIPT_DIR / "vendor" / "d3.v7.min.js"
+OUT_PATH = PROJECT_ROOT / "_attic" / "runtime" / "reports" / "backend" / "bom_family_graph.html"
 
 
 def _legacy_build_tree_unused(item_id, cache, items_map, visiting, depth):
@@ -98,6 +102,7 @@ def main():
         .replace("@@DATA@@", data_json)
         .replace("@@PROCESS_LEVELS@@", levels_json)
     )
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         f.write(doc)
 

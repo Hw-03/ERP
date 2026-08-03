@@ -25,3 +25,4 @@ python ../_attic/backend-scripts/backup_db.py
 | `sync_excel_stock.py` | xlsx 의 재고와 DB 동기화 |
 | `archive_old_logs.py` | N개월 이전 트랜잭션 로그 아카이브 |
 | `backup_db.py` | 정식 도구 호환 진입점: `backend/mes.db` → `_attic/runtime/backups/sqlite/mes_<ts>.db` (검증 + 최신 10개 유지) |
+| `query_warehouse.py` | 창고 박스 배치 수량과 창고 재고 차이를 읽기 전용으로 집계 |

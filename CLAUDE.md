@@ -147,6 +147,9 @@ Only files automatically referenced by tools remain at the root and in each fold
   - Run: `cd backend && python ../_attic/backend-scripts/<script>.py`
   - `sys.path` is patched to auto-include `backend/`
 - Permanent runtime artifacts: `_attic/runtime/` (backups/logs/reports; local only, matched by `.gitignore`; not tracked)
+- Tool-managed plans and specs: `docs/superpowers/` (the only active root `docs/` exception)
+- Active app/tool exceptions: `backend/scripts/` and `backend/data/audit_csv/`; generated reports still go to `_attic/runtime/`.
+- Local Obsidian metadata under ignored `vault/` paths may exist, but main tracks no active vault content.
 - Legacy backups already under `backend/_backup/` stay in place but new operational backups are not written there.
 - New member guide: `_attic/ONBOARDING.md`
 - Active DB: `backend/mes.db` (single — `app.db`, `erp.db` traces removed)

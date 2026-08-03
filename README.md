@@ -131,6 +131,7 @@ ERP/
 │   ├── ops/              백업 · 헬스체크 · 재고 정합
 │   ├── migrations/       DB 스키마 / 코드 정제
 │   └── dev/              verify_local.ps1 등 개발 보조
+├── docs/superpowers/     작업 스킬이 생성하는 계획·설계 문서 (도구 필수 경로)
 ├── docker/               컨테이너 정의 (docker-compose.yml · docker-compose.nas.yml)
 ├── _attic/               강제 위치 없는 모든 자료의 보관소
 │   ├── docs/             도메인 사전·가이드 (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS 등)
@@ -148,7 +149,7 @@ ERP/
 
 ## 문서 허브
 
-2026-05-29 정리 후 모든 문서는 `_attic/docs/` 에 통합. 도구가 자동 참조하지 않는 자료는 모두 `_attic/` 보관소로 옮김 ([_attic/docs/ATTIC_POLICY.md](_attic/docs/ATTIC_POLICY.md)).
+일반 문서와 완료 자료는 `_attic/docs/`에 통합한다. 작업 스킬이 자동 참조하는 계획·설계 문서만 `docs/superpowers/`에 둔다 ([_attic/docs/ATTIC_POLICY.md](_attic/docs/ATTIC_POLICY.md)).
 
 | 문서 | 대상 | 내용 |
 |---|---|---|

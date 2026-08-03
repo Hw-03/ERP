@@ -15,7 +15,7 @@
 DB 변경 없음. 결과 HTML 만 생성한다.
 
 실행:  cd backend && python scripts/safety_stock_preview.py
-출력:  backend/scripts/safety_stock_preview.html
+출력:  _attic/runtime/reports/backend/safety_stock_preview.html
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ import json
 import os
 import sqlite3
 from collections import defaultdict
+from pathlib import Path
 
 TARGET = 200  # 완성 본체 목표 대수
 
@@ -44,8 +45,10 @@ _COMPONENT_TYPES = {
 
 _DEPTH_CAP = 20
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "mes.db")
-OUT_PATH = os.path.join(os.path.dirname(__file__), "safety_stock_preview.html")
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parents[1]
+DB_PATH = SCRIPT_DIR.parent / "mes.db"
+OUT_PATH = PROJECT_ROOT / "_attic" / "runtime" / "reports" / "backend" / "safety_stock_preview.html"
 
 
 def model_label(symbol: str | None) -> str:
@@ -170,6 +173,7 @@ def main() -> None:
         "unlinked": n_unlinked,
         "non_r": n_non_r,
     })
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         f.write(html)
 
