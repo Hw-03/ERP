@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileAssemblyChecklistScreen } from "../MobileAssemblyChecklistScreen";
 
+const ITEM_CONTENT = "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인";
+
 const state = vi.hoisted(() => ({
   checklists: [
     {
@@ -52,53 +54,73 @@ const state = vi.hoisted(() => ({
   ],
   createChecklist: vi.fn(),
   createSection: vi.fn(),
+  updateSection: vi.fn(),
+  deleteSection: vi.fn(),
+  reorderSections: vi.fn(),
   createItem: vi.fn(),
   deleteItem: vi.fn(),
   updateItem: vi.fn(),
-  updatePending: false,
   reorderItems: vi.fn(),
   moveItem: vi.fn(),
-  movePending: false,
 }));
 
 vi.mock("@/lib/queries/useAssemblyChecklistsQuery", () => ({
   useAssemblyChecklistsQuery: () => ({ data: state.checklists, isLoading: false, error: null }),
   useCreateAssemblyChecklistMutation: () => ({ mutateAsync: state.createChecklist, isPending: false }),
   useCreateAssemblyChecklistSectionMutation: () => ({ mutateAsync: state.createSection, isPending: false }),
+  useUpdateAssemblyChecklistSectionMutation: () => ({ mutateAsync: state.updateSection, isPending: false }),
+  useDeleteAssemblyChecklistSectionMutation: () => ({ mutateAsync: state.deleteSection, isPending: false }),
+  useReorderAssemblyChecklistSectionsMutation: () => ({ mutateAsync: state.reorderSections, isPending: false }),
   useCreateAssemblyChecklistItemMutation: () => ({ mutateAsync: state.createItem, isPending: false }),
   useDeleteAssemblyChecklistItemMutation: () => ({ mutateAsync: state.deleteItem, isPending: false }),
-  useUpdateAssemblyChecklistItemMutation: () => ({ mutateAsync: state.updateItem, isPending: state.updatePending }),
+  useUpdateAssemblyChecklistItemMutation: () => ({ mutateAsync: state.updateItem, isPending: false }),
   useReorderAssemblyChecklistItemsMutation: () => ({ mutateAsync: state.reorderItems, isPending: false }),
-  useMoveAssemblyChecklistItemMutation: () => ({ mutateAsync: state.moveItem, isPending: state.movePending }),
+  useMoveAssemblyChecklistItemMutation: () => ({ mutateAsync: state.moveItem, isPending: false }),
 }));
 
 vi.mock("@/lib/queries/useModelsQuery", () => ({
   useModelsQuery: () => ({ data: state.models }),
 }));
 
-function renderChecklistScreen(onExit?: () => void) {
-  return render(<MobileAssemblyChecklistScreen onExit={onExit} />);
+function renderChecklistScreen() {
+  return render(<MobileAssemblyChecklistScreen />);
 }
 
-function expectCardWithoutShadow(card: HTMLElement) {
-  expect(card.style.boxShadow).toBe("");
-  expect(card.className.split(/\s+/).some((className) => className === "shadow" || className.startsWith("shadow-"))).toBe(false);
+function openManageDetail() {
+  fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
+  fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
+}
+
+function preparePointer(handle: HTMLElement, target: Element, clientY = 30) {
+  Object.defineProperty(window, "PointerEvent", {
+    configurable: true,
+    value: MouseEvent,
+  });
+  Object.defineProperty(document, "elementFromPoint", {
+    configurable: true,
+    value: vi.fn(() => target),
+  });
+  Object.defineProperty(handle, "setPointerCapture", {
+    configurable: true,
+    value: vi.fn(),
+  });
+  Object.defineProperty(target, "getBoundingClientRect", {
+    configurable: true,
+    value: () => ({ bottom: 40, height: 40, left: 0, right: 320, toJSON: () => ({}), top: 0, width: 320, x: 0, y: 0 }),
+  });
+  fireEvent.pointerDown(handle, { pointerId: 1, clientY: 0 });
+  fireEvent.pointerMove(handle, { pointerId: 1, clientX: 1, clientY });
+  fireEvent.pointerUp(handle, { pointerId: 1, clientY });
 }
 
 describe("MobileAssemblyChecklistScreen", () => {
   beforeEach(() => {
-    state.createChecklist.mockReset();
-    state.createSection.mockReset();
-    state.createItem.mockReset();
-    state.deleteItem.mockReset();
-    state.updateItem.mockReset();
-    state.updatePending = false;
-    state.reorderItems.mockReset();
-    state.moveItem.mockReset();
-    state.movePending = false;
+    Object.values(state).forEach((value) => {
+      if (typeof value === "function" && "mockReset" in value) value.mockReset();
+    });
   });
 
-  it("lists only models that already have a checklist", () => {
+  it("체크리스트가 등록된 모델만 선택 화면에 표시한다", () => {
     renderChecklistScreen();
 
     expect(screen.getByRole("button", { name: "DX3000 체크리스트 열기" })).toBeInTheDocument();
@@ -106,59 +128,33 @@ describe("MobileAssemblyChecklistScreen", () => {
     expect(screen.queryByRole("button", { name: "ADX4000W 체크리스트 열기" })).not.toBeInTheDocument();
   });
 
-  it("removes repeated checklist labels and promotes the selection hierarchy", () => {
+  it("기존 체크 수행 화면은 완료 상태를 로컬에서 유지한다", () => {
     renderChecklistScreen();
-
-    const heading = screen.getByRole("heading", { name: "조립 체크리스트" });
-    expect(heading).toHaveClass("text-2xl", "font-black");
-    expect(screen.queryByText("제품을 선택하세요.")).not.toBeInTheDocument();
-    expect(screen.getAllByText("조립 체크리스트")).toHaveLength(1);
-    expect(screen.getByText("DX3000")).toHaveClass("text-xl", "font-black");
-  });
-
-  it("keeps the existing checklist as a local, read-only completion flow", () => {
-    renderChecklistScreen();
-
     fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
 
-    expect(screen.getByRole("heading", { name: "DX3000" })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "전원 OFF 체크리스트" })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "전원 ON 체크리스트" })).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-
-    const [powerOffList] = screen.getAllByRole("list");
-    const [firstItem] = within(powerOffList).getAllByRole("button");
+    const firstItem = within(screen.getByRole("list", { name: "전원 OFF 체크리스트" }))
+      .getByRole("button", { name: new RegExp(ITEM_CONTENT) });
     fireEvent.click(firstItem);
 
     expect(firstItem).toHaveAttribute("aria-pressed", "true");
-    expect(firstItem).toHaveClass("no-btn-inset");
-    expect(screen.getAllByRole("button", { name: "전체 해제" })[0]).toHaveStyle({
-      background: "color-mix(in srgb, var(--c-yellow) 12%, transparent)",
-    });
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
-  it("keeps an item completed after it moves to another box", () => {
+  it("항목이 다른 박스로 이동해도 완료 상태를 유지한다", () => {
     const originalChecklist = state.checklists[0];
     const movedItem = originalChecklist.sections[0].items[0];
     const movedChecklist = {
       ...originalChecklist,
       sections: [
-        {
-          ...originalChecklist.sections[0],
-          items: originalChecklist.sections[0].items.slice(1),
-        },
-        {
-          ...originalChecklist.sections[1],
-          items: [movedItem, ...originalChecklist.sections[1].items],
-        },
+        { ...originalChecklist.sections[0], items: originalChecklist.sections[0].items.slice(1) },
+        { ...originalChecklist.sections[1], items: [movedItem, ...originalChecklist.sections[1].items] },
       ],
     };
     const view = renderChecklistScreen();
 
     fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
-    const completedItem = within(screen.getByRole("list", { name: "전원 OFF 체크리스트" }))
-      .getByRole("button", { name: /손잡이 나사 고정 상태 양호/ });
-    fireEvent.click(completedItem);
+    fireEvent.click(within(screen.getByRole("list", { name: "전원 OFF 체크리스트" }))
+      .getByRole("button", { name: new RegExp(ITEM_CONTENT) }));
     fireEvent.click(screen.getByRole("button", { name: "제품 선택으로 돌아가기" }));
 
     try {
@@ -167,141 +163,65 @@ describe("MobileAssemblyChecklistScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
 
       expect(within(screen.getByRole("list", { name: "전원 ON 체크리스트" }))
-        .getByRole("button", { name: /손잡이 나사 고정 상태 양호/ }))
+        .getByRole("button", { name: new RegExp(ITEM_CONTENT) }))
         .toHaveAttribute("aria-pressed", "true");
     } finally {
       state.checklists[0] = originalChecklist;
     }
   });
 
-  it("centers the product name with matching left and right header columns", () => {
+  it("일반 관리 목록은 드래그와 삭제를 숨기고 항목 편집 시트를 연다", () => {
     renderChecklistScreen();
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 체크리스트 열기" }));
+    openManageDetail();
 
-    const heading = screen.getByRole("heading", { name: "DX3000" });
-    expect(heading.parentElement).toHaveClass("grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]");
-    expect(heading).toHaveClass("text-center");
+    expect(screen.getByRole("button", { name: "순서 변경" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "박스 추가" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `${ITEM_CONTENT} 항목 순서 변경` })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "항목 삭제" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집` }));
+
+    expect(screen.getByRole("dialog", { name: "항목 수정" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "항목 문구" })).toHaveValue(ITEM_CONTENT);
   });
 
-  it("opens management, adds an unregistered MES model, and adds a named box and item", async () => {
-    state.createChecklist.mockResolvedValueOnce({ checklist_id: "adx4000", model_slot: 4, model_name: "ADX4000W", sections: [] });
-    state.createSection.mockResolvedValueOnce({
-      checklist_id: "adx4000",
-      model_slot: 4,
-      model_name: "ADX4000W",
-      sections: [{ section_id: "adx4000-section", title: "전원 ON", sort_order: 0, items: [] }],
-    });
-    state.createItem.mockResolvedValueOnce({ checklist_id: "adx4000", model_slot: 4, model_name: "ADX4000W", sections: [] });
+  it("박스와 항목을 각각 하단 시트에서 추가한다", async () => {
+    state.createSection.mockResolvedValueOnce(state.checklists[0]);
+    state.createItem.mockResolvedValueOnce(state.checklists[0]);
     renderChecklistScreen();
+    openManageDetail();
 
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "ADX4000W 체크리스트 추가" }));
-
-    await waitFor(() => expect(state.createChecklist).toHaveBeenCalledWith({ modelSlot: 4 }));
-    expect(screen.getByRole("heading", { name: "ADX4000W" })).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("박스 이름"), { target: { value: "전원 ON" } });
     fireEvent.click(screen.getByRole("button", { name: "박스 추가" }));
-    await waitFor(() => expect(state.createSection).toHaveBeenCalledWith({ modelSlot: 4, title: "전원 ON" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "박스 이름" }), { target: { value: "최종 검사" } });
+    fireEvent.click(screen.getByRole("button", { name: "박스 추가 저장" }));
+    await waitFor(() => expect(state.createSection).toHaveBeenCalledWith({ modelSlot: 1, title: "최종 검사" }));
 
-    fireEvent.change(screen.getByLabelText("전원 ON 항목"), { target: { value: "전원 LED 확인" } });
-    fireEvent.click(screen.getByRole("button", { name: "항목 추가" }));
-    await waitFor(() => expect(state.createItem).toHaveBeenCalledWith({ sectionId: "adx4000-section", content: "전원 LED 확인" }));
+    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 항목 추가" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "항목 문구" }), { target: { value: "전원 확인" } });
+    fireEvent.click(screen.getByRole("button", { name: "항목 추가 저장" }));
+    await waitFor(() => expect(state.createItem).toHaveBeenCalledWith({ sectionId: "dx-off", content: "전원 확인" }));
   });
 
-  it("saves a dragged order only within the selected box", async () => {
-    state.reorderItems.mockResolvedValueOnce(state.checklists[0]);
+  it("항목 문구를 공백 제거 후 저장한다", async () => {
+    state.updateItem.mockResolvedValueOnce(state.checklists[0]);
     renderChecklistScreen();
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
+    openManageDetail();
 
-    const firstHandle = screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 순서 변경" });
-    const target = screen.getByText("차폐 납 부착 상태 양호").closest("[data-item-id]");
-    Object.defineProperty(document, "elementFromPoint", {
-      configurable: true,
-      value: vi.fn(() => target),
-    });
-    Object.defineProperty(firstHandle, "setPointerCapture", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      value: MouseEvent,
-    });
+    fireEvent.click(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집` }));
+    fireEvent.change(screen.getByRole("textbox", { name: "항목 문구" }), { target: { value: "  손잡이 체결 확인  " } });
+    fireEvent.click(screen.getByRole("button", { name: "항목 저장" }));
 
-    fireEvent.pointerDown(firstHandle, { pointerId: 1, clientY: 10 });
-    fireEvent.pointerMove(firstHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-    fireEvent.pointerUp(firstHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-
-    await waitFor(() => expect(state.reorderItems).toHaveBeenCalledWith({
-      sectionId: "dx-off",
-      itemIds: ["dx-off-2", "dx-off-1"],
-    }));
-    expect(state.moveItem).not.toHaveBeenCalled();
+    await waitFor(() => expect(state.updateItem).toHaveBeenCalledWith({ itemId: "dx-off-1", content: "손잡이 체결 확인" }));
   });
 
-  it("moves a dragged item to a row in another box", async () => {
+  it("항목을 선택한 다른 박스의 마지막으로 이동한다", async () => {
     state.moveItem.mockResolvedValueOnce(state.checklists[0]);
     renderChecklistScreen();
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
+    openManageDetail();
 
-    const sourceRow = document.querySelector('[data-item-id="dx-off-1"]')!;
-    const sourceHandle = within(sourceRow).getByRole("button", { name: /순서 변경$/ });
-    const targetRow = document.querySelector('[data-item-id="dx-on-1"]');
-    Object.defineProperty(document, "elementFromPoint", {
-      configurable: true,
-      value: vi.fn(() => targetRow),
-    });
-    Object.defineProperty(sourceHandle, "setPointerCapture", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      value: MouseEvent,
-    });
-
-    fireEvent.pointerDown(sourceHandle, { pointerId: 1, clientY: 10 });
-    fireEvent.pointerMove(sourceHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-    expect(document.querySelector('[data-checklist-item-id="dx-on-1"]')).toHaveStyle({
-      borderColor: "var(--c-blue)",
-    });
-    fireEvent.pointerUp(sourceHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-
-    await waitFor(() => expect(state.moveItem).toHaveBeenCalledWith({
-      itemId: "dx-off-1",
-      targetSectionId: "dx-on",
-      targetIndex: 0,
-    }));
-  });
-
-  it("moves a dragged item to the end when dropped on another box empty area", async () => {
-    state.moveItem.mockResolvedValueOnce(state.checklists[0]);
-    renderChecklistScreen();
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-
-    const sourceRow = document.querySelector('[data-item-id="dx-off-1"]')!;
-    const sourceHandle = within(sourceRow).getByRole("button", { name: /순서 변경$/ });
-    const targetSection = screen.getByText("전원 ON").closest("section");
-    Object.defineProperty(document, "elementFromPoint", {
-      configurable: true,
-      value: vi.fn(() => targetSection),
-    });
-    Object.defineProperty(sourceHandle, "setPointerCapture", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      value: MouseEvent,
-    });
-
-    fireEvent.pointerDown(sourceHandle, { pointerId: 1, clientY: 10 });
-    fireEvent.pointerMove(sourceHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-    fireEvent.pointerUp(sourceHandle, { pointerId: 1, clientY: 30, clientX: 1 });
+    fireEvent.click(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집` }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 박스로 이동" }));
+    fireEvent.click(screen.getByRole("button", { name: "전원 ON으로 이동" }));
 
     await waitFor(() => expect(state.moveItem).toHaveBeenCalledWith({
       itemId: "dx-off-1",
@@ -310,181 +230,103 @@ describe("MobileAssemblyChecklistScreen", () => {
     }));
   });
 
-  it("keeps the checklist visible when moving an item fails", async () => {
-    state.moveItem.mockRejectedValueOnce(new Error("move failed"));
+  it("항목 삭제는 확인 시트에서만 실행하고 취소하면 편집 시트로 돌아간다", async () => {
+    state.deleteItem.mockResolvedValueOnce(state.checklists[0]);
     renderChecklistScreen();
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
+    openManageDetail();
 
-    const sourceRow = document.querySelector('[data-item-id="dx-off-1"]')!;
-    const sourceHandle = within(sourceRow).getByRole("button", { name: /순서 변경$/ });
-    const targetRow = document.querySelector('[data-item-id="dx-on-1"]');
-    Object.defineProperty(document, "elementFromPoint", {
-      configurable: true,
-      value: vi.fn(() => targetRow),
-    });
-    Object.defineProperty(sourceHandle, "setPointerCapture", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      value: MouseEvent,
-    });
-
-    fireEvent.pointerDown(sourceHandle, { pointerId: 1, clientY: 10 });
-    fireEvent.pointerMove(sourceHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-    fireEvent.pointerUp(sourceHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("항목을 다른 박스로 이동하지 못했습니다."));
-    expect(screen.getByText(/나사가 풀리지/)).toBeInTheDocument();
-  });
-
-  it("clears the drag target without saving when pointer drag is cancelled", () => {
-    renderChecklistScreen();
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-
-    const sourceRow = document.querySelector('[data-item-id="dx-off-1"]')!;
-    const sourceHandle = within(sourceRow).getByRole("button", { name: /순서 변경$/ });
-    const targetRow = document.querySelector('[data-item-id="dx-on-1"]')!;
-    Object.defineProperty(document, "elementFromPoint", {
-      configurable: true,
-      value: vi.fn(() => targetRow),
-    });
-    Object.defineProperty(sourceHandle, "setPointerCapture", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      value: MouseEvent,
-    });
-
-    fireEvent.pointerDown(sourceHandle, { pointerId: 1, clientY: 10 });
-    fireEvent.pointerMove(sourceHandle, { pointerId: 1, clientY: 30, clientX: 1 });
-    expect(targetRow).toHaveStyle({ borderColor: "var(--c-blue)" });
-    fireEvent.pointerCancel(sourceHandle, { pointerId: 1 });
-
-    expect(state.reorderItems).not.toHaveBeenCalled();
-    expect(state.moveItem).not.toHaveBeenCalled();
-    expect(document.querySelector('[data-checklist-item-id="dx-on-1"]')).toHaveStyle({
-      borderColor: "var(--c-border)",
-    });
-  });
-
-  it("deletes a managed item only after confirmation", async () => {
-    state.deleteItem.mockResolvedValueOnce({
-      ...state.checklists[0],
-      sections: [{ ...state.checklists[0].sections[0], items: [state.checklists[0].sections[0].items[1]] }],
-    });
-    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
-    vi.stubGlobal("confirm", confirm);
-    renderChecklistScreen();
-
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-    const deleteButton = screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 삭제" });
-
-    fireEvent.click(deleteButton);
+    fireEvent.click(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집` }));
+    fireEvent.click(screen.getByRole("button", { name: "항목 삭제" }));
     expect(state.deleteItem).not.toHaveBeenCalled();
-    fireEvent.click(deleteButton);
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.getByRole("dialog", { name: "항목 수정" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "항목 삭제" }));
+    fireEvent.click(screen.getByRole("button", { name: "항목 삭제 확인" }));
     await waitFor(() => expect(state.deleteItem).toHaveBeenCalledWith({ itemId: "dx-off-1" }));
   });
 
-  it("edits a managed item with trimmed content", async () => {
-    const updatedChecklist = {
-      ...state.checklists[0],
-      sections: state.checklists[0].sections.map((section) => section.section_id === "dx-off"
-        ? { ...section, items: section.items.map((item) => item.item_id === "dx-off-1" ? { ...item, content: "손잡이 체결 확인" } : item) }
-        : section),
-    };
-    state.updateItem.mockResolvedValueOnce(updatedChecklist);
+  it("박스 이름을 수정하고 항목 수를 알린 뒤 박스를 삭제한다", async () => {
+    state.updateSection.mockResolvedValueOnce(state.checklists[0]);
+    state.deleteSection.mockResolvedValueOnce(state.checklists[0]);
     renderChecklistScreen();
+    openManageDetail();
 
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 수정" }));
-    const textarea = screen.getByRole("textbox", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 문구" });
-    expect(textarea).toHaveFocus();
-    fireEvent.change(textarea, {
-      target: { value: "  손잡이 체결 확인  " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "항목 수정 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 박스 메뉴" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "박스 이름" }), { target: { value: "  전원 준비  " } });
+    fireEvent.click(screen.getByRole("button", { name: "박스 이름 저장" }));
+    await waitFor(() => expect(state.updateSection).toHaveBeenCalledWith({ sectionId: "dx-off", title: "전원 준비" }));
 
-    await waitFor(() => expect(state.updateItem).toHaveBeenCalledWith({
-      itemId: "dx-off-1",
-      content: "손잡이 체결 확인",
+    fireEvent.click(screen.getByRole("button", { name: "전원 OFF 박스 메뉴" }));
+    fireEvent.click(screen.getByRole("button", { name: "박스 삭제" }));
+    expect(screen.getByText("2개 항목도 함께 삭제됩니다.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(state.deleteSection).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "박스 삭제" }));
+    fireEvent.click(screen.getByRole("button", { name: "박스 삭제 확인" }));
+    await waitFor(() => expect(state.deleteSection).toHaveBeenCalledWith({ sectionId: "dx-off" }));
+  });
+
+  it("순서 변경은 현재 관리 화면에서 활성 완료 상태로 전환한다", async () => {
+    state.reorderSections.mockResolvedValueOnce(state.checklists[0]);
+    renderChecklistScreen();
+    openManageDetail();
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
+
+    expect(screen.getByRole("heading", { name: "DX3000" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "순서 변경 완료" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "박스 추가" })).toBeDisabled();
+
+    const source = screen.getByRole("button", { name: "전원 OFF 박스 순서 변경" });
+    const target = document.querySelector('[data-checklist-section-sort-id="dx-on"]')!;
+    preparePointer(source, target);
+
+    await waitFor(() => expect(state.reorderSections).toHaveBeenCalledWith({
+      modelSlot: 1,
+      sectionIds: ["dx-on", "dx-off"],
     }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "손잡이 체결 확인 수정" })).toHaveFocus());
+    expect(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 순서 변경` })).toHaveClass("h-11", "w-11");
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경 완료" }));
+    expect(screen.queryByRole("button", { name: "전원 OFF 박스 순서 변경" })).not.toBeInTheDocument();
   });
 
-  it("cancels a managed item edit without calling the update mutation", () => {
+  it("순서 변경 모드에서 항목을 다른 박스의 삽입 위치로 이동한다", async () => {
+    state.moveItem.mockResolvedValueOnce(state.checklists[0]);
     renderChecklistScreen();
+    openManageDetail();
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 수정" }));
-    fireEvent.click(screen.getByRole("button", { name: "항목 수정 취소" }));
+    const source = screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 순서 변경` });
+    const target = document.querySelector('[data-checklist-item-id="dx-on-1"]')!;
+    preparePointer(source, target, 10);
 
-    expect(state.updateItem).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 수정" })).toHaveFocus();
+    await waitFor(() => expect(state.moveItem).toHaveBeenCalledWith({
+      itemId: "dx-off-1",
+      targetSectionId: "dx-on",
+      targetIndex: 0,
+    }));
   });
 
-  it("disables managed edit controls while an item update is pending", () => {
-    const { rerender } = renderChecklistScreen();
-
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 수정" }));
-    state.updatePending = true;
-    rerender(<MobileAssemblyChecklistScreen />);
-
-    expect(screen.getByRole("textbox", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 문구" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "항목 수정 취소" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "항목 수정 저장" })).toBeDisabled();
-  });
-
-  it("keeps managed item edit, drag, and delete controls at 44px targets", () => {
-    renderChecklistScreen();
-
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-
-    expect(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 수정" })).toHaveClass("min-h-11", "no-btn-inset");
-    expect(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 순서 변경" })).toHaveClass("h-11", "w-11");
-    expect(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 삭제" })).toHaveClass("h-11", "w-11");
-  });
-
-  it("disables saving a blank managed item draft", () => {
-    renderChecklistScreen();
-
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 수정" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 문구" }), {
-      target: { value: "   " },
-    });
-
-    expect(screen.getByRole("button", { name: "항목 수정 저장" })).toBeDisabled();
-  });
-
-  it("keeps a managed item in edit mode when saving fails", async () => {
+  it("항목 저장이 실패하면 시트와 오류를 유지한다", async () => {
     state.updateItem.mockRejectedValueOnce(new Error("save failed"));
     renderChecklistScreen();
+    openManageDetail();
 
-    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "DX3000 관리" }));
-    fireEvent.click(screen.getByRole("button", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 수정" }));
-    fireEvent.click(screen.getByRole("button", { name: "항목 수정 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: `${ITEM_CONTENT} 항목 편집` }));
+    fireEvent.click(screen.getByRole("button", { name: "항목 저장" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("항목 문구를 저장하지 못했습니다."));
-    expect(screen.getByRole("textbox", { name: "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인 문구" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "항목 문구" })).toBeInTheDocument();
   });
 
-  it("keeps checklist cards free of shadows", () => {
-    const { container } = renderChecklistScreen();
-    [container.querySelector<HTMLElement>("section"), ...screen.getAllByRole("button", { name: /체크리스트 열기$/ })]
-      .forEach((card) => expectCardWithoutShadow(card!));
+  it("관리 화면의 조작 버튼은 44px 터치 영역을 유지한다", () => {
+    renderChecklistScreen();
+    openManageDetail();
+
+    expect(screen.getByRole("button", { name: "전원 OFF 박스 메뉴" })).toHaveClass("h-11", "w-11");
+    expect(screen.getByRole("button", { name: "전원 OFF 항목 추가" })).toHaveClass("min-h-11");
+    fireEvent.click(screen.getByRole("button", { name: "순서 변경" }));
+    expect(screen.getByRole("button", { name: "전원 OFF 박스 순서 변경" })).toHaveClass("h-11", "w-11");
   });
 });

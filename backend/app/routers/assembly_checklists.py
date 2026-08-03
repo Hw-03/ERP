@@ -24,6 +24,8 @@ from app.schemas.assembly_checklist import (
     AssemblyChecklistItemUpdate,
     AssemblyChecklistResponse,
     AssemblyChecklistSectionCreate,
+    AssemblyChecklistSectionReorder,
+    AssemblyChecklistSectionUpdate,
 )
 
 
@@ -180,6 +182,96 @@ def create_assembly_checklist_section(
             sort_order=next_order,
         )
     )
+    db.commit()
+    return _serialize(_latest_checklist(db, model_slot))
+
+
+@router.put(
+    "/{model_slot}/sections/reorder",
+    response_model=AssemblyChecklistResponse,
+    summary="체크리스트 박스 순서 저장",
+)
+def reorder_assembly_checklist_sections(
+    model_slot: int,
+    payload: AssemblyChecklistSectionReorder,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Persist an exact checklist section permutation in contiguous display order."""
+
+    checklist = _get_checklist_by_slot(db, model_slot)
+    current_sections = (
+        db.query(AssemblyChecklistSection)
+        .filter(AssemblyChecklistSection.checklist_id == checklist.checklist_id)
+        .all()
+    )
+    current_ids = {section.section_id for section in current_sections}
+    requested_ids = payload.section_ids
+    if len(requested_ids) != len(set(requested_ids)) or set(requested_ids) != current_ids:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "같은 체크리스트의 모든 박스 순서만 저장할 수 있습니다.")
+
+    section_by_id = {section.section_id: section for section in current_sections}
+    for sort_order, section_id in enumerate(requested_ids):
+        section_by_id[section_id].sort_order = sort_order
+    db.commit()
+    return _serialize(_latest_checklist(db, model_slot))
+
+
+@router.put(
+    "/sections/{section_id}",
+    response_model=AssemblyChecklistResponse,
+    summary="체크리스트 박스 이름 수정",
+)
+def update_assembly_checklist_section(
+    section_id: uuid.UUID,
+    payload: AssemblyChecklistSectionUpdate,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Trim and persist one unique section title, returning its latest checklist."""
+
+    title = payload.title.strip()
+    if not title:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "박스 이름을 입력하세요.")
+    section = _get_section(db, section_id)
+    duplicate = (
+        db.query(AssemblyChecklistSection)
+        .filter(AssemblyChecklistSection.checklist_id == section.checklist_id)
+        .filter(func.lower(AssemblyChecklistSection.title) == title.lower())
+        .filter(AssemblyChecklistSection.section_id != section.section_id)
+        .first()
+    )
+    if duplicate is not None:
+        raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 박스가 이미 있습니다.")
+
+    model_slot = section.checklist.model_slot
+    section.title = title
+    db.commit()
+    return _serialize(_latest_checklist(db, model_slot))
+
+
+@router.delete(
+    "/sections/{section_id}",
+    response_model=AssemblyChecklistResponse,
+    summary="체크리스트 박스 삭제",
+)
+def delete_assembly_checklist_section(
+    section_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Delete one section and its items, then compact the remaining section order."""
+
+    section = _get_section(db, section_id)
+    checklist_id = section.checklist_id
+    model_slot = section.checklist.model_slot
+    db.delete(section)
+    db.flush()
+    remaining_sections = (
+        db.query(AssemblyChecklistSection)
+        .filter(AssemblyChecklistSection.checklist_id == checklist_id)
+        .order_by(AssemblyChecklistSection.sort_order.asc(), AssemblyChecklistSection.section_id.asc())
+        .all()
+    )
+    for sort_order, remaining_section in enumerate(remaining_sections):
+        remaining_section.sort_order = sort_order
     db.commit()
     return _serialize(_latest_checklist(db, model_slot))
 

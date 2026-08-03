@@ -11,6 +11,15 @@ export const assemblyChecklistsApi = {
   createAssemblyChecklistSection: (modelSlot: number, payload: { title: string }) =>
     postJson<AssemblyChecklist>(toApiUrl(`/api/assembly-checklists/${modelSlot}/sections`), payload),
 
+  updateAssemblyChecklistSection: (sectionId: string, payload: { title: string }) =>
+    putJson<AssemblyChecklist>(toApiUrl(`/api/assembly-checklists/sections/${sectionId}`), payload),
+
+  deleteAssemblyChecklistSection: (sectionId: string) =>
+    deleteJson<AssemblyChecklist>(toApiUrl(`/api/assembly-checklists/sections/${sectionId}`)),
+
+  reorderAssemblyChecklistSections: (modelSlot: number, payload: { section_ids: string[] }) =>
+    putJson<AssemblyChecklist>(toApiUrl(`/api/assembly-checklists/${modelSlot}/sections/reorder`), payload),
+
   createAssemblyChecklistItem: (sectionId: string, payload: { content: string }) =>
     postJson<AssemblyChecklist>(toApiUrl(`/api/assembly-checklists/sections/${sectionId}/items`), payload),
 

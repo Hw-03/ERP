@@ -3,6 +3,8 @@
 import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { AssemblyChecklistSection } from "@/lib/api/types/assembly-checklists";
 
+type DropPosition = "before" | "after" | "end" | null;
+
 type MoveInput = {
   itemId: string;
   targetSectionId: string;
@@ -24,19 +26,21 @@ type DragSource = {
 
 type DropTarget = {
   itemId: string | null;
+  position: DropPosition;
   sectionId: string | null;
 };
 
 export type UseAssemblyChecklistItemDragResult = {
   dragId: string | null;
+  dropPosition: DropPosition;
   dropTargetItemId: string | null;
   dropTargetSectionId: string | null;
   makeHandlers: (sectionId: string, itemId: string) => DragHandlers;
 };
 
 /**
- * 조립 체크리스트 행을 같은 박스 안에서 재정렬하거나 다른 박스로 옮긴다.
- * 드래그 중인 행과 현재 대상만 상태로 노출하고, 저장은 포인터를 놓을 때 한 번만 요청한다.
+ * 정렬 모드에서 항목의 같은 박스 재정렬과 다른 박스 이동을 처리한다.
+ * 드롭 행의 상·하단을 구분해 삽입 위치를 명확하게 유지한다.
  */
 export function useAssemblyChecklistItemDrag(
   sections: AssemblyChecklistSection[],
@@ -46,35 +50,43 @@ export function useAssemblyChecklistItemDrag(
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetItemId, setDropTargetItemId] = useState<string | null>(null);
   const [dropTargetSectionId, setDropTargetSectionId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<DropPosition>(null);
   const sourceRef = useRef<DragSource | null>(null);
-  const targetRef = useRef<DropTarget>({ itemId: null, sectionId: null });
+  const targetRef = useRef<DropTarget>({ itemId: null, position: null, sectionId: null });
   const pointerStartYRef = useRef(0);
   const isDraggingRef = useRef(false);
 
   function cleanup(): void {
     sourceRef.current = null;
-    targetRef.current = { itemId: null, sectionId: null };
+    targetRef.current = { itemId: null, position: null, sectionId: null };
     isDraggingRef.current = false;
     setDragId(null);
     setDropTargetItemId(null);
     setDropTargetSectionId(null);
+    setDropPosition(null);
   }
 
   function updateTargetAtPoint(clientX: number, clientY: number): void {
     const element = document.elementFromPoint(clientX, clientY);
     const sectionElement = element?.closest<HTMLElement>("[data-checklist-section-id]") ?? null;
     const itemElement = element?.closest<HTMLElement>("[data-checklist-item-id]") ?? null;
-    const nextSectionId = sectionElement?.dataset.checklistSectionId ?? null;
-    const nextItemId = itemElement?.dataset.checklistItemId ?? null;
+    const sectionId = sectionElement?.dataset.checklistSectionId ?? null;
+    const itemId = itemElement?.dataset.checklistItemId ?? null;
+    const rect = itemElement?.getBoundingClientRect();
+    const position: DropPosition = itemId && rect
+      ? clientY < rect.top + rect.height / 2 ? "before" : "after"
+      : sectionId ? "end" : null;
 
     if (
-      targetRef.current.sectionId === nextSectionId
-      && targetRef.current.itemId === nextItemId
+      targetRef.current.sectionId === sectionId
+      && targetRef.current.itemId === itemId
+      && targetRef.current.position === position
     ) return;
 
-    targetRef.current = { sectionId: nextSectionId, itemId: nextItemId };
-    setDropTargetSectionId(nextSectionId);
-    setDropTargetItemId(nextItemId);
+    targetRef.current = { itemId, position, sectionId };
+    setDropTargetSectionId(sectionId);
+    setDropTargetItemId(itemId);
+    setDropPosition(position);
   }
 
   function finishDrop(): void {
@@ -84,28 +96,29 @@ export function useAssemblyChecklistItemDrag(
 
     const sourceSection = sections.find((section) => section.section_id === source.sectionId);
     const targetSection = sections.find((section) => section.section_id === target.sectionId);
-    const sourceIndex = sourceSection?.items.findIndex((item) => item.item_id === source.itemId) ?? -1;
-    if (!sourceSection || !targetSection || sourceIndex < 0) return;
+    if (!sourceSection || !targetSection) return;
 
     if (source.sectionId === target.sectionId) {
       if (target.itemId === source.itemId) return;
-      const targetIndex = target.itemId
-        ? sourceSection.items.findIndex((item) => item.item_id === target.itemId)
-        : sourceSection.items.length - 1;
-      if (targetIndex < 0 || sourceIndex === targetIndex) return;
-
       const itemIds = sourceSection.items.map((item) => item.item_id);
+      const sourceIndex = itemIds.indexOf(source.itemId);
+      if (sourceIndex < 0) return;
       const [movedItemId] = itemIds.splice(sourceIndex, 1);
       if (!movedItemId) return;
-      itemIds.splice(target.itemId ? targetIndex : itemIds.length, 0, movedItemId);
+      const targetIndex = target.itemId ? itemIds.indexOf(target.itemId) : itemIds.length;
+      if (targetIndex < 0) return;
+      const insertionIndex = target.itemId && target.position === "after" ? targetIndex + 1 : targetIndex;
+      itemIds.splice(insertionIndex, 0, movedItemId);
+      if (itemIds.every((itemId, index) => itemId === sourceSection.items[index]?.item_id)) return;
       onReorder(source.sectionId, itemIds);
       return;
     }
 
-    const targetIndex = target.itemId
+    const targetItemIndex = target.itemId
       ? targetSection.items.findIndex((item) => item.item_id === target.itemId)
       : targetSection.items.length;
-    if (targetIndex < 0) return;
+    if (targetItemIndex < 0) return;
+    const targetIndex = target.itemId && target.position === "after" ? targetItemIndex + 1 : targetItemIndex;
     onMove({ itemId: source.itemId, targetSectionId: target.sectionId, targetIndex });
   }
 
@@ -113,7 +126,7 @@ export function useAssemblyChecklistItemDrag(
     function onPointerDown(event: PointerEvent): void {
       event.preventDefault();
       event.stopPropagation();
-      sourceRef.current = { sectionId, itemId };
+      sourceRef.current = { itemId, sectionId };
       pointerStartYRef.current = event.clientY;
       isDraggingRef.current = false;
       (event.currentTarget as Element).setPointerCapture(event.pointerId);
@@ -129,12 +142,12 @@ export function useAssemblyChecklistItemDrag(
       if (isDraggingRef.current) updateTargetAtPoint(event.clientX, event.clientY);
     }
 
-    function onPointerUp(event: PointerEvent): void {
+    function onPointerUp(): void {
       finishDrop();
       cleanup();
     }
 
-    function onPointerCancel(event: PointerEvent): void {
+    function onPointerCancel(): void {
       cleanup();
     }
 
@@ -147,5 +160,5 @@ export function useAssemblyChecklistItemDrag(
     };
   }
 
-  return { dragId, dropTargetItemId, dropTargetSectionId, makeHandlers };
+  return { dragId, dropPosition, dropTargetItemId, dropTargetSectionId, makeHandlers };
 }

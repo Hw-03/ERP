@@ -349,3 +349,67 @@ def test_assembly_checklist_item_move_rejects_invalid_target_sections_and_indice
     )
     assert missing_target.status_code == 404
     assert client.get("/api/assembly-checklists").json() == snapshot
+
+
+def test_assembly_checklist_section_update_trims_title_and_rejects_blank_or_duplicate(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    first = client.post("/api/assembly-checklists/1/sections", json={"title": "전원 OFF"}).json()["sections"][0]
+    second = client.post("/api/assembly-checklists/1/sections", json={"title": "전원 ON"}).json()["sections"][1]
+
+    updated = client.put(
+        f"/api/assembly-checklists/sections/{first['section_id']}",
+        json={"title": "  전원 대기  "},
+    )
+
+    assert updated.status_code == 200
+    assert [section["title"] for section in updated.json()["sections"]] == ["전원 대기", "전원 ON"]
+    assert client.put(
+        f"/api/assembly-checklists/sections/{first['section_id']}",
+        json={"title": "전원 ON"},
+    ).status_code == 409
+    assert client.put(
+        f"/api/assembly-checklists/sections/{second['section_id']}",
+        json={"title": "   "},
+    ).status_code == 422
+
+
+def test_assembly_checklist_section_reorder_and_delete_with_items_returns_latest_checklist(client, db_session):
+    _model(db_session, slot=1, name="DX3000", symbol="3")
+    assert client.post("/api/assembly-checklists", json={"model_slot": 1}).status_code == 201
+    first = client.post("/api/assembly-checklists/1/sections", json={"title": "준비"}).json()["sections"][0]
+    second = client.post("/api/assembly-checklists/1/sections", json={"title": "조립"}).json()["sections"][1]
+    third = client.post("/api/assembly-checklists/1/sections", json={"title": "검사"}).json()["sections"][2]
+    client.post(
+        f"/api/assembly-checklists/sections/{second['section_id']}/items",
+        json={"content": "나사 체결 확인"},
+    )
+    client.post(
+        f"/api/assembly-checklists/sections/{second['section_id']}/items",
+        json={"content": "라벨 부착 확인"},
+    )
+
+    reordered = client.put(
+        "/api/assembly-checklists/1/sections/reorder",
+        json={"section_ids": [third["section_id"], first["section_id"], second["section_id"]]},
+    )
+
+    assert reordered.status_code == 200
+    assert [(section["title"], section["sort_order"]) for section in reordered.json()["sections"]] == [
+        ("검사", 0),
+        ("준비", 1),
+        ("조립", 2),
+    ]
+    assert client.put(
+        "/api/assembly-checklists/1/sections/reorder",
+        json={"section_ids": [third["section_id"], third["section_id"], first["section_id"]]},
+    ).status_code == 422
+
+    deleted = client.delete(f"/api/assembly-checklists/sections/{second['section_id']}")
+
+    assert deleted.status_code == 200
+    assert [(section["title"], section["sort_order"]) for section in deleted.json()["sections"]] == [
+        ("검사", 0),
+        ("준비", 1),
+    ]
+    assert client.get("/api/assembly-checklists").json()[0] == deleted.json()

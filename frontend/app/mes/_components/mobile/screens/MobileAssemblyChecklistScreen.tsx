@@ -1,27 +1,42 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ClipboardCheck, GripVertical, Settings2, Trash2 } from "lucide-react";
-import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  ClipboardCheck,
+  GripVertical,
+  ListOrdered,
+  MoreHorizontal,
+  Plus,
+  Settings2,
+} from "lucide-react";
 import type { ProductModel } from "@/lib/api";
 import type {
   AssemblyChecklist,
   AssemblyChecklistItem,
   AssemblyChecklistSection,
 } from "@/lib/api/types/assembly-checklists";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
   useAssemblyChecklistsQuery,
   useCreateAssemblyChecklistItemMutation,
   useCreateAssemblyChecklistMutation,
   useCreateAssemblyChecklistSectionMutation,
   useDeleteAssemblyChecklistItemMutation,
+  useDeleteAssemblyChecklistSectionMutation,
   useMoveAssemblyChecklistItemMutation,
   useReorderAssemblyChecklistItemsMutation,
+  useReorderAssemblyChecklistSectionsMutation,
   useUpdateAssemblyChecklistItemMutation,
+  useUpdateAssemblyChecklistSectionMutation,
 } from "@/lib/queries/useAssemblyChecklistsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { TYPO } from "../tokens";
 import { useAssemblyChecklistItemDrag, type UseAssemblyChecklistItemDragResult } from "./useAssemblyChecklistItemDrag";
+import { useAssemblyChecklistSectionDrag, type UseAssemblyChecklistSectionDragResult } from "./useAssemblyChecklistSectionDrag";
 
 const CARD_STYLE = {
   background: LEGACY_COLORS.s1,
@@ -30,8 +45,33 @@ const CARD_STYLE = {
 
 type ScreenMode = "browse" | "manage" | "manageDetail";
 
+type SectionEditorState = {
+  sectionId: string | null;
+};
+
+type ItemEditorState = {
+  itemId: string | null;
+  sectionId: string;
+};
+
 function checklistItemKey(itemId: string): string {
   return itemId;
+}
+
+function sectionLabel(section: AssemblyChecklistSection): string {
+  return section.title ?? "기본 항목";
+}
+
+function findItem(
+  checklist: AssemblyChecklist,
+  itemId: string | null,
+): { item: AssemblyChecklistItem; section: AssemblyChecklistSection } | null {
+  if (!itemId) return null;
+  for (const section of checklist.sections) {
+    const item = section.items.find((candidate) => candidate.item_id === itemId);
+    if (item) return { item, section };
+  }
+  return null;
 }
 
 function ErrorText({ message }: { message: string | null }) {
@@ -47,10 +87,12 @@ function Header({
   title,
   onBack,
   backLabel,
+  rightAction,
 }: {
   title: string;
   onBack: () => void;
   backLabel: string;
+  rightAction?: ReactNode;
 }) {
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center">
@@ -66,7 +108,7 @@ function Header({
       <h2 className="min-w-0 truncate text-center text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
         {title}
       </h2>
-      <span aria-hidden="true" className="h-10 w-10" />
+      {rightAction ?? <span aria-hidden="true" className="h-10 w-10" />}
     </div>
   );
 }
@@ -186,201 +228,444 @@ function BrowseDetail({
   );
 }
 
+function SheetPrimaryButton({
+  ariaLabel,
+  children,
+  disabled,
+  onClick,
+}: {
+  ariaLabel: string;
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      className="min-h-11 w-full rounded-[16px] px-4 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-45"
+      style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.s1 }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SheetSecondaryButton({
+  ariaLabel,
+  children,
+  disabled,
+  onClick,
+}: {
+  ariaLabel: string;
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      className="min-h-11 w-full rounded-[16px] border px-4 py-3 text-sm font-bold transition-[transform,opacity] active:scale-[0.99] disabled:opacity-45"
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SheetDangerButton({
+  ariaLabel,
+  children,
+  disabled,
+  onClick,
+}: {
+  ariaLabel: string;
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      className="min-h-11 w-full rounded-[16px] border px-4 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-45"
+      style={{
+        background: `color-mix(in srgb, ${LEGACY_COLORS.red} 9%, transparent)`,
+        borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+        color: LEGACY_COLORS.red,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SectionEditorSheet({
+  open,
+  section,
+  draft,
+  busy,
+  onChange,
+  onClose,
+  onDelete,
+  onSave,
+}: {
+  open: boolean;
+  section: AssemblyChecklistSection | null;
+  draft: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onDelete: () => void;
+  onSave: () => void;
+}) {
+  const isCreate = section === null;
+  return (
+    <BottomSheet open={open} onClose={onClose} title={isCreate ? "박스 추가" : "박스 편집"}>
+      <div className="flex flex-col gap-3 px-5 pb-2">
+        <label className={`flex flex-col gap-2 ${TYPO.body} font-bold`} style={{ color: LEGACY_COLORS.text }}>
+          박스 이름
+          <input
+            aria-label="박스 이름"
+            value={draft}
+            disabled={busy}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="예: 전원 ON"
+            className="min-h-11 rounded-[12px] border px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45"
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          />
+        </label>
+        <SheetPrimaryButton
+          ariaLabel={isCreate ? "박스 추가 저장" : "박스 이름 저장"}
+          disabled={busy || !draft.trim()}
+          onClick={onSave}
+        >
+          {isCreate ? "박스 추가" : "저장"}
+        </SheetPrimaryButton>
+        {!isCreate && <SheetDangerButton ariaLabel="박스 삭제" disabled={busy} onClick={onDelete}>박스 삭제</SheetDangerButton>}
+        <SheetSecondaryButton ariaLabel="취소" disabled={busy} onClick={onClose}>취소</SheetSecondaryButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function ItemEditorSheet({
+  open,
+  item,
+  draft,
+  busy,
+  onChange,
+  onClose,
+  onDelete,
+  onMove,
+  onSave,
+}: {
+  open: boolean;
+  item: AssemblyChecklistItem | null;
+  draft: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onDelete: () => void;
+  onMove: () => void;
+  onSave: () => void;
+}) {
+  const isCreate = item === null;
+  return (
+    <BottomSheet open={open} onClose={onClose} title={isCreate ? "항목 추가" : "항목 수정"}>
+      <div className="flex flex-col gap-3 px-5 pb-2">
+        <label className={`flex flex-col gap-2 ${TYPO.body} font-bold`} style={{ color: LEGACY_COLORS.text }}>
+          항목 문구
+          <textarea
+            aria-label="항목 문구"
+            value={draft}
+            disabled={busy}
+            rows={5}
+            onChange={(event) => onChange(event.target.value)}
+            className={`${TYPO.body} min-h-28 w-full resize-y rounded-[12px] border px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45`}
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          />
+        </label>
+        <SheetPrimaryButton
+          ariaLabel={isCreate ? "항목 추가 저장" : "항목 저장"}
+          disabled={busy || !draft.trim()}
+          onClick={onSave}
+        >
+          {isCreate ? "항목 추가" : "저장"}
+        </SheetPrimaryButton>
+        {!isCreate && (
+          <>
+            <SheetSecondaryButton ariaLabel="다른 박스로 이동" disabled={busy} onClick={onMove}>다른 박스로 이동</SheetSecondaryButton>
+            <SheetDangerButton ariaLabel="항목 삭제" disabled={busy} onClick={onDelete}>항목 삭제</SheetDangerButton>
+          </>
+        )}
+        <SheetSecondaryButton ariaLabel="취소" disabled={busy} onClick={onClose}>취소</SheetSecondaryButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function MoveItemSheet({
+  open,
+  source,
+  sections,
+  busy,
+  onClose,
+  onMove,
+}: {
+  open: boolean;
+  source: { item: AssemblyChecklistItem; section: AssemblyChecklistSection } | null;
+  sections: AssemblyChecklistSection[];
+  busy: boolean;
+  onClose: () => void;
+  onMove: (section: AssemblyChecklistSection) => void;
+}) {
+  const targets = source ? sections.filter((section) => section.section_id !== source.section.section_id) : [];
+  return (
+    <BottomSheet open={open} onClose={onClose} title="다른 박스로 이동">
+      <div className="flex flex-col gap-3 px-5 pb-2">
+        <p className={TYPO.body} style={{ color: LEGACY_COLORS.muted2 }}>
+          선택한 항목을 대상 박스의 맨 아래로 이동합니다.
+        </p>
+        {targets.length === 0 ? (
+          <p className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>이동할 다른 박스가 없습니다.</p>
+        ) : targets.map((section) => (
+          <button
+            key={section.section_id}
+            type="button"
+            aria-label={`${sectionLabel(section)}으로 이동`}
+            disabled={busy}
+            onClick={() => onMove(section)}
+            className="flex min-h-11 items-center justify-between rounded-[14px] border px-4 text-left text-sm font-black transition-[transform] active:scale-[0.99] disabled:opacity-45"
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          >
+            <span>{sectionLabel(section)}</span>
+            <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
+          </button>
+        ))}
+        <SheetSecondaryButton ariaLabel="취소" disabled={busy} onClick={onClose}>취소</SheetSecondaryButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function DeleteItemSheet({
+  open,
+  item,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  item: AssemblyChecklistItem | null;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="항목을 삭제할까요?">
+      <div className="flex flex-col gap-3 px-5 pb-2">
+        <p className={`${TYPO.body} whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>{item?.content}</p>
+        <p className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>이 작업은 되돌릴 수 없습니다.</p>
+        <SheetDangerButton ariaLabel="항목 삭제 확인" disabled={busy} onClick={onConfirm}>삭제</SheetDangerButton>
+        <SheetSecondaryButton ariaLabel="취소" disabled={busy} onClick={onClose}>취소</SheetSecondaryButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function DeleteSectionSheet({
+  open,
+  section,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  section: AssemblyChecklistSection | null;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const itemCount = section?.items.length ?? 0;
+  return (
+    <BottomSheet open={open} onClose={onClose} title={`${section ? sectionLabel(section) : "이"} 박스를 삭제할까요?`}>
+      <div className="flex flex-col gap-3 px-5 pb-2">
+        <p className={TYPO.body} style={{ color: LEGACY_COLORS.text }}>{itemCount}개 항목도 함께 삭제됩니다.</p>
+        <p className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>이 작업은 되돌릴 수 없습니다.</p>
+        <SheetDangerButton ariaLabel="박스 삭제 확인" disabled={busy} onClick={onConfirm}>삭제</SheetDangerButton>
+        <SheetSecondaryButton ariaLabel="취소" disabled={busy} onClick={onClose}>취소</SheetSecondaryButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
 function ManagedSection({
   section,
   onAddItem,
-  onDeleteItem,
-  onUpdateItem,
-  pending,
-  drag,
+  onEditItem,
+  onEditSection,
 }: {
   section: AssemblyChecklistSection;
-  onAddItem: (sectionId: string, content: string) => Promise<void>;
-  onDeleteItem: (itemId: string) => Promise<void>;
-  onUpdateItem: (itemId: string, content: string) => Promise<void>;
-  pending: boolean;
-  drag: UseAssemblyChecklistItemDragResult;
+  onAddItem: (section: AssemblyChecklistSection) => void;
+  onEditItem: (section: AssemblyChecklistSection, item: AssemblyChecklistItem) => void;
+  onEditSection: (section: AssemblyChecklistSection) => void;
 }) {
-  const [itemDraft, setItemDraft] = useState("");
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const editButtonRefs = useRef(new Map<string, HTMLButtonElement>());
-  const focusRestoreItemId = useRef<string | null>(null);
-  const label = section.title ?? "기본 항목";
-  const isEmptyDropTarget = drag.dropTargetSectionId === section.section_id && !drag.dropTargetItemId;
+  const label = sectionLabel(section);
+  return (
+    <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className={TYPO.title} style={{ color: LEGACY_COLORS.text }}>{label}</h3>
+          <p className={`mt-1 ${TYPO.caption}`} style={{ color: LEGACY_COLORS.muted2 }}>{section.items.length}개 항목</p>
+        </div>
+        <button
+          type="button"
+          aria-label={`${label} 박스 메뉴`}
+          onClick={() => onEditSection(section)}
+          className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border transition-[transform] active:scale-[0.94]"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+        >
+          <MoreHorizontal className="h-5 w-5" />
+        </button>
+      </div>
+      <ol className="mt-3 flex list-none flex-col gap-2 p-0" aria-label={`${label} 관리 항목`}>
+        {section.items.map((item, index) => (
+          <li key={item.item_id}>
+            <button
+              type="button"
+              aria-label={`${item.content} 항목 편집`}
+              onClick={() => onEditItem(section, item)}
+              className="no-btn-inset flex min-h-11 w-full items-center gap-3 rounded-[14px] border px-3 py-3 text-left transition-[transform] active:scale-[0.99]"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              <span
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.muted2 }}
+              >
+                {index + 1}
+              </span>
+              <span className={`${TYPO.body} min-w-0 flex-1 whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
+                {item.content}
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+            </button>
+          </li>
+        ))}
+      </ol>
+      <button
+        type="button"
+        aria-label={`${label} 항목 추가`}
+        onClick={() => onAddItem(section)}
+        className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border px-3 text-sm font-black transition-[transform] active:scale-[0.99]"
+        style={{
+          background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`,
+          borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`,
+          color: LEGACY_COLORS.blue,
+        }}
+      >
+        <Plus className="h-4 w-4" />
+        항목 추가
+      </button>
+    </section>
+  );
+}
 
-  useEffect(() => {
-    if (editingItemId) {
-      textareaRef.current?.focus();
-      return;
-    }
-    const itemId = focusRestoreItemId.current;
-    if (!itemId) return;
-    editButtonRefs.current.get(itemId)?.focus();
-    focusRestoreItemId.current = null;
-  }, [editingItemId]);
-
-  const submit = async () => {
-    const content = itemDraft.trim();
-    if (!content) return;
-    await onAddItem(section.section_id, content);
-    setItemDraft("");
-  };
-
-  const saveEdit = async (itemId: string) => {
-    const content = editDraft.trim();
-    if (!content) return;
-    try {
-      await onUpdateItem(itemId, content);
-      focusRestoreItemId.current = itemId;
-      setEditingItemId(null);
-      setEditDraft("");
-    } catch {
-      // ManageDetail displays the mutation failure while this row stays editable.
-    }
-  };
+function SortSection({
+  section,
+  sectionIndex,
+  pending,
+  itemDrag,
+  sectionDrag,
+}: {
+  section: AssemblyChecklistSection;
+  sectionIndex: number;
+  pending: boolean;
+  itemDrag: UseAssemblyChecklistItemDragResult;
+  sectionDrag: UseAssemblyChecklistSectionDragResult;
+}) {
+  const label = sectionLabel(section);
+  const sectionHandlers = sectionDrag.makeHandlers(section.section_id);
+  const isSectionTarget = sectionDrag.dropTargetSectionId === section.section_id;
+  const sectionShadow = isSectionTarget
+    ? sectionDrag.dropPosition === "before"
+      ? `inset 0 3px 0 ${LEGACY_COLORS.blue}`
+      : `inset 0 -3px 0 ${LEGACY_COLORS.blue}`
+    : undefined;
 
   return (
     <section
       data-checklist-section-id={section.section_id}
+      data-checklist-section-sort-id={section.section_id}
       className="rounded-[20px] border p-4"
       style={{
         ...CARD_STYLE,
-        background: isEmptyDropTarget ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : CARD_STYLE.background,
-        borderColor: isEmptyDropTarget ? LEGACY_COLORS.blue : CARD_STYLE.borderColor,
+        background: sectionDrag.dragId === section.section_id
+          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`
+          : CARD_STYLE.background,
+        borderColor: isSectionTarget ? LEGACY_COLORS.blue : CARD_STYLE.borderColor,
+        boxShadow: sectionShadow,
       }}
     >
-      <h3 className={TYPO.title} style={{ color: LEGACY_COLORS.text }}>{label}</h3>
-      <div className="mt-3 flex gap-2">
-        <input
-          aria-label={`${label} 항목`}
-          value={itemDraft}
-          onChange={(event) => setItemDraft(event.target.value)}
-          placeholder="세부 항목 입력"
-          className="min-h-11 min-w-0 flex-1 rounded-[12px] border px-3 text-sm font-medium outline-none"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        />
+      <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => void submit()}
-          disabled={pending || !itemDraft.trim()}
-          className="min-h-11 shrink-0 rounded-[12px] border px-3 text-sm font-black disabled:opacity-45"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 45%, transparent)`,
-            color: LEGACY_COLORS.blue,
-          }}
+          aria-label={`${label} 박스 순서 변경`}
+          disabled={pending}
+          className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] disabled:opacity-45"
+          {...sectionHandlers}
+          style={{ ...sectionHandlers.style, color: LEGACY_COLORS.muted2 }}
         >
-          항목 추가
+          <GripVertical className="h-5 w-5" />
         </button>
+        <span className="w-5 shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>{sectionIndex + 1}</span>
+        <h3 className={`${TYPO.title} min-w-0 flex-1`} style={{ color: LEGACY_COLORS.text }}>{label}</h3>
       </div>
-      <ol className="mt-3 flex list-none flex-col gap-2 p-0" aria-label={`${label} 관리 항목`}>
+      <ol className="mt-3 flex list-none flex-col gap-2 p-0" aria-label={`${label} 순서 변경 항목`}>
         {section.items.map((item, index) => {
-          const isEditing = editingItemId === item.item_id;
-          const interactionDisabled = pending || editingItemId !== null;
-          const isDragTarget = drag.dragId === item.item_id
-            || (drag.dropTargetSectionId === section.section_id && drag.dropTargetItemId === item.item_id);
-          const dragHandlers = drag.makeHandlers(section.section_id, item.item_id);
+          const itemHandlers = itemDrag.makeHandlers(section.section_id, item.item_id);
+          const isItemTarget = itemDrag.dropTargetSectionId === section.section_id
+            && itemDrag.dropTargetItemId === item.item_id;
+          const itemShadow = isItemTarget
+            ? itemDrag.dropPosition === "before"
+              ? `inset 0 3px 0 ${LEGACY_COLORS.blue}`
+              : `inset 0 -3px 0 ${LEGACY_COLORS.blue}`
+            : undefined;
           return (
             <li
               key={item.item_id}
-              data-item-id={item.item_id}
-              data-checklist-section-id={section.section_id}
               data-checklist-item-id={item.item_id}
+              data-checklist-section-id={section.section_id}
               className="flex min-h-11 items-center gap-2 rounded-[14px] border px-2 py-2"
               style={{
-                background: isDragTarget ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : LEGACY_COLORS.s2,
-                borderColor: isDragTarget ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                background: itemDrag.dragId === item.item_id
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`
+                  : LEGACY_COLORS.s2,
+                borderColor: isItemTarget ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                boxShadow: itemShadow,
               }}
             >
               <button
                 type="button"
-                aria-label={`${item.content} 순서 변경`}
-                disabled={interactionDisabled}
+                aria-label={`${item.content} 항목 순서 변경`}
+                disabled={pending}
                 className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-45"
-                {...dragHandlers}
-                style={{ ...dragHandlers.style, color: LEGACY_COLORS.muted2 }}
+                {...itemHandlers}
+                style={{ ...itemHandlers.style, color: LEGACY_COLORS.muted2 }}
               >
                 <GripVertical className="h-5 w-5" />
               </button>
               <span className="w-5 shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>{index + 1}</span>
-              {isEditing ? (
-                <div className="min-w-0 flex-1">
-                  <textarea
-                    aria-label={`${item.content} 문구`}
-                    ref={textareaRef}
-                    value={editDraft}
-                    onChange={(event) => setEditDraft(event.target.value)}
-                    disabled={pending}
-                    rows={3}
-                    className={`${TYPO.body} min-h-20 w-full resize-y rounded-[12px] border px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45`}
-                    style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                  />
-                  <div className="mt-2 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      aria-label="항목 수정 취소"
-                      disabled={pending}
-                      onClick={() => {
-                        focusRestoreItemId.current = item.item_id;
-                        setEditingItemId(null);
-                        setEditDraft("");
-                      }}
-                      className="min-h-11 rounded-[12px] border px-3 text-sm font-black disabled:opacity-45"
-                      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-                    >
-                      취소
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="항목 수정 저장"
-                      onClick={() => void saveEdit(item.item_id)}
-                      disabled={pending || !editDraft.trim()}
-                      className="min-h-11 rounded-[12px] border px-3 text-sm font-black disabled:opacity-45"
-                      style={{
-                        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
-                        borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 45%, transparent)`,
-                        color: LEGACY_COLORS.blue,
-                      }}
-                    >
-                      저장
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  aria-label={`${item.content} 수정`}
-                  onClick={() => {
-                    setEditingItemId(item.item_id);
-                    setEditDraft(item.content);
-                  }}
-                  disabled={pending}
-                  ref={(element) => {
-                    if (element) editButtonRefs.current.set(item.item_id, element);
-                    else editButtonRefs.current.delete(item.item_id);
-                  }}
-                  className={`${TYPO.body} no-btn-inset min-h-11 min-w-0 flex-1 whitespace-pre-line text-left disabled:opacity-45`}
-                  style={{ color: LEGACY_COLORS.text }}
-                >
-                  {item.content}
-                </button>
-              )}
-              <button
-                type="button"
-                aria-label={`${item.content} 삭제`}
-                disabled={interactionDisabled}
-                onClick={() => {
-                  if (window.confirm("이 체크리스트 항목을 삭제할까요?")) {
-                    void onDeleteItem(item.item_id);
-                  }
-                }}
-                className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:opacity-45"
-                style={{ color: LEGACY_COLORS.red }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <span className={`${TYPO.body} min-w-0 flex-1 whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
+                {item.content}
+              </span>
             </li>
           );
         })}
@@ -398,122 +683,325 @@ function ManageDetail({
   onBack: () => void;
   onLatest: (checklist: AssemblyChecklist) => void;
 }) {
-  const [sectionTitle, setSectionTitle] = useState("");
+  const [isSorting, setIsSorting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sectionDraft, setSectionDraft] = useState("");
+  const [itemDraft, setItemDraft] = useState("");
+  const [sectionEditor, setSectionEditor] = useState<SectionEditorState | null>(null);
+  const [itemEditor, setItemEditor] = useState<ItemEditorState | null>(null);
+  const [moveItemId, setMoveItemId] = useState<string | null>(null);
+  const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+  const [deleteSectionId, setDeleteSectionId] = useState<string | null>(null);
   const createSection = useCreateAssemblyChecklistSectionMutation();
+  const updateSection = useUpdateAssemblyChecklistSectionMutation();
+  const deleteSection = useDeleteAssemblyChecklistSectionMutation();
+  const reorderSections = useReorderAssemblyChecklistSectionsMutation();
   const createItem = useCreateAssemblyChecklistItemMutation();
+  const updateItem = useUpdateAssemblyChecklistItemMutation();
   const deleteItem = useDeleteAssemblyChecklistItemMutation();
   const moveItem = useMoveAssemblyChecklistItemMutation();
   const reorderItems = useReorderAssemblyChecklistItemsMutation();
-  const updateItem = useUpdateAssemblyChecklistItemMutation();
+  const pending = createSection.isPending || updateSection.isPending || deleteSection.isPending
+    || reorderSections.isPending || createItem.isPending || updateItem.isPending || deleteItem.isPending
+    || moveItem.isPending || reorderItems.isPending;
+  const editedSection = sectionEditor?.sectionId
+    ? checklist.sections.find((section) => section.section_id === sectionEditor.sectionId) ?? null
+    : null;
+  const editedItem = findItem(checklist, itemEditor?.itemId ?? null);
+  const movedItem = findItem(checklist, moveItemId);
+  const deletedItem = findItem(checklist, deleteItemId)?.item ?? null;
+  const deletedSection = deleteSectionId
+    ? checklist.sections.find((section) => section.section_id === deleteSectionId) ?? null
+    : null;
+
+  const persistMove = async ({
+    itemId,
+    targetSectionId,
+    targetIndex,
+  }: {
+    itemId: string;
+    targetSectionId: string;
+    targetIndex: number;
+  }): Promise<boolean> => {
+    try {
+      setErrorMessage(null);
+      onLatest(await moveItem.mutateAsync({ itemId, targetSectionId, targetIndex }));
+      return true;
+    } catch {
+      setErrorMessage("항목을 다른 박스로 이동하지 못했습니다.");
+      return false;
+    }
+  };
+
+  const itemDrag = useAssemblyChecklistItemDrag(
+    checklist.sections,
+    (sectionId, itemIds) => {
+      void (async () => {
+        try {
+          setErrorMessage(null);
+          onLatest(await reorderItems.mutateAsync({ sectionId, itemIds }));
+        } catch {
+          setErrorMessage("항목 순서를 저장하지 못했습니다.");
+        }
+      })();
+    },
+    (input) => { void persistMove(input); },
+  );
+  const sectionDrag = useAssemblyChecklistSectionDrag(checklist.sections, (sectionIds) => {
+    void (async () => {
+      try {
+        setErrorMessage(null);
+        onLatest(await reorderSections.mutateAsync({ modelSlot: checklist.model_slot, sectionIds }));
+      } catch {
+        setErrorMessage("박스 순서를 저장하지 못했습니다.");
+      }
+    })();
+  });
+
+  const openCreateSection = () => {
+    setErrorMessage(null);
+    setSectionDraft("");
+    setSectionEditor({ sectionId: null });
+  };
+
+  const openEditSection = (section: AssemblyChecklistSection) => {
+    setErrorMessage(null);
+    setSectionDraft(sectionLabel(section));
+    setSectionEditor({ sectionId: section.section_id });
+  };
+
+  const openCreateItem = (section: AssemblyChecklistSection) => {
+    setErrorMessage(null);
+    setItemDraft("");
+    setItemEditor({ itemId: null, sectionId: section.section_id });
+  };
+
+  const openEditItem = (section: AssemblyChecklistSection, item: AssemblyChecklistItem) => {
+    setErrorMessage(null);
+    setItemDraft(item.content);
+    setItemEditor({ itemId: item.item_id, sectionId: section.section_id });
+  };
 
   const saveSection = async () => {
-    const title = sectionTitle.trim();
+    if (!sectionEditor) return;
+    const title = sectionDraft.trim();
     if (!title) return;
     try {
       setErrorMessage(null);
-      onLatest(await createSection.mutateAsync({ modelSlot: checklist.model_slot, title }));
-      setSectionTitle("");
+      const latest = sectionEditor.sectionId
+        ? await updateSection.mutateAsync({ sectionId: sectionEditor.sectionId, title })
+        : await createSection.mutateAsync({ modelSlot: checklist.model_slot, title });
+      onLatest(latest);
+      setSectionEditor(null);
     } catch {
-      setErrorMessage("박스를 추가하지 못했습니다.");
+      setErrorMessage(sectionEditor.sectionId ? "박스 이름을 저장하지 못했습니다." : "박스를 추가하지 못했습니다.");
     }
   };
 
-  const saveItem = async (sectionId: string, content: string) => {
+  const saveItem = async () => {
+    if (!itemEditor) return;
+    const content = itemDraft.trim();
+    if (!content) return;
     try {
       setErrorMessage(null);
-      onLatest(await createItem.mutateAsync({ sectionId, content }));
+      const latest = itemEditor.itemId
+        ? await updateItem.mutateAsync({ itemId: itemEditor.itemId, content })
+        : await createItem.mutateAsync({ sectionId: itemEditor.sectionId, content });
+      onLatest(latest);
+      setItemEditor(null);
     } catch {
-      setErrorMessage("항목을 추가하지 못했습니다.");
+      setErrorMessage(itemEditor.itemId ? "항목 문구를 저장하지 못했습니다." : "항목을 추가하지 못했습니다.");
     }
   };
 
-  const saveOrder = async (sectionId: string, itemIds: string[]) => {
+  const confirmDeleteItem = async () => {
+    if (!deleteItemId) return;
     try {
       setErrorMessage(null);
-      onLatest(await reorderItems.mutateAsync({ sectionId, itemIds }));
-    } catch {
-      setErrorMessage("항목 순서를 저장하지 못했습니다.");
-    }
-  };
-
-  const removeItem = async (itemId: string) => {
-    try {
-      setErrorMessage(null);
-      onLatest(await deleteItem.mutateAsync({ itemId }));
+      onLatest(await deleteItem.mutateAsync({ itemId: deleteItemId }));
+      setDeleteItemId(null);
+      setItemEditor(null);
     } catch {
       setErrorMessage("항목을 삭제하지 못했습니다.");
     }
   };
 
-  const saveUpdatedItem = async (itemId: string, content: string) => {
+  const confirmDeleteSection = async () => {
+    if (!deleteSectionId) return;
     try {
       setErrorMessage(null);
-      onLatest(await updateItem.mutateAsync({ itemId, content }));
-    } catch (error) {
-      setErrorMessage("항목 문구를 저장하지 못했습니다.");
-      throw error;
-    }
-  };
-
-  const saveMove = async ({ itemId, targetSectionId, targetIndex }: { itemId: string; targetSectionId: string; targetIndex: number }) => {
-    try {
-      setErrorMessage(null);
-      onLatest(await moveItem.mutateAsync({ itemId, targetSectionId, targetIndex }));
+      onLatest(await deleteSection.mutateAsync({ sectionId: deleteSectionId }));
+      setDeleteSectionId(null);
+      setSectionEditor(null);
     } catch {
-      setErrorMessage("항목을 다른 박스로 이동하지 못했습니다.");
+      setErrorMessage("박스를 삭제하지 못했습니다.");
     }
   };
 
-  const drag = useAssemblyChecklistItemDrag(
-    checklist.sections,
-    (sectionId, itemIds) => { void saveOrder(sectionId, itemIds); },
-    (input) => { void saveMove(input); },
-  );
-  const pending = createSection.isPending || createItem.isPending || deleteItem.isPending
-    || moveItem.isPending || reorderItems.isPending || updateItem.isPending;
+  const closeItemEditor = () => {
+    if (!pending) setItemEditor(null);
+  };
+
+  const closeSectionEditor = () => {
+    if (!pending) setSectionEditor(null);
+  };
+
+  const closeMoveSheet = () => {
+    if (pending || !movedItem) return;
+    setMoveItemId(null);
+    setItemEditor({ itemId: movedItem.item.item_id, sectionId: movedItem.section.section_id });
+  };
+
+  const closeDeleteItemSheet = () => {
+    if (pending || !deleteItemId) return;
+    const current = findItem(checklist, deleteItemId);
+    setDeleteItemId(null);
+    if (current) setItemEditor({ itemId: current.item.item_id, sectionId: current.section.section_id });
+  };
+
+  const closeDeleteSectionSheet = () => {
+    if (pending || !deleteSectionId) return;
+    setDeleteSectionId(null);
+    setSectionEditor({ sectionId: deleteSectionId });
+  };
+
+  const moveSelectedItem = async (section: AssemblyChecklistSection) => {
+    if (!moveItemId) return;
+    const moved = await persistMove({
+      itemId: moveItemId,
+      targetSectionId: section.section_id,
+      targetIndex: section.items.length,
+    });
+    if (moved) {
+      setMoveItemId(null);
+      setItemEditor(null);
+    }
+  };
+
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
-      <Header title={checklist.model_name} onBack={onBack} backLabel="체크리스트 관리 목록으로 돌아가기" />
-      <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
-        <h3 className={TYPO.title} style={{ color: LEGACY_COLORS.text }}>박스 추가</h3>
-        <div className="mt-3 flex gap-2">
-          <input
-            aria-label="박스 이름"
-            value={sectionTitle}
-            onChange={(event) => setSectionTitle(event.target.value)}
-            placeholder="예: 전원 ON"
-            className="min-h-11 min-w-0 flex-1 rounded-[12px] border px-3 text-sm font-medium outline-none"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          />
+    <>
+      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+        <Header title={checklist.model_name} onBack={onBack} backLabel="체크리스트 관리 목록으로 돌아가기" />
+        <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => void saveSection()}
-            disabled={pending || !sectionTitle.trim()}
-            className="min-h-11 shrink-0 rounded-[12px] border px-3 text-sm font-black disabled:opacity-45"
+            aria-label={isSorting ? "순서 변경 완료" : "순서 변경"}
+            aria-pressed={isSorting}
+            disabled={pending}
+            onClick={() => setIsSorting((current) => !current)}
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[14px] border px-3 text-sm font-black transition-[transform] active:scale-[0.99] disabled:opacity-45"
             style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 45%, transparent)`,
+              background: isSorting
+                ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                : LEGACY_COLORS.s2,
+              borderColor: isSorting
+                ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 50%, transparent)`
+                : LEGACY_COLORS.border,
+              color: isSorting ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
+            }}
+          >
+            {isSorting ? <Check className="h-4 w-4" /> : <ListOrdered className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />}
+            {isSorting ? "완료" : "순서 변경"}
+          </button>
+          <button
+            type="button"
+            aria-label="박스 추가"
+            disabled={pending || isSorting}
+            onClick={openCreateSection}
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[14px] border px-3 text-sm font-black transition-[transform] active:scale-[0.99] disabled:opacity-45"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`,
               color: LEGACY_COLORS.blue,
             }}
           >
+            <Plus className="h-4 w-4" />
             박스 추가
           </button>
         </div>
-      </section>
-      <ErrorText message={errorMessage} />
-      {checklist.sections.map((section) => (
-        <ManagedSection
-          key={section.section_id}
-          section={section}
-          onAddItem={saveItem}
-          onDeleteItem={removeItem}
-          onUpdateItem={saveUpdatedItem}
-          pending={pending}
-          drag={drag}
-        />
-      ))}
-    </div>
+        {isSorting && (
+          <p className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
+            박스와 항목을 길게 누르고 끌어 순서를 바꾸세요. 놓을 때마다 바로 저장됩니다.
+          </p>
+        )}
+        <ErrorText message={errorMessage} />
+        {isSorting
+          ? checklist.sections.map((section, index) => (
+            <SortSection
+              key={section.section_id}
+              section={section}
+              sectionIndex={index}
+              pending={pending}
+              itemDrag={itemDrag}
+              sectionDrag={sectionDrag}
+            />
+          ))
+          : checklist.sections.map((section) => (
+            <ManagedSection
+              key={section.section_id}
+              section={section}
+              onAddItem={openCreateItem}
+              onEditItem={openEditItem}
+              onEditSection={openEditSection}
+            />
+          ))}
+      </div>
+      <SectionEditorSheet
+        open={sectionEditor !== null}
+        section={editedSection}
+        draft={sectionDraft}
+        busy={pending}
+        onChange={setSectionDraft}
+        onClose={closeSectionEditor}
+        onSave={() => void saveSection()}
+        onDelete={() => {
+          if (!editedSection) return;
+          setSectionEditor(null);
+          setDeleteSectionId(editedSection.section_id);
+        }}
+      />
+      <ItemEditorSheet
+        open={itemEditor !== null}
+        item={editedItem?.item ?? null}
+        draft={itemDraft}
+        busy={pending}
+        onChange={setItemDraft}
+        onClose={closeItemEditor}
+        onSave={() => void saveItem()}
+        onMove={() => {
+          if (!editedItem) return;
+          setItemEditor(null);
+          setMoveItemId(editedItem.item.item_id);
+        }}
+        onDelete={() => {
+          if (!editedItem) return;
+          setItemEditor(null);
+          setDeleteItemId(editedItem.item.item_id);
+        }}
+      />
+      <MoveItemSheet
+        open={moveItemId !== null}
+        source={movedItem}
+        sections={checklist.sections}
+        busy={pending}
+        onClose={closeMoveSheet}
+        onMove={(section) => void moveSelectedItem(section)}
+      />
+      <DeleteItemSheet
+        open={deleteItemId !== null}
+        item={deletedItem}
+        busy={pending}
+        onClose={closeDeleteItemSheet}
+        onConfirm={() => void confirmDeleteItem()}
+      />
+      <DeleteSectionSheet
+        open={deleteSectionId !== null}
+        section={deletedSection}
+        busy={pending}
+        onClose={closeDeleteSectionSheet}
+        onConfirm={() => void confirmDeleteSection()}
+      />
+    </>
   );
 }
 

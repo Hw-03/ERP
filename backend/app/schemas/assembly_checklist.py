@@ -15,6 +15,14 @@ class AssemblyChecklistSectionCreate(BaseModel):
     title: str = Field(..., max_length=80)
 
 
+class AssemblyChecklistSectionUpdate(BaseModel):
+    title: str = Field(..., max_length=80)
+
+
+class AssemblyChecklistSectionReorder(BaseModel):
+    section_ids: list[uuid.UUID] = Field(..., min_length=1)
+
+
 class AssemblyChecklistItemCreate(BaseModel):
     content: str = Field(..., max_length=2000)
 

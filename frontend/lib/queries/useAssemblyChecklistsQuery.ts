@@ -49,6 +49,24 @@ export function useCreateAssemblyChecklistSectionMutation() {
   );
 }
 
+export function useUpdateAssemblyChecklistSectionMutation() {
+  return useLatestChecklistMutation(({ sectionId, title }: { sectionId: string; title: string }) =>
+    assemblyChecklistsApi.updateAssemblyChecklistSection(sectionId, { title }),
+  );
+}
+
+export function useDeleteAssemblyChecklistSectionMutation() {
+  return useLatestChecklistMutation(({ sectionId }: { sectionId: string }) =>
+    assemblyChecklistsApi.deleteAssemblyChecklistSection(sectionId),
+  );
+}
+
+export function useReorderAssemblyChecklistSectionsMutation() {
+  return useLatestChecklistMutation(({ modelSlot, sectionIds }: { modelSlot: number; sectionIds: string[] }) =>
+    assemblyChecklistsApi.reorderAssemblyChecklistSections(modelSlot, { section_ids: sectionIds }),
+  );
+}
+
 export function useCreateAssemblyChecklistItemMutation() {
   return useLatestChecklistMutation(({ sectionId, content }: { sectionId: string; content: string }) =>
     assemblyChecklistsApi.createAssemblyChecklistItem(sectionId, { content }),
