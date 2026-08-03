@@ -20,11 +20,11 @@ describe("DesktopSidebar", () => {
     const mainLabels = screen
       .getAllByRole("button")
       .map((button) => button.textContent ?? "")
-      .filter((text) => ["주간보고", "일일 작업 일지"].some((label) => text.includes(label)));
+      .filter((text) => ["주간보고", "일일 작업 일보"].some((label) => text.includes(label)));
 
     expect(mainLabels).toEqual([
       expect.stringContaining("주간보고"),
-      expect.stringContaining("일일 작업 일지"),
+      expect.stringContaining("일일 작업 일보"),
     ]);
   });
 

@@ -6,5 +6,5 @@ import { useConfirmNavigation } from "@/lib/ui/dirty-guard";
 
 export function DesktopDailyWorkReportView({ operator }: { operator: Operator | null }) {
   const confirmNavigation = useConfirmNavigation();
-  return <DailyWorkReportScreen employeeId={operator?.employee_id} confirmNavigation={confirmNavigation} />;
+  return <DailyWorkReportScreen employeeId={operator?.employee_id} operator={operator} confirmNavigation={confirmNavigation} />;
 }

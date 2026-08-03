@@ -16,6 +16,7 @@ describe("DailyWorkActivity", () => {
       />,
     );
 
+    expect(screen.getByText("MES 거래 요약")).toBeInTheDocument();
     expect(screen.getByText("공정")).toBeInTheDocument();
     expect(screen.getByText("8 EA")).toBeInTheDocument();
     expect(screen.queryByText("테스트 품목")).not.toBeInTheDocument();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mobileMoreHasVisibleEntries, normalizeHiddenSidebarTabs } from "../tabAccess";
 
-describe("일일 작업 일지 접근 제어", () => {
+describe("일일 작업 일보 접근 제어", () => {
   it("저장된 숨김 설정에 dailyReport를 인식한다", () => {
     expect(normalizeHiddenSidebarTabs(["dailyReport"])).toEqual(["dailyReport"]);
   });

@@ -1,4 +1,4 @@
-"""개인 일일 작업 일지와 거래 활동 조회 API."""
+"""개인 일일 작업 일보와 거래 활동 조회 API."""
 
 from __future__ import annotations
 
@@ -155,20 +155,20 @@ def upsert_daily_work_report(
 ):
     """본인만 오늘 또는 과거 일지를 작성·수정한다."""
     if payload.actor_employee_id != employee_id:
-        raise http_error(403, ErrorCode.FORBIDDEN, "본인 일지만 작성할 수 있습니다.")
+        raise http_error(403, ErrorCode.FORBIDDEN, "본인 일보만 작성할 수 있습니다.")
     if work_date > datetime.now(KST).date():
-        raise http_error(422, ErrorCode.BUSINESS_RULE, "미래 날짜의 일지는 작성할 수 없습니다.")
+        raise http_error(422, ErrorCode.BUSINESS_RULE, "미래 날짜의 일보는 작성할 수 없습니다.")
     content = payload.content.strip()
     if not content:
-        raise http_error(422, ErrorCode.UNPROCESSABLE, "일지 내용을 입력해 주세요.")
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "일보 내용을 입력해 주세요.")
     if len(content) > 5000:
-        raise http_error(422, ErrorCode.UNPROCESSABLE, "일지 내용은 5,000자 이하여야 합니다.")
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "일보 내용은 5,000자 이하여야 합니다.")
 
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     if not employee.is_active:
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 일지를 작성할 수 없습니다.")
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 일보를 작성할 수 없습니다.")
 
     report = (
         db.query(DailyWorkReport)

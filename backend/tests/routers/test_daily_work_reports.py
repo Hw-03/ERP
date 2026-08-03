@@ -80,10 +80,19 @@ def test_daily_work_report_put_rejects_impersonation_inactive_and_invalid_conten
     inactive = _employee(db_session, name="비활성", active=False)
     db_session.commit()
 
-    assert _put(client, employee, "권한 없음", actor_id=other.employee_id).status_code == 403
-    assert _put(client, inactive, "비활성 저장").status_code == 403
-    assert _put(client, employee, "   ").status_code == 422
-    assert _put(client, employee, "x" * 5001).status_code == 422
+    impersonation = _put(client, employee, "권한 없음", actor_id=other.employee_id)
+    inactive_response = _put(client, inactive, "비활성 저장")
+    blank = _put(client, employee, "   ")
+    too_long = _put(client, employee, "x" * 5001)
+
+    assert impersonation.status_code == 403
+    assert impersonation.json()["detail"]["message"] == "본인 일보만 작성할 수 있습니다."
+    assert inactive_response.status_code == 403
+    assert inactive_response.json()["detail"]["message"] == "비활성 직원은 일보를 작성할 수 없습니다."
+    assert blank.status_code == 422
+    assert blank.json()["detail"]["message"] == "일보 내용을 입력해 주세요."
+    assert too_long.status_code == 422
+    assert too_long.json()["detail"]["message"] == "일보 내용은 5,000자 이하여야 합니다."
     future = client.put(
         f"/api/daily-work-reports/{employee.employee_id}/2099-01-01",
         json={"actor_employee_id": str(employee.employee_id), "content": "미래"},

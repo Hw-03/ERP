@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isFutureKstDate, toKstDateKey } from "../dailyReportDate";
 
-describe("일일 작업 일지 KST 날짜", () => {
+describe("일일 작업 일보 KST 날짜", () => {
   it("UTC 자정 경계에서도 KST 날짜를 사용한다", () => {
     expect(toKstDateKey(new Date("2026-07-27T16:30:00.000Z"))).toBe("2026-07-28");
   });

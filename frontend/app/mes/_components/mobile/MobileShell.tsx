@@ -61,7 +61,7 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   history: { label: "내역", icon: HistoryIcon },
   more: { label: "더보기", icon: MoreHorizontal },
   assemblyChecklist: { label: "체크리스트", icon: ClipboardCheck },
-  dailyReport: { label: "일일 작업 일지", icon: ClipboardCheck },
+  dailyReport: { label: "일일 작업 일보", icon: ClipboardCheck },
   shipping: { label: "출하", icon: PackageCheck },
   weekly: { label: "주간보고", icon: BarChart2 },
   warehouseMap: { label: "창고지도", icon: MapPinned },

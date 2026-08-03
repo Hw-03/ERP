@@ -24,8 +24,8 @@ const MORE_ENTRIES: Record<
   },
   dailyReport: {
     icon: ClipboardList,
-    label: "일일 작업 일지",
-    description: "오늘 작업과 거래 활동 확인",
+    label: "일일 작업 일보",
+    description: "작업 내역과 MES 거래 확인",
     accent: LEGACY_COLORS.blue,
   },
   weekly: {

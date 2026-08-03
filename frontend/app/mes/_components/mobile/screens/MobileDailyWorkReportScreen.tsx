@@ -12,5 +12,5 @@ export function MobileDailyWorkReportScreen({
   onDirtyChange: (dirty: boolean) => void;
   flushSaveRef: React.MutableRefObject<(() => Promise<void>) | null>;
 }) {
-  return <DailyWorkReportScreen employeeId={operator?.employee_id} onDirtyChange={onDirtyChange} saveRef={flushSaveRef} />;
+  return <DailyWorkReportScreen employeeId={operator?.employee_id} operator={operator} onDirtyChange={onDirtyChange} saveRef={flushSaveRef} />;
 }

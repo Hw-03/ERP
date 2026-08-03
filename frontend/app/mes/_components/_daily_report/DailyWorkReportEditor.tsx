@@ -13,6 +13,7 @@ export function DailyWorkReportEditor({
   onSave,
   onDirtyChange,
   saveRef,
+  fillAvailableHeight = false,
 }: {
   initialContent: string;
   resetKey?: string;
@@ -22,6 +23,7 @@ export function DailyWorkReportEditor({
   onSave: (content: string) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   saveRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+  fillAvailableHeight?: boolean;
 }) {
   const [content, setContent] = useState(initialContent);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function DailyWorkReportEditor({
     if (savePromiseRef.current) return savePromiseRef.current;
     const next = content.trim();
     if (!next) {
-      const error = new Error("일지 내용을 입력하세요.");
+      const error = new Error("일보 내용을 입력하세요.");
       setValidationError(error.message);
       return Promise.reject(error);
     }
@@ -84,34 +86,31 @@ export function DailyWorkReportEditor({
 
   if (!editable) {
     return (
-      <section className="rounded-[20px] border p-4 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, boxShadow: "var(--c-card-shadow)" }}>
+      <section className="rounded-[20px] border p-4 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
             <PencilLine className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-xs font-black tracking-[0.08em]" style={{ color: LEGACY_COLORS.blue }}>DAILY NOTE</p>
-            <h2 className="mt-0.5 text-lg font-black">오늘 한 일</h2>
+            <h2 className="text-lg font-black">작업 내역</h2>
           </div>
         </div>
         <p className="mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7" style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {initialContent || "작성된 일지가 없습니다."}
+          {initialContent || "작성된 일보가 없습니다."}
         </p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-[20px] border p-4 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, boxShadow: "var(--c-card-shadow)" }}>
-      <div className="flex items-start justify-between gap-3">
+    <section className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className="flex shrink-0 items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
             <PencilLine className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-xs font-black tracking-[0.08em]" style={{ color: LEGACY_COLORS.blue }}>DAILY NOTE</p>
-            <h2 className="mt-0.5 text-lg font-black">오늘 한 일</h2>
-            <p className="mt-1 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>시간대 대신, 오늘 수행한 핵심 작업을 간단히 남기세요.</p>
+            <h2 className="text-lg font-black">작업 내역</h2>
           </div>
         </div>
         <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-black" style={{ color: dirty ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>
@@ -119,22 +118,21 @@ export function DailyWorkReportEditor({
         </span>
       </div>
       <textarea
-        aria-label="오늘 한 일"
+        aria-label="작업 내역"
         value={content}
         maxLength={5000}
-        placeholder="예) 입고 자재 확인 후 생산 라인으로 이관하고, 출하 예정 품목을 점검했습니다."
         onChange={(event) => {
           userEditedRef.current = true;
           setContent(event.target.value);
         }}
-        className="mt-5 min-h-44 w-full resize-y rounded-[16px] border px-4 py-3.5 text-sm leading-7 outline-none transition focus-visible:ring-2"
+        className={`mt-4 min-h-44 w-full resize-none rounded-[16px] border px-4 py-3.5 text-sm leading-7 outline-none transition focus-visible:ring-2 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
       />
       {(validationError || saveError) && <p role="alert" className="mt-3 rounded-[12px] px-3 py-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>{validationError || saveError}</p>}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-4 flex shrink-0 flex-wrap items-center justify-end gap-3">
         <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
           <CheckCircle2 className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
-          저장 후에도 과거 일지는 수정할 수 있습니다.
+          저장 후에도 과거 일보는 수정할 수 있습니다.
         </p>
         <button
           type="button"

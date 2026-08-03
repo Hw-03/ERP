@@ -1,4 +1,4 @@
-"""개인 일일 작업 일지 API 스키마."""
+"""개인 일일 작업 일보 API 스키마."""
 
 import uuid
 from datetime import date

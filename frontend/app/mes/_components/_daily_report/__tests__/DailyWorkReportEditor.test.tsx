@@ -7,7 +7,7 @@ describe("DailyWorkReportEditor", () => {
     const onSave = vi.fn().mockRejectedValueOnce(new Error("저장 실패"));
     render(<DailyWorkReportEditor initialContent="기존 내용" editable saving={false} saveError="저장 실패" onSave={onSave} />);
 
-    const input = screen.getByLabelText("오늘 한 일");
+    const input = screen.getByLabelText("작업 내역");
     fireEvent.change(input, { target: { value: "새 작업 내용" } });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
 
@@ -17,7 +17,7 @@ describe("DailyWorkReportEditor", () => {
 
   it("대상 일지가 바뀌면 저장하지 않은 이전 입력을 새 대상 내용으로 초기화한다", () => {
     const { rerender } = render(<DailyWorkReportEditor initialContent="7월 27일" resetKey="2026-07-27" editable saving={false} saveError={null} onSave={vi.fn()} />);
-    const input = screen.getByLabelText("오늘 한 일");
+    const input = screen.getByLabelText("작업 내역");
     fireEvent.change(input, { target: { value: "버려야 할 이전 입력" } });
 
     rerender(<DailyWorkReportEditor initialContent="7월 28일" resetKey="2026-07-28" editable saving={false} saveError={null} onSave={vi.fn()} />);
@@ -27,7 +27,7 @@ describe("DailyWorkReportEditor", () => {
 
   it("같은 대상의 늦은 조회 응답은 이미 입력한 초안을 덮어쓰지 않는다", () => {
     const { rerender } = render(<DailyWorkReportEditor initialContent="" resetKey="employee-1:2026-07-28" editable saving={false} saveError={null} onSave={vi.fn()} />);
-    const input = screen.getByLabelText("오늘 한 일");
+    const input = screen.getByLabelText("작업 내역");
     fireEvent.change(input, { target: { value: "작성 중인 초안" } });
 
     rerender(<DailyWorkReportEditor initialContent="늦게 도착한 서버 내용" resetKey="employee-1:2026-07-28" editable saving={false} saveError={null} onSave={vi.fn()} />);
@@ -41,12 +41,12 @@ describe("DailyWorkReportEditor", () => {
     rerender(<DailyWorkReportEditor initialContent="" resetKey="employee-2:2026-07-28" editable saving={false} saveError={null} onSave={vi.fn()} />);
     rerender(<DailyWorkReportEditor initialContent="새 대상 서버 내용" resetKey="employee-2:2026-07-28" editable saving={false} saveError={null} onSave={vi.fn()} />);
 
-    expect(screen.getByLabelText("오늘 한 일")).toHaveValue("새 대상 서버 내용");
+    expect(screen.getByLabelText("작업 내역")).toHaveValue("새 대상 서버 내용");
   });
 
   it("같은 직원과 날짜의 new에서 loaded 전환은 입력한 초안을 보존한다", () => {
     const { rerender } = render(<DailyWorkReportEditor initialContent="" resetKey="mine:2026-07-28:employee-1" editable saving={false} saveError={null} onSave={vi.fn()} />);
-    const input = screen.getByLabelText("오늘 한 일");
+    const input = screen.getByLabelText("작업 내역");
     fireEvent.change(input, { target: { value: "조회 중 작성한 초안" } });
 
     rerender(<DailyWorkReportEditor initialContent="늦게 도착한 기존 일지" resetKey="mine:2026-07-28:employee-1" editable saving={false} saveError={null} onSave={vi.fn()} />);
@@ -60,7 +60,14 @@ describe("DailyWorkReportEditor", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
 
-    expect(await screen.findByText("일지 내용을 입력하세요.")).toBeInTheDocument();
-    await expect(flushRef.current?.()).rejects.toThrow("일지 내용을 입력하세요.");
+    expect(await screen.findByText("일보 내용을 입력하세요.")).toBeInTheDocument();
+    await expect(flushRef.current?.()).rejects.toThrow("일보 내용을 입력하세요.");
+  });
+  it("작업 내역 입력창의 크기 조절을 막는다", () => {
+    render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} />);
+
+    const input = screen.getByRole("textbox", { name: "작업 내역" });
+    expect(input).toHaveClass("resize-none");
+    expect(input).not.toHaveClass("resize-y");
   });
 });

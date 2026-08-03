@@ -99,7 +99,7 @@ describe("MobileMoreScreen", () => {
     expect(menuList).toHaveClass("flex-1");
     expect(menuButtons.map((button) => button.textContent)).toEqual([
       expect.stringContaining("체크리스트"),
-      expect.stringContaining("일일 작업 일지"),
+      expect.stringContaining("일일 작업 일보"),
       expect.stringContaining("출하"),
       expect.stringContaining("주간보고"),
       expect.stringContaining("창고 지도"),
@@ -107,7 +107,7 @@ describe("MobileMoreScreen", () => {
     menuButtons.forEach((button) => expect(button).toHaveClass("flex-1"));
 
     fireEvent.click(screen.getByRole("button", { name: /체크리스트/ }));
-    fireEvent.click(screen.getByRole("button", { name: /일일 작업 일지/ }));
+    fireEvent.click(screen.getByRole("button", { name: /일일 작업 일보/ }));
 
     fireEvent.click(screen.getByRole("button", { name: /출하/ }));
     fireEvent.click(screen.getByRole("button", { name: /주간보고/ }));

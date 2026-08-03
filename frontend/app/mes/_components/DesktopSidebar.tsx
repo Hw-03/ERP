@@ -31,7 +31,7 @@ const MAIN_TABS: TabDef[] = [
   { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle, color: DESKTOP_TAB_ICON_COLORS.defect },
   { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned, color: DESKTOP_TAB_ICON_COLORS.warehouseMap },
   { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2, color: DESKTOP_TAB_ICON_COLORS.weekly },
-  { id: "dailyReport", label: "일일 작업 일지", subtitle: "오늘 작업과 거래 활동", icon: ClipboardList, color: DESKTOP_TAB_ICON_COLORS.dailyReport },
+  { id: "dailyReport", label: "일일 작업 일보", subtitle: "작업 내역과 MES 거래", icon: ClipboardList, color: DESKTOP_TAB_ICON_COLORS.dailyReport },
 ];
 
 const BOTTOM_TABS: TabDef[] = [

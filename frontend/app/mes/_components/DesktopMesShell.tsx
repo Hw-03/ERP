@@ -58,7 +58,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   warehouseMap: { title: "창고 지도", icon: MapPinned },
   defect: { title: "불량", icon: AlertTriangle },
   history: { title: "입출고 내역", icon: History },
-  dailyReport: { title: "일일 작업 일지", icon: ClipboardList },
+  dailyReport: { title: "일일 작업 일보", icon: ClipboardList },
   weekly: { title: "주간보고", icon: BarChart2 },
   admin: { title: "관리자", icon: Settings2 },
 };

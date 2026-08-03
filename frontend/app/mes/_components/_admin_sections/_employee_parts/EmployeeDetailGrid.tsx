@@ -28,7 +28,7 @@ const SIDEBAR_TAB_LABELS: Record<SidebarTabId, string> = {
   warehouseMap: "창고 지도",
   defect: "불량",
   history: "입출고 내역",
-  dailyReport: "일일 작업 일지",
+  dailyReport: "일일 작업 일보",
   weekly: "주간보고",
   admin: "관리자",
 };
