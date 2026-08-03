@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, Download, Network, Pencil } from "lucide-react";
+import { ArrowRightLeft, Network, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -231,74 +231,6 @@ export function BomWorkbench({
     }
   }
 
-  function exportCompletedBom() {
-    const completedParents = new Set(
-      items.filter((i) => i.bom_completed_at).map((i) => i.item_id),
-    );
-    const rows = allBomRows
-      .filter((r) => completedParents.has(r.parent_item_id))
-      .map((r) => {
-        const p = items.find((i) => i.item_id === r.parent_item_id);
-        const c = items.find((i) => i.item_id === r.child_item_id);
-        return {
-          parent_mes_code: p?.mes_code ?? "",
-          parent_item_name: r.parent_item_name,
-          parent_process_type: p?.process_type_code ?? "",
-          child_mes_code: c?.mes_code ?? "",
-          child_item_name: r.child_item_name,
-          child_process_type: c?.process_type_code ?? "",
-          quantity: r.quantity,
-          unit: r.unit ?? "EA",
-        };
-      });
-    if (rows.length === 0) {
-      onError("완료된 BOM 이 없습니다.");
-      return;
-    }
-    const stamp = new Date().toISOString().slice(0, 10);
-    // JSON
-    const jsonA = document.createElement("a");
-    jsonA.href = URL.createObjectURL(
-      new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" }),
-    );
-    jsonA.download = `bom_export_${stamp}.json`;
-    jsonA.click();
-    URL.revokeObjectURL(jsonA.href);
-    // CSV (standalone build.py 와 동일 스키마, UTF-8 BOM)
-    const header =
-      "parent_mes_code,parent_item_name,parent_process_type,child_mes_code,child_item_name,child_process_type,quantity,unit";
-    const csv =
-      "﻿" +
-      header +
-      "\n" +
-      rows
-        .map((r) =>
-          [
-            r.parent_mes_code,
-            r.parent_item_name,
-            r.parent_process_type,
-            r.child_mes_code,
-            r.child_item_name,
-            r.child_process_type,
-            r.quantity,
-            r.unit,
-          ]
-            .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-            .join(","),
-        )
-        .join("\n");
-    const csvA = document.createElement("a");
-    csvA.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    csvA.download = `bom_export_${stamp}.csv`;
-    setTimeout(() => {
-      csvA.click();
-      URL.revokeObjectURL(csvA.href);
-    }, 300);
-    onStatusChange(`BOM ${rows.length}건 내보내기 완료`);
-  }
-
-  const completedCount = completedSet.size;
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <AdminPageHeader
@@ -318,67 +250,47 @@ export function BomWorkbench({
           ) : undefined
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div
+            role="group"
+            aria-label="BOM 보기 방식"
+            className="flex h-11 w-[168px] items-center gap-1 rounded-full border"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+          >
             <Button
-              variant="secondary"
+              variant={mode === "edit" ? "primary" : "ghost"}
               size="sm"
-              className="h-[42px]"
-              iconLeft={<Download size={13} />}
-              onClick={exportCompletedBom}
-              disabled={completedCount === 0}
-              title={
-                completedCount === 0
-                  ? "완료된 BOM 이 없습니다."
-                  : "완료된 BOM 을 JSON·CSV 로 내보냅니다."
+              iconLeft={<Pencil size={13} />}
+              onClick={() => setMode("edit")}
+              className="h-11 min-w-[82px] rounded-full"
+              style={
+                mode === "edit"
+                  ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                  : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
               }
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
             >
-              BOM 내보내기
+              편집
             </Button>
-            <div
-              className="flex h-[42px] items-center gap-1 rounded-full border p-1"
-              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+            <Button
+              variant={mode === "whereused" ? "primary" : "ghost"}
+              size="sm"
+              iconLeft={<ArrowRightLeft size={13} />}
+              onClick={() => setMode("whereused")}
+              className="h-11 min-w-[82px] rounded-full"
+              style={
+                mode === "whereused"
+                  ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                  : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
+              }
             >
-              <Button
-                variant={mode === "edit" ? "primary" : "ghost"}
-                size="sm"
-                iconLeft={<Pencil size={13} />}
-                onClick={() => setMode("edit")}
-                className="rounded-full"
-                style={
-                  mode === "edit"
-                    ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
-                    : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
-                }
-              >
-                편집
-              </Button>
-              <Button
-                variant={mode === "whereused" ? "primary" : "ghost"}
-                size="sm"
-                iconLeft={<ArrowRightLeft size={13} />}
-                onClick={() => setMode("whereused")}
-                className="rounded-full"
-                style={
-                  mode === "whereused"
-                    ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
-                    : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
-                }
-              >
-                사용처
-              </Button>
-            </div>
+              사용처
+            </Button>
           </div>
         }
       />
 
       {/* 부서 탭 + 선택된 부모 헤더 (한 줄) */}
       <div className="mb-3 flex min-w-0 flex-wrap items-center gap-3">
-        <div className="shrink-0">
+        <div className="min-w-0 max-w-full">
           <BomDeptTabs value={dept} onChange={handleDeptChange} />
         </div>
         <BomParentHeader

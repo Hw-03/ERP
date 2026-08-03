@@ -5,18 +5,29 @@ const state = vi.hoisted(() => ({
   downloadAuditFile: vi.fn(),
   downloadF704Ledger: vi.fn(),
   downloadF705ProductionLog: vi.fn(),
+  fetchBlob: vi.fn(),
+  getAllBOM: vi.fn(),
+  getEmployees: vi.fn(),
+  getItems: vi.fn(),
+  getItemsExportUrl: vi.fn(),
+  getTransactions: vi.fn(),
+  getTransactionsExportUrl: vi.fn(),
   refetchAuditFiles: vi.fn(),
   triggerAuditBackfill: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getItems: vi.fn(),
-    getTransactions: vi.fn(),
-    getEmployees: vi.fn(),
-    getAllBOM: vi.fn(),
+    getItems: state.getItems,
+    getTransactions: state.getTransactions,
+    getEmployees: state.getEmployees,
+    getAllBOM: state.getAllBOM,
+    getItemsExportUrl: state.getItemsExportUrl,
+    getTransactionsExportUrl: state.getTransactionsExportUrl,
   },
 }));
+
+vi.mock("@/lib/api-core", () => ({ fetchBlob: state.fetchBlob }));
 
 vi.mock("@/lib/api/admin", () => ({
   adminApi: {
@@ -38,17 +49,33 @@ vi.mock("@/lib/queries/useSettingsQuery", () => ({
 
 import { AdminExportSection } from "../AdminExportSection";
 
-const itemsExportUrl = "/api/items/export";
-const transactionsExportUrl = "/api/transactions/export";
+function stubObjectUrl(url = "blob:export") {
+  const createObjectURL = vi.fn(() => url);
+  const revokeObjectURL = vi.fn();
+  vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  return { createObjectURL, revokeObjectURL };
+}
 
-describe("AdminExportSection CSV 작업 블록", () => {
+function readBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
+
+describe("AdminExportSection", () => {
   beforeEach(() => {
-    sessionStorage.clear();
-    state.downloadAuditFile.mockReset();
-    state.downloadF704Ledger.mockReset();
-    state.downloadF705ProductionLog.mockReset();
-    state.refetchAuditFiles.mockReset();
-    state.triggerAuditBackfill.mockReset();
+    Object.values(state).forEach((mock) => mock.mockReset());
+    state.getItems.mockResolvedValue([]);
+    state.getTransactions.mockResolvedValue([]);
+    state.getEmployees.mockResolvedValue([]);
+    state.getAllBOM.mockResolvedValue([]);
+    state.getItemsExportUrl.mockReturnValue("/api/items/export.xlsx");
+    state.getTransactionsExportUrl.mockReturnValue("/api/inventory/transactions/export.xlsx");
+    state.fetchBlob.mockResolvedValue(new Blob(["xlsx"]));
   });
 
   afterEach(() => {
@@ -57,246 +84,251 @@ describe("AdminExportSection CSV 작업 블록", () => {
     vi.restoreAllMocks();
   });
 
-  it("범위별 CSV 설명과 조건부 기간·비활성 옵션을 표시한다", () => {
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
+  it("F704·F705·데이터 내보내기·내부 원본 로그를 독립 작업 카드로 표시한다", () => {
+    render(<AdminExportSection />);
+
+    const section = screen.getByTestId("admin-export-section");
+    const scrollContainer = screen.getByTestId("export-scroll-container");
+    const officialGroup = screen.getByRole("group", { name: "공식 서식 내보내기" });
+    const f704 = within(officialGroup).getByRole("region", { name: "F704-02 연간 자재 입출고관리대장" });
+    const f705 = within(officialGroup).getByRole("region", { name: "F705-02 연간 생산일지" });
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+    const secondaryGrid = screen.getByTestId("export-secondary-grid");
+    const controlPanel = screen.getByTestId("export-control-panel");
+    const downloadAction = screen.getByTestId("export-download-action");
+    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
+
+    expect(section).toHaveClass("h-full", "min-h-0", "flex-1", "overflow-hidden");
+    expect(scrollContainer).toHaveClass("min-h-0", "flex-1", "overflow-y-auto", "xl:overflow-hidden");
+    expect(screen.queryByRole("banner", { name: "내보내기 페이지 제목" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "내보내기", level: 2 })).not.toBeInTheDocument();
+    expect(officialGroup).toHaveClass("grid", "shrink-0", "xl:grid-cols-2");
+    expect(within(officialGroup).getAllByRole("region")).toHaveLength(2);
+    expect(f704).toHaveClass("h-full");
+    expect(f705).toHaveClass("h-full");
+    expect(f704.compareDocumentPosition(f705) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(secondaryGrid).toHaveClass(
+      "grid",
+      "shrink-0",
+      "xl:min-h-0",
+      "xl:flex-1",
+      "xl:grid-cols-2",
     );
+    expect(dataExport).toHaveClass("min-h-0", "xl:h-full", "xl:overflow-hidden");
+    expect(controlPanel).toHaveClass("min-h-0", "xl:overflow-y-auto");
+    expect(downloadAction).toHaveClass("mt-auto", "shrink-0");
+    expect(auditPanel).toHaveClass("min-h-0", "xl:h-full", "xl:overflow-hidden");
+    expect(within(dataExport).queryByText("내부 원본 로그 (월별)")).not.toBeInTheDocument();
+    expect(auditPanel.querySelector("details")).not.toBeInTheDocument();
 
-    const csvBlock = screen.getByRole("region", { name: "선택 데이터 내보내기 (CSV)" });
-    const scopeSummary = within(csvBlock).getByTestId("csv-scope-summary");
+    for (const title of [
+      "F704-02 연간 자재 입출고관리대장",
+      "F705-02 연간 생산일지",
+      "데이터 내보내기",
+      "내부 원본 로그 (월별)",
+    ]) {
+      expect(screen.getByRole("heading", { name: title })).toHaveClass("text-[18px]", "font-black");
+    }
 
-    expect(within(csvBlock).getByRole("button", { name: "선택 데이터 내보내기" })).toBeEnabled();
-    expect(scopeSummary).toHaveTextContent("전체 범위 CSV 4개");
-    expect(within(csvBlock).getByTestId("csv-period-settings")).toBeInTheDocument();
-    expect(within(csvBlock).getByTestId("csv-inactive-option")).toBeInTheDocument();
-    expect(within(csvBlock).getByRole("checkbox", { name: "헤더 포함" })).toHaveClass("focus-visible:ring-2");
-
-    fireEvent.click(within(csvBlock).getByRole("button", { name: "품목" }));
-    expect(scopeSummary).toHaveTextContent("품목");
-    expect(within(csvBlock).queryByTestId("csv-period-settings")).not.toBeInTheDocument();
-    expect(within(csvBlock).queryByTestId("csv-inactive-option")).not.toBeInTheDocument();
-
-    fireEvent.click(within(csvBlock).getByRole("button", { name: "입출고" }));
-    expect(scopeSummary).toHaveTextContent("입출고");
-    expect(within(csvBlock).getByTestId("csv-period-settings")).toBeInTheDocument();
-    expect(within(csvBlock).queryByTestId("csv-inactive-option")).not.toBeInTheDocument();
-
-    fireEvent.click(within(csvBlock).getByRole("button", { name: "직원" }));
-    expect(scopeSummary).toHaveTextContent("직원");
-    expect(within(csvBlock).queryByTestId("csv-period-settings")).not.toBeInTheDocument();
-    expect(within(csvBlock).getByTestId("csv-inactive-option")).toBeInTheDocument();
-
-    fireEvent.click(within(csvBlock).getByRole("button", { name: "BOM" }));
-    expect(scopeSummary).toHaveTextContent("BOM");
-    expect(within(csvBlock).queryByTestId("csv-period-settings")).not.toBeInTheDocument();
-    expect(within(csvBlock).queryByTestId("csv-inactive-option")).not.toBeInTheDocument();
+    expect(dataExport).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "내보내기 바로가기" })).not.toBeInTheDocument();
+    expect(screen.queryByText("주요 내보내기")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "최근 내보내기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "품목·입출고 Excel" })).not.toBeInTheDocument();
+    expect(screen.queryByText("일반 데이터부터 공식 서식·원본 로그까지 목적별로 내려받습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("선택 연도의 MES 생산 이력을 원본 F705-02 서식으로 내려받습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/선택한 연도의 실제 창고 입·출고만/)).not.toBeInTheDocument();
   });
 
-  it("품목·입출고 Excel 독립 카드에서 두 파일을 내려받는다", () => {
+  it("범위에 맞는 형식·기간·비활성 옵션만 표시하고 비지원 형식은 CSV로 되돌린다", () => {
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+
+    expect(within(dataExport).getByRole("button", { name: "전체 데이터 CSV 4개 다운로드" })).toBeEnabled();
+    expect(within(dataExport).getByTestId("export-period-settings")).toBeInTheDocument();
+    expect(within(dataExport).getByTestId("export-inactive-option")).toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("export-format-settings")).not.toBeInTheDocument();
+    expect(within(dataExport).queryByRole("checkbox", { name: "헤더 포함" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목" }));
+    expect(within(dataExport).getByTestId("export-format-settings")).toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("export-period-settings")).not.toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("export-inactive-option")).not.toBeInTheDocument();
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "Excel" }));
+    expect(within(dataExport).getByRole("button", { name: "품목 Excel 다운로드" })).toBeEnabled();
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "직원" }));
+    expect(within(dataExport).queryByTestId("export-format-settings")).not.toBeInTheDocument();
+    expect(within(dataExport).getByTestId("export-inactive-option")).toBeInTheDocument();
+    expect(within(dataExport).getByRole("button", { name: "직원 CSV 다운로드" })).toBeEnabled();
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "입출고" }));
+    expect(within(dataExport).getByTestId("export-format-settings")).toBeInTheDocument();
+    expect(within(dataExport).getByTestId("export-period-settings")).toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("export-inactive-option")).not.toBeInTheDocument();
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "BOM" }));
+    expect(within(dataExport).queryByTestId("export-format-settings")).not.toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("export-period-settings")).not.toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("export-inactive-option")).not.toBeInTheDocument();
+  });
+
+  it("품목 Excel을 인증 Blob 경로로 내려받고 성공 상태를 표시한다", async () => {
+    const { createObjectURL, revokeObjectURL } = stubObjectUrl("blob:items-xlsx");
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "Excel" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목 Excel 다운로드" }));
+
+    await waitFor(() => expect(state.fetchBlob).toHaveBeenCalledWith("/api/items/export.xlsx"));
+    expect(state.getItemsExportUrl).toHaveBeenCalledWith();
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:items-xlsx");
+    expect(await within(dataExport).findByRole("status")).toHaveTextContent("품목 Excel 다운로드를 시작했습니다.");
+  });
+
+  it("입출고 Excel URL에 선택 기간을 전달한다", async () => {
     vi.useFakeTimers();
-    const clicks: Array<{ href: string; download: string }> = [];
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function click() {
-      clicks.push({ href: this.href, download: this.download });
-    });
+    vi.setSystemTime(new Date("2026-08-03T00:00:00.000Z"));
+    stubObjectUrl("blob:transactions-xlsx");
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
 
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
-
-    const primaryExports = screen.getByRole("region", { name: "주요 내보내기" });
-    const excelExports = screen.getByRole("region", { name: "품목·입출고 Excel" });
-    expect(within(primaryExports).getByRole("button", { name: "F705-02 생산일지 다운로드" })).toBeEnabled();
-
-    fireEvent.click(within(excelExports).getByRole("button", { name: "Excel 2개 다운로드" }));
-    expect(clicks).toHaveLength(1);
-    expect(clicks[0].href).toContain(itemsExportUrl);
-
-    act(() => {
-      vi.advanceTimersByTime(300);
-    });
-    expect(clicks).toHaveLength(2);
-    expect(clicks[1].href).toContain(transactionsExportUrl);
-  });
-
-  it("최근 내보내기에는 중복 요약 카드 없이 세션 기록만 표시하고 지울 수 있다", () => {
-    vi.useFakeTimers();
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
-
-    const excelExports = screen.getByRole("region", { name: "품목·입출고 Excel" });
-    const history = screen.getByRole("region", { name: "최근 내보내기" });
-
-    fireEvent.click(within(excelExports).getByRole("button", { name: "Excel 2개 다운로드" }));
-    act(() => {
-      vi.advanceTimersByTime(300);
-    });
-
-    expect(within(history).getByText(/items_.*\.xlsx/)).toBeInTheDocument();
-    expect(screen.queryByText("마지막 내보내기")).not.toBeInTheDocument();
-
-    fireEvent.click(within(history).getByRole("button", { name: "기록 지우기" }));
-    expect(within(history).getByText("아직 내보내기 기록이 없습니다")).toBeInTheDocument();
-  });
-
-  it("downloads the selected year as an F705-02 annual production log", async () => {
-    const createObjectURL = vi.fn(() => "blob:f705-production-log");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    state.downloadF705ProductionLog.mockResolvedValue(new Blob(["f705"]));
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("F705-02 연도"), { target: { value: "2025" } });
-    fireEvent.click(screen.getByRole("button", { name: "F705-02 생산일지 다운로드" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "입출고" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "7일" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "Excel" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "입출고 Excel 다운로드" }));
 
     await act(async () => {
       await Promise.resolve();
     });
-    expect(state.downloadF705ProductionLog).toHaveBeenCalledWith(2025);
-    expect(createObjectURL).toHaveBeenCalledOnce();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:f705-production-log");
-    expect(document.querySelector('a[download="F705-02 (R01) 2025 생산일지.xlsx"]')).toBeNull();
+    expect(state.getTransactionsExportUrl).toHaveBeenCalledWith({
+      start_date: "2026-07-27",
+      end_date: "2026-08-03",
+    });
+    expect(state.fetchBlob).toHaveBeenCalledWith("/api/inventory/transactions/export.xlsx");
   });
 
-  it("shows a download error for the F705-02 production log", async () => {
-    state.downloadF705ProductionLog.mockRejectedValue(new Error("production log download failed"));
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
+  it("CSV에는 헤더를 항상 포함하고 카드 안에 성공 상태를 표시한다", async () => {
+    const { createObjectURL } = stubObjectUrl("blob:items-csv");
+    state.getItems.mockResolvedValue([
+      {
+        mes_code: "ITEM-001",
+        item_name: "테스트 품목",
+        unit: "EA",
+        quantity: 3,
+        min_stock: 1,
+        department: "생산",
+        supplier: "공급사",
+      },
+    ]);
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
 
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목 CSV 다운로드" }));
+
+    expect(await within(dataExport).findByRole("status")).toHaveTextContent("품목 CSV 다운로드를 시작했습니다.");
+    const blob = createObjectURL.mock.calls[0]?.[0] as Blob;
+    expect(await readBlobText(blob)).toContain('"품목 코드","품명","단위","현재고","안전재고","부서","공급처"');
+  });
+
+  it("품목과 입출고 CSV는 서버 최대 건수에 맞춰 모든 페이지를 조회한다", async () => {
+    stubObjectUrl("blob:all-csv");
+    const itemsPage = Array.from({ length: 2000 }, (_, index) => ({
+      mes_code: `ITEM-${index}`,
+      item_name: `품목 ${index}`,
+      unit: "EA",
+      quantity: 1,
+      min_stock: 0,
+    }));
+    const transactionsPage = Array.from({ length: 2000 }, (_, index) => ({
+      created_at: "2026-08-03T00:00:00",
+      transaction_type: "RECEIVE",
+      item_name: `품목 ${index}`,
+      quantity_change: 1,
+      item_unit: "EA",
+    }));
+    state.getItems.mockResolvedValueOnce(itemsPage).mockResolvedValueOnce([]);
+    state.getTransactions.mockResolvedValueOnce(transactionsPage).mockResolvedValueOnce([]);
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "전체 데이터 CSV 4개 다운로드" }));
+
+    expect(await within(dataExport).findByRole("status")).toHaveTextContent("전체 데이터 CSV 4개 다운로드를 시작했습니다.");
+    expect(state.getItems.mock.calls).toEqual([
+      [{ skip: 0, limit: 2000 }],
+      [{ skip: 2000, limit: 2000 }],
+    ]);
+    expect(state.getTransactions.mock.calls).toEqual([
+      [{ skip: 0, limit: 2000 }],
+      [{ skip: 2000, limit: 2000 }],
+    ]);
+  });
+
+  it("데이터 내보내기 실패를 카드 안에 표시한다", async () => {
+    state.getItems.mockRejectedValue(new Error("품목 조회 실패"));
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목 CSV 다운로드" }));
+
+    expect(await within(dataExport).findByRole("alert")).toHaveTextContent("품목 조회 실패");
+  });
+
+  it("서버 조회 한도 오류를 사용자용 한국어로 표시한다", async () => {
+    state.getItems.mockRejectedValue(new Error("Input should be less than or equal to 2000"));
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목 CSV 다운로드" }));
+
+    expect(await within(dataExport).findByRole("alert")).toHaveTextContent("데이터 조회 범위가 허용 한도를 초과했습니다.");
+  });
+
+  it("선택 연도의 F704-02와 F705-02 파일을 내려받는다", async () => {
+    const { createObjectURL, revokeObjectURL } = stubObjectUrl("blob:official-form");
+    state.downloadF704Ledger.mockResolvedValue(new Blob(["f704"]));
+    state.downloadF705ProductionLog.mockResolvedValue(new Blob(["f705"]));
+    render(<AdminExportSection />);
+
+    fireEvent.change(screen.getByLabelText("F704-02 연도"), { target: { value: "2025" } });
+    fireEvent.click(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
+    fireEvent.change(screen.getByLabelText("F705-02 연도"), { target: { value: "2024" } });
     fireEvent.click(screen.getByRole("button", { name: "F705-02 생산일지 다운로드" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("production log download failed");
+    await waitFor(() => expect(state.downloadF704Ledger).toHaveBeenCalledWith(2025));
+    await waitFor(() => expect(state.downloadF705ProductionLog).toHaveBeenCalledWith(2024));
+    expect(createObjectURL).toHaveBeenCalledTimes(2);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(2);
   });
 
-  it("embeds the F704 and original-log controls without a separate external-log heading", () => {
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
+  it("공식 서식 다운로드 오류를 해당 카드에 표시한다", async () => {
+    state.downloadF704Ledger.mockRejectedValue(new Error("F704 다운로드 실패"));
+    render(<AdminExportSection />);
 
-    const f704Ledger = screen.getByRole("region", { name: "F704-02 연간 자재 입출고관리대장" });
+    fireEvent.click(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
 
-    expect(f704Ledger).toContainElement(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
-    expect(screen.getByRole("region", { name: "시스템 원본 로그 관리" })).toHaveTextContent("백필 재실행");
-    expect(screen.getByRole("region", { name: "시스템 원본 로그 (월별)" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "외부 제출·원본 로그" })).not.toBeInTheDocument();
-    expect(screen.queryByText("외부 심사용 F704-02 대장과 시스템 원본 로그를 관리합니다.")).not.toBeInTheDocument();
+    const f704 = screen.getByRole("region", { name: "F704-02 연간 자재 입출고관리대장" });
+    expect(await within(f704).findByRole("alert")).toHaveTextContent("F704 다운로드 실패");
   });
 
-  it("헤더 안 바로가기가 다섯 대상 영역을 정해진 순서로 부드럽게 스크롤한다", () => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
+  it("내부 원본 로그는 데이터 카드와 분리되어 항상 펼쳐진다", () => {
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
 
-    const scrollContainer = screen.getByTestId("export-scroll-container");
-    const scrollTo = vi.fn();
-    Object.defineProperty(scrollContainer, "scrollTo", { value: scrollTo });
-    Object.defineProperty(scrollContainer, "scrollTop", { value: 120, writable: true });
-    vi.spyOn(scrollContainer, "getBoundingClientRect").mockReturnValue({ top: 30 } as DOMRect);
-
-    const navigation = screen.getByRole("navigation", { name: "내보내기 바로가기" });
-    const header = screen.getByRole("heading", { name: "내보내기" }).closest(".mb-4");
-    const quickLinks = within(navigation).getAllByRole("button");
-    expect(header).toContainElement(navigation);
-    expect(header).toHaveClass("flex", "flex-wrap");
-    expect(navigation.parentElement).toHaveClass("ml-auto", "shrink-0");
-    expect(navigation).toHaveClass("flex", "w-fit", "max-w-[calc(100vw-2rem)]", "flex-wrap", "justify-end");
-    expect(quickLinks).toHaveLength(5);
-    quickLinks.forEach((button) => expect(button).toHaveClass("min-h-11"));
-    expect(quickLinks.map((button) => button.textContent)).toEqual([
-      "주요 내보내기",
-      "원본 로그",
-      "선택 CSV",
-      "최근 내보내기",
-      "품목·입출고 Excel",
-    ]);
-
-    const destinations = [
-      ["주요 내보내기", screen.getByRole("region", { name: "주요 내보내기" })],
-      ["원본 로그", screen.getByTestId("original-logs-section")],
-      ["선택 CSV", screen.getByRole("region", { name: "선택 데이터 내보내기 (CSV)" })],
-      ["최근 내보내기", screen.getByRole("region", { name: "최근 내보내기" })],
-      ["품목·입출고 Excel", screen.getByRole("region", { name: "품목·입출고 Excel" })],
-    ] as const;
-
-    for (const [label, destination] of destinations) {
-      const focus = vi.spyOn(destination, "focus");
-      vi.spyOn(destination, "getBoundingClientRect").mockReturnValue({ top: 230 } as DOMRect);
-      fireEvent.click(screen.getByRole("button", { name: label }));
-      expect(scrollTo).toHaveBeenLastCalledWith({ top: 320, behavior: "smooth" });
-      expect(destination).toHaveAttribute("tabindex", "-1");
-      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-      expect(destination).toHaveFocus();
-    }
-  });
-
-  it("동작 줄이기 설정에서는 바로가기를 즉시 스크롤한다", () => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
-
-    const scrollContainer = screen.getByTestId("export-scroll-container");
-    const scrollTo = vi.fn();
-    Object.defineProperty(scrollContainer, "scrollTo", { value: scrollTo });
-    vi.spyOn(scrollContainer, "getBoundingClientRect").mockReturnValue({ top: 10 } as DOMRect);
-    const primaryExports = screen.getByRole("region", { name: "주요 내보내기" });
-    vi.spyOn(primaryExports, "getBoundingClientRect").mockReturnValue({ top: 110 } as DOMRect);
-
-    fireEvent.click(screen.getByRole("button", { name: "주요 내보내기" }));
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 100, behavior: "auto" });
-  });
-
-  it("F705, 원본 로그 전체, 선택 CSV, 최근 기록, Excel 순서로 스크롤 DOM을 배치한다", () => {
-    render(
-      <AdminExportSection
-        itemsExportUrl={itemsExportUrl}
-        transactionsExportUrl={transactionsExportUrl}
-      />,
-    );
-
-    const f705Exports = screen.getByRole("region", { name: "F705-02 연간 생산일지" });
-    const originalLogs = screen.getByTestId("original-logs-section");
-    const selectedCsv = screen.getByRole("region", { name: "선택 데이터 내보내기 (CSV)" });
-    const recentExports = screen.getByRole("region", { name: "최근 내보내기" });
-    const excelExports = screen.getByRole("region", { name: "품목·입출고 Excel" });
-
-    expect(f705Exports.compareDocumentPosition(originalLogs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(originalLogs.compareDocumentPosition(selectedCsv) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(selectedCsv.compareDocumentPosition(recentExports) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(recentExports.compareDocumentPosition(excelExports) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(originalLogs).getByRole("region", { name: "F704-02 연간 자재 입출고관리대장" })).toBeInTheDocument();
-    expect(within(originalLogs).getByRole("region", { name: "시스템 원본 로그 관리" })).toBeInTheDocument();
-    expect(within(originalLogs).getByRole("region", { name: "시스템 원본 로그 (월별)" })).toBeInTheDocument();
+    expect(within(dataExport).queryByText("내부 원본 로그 (월별)")).not.toBeInTheDocument();
+    expect(auditPanel.querySelector("details")).not.toBeInTheDocument();
+    const header = within(auditPanel).getByTestId("audit-log-header");
+    expect(within(header).queryByRole("button", { name: "백필 재실행" })).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: "새로고침" })).not.toBeInTheDocument();
+    expect(within(auditPanel).queryByRole("heading", { name: "시스템 원본 로그 (월별)" })).not.toBeInTheDocument();
   });
 });

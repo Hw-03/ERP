@@ -2,7 +2,6 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import type { BOMDetailEntry, DepartmentMaster, Employee, Item, ProductModel } from "@/lib/api";
-import { api } from "@/lib/api";
 import { AdminMasterItemsSection } from "./AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./AdminEmployeesSection";
 import { BomWorkbench } from "./_bom_workbench/BomWorkbench";
@@ -140,12 +139,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     );
   }
   if (section === "export") {
-    return (
-      <AdminExportSection
-        itemsExportUrl={api.getItemsExportUrl()}
-        transactionsExportUrl={api.getTransactionsExportUrl()}
-      />
-    );
+    return <AdminExportSection />;
   }
   if (section === "settings") {
     return (

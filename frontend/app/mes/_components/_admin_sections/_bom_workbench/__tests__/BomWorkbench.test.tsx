@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { Item } from "@/lib/api";
 import { BomWorkbench } from "../BomWorkbench";
 
 function closestWithClass(element: HTMLElement, className: string): HTMLElement {
@@ -8,6 +9,14 @@ function closestWithClass(element: HTMLElement, className: string): HTMLElement 
   if (!current) throw new Error(`Missing ancestor with ${className}`);
   return current;
 }
+
+const selectedParent = {
+  item_id: "parent-1",
+  item_name: "Selected parent summary",
+  mes_code: "PARENT-001",
+  process_type_code: "AA",
+  bom_completed_at: null,
+} as Item;
 
 describe("BomWorkbench", () => {
   it("constrains the workbench and parent column while preserving the parent-list scroll region", () => {
@@ -40,10 +49,10 @@ describe("BomWorkbench", () => {
     expect(parentListCard.parentElement).toHaveClass("flex", "flex-1", "min-h-0", "flex-col");
   });
 
-  it("aligns the department filter and header actions to their height contracts", () => {
+  it("removes duplicate export and expands the mode controls into its space", async () => {
     render(
       <BomWorkbench
-        items={[]}
+        items={[selectedParent]}
         allBomRows={[]}
         refreshAllBom={() => undefined}
         refreshItems={async () => undefined}
@@ -53,12 +62,26 @@ describe("BomWorkbench", () => {
     );
 
     const departmentFilters = screen.getByTestId("bom-department-filters");
-    expect(departmentFilters).toHaveClass("min-h-[54px]");
+    expect(departmentFilters).toHaveClass("min-h-[58px]", "flex-wrap");
     for (const filter of departmentFilters.querySelectorAll("button")) {
-      expect(filter).toHaveClass("min-h-10");
+      expect(filter).toHaveClass("h-11");
     }
 
-    expect(screen.getByText("BOM 내보내기").closest("button")).toHaveClass("h-[42px]");
-    expect(screen.getByText("편집").closest("button")?.parentElement).toHaveClass("h-[42px]");
+    expect(screen.queryByRole("button", { name: "BOM 내보내기" })).not.toBeInTheDocument();
+    const modeControls = screen.getByRole("group", { name: "BOM 보기 방식" });
+    expect(modeControls).toHaveClass("h-11", "w-[168px]");
+    expect(screen.getByRole("button", { name: "편집" })).toHaveClass("h-11", "min-w-[82px]");
+    expect(screen.getByRole("button", { name: "사용처" })).toHaveClass("h-11", "min-w-[82px]");
+
+    const departmentWrapper = departmentFilters.parentElement!;
+    expect(departmentWrapper).toHaveClass("min-w-0", "max-w-full");
+    expect(departmentWrapper).not.toHaveClass("shrink-0");
+
+    const summary = (await screen.findAllByText("Selected parent summary")).find((element) =>
+      element.classList.contains("text-base"),
+    )!;
+    const summaryCard = summary.closest(".rounded-2xl")!;
+    expect(summaryCard).toHaveClass("min-w-0", "flex-1");
+    expect(departmentWrapper.nextElementSibling).toBe(summaryCard);
   });
 });

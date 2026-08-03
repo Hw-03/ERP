@@ -35,4 +35,17 @@ describe("AdminPageHeader", () => {
     expect(primary).toHaveClass("items-center");
     expect(iconContainer).not.toHaveClass("mt-0.5");
   });
+
+  it("기본 제목 크기와 여백을 유지한다", () => {
+    const { container } = render(<AdminPageHeader icon={Layers} title="내보내기" />);
+
+    const heading = screen.getByRole("heading", { name: "내보내기" });
+    const primary = heading.parentElement?.parentElement?.parentElement;
+    const header = primary?.parentElement;
+    const iconContainer = container.querySelector("svg")?.parentElement;
+
+    expect(header).toHaveClass("mb-4");
+    expect(heading).toHaveClass("text-[22px]");
+    expect(iconContainer).toHaveClass("h-10", "w-10");
+  });
 });

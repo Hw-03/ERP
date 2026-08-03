@@ -1,18 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   downloadAuditFile: vi.fn(),
-  downloadF704Ledger: vi.fn(),
-  refetch: vi.fn(),
-  backfill: vi.fn(),
 }));
 
 vi.mock("@/lib/api/admin", () => ({
-  adminApi: {
-    downloadAuditFile: state.downloadAuditFile,
-    downloadF704Ledger: state.downloadF704Ledger,
-  },
+  adminApi: { downloadAuditFile: state.downloadAuditFile },
 }));
 
 vi.mock("@/lib/queries/useSettingsQuery", () => ({
@@ -20,9 +14,7 @@ vi.mock("@/lib/queries/useSettingsQuery", () => ({
     data: [{ month: "2026-05", file_name: "inout_2026-05.csv", row_count: 2, size_bytes: 128 }],
     isLoading: false,
     error: null,
-    refetch: state.refetch,
   }),
-  useTriggerAuditBackfillMutation: () => ({ isPending: false, mutate: state.backfill }),
 }));
 
 import { AdminAuditCsvSection } from "../AdminAuditCsvSection";
@@ -35,107 +27,79 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-describe("AdminAuditCsvSection audit downloads", () => {
+describe("AdminAuditCsvSection", () => {
+  beforeEach(() => {
+    state.downloadAuditFile.mockReset();
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  beforeEach(() => {
-    state.downloadAuditFile.mockReset();
-    state.downloadF704Ledger.mockReset();
-    state.refetch.mockReset();
-    state.backfill.mockReset();
+  it("독립 카드에서 월별 원본 로그와 다운로드만 표시한다", () => {
+    render(<AdminAuditCsvSection />);
+    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
+    const title = within(auditPanel).getByRole("heading", { name: "내부 원본 로그 (월별)" });
+    const header = screen.getByTestId("audit-log-header");
+    const body = screen.getByTestId("audit-log-body");
+    const scrollArea = screen.getByTestId("audit-log-scroll");
+
+    expect(auditPanel).toHaveClass("flex", "min-h-0", "flex-col", "rounded-[20px]", "xl:h-full", "xl:overflow-hidden");
+    expect(auditPanel.querySelector("details")).not.toBeInTheDocument();
+    expect(auditPanel.querySelector("summary")).not.toBeInTheDocument();
+    expect(body).toHaveClass("flex", "min-h-0", "flex-1", "flex-col", "xl:overflow-hidden");
+    expect(scrollArea).toHaveClass("min-h-0", "flex-1", "overflow-x-auto", "xl:overflow-auto");
+    expect(title).toHaveClass("text-[18px]", "font-black");
+    expect(header).toHaveClass("flex", "min-h-11", "shrink-0", "flex-wrap", "items-center");
+    expect(within(header).queryByRole("button", { name: "백필 재실행" })).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: "새로고침" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "시스템 원본 로그 (월별)" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/월별 CSV\/XLSX는 내부 확인용으로 유지됩니다/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/1개 파일 · 2행/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "F704-02 연간 자재 입출고관리대장" })).not.toBeInTheDocument();
   });
 
-  it("임베드 화면에서는 F704 대장과 원본 로그 작업을 하나의 작업 그룹으로 묶는다", () => {
-    render(<AdminAuditCsvSection embedded />);
-
-    const actionGroup = screen.getByRole("group", { name: "외부 로그 작업" });
-
-    expect(actionGroup).toContainElement(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
-    expect(actionGroup).toHaveTextContent("시스템 원본 로그 — 내부 확인용");
-    expect(screen.queryByRole("heading", { name: "입출고 로그" })).not.toBeInTheDocument();
-  });
-
-  it("시스템 원본 컬럼 구성 안내를 노출하지 않는다", () => {
-    render(<AdminAuditCsvSection embedded />);
-
-    expect(screen.queryByText("시스템 원본 컬럼 구성 (11)")).not.toBeInTheDocument();
-  });
-
-  it("downloads XLSX and CSV through the authenticated API and shows a download error", async () => {
+  it("인증 API로 XLSX와 CSV를 내려받고 오류를 표시한다", async () => {
     state.downloadAuditFile
       .mockRejectedValueOnce(new Error("다운로드 서버 오류"))
       .mockRejectedValueOnce(new Error("다운로드 서버 오류"));
     render(<AdminAuditCsvSection />);
+    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
 
-    const buttons = screen.getAllByRole("button");
-    const xlsxButton = buttons[buttons.length - 2];
-    const csvButton = buttons[buttons.length - 1];
+    fireEvent.click(within(auditPanel).getByRole("button", { name: "엑셀" }));
+    await waitFor(() => expect(state.downloadAuditFile).toHaveBeenCalledWith("2026-05", "xlsx"));
+    expect(await within(auditPanel).findByRole("alert")).toHaveTextContent("다운로드 서버 오류");
 
-    fireEvent.click(xlsxButton);
-    await waitFor(() => {
-      expect(state.downloadAuditFile).toHaveBeenCalledWith("2026-05", "xlsx");
-    });
-    expect(await screen.findByRole("alert")).toHaveTextContent("다운로드 서버 오류");
-
-    fireEvent.click(csvButton);
-    await waitFor(() => {
-      expect(state.downloadAuditFile).toHaveBeenLastCalledWith("2026-05", "csv");
-    });
+    fireEvent.click(within(auditPanel).getByRole("button", { name: "CSV" }));
+    await waitFor(() => expect(state.downloadAuditFile).toHaveBeenLastCalledWith("2026-05", "csv"));
   });
 
-  it("downloads the selected year as an F704-02 annual ledger", async () => {
-    const createObjectURL = vi.fn(() => "blob:f704-ledger");
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    state.downloadF704Ledger.mockResolvedValue(new Blob(["f704"]));
-    render(<AdminAuditCsvSection />);
-
-    expect(screen.getByText("시스템 원본 로그 (월별)")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("대장 연도"), { target: { value: "2025" } });
-    fireEvent.click(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
-
-    await waitFor(() => {
-      expect(state.downloadF704Ledger).toHaveBeenCalledWith(2025);
-    });
-    expect(createObjectURL).toHaveBeenCalledOnce();
-  });
-
-  it("keeps the CSV button disabled until its own concurrent download finishes", async () => {
+  it("동시 다운로드 중에는 각 형식 버튼 상태를 독립적으로 유지한다", async () => {
     const xlsx = deferred<Blob>();
     const csv = deferred<Blob>();
-    const createObjectURL = vi.fn(() => "blob:audit-export");
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:audit-export"), revokeObjectURL: vi.fn() });
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     state.downloadAuditFile.mockImplementation((_month, format) =>
       format === "xlsx" ? xlsx.promise : csv.promise,
     );
     render(<AdminAuditCsvSection />);
-
-    const buttons = screen.getAllByRole("button");
-    const xlsxButton = buttons[buttons.length - 2];
-    const csvButton = buttons[buttons.length - 1];
+    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
+    const xlsxButton = within(auditPanel).getByRole("button", { name: "엑셀" });
+    const csvButton = within(auditPanel).getByRole("button", { name: "CSV" });
 
     fireEvent.click(xlsxButton);
     fireEvent.click(csvButton);
     xlsx.resolve(new Blob(["xlsx"]));
 
-    await waitFor(() => {
-      expect(createObjectURL).toHaveBeenCalledOnce();
-    });
-    await waitFor(() => {
-      expect(csvButton).toBeDisabled();
-    });
+    await waitFor(() => expect(xlsxButton).not.toBeDisabled());
+    expect(csvButton).toBeDisabled();
 
     csv.resolve(new Blob(["csv"]));
-    await waitFor(() => {
-      expect(csvButton).not.toBeDisabled();
-    });
+    await waitFor(() => expect(csvButton).not.toBeDisabled());
   });
 
-  it("cleans up the object URL and anchor when a download click fails", async () => {
+  it("다운로드 클릭 실패에도 객체 URL과 앵커를 정리한다", async () => {
     const createObjectURL = vi.fn(() => "blob:audit-export");
     const revokeObjectURL = vi.fn();
     const removeChild = vi.spyOn(document.body, "removeChild");
@@ -145,33 +109,12 @@ describe("AdminAuditCsvSection audit downloads", () => {
     });
     state.downloadAuditFile.mockResolvedValue(new Blob(["xlsx"]));
     render(<AdminAuditCsvSection />);
+    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
 
-    const buttons = screen.getAllByRole("button");
-    fireEvent.click(buttons[buttons.length - 2]);
+    fireEvent.click(within(auditPanel).getByRole("button", { name: "엑셀" }));
 
-    await waitFor(() => {
-      expect(revokeObjectURL).toHaveBeenCalledWith("blob:audit-export");
-    });
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:audit-export"));
     expect(removeChild).toHaveBeenCalled();
-    expect(await screen.findByRole("alert")).toHaveTextContent("브라우저 다운로드 실패");
-  });
-
-  it("revokes the object URL and shows an error when appending the download anchor fails", async () => {
-    const createObjectURL = vi.fn(() => "blob:audit-export");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
-    state.downloadAuditFile.mockResolvedValue(new Blob(["xlsx"]));
-    render(<AdminAuditCsvSection />);
-    vi.spyOn(document.body, "appendChild").mockImplementation(() => {
-      throw new Error("다운로드 링크를 만들 수 없습니다.");
-    });
-
-    const buttons = screen.getAllByRole("button");
-    fireEvent.click(buttons[buttons.length - 2]);
-
-    await waitFor(() => {
-      expect(revokeObjectURL).toHaveBeenCalledWith("blob:audit-export");
-    });
-    expect(await screen.findByRole("alert")).toHaveTextContent("다운로드 링크를 만들 수 없습니다.");
+    expect(await within(auditPanel).findByRole("alert")).toHaveTextContent("브라우저 다운로드 실패");
   });
 });
