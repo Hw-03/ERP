@@ -82,7 +82,8 @@ describe("DailyWorkReportEditor", () => {
     render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} fillAvailableHeight />);
 
     const input = screen.getByRole("textbox", { name: "작업 내역" });
-    expect(input).toHaveClass("lg:min-h-[220px]");
-    expect(input.parentElement).toHaveClass("lg:min-h-[360px]");
+    expect(input).toHaveClass("lg:min-h-0");
+    expect(input.parentElement).toHaveClass("lg:h-[424px]");
+    expect(input.parentElement).toHaveClass("lg:flex-none");
   });
 });

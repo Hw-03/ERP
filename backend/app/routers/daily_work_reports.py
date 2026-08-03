@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import or_
+from sqlalchemy import case, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,15 @@ from app.services.transaction_display_groups import build_display_groups
 router = APIRouter()
 
 KST = ZoneInfo("Asia/Seoul")
+
+PRODUCTION_DEPARTMENT_ORDER = {
+    "튜브": 0,
+    "고압": 1,
+    "진공": 2,
+    "튜닝": 3,
+    "조립": 4,
+    "출하": 5,
+}
 
 _OPERATION_BY_SUBTYPE = {
     "produce": ("process", "공정"),
@@ -130,8 +139,18 @@ def list_daily_work_reports(work_date: date, db: Session = Depends(get_db)):
     """선택한 날짜에 작성된 전 직원의 일지를 반환한다."""
     return (
         db.query(DailyWorkReport)
+        .outerjoin(Employee, DailyWorkReport.employee_id == Employee.employee_id)
         .filter(DailyWorkReport.work_date == work_date)
-        .order_by(DailyWorkReport.department, DailyWorkReport.employee_name, DailyWorkReport.report_id)
+        .order_by(
+            case(
+                PRODUCTION_DEPARTMENT_ORDER,
+                value=DailyWorkReport.department,
+                else_=len(PRODUCTION_DEPARTMENT_ORDER),
+            ),
+            Employee.display_order.asc(),
+            DailyWorkReport.employee_name.asc(),
+            DailyWorkReport.report_id,
+        )
         .all()
     )
 

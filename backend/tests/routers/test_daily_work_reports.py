@@ -12,12 +12,20 @@ from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
 WORK_DATE = "2026-07-27"
 
 
-def _employee(db_session, *, name: str, active: bool = True) -> Employee:
+def _employee(
+    db_session,
+    *,
+    name: str,
+    active: bool = True,
+    department: str = "조립",
+    display_order: int = 0,
+) -> Employee:
     employee = Employee(
         employee_code=f"DWR-{uuid.uuid4().hex[:8]}",
         name=name,
         role="작업자",
-        department="조립",
+        department=department,
+        display_order=display_order,
         is_active=active,
     )
     db_session.add(employee)
@@ -72,6 +80,37 @@ def test_daily_work_report_get_returns_null_when_not_written_and_list_returns_al
     listed = client.get("/api/daily-work-reports", params={"work_date": WORK_DATE})
     assert listed.status_code == 200, listed.text
     assert {row["employee_id"] for row in listed.json()} == {str(employee.employee_id), str(other.employee_id)}
+
+
+def test_daily_work_reports_follow_production_line_and_employee_display_order(client, db_session):
+    employees = [
+        _employee(db_session, name="조립 늦은", department="조립", display_order=20),
+        _employee(db_session, name="출하 첫째", department="출하", display_order=10),
+        _employee(db_session, name="튜브 첫째", department="튜브", display_order=10),
+        _employee(db_session, name="고압 첫째", department="고압", display_order=10),
+        _employee(db_session, name="진공 첫째", department="진공", display_order=10),
+        _employee(db_session, name="튜닝 첫째", department="튜닝", display_order=10),
+        _employee(db_session, name="조립 앞", department="조립", display_order=10),
+        _employee(db_session, name="기타 직원", department="기타", display_order=10),
+    ]
+    db_session.commit()
+
+    for employee in employees:
+        assert _put(client, employee, f"{employee.name} 일보").status_code == 200
+
+    listed = client.get("/api/daily-work-reports", params={"work_date": WORK_DATE})
+
+    assert listed.status_code == 200, listed.text
+    assert [row["employee_name"] for row in listed.json()] == [
+        "튜브 첫째",
+        "고압 첫째",
+        "진공 첫째",
+        "튜닝 첫째",
+        "조립 앞",
+        "조립 늦은",
+        "출하 첫째",
+        "기타 직원",
+    ]
 
 
 def test_daily_work_report_put_rejects_impersonation_inactive_and_invalid_content(client, db_session):

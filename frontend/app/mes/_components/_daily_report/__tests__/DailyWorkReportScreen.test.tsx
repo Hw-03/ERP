@@ -82,6 +82,32 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.queryByRole("textbox", { name: "작업 내역" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument();
   });
+
+  it("전체 일보 작성자 버튼을 공정 순서로 보여 준다", () => {
+    queryState.reports = [
+      { employee_id: "employee-1", employee_name: "조립 직원", department: "조립" },
+      { employee_id: "employee-2", employee_name: "고압 직원", department: "고압" },
+      { employee_id: "employee-3", employee_name: "출하 직원", department: "출하" },
+      { employee_id: "employee-4", employee_name: "튜브 직원", department: "튜브" },
+      { employee_id: "employee-5", employee_name: "진공 직원", department: "진공" },
+      { employee_id: "employee-6", employee_name: "튜닝 직원", department: "튜닝" },
+    ];
+
+    render(
+      <DailyWorkReportScreen
+        employeeId="employee-1"
+        operator={{ employee_id: "employee-1", name: "현재 작성자", department: "조립" } as never}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
+    const chips = ["튜브 직원 튜브", "고압 직원 고압", "진공 직원 진공", "튜닝 직원 튜닝", "조립 직원 조립", "출하 직원 출하"]
+      .map((name) => screen.getByRole("button", { name }));
+
+    for (let index = 0; index < chips.length - 1; index += 1) {
+      expect(chips[index].compareDocumentPosition(chips[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
   it("헤더를 한 줄 정보행으로 보이고 MES 거래 요약을 작업 내역보다 먼저 배치한다", () => {
     render(
       <DailyWorkReportScreen
@@ -131,7 +157,8 @@ describe("DailyWorkReportScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("textbox", { name: "작업 내역" }).closest("section")).toHaveClass("lg:flex-1");
+    const editor = screen.getByRole("textbox", { name: "작업 내역" }).closest("section");
+    expect(editor).toHaveClass("lg:h-[424px]", "lg:flex-none");
   });
 
   it("작업 내역에 불필요한 보조 문구와 예시를 표시하지 않는다", () => {
@@ -202,5 +229,28 @@ describe("DailyWorkReportScreen", () => {
 
     expect(screen.getByRole("button", { name: futureLabel })).toBeDisabled();
     expect(screen.getByRole("button", { name: "다음 달" })).toBeDisabled();
+  });
+
+  it("부서 색상으로 상단 정보와 전체 일보 직원 버튼을 구분한다", () => {
+    queryState.reports = [{ employee_id: "employee-2", employee_name: "김지현", department: "고압" }];
+
+    render(
+      <DailyWorkReportScreen
+        employeeId="employee-1"
+        operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never}
+      />,
+    );
+
+    const departmentMeta = screen.getByText("부서").parentElement;
+    const authorMeta = screen.getByText("작성자").parentElement;
+    expect(departmentMeta?.getAttribute("style")).toContain("rgb(59, 130, 246)");
+    expect(departmentMeta?.querySelector(".h-2.w-2")).toBeNull();
+    expect(authorMeta?.querySelector(".h-2.w-2")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
+
+    const employeeButton = screen.getByText("고압").closest("button");
+    expect(employeeButton?.getAttribute("style")).toContain("rgb(217, 119, 6)");
+    expect(employeeButton?.querySelector(".h-2.w-2")).toBeNull();
   });
 });

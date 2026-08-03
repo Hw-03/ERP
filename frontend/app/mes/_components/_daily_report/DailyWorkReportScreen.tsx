@@ -2,7 +2,7 @@
 
 import { CircleAlert, ClipboardList, FileText, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LEGACY_COLORS } from "@/lib/mes/color";
+import { getDepartmentFallbackColor, LEGACY_COLORS } from "@/lib/mes/color";
 import { useDailyWorkActivityQuery, useDailyWorkReportQuery, useDailyWorkReportsQuery, useSaveDailyWorkReport } from "@/lib/queries/useDailyWorkReportsQuery";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { DailyWorkActivity } from "./DailyWorkActivity";
@@ -12,6 +12,23 @@ import { toKstDateKey } from "./dailyReportDate";
 import type { Operator } from "../login/useCurrentOperator";
 
 type ReportTab = "mine" | "all";
+
+const PRODUCTION_DEPARTMENT_ORDER: Record<string, number> = {
+  "튜브": 0,
+  "고압": 1,
+  "진공": 2,
+  "튜닝": 3,
+  "조립": 4,
+  "출하": 5,
+};
+
+function sortReportsByDepartment<T extends { department: string }>(reports: T[]): T[] {
+  return reports.sort(
+    (left, right) =>
+      (PRODUCTION_DEPARTMENT_ORDER[left.department] ?? Object.keys(PRODUCTION_DEPARTMENT_ORDER).length)
+      - (PRODUCTION_DEPARTMENT_ORDER[right.department] ?? Object.keys(PRODUCTION_DEPARTMENT_ORDER).length),
+  );
+}
 
 function Failure({ message }: { message: string }) {
   return (
@@ -60,9 +77,11 @@ export function DailyWorkReportScreen({
   const saveMutation = useSaveDailyWorkReport();
   const editable = Boolean(employeeId && targetEmployeeId === employeeId);
   const report = tab === "mine" ? reportQuery.data : selectedReportQuery.data;
+  const reports = sortReportsByDepartment([...(reportsQuery.data ?? [])]);
   const selectedListEntry = (reportsQuery.data ?? []).find((entry) => entry.employee_id === targetEmployeeId);
   const headerEmployeeName = report?.employee_name ?? selectedListEntry?.employee_name ?? operator?.name ?? "-";
   const headerDepartment = report?.department ?? selectedListEntry?.department ?? operator?.department ?? "-";
+  const headerDepartmentColor = getDepartmentFallbackColor(headerDepartment);
   const editorResetKey = `${tab}:${workDate}:${targetEmployeeId ?? ""}`;
 
   const save = useCallback(async () => {
@@ -147,13 +166,13 @@ export function DailyWorkReportScreen({
             </div>
             <DailyWorkDatePicker value={workDate} maxDate={today} onChange={changeDate} />
             <dl className="flex flex-wrap items-center gap-2">
-              <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${headerDepartmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${headerDepartmentColor} 35%, transparent)` }}>
                 <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>부서</dt>
-                <dd className="text-sm font-black">{headerDepartment}</dd>
+                <dd className="text-sm font-black" style={{ color: headerDepartmentColor }}>{headerDepartment}</dd>
               </div>
-              <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${headerDepartmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${headerDepartmentColor} 35%, transparent)` }}>
                 <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작성자</dt>
-                <dd className="text-sm font-black">{headerEmployeeName}</dd>
+                <dd className="text-sm font-black" style={{ color: headerDepartmentColor }}>{headerEmployeeName}</dd>
               </div>
             </dl>
             <div className="ml-auto inline-flex rounded-[14px] p-1" role="tablist" aria-label="일보 보기" style={{ background: LEGACY_COLORS.s2 }}>
@@ -170,19 +189,20 @@ export function DailyWorkReportScreen({
                 <h2 className="text-base font-black">작성한 직원</h2>
                 <p className="mt-1 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>직원을 선택하면 해당 날짜의 일보와 MES 거래를 읽을 수 있습니다.</p>
               </div>
-              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{(reportsQuery.data ?? []).length}명</span>
+              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{reports.length}명</span>
             </div>
             {reportsQuery.isError ? <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." /></div> : (
               <div className="mt-4 flex flex-wrap gap-2">
-                {(reportsQuery.data ?? []).length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
-                {(reportsQuery.data ?? []).map((entry) => {
+                {reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
+                {reports.map((entry) => {
                   const selected = selectedEmployeeId === entry.employee_id;
+                  const departmentColor = getDepartmentFallbackColor(entry.department);
                   return (
                     <button key={entry.employee_id} type="button" onClick={() => requestChange(() => {
                       setDirty(false);
                       setSelectedEmployeeId(entry.employee_id);
-                    }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.text, borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border, background: selected ? LEGACY_COLORS.s3 : LEGACY_COLORS.s2 }}>
-                      <span>{entry.employee_name}</span><span className="ml-1.5 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{entry.department}</span>
+                    }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
+                      <span>{entry.employee_name}</span><span className="ml-1.5 text-xs font-medium" style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
                     </button>
                   );
                 })}
