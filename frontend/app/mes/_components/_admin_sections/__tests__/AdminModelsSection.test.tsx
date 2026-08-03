@@ -108,6 +108,20 @@ describe("AdminModelsSection", () => {
     });
   });
 
+  it("uses the shared primary action size for the selected model save button", async () => {
+    render(
+      <DirtyGuardProvider>
+        <AdminModelsSection items={[]} allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    await screen.findByDisplayValue("DX3000");
+    const saveButton = screen.getByRole("button", { name: "저장" });
+
+    expect(saveButton).toHaveClass("h-11", "min-w-[88px]", "px-4", "py-2", "text-[13px]");
+    expect(saveButton.querySelector("svg")).toHaveClass("h-4", "w-4");
+  });
+
   it("lays name and symbol out responsively and limits the saved symbol to five characters", async () => {
     let savedEditForm = context.editForm;
     context.setEditForm.mockClear();

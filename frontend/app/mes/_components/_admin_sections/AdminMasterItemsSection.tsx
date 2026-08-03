@@ -49,6 +49,10 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
 
   const [tab, setTab] = useState<DetailTab>("info");
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
+  const previousDeleteConfirmRef = useRef(false);
+  const restoreDeleteFocusRef = useRef(false);
 
   // 드래그 reorder — Pointer Events 기반 (HTML5 DnD 는 drag 중 wheel 이벤트 차단).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -134,9 +138,23 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
 
   // 선택이 바뀌면 첫 탭으로 리셋 + 삭제 확인 닫기
   useEffect(() => {
+    restoreDeleteFocusRef.current = false;
     setTab("info");
     setDeleteConfirm(false);
   }, [selectedItem?.item_id]);
+
+  useEffect(() => {
+    const wasConfirming = previousDeleteConfirmRef.current;
+
+    if (!wasConfirming && deleteConfirm) {
+      deleteCancelRef.current?.focus();
+    } else if (wasConfirming && !deleteConfirm && restoreDeleteFocusRef.current) {
+      deleteTriggerRef.current?.focus();
+      restoreDeleteFocusRef.current = false;
+    }
+
+    previousDeleteConfirmRef.current = deleteConfirm;
+  }, [deleteConfirm]);
 
   function handleStartAdd() {
     confirmNavigation(() => {
@@ -303,7 +321,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               ? "필요한 항목을 채우고 추가 버튼을 눌러주세요."
               : undefined
           }
-          actions={
+          tabActions={
             !addMode &&
             selectedItem &&
             !selectedItem.deleted_at ? (
@@ -313,8 +331,12 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     정말 삭제하시겠습니까?
                   </span>
                   <button
+                    ref={deleteCancelRef}
                     type="button"
-                    onClick={() => setDeleteConfirm(false)}
+                    onClick={() => {
+                      restoreDeleteFocusRef.current = true;
+                      setDeleteConfirm(false);
+                    }}
                     className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
                     style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted }}
                   >
@@ -323,6 +345,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   <button
                     type="button"
                     onClick={() => {
+                      restoreDeleteFocusRef.current = false;
                       setDeleteConfirm(false);
                       void deleteItem(selectedItem.item_id);
                     }}
@@ -334,8 +357,12 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 </>
               ) : (
                 <button
+                  ref={deleteTriggerRef}
                   type="button"
-                  onClick={() => setDeleteConfirm(true)}
+                  onClick={() => {
+                    restoreDeleteFocusRef.current = false;
+                    setDeleteConfirm(true);
+                  }}
                   className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
                   style={{
                     background: LEGACY_COLORS.s2,

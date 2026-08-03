@@ -304,7 +304,7 @@ export function AdminDepartmentsSection({
                   취소
                 </Button>
               ) : selectedDept ? (
-                <Button variant="primary" size="sm" iconLeft={<Save className="h-3.5 w-3.5" />} onClick={() => deptSaveRef.current?.()}>
+                <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={() => deptSaveRef.current?.()}>
                   저장
                 </Button>
               ) : null

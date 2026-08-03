@@ -14,6 +14,7 @@ export interface AdminDetailCardProps {
   status?: ReactNode;
   actions?: ReactNode;
   tabs?: AdminDetailTab[];
+  tabActions?: ReactNode;
   activeTab?: string;
   onTabChange?: (id: string) => void;
   children: ReactNode;
@@ -26,6 +27,7 @@ export function AdminDetailCard({
   status,
   actions,
   tabs,
+  tabActions,
   activeTab,
   onTabChange,
   children,
@@ -96,39 +98,41 @@ export function AdminDetailCard({
       )}
       {hasTabs && (
         <div
-          role="tablist"
-          className="flex shrink-0 gap-2 border-b px-4 py-2"
+          className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2"
           style={{ borderColor: LEGACY_COLORS.border }}
         >
-          {tabs?.map((tab, index) => {
-            const active = index === selectedTabIndex;
-            const tabId = `${tabInstanceId}-tab-${index}`;
-            return (
-              <button
-                key={tab.id}
-                id={tabId}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls={tabPanelId}
-                tabIndex={active ? 0 : -1}
-                onClick={() => onTabChange?.(tab.id)}
-                onKeyDown={(event) => handleTabKeyDown(event, index)}
-                className="flex h-10 items-center justify-center rounded-[12px] border px-3 text-[14px] font-bold transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 active:scale-[0.98]"
-                style={{
-                  background: active
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                    : "transparent",
-                  borderColor: active
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`
-                    : "transparent",
-                  color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+          <div role="tablist" className="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto">
+            {tabs?.map((tab, index) => {
+              const active = index === selectedTabIndex;
+              const tabId = `${tabInstanceId}-tab-${index}`;
+              return (
+                <button
+                  key={tab.id}
+                  id={tabId}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls={tabPanelId}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => onTabChange?.(tab.id)}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
+                  className="flex h-10 shrink-0 items-center justify-center rounded-[12px] border px-3 text-[14px] font-bold transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 active:scale-[0.98]"
+                  style={{
+                    background: active
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                      : "transparent",
+                    borderColor: active
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`
+                      : "transparent",
+                    color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+          {tabActions && <div className="flex shrink-0 items-center gap-2">{tabActions}</div>}
         </div>
       )}
       <div

@@ -329,8 +329,9 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             ) : selected ? (
               <Button
                 variant="primary"
-                size="sm"
-                iconLeft={<Save className="h-3.5 w-3.5" />}
+                size="md"
+                className="h-11 min-w-[88px]"
+                iconLeft={<Save className="h-4 w-4" />}
                 disabled={!editDirty || editSaving}
                 loading={editSaving}
                 onClick={() => saveModel(selected.slot)}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { InventoryEffectRow } from "../historyInventoryEffect";
 import type { HistoryDetailSummary } from "../historyDetailSummary";
@@ -115,8 +115,8 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    const output = screen.getByRole("button", { name: "완제품 · 1품목" });
-    const components = screen.getByRole("button", { name: "부품 · 2품목" });
+    const output = screen.getByRole("button", { name: "완제품 · 1품목 · +2" });
+    const components = screen.getByRole("button", { name: "부품 · 2품목 · -5" });
     expect(output).toHaveAttribute("aria-expanded", "false");
     expect(components).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(output);
@@ -209,8 +209,8 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    const warehouse = screen.getByRole("button", { name: "창고 재고 · 1품목" });
-    const outbound = screen.getByRole("button", { name: "출하 재고 · 1품목" });
+    const warehouse = screen.getByRole("button", { name: "창고 재고 · 1품목 · -10" });
+    const outbound = screen.getByRole("button", { name: "출하 재고 · 1품목 · +10" });
     expect(warehouse).toHaveAttribute("aria-expanded", "false");
     expect(outbound).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("출하 품목")).not.toBeInTheDocument();
@@ -221,7 +221,7 @@ describe("HistoryKeyPointSummary", () => {
     expect(warehouse).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("shows only the location and item count in a collapsed shipping impact header", () => {
+  it("shows the signed total in a collapsed shipping impact header", () => {
     const shippingEffects = Array.from({ length: 12 }, (_, index) => effect({
       key: `shipping-${index + 1}`,
       itemId: `shipping-item-${index + 1}`,
@@ -242,10 +242,76 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    const shipping = screen.getByRole("button", { name: "출하 재고 · 12품목" });
+    const shipping = screen.getByRole("button", { name: "출하 재고 · 12품목 · -12" });
     expect(shipping).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(shipping);
     expect(screen.getAllByText("-1 EA")).toHaveLength(12);
+  });
+
+  it("shows totals only for nonzero single-unit groups and keeps detail row units", () => {
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          impactGroups: [
+            {
+              key: "positive",
+              label: "완제품 재고",
+              effects: [
+                effect({ key: "positive-1", delta: 2, deltaLabel: "+2" }),
+                effect({ key: "positive-2", delta: 3, deltaLabel: "+3" }),
+              ],
+            },
+            {
+              key: "negative",
+              label: "부품 재고",
+              effects: [
+                effect({ key: "negative-1", delta: -2, deltaLabel: "-2" }),
+                effect({ key: "negative-2", delta: -3, deltaLabel: "-3" }),
+              ],
+            },
+            {
+              key: "mixed-unit",
+              label: "혼합 단위 재고",
+              effects: [
+                effect({ key: "mixed-1", delta: 2, deltaLabel: "+2", unit: "EA" }),
+                effect({ key: "mixed-2", delta: 3, deltaLabel: "+3", unit: "BOX" }),
+              ],
+            },
+            {
+              key: "zero-total",
+              label: "상쇄 재고",
+              effects: [
+                effect({ key: "zero-1", delta: 2, deltaLabel: "+2" }),
+                effect({ key: "zero-2", delta: -2, deltaLabel: "-2" }),
+              ],
+            },
+            {
+              key: "empty-unit",
+              label: "단위 없는 재고",
+              effects: [
+                effect({ key: "empty-1", delta: 2, deltaLabel: "+2", unit: "" }),
+                effect({ key: "empty-2", delta: 3, deltaLabel: "+3", unit: "" }),
+              ],
+            },
+          ],
+        })}
+      />,
+    );
+
+    const positive = screen.getByRole("button", { name: "완제품 재고 · 2품목 · +5" });
+    expect(screen.getByRole("button", { name: "부품 재고 · 2품목 · -5" })).toBeInTheDocument();
+    const mixedUnit = screen.getByRole("button", { name: "혼합 단위 재고 · 2품목" });
+    expect(screen.getByRole("button", { name: "상쇄 재고 · 2품목" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "단위 없는 재고 · 2품목" })).toBeInTheDocument();
+
+    fireEvent.click(positive);
+    expect(screen.getByText("+2 EA")).toBeInTheDocument();
+    expect(screen.getByText("+3 EA")).toBeInTheDocument();
+
+    fireEvent.click(mixedUnit);
+    const mixedUnitDetails = document.getElementById(mixedUnit.getAttribute("aria-controls")!);
+    expect(within(mixedUnitDetails!).getByText("+2 EA")).toBeInTheDocument();
+    expect(within(mixedUnitDetails!).getByText("+3 BOX")).toBeInTheDocument();
   });
 
   it("does not truncate the requester timestamp", () => {

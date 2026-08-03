@@ -143,6 +143,31 @@ describe("AdminEmployeesSection", () => {
     expect(container.querySelector(".flex.min-h-0.flex-1.flex-col")).toHaveClass("min-h-0", "flex-1");
   });
 
+  it("uses the shared primary action size for the selected employee save button", () => {
+    context.selectedEmployee = defaultEmployee;
+    context.editForm = {
+      name: defaultEmployee.name,
+      role: defaultEmployee.role,
+      phone: "",
+      department: defaultEmployee.department,
+      level: defaultEmployee.level,
+      warehouse_role: defaultEmployee.warehouse_role,
+      department_role: defaultEmployee.department_role,
+      hidden_sidebar_tabs: [],
+      assigned_model_slots: [],
+    };
+    render(
+      <DirtyGuardProvider>
+        <AdminEmployeesSection />
+      </DirtyGuardProvider>,
+    );
+
+    const saveButton = screen.getByRole("button", { name: "저장" });
+
+    expect(saveButton).toHaveClass("h-11", "min-w-[88px]", "px-4", "py-2", "text-[13px]");
+    expect(saveButton.querySelector("svg")).toHaveClass("h-4", "w-4");
+  });
+
   it("legacy 부서/직급은 목록과 선택 헤더에서 표준 직급으로 표시한다", () => {
     const legacyEmployee = {
       ...context.employees[0],

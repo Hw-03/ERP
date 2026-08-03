@@ -110,7 +110,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
                 cancel();
               }
             }}
-            className="w-full rounded-md border px-2 py-1 text-right text-sm font-semibold outline-none"
+            className="h-[30px] w-full rounded-md border px-2 py-1 text-right text-sm font-semibold outline-none"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.blue,
@@ -122,7 +122,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
             type="button"
             onClick={() => setEditing(true)}
             {...actionTooltipProps}
-            className="rounded-md border px-3 py-1 text-sm font-semibold transition-colors hover:brightness-110"
+            className="h-[30px] rounded-md border px-3 py-1 text-sm font-semibold transition-colors hover:brightness-110"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.border,
@@ -139,7 +139,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
           type="button"
           onClick={() => onRequestDelete(row, childName)}
           {...actionTooltipProps}
-          className="rounded-md p-1.5 transition-colors hover:brightness-110"
+          className="flex h-7 w-7 items-center justify-center rounded-md p-0 transition-colors hover:brightness-110"
           style={{
             color: LEGACY_COLORS.red,
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,

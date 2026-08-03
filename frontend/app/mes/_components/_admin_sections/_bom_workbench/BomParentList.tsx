@@ -94,41 +94,50 @@ export function BomParentList({
   return (
     <div
       className="flex min-h-0 flex-1 flex-col rounded-2xl border"
-      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
       {/* 검색 */}
-      <div className="flex min-w-0 items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+      <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
         <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
           상위 품목 선택
         </div>
         <div className="min-w-0 flex-1">
-          <BomSearchInput value={search} onChange={setSearch} />
+          <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
         </div>
       </div>
-      <div className="flex flex-nowrap items-center gap-1.5 px-4 py-3">
-        {filters.map((f) => {
-          const active = stageFilter === f.id;
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setStageFilter(f.id)}
-              aria-pressed={active}
-              className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
-              style={{
-                background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-              }}
-            >
-              {f.label}
-            </button>
-          );
-        })}
+      <div className="px-4 py-3">
+        <div className="overflow-x-auto">
+          <div className="flex min-w-full w-max items-center gap-1">
+            <div className="flex shrink-0 gap-1.5">
+              {filters.map((f) => {
+                const active = stageFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setStageFilter(f.id)}
+                    aria-pressed={active}
+                    className="whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
+                    style={{
+                      background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+                      color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                      borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 리스트 */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        style={{ borderTop: `1px solid ${LEGACY_COLORS.border}` }}
+      >
         <BomTableHeader
           variant={mode === "edit" ? "parent" : "whereused"}
           gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}

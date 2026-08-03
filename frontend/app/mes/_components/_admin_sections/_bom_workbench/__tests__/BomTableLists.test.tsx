@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { BomChildAddBox } from "../BomChildAddBox";
 import { BomEditPanel } from "../BomEditPanel";
+import { BomParentHeader } from "../BomParentHeader";
 import { BomParentList } from "../BomParentList";
 import { BOM_CURRENT_ROW_GRID_TEMPLATE, BOM_ROW_SURFACE_CLASS_NAME } from "../BomTablePrimitives";
 
@@ -118,7 +119,9 @@ describe("BOM 편집 표형 목록", () => {
     );
 
     const filterRow = screen.getAllByRole("button", { name: "전체" })[0].parentElement;
-    expect(filterRow).toHaveClass("flex-nowrap", "items-center", "gap-1.5");
+    expect(filterRow).toHaveClass("flex", "shrink-0", "gap-1.5");
+    expect(filterRow?.parentElement).toHaveClass("flex", "w-max", "min-w-full", "gap-1");
+    expect(filterRow?.parentElement?.parentElement).toHaveClass("overflow-x-auto");
     expect(screen.queryByText(/^\d+건$/)).not.toBeInTheDocument();
     for (const button of within(filterRow!).getAllByRole("button")) {
       expect(button).toHaveClass("whitespace-nowrap", "px-2", "py-1", "text-xs");
@@ -146,11 +149,13 @@ describe("BOM 편집 표형 목록", () => {
     const completedFilter = screen.getByRole("button", { name: "공정완료" });
     expect(allFilter).toHaveAttribute("aria-pressed", "true");
     expect(completedFilter).toHaveAttribute("aria-pressed", "false");
+    expect(completedFilter.style.background).toBe("var(--c-s1)");
 
     fireEvent.click(completedFilter);
 
     expect(allFilter).toHaveAttribute("aria-pressed", "false");
     expect(completedFilter).toHaveAttribute("aria-pressed", "true");
+    expect(allFilter.style.background).toBe("var(--c-s1)");
     expect(screen.queryByText("중간 단계 품목")).not.toBeInTheDocument();
     expect(screen.getByText("완료 단계 품목")).toBeInTheDocument();
   });
@@ -262,7 +267,8 @@ describe("BOM 편집 표형 목록", () => {
     expect(header?.children.item(3)).toHaveClass("justify-self-end");
     expect(row?.children.item(0)).toHaveClass("justify-self-center");
     expect(row?.children.item(3)).toHaveClass("justify-self-end");
-    expect(row).toHaveClass("no-btn-inset", "px-3", "py-2", "hover:bg-[var(--c-s4)]");
+    expect(row).toHaveClass("no-btn-inset", "h-[37px]", "px-3", "hover:bg-[var(--c-s4)]");
+    expect(row).not.toHaveClass("py-2");
     expect(row).toHaveClass("border-b");
     expect(row).not.toHaveClass("border-l-[3px]", "border-l-transparent");
     expect(row?.style.borderBottom).toBe("1px solid var(--c-border)");
@@ -312,7 +318,8 @@ describe("BOM 편집 표형 목록", () => {
       (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === gridTemplateColumns,
     );
     expect(candidateHeader?.children.item(3)).toHaveClass("justify-self-end");
-    expect(row).toHaveClass("px-3", "py-2", "hover:bg-[var(--c-s4)]");
+    expect(row).toHaveClass("h-[37px]", "px-3", "hover:bg-[var(--c-s4)]");
+    expect(row).not.toHaveClass("py-2");
     expect(row?.querySelector("[data-bom-row-label]")).not.toHaveAttribute("title");
     expect(row?.querySelector("[data-bom-row-code]")).not.toHaveAttribute("title");
     expect(row).not.toHaveStyle({ background: "transparent" });
@@ -335,6 +342,7 @@ describe("BOM 편집 표형 목록", () => {
     expect(screen.getByText("등록된 품목")).not.toHaveAttribute("title");
     const currentSurface = screen.getByText("등록된 품목").closest("[data-bom-row-surface]")!;
     expect(currentSurface).toHaveClass(...BOM_ROW_SURFACE_CLASS_NAME.split(" "));
+    expect(currentSurface).toHaveClass("h-[37px]");
     expect(currentSurface.style.gridTemplateColumns).toBe(BOM_CURRENT_ROW_GRID_TEMPLATE);
     expect(currentSurface.style.borderBottom).toBe("1px solid var(--c-border)");
     expect(currentSurface.children.item(3)).toHaveClass("justify-center");
@@ -536,12 +544,17 @@ describe("BOM 레이아웃 높이 계약", () => {
     const title = screen.getByText("상위 품목 선택");
     const search = screen.getByRole("textbox");
     const titleSection = title.parentElement!;
-    const filterSection = screen.getAllByRole("button", { name: "전체" })[0].parentElement!;
+    const filterGroup = screen.getAllByRole("button", { name: "전체" })[0].parentElement!;
+    const filterSection = filterGroup.parentElement?.parentElement?.parentElement!;
 
     expect(titleSection).toHaveClass("flex", "items-center", "gap-3", "px-4", "py-3");
     expect(titleSection).toContainElement(search);
     expect(titleSection.style.borderBottom).toBe("1px solid var(--c-border)");
-    expect(filterSection).toHaveClass("flex", "flex-nowrap", "items-center", "gap-1.5", "px-4", "py-3");
+    expect(search).toHaveStyle({ background: "var(--c-s1)" });
+    expect(filterSection).toHaveClass("px-4", "py-3");
+    expect(filterGroup).toHaveClass("flex", "shrink-0", "gap-1.5");
+    expect(filterGroup.parentElement).toHaveClass("flex", "w-max", "min-w-full", "gap-1");
+    expect(filterGroup.parentElement?.parentElement).toHaveClass("overflow-x-auto");
     expect(titleSection).not.toBe(filterSection);
     expect(screen.queryByText(/^\d+건$/)).not.toBeInTheDocument();
   });
@@ -581,5 +594,103 @@ describe("BOM 레이아웃 높이 계약", () => {
       (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === "52px minmax(0, 1fr) 78px 44px",
     );
     expect(parentHeader).not.toHaveClass("h-[50px]");
+  });
+});
+
+describe("BOM normal data row height", () => {
+  it("keeps parent, candidate, registered, and current rows at 37px while quantity editing", () => {
+    const { container: parentContainer } = render(
+      <BomParentList
+        dept="A"
+        items={[item()]}
+        allBomRows={[]}
+        completedSet={new Set()}
+        statusFilter="ALL"
+        selectedId="item-1"
+        onSelect={vi.fn()}
+        mode="edit"
+      />,
+    );
+    const selectedParentRow = findTableRow(parentContainer, "52px minmax(0, 1fr) 78px 44px")!;
+    expect(selectedParentRow).toHaveAttribute("aria-pressed", "true");
+    expect(selectedParentRow).toHaveClass("h-[37px]");
+
+    const { unmount } = render(
+      <BomChildAddBox
+        parent={item({ item_id: "parent" })}
+        bomRows={[bomRow]}
+        items={[
+          item({ item_id: "item-2", item_name: "Registered child" }),
+          item({ item_id: "item-3", item_name: "Candidate child" }),
+        ]}
+        onAdd={vi.fn()}
+      />,
+    );
+    const registeredRow = screen.getByText("Registered child").closest("button")!;
+    const candidateRow = screen.getByText("Candidate child").closest("button")!;
+    expect(registeredRow).toBeDisabled();
+    expect(registeredRow).toHaveClass("h-[37px]");
+    expect(candidateRow).toHaveClass("h-[37px]");
+    unmount();
+
+    const onSaveQty = vi.fn();
+    render(
+      <BomEditPanel
+        parent={item()}
+        bomRows={[bomRow]}
+        items={[item(), item({ item_id: "item-2", item_name: "A very long deleted current child", deleted_at: "2026-01-02T00:00:00Z" })]}
+        onSaveQty={onSaveQty}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+    const currentRow = screen.getByText("A very long deleted current child").closest("[data-bom-row-surface]")!;
+    expect(currentRow).toHaveClass("h-[37px]");
+    const [quantityDisplay, deleteButton] = [...currentRow.querySelectorAll("button")];
+    expect(quantityDisplay).toHaveClass("h-[30px]");
+    expect(deleteButton).toHaveClass("h-7", "w-7");
+
+    fireEvent.click(quantityDisplay);
+    let quantityInput = screen.getByRole("spinbutton");
+    expect(quantityInput).toHaveClass("h-[30px]");
+    expect(quantityInput.closest("[data-bom-row-surface]")).toHaveClass("h-[37px]");
+    fireEvent.change(quantityInput, { target: { value: "3" } });
+    fireEvent.keyDown(quantityInput, { key: "Enter" });
+    expect(onSaveQty).toHaveBeenCalledWith("bom-1", 3);
+    expect(currentRow).toHaveClass("h-[37px]");
+
+    fireEvent.click(currentRow.querySelector("button")!);
+    quantityInput = screen.getByRole("spinbutton");
+    expect(quantityInput.closest("[data-bom-row-surface]")).toHaveClass("h-[37px]");
+    fireEvent.keyDown(quantityInput, { key: "Escape" });
+    expect(onSaveQty).toHaveBeenCalledTimes(1);
+    expect(currentRow).toHaveClass("h-[37px]");
+
+    fireEvent.click(currentRow.querySelector("button")!);
+    quantityInput = screen.getByRole("spinbutton");
+    expect(quantityInput.closest("[data-bom-row-surface]")).toHaveClass("h-[37px]");
+    fireEvent.change(quantityInput, { target: { value: "4" } });
+    fireEvent.blur(quantityInput);
+    expect(onSaveQty).toHaveBeenLastCalledWith("bom-1", 4);
+    expect(currentRow).toHaveClass("h-[37px]");
+  });
+});
+
+describe("BOM selected parent summary", () => {
+  it("keeps a safe responsive minimum width without changing its content or action", () => {
+    render(
+      <BomParentHeader
+        parent={item({ item_name: "Selected parent", mes_code: "PARENT-001" })}
+        mode="edit"
+        childCount={1}
+        isCompleted={false}
+        onOpenReview={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByText("Selected parent").closest(".rounded-2xl")!;
+    expect(card).toHaveClass("min-w-0", "flex-1");
+    expect(card).toHaveStyle({ minWidth: "min(100%, 420px)" });
+    expect(screen.getByText(/PARENT-001/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /검토 · 완료/ })).toBeInTheDocument();
   });
 });

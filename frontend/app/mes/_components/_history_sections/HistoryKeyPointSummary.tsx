@@ -179,6 +179,13 @@ export function HistoryKeyPointSummary({
             const isToggleable = hasMultipleImpactLocations || autoCollapsedImpactIdentity === summary.impactIdentity;
             const isExpanded = !isToggleable || expandedImpactGroups.has(group.key);
             const contentId = `history-impact-${summary.impactIdentity}-${group.key}`;
+            const firstUnit = group.effects[0]?.unit;
+            const hasSingleUnit = Boolean(firstUnit)
+              && group.effects.every((effect) => effect.unit === firstUnit);
+            const totalDelta = group.effects.reduce((total, effect) => total + effect.delta, 0);
+            const totalDeltaLabel = hasSingleUnit && totalDelta !== 0
+              ? ` · ${totalDelta > 0 ? "+" : ""}${totalDelta}`
+              : "";
 
             return (
               <div key={group.key} className="px-4 pb-3">
@@ -195,7 +202,7 @@ export function HistoryKeyPointSummary({
                     }}
                   >
                     <span className="min-w-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                      {group.label ?? "재고"} · {group.effects.length}품목
+                      {group.label ?? "재고"} · {group.effects.length}품목{totalDeltaLabel}
                     </span>
                     <ChevronDown
                       className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}

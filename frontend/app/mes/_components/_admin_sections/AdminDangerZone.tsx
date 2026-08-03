@@ -56,66 +56,68 @@ export function AdminDangerZone({
           title="보안"
         />
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
-          <div className="mx-auto mb-auto mt-[clamp(48px,8vh,80px)] w-full max-w-[560px]">
-            <div
-              className="rounded-[16px] border p-5"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
-                  style={{
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
-                    color: LEGACY_COLORS.blue,
-                  }}
-                >
-                  <KeyRound className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                    관리자 PIN 변경
-                  </div>
-                  <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    관리자 인증 PIN을 변경하여 계정 보안을 강화하세요.
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 grid gap-3">
-                <PinField
-                  id="admin-current-pin"
-                  label="현재 PIN"
-                  value={pinForm.current_pin}
-                  onChange={(v) => setPinForm((c) => ({ ...c, current_pin: v }))}
-                  error={currentPinError}
-                  disabled={saving}
-                />
-                <PinField
-                  id="admin-new-pin"
-                  label="새 PIN"
-                  value={pinForm.new_pin}
-                  onChange={(v) => setPinForm((c) => ({ ...c, new_pin: v }))}
-                  error={newPinError}
-                  disabled={saving}
-                />
-                <PinField
-                  id="admin-confirm-pin"
-                  label="새 PIN 확인"
-                  value={pinForm.confirm_pin}
-                  onChange={(v) => setPinForm((c) => ({ ...c, confirm_pin: v }))}
-                  error={confirmPinError}
-                  disabled={saving}
-                />
-              </div>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={handleChangePin}
-                disabled={saving || !canChangePin}
-                className="mt-5"
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid min-h-full place-items-center py-6">
+            <div className="mx-auto w-full max-w-[560px]">
+              <div
+                className="rounded-[16px] border p-5"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
               >
-                {saving ? "변경 중..." : "PIN 변경"}
-              </Button>
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+                    style={{
+                      background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
+                      color: LEGACY_COLORS.blue,
+                    }}
+                  >
+                    <KeyRound className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                      관리자 PIN 변경
+                    </div>
+                    <div className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      관리자 인증 PIN을 변경하여 계정 보안을 강화하세요.
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 grid gap-3">
+                  <PinField
+                    id="admin-current-pin"
+                    label="현재 PIN"
+                    value={pinForm.current_pin}
+                    onChange={(v) => setPinForm((c) => ({ ...c, current_pin: v }))}
+                    error={currentPinError}
+                    disabled={saving}
+                  />
+                  <PinField
+                    id="admin-new-pin"
+                    label="새 PIN"
+                    value={pinForm.new_pin}
+                    onChange={(v) => setPinForm((c) => ({ ...c, new_pin: v }))}
+                    error={newPinError}
+                    disabled={saving}
+                  />
+                  <PinField
+                    id="admin-confirm-pin"
+                    label="새 PIN 확인"
+                    value={pinForm.confirm_pin}
+                    onChange={(v) => setPinForm((c) => ({ ...c, confirm_pin: v }))}
+                    error={confirmPinError}
+                    disabled={saving}
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handleChangePin}
+                  disabled={saving || !canChangePin}
+                  className="mt-5"
+                >
+                  {saving ? "변경 중..." : "PIN 변경"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

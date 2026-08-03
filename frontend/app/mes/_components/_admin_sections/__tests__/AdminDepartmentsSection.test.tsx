@@ -103,6 +103,19 @@ describe("AdminDepartmentsSection", () => {
     expect(container.querySelector(".flex.min-h-0.flex-1.flex-col")).toHaveClass("min-h-0", "flex-1");
   });
 
+  it("uses the shared primary action size for the selected department save button", () => {
+    render(
+      <DirtyGuardProvider>
+        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+      </DirtyGuardProvider>,
+    );
+
+    const saveButton = screen.getByRole("button", { name: "저장" });
+
+    expect(saveButton).toHaveClass("h-11", "min-w-[88px]", "px-4", "py-2", "text-[13px]");
+    expect(saveButton.querySelector("svg")).toHaveClass("h-4", "w-4");
+  });
+
   it("counts related items from their process type instead of their legacy department field", () => {
     render(
       <DirtyGuardProvider>

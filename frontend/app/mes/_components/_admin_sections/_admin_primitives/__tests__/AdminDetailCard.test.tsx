@@ -84,4 +84,29 @@ describe("AdminDetailCard", () => {
 
     expect(screen.getByRole("button", { name: "삭제 확인" }).parentElement).toHaveClass("w-full", "flex-nowrap");
   });
+
+  it("renders tab actions beside, rather than inside, the tablist", () => {
+    render(
+      <AdminDetailCard
+        tabs={[{ id: "info", label: "Info" }, { id: "history", label: "History" }]}
+        activeTab="info"
+        tabActions={<button type="button">Delete</button>}
+      >
+        content
+      </AdminDetailCard>,
+    );
+
+    const tablist = screen.getByRole("tablist");
+    const deleteButton = screen.getByRole("button", { name: "Delete" });
+    const tabRow = tablist.parentElement!;
+    const actionWrapper = tablist.nextElementSibling;
+
+    expect(tabRow).toHaveClass("flex", "justify-between");
+    expect(tabRow.previousElementSibling).toBeNull();
+    expect(tablist).toHaveClass("min-w-0", "flex-1", "flex-nowrap", "overflow-x-auto");
+    expect(actionWrapper).toBe(deleteButton.parentElement);
+    expect(actionWrapper).toHaveClass("shrink-0");
+    expect(actionWrapper).toContainElement(deleteButton);
+    expect(tablist).not.toContainElement(deleteButton);
+  });
 });

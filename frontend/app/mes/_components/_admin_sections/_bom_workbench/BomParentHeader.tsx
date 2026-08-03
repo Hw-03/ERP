@@ -51,6 +51,7 @@ export function BomParentHeader({
     <div
       className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2"
       style={{
+        minWidth: "min(100%, 420px)",
         background: LEGACY_COLORS.s2,
         borderColor: `color-mix(in srgb, ${accent} 35%, ${LEGACY_COLORS.border})`,
       }}

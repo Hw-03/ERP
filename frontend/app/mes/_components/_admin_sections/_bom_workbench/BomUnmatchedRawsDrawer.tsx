@@ -32,7 +32,7 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:brightness-105"
+        className="no-btn-inset flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:brightness-105"
       >
         <div className="flex items-center gap-2">
           {isEmpty ? (

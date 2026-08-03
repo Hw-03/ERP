@@ -13,16 +13,20 @@ function AdminDangerZoneHarness({ isSaving = false }: { isSaving?: boolean }) {
 }
 
 describe("AdminDangerZone", () => {
-  it("places the security card below the header while preserving its scroll region", () => {
+  it("centers the security card with a scroll-safe content structure", () => {
     const { container } = render(<AdminDangerZoneHarness />);
 
     expect(container.firstElementChild).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
-    expect(container.querySelector(".overflow-y-auto")).toHaveClass("flex", "flex-1", "flex-col");
+    const scrollRegion = container.querySelector(".overflow-y-auto");
+    expect(scrollRegion).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(scrollRegion?.firstElementChild).toHaveClass("grid", "min-h-full", "place-items-center");
     expect(container.querySelector(".max-w-\\[560px\\]")).toHaveClass(
       "mx-auto",
+      "w-full",
+    );
+    expect(container.querySelector(".max-w-\\[560px\\]")).not.toHaveClass(
       "mb-auto",
       "mt-[clamp(48px,8vh,80px)]",
-      "w-full",
     );
   });
 

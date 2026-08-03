@@ -16,7 +16,7 @@ import { BomBadge } from "./BomBadge";
 
 export const BOM_EDIT_LIST_GRID_TEMPLATE = "52px minmax(0, 1fr) 78px 44px";
 export const BOM_CURRENT_ROW_GRID_TEMPLATE = "52px minmax(0, 1fr) 78px 72px 28px";
-export const BOM_ROW_SURFACE_CLASS_NAME = "grid items-center gap-3 border-b px-3 py-2 transition-colors duration-150 hover:bg-[var(--c-s4)]";
+export const BOM_ROW_SURFACE_CLASS_NAME = "grid h-[37px] items-center gap-3 border-b px-3 transition-colors duration-150 hover:bg-[var(--c-s4)]";
 
 export function bomRowSurfaceStyle({
   gridTemplateColumns,

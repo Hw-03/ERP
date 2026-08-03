@@ -558,10 +558,10 @@ describe("desktop history detail panels", () => {
     expect(screen.getByText("취소 범위 확인 중...")).toBeInTheDocument();
 
     await act(async () => resolveScope([visible, hidden]));
-    expect(await screen.findByRole("button", { name: "assembly 재고 · 1품목" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "assembly 재고 · 1품목 · -7" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
 
-    expect(screen.getAllByRole("button", { name: "assembly 재고 · 1품목" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "assembly 재고 · 1품목 · -7" })).toHaveLength(1);
     expect(screen.getByText("hidden-component")).toBeInTheDocument();
   });
 
@@ -625,7 +625,7 @@ describe("desktop history detail panels", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getAllByRole("button", { name: "assembly 재고 · 1품목" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "assembly 재고 · 1품목 · -3" })).toHaveLength(1);
     expect(screen.getByText("reference-sibling")).toBeInTheDocument();
   });
 

@@ -52,6 +52,7 @@ describe("BomUnmatchedRawsDrawer", () => {
     const drawer = container.firstElementChild as HTMLDivElement;
     expect(drawer.style.background).toBe(LEGACY_COLORS.bg);
     expect(drawer).not.toHaveClass("border");
+    expect(screen.getByRole("button")).toHaveClass("no-btn-inset");
     expect(screen.queryByText("Raw material")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button"));
