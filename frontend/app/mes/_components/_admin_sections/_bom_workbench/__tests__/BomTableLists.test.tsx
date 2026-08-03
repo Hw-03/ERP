@@ -349,6 +349,9 @@ describe("BOM 편집 표형 목록", () => {
     const currentHeader = [...container.querySelectorAll<HTMLElement>("div")].find(
       (element) => element.classList.contains("sticky") && element.style.gridTemplateColumns === BOM_CURRENT_ROW_GRID_TEMPLATE,
     );
+    expect(currentHeader).toHaveClass("text-sm", "tracking-[0.5px]");
+    expect(currentHeader).not.toHaveClass("text-[11px]");
+    expect(currentHeader).not.toHaveClass("tracking-[1.5px]");
     expect(currentHeader?.children.item(3)).toHaveClass("justify-self-center");
   });
 
