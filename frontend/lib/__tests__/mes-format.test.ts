@@ -3,6 +3,7 @@ import {
   formatQty,
   formatDate,
   formatDateTime,
+  formatKstDateTime,
   formatPercent,
 } from "../mes-format";
 
@@ -58,6 +59,25 @@ describe("formatDateTime", () => {
     expect(formatDateTime(null)).toBe("-");
     expect(formatDateTime("")).toBe("-");
     expect(formatDateTime("nope")).toBe("-");
+  });
+});
+
+describe("formatKstDateTime", () => {
+  it("UTC 시각을 두 자리 KST 절대 일시로 표시", () => {
+    expect(formatKstDateTime("2026-08-04T00:05:00Z")).toBe(
+      "2026년 08월 04일 09시 05분",
+    );
+  });
+
+  it("KST 자정 날짜 경계를 00시로 표시", () => {
+    expect(formatKstDateTime("2026-08-03T15:05:00+00:00")).toBe(
+      "2026년 08월 04일 00시 05분",
+    );
+  });
+
+  it("null과 유효하지 않은 입력은 - 반환", () => {
+    expect(formatKstDateTime(null)).toBe("-");
+    expect(formatKstDateTime("not-a-date")).toBe("-");
   });
 });
 

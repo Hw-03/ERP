@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import type { IoBatch, IoLine, IoSubType } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { formatKstDateTime } from "@/lib/mes/format";
 import {
   IO_WORK_TYPES,
   deptIoDisplayLabel,
@@ -26,26 +27,6 @@ const TAG_TONE: Record<string, string> = {
   purple: LEGACY_COLORS.purple,
   muted: LEGACY_COLORS.muted2,
 };
-
-// 백엔드(services/io.py)가 datetime.utcnow() 로 timezone-naive UTC 를 저장하므로
-// 응답 ISO 문자열에 "Z" 가 없으면 UTC 로 간주하고 보정.
-// 제거 시점: P1-5 (Decimal/UTC 직렬화 정상화) 에서 백엔드가 datetime.now(timezone.utc) +
-// SQLAlchemy DateTime(timezone=True) 로 전환되면 본 함수 불필요.
-function parseServerTime(iso: string): number {
-  const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(iso);
-  return new Date(hasTz ? iso : iso + "Z").getTime();
-}
-
-function formatRelative(iso: string): string {
-  const diff = Date.now() - parseServerTime(iso);
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  const day = Math.floor(hr / 24);
-  return `${day}일 전`;
-}
 
 function asString(v: unknown): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
@@ -112,7 +93,7 @@ export function IoDraftWorkCard({
         if (l.included && Number(l.shortage) > 0) shortage += 1;
       }
     }
-    const startedText = formatRelative(draft.created_at);
+    const startedText = formatKstDateTime(draft.created_at);
     return {
       totalQty: qty,
       lineCount: lines,
@@ -216,7 +197,7 @@ export function IoDraftWorkCard({
       {/* 시간 · 부족 경고 */}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <span
-          className="text-[11px] font-semibold"
+          className="whitespace-nowrap text-[11px] font-semibold tabular-nums"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           {meta.startedText} 작업 시작

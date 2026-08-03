@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
-import { formatQty } from "@/lib/mes/format";
+import { formatKstDateTime, formatQty } from "@/lib/mes/format";
 import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -26,17 +26,6 @@ const STATUS_COLOR: Record<string, string> = {
   completed: LEGACY_COLORS.green,
   failed_approval: LEGACY_COLORS.red,
 };
-
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  const day = Math.floor(hr / 24);
-  return `${day}일 전`;
-}
 
 /**
  * Round-13 (#13) 추출 — MyRequestsPanel 의 단일 request 행.
@@ -85,8 +74,11 @@ export function MyRequestRow({
         >
           {STATUS_LABEL[req.status] ?? req.status}
         </span>
-        <span className="ml-auto text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          {formatRelative(req.created_at)}
+        <span
+          className="ml-auto whitespace-nowrap text-xs tabular-nums"
+          style={{ color: LEGACY_COLORS.muted }}
+        >
+          {formatKstDateTime(req.submitted_at ?? req.created_at)}
         </span>
       </div>
 

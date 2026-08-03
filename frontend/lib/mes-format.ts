@@ -13,6 +13,16 @@
  */
 
 const PLACEHOLDER = "-";
+const KST_TIME_ZONE = "Asia/Seoul";
+const KST_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: KST_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
 function toFiniteNumber(value: number | string | null | undefined): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -67,6 +77,24 @@ export function formatDateTime(value: string | null | undefined): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(d);
+}
+
+/**
+ * KST 24시간제 날짜+시간 — "2026년 08월 04일 09시 05분".
+ */
+export function formatKstDateTime(
+  value: string | Date | null | undefined,
+): string {
+  const d = toValidDate(value);
+  if (d === null) return PLACEHOLDER;
+
+  const parts = Object.fromEntries(
+    KST_DATE_TIME_FORMATTER.formatToParts(d).map(({ type, value: partValue }) => [
+      type,
+      partValue,
+    ]),
+  );
+  return `${parts.year}년 ${parts.month}월 ${parts.day}일 ${parts.hour}시 ${parts.minute}분`;
 }
 
 /**

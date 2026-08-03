@@ -3,7 +3,7 @@
 import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
-import { formatQty } from "@/lib/mes/format";
+import { formatKstDateTime, formatQty } from "@/lib/mes/format";
 import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
 
 /**
@@ -48,8 +48,11 @@ export function DraftCartItemRow({
         <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
           {draft.lines.length}건 · 총 {formatQty(totalQty)}
         </span>
-        <span className="ml-auto text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          {new Date(draft.updated_at).toLocaleString("ko-KR", { hour12: false })}
+        <span
+          className="ml-auto whitespace-nowrap text-xs tabular-nums"
+          style={{ color: LEGACY_COLORS.muted }}
+        >
+          {formatKstDateTime(draft.updated_at)}
         </span>
       </div>
 

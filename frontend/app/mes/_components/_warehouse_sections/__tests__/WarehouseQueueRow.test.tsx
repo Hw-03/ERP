@@ -12,6 +12,7 @@ function makeRequest(): StockRequest {
     requester_name: "권동환",
     requester_department: "조립",
     notes: null,
+    submitted_at: "2026-08-04T00:05:00Z",
     created_at: "2026-07-02T00:00:00Z",
     lines: [
       {
@@ -73,5 +74,25 @@ describe("WarehouseQueueRow approval PIN", () => {
     fireEvent.keyDown(screen.getByPlaceholderText("0000"), { key: " " });
 
     expect(submitApprove).toHaveBeenCalledWith("req-1");
+  });
+});
+
+describe("WarehouseQueueRow request timestamp", () => {
+  it("요청자의 실제 제출 일시를 KST 절대 시각으로 표시", () => {
+    render(<WarehouseQueueRow {...baseProps} />);
+
+    expect(screen.getByText("2026년 08월 04일 09시 05분")).toBeInTheDocument();
+  });
+
+  it("제출 일시가 없는 레거시 요청은 생성 일시를 표시", () => {
+    const req = {
+      ...makeRequest(),
+      submitted_at: null,
+      created_at: "2026-08-03T15:05:00Z",
+    };
+
+    render(<WarehouseQueueRow {...baseProps} req={req} />);
+
+    expect(screen.getByText("2026년 08월 04일 00시 05분")).toBeInTheDocument();
   });
 });

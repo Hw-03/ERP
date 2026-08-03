@@ -4,7 +4,7 @@ import type { StockRequest } from "@/lib/api";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
-import { formatQty } from "@/lib/mes/format";
+import { formatKstDateTime, formatQty } from "@/lib/mes/format";
 import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
 
 function normalizePin(value: string) {
@@ -70,9 +70,17 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
         <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
           {REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type}
         </span>
-        <span className="ml-auto text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          {req.requester_name} · {normalizeDepartment(req.requester_department)}
-        </span>
+        <div
+          className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs"
+          style={{ color: LEGACY_COLORS.muted }}
+        >
+          <span className="whitespace-nowrap tabular-nums">
+            {formatKstDateTime(req.submitted_at ?? req.created_at)}
+          </span>
+          <span className="whitespace-nowrap">
+            {req.requester_name} · {normalizeDepartment(req.requester_department)}
+          </span>
+        </div>
       </div>
 
       <div className="mt-2 flex flex-col gap-1 text-sm" style={{ color: LEGACY_COLORS.text }}>
