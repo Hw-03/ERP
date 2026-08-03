@@ -11,6 +11,7 @@ const navigationMock = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   search: "tab=shipping",
+  searchParams: null as URLSearchParams | null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -18,7 +19,12 @@ vi.mock("next/navigation", () => ({
     push: navigationMock.push,
     replace: navigationMock.replace,
   }),
-  useSearchParams: () => new URLSearchParams(navigationMock.search),
+  useSearchParams: () => {
+    if (navigationMock.searchParams?.toString() !== navigationMock.search) {
+      navigationMock.searchParams = new URLSearchParams(navigationMock.search);
+    }
+    return navigationMock.searchParams;
+  },
 }));
 vi.mock("@/lib/api", () => ({
   api: {
@@ -1927,6 +1933,45 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledWith(
       expect.objectContaining({ invoice_number: "inv-001" }),
     ));
+  });
+
+  it("preserves a typed invoice when the shipping request cache updates", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestWork";
+    const client = makeClient({ staleTime: 5 * 60_000 });
+    client.setQueryData(queryKeys.shipping.requests(), [
+      request({ request_id: "cache-initial", status: "REQUESTED" }),
+    ]);
+    const { container } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+
+    const invoiceInput = await screen.findByRole("textbox", { name: "인보이스 번호" });
+    fireEvent.change(invoiceInput, { target: { value: "INV-CACHE-001" } });
+
+    await act(async () => {
+      client.setQueryData(queryKeys.shipping.requests(), [
+        request({ request_id: "cache-refresh", status: "REQUESTED" }),
+      ]);
+    });
+
+    await waitFor(() => expect(invoiceInput).toHaveValue("INV-CACHE-001"));
+
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    nextStep(container);
+    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+
+    await waitFor(() => {
+      expect(api.createShippingRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ invoice_number: "INV-CACHE-001" }),
+      );
+      expect(api.sendShippingToPrep).toHaveBeenCalledWith("new-1");
+    });
+    expect(await screen.findByTestId("shipping-prep-detail")).toBeInTheDocument();
   });
 
   it("edits invoice from detail using the normalized response and discloses revisions", async () => {

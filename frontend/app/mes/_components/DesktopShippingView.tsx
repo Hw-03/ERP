@@ -740,6 +740,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
       setView("historyWork");
       return;
     }
+    if (view === "requestWork" && editingId === requestId) return;
     if (requestId) {
       const found = requests.find((req) => req.request_id === requestId);
       if (found) {
@@ -769,7 +770,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
-  }, [searchParams, requests, loading, view, historyStatus, ensurePfItemsLoaded, ensureItemsLoaded]);
+  }, [searchParams, requests, loading, view, historyStatus, editingId, ensurePfItemsLoaded, ensureItemsLoaded]);
 
   function clearDraft() {
     navigateView("requestWork");
