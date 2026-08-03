@@ -56,7 +56,7 @@ export function DailyWorkReportScreen({
   const reportsQuery = useDailyWorkReportsQuery(workDate);
   const targetEmployeeId = tab === "mine" ? employeeId : selectedEmployeeId;
   const selectedReportQuery = useDailyWorkReportQuery(targetEmployeeId, workDate);
-  const activityQuery = useDailyWorkActivityQuery(targetEmployeeId, workDate);
+  const activityQuery = useDailyWorkActivityQuery(targetEmployeeId, workDate, { live: workDate === today });
   const saveMutation = useSaveDailyWorkReport();
   const editable = Boolean(employeeId && targetEmployeeId === employeeId);
   const report = tab === "mine" ? reportQuery.data : selectedReportQuery.data;
@@ -137,7 +137,7 @@ export function DailyWorkReportScreen({
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
       <div className="scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pb-0">
-        <header className="rounded-[20px] border p-4 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        <header className="rounded-[20px] border p-4 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-h-11 items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>

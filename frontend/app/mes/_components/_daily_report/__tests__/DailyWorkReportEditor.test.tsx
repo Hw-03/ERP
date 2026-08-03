@@ -70,4 +70,19 @@ describe("DailyWorkReportEditor", () => {
     expect(input).toHaveClass("resize-none");
     expect(input).not.toHaveClass("resize-y");
   });
+
+  it("작업 내역 제목과 글자 수를 같은 세로선에 맞춘다", () => {
+    render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} />);
+
+    const heading = screen.getByRole("heading", { name: "작업 내역" });
+    expect(heading.parentElement?.parentElement).toHaveClass("items-center");
+  });
+
+  it("거래 상세가 커져도 채움 편집기는 데스크톱 입력 높이를 유지한다", () => {
+    render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} fillAvailableHeight />);
+
+    const input = screen.getByRole("textbox", { name: "작업 내역" });
+    expect(input).toHaveClass("lg:min-h-[220px]");
+    expect(input.parentElement).toHaveClass("lg:min-h-[360px]");
+  });
 });

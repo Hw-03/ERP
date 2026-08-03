@@ -94,7 +94,7 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.queryByText("하루의 작업 내역과 실제 MES 거래를 함께 확인합니다.")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "일일 작업 일보" }).parentElement).toHaveClass("flex", "items-center");
 
-    const activity = screen.getByRole("region", { name: "MES 거래 요약" });
+    const activity = screen.getByRole("region", { name: "MES 작업 기록" });
     const editor = screen.getByRole("textbox", { name: "작업 내역" });
     expect(activity.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -164,6 +164,19 @@ describe("DailyWorkReportScreen", () => {
 
     const header = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header");
     expect(header?.parentElement?.parentElement).not.toHaveAttribute("style");
+  });
+
+  it("상단 정보는 그대로 두고 세로 여백만 압축한다", () => {
+    render(
+      <DailyWorkReportScreen
+        employeeId="employee-1"
+        operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never}
+      />,
+    );
+
+    const header = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header");
+    expect(header).toHaveClass("lg:py-2.5");
+    expect(header).not.toHaveClass("lg:p-5");
   });
 
   it("일보 달력에서 미래 날짜는 선택할 수 없다", () => {

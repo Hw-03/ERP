@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dailyWorkReportsApi } from "@/lib/api/daily-work-reports";
 import type { SaveDailyWorkReportPayload } from "@/lib/api/types/daily-work-reports";
+import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 export function useDailyWorkReportsQuery(workDate: string) {
@@ -22,11 +23,23 @@ export function useDailyWorkReportQuery(employeeId: string | null | undefined, w
   });
 }
 
-export function useDailyWorkActivityQuery(employeeId: string | null | undefined, workDate: string) {
+export function useDailyWorkActivityQuery(
+  employeeId: string | null | undefined,
+  workDate: string,
+  options: { live?: boolean } = {},
+) {
+  const live = options.live === true;
   return useQuery({
     queryKey: queryKeys.dailyWorkReports.activity(employeeId ?? "", workDate),
     queryFn: ({ signal }) => dailyWorkReportsApi.activity(employeeId!, workDate, { signal }),
     enabled: Boolean(employeeId && workDate),
+    ...(live ? {
+      refetchOnMount: "always" as const,
+      refetchOnWindowFocus: true,
+      refetchInterval: STALE_TIME.VOLATILE,
+      staleTime: STALE_TIME.VOLATILE,
+    } : {}),
+    refetchIntervalInBackground: false,
   });
 }
 

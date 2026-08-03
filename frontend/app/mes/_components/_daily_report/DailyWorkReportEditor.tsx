@@ -87,7 +87,7 @@ export function DailyWorkReportEditor({
   if (!editable) {
     return (
       <section className="rounded-[20px] border p-4 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
             <PencilLine className="h-5 w-5" />
           </span>
@@ -103,9 +103,9 @@ export function DailyWorkReportEditor({
   }
 
   return (
-    <section className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <div className="flex shrink-0 items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+    <section className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:min-h-[360px] lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className="flex shrink-0 items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
             <PencilLine className="h-5 w-5" />
           </span>
@@ -125,7 +125,7 @@ export function DailyWorkReportEditor({
           userEditedRef.current = true;
           setContent(event.target.value);
         }}
-        className={`mt-4 min-h-44 w-full resize-none rounded-[16px] border px-4 py-3.5 text-sm leading-7 outline-none transition focus-visible:ring-2 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}
+        className={`mt-4 min-h-44 w-full resize-none rounded-[16px] border px-4 py-3.5 text-sm leading-7 outline-none transition focus-visible:ring-2 ${fillAvailableHeight ? "lg:min-h-[220px] lg:flex-1" : ""}`}
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
       />
       {(validationError || saveError) && <p role="alert" className="mt-3 rounded-[12px] px-3 py-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>{validationError || saveError}</p>}
