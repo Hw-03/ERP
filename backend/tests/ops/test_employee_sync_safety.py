@@ -11,6 +11,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 SYNC_SCRIPT = ROOT / "scripts" / "dev" / "sync-to-employee.ps1"
+AUTO_SYNC_SCRIPT = ROOT / "scripts" / "dev" / "auto-sync-to-employee.ps1"
 CHECKED_COMMAND = ROOT / "scripts" / "dev" / "checked-command.ps1"
 START_BAT = ROOT / "start.bat"
 RUNTIME_SCRIPTS = (
@@ -229,6 +230,7 @@ def _run_sync(sync_path: Path, environment: dict[str, str]) -> subprocess.Comple
         env=environment,
         text=True,
         encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -426,8 +428,8 @@ def test_employee_sync_runs_schema_and_inventory_verification_before_start() -> 
 
     migrate = script.index('"--migrate"')
     schema_check = script.index('"--check"', migrate)
-    schema_verify = script.index('"scripts\\ops\\_verify_backup.py"')
-    inventory_verify = script.index('"scripts\\ops\\check_inventory_integrity.py"')
+    schema_verify = script.index('$verifyTool = Join-Path $EmpRoot "scripts\\ops\\_verify_backup.py"')
+    inventory_verify = script.index('$inventoryVerifyTool = Join-Path $EmpRoot "scripts\\ops\\check_inventory_integrity.py"')
     start = script.index('Write-Host "[start]')
 
     assert migrate < schema_check < schema_verify < inventory_verify < start
@@ -447,6 +449,28 @@ def test_employee_sync_uses_checked_alembic_commands_and_schema_patterns() -> No
     assert "\\\\alembic\\\\" in script
     assert "alembic\\.ini" in script
     assert "migration_type_compare\\.py" in script
+
+
+def test_employee_sync_auto_schema_preflight_runs_before_stopping_services() -> None:
+    script = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
+
+    assert "[switch] $AutoSchema" in script
+    preflight = script.index("employee_schema_preflight.py")
+    stop = script.index('Write-Host "[stop] 직원 서버 정지 중..."')
+    assert preflight < stop
+    assert "--source-migrations" in script[preflight:stop]
+    assert "--target-migrations" in script[preflight:stop]
+    assert "exit 9" in script[preflight:stop]
+
+
+def test_automatic_sync_uses_dry_run_and_never_forces_active_employee() -> None:
+    script = AUTO_SYNC_SCRIPT.read_text(encoding="utf-8-sig")
+
+    assert "-DryRun" in script
+    assert "-AutoSchema" in script
+    assert "git status --porcelain" in script
+    assert "git rev-list" in script
+    assert "-Force" not in script
 
 
 def test_start_bat_checks_schema_read_only_before_starting_servers() -> None:

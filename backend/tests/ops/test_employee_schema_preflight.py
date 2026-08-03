@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[3]
+PREFLIGHT_SCRIPT = ROOT / "scripts" / "ops" / "employee_schema_preflight.py"
+MIGRATIONS = ROOT / "backend" / "alembic" / "versions"
+
+
+def _load_preflight_module():
+    spec = importlib.util.spec_from_file_location("employee_schema_preflight", PREFLIGHT_SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _write_migration(path: Path, revision: str, policy: str | None) -> None:
+    declaration = "" if policy is None else f"\nEMPLOYEE_AUTO_DEPLOY_POLICY = {policy}\n"
+    path.write_text(
+        f'revision = "{revision}"\ndown_revision = None\n{declaration}', encoding="utf-8"
+    )
+
+
+def test_changed_migrations_require_declared_auto_deploy_policy(tmp_path: Path) -> None:
+    module = _load_preflight_module()
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    _write_migration(source / "20260803_0001_missing.py", "20260803_0001", None)
+
+    with pytest.raises(module.PreflightPolicyError, match="policy"):
+        module.load_changed_migration_policies(source, target)
+
+
+def test_data_change_policy_requires_a_query_validator(tmp_path: Path) -> None:
+    module = _load_preflight_module()
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    _write_migration(
+        source / "20260803_0001_backfill.py",
+        "20260803_0001",
+        '{"kind": "data-change", "allowed_tables": ["items"]}',
+    )
+
+    with pytest.raises(module.PreflightPolicyError, match="validator"):
+        module.load_changed_migration_policies(source, target)
+
+
+def test_preflight_rejects_removing_an_employee_migration_file(tmp_path: Path) -> None:
+    module = _load_preflight_module()
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    _write_migration(target / "20260802_0001_existing.py", "20260802_0001", '{"kind": "schema-only"}')
+
+    with pytest.raises(module.PreflightPolicyError, match="removed"):
+        module.load_changed_migration_policies(source, target)
+
+
+def test_data_preserving_snapshot_rejects_existing_row_changes(tmp_path: Path) -> None:
+    module = _load_preflight_module()
+    database = tmp_path / "employee.db"
+    module.sqlite3.connect(database).execute(
+        "CREATE TABLE shipping_requests (request_id TEXT PRIMARY KEY, status TEXT)"
+    ).connection.execute(
+        "INSERT INTO shipping_requests VALUES ('SR-1', 'ready')"
+    ).connection.commit()
+
+    before = module.snapshot_existing_rows(database)
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("UPDATE shipping_requests SET status = 'shipped' WHERE request_id = 'SR-1'")
+
+    with pytest.raises(module.PreflightDataError, match="shipping_requests"):
+        module.assert_existing_rows_unchanged(database, before, allowed_tables=frozenset())
+
+
+def test_data_change_policy_allows_only_declared_table_and_validator(tmp_path: Path) -> None:
+    module = _load_preflight_module()
+    database = tmp_path / "employee.db"
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE items (item_id TEXT PRIMARY KEY, enabled INTEGER)")
+        connection.execute("CREATE TABLE employees (employee_id TEXT PRIMARY KEY, name TEXT)")
+        connection.execute("INSERT INTO items VALUES ('AF-1', 0)")
+        connection.execute("INSERT INTO employees VALUES ('E-1', 'Kim')")
+
+    before = module.snapshot_existing_rows(database)
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("UPDATE items SET enabled = 1 WHERE item_id = 'AF-1'")
+
+    policy = module.MigrationPolicy(
+        revision="20260803_0001",
+        kind="data-change",
+        allowed_tables=frozenset({"items"}),
+        validator_sql="SELECT COUNT(*) FROM items WHERE enabled <> 1",
+        validator_expected=0,
+    )
+    module.assert_existing_rows_unchanged(database, before, policy.allowed_tables)
+    module.assert_policy_validators(database, (policy,))
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "20260727_0008_af_sales_review_defaults.py",
+        "20260728_0009_shipping_prepared_actor.py",
+        "20260728_0010_daily_work_reports.py",
+        "20260728_0011_shipping_prepared_actor_repair.py",
+    ],
+)
+def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:
+    module = _load_preflight_module()
+
+    policy = module._policy_from_migration(MIGRATIONS / filename)
+
+    assert policy.kind in {"schema-only", "data-preserving", "data-change"}

@@ -13,6 +13,8 @@ down_revision: Union[str, None] = "20260727_0008"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+EMPLOYEE_AUTO_DEPLOY_POLICY = {"kind": "schema-only"}
+
 
 _REQUIRED_COLUMNS = {
     "report_id",

@@ -13,6 +13,8 @@ down_revision: Union[str, None] = "20260728_0010"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+EMPLOYEE_AUTO_DEPLOY_POLICY = {"kind": "data-preserving"}
+
 
 def _quote_identifier(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'

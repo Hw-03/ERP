@@ -14,6 +14,8 @@ down_revision: Union[str, None] = "20260727_0007"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+EMPLOYEE_AUTO_DEPLOY_POLICY = {"kind": "data-preserving"}
+
 
 def _snapshot_sqlite_shipping_dependents(
     bind: sa.Connection,

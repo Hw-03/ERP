@@ -14,12 +14,14 @@
 param(
     [switch] $DryRun,
     [switch] $Force,
-    [switch] $AllowSchemaChange
+    [switch] $AllowSchemaChange,
+    [switch] $AutoSchema
 )
 
 $ErrorActionPreference = "Stop"
 
 $DevRoot = "C:\ERP"
+$DevBackend = Join-Path $DevRoot "backend"
 $EmpRoot = "C:\ERP-dev"
 $EmpBackend = Join-Path $EmpRoot "backend"
 $EmpFrontend = Join-Path $EmpRoot "frontend"
@@ -135,12 +137,38 @@ $schemaHits = $backendDryRun | Where-Object {
 }
 
 if ($schemaHits -and -not $AllowSchemaChange) {
+    if ($AutoSchema) {
+        Write-Host "[schema] 자동 사전 검증으로 변경을 확인합니다."
+    }
+    else {
     Write-Host "[schema] DB 스키마 관련 파일 변경이 감지됐습니다:"
     $schemaHits | ForEach-Object { Write-Host "  $_" }
     Write-Host "[schema] 검토 후 -AllowSchemaChange 로 재실행하세요."
     exit 3
+    }
 }
-if ($schemaHits) {
+if ($schemaHits -and $AutoSchema) {
+    $preflightTool = Join-Path $DevRoot "scripts\ops\employee_schema_preflight.py"
+    $preflightResult = Invoke-CheckedExternalCommand `
+        -FilePath "py.exe" `
+        -ArgumentList @(
+            $preflightTool,
+            "--employee-db", $EmpDb,
+            "--backend-dir", $DevBackend,
+            "--runtime-root", $EmpRuntimeRoot,
+            "--source-migrations", (Join-Path $DevBackend "alembic\versions"),
+            "--target-migrations", (Join-Path $EmpBackend "alembic\versions"),
+            "--verify-tool", (Join-Path $DevRoot "scripts\ops\_verify_backup.py"),
+            "--inventory-tool", (Join-Path $DevRoot "scripts\ops\check_inventory_integrity.py")
+        )
+    Write-CheckedCommandResult -Label "schema-preflight" -Result $preflightResult
+    if (-not $preflightResult.Success) {
+        Write-Host "[schema] 자동 사전 검증 실패 - 직원 DB와 서버를 변경하지 않았습니다."
+        exit 9
+    }
+    Write-Host "[schema] 자동 사전 검증 통과"
+}
+elseif ($schemaHits) {
     Write-Host "[schema] 스키마 관련 변경 감지됨 (-AllowSchemaChange 로 진행)"
 }
 else {
