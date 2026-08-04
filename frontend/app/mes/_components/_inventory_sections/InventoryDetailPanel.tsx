@@ -282,7 +282,7 @@ export function InventoryDetailPanel({
                 onClick={() => setIoMenu((m) => (m === "in" ? null : "in"))}
                 aria-pressed={ioMenu === "in"}
                 className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
-                style={{ background: LEGACY_COLORS.blue, opacity: ioMenu === "out" ? 0.55 : 1 }}
+                style={{ background: LEGACY_COLORS.blueSolid, opacity: ioMenu === "out" ? 0.55 : 1 }}
               >
                 입고
               </button>
@@ -291,7 +291,7 @@ export function InventoryDetailPanel({
                 onClick={() => setIoMenu((m) => (m === "out" ? null : "out"))}
                 aria-pressed={ioMenu === "out"}
                 className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
-                style={{ background: LEGACY_COLORS.red, opacity: ioMenu === "in" ? 0.55 : 1 }}
+                style={{ background: LEGACY_COLORS.redSolid, opacity: ioMenu === "in" ? 0.55 : 1 }}
               >
                 출고
               </button>

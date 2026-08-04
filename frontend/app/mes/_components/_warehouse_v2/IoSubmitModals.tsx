@@ -40,7 +40,7 @@ export function IoSubmitModals({ result, onClose, onGoToMap }: Props) {
             onGoToMap?.();
           }}
           className="mt-3 rounded-[10px] px-3 py-2 text-sm font-bold text-white transition-colors hover:brightness-[1.04]"
-          style={{ background: LEGACY_COLORS.blue }}
+          style={{ background: LEGACY_COLORS.blueSolid }}
         >
           창고 지도에서 배치하기 →
         </button>

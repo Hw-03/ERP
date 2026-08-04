@@ -114,7 +114,7 @@ export function HistoryFilterBar({
           {activeFilterCount > 0 && (
             <span
               className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-black"
-              style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
+              style={{ background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white }}
             >
               {activeFilterCount}
             </span>

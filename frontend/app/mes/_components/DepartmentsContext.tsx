@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, type DepartmentMaster } from "@/lib/api";
-import { employeeColor } from "@/lib/mes/color";
+import { departmentDisplayColor, employeeColor } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 
 type Ctx = {
@@ -52,9 +52,9 @@ export function DepartmentsProvider({ children }: { children: ReactNode }) {
       if (d.color_hex) byName.set(d.name, d.color_hex);
     }
     return (name?: string | null) => {
-      if (!name) return employeeColor(name);
+      if (!name) return departmentDisplayColor(employeeColor(name));
       const normalized = normalizeDepartment(name);
-      return byName.get(name) ?? byName.get(normalized) ?? employeeColor(name);
+      return departmentDisplayColor(byName.get(name) ?? byName.get(normalized) ?? employeeColor(name));
     };
   }, [departments]);
 
@@ -82,7 +82,7 @@ export function useRefreshDepartments(): () => Promise<void> {
   return useCtx().refresh;
 }
 
-/** 단일 부서명에 대한 색을 반환. color_hex 우선, 없으면 폴백 팔레트. */
+/** 단일 부서명에 대한 현재 테마용 표시색을 반환한다. 원본 hex는 보존된다. */
 export function useDeptColor(name?: string | null): string {
   return useCtx().getColor(name);
 }

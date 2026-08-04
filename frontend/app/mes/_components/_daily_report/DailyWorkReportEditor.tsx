@@ -139,7 +139,7 @@ export function DailyWorkReportEditor({
           onClick={() => { void save().catch(() => {}); }}
           disabled={saving || savingLocal}
           className="flex min-h-11 items-center gap-2 rounded-[12px] px-4 text-sm font-black text-white transition active:scale-[0.98] disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.blue }}
+          style={{ background: LEGACY_COLORS.blueSolid }}
         >
           <Save className="h-4 w-4" />
           {saving ? "저장 중" : "저장"}

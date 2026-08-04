@@ -127,7 +127,7 @@ export function EmployeeAddPanel({ form, setForm, departments, onClose, onSubmit
       <button
         onClick={onSubmit}
         className="w-full rounded-[18px] px-4 py-3 text-base font-bold text-white"
-        style={{ background: LEGACY_COLORS.blue }}
+        style={{ background: LEGACY_COLORS.blueSolid }}
       >
         추가
       </button>

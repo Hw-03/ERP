@@ -145,7 +145,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
             disabled={busyId === req.request_id}
             onClick={() => submitApprove(req.request_id)}
             className="rounded-[10px] px-3 py-1.5 text-xs font-bold"
-            style={{ background: LEGACY_COLORS.green, color: "white" }}
+            style={{ background: LEGACY_COLORS.greenSolid, color: "white" }}
           >
             {busyId === req.request_id ? "처리 중..." : "승인 확정"}
           </button>
@@ -204,7 +204,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
               disabled={busyId === req.request_id}
               onClick={() => submitReject(req.request_id)}
               className="rounded-[10px] px-3 py-1.5 text-xs font-bold"
-              style={{ background: LEGACY_COLORS.red, color: "white" }}
+              style={{ background: LEGACY_COLORS.redSolid, color: "white" }}
             >
               {busyId === req.request_id ? "처리 중..." : "반려 확정"}
             </button>
@@ -228,7 +228,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
               setApprovePin("");
             }}
             className="rounded-[10px] px-3 py-1.5 text-xs font-bold"
-            style={{ background: LEGACY_COLORS.green, color: "white" }}
+            style={{ background: LEGACY_COLORS.greenSolid, color: "white" }}
           >
             승인
           </button>

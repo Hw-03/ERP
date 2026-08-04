@@ -88,7 +88,7 @@ export function MobileHistoryList({
               aria-pressed={active}
               className="w-full min-h-[60px] rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
               style={{
-                background: active ? "rgba(101,169,255,.12)" : rowTint(log.transaction_type),
+                background: active ? "color-mix(in srgb, var(--c-blue) 12%, transparent)" : rowTint(log.transaction_type),
                 borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
               }}
             >
@@ -142,7 +142,7 @@ export function MobileHistoryList({
               aria-pressed={active}
               className="w-full min-h-[60px] rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
               style={{
-                background: active ? "rgba(101,169,255,.12)" : rowTint(parent.transaction_type),
+                background: active ? "color-mix(in srgb, var(--c-blue) 12%, transparent)" : rowTint(parent.transaction_type),
                 borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
               }}
             >
@@ -190,7 +190,7 @@ export function MobileHistoryList({
             aria-pressed={active}
             className="w-full min-h-[60px] rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
             style={{
-              background: active ? "rgba(101,169,255,.12)" : rowTint(first.transaction_type),
+              background: active ? "color-mix(in srgb, var(--c-blue) 12%, transparent)" : rowTint(first.transaction_type),
               borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
             }}
           >

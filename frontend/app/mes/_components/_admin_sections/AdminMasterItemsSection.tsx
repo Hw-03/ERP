@@ -350,7 +350,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                       void deleteItem(selectedItem.item_id);
                     }}
                     className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
-                    style={{ background: LEGACY_COLORS.red }}
+                    style={{ background: LEGACY_COLORS.redSolid }}
                   >
                     삭제 확인
                   </button>
@@ -386,7 +386,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   type="button"
                   onClick={() => void restoreItem(selectedItem.item_id)}
                   className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.green }}
+                  style={{ background: LEGACY_COLORS.greenSolid }}
                 >
                   복구
                 </button>
@@ -395,7 +395,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   type="button"
                   onClick={() => void saveItem()}
                   className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.blue }}
+                  style={{ background: LEGACY_COLORS.blueSolid }}
                 >
                   <Save className="h-3.5 w-3.5" />
                   저장

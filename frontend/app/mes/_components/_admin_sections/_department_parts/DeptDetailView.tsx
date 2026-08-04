@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, Palette, Trash2 } from "lucide-react";
 import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { departmentDisplayColor } from "@/lib/mes-department";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -103,6 +104,7 @@ export function DeptDetailView({
 
   const isValidHex = /^#[0-9a-fA-F]{6}$/.test(editForm.color_hex);
   const previewColor = isValidHex ? editForm.color_hex : savedColor;
+  const displayedPreviewColor = departmentDisplayColor(previewColor);
   const colorChanged = isValidHex && previewColor.toLowerCase() !== savedColor.toLowerCase();
 
   return (
@@ -185,6 +187,17 @@ export function DeptDetailView({
                   {colorInputError}
                 </span>
               )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                다크 모드 표시
+              </span>
+              <div
+                data-testid="department-dark-color-preview"
+                className="h-5 w-5 rounded-full border"
+                style={{ background: displayedPreviewColor, borderColor: LEGACY_COLORS.border }}
+                title="다크 모드 표시 미리보기"
+              />
             </div>
           </div>
           <div>

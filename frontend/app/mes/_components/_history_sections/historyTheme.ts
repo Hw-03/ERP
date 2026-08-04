@@ -9,17 +9,17 @@ export function rowTint(type: string): string {
   switch (type) {
     case "RECEIVE":
     case "PRODUCE":
-      return "rgba(67,211,157,.05)";
+      return "color-mix(in srgb, var(--c-green) 5%, transparent)";
     case "SHIP":
     case "BACKFLUSH":
     case "INTERNAL_USE":
-      return "rgba(255,123,123,.05)";
+      return "color-mix(in srgb, var(--c-red) 5%, transparent)";
     case "ADJUST":
-      return "rgba(101,169,255,.05)";
+      return "color-mix(in srgb, var(--c-blue) 5%, transparent)";
     case "TRANSFER_TO_PROD":
     case "TRANSFER_TO_WH":
     case "TRANSFER_DEPT":
-      return "rgba(78,201,245,.05)";
+      return "color-mix(in srgb, var(--c-cyan) 5%, transparent)";
     default:
       return "transparent";
   }

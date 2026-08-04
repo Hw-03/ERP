@@ -164,7 +164,7 @@ export function AdminAuditCsvSection() {
                         onClick={() => void handleDownload(file.month, "xlsx", `inout_${file.month}.xlsx`)}
                         disabled={downloading.has(`${file.month}:xlsx`)}
                         className="min-h-11"
-                        style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
+                        style={{ background: LEGACY_COLORS.greenSolid, color: LEGACY_COLORS.white }}
                       >
                         엑셀
                       </Button>

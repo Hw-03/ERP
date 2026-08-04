@@ -163,7 +163,7 @@ function LoginNotificationDialog({
           <button
             type="button"
             className="no-btn-inset rounded-[14px] px-3 py-2.5 text-sm font-black text-white"
-            style={{ background: LEGACY_COLORS.blue }}
+            style={{ background: LEGACY_COLORS.blueSolid }}
             onClick={onOpenPanel}
           >
             알림 보기
@@ -281,7 +281,7 @@ export function NotificationBell({
           <span
             key={unread}
             className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none text-white"
-            style={{ background: LEGACY_COLORS.red }}
+            style={{ background: LEGACY_COLORS.redSolid }}
           >
             {unread > 99 ? "99+" : unread}
           </span>

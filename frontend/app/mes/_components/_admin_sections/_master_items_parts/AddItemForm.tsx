@@ -46,7 +46,7 @@ export function AddItemForm() {
       <button
         onClick={onAddItem}
         className="w-full rounded-[18px] py-3 text-base font-bold text-white"
-        style={{ background: LEGACY_COLORS.green }}
+        style={{ background: LEGACY_COLORS.greenSolid }}
       >
         추가
       </button>

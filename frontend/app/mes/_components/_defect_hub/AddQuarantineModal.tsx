@@ -415,7 +415,7 @@ export function AddQuarantineModal({
             onClick={() => void handleSubmit()}
             disabled={!canSubmit}
             className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-            style={{ background: LEGACY_COLORS.red }}
+            style={{ background: LEGACY_COLORS.redSolid }}
           >
             {busy ? "처리 중..." : "격리하기 →"}
           </button>

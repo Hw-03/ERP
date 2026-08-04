@@ -180,7 +180,7 @@ export function FloorStage({
                       height: 16,
                       padding: "0 3px",
                       borderRadius: 9999,
-                      background: LEGACY_COLORS.blue,
+                      background: LEGACY_COLORS.blueSolid,
                       color: "#fff",
                       fontSize: 9,
                       fontWeight: 700,

@@ -264,7 +264,7 @@ export function BomWorkbench({
               className="h-11 min-w-[82px] rounded-full"
               style={
                 mode === "edit"
-                  ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                  ? { background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white, borderColor: "transparent" }
                   : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
               }
             >
@@ -278,7 +278,7 @@ export function BomWorkbench({
               className="h-11 min-w-[82px] rounded-full"
               style={
                 mode === "whereused"
-                  ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                  ? { background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white, borderColor: "transparent" }
                   : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
               }
             >

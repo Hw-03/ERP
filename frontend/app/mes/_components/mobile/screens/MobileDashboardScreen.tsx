@@ -267,7 +267,7 @@ export function MobileDashboardScreen({
                 {activeFilterCount > 0 && (
                   <span
                     className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
-                    style={{ background: LEGACY_COLORS.red, color: LEGACY_COLORS.white }}
+                    style={{ background: LEGACY_COLORS.redSolid, color: LEGACY_COLORS.white }}
                   >
                     {activeFilterCount}
                   </span>

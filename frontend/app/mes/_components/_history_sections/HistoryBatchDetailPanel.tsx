@@ -520,7 +520,7 @@ function BundleBlock({
         className="flex items-center gap-2 px-3 py-2"
         style={{
           background: framed
-            ? "rgba(101,169,255,.05)"
+            ? "color-mix(in srgb, var(--c-blue) 5%, transparent)"
             : `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, transparent)`,
         }}
       >

@@ -161,7 +161,7 @@ export function DesktopWarehouseMapTab({
                 onClick={() => void confirmPin()}
                 disabled={verifying || !pin}
                 className="rounded-[12px] px-3 py-2 text-[13px] font-bold text-white transition-colors disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.blue }}
+                style={{ background: LEGACY_COLORS.blueSolid }}
               >
                 {verifying ? "확인 중…" : "편집 시작"}
               </button>
@@ -179,7 +179,7 @@ export function DesktopWarehouseMapTab({
                 setPinError(null);
               }}
               className="flex items-center gap-1.5 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-[1.04]"
-              style={{ background: LEGACY_COLORS.blue }}
+              style={{ background: LEGACY_COLORS.blueSolid }}
             >
               <Pencil className="h-4 w-4" />
               편집 모드
@@ -210,7 +210,7 @@ export function DesktopWarehouseMapTab({
                   className="rounded-[10px] px-3 py-1.5 text-[13px] font-bold transition-colors"
                   style={
                     editorTab === t.id
-                      ? { background: LEGACY_COLORS.blue, color: "#fff" }
+                      ? { background: LEGACY_COLORS.blueSolid, color: "#fff" }
                       : { background: "transparent", color: LEGACY_COLORS.muted2 }
                   }
                 >

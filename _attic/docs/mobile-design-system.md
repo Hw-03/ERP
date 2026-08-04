@@ -17,8 +17,9 @@
 | `border`·`borderStrong` | 약/강 테두리 | 〃 | divider·강조 |
 | `text` | 본문 텍스트 | 본문 텍스트 | 항상 최대 대비 |
 | `muted`·`muted2` | 보조 텍스트 2단계 | 〃 | 메타·라벨 |
-| `blue`·`green`·`red`·`yellow`·`purple`·`cyan` | 의미 색 6종 | 〃 | 강조·상태 |
-| `successBg`·`errorBg`·`warningBg` | `#e6f7f2`·`#fdeaea`·`#fef6e4` | `#0a2420`·`#2b0d0d`·`#261d00` | 메시지 박스 배경 (4.5:1 보장) |
+| `blue`·`green`·`red`·`yellow`·`purple`·`cyan` | 의미 전경색 6종 | 저채도 의미 전경색 6종 | 텍스트·아이콘·점·차트·얇은 표시 |
+| `blueSolid`·`greenSolid`·`redSolid`·`yellowSolid`·`purpleSolid`·`cyanSolid` | 같은 계열 원색 | 어두운 채움색 6종 | 흰 글자가 있는 버튼·선택 상태·배지의 불투명 채움 |
+| `successBg`·`errorBg`·`warningBg` | `#e6f7f2`·`#fdeaea`·`#fef6e4` | `#16261f`·`#2b171a`·`#292519` | 메시지 박스 배경 (4.5:1 보장) |
 | `panelGlow` | radial gradient | radial gradient | 카드 우상단 하이라이트 |
 | `white` | 항상 #ffffff | 항상 #ffffff | 강조 텍스트·배지 |
 
@@ -27,13 +28,19 @@
 - **인라인 색상 금지** — `style={{ background: '#xxx' }}` 직접 작성 X. 항상 `LEGACY_COLORS.xxx` 또는 CSS 변수 `var(--c-xxx)`.
   - ⚠️ **현실 괴리**: 레거시·일부 의도적 rgba 오버레이/딤에 인라인 색이 다수 남아 있다. **신규 코드는 토큰만** 쓰고, 레거시는 인접 작업 시에만 점진 정리한다(일괄 변경 금지). 위반 건수는 변동값이라 박지 않는다 — 필요하면 직접 grep.
 - **새 색 추가 절차**: 1) color.ts 에 키 추가 → 2) globals.css 라이트·다크 두 블록 모두에 변수 정의 → 3) WCAG AA 4.5:1 대비 수계산 또는 [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/) 확인 → 4) 본 문서 표 갱신
-- **합성 색 (color-mix) 지양** — 부모 배경에 따라 대비가 달라짐. 메시지 배경처럼 가독성이 중요하면 불투명 토큰 추가.
+- **전경과 채움을 분리** — `blue` 등 전경 토큰은 텍스트·아이콘·점·차트에, `blueSolid` 등 채움 토큰은 `text-white`가 있는 불투명 버튼·선택 상태에만 쓴다. 채움에 전경 토큰을 재사용하지 않는다.
+- **합성 색 (color-mix)은 저강도 tint에만** — 행 hover·선택 배경처럼 장식적인 tint는 의미색 10~12% 이하로 제한한다. 메시지 배경·버튼 채움처럼 가독성이 중요한 곳은 불투명 토큰을 쓴다.
 
 #### 부서·옵션 색
 
 별도 enum:
 - `MES_DEPARTMENT_COLORS` — 부서별 고정 색 (튜브·고압·진공·튜닝·조립·출하·고품질·연구 등)
 - `OPTION_COLOR` — BG/WM/SV 의 옵션 색 (#60a5fa·#f97316·#a3a3a3)
+
+부서색은 저장값과 표시값을 분리한다.
+- DB `departments.color_hex`와 관리자 색상 입력값은 원본 hex를 그대로 저장·유지한다.
+- 목록·선택 UI는 `departmentDisplayColor()`를 거쳐 표시한다. 라이트 모드는 원본 100%, 다크 모드는 원본 55%와 중성 `#adb7c3` 45%를 혼합해 색 계열을 선명하게 유지한 표시색을 쓴다.
+- 관리자 화면에는 원본 색상과 함께 다크 모드 표시 미리보기를 제공한다. 이 변환은 화면 표시용이므로 API·DB 값은 바꾸지 않는다.
 
 ### 1.2 타이포 (`TYPO`)
 
@@ -139,6 +146,7 @@
 
 ## 4. 변경 이력
 
+- **2026-08-04**: 다크 모드 기업형 팔레트 적용 — 중성 차콜 surface·저채도 의미 전경색·`*Solid` 채움 역할을 분리하고, glow 제거 및 부서색 다크 표시 변환 규칙을 추가.
 - **2026-06-05**: Pretendard `next/font/local` self-host 실로딩 전환 반영(이전엔 선언만·미로드). 카탈로그 개수 하드코딩 제거(폴더 기준 안내로 전환), 인라인색·`text-[10/11px]` 규칙에 현실 괴리 주석, TYPO 모바일 전용 범위 명시.
 - **2026-05-27 W3**: `successBg`·`errorBg`·`warningBg` 토큰 신설 — 메시지 박스 가독성
 - **2026-05-27 W6**: globals.css 에 iOS 자동 줌 방지 미디어 쿼리 — `input/textarea/select` 16px 강제

@@ -8,11 +8,13 @@ export function FilterPills({
   value,
   onChange,
   activeColor = LEGACY_COLORS.blue,
+  activeFillColor = LEGACY_COLORS.blueSolid,
 }: {
   options: { label: string; value: string }[];
   value: string;
   onChange: (v: string) => void;
   activeColor?: string;
+  activeFillColor?: string;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -31,8 +33,8 @@ export function FilterPills({
             style={
               active
                 ? {
-                    background: activeColor,
-                    borderColor: activeColor,
+                    background: activeFillColor,
+                    borderColor: activeFillColor,
                     color: LEGACY_COLORS.white,
                   }
                 : isHovered

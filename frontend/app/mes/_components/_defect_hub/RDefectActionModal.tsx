@@ -201,7 +201,7 @@ export function RDefectActionModal({
                   {act !== "unquarantine" && (
                     <span
                       className="ml-2 rounded-full px-2 py-0.5 text-xs font-black"
-                      style={{ background: LEGACY_COLORS.red, color: LEGACY_COLORS.white }}
+                      style={{ background: LEGACY_COLORS.redSolid, color: LEGACY_COLORS.white }}
                     >
                       즉시 처리
                     </span>
@@ -249,7 +249,7 @@ export function RDefectActionModal({
             onClick={() => void handleSubmit()}
             disabled={!canSubmit}
             className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-            style={{ background: LEGACY_COLORS.red }}
+            style={{ background: LEGACY_COLORS.redSolid }}
           >
             {busy ? "처리 중..." : "확인 →"}
           </button>

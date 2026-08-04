@@ -231,7 +231,7 @@ export function HistoryCalendarStrip({
                   onClick={() => setSelectedDay(selectedDay === key ? null : key)}
                   className="flex min-h-[92px] flex-col items-center rounded-[14px] border p-1.5 transition-colors hover:brightness-110 lg:min-h-[132px]"
                   style={{
-                    background: isSelected ? "rgba(101,169,255,.18)" : isToday ? "rgba(101,169,255,.08)" : LEGACY_COLORS.s2,
+                    background: isSelected ? "color-mix(in srgb, var(--c-blue) 18%, transparent)" : isToday ? "color-mix(in srgb, var(--c-blue) 8%, transparent)" : LEGACY_COLORS.s2,
                     borderColor: isSelected
                       ? LEGACY_COLORS.blue
                       : isToday
@@ -245,7 +245,7 @@ export function HistoryCalendarStrip({
                   {dayLogs.length > 0 && (
                     <span
                       className="mt-1 rounded-full px-1.5 py-0.5 text-xs font-bold"
-                      style={{ background: "rgba(101,169,255,.2)", color: LEGACY_COLORS.blue }}
+                      style={{ background: "color-mix(in srgb, var(--c-blue) 20%, transparent)", color: LEGACY_COLORS.blue }}
                     >
                       총 {dayLogs.length}건
                     </span>

@@ -162,7 +162,7 @@ export function InventoryTableStickyHeader({
       className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 rounded-t-[28px]"
       style={{
         background: LEGACY_COLORS.bg,
-        backgroundImage: "linear-gradient(rgba(101, 169, 255, 0.08), rgba(101, 169, 255, 0.08))",
+        backgroundImage: "linear-gradient(color-mix(in srgb, var(--c-blue) 8%, transparent), color-mix(in srgb, var(--c-blue) 8%, transparent))",
       }}
     >
       <div className="flex flex-wrap items-center gap-2.5 px-5 pb-3 pt-5">

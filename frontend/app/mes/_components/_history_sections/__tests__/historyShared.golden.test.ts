@@ -881,35 +881,35 @@ describe("isReworkOperation", () => {
 // ──────────────────────────────────────────────────────────────────
 describe("rowTint", () => {
   it("RECEIVE → 초록 tint", () => {
-    expect(rowTint("RECEIVE")).toBe("rgba(67,211,157,.05)");
+    expect(rowTint("RECEIVE")).toBe("color-mix(in srgb, var(--c-green) 5%, transparent)");
   });
 
   it("PRODUCE → 초록 tint", () => {
-    expect(rowTint("PRODUCE")).toBe("rgba(67,211,157,.05)");
+    expect(rowTint("PRODUCE")).toBe("color-mix(in srgb, var(--c-green) 5%, transparent)");
   });
 
   it("SHIP → 빨강 tint", () => {
-    expect(rowTint("SHIP")).toBe("rgba(255,123,123,.05)");
+    expect(rowTint("SHIP")).toBe("color-mix(in srgb, var(--c-red) 5%, transparent)");
   });
 
   it("BACKFLUSH → 빨강 tint", () => {
-    expect(rowTint("BACKFLUSH")).toBe("rgba(255,123,123,.05)");
+    expect(rowTint("BACKFLUSH")).toBe("color-mix(in srgb, var(--c-red) 5%, transparent)");
   });
 
   it("ADJUST → 파랑 tint", () => {
-    expect(rowTint("ADJUST")).toBe("rgba(101,169,255,.05)");
+    expect(rowTint("ADJUST")).toBe("color-mix(in srgb, var(--c-blue) 5%, transparent)");
   });
 
   it("TRANSFER_TO_PROD → 하늘 tint", () => {
-    expect(rowTint("TRANSFER_TO_PROD")).toBe("rgba(78,201,245,.05)");
+    expect(rowTint("TRANSFER_TO_PROD")).toBe("color-mix(in srgb, var(--c-cyan) 5%, transparent)");
   });
 
   it("TRANSFER_TO_WH → 하늘 tint", () => {
-    expect(rowTint("TRANSFER_TO_WH")).toBe("rgba(78,201,245,.05)");
+    expect(rowTint("TRANSFER_TO_WH")).toBe("color-mix(in srgb, var(--c-cyan) 5%, transparent)");
   });
 
   it("TRANSFER_DEPT → 하늘 tint", () => {
-    expect(rowTint("TRANSFER_DEPT")).toBe("rgba(78,201,245,.05)");
+    expect(rowTint("TRANSFER_DEPT")).toBe("color-mix(in srgb, var(--c-cyan) 5%, transparent)");
   });
 
   it("알 수 없는 타입 → transparent", () => {

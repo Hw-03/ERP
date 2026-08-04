@@ -253,7 +253,7 @@ export function DefectItemPicker({
               onClick={() => void handleSaveOrder()}
               disabled={putMyOrder.isPending}
               className="flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[12px] font-black text-white transition-colors hover:brightness-110 disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.red }}
+              style={{ background: LEGACY_COLORS.redSolid }}
             >
               <Save className="h-3 w-3" />
               저장

@@ -7,6 +7,7 @@ import {
   DEPARTMENT_LABELS,
   DEPARTMENT_ICONS,
   normalizeDepartment,
+  departmentDisplayColor,
 } from "../mes-department";
 
 describe("normalizeDepartmentName", () => {
@@ -71,6 +72,20 @@ describe("MES_DEPARTMENT_COLORS", () => {
     for (const key of expected) {
       expect(MES_DEPARTMENT_COLORS[key]).toMatch(/^#[0-9a-fA-F]{6}$/);
     }
+  });
+});
+
+describe("departmentDisplayColor", () => {
+  it("원본 부서색을 테마 의존 표시색으로 변환한다", () => {
+    expect(departmentDisplayColor("#3b82f6")).toBe(
+      "color-mix(in srgb, #3b82f6 var(--c-department-color-source-weight), var(--c-department-color-neutral))",
+    );
+  });
+
+  it("저장된 사용자 지정 색도 같은 표시 규칙을 사용한다", () => {
+    expect(departmentDisplayColor("#000000")).toBe(
+      "color-mix(in srgb, #000000 var(--c-department-color-source-weight), var(--c-department-color-neutral))",
+    );
   });
 });
 

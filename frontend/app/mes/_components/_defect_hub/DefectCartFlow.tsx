@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Building2, ChevronRight, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
-import { LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
+import { departmentDisplayColor, LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
@@ -383,7 +383,7 @@ export function DefectCartFlow({
                 <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3">
                   {PRODUCTION_LINES.map((d) => {
                     const active = dept === d;
-                    const deptColor = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2;
+                    const deptColor = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2);
                     return (
                       <button key={d} type="button" onClick={() => setDept(d)} className="h-full rounded-[18px] border text-3xl font-black transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: active ? tint(deptColor, 14) : LEGACY_COLORS.s2, borderColor: active ? deptColor : LEGACY_COLORS.border, borderWidth: active ? 2 : 1, color: active ? deptColor : LEGACY_COLORS.muted2 }}>
                         {d}
@@ -395,7 +395,7 @@ export function DefectCartFlow({
             </div>
           </div>
           <div className="flex shrink-0 justify-end">
-            <button type="button" onClick={() => pushStep(2)} className="flex items-center gap-1 rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]" style={{ background: LEGACY_COLORS.red }}>
+            <button type="button" onClick={() => pushStep(2)} className="flex items-center gap-1 rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]" style={{ background: LEGACY_COLORS.redSolid }}>
               다음 →
             </button>
           </div>
@@ -480,11 +480,11 @@ export function DefectCartFlow({
               </span>
             )}
             {isRework ? (
-              <button type="button" onClick={() => pushStep(3)} disabled={!reworkLineReady || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.red }}>
+              <button type="button" onClick={() => pushStep(3)} disabled={!reworkLineReady || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
                 BOM 확인 →
               </button>
             ) : (
-              <button type="button" onClick={() => setConfirmOpen(true)} disabled={!allValid || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.red }}>
+              <button type="button" onClick={() => setConfirmOpen(true)} disabled={!allValid || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
                 {busy ? "처리 중..." : `${submitLabel} (${lines.length}건) →`}
               </button>
             )}
@@ -531,7 +531,7 @@ export function DefectCartFlow({
             <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               격리·폐기를 입력하면 정상 수량이 자동으로 줄어듭니다.
             </span>
-            <button type="button" onClick={() => setConfirmOpen(true)} disabled={!allValid || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.red }}>
+            <button type="button" onClick={() => setConfirmOpen(true)} disabled={!allValid || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
               {busy ? "처리 중..." : `${submitLabel} (${lines.length}건) →`}
             </button>
           </div>

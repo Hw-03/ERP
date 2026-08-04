@@ -616,7 +616,7 @@ export function ChevronToggleBtn({
         onToggle();
       }}
       className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] hover:brightness-125"
-      style={{ background: "rgba(101,169,255,.10)" }}
+      style={{ background: "color-mix(in srgb, var(--c-blue) 10%, transparent)" }}
     >
       {expanded
         ? <ChevronDown className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.blue }} />

@@ -260,7 +260,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                         disabled={busy}
                         onClick={() => void commit(c)}
                         className="rounded-md px-3 py-1 text-xs font-bold transition-colors hover:brightness-110 disabled:opacity-60"
-                        style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
+                        style={{ background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white }}
                       >
                         {busy ? "추가 중…" : "추가 (Enter)"}
                       </button>
