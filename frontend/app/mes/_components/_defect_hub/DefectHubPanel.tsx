@@ -20,6 +20,7 @@ import type { DefectCartMode } from "./DefectCartFlow";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { tint } from "@/lib/mes/colorUtils";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -45,6 +46,7 @@ export function DefectHubPanel({
   productModels = [],
   defaultSource,
 }: Props) {
+  const realtimeRevision = useRealtimeRevision();
   const [kpi, setKpi] = useState<DefectKpi>(DEFAULT_KPI);
   const [locations, setLocations] = useState<DefectLocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +66,22 @@ export function DefectHubPanel({
   const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
   const [cartMode, setCartMode] = useState<DefectCartMode>("add");
   const [reloadNonce, setReloadNonce] = useState(0);
+
+  const activeProcessingLocation = useMemo(() => {
+    if (!processingLocation) return null;
+    return locations.find(
+      (location) =>
+        location.item_id === processingLocation.item_id &&
+        location.department === processingLocation.department &&
+        Number(location.quantity) > 0,
+    ) ?? null;
+  }, [locations, processingLocation]);
+
+  useEffect(() => {
+    if (view !== "process" || !processingLocation || loading || activeProcessingLocation) return;
+    setProcessingLocation(null);
+    setView("list");
+  }, [view, processingLocation, loading, activeProcessingLocation]);
 
   // 마운트 시 KPI + 목록 동시 로드 (처리 완료 후 reloadNonce 증가 시 재로드)
   useEffect(() => {
@@ -92,7 +110,7 @@ export function DefectHubPanel({
 
     void load();
     return () => { cancelled = true; };
-  }, [reloadNonce]);
+  }, [reloadNonce, realtimeRevision]);
 
   // scope/defectDeptFilter 에 따른 목록 필터
   const filteredLocations = useMemo(() => {
@@ -180,10 +198,10 @@ export function DefectHubPanel({
   }
 
   // 처리 화면 — 데스크톱 DefectProcessPanel 과 동일 동작의 모바일 통합 패널(전폭).
-  if (view === "process" && processingLocation) {
+  if (view === "process" && activeProcessingLocation) {
     return (
       <MobileDefectProcessPanel
-        location={processingLocation}
+        location={activeProcessingLocation}
         currentEmployee={currentEmployee}
         onDone={handleProcessDone}
         onCancel={handleProcessCancel}

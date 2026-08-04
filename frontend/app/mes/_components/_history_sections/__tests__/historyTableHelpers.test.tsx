@@ -1,6 +1,8 @@
-﻿import { fireEvent, render, screen } from "@testing-library/react";
-import { within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+﻿import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode, useEffect, useLayoutEffect, useState } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ioApi } from "@/lib/api/io";
+import type { IoBatch } from "@/lib/api/types/io";
 import type { TransactionLog } from "@/lib/api/types/production";
 import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor } from "@/lib/mes-status";
@@ -19,6 +21,16 @@ import {
   buildGroups,
   toHistoryLogGroups,
 } from "../historyTableHelpers";
+
+vi.mock("@/lib/api/io", () => ({
+  ioApi: {
+    getBatch: vi.fn(),
+  },
+}));
+
+beforeEach(() => {
+  vi.mocked(ioApi.getBatch).mockReset();
+});
 
 function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   return {
@@ -95,6 +107,285 @@ describe("toHistoryLogGroups", () => {
 });
 
 describe("HistoryTable server groups", () => {
+  it("invalidates the prior request during a revision render before passive cache reset", async () => {
+    const batchId = "batch-revision-race";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Revision",
+      to_department: "Stale Revision",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Revision",
+      to_department: "Fresh Revision",
+    };
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveStale = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+
+    function RevisionHarness({ cacheEpoch }: { cacheEpoch: number }) {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(new Map());
+      useLayoutEffect(() => {
+        if (cacheEpoch === 2) resolveStale(staleBatch);
+      }, [cacheEpoch]);
+      return (
+        <>
+          <span data-testid="revision-race-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            cacheEpoch={cacheEpoch}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<RevisionHarness cacheEpoch={1} />);
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+
+    rerender(<RevisionHarness cacheEpoch={2} />);
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("revision-race-cache")).toHaveTextContent("empty");
+    expect(screen.getAllByLabelText("작업 정보 확인 중").length).toBeGreaterThan(0);
+
+    await act(async () => resolveFresh(freshBatch));
+    await waitFor(() => expect(screen.getByTestId("revision-race-cache")).toHaveTextContent("Fresh Revision"));
+  });
+
+  it("requeues an aborted StrictMode setup request and applies only the fresh batch", async () => {
+    const batchId = "batch-strict-mode";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Setup",
+      to_department: "Stale Setup",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Setup",
+      to_department: "Fresh Setup",
+    };
+    let firstSignal: AbortSignal | undefined;
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce((_batchId, options) => {
+        firstSignal = options?.signal;
+        return new Promise<IoBatch>((resolve) => {
+          resolveStale = resolve;
+        });
+      })
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+
+    function StrictModeHarness() {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(new Map());
+      return (
+        <>
+          <span data-testid="strict-mode-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            cacheEpoch={1}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    render(
+      <StrictMode>
+        <StrictModeHarness />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(firstSignal?.aborted).toBe(true));
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+
+    await act(async () => resolveStale(staleBatch));
+    expect(screen.getByTestId("strict-mode-cache")).toHaveTextContent("empty");
+
+    await act(async () => resolveFresh(freshBatch));
+    await waitFor(() => expect(screen.getByTestId("strict-mode-cache")).toHaveTextContent("Fresh Setup"));
+  });
+
+  it("discards an in-flight batch from the prior cache epoch and starts a fresh request after clear", async () => {
+    const batchId = "batch-in-flight";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Epoch",
+      to_department: "Stale Epoch",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Epoch",
+      to_department: "Fresh Epoch",
+    };
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveStale = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+
+    function InFlightCacheHarness({ clearNonce }: { clearNonce: number }) {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(new Map());
+      useEffect(() => {
+        if (clearNonce > 0) setCache(new Map());
+      }, [clearNonce]);
+      return (
+        <>
+          <span data-testid="in-flight-batch-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<InFlightCacheHarness clearNonce={0} />);
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("in-flight-batch-cache")).toHaveTextContent("empty");
+
+    rerender(<InFlightCacheHarness clearNonce={1} />);
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+    await act(async () => resolveStale(staleBatch));
+    expect(screen.getByTestId("in-flight-batch-cache")).toHaveTextContent("empty");
+    expect(screen.getAllByLabelText("작업 정보 확인 중").length).toBeGreaterThan(0);
+
+    await act(async () => resolveFresh(freshBatch));
+    await waitFor(() => expect(screen.getByTestId("in-flight-batch-cache")).toHaveTextContent("Fresh Epoch"));
+    expect(screen.queryByLabelText("작업 정보 확인 중")).not.toBeInTheDocument();
+  });
+
+  it("requeues a visible batch after its shared cache is cleared and repopulates the cache", async () => {
+    const batchId = "batch-realtime";
+    const staleBatch = {
+      batch_id: batchId,
+      work_type: "process",
+      sub_type: "produce",
+      status: "completed",
+      bundles: [],
+      from_department: "Stale Cache",
+      to_department: "Stale Cache",
+    } as IoBatch;
+    const freshBatch = {
+      ...staleBatch,
+      from_department: "Fresh Cache",
+      to_department: "Fresh Cache",
+    };
+    const groups = [{
+      type: "op_batch" as const,
+      key: batchId,
+      batchId,
+      logs: [makeLog({ operation_batch_id: batchId })],
+    }];
+    vi.mocked(ioApi.getBatch).mockResolvedValue(freshBatch);
+
+    function CacheHarness({ clearNonce }: { clearNonce: number }) {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(
+        () => new Map([[batchId, staleBatch]]),
+      );
+      useEffect(() => {
+        if (clearNonce > 0) setCache(new Map());
+      }, [clearNonce]);
+      return (
+        <>
+          <span data-testid="table-batch-cache">{cache.get(batchId)?.from_department ?? "empty"}</span>
+          <HistoryTable
+            loading={false}
+            displayGroups={groups}
+            selection={null}
+            onSelectLog={() => {}}
+            onSelectBatch={() => {}}
+            batchCache={cache}
+            setBatchCache={setCache}
+            canLoadMore={false}
+            loadingMore={false}
+            onLoadMore={() => {}}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<CacheHarness clearNonce={0} />);
+    expect(screen.getByTestId("table-batch-cache")).toHaveTextContent("Stale Cache");
+    expect(ioApi.getBatch).not.toHaveBeenCalled();
+
+    rerender(<CacheHarness clearNonce={1} />);
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledWith(
+      batchId,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ));
+    await waitFor(() => expect(screen.getByTestId("table-batch-cache")).toHaveTextContent("Fresh Cache"));
+  });
+
   it("클라이언트 원본 로그를 다시 묶지 않고 서버가 준 대표 묶음을 렌더링한다", () => {
     const first = makeLog({ log_id: "server-group-first", reference_no: "SERVER-REF" });
     const second = makeLog({ log_id: "server-group-second", reference_no: "SERVER-REF" });

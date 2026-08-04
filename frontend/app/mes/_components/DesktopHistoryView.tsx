@@ -17,6 +17,7 @@ import { useToggleSet } from "./_hooks/useToggleSet";
 import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery, useTransactionsSummaryQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
 import { type HistorySelection } from "./_history_sections/historyConstants";
 import { DATE_OPTIONS, dateFilterToFrom } from "./_history_sections/historyQuery";
@@ -32,6 +33,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 
 export function DesktopHistoryView() {
   const queryClient = useQueryClient();
+  const realtimeRevision = useRealtimeRevision();
   // 3차: 상단 KPI 박스는 표시 전용(클릭 필터 폐기). 필터는 "필터" 패널 단일.
   // scope/typeFilter/activeBucket·부서 전개 상태 없음 — 항상 "전체"로 시작.
   // 대시보드식 독립 필터 패널 (부서·모델·거래종류 다중 선택).
@@ -140,6 +142,7 @@ export function DesktopHistoryView() {
     selectedDateKey: selectedDay,
     department: deptParam,
     model: modelParam,
+    realtimeRevision,
   });
   const {
     groups: serverGroups,
@@ -171,6 +174,7 @@ export function DesktopHistoryView() {
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
     const ctrl = new AbortController();
+    let active = true;
     void api
       .getTransactions(
         {
@@ -182,14 +186,22 @@ export function DesktopHistoryView() {
         { signal: ctrl.signal },
       )
       .then((data) => {
+        if (!active) return;
         setCalendarLogs(data);
         setCalendarLoading(false);
       })
       .catch((err) => {
-        if ((err as Error)?.name !== "AbortError") setCalendarLoading(false);
+        if (active && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
       });
-    return () => ctrl.abort();
-  }, [calendarOpen, calendarYear, calendarMonth]);
+    return () => {
+      active = false;
+      ctrl.abort();
+    };
+  }, [calendarOpen, calendarYear, calendarMonth, realtimeRevision]);
+
+  useEffect(() => {
+    if (realtimeRevision !== null) setBatchCache(new Map());
+  }, [realtimeRevision, setBatchCache]);
 
   function prevMonth() {
     if (calendarMonth === 0) {
@@ -554,6 +566,7 @@ export function DesktopHistoryView() {
             onSelectBatch={handleSelectBatch}
             batchCache={batchCache}
             setBatchCache={setBatchCache}
+            cacheEpoch={realtimeRevision}
             canLoadMore={canLoadMore}
             loadingMore={loadingMore}
             loadMoreError={loadMoreError}

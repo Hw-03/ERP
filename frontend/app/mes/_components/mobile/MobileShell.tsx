@@ -40,6 +40,7 @@ import { MobileDirtyLeaveSheet } from "./warehouse/MobileDirtyLeaveSheet";
 import type { MobileMoreEntryId } from "./screens/MobileMoreScreen";
 import { isSidebarTabVisible } from "../tabAccess";
 import { MobileViewportFrame } from "./MobileViewportFrame";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
 export type MobileTabId =
@@ -143,6 +144,7 @@ function NavButton({
 }
 
 export function MobileShell() {
+  const revision = useRealtimeRevision();
   const operator = useCurrentOperator();
   const employeeId = operator?.employee_id;
   const { data: notificationsData } = useNotificationsQuery(employeeId);
@@ -166,6 +168,7 @@ export function MobileShell() {
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
+  const capacityRequestRef = useRef(0);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
   // 항목 16 — 입출고 작성 중(담은 묶음 있음) 하단 네비로 이탈 시 확인 시트.
@@ -251,12 +254,26 @@ export function MobileShell() {
   }, [canOpenMobileTab, commitMobileTab]);
 
   const loadCapacity = useCallback(() => {
-    void api.getProductionCapacity().then(setCapacityData).catch(() => {});
+    const requestId = ++capacityRequestRef.current;
+    void api
+      .getProductionCapacity()
+      .then((nextCapacity) => {
+        if (requestId === capacityRequestRef.current) setCapacityData(nextCapacity);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     loadCapacity();
+    return () => {
+      capacityRequestRef.current += 1;
+    };
   }, [loadCapacity]);
+
+  useEffect(() => {
+    if (revision === null) return;
+    loadCapacity();
+  }, [loadCapacity, revision]);
 
   useEffect(() => {
     function handleFocus() {

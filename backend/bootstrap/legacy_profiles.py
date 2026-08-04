@@ -11,7 +11,7 @@ from sqlalchemy.engine import Connection
 
 
 ALEMBIC_INFRASTRUCTURE_TABLES: frozenset[str] = frozenset(
-    {"alembic_version", "alembic_schema_state"}
+    {"alembic_version", "alembic_schema_state", "data_revision"}
 )
 
 

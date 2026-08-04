@@ -11,6 +11,7 @@ import { WarehouseJariPanel } from "../../_warehouse_map_sections/WarehouseJariP
 import { InlineSearch } from "../primitives";
 import { TYPO } from "../tokens";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 interface CellHit {
   angleId: number;
@@ -76,6 +77,7 @@ export function MobileWarehouseMapScreen({
   /** 평면도에서 뒤로/닫기 시 지도 탭에서 나간다(더보기로 복귀). */
   onExit: () => void;
 }) {
+  const revision = useRealtimeRevision();
   const [map, setMap] = useState<WarehouseMap | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +111,7 @@ export function MobileWarehouseMapScreen({
     return () => {
       cancelled = true;
     };
-  }, [reloadNonce, onStatusChange]);
+  }, [reloadNonce, onStatusChange, revision]);
 
   const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
   const angles = useMemo(

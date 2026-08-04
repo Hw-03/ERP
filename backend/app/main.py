@@ -54,14 +54,17 @@ from app.routers import (
     models as models_router,
     notifications,
     production,
+    realtime,
     settings,
     shipping,
     stock_requests,
     warehouse_map,
 )
 from app.services import audit_csv as audit_csv_svc
+from app.services import realtime as realtime_svc
 
 audit_csv_svc.register_session_listeners()
+realtime_svc.register_session_listeners()
 
 
 _BOOT_ID: str = uuid.uuid4().hex
@@ -177,6 +180,11 @@ def _warm_symbol_cache() -> None:
 @app.on_event("shutdown")
 def _log_shutdown() -> None:
     _log.info("evt=system_shutdown boot_id=%s", _BOOT_ID)
+
+
+@app.on_event("shutdown")
+async def _stop_realtime_broker() -> None:
+    await realtime_svc.revision_broker.stop()
 
 
 def _error_payload(code: str, message: str, extra: dict | None = None) -> dict:
@@ -300,6 +308,7 @@ app.include_router(handover.router, prefix="/api/handovers", tags=["Handover"])
 app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
 app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
 app.include_router(warehouse_map.router, prefix="/api/warehouse-map", tags=["Warehouse Map"])
+app.include_router(realtime.router, prefix="/api/realtime", tags=["System"])
 
 
 @app.get("/health", tags=["System"])

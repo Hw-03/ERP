@@ -32,7 +32,7 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260804_0012"
+HEAD_REVISION = "20260804_0013"
 
 
 def test_schema_state_exposes_explicit_legacy_onboarding_state():
@@ -86,7 +86,7 @@ def _infrastructure_tables(path: Path) -> set[str]:
             for row in db.execute(
                 "SELECT name FROM sqlite_master "
                 "WHERE type='table' AND name IN "
-                "('alembic_version', 'alembic_schema_state')"
+                "('alembic_version', 'alembic_schema_state', 'data_revision')"
             )
         }
 
@@ -144,6 +144,29 @@ def _approve_current_profile(
         {schema_fingerprint: profile},
     )
     return profile
+
+
+def _mark_head_as_legacy(
+    path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Relabel an intact managed head with a known non-canonical profile."""
+
+    schema_fingerprint, _ = _fingerprints(path)
+    profile = LegacySQLiteProfile(
+        profile_id="test_managed_legacy",
+        schema_fingerprint=schema_fingerprint,
+    )
+    monkeypatch.setattr(
+        legacy_profiles,
+        "LEGACY_SQLITE_PROFILES",
+        {schema_fingerprint: profile},
+    )
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "UPDATE alembic_schema_state SET profile_id=? WHERE id=1",
+            (profile.profile_id,),
+        )
 
 
 def _create_independent_legacy_items_database(path: Path) -> None:
@@ -424,6 +447,36 @@ def test_approved_legacy_schema_is_backed_up_and_stamped_without_business_change
     assert _fingerprints(path) == (before_schema, before_data)
 
 
+def test_approved_legacy_rejects_malformed_preexisting_data_revision(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = _copy_head(head_database, tmp_path / "malformed-data-revision.db", unversioned=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_items_sort_order")
+        db.execute("DROP TABLE data_revision")
+        db.execute(
+            "CREATE TABLE data_revision ("
+            "id INTEGER PRIMARY KEY, revision BIGINT NOT NULL)"
+        )
+        db.execute("INSERT INTO data_revision VALUES (1, 0)")
+    _approve_current_profile(path, monkeypatch)
+    receipt_path = tmp_path / "malformed-revision-receipt.db"
+
+    engine = _engine(path)
+    try:
+        with pytest.raises(RuntimeError, match="canonical contract"):
+            ensure_schema(
+                engine=engine,
+                backup_provider=_receipt_provider(receipt_path, []),
+            )
+    finally:
+        engine.dispose()
+
+    assert _version_rows(path) == []
+
+
 def test_approved_legacy_backup_failure_leaves_no_version_or_state_row(
     tmp_path: Path,
     head_database: Path,
@@ -444,7 +497,7 @@ def test_approved_legacy_backup_failure_leaves_no_version_or_state_row(
     finally:
         engine.dispose()
 
-    assert _infrastructure_tables(path) == set()
+    assert _infrastructure_tables(path) == {"data_revision"}
 
 
 def test_approved_legacy_rechecks_schema_after_verified_backup(
@@ -480,7 +533,7 @@ def test_approved_legacy_rechecks_schema_after_verified_backup(
             )
         }
     assert "injected_after_approval" not in tables
-    assert _infrastructure_tables(path) == set()
+    assert _infrastructure_tables(path) == {"data_revision"}
 
 
 def test_approved_legacy_data_fingerprint_change_rolls_back_stamp(
@@ -508,7 +561,7 @@ def test_approved_legacy_data_fingerprint_change_rolls_back_stamp(
     finally:
         engine.dispose()
 
-    assert _infrastructure_tables(path) == set()
+    assert _infrastructure_tables(path) == {"data_revision"}
 
 
 def test_registered_legacy_schema_rejects_manual_ddl_drift(
@@ -921,6 +974,163 @@ def test_versioned_head_manual_drift_is_not_ready_and_ensure_fails(
     assert check.ready is False
     assert any("fingerprint mismatch" in difference for difference in check.differences)
     assert _version_rows(path) == [HEAD_REVISION]
+
+
+@pytest.mark.parametrize("profile_id", ["canonical", "legacy"])
+def test_versioned_head_missing_data_revision_row_is_not_ready_and_fails_closed(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_id: str,
+):
+    path = _copy_head(head_database, tmp_path / f"missing-revision-row-{profile_id}.db")
+    if profile_id == "legacy":
+        _mark_head_as_legacy(path, monkeypatch)
+    with sqlite3.connect(path) as db:
+        db.execute("DELETE FROM data_revision")
+
+    engine = _engine(path)
+    try:
+        check = check_schema(engine=engine)
+        with pytest.raises(SchemaMismatchError, match="data_revision"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert check.profile_id == (
+        "canonical" if profile_id == "canonical" else "test_managed_legacy"
+    )
+    assert check.differences == (
+        "data_revision singleton row count mismatch: expected=1 actual=0",
+    )
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT COUNT(*) FROM data_revision").fetchone() == (0,)
+
+
+@pytest.mark.parametrize("profile_id", ["canonical", "legacy"])
+@pytest.mark.parametrize(
+    ("assignment", "evidence"),
+    [
+        ("revision = -1", "revision is invalid"),
+        ("updated_at = 'not-a-timestamp'", "updated_at is invalid"),
+    ],
+)
+def test_versioned_head_invalid_data_revision_row_is_not_ready_and_fails_closed(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_id: str,
+    assignment: str,
+    evidence: str,
+):
+    path = _copy_head(
+        head_database,
+        tmp_path / f"invalid-revision-row-{profile_id}-{evidence.split()[0]}.db",
+    )
+    if profile_id == "legacy":
+        _mark_head_as_legacy(path, monkeypatch)
+    with sqlite3.connect(path) as db:
+        db.execute(f"UPDATE data_revision SET {assignment} WHERE id=1")
+
+    engine = _engine(path)
+    try:
+        check = check_schema(engine=engine)
+        with pytest.raises(SchemaMismatchError, match="data_revision"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert any(evidence in difference for difference in check.differences)
+    with sqlite3.connect(path) as db:
+        row = db.execute(
+            "SELECT revision, updated_at FROM data_revision WHERE id=1"
+        ).fetchone()
+    if assignment.startswith("revision"):
+        assert row[0] == -1
+    else:
+        assert row[1] == "not-a-timestamp"
+
+
+@pytest.mark.parametrize("profile_id", ["canonical", "legacy"])
+def test_versioned_head_rejects_quoted_data_revision_timestamp_default(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_id: str,
+):
+    path = _copy_head(
+        head_database,
+        tmp_path / f"quoted-revision-default-{profile_id}.db",
+    )
+    if profile_id == "legacy":
+        _mark_head_as_legacy(path, monkeypatch)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP TABLE data_revision")
+        db.execute(
+            "CREATE TABLE data_revision ("
+            "id INTEGER NOT NULL, "
+            "revision BIGINT NOT NULL, "
+            "updated_at DATETIME DEFAULT 'CURRENT_TIMESTAMP' NOT NULL, "
+            "CONSTRAINT ck_data_revision_singleton CHECK (id = 1), "
+            "PRIMARY KEY (id))"
+        )
+        db.execute(
+            "INSERT INTO data_revision (id, revision, updated_at) "
+            "VALUES (1, 0, '2026-08-04 00:00:00')"
+        )
+
+    engine = _engine(path)
+    try:
+        check = check_schema(engine=engine)
+        with pytest.raises(SchemaMismatchError, match="data_revision"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert any("server default mismatch: data_revision.updated_at" in difference for difference in check.differences)
+    with sqlite3.connect(path) as db:
+        assert db.execute(
+            "SELECT revision, updated_at FROM data_revision WHERE id=1"
+        ).fetchone() == (0, "2026-08-04 00:00:00")
+
+
+@pytest.mark.parametrize("mutation", ["missing", "malformed"])
+def test_managed_legacy_head_requires_canonical_data_revision_table(
+    tmp_path: Path,
+    head_database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+):
+    path = _copy_head(head_database, tmp_path / f"legacy-revision-table-{mutation}.db")
+    _mark_head_as_legacy(path, monkeypatch)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP TABLE data_revision")
+        if mutation == "malformed":
+            db.execute(
+                "CREATE TABLE data_revision ("
+                "id INTEGER PRIMARY KEY, revision BIGINT NOT NULL)"
+            )
+            db.execute("INSERT INTO data_revision VALUES (1, 0)")
+
+    engine = _engine(path)
+    try:
+        check = check_schema(engine=engine)
+        with pytest.raises(SchemaMismatchError, match="data_revision"):
+            ensure_schema(engine=engine)
+    finally:
+        engine.dispose()
+
+    assert check.ready is False
+    assert any("data_revision" in difference for difference in check.differences)
+    with sqlite3.connect(path) as db:
+        columns = db.execute("PRAGMA table_info(data_revision)").fetchall()
+    if mutation == "missing":
+        assert columns == []
+    else:
+        assert [column[1] for column in columns] == ["id", "revision"]
 
 
 def test_postgresql_unversioned_backup_without_provider_fails_closed():

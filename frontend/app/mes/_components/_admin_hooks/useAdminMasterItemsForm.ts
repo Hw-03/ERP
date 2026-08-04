@@ -5,12 +5,10 @@
 // + 필드 단위 즉시 저장 (saveItemField / updateItemFull) 도 form 책임 — 선택된 품목의 변경 작업.
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Item } from "@/lib/api";
 import { api } from "@/lib/api";
-
-function notifyItemsChanged() {
-  window.dispatchEvent(new Event("items"));
-}
+import { queryKeys } from "@/lib/queries/keys";
 
 export type ItemEditForm = {
   item_name: string;
@@ -105,6 +103,7 @@ export function useAdminMasterItemsForm({
   onError,
   onShowSave,
 }: UseAdminMasterItemsFormArgs): UseAdminMasterItemsFormState {
+  const queryClient = useQueryClient();
   const [form, setFormState] = useState<ItemEditForm>(EMPTY_ITEM_EDIT_FORM);
   const [dirty, setDirty] = useState(false);
 
@@ -118,6 +117,11 @@ export function useAdminMasterItemsForm({
       setDirty(false);
     }
   }, [selectedItem?.item_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!selectedItem || dirty) return;
+    setFormState(itemToEditForm(selectedItem));
+  }, [selectedItem, dirty]);
 
   function setForm(updater: (prev: ItemEditForm) => ItemEditForm) {
     setFormState(updater);
@@ -146,7 +150,7 @@ export function useAdminMasterItemsForm({
       // useEffect deps 가 selectedItem.item_id 라 같은 부품 갱신은 발화 안 함 → 명시 호출 필요.
       setFormState(itemToEditForm(updated));
       setDirty(false);
-      notifyItemsChanged();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       onShowSave?.("저장됐습니다.");
     } catch (error) {
@@ -167,7 +171,7 @@ export function useAdminMasterItemsForm({
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
       setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
-      notifyItemsChanged();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -181,7 +185,7 @@ export function useAdminMasterItemsForm({
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
       setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
-      notifyItemsChanged();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onShowSave?.("저장됐습니다.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "저장에 실패했습니다.");

@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from decimal import Decimal
 
@@ -836,6 +837,58 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
         TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP,
     ).first()
     assert scrap_log is None
+
+
+@pytest.mark.parametrize("stale_field", ["quantity", "item"])
+def test_defect_disassemble_stale_bom_payload_returns_422_and_rolls_back(
+    db_session, client, make_item, make_bom, stale_field
+):
+    parent = make_item(name="ROLLBACK-PARENT", process_type_code="PF", warehouse_qty=Decimal("0"))
+    child = make_item(name="ROLLBACK-CHILD", process_type_code="VR", warehouse_qty=Decimal("0"))
+    stale_child = make_item(name="STALE-CHILD", process_type_code="VR", warehouse_qty=Decimal("0"))
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    _make_defective_location(db_session, parent.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"))
+    requester = _make_employee(db_session, code="RB01", name="rollback actor")
+    db_session.commit()
+    request_count_before = db_session.query(StockRequest).count()
+
+    response = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "defect_disassemble",
+        "notes": json.dumps({
+            "child_decisions": [{
+                "item_id": str(stale_child.item_id if stale_field == "item" else child.item_id),
+                "qty": "3" if stale_field == "quantity" else "2",
+                "normal_qty": "3" if stale_field == "quantity" else "2",
+                "defective_qty": "0",
+                "scrap_qty": "0",
+            }]
+        }),
+        "lines": [{
+            "item_id": str(parent.item_id),
+            "quantity": "2",
+            "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "to_bucket": "none",
+        }],
+    })
+
+    assert response.status_code == 422, response.json()
+    db_session.expire_all()
+    assert db_session.query(StockRequest).count() == request_count_before
+    assert (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == parent.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+            InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+        )
+        .one()
+        .quantity
+    ) == Decimal("2")
+    assert db_session.query(TransactionLog).filter(
+        TransactionLog.item_id.in_([parent.item_id, child.item_id, stale_child.item_id])
+    ).count() == 0
 
 
 # ---------------------------------------------------------------------------

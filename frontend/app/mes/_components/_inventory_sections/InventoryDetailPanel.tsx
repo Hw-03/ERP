@@ -9,6 +9,7 @@ import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 import { getStockState } from "@/lib/mes/inventory";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
@@ -36,6 +37,7 @@ export function InventoryDetailPanel({
   imageFilename,
   quickActionVariant = "desktop",
 }: Props) {
+  const revision = useRealtimeRevision();
   const getDeptColor = useDeptColorLookup();
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -71,7 +73,7 @@ export function InventoryDetailPanel({
     return () => {
       cancelled = true;
     };
-  }, [item.item_id, pendingQty]);
+  }, [item.item_id, pendingQty, revision]);
 
   return (
     <div className="space-y-4">

@@ -37,6 +37,7 @@ type Props = {
   /** 부모(DesktopHistoryView)가 들고 있는 batchCache — 우측 패널과 공유. */
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
+  cacheEpoch?: number | null;
   canLoadMore: boolean;
   loadingMore: boolean;
   loadMoreError?: string | null;
@@ -132,6 +133,7 @@ export function HistoryTable({
   onSelectBatch,
   batchCache,
   setBatchCache,
+  cacheEpoch,
   canLoadMore,
   loadingMore,
   loadMoreError,
@@ -142,6 +144,7 @@ export function HistoryTable({
   collapseRequestNonce = 0,
 }: Props) {
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+  const [fetchGeneration, setFetchGeneration] = useState(0);
   const previousCollapseRequestRef = useRef(collapseRequestNonce);
 
   useEffect(() => {
@@ -186,23 +189,67 @@ export function HistoryTable({
   const pendingFetchesRef = useRef<Set<string>>(new Set());
   const fetchQueueRef = useRef<string[]>([]);
   const inFlightRef = useRef(0);
+  const batchCacheEpochRef = useRef(0);
+  const previousCacheEpochRef = useRef(cacheEpoch);
+  const resetCacheEpochRef = useRef(cacheEpoch);
+  const previousBatchCacheRef = useRef(batchCache);
+  const batchFetchControllersRef = useRef<Map<string, AbortController>>(new Map());
   const observerRef = useRef<IntersectionObserver | null>(null);
   const observedRowsRef = useRef<Set<HTMLTableRowElement>>(new Set());
   const batchCacheRef = useRef(batchCache);
   batchCacheRef.current = batchCache;
 
+  if (previousCacheEpochRef.current !== cacheEpoch) {
+    previousCacheEpochRef.current = cacheEpoch;
+    batchCacheEpochRef.current += 1;
+  }
+
+  const resetBatchFetches = useCallback(() => {
+    batchFetchControllersRef.current.forEach((controller) => controller.abort());
+    batchFetchControllersRef.current.clear();
+    pendingFetchesRef.current.clear();
+    fetchQueueRef.current = [];
+    inFlightRef.current = 0;
+  }, []);
+
+  const invalidateBatchFetches = useCallback(() => {
+    batchCacheEpochRef.current += 1;
+    resetBatchFetches();
+  }, [resetBatchFetches]);
+
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+    return () => {
+      mountedRef.current = false;
+      invalidateBatchFetches();
+    };
+  }, [invalidateBatchFetches]);
+
+  useEffect(() => {
+    if (resetCacheEpochRef.current === cacheEpoch) return;
+    resetCacheEpochRef.current = cacheEpoch;
+    resetBatchFetches();
+    setFetchGeneration((generation) => generation + 1);
+  }, [cacheEpoch, resetBatchFetches]);
+
+  useEffect(() => {
+    const previousCache = previousBatchCacheRef.current;
+    previousBatchCacheRef.current = batchCache;
+    if (previousCache === batchCache || batchCache.size > 0) return;
+
+    invalidateBatchFetches();
+  }, [batchCache, invalidateBatchFetches]);
 
   const tryDrainQueue = useCallback(() => {
     while (inFlightRef.current < VISIBLE_FETCH_CONCURRENCY && fetchQueueRef.current.length > 0) {
       const next = fetchQueueRef.current.shift()!;
+      const requestEpoch = batchCacheEpochRef.current;
+      const controller = new AbortController();
+      batchFetchControllersRef.current.set(next, controller);
       inFlightRef.current++;
-      void ioApi.getBatch(next)
+      void ioApi.getBatch(next, { signal: controller.signal })
         .then((b) => {
-          if (mountedRef.current) {
+          if (mountedRef.current && requestEpoch === batchCacheEpochRef.current) {
             setBatchCache((prev) => {
               if (prev.has(next)) return prev;
               const m = new Map(prev);
@@ -213,6 +260,10 @@ export function HistoryTable({
         })
         .catch(() => { /* 무시 — 다음 시도에서 재요청 가능. */ })
         .finally(() => {
+          if (requestEpoch !== batchCacheEpochRef.current) return;
+          if (batchFetchControllersRef.current.get(next) === controller) {
+            batchFetchControllersRef.current.delete(next);
+          }
           pendingFetchesRef.current.delete(next);
           inFlightRef.current--;
           if (mountedRef.current) tryDrainQueue();
@@ -262,7 +313,7 @@ export function HistoryTable({
     for (const g of groups) {
       if (g.type === "op_batch") enqueueBatchFetch(g.batchId);
     }
-  }, [groups, enqueueBatchFetch]);
+  }, [batchCache, enqueueBatchFetch, fetchGeneration, groups]);
 
   function toggleGroup(key: string) {
     setExpandedGroupKey((prev) => (prev === key ? null : key));
@@ -278,7 +329,7 @@ export function HistoryTable({
 
   function handleCacheBatch(batchId: string, batch: IoBatch) {
     setBatchCache((prev) => {
-      if (prev.has(batchId)) return prev;
+      if (prev.get(batchId) === batch) return prev;
       const m = new Map(prev);
       m.set(batchId, batch);
       return m;

@@ -515,11 +515,12 @@ def test_execute_line_rework_normal_splits_children_by_item_department(
 
 
 def test_execute_line_defect_disassemble_uses_three_way_child_split(
-    db_session, make_item, make_location
+    db_session, make_item, make_location, make_bom
 ):
     """DEFECT_DISASSEMBLE: 격리 부모도 같은 정상/격리/폐기 3분할 모델을 사용한다."""
     parent = make_item(name="QD-PARENT", process_type_code="PF", warehouse_qty=D("0"))
     child = make_item(name="VAC-CHILD", process_type_code="VR", warehouse_qty=D("0"))
+    make_bom(parent.item_id, child.item_id, D("1"))
     make_location(parent.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.DEFECTIVE, quantity=D("3"))
     inv = db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).first()
@@ -562,6 +563,55 @@ def test_execute_line_defect_disassemble_uses_three_way_child_split(
         TransactionTypeEnum.MARK_DEFECTIVE,
         TransactionTypeEnum.DEFECT_SCRAP,
     ]
+
+
+def test_execute_line_defect_disassemble_rejects_stale_bom_quantity_before_inventory_changes(
+    db_session, make_item, make_location, make_bom
+):
+    parent = make_item(name="STALE-PARENT", process_type_code="PF", warehouse_qty=D("0"))
+    child = make_item(name="STALE-CHILD", process_type_code="VR", warehouse_qty=D("0"))
+    make_bom(parent.item_id, child.item_id, D("1"))
+    make_location(
+        parent.item_id,
+        department=ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("2"),
+    )
+    inv = db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).one()
+    inv.quantity = D("2")
+    employee = _make_employee(db_session)
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+        requires_warehouse_approval=False,
+        notes=json.dumps({
+            "child_decisions": [{
+                "item_id": str(child.item_id),
+                "qty": "3",
+                "normal_qty": "3",
+                "defective_qty": "0",
+                "scrap_qty": "0",
+            }]
+        }),
+    )
+    line = _add_line(
+        db_session,
+        request,
+        parent,
+        quantity=D("2"),
+        from_bucket=RequestBucketEnum.DEFECTIVE,
+        to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+
+    with pytest.raises(ValueError, match="BOM"):
+        svc._execute_line(db_session, request, line, approver=employee, is_approval=False)
+
+    assert _defective_qty(db_session, parent.item_id, ASSEMBLY) == D("2")
+    assert _total_qty(db_session, child.item_id) == D("0")
+    assert _logs(db_session, parent.item_id) == []
+    assert _logs(db_session, child.item_id) == []
 
 def test_execute_line_raw_ship_insufficient_raises(db_session, make_item):
     """RAW_SHIP 창고 재고 부족 → ValueError."""

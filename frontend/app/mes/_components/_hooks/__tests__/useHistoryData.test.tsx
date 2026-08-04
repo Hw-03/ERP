@@ -91,6 +91,66 @@ describe("useHistoryData", () => {
     expect(fetchSpy.mock.calls.length).toBe(callCountAfterFirstMount);
   });
 
+  it("cancels an in-flight same-key request before a realtime revision refresh", async () => {
+    const staleRequest = deferred<Response>();
+    const freshRequest = deferred<Response>();
+    let staleSignal: AbortSignal | null = null;
+    const refreshedPage = page1.map((log, index) => ({ ...log, log_id: `R${index}` }));
+    const fetchSpy = vi.fn()
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        staleSignal = init?.signal as AbortSignal | null ?? null;
+        return staleRequest.promise;
+      })
+      .mockImplementationOnce(() => freshRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient({ staleTime: 30_000 });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useHistoryData({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(staleSignal?.aborted).toBe(true);
+    await act(async () => freshRequest.resolve(makeResponse(refreshedPage)));
+    await waitFor(() => expect(result.current.logs).toEqual(refreshedPage));
+
+    await act(async () => staleRequest.resolve(makeResponse(page1)));
+    expect(result.current.logs).toEqual(refreshedPage);
+  });
+
+  it("revalidates every loaded page on a realtime revision", async () => {
+    const insertedPage = page1.map((log, index) => ({ ...log, log_id: `N${index}` }));
+    const refreshedPage1 = page1.map((log) => ({ ...log, item_name: "refreshed" }));
+    const refreshedPage2 = page2.map((log) => ({ ...log, item_name: "refreshed" }));
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(page1))
+      .mockResolvedValueOnce(makeResponse(page2))
+      .mockResolvedValueOnce(makeResponse(insertedPage))
+      .mockResolvedValueOnce(makeResponse(refreshedPage1))
+      .mockResolvedValueOnce(makeResponse(refreshedPage2));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient({ staleTime: 30_000 });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useHistoryData({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.loadMore());
+    expect(result.current.logs).toHaveLength(140);
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
+    expect(String(fetchSpy.mock.calls[4][0])).toContain("skip=200");
+    expect(result.current.logs).toEqual([...insertedPage, ...refreshedPage1, ...refreshedPage2]);
+  });
+
   it("keeps query generations distinct when field values contain the old delimiter", async () => {
     const firstRequest = deferred<Response>();
     const secondRequest = deferred<Response>();

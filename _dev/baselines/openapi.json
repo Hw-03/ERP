@@ -18340,6 +18340,39 @@
         ]
       }
     },
+    "/api/realtime/revision": {
+      "get": {
+        "operationId": "revision_snapshot_api_realtime_revision_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revision Snapshot",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/realtime/stream": {
+      "get": {
+        "operationId": "revision_stream_api_realtime_stream_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revision Stream",
+        "tags": [
+          "System"
+        ]
+      }
+    },
     "/api/settings/admin-pin": {
       "put": {
         "operationId": "update_admin_pin_api_settings_admin_pin_put",

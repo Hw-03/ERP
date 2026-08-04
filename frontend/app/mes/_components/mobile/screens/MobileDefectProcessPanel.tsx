@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -44,7 +44,7 @@ export function MobileDefectProcessPanel({
   onCancel: () => void;
 }) {
   const isWarehouse = location.department === "창고";
-  const maxQty = Number(location.quantity);
+  const maxQty = Math.max(1, Number(location.quantity) || 1);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [action, setAction] = useState<ProcessAction>("unquarantine");
@@ -52,27 +52,66 @@ export function MobileDefectProcessPanel({
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
+  const [decisionParentQty, setDecisionParentQty] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const locationIdentityRef = useRef({
+    itemId: location.item_id,
+    department: location.department,
+  });
+  const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
   useEffect(() => {
+    const previousIdentity = locationIdentityRef.current;
+    if (
+      previousIdentity.itemId === location.item_id &&
+      previousIdentity.department === location.department
+    ) return;
+    locationIdentityRef.current = {
+      itemId: location.item_id,
+      department: location.department,
+    };
     setStep(1);
     setAction("unquarantine");
-    setProcessQty(Number(location.quantity));
+    setProcessQty(Math.max(1, Number(location.quantity) || 1));
     setCategory("");
     setMemo("");
     setDecisions([]);
+    setDecisionParentQty(null);
     setBusy(false);
     setErrorMsg(null);
     setConfirmOpen(false);
   }, [location.item_id, location.department, location.quantity]);
 
   useEffect(() => {
-    if (action !== "disassemble") setDecisions([]);
+    const freshMax = Math.max(1, Number(location.quantity) || 1);
+    setProcessQty((currentQty) => Math.max(1, Math.min(freshMax, currentQty)));
+  }, [location.quantity]);
+
+  useEffect(() => {
+    if (action !== "disassemble") {
+      setDecisions([]);
+      setDecisionParentQty(null);
+    }
   }, [action]);
 
-  const reworkReady = decisions.length > 0 && validateDecisionTree(decisions);
+  useEffect(() => {
+    if (decisionParentQty !== null && decisionParentQty !== boundedProcessQty) {
+      setDecisions([]);
+      setDecisionParentQty(null);
+      setConfirmOpen(false);
+    }
+  }, [boundedProcessQty, decisionParentQty]);
+
+  const reworkReady = decisionParentQty === boundedProcessQty
+    && decisions.length > 0
+    && validateDecisionTree(decisions);
+
+  function handleDecisionsChange(next: ChildDecision[]) {
+    setDecisions(next);
+    setDecisionParentQty(next.length > 0 ? boundedProcessQty : null);
+  }
 
   async function handleSubmit() {
     if (busy || (action === "disassemble" && !reworkReady)) return;
@@ -82,7 +121,7 @@ export function MobileDefectProcessPanel({
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
           item_id: location.item_id,
-          qty: processQty,
+          qty: boundedProcessQty,
           dept: location.department,
           reason_category: category || null,
           reason_memo: memo || null,
@@ -98,7 +137,7 @@ export function MobileDefectProcessPanel({
           lines: [
             {
               item_id: location.item_id,
-              quantity: processQty,
+              quantity: boundedProcessQty,
               from_bucket: "defective",
               from_department: location.department as Department,
               to_bucket: "none",
@@ -116,7 +155,7 @@ export function MobileDefectProcessPanel({
           lines: [
             {
               item_id: location.item_id,
-              quantity: processQty,
+              quantity: boundedProcessQty,
               from_bucket: "defective",
               from_department: location.department as Department,
               to_bucket: "none",
@@ -166,7 +205,7 @@ export function MobileDefectProcessPanel({
               {location.mes_code} {location.item_name}
             </span>
             <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-              재작업 {formatQty(processQty)} / {formatQty(location.quantity)}개
+              재작업 {formatQty(boundedProcessQty)} / {formatQty(location.quantity)}개
               {category ? ` · ${category}` : ""}
             </span>
           </div>
@@ -180,10 +219,10 @@ export function MobileDefectProcessPanel({
             parentItemId={location.item_id}
             parentItemName={location.item_name}
             parentMesCode={location.mes_code ?? ""}
-            parentQty={processQty}
+            parentQty={boundedProcessQty}
             parentDept={location.department}
             decisions={decisions}
-            onChange={setDecisions}
+            onChange={handleDecisionsChange}
           />
         </div>
 
@@ -219,7 +258,7 @@ export function MobileDefectProcessPanel({
           }}
         >
           <span style={{ color: LEGACY_COLORS.text }}>
-            {location.item_name} × {processQty}개를 재작업합니다.
+            {location.item_name} × {boundedProcessQty}개를 재작업합니다.
           </span>
         </ConfirmModal>
       </div>
@@ -270,7 +309,7 @@ export function MobileDefectProcessPanel({
         </span>
         <div className="flex items-center gap-2">
           <Stepper
-            value={processQty}
+            value={boundedProcessQty}
             onChange={(n) => setProcessQty(Math.max(1, Math.min(maxQty, n)))}
             min={1}
             max={maxQty}
@@ -410,8 +449,8 @@ export function MobileDefectProcessPanel({
       >
         <span style={{ color: LEGACY_COLORS.text }}>
           {action === "scrap"
-            ? `${location.item_name} × ${processQty}개를 폐기합니다.`
-            : `${location.item_name} × ${processQty}개를 반품합니다.`}
+            ? `${location.item_name} × ${boundedProcessQty}개를 폐기합니다.`
+            : `${location.item_name} × ${boundedProcessQty}개를 반품합니다.`}
         </span>
       </ConfirmModal>
     </div>

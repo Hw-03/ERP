@@ -1,10 +1,18 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, type BOMTreeNode, type Item } from "@/lib/api";
+import { api, type BOMTreeNode, type Item, type StockRequestReservationLine } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopRightPanel } from "../../DesktopRightPanel";
 import { SlidePanel } from "../../common/SlidePanel";
 import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
+
+const realtimeState = vi.hoisted(() => ({
+  revision: 1 as number | null,
+}));
+
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => realtimeState.revision,
+}));
 
 vi.mock("@/app/mes/_components/DepartmentsContext", () => ({
   useDeptColorLookup: () => () => LEGACY_COLORS.blue,
@@ -44,6 +52,21 @@ function makeBomItem(): Item {
   return { ...makeItem(), bom_completed_at: "2026-07-21T00:00:00Z" } as Item;
 }
 
+function makeReservation(lineId: string, requesterName: string): StockRequestReservationLine {
+  return {
+    line_id: lineId,
+    request_id: `request-${lineId}`,
+    request_code: null,
+    requester_name: requesterName,
+    requester_department: "production",
+    quantity: 5,
+    from_bucket: "warehouse",
+    to_bucket: "department",
+    to_department: "production",
+    created_at: "2026-08-04T00:00:00Z",
+  } as unknown as StockRequestReservationLine;
+}
+
 const bomTree: BOMTreeNode = {
   item_id: "item-1",
   item_name: "완성품",
@@ -75,6 +98,7 @@ function deferred<T>() {
 }
 
 afterEach(() => {
+  realtimeState.revision = 1;
   vi.restoreAllMocks();
 });
 
@@ -162,6 +186,55 @@ describe("InventoryDetailPanel desktop quick actions", () => {
     expect(footer).toContainElement(screen.getByRole("button", { name: "출고" }));
     expect(body).not.toContainElement(screen.getByRole("button", { name: "입고" }));
     expect(footer).toHaveClass("max-h-[45%]", "overflow-y-auto");
+  });
+});
+
+describe("InventoryDetailPanel realtime reservations", () => {
+  it("refreshes unchanged pending quantity on a revision without closing the open quick action", async () => {
+    vi.spyOn(api, "getItemReservations")
+      .mockResolvedValueOnce([makeReservation("old", "기존 요청자")])
+      .mockResolvedValueOnce([makeReservation("new", "최신 요청자")]);
+    const item = { ...makeItem(), pending_quantity: 5 } as Item;
+    const { rerender } = render(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
+
+    expect(await screen.findByText("기존 요청자")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "입고" }));
+    expect(screen.getByTestId("quick-action-choices")).toBeInTheDocument();
+
+    realtimeState.revision = 2;
+    rerender(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
+
+    expect(await screen.findByText("최신 요청자")).toBeInTheDocument();
+    expect(api.getItemReservations).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("quick-action-choices")).toBeInTheDocument();
+  });
+
+  it("ignores an earlier reservation response after a revision refresh", async () => {
+    const earlier = deferred<StockRequestReservationLine[]>();
+    const latest = deferred<StockRequestReservationLine[]>();
+    vi.spyOn(api, "getItemReservations")
+      .mockReturnValueOnce(earlier.promise)
+      .mockReturnValueOnce(latest.promise);
+    const item = { ...makeItem(), pending_quantity: 5 } as Item;
+    const { rerender } = render(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
+    await waitFor(() => expect(api.getItemReservations).toHaveBeenCalledTimes(1));
+
+    realtimeState.revision = 2;
+    rerender(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
+    await waitFor(() => expect(api.getItemReservations).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      latest.resolve([makeReservation("new", "최신 요청자")]);
+      await latest.promise;
+    });
+    expect(await screen.findByText("최신 요청자")).toBeInTheDocument();
+
+    await act(async () => {
+      earlier.resolve([makeReservation("old", "뒤늦은 요청자")]);
+      await earlier.promise;
+    });
+    expect(screen.queryByText("뒤늦은 요청자")).not.toBeInTheDocument();
+    expect(screen.getByText("최신 요청자")).toBeInTheDocument();
   });
 });
 
@@ -314,6 +387,48 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(screen.queryByText("오래된 구성품 1")).not.toBeInTheDocument();
     expect(screen.queryByText("오래된 구성품 2")).not.toBeInTheDocument();
     expect(screen.getByText("최신 구성품")).toBeInTheDocument();
+  });
+
+  it("refreshes current stock on a realtime revision without collapsing an opened branch", async () => {
+    const firstTree = {
+      ...bomTree,
+      children: [{
+        ...bomTree.children[0],
+        item_name: "branch-component",
+        current_stock: 10,
+        children: [{
+          ...bomTree.children[0],
+          item_id: "nested-component",
+          item_name: "nested-visible",
+          current_stock: 3,
+        }],
+      }],
+    };
+    const refreshedTree = {
+      ...firstTree,
+      children: [{
+        ...firstTree.children[0],
+        current_stock: 20,
+        children: [{ ...firstTree.children[0].children[0], current_stock: 7 }],
+      }],
+    };
+    vi.spyOn(api, "getBOMTree")
+      .mockResolvedValueOnce(firstTree)
+      .mockResolvedValueOnce(refreshedTree);
+    const { rerender } = render(<BomSubExpander itemId="item-1" open modal />);
+
+    const branch = await screen.findByText("branch-component");
+    const branchRow = branch.closest("li")!;
+    fireEvent.click(within(branchRow).getByRole("button", { expanded: false }));
+    expect(await screen.findByText("nested-visible")).toBeInTheDocument();
+
+    realtimeState.revision = 2;
+    rerender(<BomSubExpander itemId="item-1" open modal />);
+
+    await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/20 EA/)).toBeInTheDocument();
+    expect(screen.getByText("nested-visible")).toBeInTheDocument();
+    expect(within(branchRow).getByRole("button")).toHaveAttribute("aria-expanded", "true");
   });
 
   it("uses a full-width modal-only BOM tree row with wrapped names and aligned metadata", async () => {

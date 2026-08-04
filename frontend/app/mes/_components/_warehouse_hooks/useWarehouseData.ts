@@ -44,14 +44,6 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemsQuery.error, employeesQuery.error]);
 
-  useEffect(() => {
-    const onItems = () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
-    };
-    window.addEventListener("items", onItems);
-    return () => window.removeEventListener("items", onItems);
-  }, [queryClient]);
-
   const setItems: React.Dispatch<React.SetStateAction<Item[]>> = useCallback(
     (next) => {
       queryClient.setQueryData<Item[]>(queryKeys.items.list({ limit: 2000, search }), (prev) =>

@@ -33,6 +33,7 @@ export function useDesktopHistoryGroups({
   selectedDateKey,
   department,
   model = "",
+  realtimeRevision,
 }: UseHistoryDataArgs): UseDesktopHistoryGroupsResult {
   const queryClient = useQueryClient();
   const operationKeys = operations || undefined;
@@ -82,6 +83,9 @@ export function useDesktopHistoryGroups({
   const generationRef = useRef(0);
   const isFirstRunRef = useRef(true);
   const retryQueryIdentityRef = useRef<string | null>(null);
+  const realtimeRevisionRef = useRef(realtimeRevision);
+  const loadedPageCountRef = useRef(1);
+  const loadedTailGroupKeyRef = useRef(initialCached?.groups.at(-1)?.key ?? null);
 
   useEffect(() => {
     const generation = generationRef.current + 1;
@@ -89,6 +93,11 @@ export function useDesktopHistoryGroups({
     loadingRef.current = true;
     const isRetry = retryQueryIdentityRef.current === queryIdentity;
     retryQueryIdentityRef.current = null;
+    const queryChanged = queryIdentityRef.current !== queryIdentity;
+    const revisionChanged = realtimeRevisionRef.current !== realtimeRevision;
+    const shouldRefreshLoadedDepth = revisionChanged && !queryChanged;
+    const pagesToRefresh = shouldRefreshLoadedDepth ? loadedPageCountRef.current : 1;
+    const refreshAnchorGroupKey = shouldRefreshLoadedDepth ? loadedTailGroupKeyRef.current : null;
     queryIdentityRef.current = queryIdentity;
     const params = pageParams();
     const skipReset = isRetry || (isFirstRunRef.current && initialCached !== undefined);
@@ -105,16 +114,39 @@ export function useDesktopHistoryGroups({
       setLoading(true);
     }
 
-    void queryClient.fetchQuery({
-      queryKey: queryKeys.transactions.displayGroups(params),
-      queryFn: ({ signal }) => productionApi.getTransactionDisplayGroups(params, { signal }),
-      staleTime: STALE_TIME.VOLATILE,
-    }).then((page) => {
+    void (async () => {
+      const refreshedPages: TransactionDisplayGroupPage[] = [];
+      let nextParams = params;
+      for (let pageIndex = 0; ; pageIndex += 1) {
+        const pageQueryKey = queryKeys.transactions.displayGroups(nextParams);
+        if (revisionChanged) {
+          await queryClient.cancelQueries({ queryKey: pageQueryKey, exact: true });
+          await queryClient.invalidateQueries({ queryKey: pageQueryKey, exact: true, refetchType: "none" });
+        }
+        const page = await queryClient.fetchQuery({
+          queryKey: pageQueryKey,
+          queryFn: ({ signal }) => productionApi.getTransactionDisplayGroups(nextParams, { signal }),
+          staleTime: STALE_TIME.VOLATILE,
+        });
+        refreshedPages.push(page);
+        const reachedPreviousDepth = pageIndex + 1 >= pagesToRefresh;
+        const reachedRefreshAnchor = refreshAnchorGroupKey === null
+          || page.groups.some((group) => group.key === refreshAnchorGroupKey);
+        if (!page.hasMore || !page.nextCursor || (reachedPreviousDepth && reachedRefreshAnchor)) break;
+        nextParams = pageParams(page.nextCursor);
+      }
+      return refreshedPages;
+    })().then((pages) => {
       if (generationRef.current !== generation || queryIdentityRef.current !== queryIdentity) return;
-      cursorRef.current = page.nextCursor;
-      hasMoreRef.current = page.hasMore;
-      setGroups(page.groups);
-      setHasMore(page.hasMore);
+      const lastPage = pages.at(-1);
+      const refreshedGroups = pages.flatMap((page) => page.groups);
+      cursorRef.current = lastPage?.nextCursor ?? null;
+      hasMoreRef.current = lastPage?.hasMore ?? false;
+      loadedPageCountRef.current = Math.max(1, pages.length);
+      loadedTailGroupKeyRef.current = refreshedGroups.at(-1)?.key ?? null;
+      realtimeRevisionRef.current = realtimeRevision;
+      setGroups(refreshedGroups);
+      setHasMore(lastPage?.hasMore ?? false);
       setError(null);
       loadingRef.current = false;
       setLoading(false);
@@ -126,7 +158,7 @@ export function useDesktopHistoryGroups({
     });
     // queryIdentity contains every primitive query condition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryIdentity, queryClient, retryNonce]);
+  }, [queryIdentity, queryClient, retryNonce, realtimeRevision]);
 
   const retry = useCallback(() => {
     retryQueryIdentityRef.current = queryIdentity;
@@ -154,6 +186,8 @@ export function useDesktopHistoryGroups({
       if (generationRef.current !== generation || queryIdentityRef.current !== identity) return;
       cursorRef.current = page.nextCursor;
       hasMoreRef.current = page.hasMore;
+      loadedPageCountRef.current += 1;
+      loadedTailGroupKeyRef.current = page.groups.at(-1)?.key ?? loadedTailGroupKeyRef.current;
       setGroups((previous) => [...previous, ...page.groups]);
       setHasMore(page.hasMore);
     } catch (caught: unknown) {

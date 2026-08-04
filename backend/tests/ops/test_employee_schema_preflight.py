@@ -117,6 +117,7 @@ def test_data_change_policy_allows_only_declared_table_and_validator(tmp_path: P
         "20260728_0010_daily_work_reports.py",
         "20260728_0011_shipping_prepared_actor_repair.py",
         "20260804_0012_employee_sidebar_mode.py",
+        "20260804_0013_data_revision.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

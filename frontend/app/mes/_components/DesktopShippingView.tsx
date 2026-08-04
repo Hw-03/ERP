@@ -34,6 +34,7 @@ import {
 } from "@/lib/api";
 import { useShippingRequestsQuery, useShippingRevisionsQuery } from "@/lib/queries/useShippingQuery";
 import { queryKeys } from "@/lib/queries/keys";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { processTypeColor } from "@/lib/mes/process";
@@ -278,6 +279,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [items, setItems] = useState<Item[]>([]);
   const [pfItems, setPfItems] = useState<Item[]>([]);
   const queryClient = useQueryClient();
+  const realtimeRevision = useRealtimeRevision();
   const shippingRequestsQuery = useShippingRequestsQuery();
   const requests = useMemo(() => shippingRequestsQuery.data ?? [], [shippingRequestsQuery.data]);
   const setRequests = useCallback(
@@ -332,6 +334,12 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [historyDetailError, setHistoryDetailError] = useState<string | null>(null);
   const historyLoadedStatusRef = useRef<ShippingHistoryStatus | null>(null);
   const historyRequestGenerationRef = useRef(0);
+  const itemsRefreshRevisionRef = useRef<number | null>(realtimeRevision);
+  const itemsRefreshGenerationRef = useRef(0);
+  const pfItemsRefreshRevisionRef = useRef<number | null>(realtimeRevision);
+  const pfItemsRefreshGenerationRef = useRef(0);
+  const historyRefreshRevisionRef = useRef<number | null>(realtimeRevision);
+  const historyDetailRevisionRef = useRef<number | null>(realtimeRevision);
   const nameValidationNoticeIdRef = useRef(0);
 
   const showNameValidationNotice = useCallback((message: string) => {
@@ -494,6 +502,40 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     }
   }, [pfItems.length, pfItemsLoaded, pfItemsLoading, onStatusChange]);
 
+  useEffect(() => {
+    if (realtimeRevision === null) return;
+    if (items.length === 0 || itemsRefreshRevisionRef.current === realtimeRevision) return;
+
+    itemsRefreshRevisionRef.current = realtimeRevision;
+    const generation = itemsRefreshGenerationRef.current + 1;
+    itemsRefreshGenerationRef.current = generation;
+    void api.getItems({ limit: 2000 })
+      .then((nextItems) => {
+        if (generation === itemsRefreshGenerationRef.current) setItems(nextItems);
+      })
+      .catch(() => {
+        // Keep the existing full catalog if this best-effort refresh fails.
+      });
+  }, [items.length, realtimeRevision]);
+
+  useEffect(() => {
+    if (realtimeRevision === null) return;
+    if ((!pfItemsLoaded && pfItems.length === 0) || pfItemsRefreshRevisionRef.current === realtimeRevision) return;
+
+    pfItemsRefreshRevisionRef.current = realtimeRevision;
+    const generation = pfItemsRefreshGenerationRef.current + 1;
+    pfItemsRefreshGenerationRef.current = generation;
+    void api.getItems({ process_type_code: "PF", limit: 2000 })
+      .then((nextPfItems) => {
+        if (generation === pfItemsRefreshGenerationRef.current) {
+          setPfItems(nextPfItems.filter((item) => item.process_type_code === "PF" && !item.deleted_at));
+        }
+      })
+      .catch(() => {
+        // Keep the existing PF catalog if this best-effort refresh fails.
+      });
+  }, [pfItems.length, pfItemsLoaded, realtimeRevision]);
+
   async function loadHistoryPage(
     params: ShippingHistoryParams,
     append = false,
@@ -643,10 +685,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     if (view !== "historyWork" || !selectedHistoryId || shippingRequestsQuery.isLoading) return;
     const existing = historyRows.find((request) => request.request_id === selectedHistoryId)
       ?? requests.find((request) => request.request_id === selectedHistoryId);
-    if (existing) {
+    const needsRealtimeRefresh = realtimeRevision !== null && historyDetailRevisionRef.current !== realtimeRevision;
+    if (existing && !needsRealtimeRefresh) {
       setHistoryDetailError(null);
       return;
     }
+
+    historyDetailRevisionRef.current = realtimeRevision;
 
     const controller = new AbortController();
     let active = true;
@@ -658,7 +703,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           setHistoryDetailError("완료 또는 취소된 출하 이력이 아닙니다.");
           return;
         }
-        historyLoadedStatusRef.current = null;
+        historyLoadedStatusRef.current = historyStatus;
         setHistoryRows((current) => [request, ...current.filter((row) => row.request_id !== request.request_id)]);
       })
       .catch((err) => {
@@ -670,7 +715,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       active = false;
       controller.abort();
     };
-  }, [historyRows, requests, selectedHistoryId, shippingRequestsQuery.isLoading, view]);
+    // Rows/catalog changes must not abort an in-flight detail refresh. They are sampled when this
+    // selected-id/view/revision lifecycle starts; loading completion still triggers the initial fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeRevision, selectedHistoryId, shippingRequestsQuery.isLoading, view]);
   useEffect(() => {
     if (view !== "historyList" && view !== "historyWork") return;
     if (view === "historyWork") {
@@ -708,6 +756,33 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     // Local search and folder actions load explicitly; this effect restores entry/status navigation only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, historyStatus, historyRows, requests, searchParams, selectedHistoryId, shippingRequestsQuery.isLoading]);
+  useEffect(() => {
+    if (realtimeRevision === null) return;
+    if (historyRefreshRevisionRef.current === realtimeRevision) return;
+    historyRefreshRevisionRef.current = realtimeRevision;
+    if (view !== "historyList" && view !== "historyWork") return;
+
+    historyLoadedStatusRef.current = historyStatus;
+    if (historyAppliedSearch) {
+      void loadHistoryPage({ status: historyStatus, q: historyAppliedSearch });
+      return;
+    }
+    if (historyYear !== null && historyMonth !== null) {
+      const generation = ++historyRequestGenerationRef.current;
+      void api.getShippingHistoryMonths({ status: historyStatus })
+        .then((months) => {
+          if (generation === historyRequestGenerationRef.current) setHistoryMonths(months);
+        })
+        .catch(() => {
+          // Keep the visible month folders when the best-effort realtime refresh fails.
+        });
+      void loadHistoryPage({ status: historyStatus, year: historyYear, month: historyMonth }, false, generation);
+      return;
+    }
+    void loadHistoryOverview(historyStatus);
+    // Revision is the sole trigger; current history filters and selection stay intact.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeRevision]);
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") return;
     const currentSearch = searchParams.toString();

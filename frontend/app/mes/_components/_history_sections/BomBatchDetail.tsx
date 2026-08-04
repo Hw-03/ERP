@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, GitBranch, Package, Recycle } from "lucide-react";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
@@ -50,30 +51,42 @@ const SIGN_TONE_MOVEMENT = {
 } as const;
 
 export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId }: Props) {
+  const realtimeRevision = useRealtimeRevision();
   const [batch, setBatch] = useState<IoBatch | null>(cache.get(batchId) ?? null);
   const [loading, setLoading] = useState(!cache.has(batchId));
   const [expandedBundles, setExpandedBundles] = useState<Set<string>>(new Set());
+  const batchRevisionRef = useRef(realtimeRevision);
 
   useEffect(() => {
-    if (cache.has(batchId)) {
+    const revisionChanged = batchRevisionRef.current !== realtimeRevision;
+    batchRevisionRef.current = realtimeRevision;
+    if (cache.has(batchId) && !revisionChanged) {
       setBatch(cache.get(batchId)!);
       setLoading(false);
       return;
     }
     setLoading(true);
     let cancelled = false;
+    const controller = new AbortController();
     void ioApi
-      .getBatch(batchId)
+      .getBatch(batchId, { signal: controller.signal })
       .then((b) => {
         if (cancelled) return;
         onCached(batchId, b);
         setBatch(b);
       })
+      .catch((err: unknown) => {
+        if (cancelled || (err as Error)?.name === "AbortError") return;
+        setBatch(null);
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
-  }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [batchId, realtimeRevision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!batch || !highlightItemId) return;

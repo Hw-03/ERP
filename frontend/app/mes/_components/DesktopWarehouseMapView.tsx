@@ -33,6 +33,61 @@ type LocGuide = { hits: Array<{ hit: SearchHit; angle: WarehouseAngle; qty: numb
 // 검색 후보 1건 = 한 품목 + 그 품목이 들어있는 칸들. 칸 단위가 아니라 품목 단위로 묶는다.
 type ItemMatch = { item_id: string; item_name: string; mes_code: string | null; hits: SearchHit[]; totalQty: number };
 
+function findItemMatch(map: WarehouseMap, itemId: string): ItemMatch | null {
+  const cells = new Map<string, SearchHit>();
+  let identity: WarehouseBoxItem | null = null;
+  for (const box of map.boxes) {
+    for (const item of box.items) {
+      if (item.item_id !== itemId) continue;
+      identity ??= item;
+      const key = cellKey(box.angle_id, box.row_no, box.layer_no);
+      const hit = cells.get(key);
+      if (hit) hit.items.push(item);
+      else {
+        cells.set(key, {
+          angle_id: box.angle_id,
+          row: box.row_no,
+          layer: box.layer_no,
+          items: [item],
+        });
+      }
+    }
+  }
+  if (!identity) return null;
+  const hits = Array.from(cells.values());
+  return {
+    item_id: identity.item_id,
+    item_name: identity.item_name,
+    mes_code: identity.mes_code,
+    hits,
+    totalQty: hits.reduce((sum, hit) => (
+      sum + hit.items.reduce((quantity, item) => quantity + item.quantity, 0)
+    ), 0),
+  };
+}
+
+function buildLocGuide(match: ItemMatch, angles: WarehouseAngle[]): LocGuide {
+  const hits: LocGuide["hits"] = [];
+  for (const hit of match.hits) {
+    const angle = angles.find((candidate) => candidate.id === hit.angle_id);
+    if (!angle) continue;
+    hits.push({
+      hit,
+      angle,
+      qty: hit.items.reduce((sum, item) => sum + item.quantity, 0),
+    });
+  }
+  return { hits };
+}
+
+function buildHitAngles(hits: SearchHit[]): Map<number, number> {
+  const result = new Map<number, number>();
+  for (const hit of hits) {
+    result.set(hit.angle_id, (result.get(hit.angle_id) ?? 0) + 1);
+  }
+  return result;
+}
+
 export function DesktopWarehouseMapView({
   onStatusChange,
   editable,
@@ -67,6 +122,12 @@ export function DesktopWarehouseMapView({
   const [curAngle, setCurAngle] = useState<WarehouseAngle | null>(null);
   const [curRow, setCurRow] = useState(1);
   const [panel, setPanel] = useState<PanelCell | null>(null);
+  const curAngleRef = useRef<WarehouseAngle | null>(null);
+  const curRowRef = useRef(1);
+  const panelRef = useRef<PanelCell | null>(null);
+  curAngleRef.current = curAngle;
+  curRowRef.current = curRow;
+  panelRef.current = panel;
   const [zonePanel, setZonePanel] = useState<WarehouseSpecialZone | null>(null);
   const [matchQuery, setMatchQuery] = useState("");
   // 편집 모드: 박스 넣기/편집 오버레이(좌측 지도 카드를 AddBoxScreen으로 덮음). null이면 지도 표시.
@@ -79,6 +140,8 @@ export function DesktopWarehouseMapView({
   const [itemMatches, setItemMatches] = useState<ItemMatch[] | null>(null);
   // 현재 선택된 품목(칩 스트립 라벨·선택 상태 표시용). 선택 전 null.
   const [selectedItem, setSelectedItem] = useState<ItemMatch | null>(null);
+  const selectedItemRef = useRef<ItemMatch | null>(null);
+  selectedItemRef.current = selectedItem;
   const [hitAngles, setHitAngles] = useState<Map<number, number> | null>(null);
   const [pulse, setPulse] = useState<{ angleId?: number; cellKey?: string; layer?: number } | null>(null);
   const [locGuide, setLocGuide] = useState<LocGuide | null>(null);
@@ -88,7 +151,70 @@ export function DesktopWarehouseMapView({
   const wmDepthRef = useRef(0);
 
   useEffect(() => {
-    if (mapQuery.data) setMap(mapQuery.data);
+    const nextMap = mapQuery.data;
+    if (!nextMap) return;
+    setMap(nextMap);
+    setAddBox(null);
+
+    const currentAngle = curAngleRef.current;
+    if (currentAngle) {
+      const nextAngle = nextMap.angles.find((candidate) => candidate.id === currentAngle.id) ?? null;
+      if (!nextAngle) {
+        setCurAngle(null);
+        setCurRow(1);
+        setPanel(null);
+        wmDepthRef.current = 0;
+        window.history.replaceState({ wmDepth: 0 }, "");
+        if (stageRef.current !== "floor") {
+          stageRef.current = "floor";
+          setStageAnimationSeq((sequence) => sequence + 1);
+        }
+        setStage("floor");
+      } else {
+        setCurAngle(nextAngle);
+        const nextRow = Math.min(Math.max(curRowRef.current, 1), Math.max(nextAngle.rows, 1));
+        if (nextRow !== curRowRef.current) {
+          setCurRow(nextRow);
+          if (stageRef.current === "row") {
+            window.history.replaceState(
+              { wm: { stage: "row", angleId: nextAngle.id, row: nextRow }, wmDepth: wmDepthRef.current },
+              "",
+            );
+          }
+        }
+      }
+    }
+
+    const currentPanel = panelRef.current;
+    if (currentPanel) {
+      const nextPanelAngle = nextMap.angles.find((candidate) => candidate.id === currentPanel.angle.id) ?? null;
+      const panelIsValid = nextPanelAngle !== null
+        && currentPanel.row >= 1
+        && currentPanel.row <= nextPanelAngle.rows
+        && currentPanel.layer >= 1
+        && currentPanel.layer <= nextPanelAngle.layers;
+      if (!panelIsValid || !nextPanelAngle) {
+        setPanel(null);
+        setAddBox(null);
+      } else {
+        setPanel({ ...currentPanel, angle: nextPanelAngle });
+      }
+    }
+
+    const selectedItemId = selectedItemRef.current?.item_id;
+    if (!selectedItemId) return;
+
+    const nextSelectedItem = findItemMatch(nextMap, selectedItemId);
+    setSelectedItem(nextSelectedItem);
+    if (!nextSelectedItem) {
+      setLocGuide(null);
+      setHitAngles(new Map());
+      setActiveHitKey(null);
+      return;
+    }
+    setMatchQuery(nextSelectedItem.mes_code ?? nextSelectedItem.item_name);
+    setLocGuide(buildLocGuide(nextSelectedItem, nextMap.angles));
+    setHitAngles(buildHitAngles(nextSelectedItem.hits));
   }, [mapQuery.data]);
 
   useEffect(() => {
@@ -360,7 +486,15 @@ export function DesktopWarehouseMapView({
         setPanel(null);
       } else if (wm.stage === "row" && wm.row != null) {
         const angle = map?.angles.find((a) => a.id === wm.angleId) ?? null;
-        if (angle) { setCurAngle(angle); setCurRow(wm.row); setAnimatedStage("row"); }
+        if (angle) {
+          setCurAngle(angle);
+          setCurRow(Math.min(Math.max(wm.row, 1), Math.max(angle.rows, 1)));
+          setAnimatedStage("row");
+        } else {
+          setCurAngle(null);
+          setCurRow(1);
+          setAnimatedStage("floor");
+        }
         setPanel(null);
       }
     };
@@ -498,14 +632,8 @@ export function DesktopWarehouseMapView({
     // 박스 강조: 고유한 mes_code 우선(비슷한 이름 0015/0016 정밀 구분), 없으면 품목명 폴백.
     const highlight = m.mes_code ?? m.item_name;
     setMatchQuery(highlight);
-    setLocGuide({
-      hits: m.hits
-        .map((h) => ({ hit: h, angle: angles.find((a) => a.id === h.angle_id)!, qty: h.items.reduce((s, it) => s + it.quantity, 0) }))
-        .filter((x) => x.angle != null),
-    });
-    const hitA = new Map<number, number>();
-    for (const h of m.hits) hitA.set(h.angle_id, (hitA.get(h.angle_id) ?? 0) + 1);
-    setHitAngles(hitA);
+    setLocGuide(buildLocGuide(m, angles));
+    setHitAngles(buildHitAngles(m.hits));
     if (m.hits.length > 0) navigateToHit(m.hits[0], highlight, { fromSelect: true });
   }
 

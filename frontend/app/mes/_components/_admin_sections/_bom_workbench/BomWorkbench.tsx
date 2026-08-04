@@ -18,6 +18,7 @@ import { BomParentHeader } from "./BomParentHeader";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
 import { bomStatusOf, stageOf, type BomDeptFilter } from "./bomDept";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 interface Props {
   items: Item[];
@@ -39,6 +40,7 @@ export function BomWorkbench({
   onStatusChange,
   onError,
 }: Props) {
+  const realtimeRevision = useRealtimeRevision();
   const [dept, setDept] = useState<BomDeptFilter>("A");
   const [parentId, setParentId] = useState("");
   const [mode, setMode] = useState<Mode>("edit");
@@ -111,7 +113,7 @@ export function BomWorkbench({
     return () => {
       alive = false;
     };
-  }, [parentId]);
+  }, [parentId, realtimeRevision]);
 
   // 선택된 품목의 역참조 (사용처 모드)
   useEffect(() => {
@@ -127,7 +129,7 @@ export function BomWorkbench({
     return () => {
       alive = false;
     };
-  }, [parentId]);
+  }, [parentId, realtimeRevision]);
 
   function handleDeptChange(next: BomDeptFilter) {
     setDept(next);

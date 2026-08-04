@@ -222,16 +222,20 @@ def _handle_return_normal(db, request, line, approver, qty, item_id) -> Decimal:
     return -qty
 
 
-def _child_decisions_from_notes(request, qty: Decimal) -> list[dict]:
+def _child_decisions_from_notes(request) -> list[dict]:
     import json
 
     try:
         raw = json.loads(request.notes or "{}") if request.notes else {}
-        child_decisions = raw.get("child_decisions", [])
     except (json.JSONDecodeError, TypeError):
-        child_decisions = []
-    for cd in child_decisions:
-        cd["qty"] = str(cd.get("qty", qty))
+        raise ValueError("재작업 자식 결정 JSON 형식이 올바르지 않습니다.")
+    if not isinstance(raw, dict):
+        raise ValueError("재작업 자식 결정은 JSON 객체여야 합니다.")
+    child_decisions = raw.get("child_decisions", [])
+    if not isinstance(child_decisions, list) or not all(
+        isinstance(decision, dict) for decision in child_decisions
+    ):
+        raise ValueError("재작업 자식 결정은 객체 배열이어야 합니다.")
     return child_decisions
 
 
@@ -242,25 +246,17 @@ def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Dec
         raise ValueError("재작업 처리에는 from_department 가 필요합니다.")
     reason_cat = request.reason_category or _DEFAULT_REASON_CATEGORY
     reason_memo_val = request.reason_memo or ""
-    child_decisions = _child_decisions_from_notes(request, qty)
-    if child_decisions:
-        submit_defective_disassemble(
-            db, item_id, qty, line.from_department,
-            child_decisions,
-            reason_category=reason_cat,
-            reason_memo=reason_memo_val,
-            actor=approver.name,
-            actor_employee_id=approver.employee_id,
-        )
-    else:
-        inventory_svc.scrap_defective(
-            db, item_id, qty, line.from_department,
-            inventory_svc.ReasonContext(
-                category=reason_cat,
-                memo=reason_memo_val,
-                actor=approver.name,
-            ),
-        )
+    child_decisions = _child_decisions_from_notes(request)
+    if not child_decisions:
+        raise ValueError("재작업 자식 결정이 비어 있습니다.")
+    submit_defective_disassemble(
+        db, item_id, qty, line.from_department,
+        child_decisions,
+        reason_category=reason_cat,
+        reason_memo=reason_memo_val,
+        actor=approver.name,
+        actor_employee_id=approver.employee_id,
+    )
     return -qty
 
 
@@ -271,7 +267,7 @@ def _handle_rework_normal(db, request, line, approver, qty, item_id) -> Decimal:
     if source == "production" and line.from_department is None:
         raise ValueError("정상 재고 바로 재작업에는 from_department 가 필요합니다.")
     source_dept = line.from_department or approver.department
-    child_decisions = _child_decisions_from_notes(request, qty)
+    child_decisions = _child_decisions_from_notes(request)
     if not child_decisions:
         raise ValueError("재작업 자식 결정이 비어 있습니다.")
     submit_normal_disassemble(

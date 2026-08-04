@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { XCircle } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { productionApi } from "@/lib/api/production";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import {
@@ -78,6 +79,7 @@ export function useHistoryCancellationScopeLogs({
   operationBatchId?: string | null;
   referenceNo?: string | null;
 }): HistoryCancellationScopeState & { retry: () => void } {
+  const realtimeRevision = useRealtimeRevision();
   const requestKey = operationBatchId
     ? `operation:${operationBatchId}`
     : referenceNo
@@ -119,7 +121,7 @@ export function useHistoryCancellationScopeLogs({
       active = false;
       controller.abort();
     };
-  }, [operationBatchId, panelOpen, referenceNo, requestKey, retryNonce, scopeKey]);
+  }, [operationBatchId, panelOpen, realtimeRevision, referenceNo, requestKey, retryNonce, scopeKey]);
 
   const synchronizedState = requestKey && state.scopeKey === scopeKey
     ? patchAtomicScopeFromVisibleCancellation(state, visibleLogs)

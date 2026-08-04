@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
 
@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
     hidden_sidebar_tabs: [],
     loginPopupEnabled: true,
   },
+  revision: null as number | null,
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -37,15 +38,28 @@ vi.mock("@/lib/client-events", () => ({
   sendClientEvent: vi.fn(),
 }));
 
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => state.revision,
+}));
+
 vi.mock("../../login/useCurrentOperator", () => ({
   useCurrentOperator: () => state.operator,
 }));
 
 vi.mock("../screens", () => ({
-  MobileDashboardScreen: ({ onStatusChange }: { onStatusChange: (status: string) => void }) => (
-    <button type="button" onClick={() => onStatusChange("item added")}>
-      dashboard screen
-    </button>
+  MobileDashboardScreen: ({
+    onStatusChange,
+    capacityData,
+  }: {
+    onStatusChange: (status: string) => void;
+    capacityData?: { immediate: number } | null;
+  }) => (
+    <>
+      <button type="button" onClick={() => onStatusChange("item added")}>
+        dashboard screen
+      </button>
+      <output data-testid="capacity-immediate">{capacityData?.immediate ?? "none"}</output>
+    </>
   ),
   MobileWarehouseScreen: () => <div>warehouse screen</div>,
   MobileDefectScreen: () => <div>defect screen</div>,
@@ -84,11 +98,20 @@ vi.mock("../screens", () => ({
 import { MobileShell } from "../MobileShell";
 import { sendClientEvent } from "@/lib/client-events";
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describe("MobileShell layout", () => {
   beforeEach(() => {
     window.history.pushState({}, "", "/mes");
     state.notifications = { items: [], unread_count: 0 };
     state.operator.hidden_sidebar_tabs = [];
+    state.revision = null;
     vi.mocked(sendClientEvent).mockClear();
   });
 
@@ -169,5 +192,51 @@ describe("MobileShell layout", () => {
       source: "mobile",
     });
     expect(sendClientEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes capacity on a realtime revision without leaving the active tab", async () => {
+    const { api } = await import("@/lib/api");
+    vi.mocked(api.getProductionCapacity).mockResolvedValue(null);
+    vi.mocked(api.getProductionCapacity).mockClear();
+    const { rerender } = render(<MobileShell />);
+
+    await screen.findByText("dashboard screen");
+    await vi.waitFor(() => {
+      expect(api.getProductionCapacity).toHaveBeenCalledTimes(1);
+    });
+    fireEvent.click(screen.getAllByRole("button").find((button) => button.getAttribute("aria-label") === "입출고")!);
+    expect(screen.getByText("warehouse screen")).toBeInTheDocument();
+
+    state.revision = 1;
+    rerender(<MobileShell />);
+
+    await vi.waitFor(() => {
+      expect(api.getProductionCapacity).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByText("warehouse screen")).toBeInTheDocument();
+  });
+
+  it("keeps the newest capacity when an older request resolves last", async () => {
+    const { api } = await import("@/lib/api");
+    const older = deferred<never>();
+    const newer = deferred<never>();
+    vi.mocked(api.getProductionCapacity)
+      .mockReset()
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+    const { rerender } = render(<MobileShell />);
+    await vi.waitFor(() => expect(api.getProductionCapacity).toHaveBeenCalledTimes(1));
+
+    state.revision = 1;
+    rerender(<MobileShell />);
+    await vi.waitFor(() => expect(api.getProductionCapacity).toHaveBeenCalledTimes(2));
+
+    await act(async () => newer.resolve({ immediate: 22 } as never));
+    await screen.findByText("22");
+    await act(async () => older.resolve({ immediate: 11 } as never));
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("capacity-immediate")).toHaveTextContent("22");
+    });
   });
 });

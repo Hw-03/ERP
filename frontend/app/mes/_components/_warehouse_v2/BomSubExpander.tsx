@@ -9,6 +9,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { mesCodeDeptBadge } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 const ROW_H = 34; // 일정한 행 높이(px) — 연결선이 정확히 이어지려면 고정
 const GUIDE_W = 22; // 가이드(레일/엘보) 컬럼 폭(px)
@@ -290,29 +291,34 @@ interface Props {
 }
 
 export function BomSubExpander({ itemId, open, compact = false, tapToExpandName = false, modal = false }: Props) {
+  const revision = useRealtimeRevision();
   const [tree, setTree] = useState<BOMTreeNode | false | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
   const loadedItemRef = useRef<string | null>(null);
+  const loadedRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    if (!open || loadedItemRef.current === itemId) return;
-    setTree(null);
+    const requestKey = `${itemId}:${revision ?? "initial"}:${requestVersion}`;
+    if (!open || loadedRequestRef.current === requestKey) return;
+    const refreshingCurrentItem = loadedItemRef.current === itemId;
+    if (!refreshingCurrentItem) setTree(null);
     api
       .getBOMTree(itemId)
       .then((nextTree) => {
         if (!active) return;
         loadedItemRef.current = itemId;
+        loadedRequestRef.current = requestKey;
         setTree(nextTree);
       })
       .catch(() => {
         if (!active) return;
-        setTree(false);
+        if (!refreshingCurrentItem) setTree(false);
       });
     return () => {
       active = false;
     };
-  }, [open, itemId, requestVersion]);
+  }, [open, itemId, requestVersion, revision]);
 
   if (!open) return null;
 

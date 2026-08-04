@@ -10,6 +10,7 @@ import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPan
 import { IoComposeView } from "./_warehouse_v2/IoComposeView";
 import { readCurrentOperator } from "./login/useCurrentOperator";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
 // 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
@@ -33,6 +34,7 @@ export function DesktopWarehouseView({
   entryIntent?: IoEntryIntent | null;
   onSubmitSuccess?: () => void;
 }) {
+  const revision = useRealtimeRevision();
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
     onStatusChange,
@@ -107,47 +109,68 @@ export function DesktopWarehouseView({
 
   useEffect(() => {
     if (!operatorEmployeeId) return;
+    let active = true;
     Promise.all([
       api.listStockRequestDrafts(operatorEmployeeId),
       api.listDrafts(operatorEmployeeId),
     ])
       .then(([legacyRows, ioRows]) => {
+        if (!active) return;
         const n = legacyRows.length + ioRows.length;
         setCartCount(n);
         cartCountCache.set(operatorEmployeeId, n);
       })
       .catch(() => {});
-  }, [operatorEmployeeId, panelRefreshNonce]);
+    return () => {
+      active = false;
+    };
+  }, [operatorEmployeeId, panelRefreshNonce, revision]);
 
   useEffect(() => {
     if (!canSeeQueue) return;
+    let active = true;
     api
       .countWarehouseQueue()
       .then(({ count }) => {
+        if (!active) return;
         setWarehouseQueueCount(count);
         warehouseQueueCountCache.value = count;
       })
       .catch(() => {});
-  }, [canSeeQueue, panelRefreshNonce]);
+    return () => {
+      active = false;
+    };
+  }, [canSeeQueue, panelRefreshNonce, revision]);
 
   useEffect(() => {
     if (!canSeeDeptQueue || !operatorEmployeeId) return;
+    let active = true;
     api
       .countDepartmentQueue(operatorEmployeeId)
       .then(({ count }) => {
+        if (!active) return;
         setDeptQueueCount(count);
         deptQueueCountCache.set(operatorEmployeeId, count);
       })
       .catch(() => {});
-  }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
+    return () => {
+      active = false;
+    };
+  }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce, revision]);
 
   useEffect(() => {
     if (!canReceiveHandover || !operatorEmployeeId) return;
+    let active = true;
     api
       .countHandoverInbox(operatorEmployeeId)
-      .then(({ count }) => setHandoverInboxCount(count))
+      .then(({ count }) => {
+        if (active) setHandoverInboxCount(count);
+      })
       .catch(() => {});
-  }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce]);
+    return () => {
+      active = false;
+    };
+  }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce, revision]);
 
 
   function handleLegacyDraftContinue(_draft: StockRequest) {

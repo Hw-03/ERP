@@ -381,6 +381,13 @@ def _submit_rework_disassemble(
         raise ValueError("재작업 수량은 0보다 커야 합니다.")
     if not child_decisions:
         raise ValueError("자식 결정이 비어 있습니다.")
+    if parent_source == "defective":
+        _validate_decision_tree_against_bom(
+            db,
+            parent_item_id,
+            parent_qty,
+            child_decisions,
+        )
 
     batch_id = uuid.uuid4()
     batch_ref = f"defect-disassemble:{batch_id}"
@@ -540,6 +547,66 @@ def _submit_rework_disassemble(
         "parent_log_id": parent_log.log_id,
         "child_log_ids": child_log_ids,
     }
+
+
+def _validate_decision_tree_against_bom(
+    db: Session,
+    parent_item_id: uuid.UUID,
+    parent_qty: Decimal,
+    decisions: list[dict],
+    *,
+    depth: int = 1,
+) -> None:
+    """현재 BOM 구조와 제출된 분해 결정의 품목·수량을 재고 변경 전에 대조한다."""
+    if depth > 10:
+        raise ValueError("BOM 분해 결정 트리 깊이가 허용 범위를 초과했습니다.")
+
+    bom_rows = db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
+    expected = {
+        row.child_item_id: Decimal(str(row.quantity)) * parent_qty
+        for row in bom_rows
+    }
+    if not expected:
+        raise ValueError(f"현재 BOM 구성품이 없는 품목입니다: {parent_item_id}")
+
+    seen: set[uuid.UUID] = set()
+    for decision in decisions:
+        try:
+            item_id = uuid.UUID(str(decision["item_id"]))
+            qty = Decimal(str(decision["qty"]))
+        except (KeyError, TypeError, ValueError, ArithmeticError) as exc:
+            raise ValueError(f"BOM 분해 결정의 품목 또는 수량이 올바르지 않습니다: {decision}") from exc
+
+        if item_id in seen:
+            raise ValueError(f"BOM 분해 결정에 중복 품목이 있습니다: {item_id}")
+        seen.add(item_id)
+        expected_qty = expected.get(item_id)
+        if expected_qty is None:
+            raise ValueError(f"현재 BOM에 없는 품목이 분해 결정에 포함됐습니다: {item_id}")
+        if qty != expected_qty:
+            raise ValueError(
+                f"BOM 분해 수량이 현재 기준과 다릅니다: {item_id} "
+                f"(요청 {qty}, 현재 {expected_qty})"
+            )
+
+        children = decision.get("children")
+        if children is not None:
+            if not isinstance(children, list) or not children:
+                raise ValueError(f"BOM 하위 분해 결정이 올바르지 않습니다: {item_id}")
+            _validate_decision_tree_against_bom(
+                db,
+                item_id,
+                qty,
+                children,
+                depth=depth + 1,
+            )
+        else:
+            _split_rework_quantities(decision, qty)
+
+    missing = set(expected) - seen
+    if missing:
+        missing_ids = ", ".join(str(item_id) for item_id in sorted(missing, key=str))
+        raise ValueError(f"현재 BOM 구성품 결정이 누락됐습니다: {missing_ids}")
 
 
 def submit_defective_disassemble(
