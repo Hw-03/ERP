@@ -215,6 +215,9 @@ export function IoComposeView({
     } else if (entryIntent.subType) {
       state.setSubType(entryIntent.subType);
     }
+    if (entryIntent.toDepartment) {
+      state.setToDepartment(entryIntent.toDepartment);
+    }
     state.goTo(3);
   // entryIntent는 마운트 시 1회만 적용 — deps 배열에 state 함수 넣으면 재실행되므로 의도적으로 생략.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -347,6 +350,7 @@ export function IoComposeView({
     fromDepartment: state.fromDepartment,
     toDepartment: state.toDepartment,
     deptIoDirection: state.deptIoDirection,
+    forceManual: entryIntent?.forceManualItem,
     addItem,
     setHighlightItemId,
   });
@@ -357,7 +361,7 @@ export function IoComposeView({
   useEffect(() => {
     if (entryLeafAdvancedRef.current) return;
     if (!entryIntent || !preselectedItem || !bomParentsLoaded) return;
-    if (bomParents.has(preselectedItem.item_id)) {
+    if (bomParents.has(preselectedItem.item_id) && !entryIntent.forceManualItem) {
       // BOM 부모 — Step3 유지(BOM/낱개 선택). 더 이상 처리하지 않음.
       entryLeafAdvancedRef.current = true;
       return;

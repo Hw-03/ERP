@@ -348,6 +348,7 @@ function DesktopMesShellInner() {
           key={key}
           operator={operator}
           onStatusChange={handleStatusChange}
+          onGoToWarehouse={handleGoToWarehouse}
         />
       );
     }

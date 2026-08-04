@@ -350,6 +350,16 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     clear_after_pickup = client.post(f"/api/shipping/requests/{request_id}/checklist/clear")
     assert clear_after_pickup.status_code == 422, clear_after_pickup.text
 
+    pickup_cancel = client.post(f"/api/shipping/requests/{request_id}/pickup-cancel")
+    assert pickup_cancel.status_code == 200, pickup_cancel.text
+    assert pickup_cancel.json()["status"] == ShippingRequestStatusEnum.PREPARED.value
+    assert pickup_cancel.json()["picked_up_at"] is None
+    assert pickup_cancel.json()["serial_numbers"] == "SN-003"
+    assert any(event["event_type"] == "PICKUP_CANCELLED" for event in pickup_cancel.json()["events"])
+
+    repeated_cancel = client.post(f"/api/shipping/requests/{request_id}/pickup-cancel")
+    assert repeated_cancel.status_code == 422, repeated_cancel.text
+
 
 def test_shipping_request_component_change_attributes_all_logs_to_executor(
     client, db_session, make_item, make_bom, make_location

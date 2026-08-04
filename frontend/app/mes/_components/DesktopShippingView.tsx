@@ -41,6 +41,7 @@ import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
+import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { matchesSearchText } from "@/lib/searchText";
 
 type SectionTab = "request" | "history";
@@ -62,6 +63,7 @@ type PendingAction =
   | "prepare"
   | "cancel"
   | "pickup"
+  | "pickupCancel"
   | "delete"
   | null;
 
@@ -69,7 +71,8 @@ type ConfirmAction =
   | { kind: "prepare"; request: ShippingRequest }
   | { kind: "cancel"; request: ShippingRequest }
   | { kind: "delete"; request: ShippingRequest }
-  | { kind: "pickup"; request: ShippingRequest };
+  | { kind: "pickup"; request: ShippingRequest }
+  | { kind: "pickupCancel"; request: ShippingRequest };
 
 type NameValidationNotice = {
   id: number;
@@ -110,6 +113,7 @@ const SHIPPING_EVENT_LABEL: Record<string, string> = {
   PREPARED: "출하 준비 완료",
   PREPARE_CANCELLED: "출하 준비 취소",
   PICKED_UP: "픽업 완료 처리",
+  PICKUP_CANCELLED: "픽업 완료 취소",
 };
 
 function txTypeLabel(type: string) {
@@ -261,9 +265,10 @@ function companionPayload(lines: CompanionDraftLine[], itemById: Map<string, Ite
     }));
 }
 
-export function DesktopShippingView({ onStatusChange, operator = null }: {
+export function DesktopShippingView({ onStatusChange, operator = null, onGoToWarehouse }: {
   onStatusChange: (status: string) => void;
   operator?: Operator | null;
+  onGoToWarehouse?: (item: Item, intent: IoEntryIntent) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -444,6 +449,30 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
       setPending(null);
     }
   }, [items, itemsLoading, onStatusChange, setError]);
+
+  async function pullShortageFromWarehouse(shortage: ShippingRequest["stock_shortages"][number]) {
+    const toDepartment = shortage.department?.trim();
+    if (!toDepartment) {
+      const message = `${shortage.item_name}의 대상 부서 정보를 확인할 수 없습니다.`;
+      setError(message);
+      onStatusChange(message);
+      return;
+    }
+    const loadedItems = await ensureItemsLoaded();
+    const item = loadedItems?.find((candidate) => candidate.item_id === shortage.item_id);
+    if (!item) {
+      const message = `${shortage.item_name} 품목 정보를 찾을 수 없습니다.`;
+      setError(message);
+      onStatusChange(message);
+      return;
+    }
+    onGoToWarehouse?.(item, {
+      workType: "warehouse_io",
+      subType: "warehouse_to_dept",
+      toDepartment,
+      forceManualItem: true,
+    });
+  }
 
   const ensurePfItemsLoaded = useCallback(async () => {
     if (pfItemsLoaded || pfItems.length > 0) return true;
@@ -1046,10 +1075,14 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     setConfirmAction({ kind: "pickup", request: req });
   }
 
+  function cancelPickup(req: ShippingRequest) {
+    setConfirmAction({ kind: "pickupCancel", request: req });
+  }
+
   async function executeConfirmedAction(serialNumbers: string) {
     if (!confirmAction) return;
     const action = confirmAction;
-    setPending(action.kind === "prepare" ? "prepare" : action.kind === "cancel" ? "cancel" : action.kind === "delete" ? "delete" : "pickup");
+    setPending(action.kind === "prepare" ? "prepare" : action.kind === "cancel" ? "cancel" : action.kind === "delete" ? "delete" : action.kind === "pickupCancel" ? "pickupCancel" : "pickup");
     setError(null);
     try {
       if (action.kind === "prepare") {
@@ -1068,6 +1101,14 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
         setEditingId(null);
         navigateView("requestList");
         onStatusChange("출하 요청을 취소했습니다.");
+      } else if (action.kind === "pickupCancel") {
+        const next = await api.cancelShippingPickup(action.request.request_id);
+        upsertRequest(next);
+        setHistoryRows((current) => current.filter((row) => row.request_id !== next.request_id));
+        setSelectedHistoryId(null);
+        setSelectedPrepId(next.request_id);
+        navigateView("prepWork", next.request_id);
+        onStatusChange("픽업 완료를 취소했습니다. 출하 준비에서 다시 확인하세요.");
       } else {
         const next = await api.completeShippingPickup(action.request.request_id);
         upsertRequest(next);
@@ -1079,7 +1120,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
       }
       setConfirmAction(null);
     } catch (err) {
-      const fallback = action.kind === "prepare" ? "준비 완료 처리에 실패했습니다." : action.kind === "cancel" ? "준비 완료 취소에 실패했습니다." : action.kind === "delete" ? "요청 취소에 실패했습니다." : "픽업 완료 처리에 실패했습니다.";
+      const fallback = action.kind === "prepare" ? "준비 완료 처리에 실패했습니다." : action.kind === "cancel" ? "준비 완료 취소에 실패했습니다." : action.kind === "delete" ? "요청 취소에 실패했습니다." : action.kind === "pickupCancel" ? "픽업 완료 취소에 실패했습니다." : "픽업 완료 처리에 실패했습니다.";
       const msg = err instanceof Error ? err.message : fallback;
       setError(msg);
       onStatusChange(msg);
@@ -1280,6 +1321,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
             onOpenPrepare={(req) => void completePrepare(req)}
             onCancel={(req) => void cancelPrepare(req)}
             onPickup={(req) => void completePickup(req)}
+            onPullFromWarehouse={(shortage) => void pullShortageFromWarehouse(shortage)}
             onInvoiceSaved={handleInvoiceSaved}
           />
         </div>
@@ -1317,7 +1359,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
     return (
       <div className="grid gap-3">
         <ViewHeader title="출하 상세 이력" subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다." onBack={() => navigateView("historyList")} />
-        <HistorySection rows={historyRows} selected={selectedHistory} emptyBody={historyDetailError ?? undefined} onSelect={(req) => setSelectedHistoryId(req.request_id)} onInvoiceSaved={handleInvoiceSaved} showList={false} />
+        <HistorySection rows={historyRows} selected={selectedHistory} emptyBody={historyDetailError ?? undefined} onSelect={(req) => setSelectedHistoryId(req.request_id)} onPickupCancel={cancelPickup} onInvoiceSaved={handleInvoiceSaved} showList={false} />
       </div>
     );
   }
@@ -2439,6 +2481,7 @@ function PrepSection({
   onOpenPrepare,
   onCancel,
   onPickup,
+  onPullFromWarehouse,
   onInvoiceSaved,
 }: {
   showList?: boolean;
@@ -2449,6 +2492,7 @@ function PrepSection({
   onOpenPrepare: (req: ShippingRequest) => void;
   onCancel: (req: ShippingRequest) => void;
   onPickup: (req: ShippingRequest) => void;
+  onPullFromWarehouse: (shortage: ShippingRequest["stock_shortages"][number]) => void;
   onInvoiceSaved: (request: ShippingRequest) => void;
 }) {
   const requestQty = selected?.request_quantity ?? 1;
@@ -2491,7 +2535,7 @@ function PrepSection({
               <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
               <RevisionHistory request={selected} />
             </div>
-            {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} kindByItemId={shortageKindByItemId} />}
+            {stockShortages.length > 0 && <StockShortageNotice shortages={stockShortages} kindByItemId={shortageKindByItemId} onPullFromWarehouse={onPullFromWarehouse} />}
 
             <div className="grid gap-3 md:grid-cols-3">
               <Metric label="출하 수량" value={`${requestQty}대`} />
@@ -2530,9 +2574,11 @@ function PrepSection({
 function StockShortageNotice({
   shortages,
   kindByItemId,
+  onPullFromWarehouse,
 }: {
   shortages: ShippingRequest["stock_shortages"];
   kindByItemId: Map<string, ShippingShortageKind>;
+  onPullFromWarehouse: (shortage: ShippingRequest["stock_shortages"][number]) => void;
 }) {
   return (
     <div
@@ -2565,9 +2611,20 @@ function StockShortageNotice({
                 <span>· {line.department ?? "-"}</span>
               </span>
             </span>
-            <span className="shrink-0 text-xs font-black tabular-nums" style={{ color: LEGACY_COLORS.red }}>
-              {line.shortage_quantity}개 부족
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-xs font-black tabular-nums" style={{ color: LEGACY_COLORS.red }}>
+                {line.shortage_quantity}개 부족
+              </span>
+              <button
+                type="button"
+                data-testid={`shipping-shortage-pull-${line.item_id}`}
+                onClick={() => onPullFromWarehouse(line)}
+                className="rounded-[9px] border px-2.5 py-1.5 text-xs font-black"
+                style={{ background: tint(LEGACY_COLORS.blue, 10), borderColor: tint(LEGACY_COLORS.blue, 35), color: LEGACY_COLORS.blue }}
+              >
+                창고에서 담기
+              </button>
+            </div>
           </div>
           );
         })}
@@ -2695,7 +2752,7 @@ function CompanionPrepList({
   );
 }
 
-function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; onSelect: (req: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
+function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, onPickupCancel, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; onSelect: (req: ShippingRequest) => void; onPickupCancel: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[420px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
       {showList && (
@@ -2729,6 +2786,11 @@ function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, 
               <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
               <RevisionHistory request={selected} />
             </div>
+            {selected.status === "PICKED_UP" && (
+              <div className="flex justify-end rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                <ActionButton icon={RotateCcw} label="픽업 완료 취소" tone={LEGACY_COLORS.yellow} onClick={() => onPickupCancel(selected)} dataTestId="shipping-pickup-cancel-from-history" />
+              </div>
+            )}
             {selected.status === "PICKED_UP" && <Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(selected.serial_numbers)} />}
             <div className="grid gap-3 md:grid-cols-3">
               <Metric label="최종 PA" value={selected.final_pa_item_name ?? "-"} />
@@ -3126,18 +3188,20 @@ function ShippingActionConfirmModal({
 }) {
   const isPrepare = kind === "prepare";
   const [serialNumbers, setSerialNumbers] = useState(request.serial_numbers || "");
-  const title = isPrepare ? "준비 완료 확인" : kind === "cancel" ? "준비 완료 취소 확인" : kind === "delete" ? "요청 취소 확인" : "픽업 완료 확인";
-  const tone = isPrepare ? LEGACY_COLORS.green : kind === "cancel" ? LEGACY_COLORS.yellow : kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
+  const title = isPrepare ? "준비 완료 확인" : kind === "cancel" ? "준비 완료 취소 확인" : kind === "pickupCancel" ? "픽업 완료 취소 확인" : kind === "delete" ? "요청 취소 확인" : "픽업 완료 확인";
+  const tone = isPrepare ? LEGACY_COLORS.green : kind === "cancel" || kind === "pickupCancel" ? LEGACY_COLORS.yellow : kind === "delete" ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
   const requestQty = request.request_quantity ?? 1;
   const description = isPrepare
     ? "최종 PF와 동반 출하품의 품목별 부서 재고를 확인한 뒤 대기 예약합니다. 재고를 추가로 변동하지 않습니다."
     : kind === "cancel"
       ? "대기 예약을 해제합니다. 작업자가 처리한 BOM 입출고 재고는 변경하지 않습니다."
+      : kind === "pickupCancel"
+        ? "픽업 완료 재고 반영을 취소하고, 준비 완료 상태와 출하 예약으로 되돌립니다."
       : kind === "delete"
         ? request.status === "PREPARING"
           ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."
           : "요청 상태의 출하 요청을 목록에서 삭제합니다. 이력은 남지 않습니다."
-        : "최종 PF와 동반 출하품을 출하 처리합니다. v1에서는 픽업 완료 후 취소 기능이 없습니다.";
+        : "최종 PF와 동반 출하품을 출하 처리합니다.";
   const lines = isPrepare
     ? [
         ...request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} · 1대 ${line.quantity}${line.unit ? ` ${line.unit}` : ""} / 총 ${line.quantity * requestQty}${line.unit ? ` ${line.unit}` : ""}`),
@@ -3145,6 +3209,8 @@ function ShippingActionConfirmModal({
       ]
     : kind === "cancel"
       ? request.transactions.filter((log) => log.shipping_phase === "PREPARE" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
+      : kind === "pickupCancel"
+        ? request.transactions.filter((log) => log.shipping_phase === "PICKUP" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
       : kind === "delete"
         ? [`기준 PF · ${request.base_pf_item_name}`]
         : [

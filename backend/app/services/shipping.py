@@ -1533,3 +1533,63 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     _record_event(db, req, "PICKED_UP", "픽업 완료 처리")
     db.flush()
     return req
+
+
+def pickup_cancel(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+    """실수로 처리한 픽업 완료를 준비 완료 상태로 되돌린다."""
+    req = _get_request(db, request_id)
+    if req.status != ShippingRequestStatusEnum.PICKED_UP:
+        raise ShippingError("픽업 완료 요청에서만 픽업 완료를 취소할 수 있습니다.")
+    if req.final_pf_item is None:
+        raise ShippingError("최종 PF가 생성되지 않았습니다.")
+
+    pickup_logs = (
+        db.query(TransactionLog)
+        .filter(
+            TransactionLog.shipping_request_id == req.request_id,
+            TransactionLog.shipping_phase == PICKUP_PHASE,
+            TransactionLog.cancelled.is_(False),
+        )
+        .order_by(TransactionLog.created_at.desc(), TransactionLog.log_id.desc())
+        .all()
+    )
+    if not pickup_logs:
+        raise ShippingError("취소할 픽업 완료 재고 이력이 없습니다.")
+
+    now = datetime.utcnow()
+    for log in pickup_logs:
+        inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
+        inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
+        if inv is not None:
+            _sync_total(db, inv)
+        log.cancelled = True
+        log.cancel_reason = "픽업 완료 취소"
+        log.cancelled_at = now
+
+    consumed_allocations = (
+        db.query(ShippingAllocation)
+        .filter(
+            ShippingAllocation.request_id == req.request_id,
+            ShippingAllocation.status == ALLOCATION_CONSUMED,
+        )
+        .all()
+    )
+    if consumed_allocations:
+        for allocation in consumed_allocations:
+            allocation.status = ALLOCATION_RESERVED
+            allocation.consumed_at = None
+    else:
+        _reserve_pickup_items(
+            db,
+            req,
+            req.final_pf_item,
+            _request_quantity(req),
+            f"SHIP-PREP-{req.request_id.hex[:8]}",
+        )
+
+    req.status = ShippingRequestStatusEnum.PREPARED
+    req.picked_up_at = None
+    req.updated_at = now
+    _record_event(db, req, "PICKUP_CANCELLED", "픽업 완료 취소")
+    db.flush()
+    return req

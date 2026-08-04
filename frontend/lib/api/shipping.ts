@@ -98,6 +98,9 @@ export const shippingApi = {
   completeShippingPickup: (requestId: string) =>
     postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/pickup-complete`), {}),
 
+  cancelShippingPickup: (requestId: string) =>
+    postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/pickup-cancel`), {}),
+
   getShippingHistory,
 
   getShippingHistoryMonths: (

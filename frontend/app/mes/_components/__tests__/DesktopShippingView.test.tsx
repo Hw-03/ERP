@@ -45,6 +45,7 @@ vi.mock("@/lib/api", () => ({
     prepareShippingComplete: vi.fn(),
     cancelShippingPrepare: vi.fn(),
     completeShippingPickup: vi.fn(),
+    cancelShippingPickup: vi.fn(),
     matchShippingBom: vi.fn(),
   },
 }));
@@ -328,6 +329,7 @@ beforeEach(() => {
   vi.mocked(api.prepareShippingComplete).mockResolvedValue(request({ status: "PREPARED" }));
   vi.mocked(api.cancelShippingPrepare).mockResolvedValue(request({ status: "PREPARING" }));
   vi.mocked(api.completeShippingPickup).mockResolvedValue(request({ request_id: "req-1", status: "PICKED_UP" }));
+  vi.mocked(api.cancelShippingPickup).mockResolvedValue(request({ request_id: "req-1", status: "PREPARED", picked_up_at: null }));
 });
 
 describe("DesktopShippingView", () => {
@@ -900,6 +902,71 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(navigationMock.replace.mock.calls.filter(([url]) =>
       String(url).includes("shippingView=historyWork") && String(url).includes("shippingHistoryStatus=PICKED_UP"),
     )).toHaveLength(1));
+  });
+
+  it("opens the warehouse transfer with the shortage item, department, and manual intent", async () => {
+    navigationMock.search = "tab=shipping&shippingView=prepWork&shippingRequestId=req-1";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({
+        stock_shortages: [{
+          item_id: "pa-1",
+          item_name: "Standard PA",
+          mes_code: "PA-001",
+          process_type_code: "PA",
+          department: "조립",
+          required_quantity: 1,
+          current_quantity: 0,
+          allocated_quantity: 0,
+          available_quantity: 0,
+          shortage_quantity: 1,
+          phase: "PREPARE",
+        }],
+      }),
+    ]);
+    const onGoToWarehouse = vi.fn();
+
+    render(<DesktopShippingView onStatusChange={() => {}} onGoToWarehouse={onGoToWarehouse} />);
+
+    fireEvent.click(await screen.findByTestId("shipping-shortage-pull-pa-1"));
+
+    await waitFor(() => expect(onGoToWarehouse).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: "pa-1" }),
+      {
+        workType: "warehouse_io",
+        subType: "warehouse_to_dept",
+        toDepartment: "조립",
+        forceManualItem: true,
+      },
+    ));
+  });
+
+  it("cancels a picked-up history entry and returns to its preparation work", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=hist-picked&shippingHistoryStatus=PICKED_UP";
+    const picked = request({
+      request_id: "hist-picked",
+      status: "PICKED_UP",
+      prepared_at: "2026-07-24T00:00:00Z",
+      picked_up_at: "2026-07-24T01:00:00Z",
+    });
+    vi.mocked(api.getShippingRequests).mockResolvedValue([picked]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [picked], next_cursor: null, has_more: false });
+    vi.mocked(api.getShippingRequest).mockResolvedValue(picked);
+    vi.mocked(api.cancelShippingPickup).mockResolvedValue({ ...picked, status: "PREPARED", picked_up_at: null });
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("shipping-pickup-cancel-from-history"));
+    fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
+
+    await waitFor(() => expect(api.cancelShippingPickup).toHaveBeenCalledWith("hist-picked"));
+    expect(navigationMock.push).toHaveBeenCalledWith(
+      expect.stringContaining("shippingView=prepWork"),
+      { scroll: false },
+    );
+    expect(navigationMock.push).toHaveBeenCalledWith(
+      expect.stringContaining("shippingRequestId=hist-picked"),
+      { scroll: false },
+    );
   });
 
   it("opens shipping subviews from URL query", async () => {

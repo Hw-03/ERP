@@ -28,6 +28,8 @@ export interface IoEntryIntent {
   workType: IoWorkType;
   direction?: DeptIoDirection;
   subType?: IoSubType;
+  toDepartment?: string;
+  forceManualItem?: boolean;
 }
 
 export interface IoComposeViewProps {

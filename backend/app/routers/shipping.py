@@ -575,6 +575,12 @@ def pickup_complete(request_id: uuid.UUID, db: Session = Depends(get_db)):
     return _to_response(db, req)
 
 
+@router.post("/requests/{request_id}/pickup-cancel", response_model=ShippingRequestResponse)
+def pickup_cancel(request_id: uuid.UUID, db: Session = Depends(get_db)):
+    req = _action_or_422(db, shipping_actions_svc.pickup_cancel, request_id)
+    return _to_response(db, req)
+
+
 def _history_cursor(request: ShippingRequest, sort_at: datetime) -> str:
     payload = {"sort_at": sort_at.isoformat(), "request_id": str(request.request_id)}
     return base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
