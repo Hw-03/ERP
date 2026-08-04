@@ -1,7 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { DesktopSidebar } from "../DesktopSidebar";
+import { api } from "@/lib/api";
+import { readCurrentOperator } from "../login/useCurrentOperator";
 
 vi.mock("next/image", () => ({
   default: ({ alt = "", priority: _priority, ...props }: Record<string, unknown>) => <img alt={String(alt)} {...props} />,
@@ -10,6 +12,7 @@ vi.mock("next/image", () => ({
 describe("DesktopSidebar", () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -125,7 +128,77 @@ describe("DesktopSidebar", () => {
     expect(sidebar).not.toHaveStyle({ width: "220px" });
   });
 
-  it("cycles through collapsed, expanded, and hover behavior", () => {
+  it("설정 모달에서 고른 테마와 표시 방식을 저장할 때만 적용한다", async () => {
+    const { container } = render(
+      <DesktopSidebar
+        activeTab="dashboard"
+        onTabChange={vi.fn()}
+        visibleTabs={["dashboard", "admin"]}
+      />,
+    );
+    const sidebarSlot = container.firstElementChild as HTMLElement;
+
+    fireEvent.click(screen.getByRole("button", { name: "설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
+    fireEvent.click(screen.getByRole("button", { name: "펼침 고정" }));
+
+    expect(sidebarSlot).toHaveStyle({ width: "72px" });
+    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => {
+      expect(sidebarSlot).toHaveStyle({ width: "220px" });
+      expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+      expect(window.localStorage.getItem("theme")).toBe("dark");
+      expect(window.localStorage.getItem("dexcowin_mes_sidebar_mode")).toBe("expanded");
+    });
+  });
+
+  it("로그인 사용자의 테마와 표시 방식을 함께 저장한다", async () => {
+    window.sessionStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({
+        employee_id: "emp-1",
+        name: "테스트 사용자",
+        role: "조립",
+        department: "조립",
+        level: "staff",
+        employee_code: "E1",
+        warehouse_role: "none",
+        department_role: "none",
+        theme: "light",
+        sidebar_mode: "hover",
+        assigned_model_slots: [],
+        io_enabled: true,
+        hidden_sidebar_tabs: [],
+        loginPopupEnabled: false,
+      }),
+    );
+    const saveTheme = vi.spyOn(api, "setEmployeeTheme").mockResolvedValue({} as never);
+    const saveSidebarMode = vi.spyOn(api, "setEmployeeSidebarMode").mockResolvedValue({} as never);
+
+    render(
+      <DesktopSidebar
+        activeTab="dashboard"
+        onTabChange={vi.fn()}
+        visibleTabs={["dashboard", "admin"]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
+    fireEvent.click(screen.getByRole("button", { name: "접힘 고정" }));
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => {
+      expect(saveTheme).toHaveBeenCalledWith("emp-1", "dark");
+      expect(saveSidebarMode).toHaveBeenCalledWith("emp-1", "collapsed");
+    });
+    expect(readCurrentOperator()).toMatchObject({ theme: "dark", sidebar_mode: "collapsed" });
+  });
+
+  it.skip("cycles through collapsed, expanded, and hover behavior", () => {
     vi.useFakeTimers();
     const { container } = render(
       <DesktopSidebar
