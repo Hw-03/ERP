@@ -58,14 +58,27 @@ def test_create_no_locations_all_warehouse(client, seed_symbol):
     assert body["locations"] == []
 
 
-def test_create_item_sets_sales_review_required_and_defaults_false(client, seed_symbol):
+def test_create_item_preserves_explicit_sales_review_and_defaults_af_to_required(client, seed_symbol):
     flagged = _create_item(client, name="Sales review", sales_review_required=True)
     assert flagged.status_code == 201, flagged.text
     assert _get_item(client, flagged.json()["item_id"]).json()["sales_review_required"] is True
 
-    defaulted = _create_item(client, name="No sales review")
-    assert defaulted.status_code == 201, defaulted.text
-    assert _get_item(client, defaulted.json()["item_id"]).json()["sales_review_required"] is False
+    defaulted_af = _create_item(client, name="AF default", process_type_code="AF")
+    assert defaulted_af.status_code == 201, defaulted_af.text
+    assert _get_item(client, defaulted_af.json()["item_id"]).json()["sales_review_required"] is True
+
+    cleared_af = _create_item(
+        client,
+        name="AF explicit clear",
+        process_type_code="AF",
+        sales_review_required=False,
+    )
+    assert cleared_af.status_code == 201, cleared_af.text
+    assert _get_item(client, cleared_af.json()["item_id"]).json()["sales_review_required"] is False
+
+    defaulted_non_af = _create_item(client, name="Non-AF default")
+    assert defaulted_non_af.status_code == 201, defaulted_non_af.text
+    assert _get_item(client, defaulted_non_af.json()["item_id"]).json()["sales_review_required"] is False
 
 
 def test_create_two_departments_split(client, seed_symbol):
