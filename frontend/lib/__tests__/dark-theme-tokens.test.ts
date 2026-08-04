@@ -31,9 +31,9 @@ const DARK_PROCESS = {
 
 const DARK_DEPARTMENTS = {
   "--c-department-tube": "#75b58a",
-  "--c-department-high-pressure": "#c9a168",
+  "--c-department-high-pressure": "#cfb36a",
   "--c-department-vacuum": "#aa98c8",
-  "--c-department-tuning": "#d4b969",
+  "--c-department-tuning": "#b5b5b5",
   "--c-department-assembly": "#78a7d8",
   "--c-department-shipping": "#b68e6c",
 };

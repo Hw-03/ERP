@@ -79,9 +79,9 @@
     --c-process-pa: #c2410c;
     --c-process-pf: #2563eb;
     --c-department-tube: #2f805d;
-    --c-department-high-pressure: #9a672d;
+    --c-department-high-pressure: #85630d;
     --c-department-vacuum: #7052a8;
-    --c-department-tuning: #80600d;
+    --c-department-tuning: #5c5c5c;
     --c-department-assembly: #2f6faf;
     --c-department-shipping: #9f4d43;
     --c-text: #101a2b;
@@ -185,9 +185,9 @@
     --c-department-color-source-weight: 55%;
     --c-department-color-neutral: #adb7c3;
     --c-department-tube: #75b58a;
-    --c-department-high-pressure: #c9a168;
+    --c-department-high-pressure: #cfb36a;
     --c-department-vacuum: #aa98c8;
-    --c-department-tuning: #d4b969;
+    --c-department-tuning: #b5b5b5;
     --c-department-assembly: #78a7d8;
     --c-department-shipping: #b68e6c;
   }

@@ -18,9 +18,9 @@ const FALLBACK_INITIAL = "기"; // "기타"
 
 const STANDARD_PRODUCTION_DEPARTMENT_COLORS: Record<string, string> = {
   "\uD29C\uBE0C": "#2f805d",
-  "\uACE0\uC555": "#9a672d",
+  "\uACE0\uC555": "#85630d",
   "\uC9C4\uACF5": "#7052a8",
-  "\uD29C\uB2DD": "#80600d",
+  "\uD29C\uB2DD": "#5c5c5c",
   "\uC870\uB9BD": "#2f6faf",
   "\uCD9C\uD558": "#9f4d43",
 };
