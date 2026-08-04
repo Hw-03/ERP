@@ -49,8 +49,8 @@ export function InventoryCapacityPanel({
 function afAccent(status: ProductionCapacityAfStatus): string {
   switch (status) {
     case "producible":
-      return LEGACY_COLORS.cyan;
     case "incomplete":
+      return LEGACY_COLORS.cyan;
     case "not_producible":
       return LEGACY_COLORS.yellow;
     default:
@@ -63,7 +63,7 @@ function afHeading(status: ProductionCapacityAfStatus): string {
     case "producible":
       return "생산 가능";
     case "incomplete":
-      return "생산 가능 · 일부 BOM 미완성";
+      return "생산 가능";
     case "not_producible":
       return "생산 불가";
     case "bom_not_registered":
@@ -88,7 +88,7 @@ export function capacityStatusBadge(
       s === "producible"
         ? "생산 가능"
         : s === "incomplete"
-          ? "일부 미완성"
+          ? "생산 가능"
           : s === "not_producible"
             ? "생산 불가"
             : s === "bom_not_registered"

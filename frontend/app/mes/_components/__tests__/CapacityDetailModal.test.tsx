@@ -66,9 +66,78 @@ const capacityData: ProductionCapacity = {
   },
 };
 
+const incompleteCapacityData: ProductionCapacity = {
+  ...capacityData,
+  af: {
+    ...capacityData.af!,
+    status: "incomplete",
+    items: [
+      ...capacityData.af!.items,
+      {
+        af_item_id: "af-ucla",
+        af_code: "3-AF-0045",
+        af_name: "DX3000 60KV 2mA / 10cm Black [UCLA / 기본]",
+        model_symbol: "DX3000",
+        ship_ready: 0,
+        fast_production: 0,
+        total_production: 0,
+        bom_status: "incomplete",
+        has_direct_children: false,
+        has_pf_path: false,
+        marked_complete: false,
+      },
+      {
+        af_item_id: "af-no-pf",
+        af_code: "3-AF-0046",
+        af_name: "DX3000 출하경로 미연결 완제품",
+        model_symbol: "DX3000",
+        ship_ready: 0,
+        fast_production: 0,
+        total_production: 0,
+        bom_status: "complete",
+        has_direct_children: true,
+        has_pf_path: false,
+        marked_complete: true,
+      },
+    ],
+  },
+};
+
 describe("CapacityDetailModal", () => {
   beforeEach(() => {
     pfPins = { DX3000: "pf-1" };
+  });
+
+  it("BOM 미등록 건수를 모달 본문 상단에 즉시 표시한다", () => {
+    render(<CapacityDetailModal capacityData={incompleteCapacityData} onClose={vi.fn()} />);
+
+    expect(
+      screen.getByText("BOM 미등록 1건 · 모델 그룹을 펼쳐 해당 품목을 확인하세요."),
+    ).toBeInTheDocument();
+  });
+
+  it("BOM이 모두 등록된 데이터에는 미등록 안내를 표시하지 않는다", () => {
+    render(<CapacityDetailModal capacityData={capacityData} onClose={vi.fn()} />);
+
+    expect(screen.queryByText(/BOM 미등록 \d+건/)).not.toBeInTheDocument();
+  });
+
+  it("품목 행은 BOM 미등록과 출하경로 없음을 별도로 표시한다", () => {
+    const { container } = render(
+      <CapacityDetailModal capacityData={incompleteCapacityData} onClose={vi.fn()} />,
+    );
+    const desktopTable = container.querySelector(".hidden.sm\\:block");
+    const groupRow = within(desktopTable!).getByText("4종").closest(".grid");
+
+    fireEvent.click(groupRow!);
+
+    const incompleteRow = within(desktopTable!).getByRole("button", { name: /UCLA/ });
+    const noPfPathRow = within(desktopTable!).getByRole("button", { name: /출하경로 미연결 완제품/ });
+
+    expect(within(incompleteRow).getByText("BOM 미등록")).toBeInTheDocument();
+    expect(within(incompleteRow).queryByText("BOM 미완성")).not.toBeInTheDocument();
+    expect(within(noPfPathRow).getByText("출하경로 없음")).toBeInTheDocument();
+    expect(within(noPfPathRow).queryByText("BOM 미등록")).not.toBeInTheDocument();
   });
 
   it("데스크톱 표에서 모델 수와 기준 모델을 별도 열로 표시한다", () => {

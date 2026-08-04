@@ -33,7 +33,7 @@ const SHARED_HINT_LINES = [
 /**
  * 생산 가능수량 상세 모달 — AF(조립 완제품) 기준.
  * ① AF별 3수량(출하 대기/빠른 조립/총생산) ② 각 병목 ③ 연결된 PF 변형(주문 기준 ship_ready)
- * ④ BOM 미완성 표시. af 블록이 없으면(구버전 응답) legacy 요약으로 fallback.
+ * ④ BOM 미등록 표시. af 블록이 없으면(구버전 응답) legacy 요약으로 fallback.
  */
 export function CapacityDetailModal({
   capacityData,
@@ -147,6 +147,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
   const isPinLoading = setPfPin.isPending || clearPfPin.isPending;
 
   const items = af.items;
+  const unregisteredBomCount = items.filter((item) => item.bom_status === "incomplete").length;
 
   const filtered = items;
 
@@ -200,6 +201,19 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
 
   return (
     <>
+      {unregisteredBomCount > 0 && (
+        <div
+          className="mb-3 flex items-center gap-2 rounded-[14px] border px-3 py-2 text-sm font-bold sm:mb-4 sm:px-4 sm:py-3"
+          style={{
+            background: LEGACY_COLORS.warningBg,
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`,
+            color: LEGACY_COLORS.yellow,
+          }}
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>BOM 미등록 {unregisteredBomCount}건 · 모델 그룹을 펼쳐 해당 품목을 확인하세요.</span>
+        </div>
+      )}
 
       {/* AF 목록 — 모바일: 카드 레이아웃 / 데스크톱: 테이블 */}
 
@@ -319,7 +333,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                             {it.af_name}
                           </span>
                           {it.bom_status === "incomplete" && (
-                            <Badge color={LEGACY_COLORS.yellow}>BOM 미완성</Badge>
+                            <Badge color={LEGACY_COLORS.yellow}>BOM 미등록</Badge>
                           )}
                           {it.bom_status !== "incomplete" && !it.has_pf_path && (
                             <Badge color={LEGACY_COLORS.muted2}>출하경로 없음</Badge>
@@ -506,7 +520,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                           {it.af_name}
                         </span>
                         {it.bom_status === "incomplete" && (
-                          <Badge color={LEGACY_COLORS.yellow}>BOM 미완성</Badge>
+                          <Badge color={LEGACY_COLORS.yellow}>BOM 미등록</Badge>
                         )}
                         {it.bom_status !== "incomplete" && !it.has_pf_path && (
                           <Badge color={LEGACY_COLORS.muted2}>출하경로 없음</Badge>

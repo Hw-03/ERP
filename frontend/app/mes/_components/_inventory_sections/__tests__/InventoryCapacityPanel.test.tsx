@@ -1,7 +1,8 @@
 import { render, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ProductionCapacity } from "@/lib/api/types/production";
-import { InventoryCapacityPanel } from "../InventoryCapacityPanel";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { capacityStatusBadge, InventoryCapacityPanel } from "../InventoryCapacityPanel";
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({
   usePfPinsQuery: () => ({ data: { DX3000: "pf-dx3000" } }),
@@ -47,7 +48,45 @@ const capacityData = {
   },
 } satisfies ProductionCapacity;
 
+const incompleteCapacityData = {
+  ...capacityData,
+  af: {
+    ...capacityData.af,
+    status: "incomplete",
+    items: [
+      ...capacityData.af.items,
+      {
+        af_item_id: "af-dx3000-ucla",
+        af_code: "3-AF-0045",
+        af_name: "DX3000 60KV 2mA / 10cm Black [UCLA / 기본]",
+        model_symbol: "DX3000",
+        ship_ready: 0,
+        fast_production: 0,
+        total_production: 0,
+        bom_status: "incomplete",
+        has_direct_children: false,
+        has_pf_path: false,
+        marked_complete: false,
+      },
+    ],
+  },
+} satisfies ProductionCapacity;
+
 describe("InventoryCapacityPanel 모바일 표", () => {
+  it("부분 BOM 미등록 상태도 메인에서는 생산 가능으로 요약한다", () => {
+    const { container } = render(<InventoryCapacityPanel capacityData={incompleteCapacityData} />);
+
+    expect(container).toHaveTextContent("생산 가능");
+    expect(container).not.toHaveTextContent("일부 BOM 미완성");
+  });
+
+  it("부분 BOM 미등록 상태도 모바일 배지는 청록색 생산 가능으로 표시한다", () => {
+    expect(capacityStatusBadge(incompleteCapacityData)).toEqual({
+      label: "생산 가능",
+      color: LEGACY_COLORS.cyan,
+    });
+  });
+
   it("첫 번째 열을 모델로 명시하고 세 수량 열을 유지한다", () => {
     const { container } = render(<InventoryCapacityPanel capacityData={capacityData} />);
     const mobileTable = container.querySelector(".sm\\:hidden table");
