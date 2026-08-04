@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Settings2, Truck, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { SidebarModeToggle, useSidebarMode } from "./SidebarModeToggle";
-import { ThemeToggle } from "./ThemeToggle";
+import { AppearanceSettingsModal } from "./AppearanceSettingsModal";
+import { useAppearancePreferences } from "./useAppearancePreferences";
 import type { DesktopTabId } from "./tabAccess";
 export type { DesktopTabId } from "./tabAccess";
 
@@ -48,11 +48,12 @@ export function DesktopSidebar({
   onTabChange: (tab: DesktopTabId) => void;
   visibleTabs: DesktopTabId[];
 }) {
-  const { mode, cycleMode } = useSidebarMode();
+  const { preferences, savePreferences } = useAppearancePreferences();
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<DesktopTabId | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expanded = mode === "expanded" || (mode === "hover" && hoverExpanded);
+  const expanded = preferences.sidebarMode === "expanded" || (preferences.sidebarMode === "hover" && hoverExpanded);
 
   const openSidebar = useCallback(() => {
     if (collapseTimerRef.current) {
@@ -173,11 +174,66 @@ export function DesktopSidebar({
               onHover={setHoveredTab}
             />
           ))}
-          <ThemeToggle expanded={expanded} />
-          <SidebarModeToggle expanded={expanded} mode={mode} onCycle={cycleMode} />
+          <SettingsButton expanded={expanded} onClick={() => setSettingsOpen(true)} />
         </div>
       </aside>
+      <AppearanceSettingsModal
+        open={settingsOpen}
+        preferences={preferences}
+        onClose={() => setSettingsOpen(false)}
+        onSave={savePreferences}
+      />
     </div>
+  );
+}
+
+function SettingsButton({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      type="button"
+      aria-label="설정"
+      title="설정"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="group flex items-center justify-start rounded-[20px] -mx-1.5 w-[calc(100%+12px)] pl-1.5 transition-all duration-150 hover:scale-[1.015]"
+      style={{
+        background: expanded && hovered
+          ? "color-mix(in srgb, var(--c-cyan) var(--sidebar-hover-mix, 18%), transparent)"
+          : "transparent",
+      }}
+    >
+      <div className="relative my-1 shrink-0">
+        <div
+          className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
+          style={{ color: LEGACY_COLORS.cyan }}
+        >
+          <Settings className="h-5 w-5" />
+        </div>
+      </div>
+      <div
+        className="min-w-0 overflow-hidden pl-2 text-left"
+        style={{
+          opacity: expanded ? 1 : 0,
+          transform: expanded ? "translateX(0)" : "translateX(-6px)",
+          transition: "opacity 180ms ease, transform 180ms ease",
+          willChange: "transform, opacity",
+          pointerEvents: expanded ? "auto" : "none",
+          width: expanded ? "auto" : 0,
+          maxWidth: expanded ? 200 : 0,
+          paddingLeft: expanded ? undefined : 0,
+        }}
+      >
+        <div className="truncate text-left text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+          설정
+        </div>
+        <div className="truncate text-left text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+          테마와 사이드바
+        </div>
+      </div>
+    </button>
   );
 }
 
