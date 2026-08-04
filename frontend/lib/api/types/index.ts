@@ -22,3 +22,4 @@ export type * from "./notifications";
 export type * from "./handover";
 export type * from "./shipping";
 export type * from "./assembly-checklists";
+export type * from "./daily-work-reports";

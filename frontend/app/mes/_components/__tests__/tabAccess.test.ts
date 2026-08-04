@@ -30,7 +30,7 @@ describe("tabAccess", () => {
     expect(setSidebarTabVisible(["warehouse", "defect", "weekly"], "defect", true)).toEqual(["weekly"]);
   });
   it("hides the mobile More slot when every More entry is hidden", () => {
-    expect(mobileMoreHasVisibleEntries(op(["shipping", "weekly", "warehouseMap"]))).toBe(false);
+    expect(mobileMoreHasVisibleEntries(op(["dailyReport", "shipping", "weekly", "warehouseMap"]))).toBe(false);
     expect(mobileMoreHasVisibleEntries(op(["shipping", "weekly"]))).toBe(true);
   });
 });

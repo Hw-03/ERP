@@ -33,6 +33,7 @@ describe("MobileMoreScreen", () => {
         onProfile={() => {}}
         onNotificationNavigate={() => {}}
         onChecklist={() => {}}
+        onDailyReport={() => {}}
         onWeekly={() => {}}
         onShipping={() => {}}
         onWarehouseMap={() => {}}
@@ -52,6 +53,7 @@ describe("MobileMoreScreen", () => {
         onProfile={onProfile}
         onNotificationNavigate={() => {}}
         onChecklist={() => {}}
+        onDailyReport={() => {}}
         onWeekly={() => {}}
         onShipping={() => {}}
         onWarehouseMap={() => {}}
@@ -70,8 +72,9 @@ describe("MobileMoreScreen", () => {
     expect(screen.getByText("Kim")).toBeInTheDocument();
   });
 
-  it("fills the available menu space with checklist, shipping, weekly, and warehouse-map entries in order", () => {
+  it("fills the available menu space with checklist, daily report, shipping, weekly, and warehouse-map entries in order", () => {
     const onChecklist = vi.fn();
+    const onDailyReport = vi.fn();
     const onWeekly = vi.fn();
     const onShipping = vi.fn();
     const onWarehouseMap = vi.fn();
@@ -82,6 +85,7 @@ describe("MobileMoreScreen", () => {
         onProfile={() => {}}
         onNotificationNavigate={() => {}}
         onChecklist={onChecklist}
+        onDailyReport={onDailyReport}
         onWeekly={onWeekly}
         onShipping={onShipping}
         onWarehouseMap={onWarehouseMap}
@@ -95,6 +99,7 @@ describe("MobileMoreScreen", () => {
     expect(menuList).toHaveClass("flex-1");
     expect(menuButtons.map((button) => button.textContent)).toEqual([
       expect.stringContaining("체크리스트"),
+      expect.stringContaining("일일 작업 일지"),
       expect.stringContaining("출하"),
       expect.stringContaining("주간보고"),
       expect.stringContaining("창고 지도"),
@@ -102,12 +107,14 @@ describe("MobileMoreScreen", () => {
     menuButtons.forEach((button) => expect(button).toHaveClass("flex-1"));
 
     fireEvent.click(screen.getByRole("button", { name: /체크리스트/ }));
+    fireEvent.click(screen.getByRole("button", { name: /일일 작업 일지/ }));
 
     fireEvent.click(screen.getByRole("button", { name: /출하/ }));
     fireEvent.click(screen.getByRole("button", { name: /주간보고/ }));
     fireEvent.click(screen.getByRole("button", { name: /창고 지도/ }));
 
     expect(onChecklist).toHaveBeenCalledTimes(1);
+    expect(onDailyReport).toHaveBeenCalledTimes(1);
     expect(onWeekly).toHaveBeenCalledTimes(1);
     expect(onShipping).toHaveBeenCalledTimes(1);
     expect(onWarehouseMap).toHaveBeenCalledTimes(1);

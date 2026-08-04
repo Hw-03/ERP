@@ -72,6 +72,7 @@ describe("AdminExportSection CSV 작업 블록", () => {
     expect(scopeSummary).toHaveTextContent("전체 범위 CSV 4개");
     expect(within(csvBlock).getByTestId("csv-period-settings")).toBeInTheDocument();
     expect(within(csvBlock).getByTestId("csv-inactive-option")).toBeInTheDocument();
+    expect(within(csvBlock).getByRole("checkbox", { name: "헤더 포함" })).toHaveClass("focus-visible:ring-2");
 
     fireEvent.click(within(csvBlock).getByRole("button", { name: "품목" }));
     expect(scopeSummary).toHaveTextContent("품목");
@@ -94,7 +95,7 @@ describe("AdminExportSection CSV 작업 블록", () => {
     expect(within(csvBlock).queryByTestId("csv-inactive-option")).not.toBeInTheDocument();
   });
 
-  it("Excel 전체 내보내기는 기존 두 다운로드를 유지한다", () => {
+  it("주요 내보내기 영역에서 품목·입출고 Excel 두 파일을 내려받는다", () => {
     vi.useFakeTimers();
     const clicks: Array<{ href: string; download: string }> = [];
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function click() {
@@ -108,7 +109,10 @@ describe("AdminExportSection CSV 작업 블록", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "전체 데이터 내보내기" }));
+    const primaryExports = screen.getByRole("region", { name: "주요 내보내기" });
+    expect(within(primaryExports).getByRole("button", { name: "F705-02 생산일지 다운로드" })).toBeEnabled();
+
+    fireEvent.click(within(primaryExports).getByRole("button", { name: "Excel 2개 다운로드" }));
     expect(clicks).toHaveLength(1);
     expect(clicks[0].href).toContain(itemsExportUrl);
 
@@ -117,6 +121,31 @@ describe("AdminExportSection CSV 작업 블록", () => {
     });
     expect(clicks).toHaveLength(2);
     expect(clicks[1].href).toContain(transactionsExportUrl);
+  });
+
+  it("최근 내보내기에는 중복 요약 카드 없이 세션 기록만 표시하고 지울 수 있다", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(
+      <AdminExportSection
+        itemsExportUrl={itemsExportUrl}
+        transactionsExportUrl={transactionsExportUrl}
+      />,
+    );
+
+    const primaryExports = screen.getByRole("region", { name: "주요 내보내기" });
+    const history = screen.getByRole("region", { name: "최근 내보내기" });
+
+    fireEvent.click(within(primaryExports).getByRole("button", { name: "Excel 2개 다운로드" }));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(within(history).getByText(/items_.*\.xlsx/)).toBeInTheDocument();
+    expect(screen.queryByText("마지막 내보내기")).not.toBeInTheDocument();
+
+    fireEvent.click(within(history).getByRole("button", { name: "기록 지우기" }));
+    expect(within(history).getByText("아직 내보내기 기록이 없습니다")).toBeInTheDocument();
   });
 
   it("downloads the selected year as an F705-02 annual production log", async () => {
@@ -166,7 +195,7 @@ describe("AdminExportSection CSV 작업 블록", () => {
       />,
     );
 
-    const externalLogs = screen.getByRole("region", { name: "외부 제출용 로그" });
+    const externalLogs = screen.getByRole("region", { name: "외부 제출·원본 로그" });
 
     expect(externalLogs).toContainElement(screen.getByRole("button", { name: "F704-02 대장 다운로드" }));
     expect(externalLogs).toHaveTextContent("시스템 원본 로그 (월별)");

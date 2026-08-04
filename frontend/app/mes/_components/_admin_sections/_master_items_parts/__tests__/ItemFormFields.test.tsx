@@ -40,7 +40,7 @@ describe("ItemFormFields", () => {
     }
   });
 
-  it("places the MES code preview after the product block and shows selected symbols inline with its label", () => {
+  it("places the sales-review checkbox directly after the MES code preview", () => {
     render(
       <ItemFormFields
         form={baseForm({ model_slots: [1] })}
@@ -53,11 +53,12 @@ describe("ItemFormFields", () => {
     const productLabel = screen.getByText("사용 제품");
     const selectedSymbol = screen.getByText(/제품 기호:/);
     const codePreview = screen.getAllByText(/A-TR-/).find((element) => element.getAttribute("aria-readonly") === "true");
+    const checkbox = screen.getByRole("checkbox", { name: "영업 확인 필요" });
 
     expect(productLabel.parentElement).toContainElement(selectedSymbol);
     expect(productLabel.closest("div")?.parentElement?.compareDocumentPosition(codePreview!))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(codePreview?.parentElement?.nextElementSibling).toBeNull();
+    expect(codePreview?.parentElement?.nextElementSibling).toBe(checkbox.closest("label"));
   });
 
   it("keeps the no-product guidance beneath the product chips", () => {

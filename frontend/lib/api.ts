@@ -39,6 +39,7 @@ import { notificationsApi } from "./api/notifications";
 import { handoverApi } from "./api/handover";
 import { shippingApi } from "./api/shipping";
 import { assemblyChecklistsApi } from "./api/assembly-checklists";
+import { dailyWorkReportsApi } from "./api/daily-work-reports";
 
 // 외부 import 호환을 위해 동일 이름 그대로 re-export.
 // parseError 는 도메인 API (직접 fetch 사용처) 가 본 파일 내부에서 사용 — 이번 PR 에선 그대로.
@@ -141,6 +142,10 @@ import type {
   AssemblyChecklist,
   AssemblyChecklistSection,
   AssemblyChecklistItem,
+  DailyWorkReport,
+  DailyWorkActivity,
+  DailyWorkActivitySummary,
+  SaveDailyWorkReportPayload,
 } from "./api/types";
 
 export type {
@@ -231,6 +236,10 @@ export type {
   AssemblyChecklist,
   AssemblyChecklistSection,
   AssemblyChecklistItem,
+  DailyWorkReport,
+  DailyWorkActivity,
+  DailyWorkActivitySummary,
+  SaveDailyWorkReportPayload,
 };
 
 export const api = {
@@ -262,4 +271,5 @@ export const api = {
   ...handoverApi,
   ...shippingApi,
   ...assemblyChecklistsApi,
+  ...dailyWorkReportsApi,
 };

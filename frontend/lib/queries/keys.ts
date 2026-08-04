@@ -50,6 +50,14 @@ export const queryKeys = {
     all: ["assemblyChecklists"] as const,
     list: () => ["assemblyChecklists", "list"] as const,
   },
+  dailyWorkReports: {
+    all: ["dailyWorkReports"] as const,
+    list: (workDate: string) => ["dailyWorkReports", "list", workDate] as const,
+    detail: (employeeId: string, workDate: string) =>
+      ["dailyWorkReports", "detail", employeeId, workDate] as const,
+    activity: (employeeId: string, workDate: string) =>
+      ["dailyWorkReports", "activity", employeeId, workDate] as const,
+  },
   weekly: {
     all: ["weekly"] as const,
     report: (weekStart: string, weekEnd: string) =>

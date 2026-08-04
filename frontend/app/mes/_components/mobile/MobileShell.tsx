@@ -24,6 +24,7 @@ import {
   MobileMoreScreen,
   MobileShippingScreen,
   MobileAssemblyChecklistScreen,
+  MobileDailyWorkReportScreen,
 } from "./screens";
 import { getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
@@ -50,7 +51,8 @@ export type MobileTabId =
   | "weekly"
   | "warehouseMap"
   | "shipping"
-  | "assemblyChecklist";
+  | "assemblyChecklist"
+  | "dailyReport";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
@@ -59,6 +61,7 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   history: { label: "내역", icon: HistoryIcon },
   more: { label: "더보기", icon: MoreHorizontal },
   assemblyChecklist: { label: "체크리스트", icon: ClipboardCheck },
+  dailyReport: { label: "일일 작업 일지", icon: ClipboardCheck },
   shipping: { label: "출하", icon: PackageCheck },
   weekly: { label: "주간보고", icon: BarChart2 },
   warehouseMap: { label: "창고지도", icon: MapPinned },
@@ -66,7 +69,7 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
 
 // 하단 탭바에 노출되는 5탭. 더보기는 전폭 화면(출하·주간보고·창고지도)으로 진입한다.
 const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "more"];
-const MORE_ENTRY_ORDER: MobileMoreEntryId[] = ["assemblyChecklist", "shipping", "weekly", "warehouseMap"];
+const MORE_ENTRY_ORDER: MobileMoreEntryId[] = ["assemblyChecklist", "dailyReport", "shipping", "weekly", "warehouseMap"];
 
 // 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합. 알 수 없는 값(예: admin)이
 // 들어오면 무시되어 기본 dashboard 가 유지된다.
@@ -80,6 +83,7 @@ const VALID_TAB_IDS: MobileTabId[] = [
   "warehouseMap",
   "shipping",
   "assemblyChecklist",
+  "dailyReport",
 ];
 
 // 항목 3-1 — 데스크톱 상단바와 동일한 기본 브랜드 상태 텍스트.
@@ -167,6 +171,8 @@ export function MobileShell() {
   // 항목 16 — 입출고 작성 중(담은 묶음 있음) 하단 네비로 이탈 시 확인 시트.
   const [warehouseDirty, setWarehouseDirty] = useState(false);
   const warehouseFlushRef = useRef<(() => void) | null>(null);
+  const [dailyReportDirty, setDailyReportDirty] = useState(false);
+  const dailyReportFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
 
   const unreadNotifications = notificationsData?.unread_count ?? 0;
@@ -220,12 +226,12 @@ export function MobileShell() {
       return;
     }
     // 항목 16 — 입출고 작성 중 다른 탭으로 이탈 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
-    if (activeTab === "warehouse" && warehouseDirty) {
+    if ((activeTab === "warehouse" && warehouseDirty) || (activeTab === "dailyReport" && dailyReportDirty)) {
       setPendingNavTab(target);
       return;
     }
     commitMobileTab(target);
-  }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, warehouseDirty]);
+  }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, warehouseDirty]);
 
   const handleNotificationNavigate = useCallback((tab: string, section: string | null) => {
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
@@ -266,7 +272,7 @@ export function MobileShell() {
   // 항목 2-9 — weekly/warehouseMap 은 '더보기' 탭으로 진입한 하위 화면이라 TAB_BAR_IDS 에 없다.
   // 하단 네비에선 '더보기' 슬롯을 활성으로 매핑해 pill·강조가 더보기에 붙도록 한다.
   const isMoreSubScreen =
-    activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping" || activeTab === "assemblyChecklist";
+    activeTab === "weekly" || activeTab === "warehouseMap" || activeTab === "shipping" || activeTab === "assemblyChecklist" || activeTab === "dailyReport";
   const effectiveNavTab: MobileTabId = isMoreSubScreen ? "more" : activeTab;
   const activeIndex = visibleTabs.indexOf(effectiveNavTab);
 
@@ -330,6 +336,7 @@ export function MobileShell() {
           onProfile={() => setUserMenuOpen(true)}
           onNotificationNavigate={handleNotificationNavigate}
           onChecklist={() => handleTabChange("assemblyChecklist")}
+          onDailyReport={() => handleTabChange("dailyReport")}
           onWeekly={() => handleTabChange("weekly")}
           onShipping={() => handleTabChange("shipping")}
           onWarehouseMap={() => handleTabChange("warehouseMap")}
@@ -342,6 +349,9 @@ export function MobileShell() {
     }
     if (activeTab === "assemblyChecklist") {
       return <MobileAssemblyChecklistScreen key={key} onExit={() => handleTabChange("more")} />;
+    }
+    if (activeTab === "dailyReport") {
+      return <MobileDailyWorkReportScreen key={key} operator={operator} onDirtyChange={setDailyReportDirty} flushSaveRef={dailyReportFlushRef} />;
     }
     if (activeTab === "weekly") {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} onWeekChange={setWeekMon} onExit={() => handleTabChange("more")} />;
@@ -459,11 +469,19 @@ export function MobileShell() {
       <MobileDirtyLeaveSheet
         open={pendingNavTab !== null}
         onCancel={() => setPendingNavTab(null)}
-        onConfirm={() => {
+        onConfirm={async () => {
+          if (activeTab === "dailyReport") {
+            try {
+              await dailyReportFlushRef.current?.();
+            } catch {
+              return;
+            }
+          }
           warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
+          setDailyReportDirty(false);
           if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
         }}
         onDiscard={() => {
@@ -471,6 +489,7 @@ export function MobileShell() {
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
+          setDailyReportDirty(false);
           if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
         }}
       />

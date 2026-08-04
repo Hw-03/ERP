@@ -5,6 +5,7 @@ export const SIDEBAR_TAB_IDS = [
   "warehouseMap",
   "defect",
   "history",
+  "dailyReport",
   "weekly",
   "admin",
 ] as const;
@@ -14,7 +15,7 @@ export type DesktopTabId = SidebarTabId;
 
 export const IO_RELATED_SIDEBAR_TAB_IDS = ["warehouse", "defect"] as const;
 
-export const MOBILE_MORE_ENTRY_TAB_IDS = ["weekly", "shipping", "warehouseMap"] as const;
+export const MOBILE_MORE_ENTRY_TAB_IDS = ["dailyReport", "weekly", "shipping", "warehouseMap"] as const;
 
 type TabAccessSource = {
   hidden_sidebar_tabs?: readonly string[] | null;

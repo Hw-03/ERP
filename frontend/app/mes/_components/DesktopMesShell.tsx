@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
 import { DESKTOP_TAB_ICON_COLORS, DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
@@ -15,6 +15,7 @@ import { DesktopDefectView } from "./DesktopDefectView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
 import { DesktopWeeklyReportView } from "./DesktopWeeklyReportView";
+import { DesktopDailyWorkReportView } from "./DesktopDailyWorkReportView";
 import { useCurrentOperator } from "./login/useCurrentOperator";
 import {
   WeeklyWeekPicker,
@@ -57,6 +58,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   warehouseMap: { title: "창고 지도", icon: MapPinned },
   defect: { title: "불량", icon: AlertTriangle },
   history: { title: "입출고 내역", icon: History },
+  dailyReport: { title: "일일 작업 일지", icon: ClipboardList },
   weekly: { title: "주간보고", icon: BarChart2 },
   admin: { title: "관리자", icon: Settings2 },
 };
@@ -371,6 +373,9 @@ function DesktopMesShellInner() {
     }
     if (activeTab === "history") {
       return <DesktopHistoryView key={key} />;
+    }
+    if (activeTab === "dailyReport") {
+      return <DesktopDailyWorkReportView key={key} operator={operator} />;
     }
     if (activeTab === "weekly") {
       return <DesktopWeeklyReportView key={key} weekMon={weekMon} />;
