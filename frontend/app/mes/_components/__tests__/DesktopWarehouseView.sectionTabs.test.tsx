@@ -81,6 +81,20 @@ describe("DesktopWarehouseView", () => {
     expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveClass("shrink-0");
   });
 
+  it("uses only the shared shell spacing above the section tabs", () => {
+    const { container } = render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    const contentRoot = screen.getByTestId("desktop-warehouse-content");
+
+    expect(contentRoot).toHaveClass("pt-0", "gap-3");
+    expect(contentRoot).not.toHaveClass("pt-2.5");
+  });
+
   it("요청 작성의 품목 전환 포커스에서는 상단 탭을 숨긴다", () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse");
     const { container } = render(

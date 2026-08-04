@@ -39,7 +39,7 @@ vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => null,
 }));
 
-const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "history", "weekly", "warehouseMap"];
+const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "history", "dailyReport", "weekly", "warehouseMap"];
 
 vi.mock("../DesktopSidebar", () => ({
   DESKTOP_TAB_ICON_COLORS: {
@@ -49,6 +49,7 @@ vi.mock("../DesktopSidebar", () => ({
     warehouseMap: "#fff",
     defect: "#fff",
     history: "#fff",
+    dailyReport: "#fff",
     weekly: "#fff",
     admin: "#fff",
   },
@@ -94,6 +95,7 @@ vi.mock("../DesktopShippingView", () => ({
 }));
 vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <main>defect content</main> }));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <main>history content</main> }));
+vi.mock("../DesktopDailyWorkReportView", () => ({ DesktopDailyWorkReportView: () => <main>daily report content</main> }));
 vi.mock("../DesktopWeeklyReportView", () => ({ DesktopWeeklyReportView: () => <main>weekly content</main> }));
 vi.mock("../DesktopAdminView", () => ({ DesktopAdminView: () => <main>admin content</main> }));
 vi.mock("../DesktopWarehouseMapTab", () => ({ DesktopWarehouseMapTab: () => <main>warehouse map content</main> }));
@@ -175,4 +177,15 @@ describe("DesktopMesShell tab transition", () => {
       expect.not.objectContaining({ onStartPrepareWork: expect.any(Function) }),
     );
   });
+
+  it.each(["dashboard", "history", "dailyReport", "weekly"] as const)(
+    "keeps 12px top spacing for the %s tab content after navigation",
+    (tab) => {
+      const { container } = render(<DesktopMesShell />);
+
+      fireEvent.click(screen.getByRole("button", { name: tab }));
+
+      expect(container.querySelector(".desktop-tab-content")).toHaveClass("mt-3");
+    },
+  );
 });

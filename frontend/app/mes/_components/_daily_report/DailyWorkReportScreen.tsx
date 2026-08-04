@@ -68,6 +68,8 @@ export function DailyWorkReportScreen({
   const [dirty, setDirty] = useState(false);
   const today = toKstDateKey();
   const localSaveRef = useRef<(() => Promise<void>) | null>(null);
+  const targetVersionRef = useRef(0);
+  const contentVersionRef = useRef(0);
 
   const reportQuery = useDailyWorkReportQuery(employeeId, workDate);
   const reportsQuery = useDailyWorkReportsQuery(workDate);
@@ -99,18 +101,21 @@ export function DailyWorkReportScreen({
     };
   }, [save, saveRef]);
 
-  const persist = useCallback(async (content: string) => {
-    if (!employeeId) return;
+  const persist = useCallback(async (content: string): Promise<string> => {
+    if (!employeeId) throw new Error("로그인한 작업자 정보가 없습니다.");
+    const targetVersion = targetVersionRef.current;
+    const contentVersion = contentVersionRef.current;
     setSaveError(null);
     try {
-      await saveMutation.mutateAsync({
+      const savedReport = await saveMutation.mutateAsync({
         employeeId,
         workDate,
         payload: { actorEmployeeId: employeeId, content },
       });
-      setDirty(false);
+      if (targetVersion === targetVersionRef.current && contentVersion === contentVersionRef.current) setDirty(false);
+      return savedReport.updated_at;
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "일보를 저장하지 못했습니다.");
+      if (targetVersion === targetVersionRef.current && contentVersion === contentVersionRef.current) setSaveError(error instanceof Error ? error.message : "일보를 저장하지 못했습니다.");
       throw error;
     }
   }, [employeeId, saveMutation, workDate]);
@@ -127,7 +132,9 @@ export function DailyWorkReportScreen({
   const changeTab = (next: ReportTab) => {
     if (next === tab) return;
     requestChange(() => {
+      targetVersionRef.current += 1;
       setDirty(false);
+      setSaveError(null);
       setTab(next);
       setSelectedEmployeeId(null);
     }, "저장하지 않은 내용이 있습니다. 이동하면 작성 중인 일보가 사라집니다.");
@@ -136,7 +143,9 @@ export function DailyWorkReportScreen({
   const changeDate = (next: string) => {
     if (!next || next > today) return;
     requestChange(() => {
+      targetVersionRef.current += 1;
       setDirty(false);
+      setSaveError(null);
       setWorkDate(next);
       setSelectedEmployeeId(null);
     }, "저장하지 않은 내용이 있습니다. 날짜를 바꾸면 작성 중인 일보가 사라집니다.");
@@ -155,8 +164,8 @@ export function DailyWorkReportScreen({
 
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
-      <div className="scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pb-0">
-        <header className="rounded-[20px] border p-4 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className="scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-0">
+        <header className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-h-11 items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
@@ -183,7 +192,7 @@ export function DailyWorkReportScreen({
         </header>
 
         {tab === "all" && (
-          <section className="rounded-[20px] border p-4 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          <section className="rounded-[20px] border p-4 lg:shrink-0 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-black">작성한 직원</h2>
@@ -192,14 +201,16 @@ export function DailyWorkReportScreen({
               <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{reports.length}명</span>
             </div>
             {reportsQuery.isError ? <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." /></div> : (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div data-testid="daily-work-report-author-chips" className="mt-4 flex flex-wrap gap-2 lg:max-h-36 lg:overflow-y-auto lg:pr-1">
                 {reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
                 {reports.map((entry) => {
                   const selected = selectedEmployeeId === entry.employee_id;
                   const departmentColor = getDepartmentFallbackColor(entry.department);
                   return (
                     <button key={entry.employee_id} type="button" onClick={() => requestChange(() => {
+                      targetVersionRef.current += 1;
                       setDirty(false);
+                      setSaveError(null);
                       setSelectedEmployeeId(entry.employee_id);
                     }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
                       <span>{entry.employee_name}</span><span className="ml-1.5 text-xs font-medium" style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
@@ -212,17 +223,22 @@ export function DailyWorkReportScreen({
         )}
 
         {targetEmployeeId ? (
-          <div className="min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0">
+          <div className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${editable ? "" : "lg:overflow-y-auto lg:pr-1"}`}>
             {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." />}
             {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : activityQuery.data ? <DailyWorkActivity activity={activityQuery.data} /> : <PanelPlaceholder>MES 거래를 불러오는 중입니다.</PanelPlaceholder>}
             <DailyWorkReportEditor
               initialContent={report?.content ?? ""}
+              initialUpdatedAt={report?.updated_at ?? null}
               resetKey={editorResetKey}
               editable={editable}
               saving={saveMutation.isPending}
               saveError={saveError}
               onSave={persist}
               onDirtyChange={(next) => { setDirty(next); onDirtyChange?.(next); }}
+              onEdit={() => {
+                contentVersionRef.current += 1;
+                setSaveError(null);
+              }}
               saveRef={editorSaveRef}
               fillAvailableHeight={editable}
             />

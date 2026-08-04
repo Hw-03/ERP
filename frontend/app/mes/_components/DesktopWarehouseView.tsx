@@ -180,7 +180,10 @@ export function DesktopWarehouseView({
 
   return (
     <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden">
-      <div className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-2.5 ${isComposeSection ? "pb-0" : "pb-10"}`}>
+      <div
+        data-testid="desktop-warehouse-content"
+        className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-0 ${isComposeSection ? "pb-0" : "pb-10"}`}
+      >
         <WarehouseHeader loadFailure={loadFailure} />
         <div
           className={`shrink-0 overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ${

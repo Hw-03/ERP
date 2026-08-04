@@ -57,6 +57,7 @@ describe("DailyWorkActivity", () => {
     );
 
     expect(screen.getByRole("heading", { name: "MES 작업 기록" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "MES 작업 기록" })).toHaveClass("lg:shrink-0");
     expect(screen.getByText("창고")).toBeInTheDocument();
     expect(screen.getByText("1 EA")).toBeInTheDocument();
     expect(screen.queryByText("D-910 크래들 TOP 사출")).not.toBeInTheDocument();
@@ -78,6 +79,7 @@ describe("DailyWorkActivity", () => {
     expect(screen.getByText("+1 EA")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "창고 거래 상세 접기" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "거래 상세 접기" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("daily-work-activity-details")).toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
   });
 
   it("재고 변화가 많아도 모두 두 열에 표시하고 추가 펼치기를 만들지 않는다", () => {
@@ -145,5 +147,22 @@ describe("DailyWorkActivity", () => {
     expect(screen.queryByRole("button", { name: /재고 변화.*더 보기/ })).not.toBeInTheDocument();
     expect(screen.queryByText("위치 / 이동 경로")).not.toBeInTheDocument();
     expect(screen.getByText("생산 입고")).toBeInTheDocument();
+  });
+
+  it("읽기 전용 일보의 펼친 상세도 데스크톱 카드 내부에서 스크롤한다", () => {
+    render(
+      <DailyWorkActivity
+        activity={{
+          work_date: "2026-08-03",
+          employee_id: "employee-2",
+          cancelled_count: 0,
+          summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 1, quantity_by_unit: { EA: 1 } }],
+          details: [{ type: "solo", key: "log-1", logs: [] }],
+        } as never}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-activity-details")).toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
   });
 });

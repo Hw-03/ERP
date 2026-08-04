@@ -128,7 +128,7 @@ export function DailyWorkActivity({ activity }: { activity: DailyWorkActivityDat
   const [openOperation, setOpenOperation] = useState<string | null>(null);
 
   return (
-    <section className="rounded-[20px] border p-4 lg:px-5 lg:py-4" aria-labelledby="daily-work-activity-title" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <section className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-4" aria-labelledby="daily-work-activity-title" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <div className="flex min-h-11 flex-wrap items-center gap-2 sm:flex-nowrap">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
           <ClipboardList className="h-5 w-5" />
@@ -167,7 +167,7 @@ export function DailyWorkActivity({ activity }: { activity: DailyWorkActivityDat
       )}
 
       {openOperation && activity.details.length > 0 && (
-        <div className="mt-2 space-y-2">
+        <div data-testid="daily-work-activity-details" className="mt-2 space-y-2 lg:max-h-56 lg:overflow-y-auto lg:pr-1">
           {activity.details.filter((group) => operationKeyForGroup(group) === openOperation).map((group) => (
             <DailyWorkActivityDetail key={group.key} group={group} />
           ))}

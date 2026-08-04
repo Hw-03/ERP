@@ -3,6 +3,19 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
+import { SIDEBAR_TAB_IDS } from "../tabAccess";
+
+const desktopTabIconColors = vi.hoisted(() => ({
+  dashboard: "#fff",
+  warehouse: "#fff",
+  shipping: "#fff",
+  warehouseMap: "#fff",
+  defect: "#fff",
+  history: "#fff",
+  dailyReport: "#fff",
+  weekly: "#fff",
+  admin: "#fff",
+}));
 
 const queryClientMock = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
@@ -31,16 +44,7 @@ vi.mock("../login/useCurrentOperator", () => ({
 }));
 
 vi.mock("../DesktopSidebar", () => ({
-  DESKTOP_TAB_ICON_COLORS: {
-    dashboard: "#fff",
-    warehouse: "#fff",
-    shipping: "#fff",
-    warehouseMap: "#fff",
-    defect: "#fff",
-    history: "#fff",
-    weekly: "#fff",
-    admin: "#fff",
-  },
+  DESKTOP_TAB_ICON_COLORS: desktopTabIconColors,
   DesktopSidebar: () => <nav data-testid="desktop-sidebar" />,
 }));
 
@@ -79,8 +83,12 @@ vi.mock("../DesktopWarehouseMapTab", () => ({
 }));
 
 describe("DesktopMesShell warehouse map fullscreen", () => {
+  it("mocks colors for every desktop tab", () => {
+    expect(Object.keys(desktopTabIconColors).sort()).toEqual([...SIDEBAR_TAB_IDS].sort());
+  });
+
   it("re-renders the warehouse map tab when fullscreen changes", () => {
-    render(<DesktopMesShell />);
+    const { container } = render(<DesktopMesShell />);
 
     expect(screen.getByTestId("warehouse-map-fullscreen-state")).toHaveTextContent("false");
     expect(screen.getByTestId("desktop-topbar")).toBeInTheDocument();
@@ -89,5 +97,8 @@ describe("DesktopMesShell warehouse map fullscreen", () => {
 
     expect(screen.getByTestId("warehouse-map-fullscreen-state")).toHaveTextContent("true");
     expect(screen.queryByTestId("desktop-topbar")).toBeNull();
+    const tabContent = container.querySelector<HTMLDivElement>(".desktop-tab-content");
+    expect(tabContent).toBeInstanceOf(HTMLDivElement);
+    expect(tabContent!.className).not.toMatch(/\bmt-\S+/);
   });
 });
