@@ -19377,6 +19377,49 @@
         ]
       }
     },
+    "/api/shipping/requests/{request_id}/pickup-cancel": {
+      "post": {
+        "operationId": "pickup_cancel_api_shipping_requests__request_id__pickup_cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pickup Cancel",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
     "/api/shipping/requests/{request_id}/pickup-complete": {
       "post": {
         "operationId": "pickup_complete_api_shipping_requests__request_id__pickup_complete_post",

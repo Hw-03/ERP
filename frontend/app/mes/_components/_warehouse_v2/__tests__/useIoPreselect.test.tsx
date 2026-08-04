@@ -13,6 +13,8 @@ import { renderHook } from "@testing-library/react";
 import { useIoPreselect } from "../useIoPreselect";
 import type { Item, IoWorkType } from "@/lib/api";
 
+const MANUAL_BOM_PARENT_ID = "PARENT-1";
+
 function makeItem(item_id = "ITEM-001"): Item {
   return {
     item_id,
@@ -37,6 +39,25 @@ const defaults: Args = {
 };
 
 describe("useIoPreselect", () => {
+  it("낱개 강제 진입이면 BOM 부모도 manual로 담는다", () => {
+    const addItem = vi.fn();
+    const setHighlightItemId = vi.fn();
+    const item = makeItem(MANUAL_BOM_PARENT_ID);
+    renderHook(() =>
+      useIoPreselect({
+        ...defaults,
+        preselectedItem: item,
+        bomParents: new Set([MANUAL_BOM_PARENT_ID]),
+        forceManual: true,
+        addItem,
+        setHighlightItemId,
+      }),
+    );
+
+    expect(addItem).toHaveBeenCalledWith(item, "manual");
+    expect(setHighlightItemId).toHaveBeenCalledWith(null);
+  });
+
   it("일반 품목이면 addItem 자동 호출 + 하이라이트 clear", () => {
     const addItem = vi.fn();
     const setHighlightItemId = vi.fn();

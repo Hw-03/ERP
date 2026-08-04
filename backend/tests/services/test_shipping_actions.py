@@ -681,6 +681,84 @@ def test_pickup_complete_restores_inventory_logs_allocation_and_status_when_even
     assert boundaries == {"commit": 0, "rollback": 1}
 
 
+def test_pickup_cancel_restores_inventory_allocations_and_prepared_state(
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+) -> None:
+    request_id, _final_pa_id, final_pf_id, companion_id = _make_prepared_request(
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+    final_pf = db_session.get(Item, final_pf_id)
+    companion = db_session.get(Item, companion_id)
+    assert final_pf is not None
+    assert companion is not None
+    prepared_final_pf_qty = _location_qty(db_session, final_pf_id, DepartmentEnum.SHIPPING)
+    prepared_companion_qty = _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING)
+
+    shipping_actions_svc.pickup_complete(db_session, request_id)
+    cancelled = shipping_actions_svc.pickup_cancel(db_session, request_id)
+
+    assert cancelled.status == ShippingRequestStatusEnum.PREPARED
+    assert cancelled.picked_up_at is None
+    assert cancelled.serial_numbers == "SN-001"
+    assert _location_qty(db_session, final_pf_id, DepartmentEnum.SHIPPING) == prepared_final_pf_qty
+    assert _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING) == prepared_companion_qty
+    allocations = db_session.query(ShippingAllocation).filter_by(request_id=request_id).all()
+    assert allocations
+    assert {row.status for row in allocations} == {"RESERVED"}
+    assert all(row.consumed_at is None for row in allocations)
+    pickup_logs = (
+        db_session.query(TransactionLog)
+        .filter_by(shipping_request_id=request_id, shipping_phase="PICKUP")
+        .all()
+    )
+    assert pickup_logs
+    assert all(row.cancelled for row in pickup_logs)
+    assert {row.cancel_reason for row in pickup_logs} == {"픽업 완료 취소"}
+    assert any(event.event_type == "PICKUP_CANCELLED" for event in cancelled.events)
+
+
+def test_pickup_cancel_rolls_back_when_event_recording_fails(
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+    monkeypatch,
+) -> None:
+    request_id, final_pa_id, final_pf_id, companion_id = _make_prepared_request(
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+    item_ids = (final_pa_id, final_pf_id, companion_id)
+    shipping_actions_svc.pickup_complete(db_session, request_id)
+    with Session(bind=db_session.get_bind()) as verify_db:
+        before = _prepared_request_state(verify_db, request_id, item_ids)
+    assert before["request"][0] == ShippingRequestStatusEnum.PICKED_UP
+    assert {row[2] for row in before["allocations"]} == {"CONSUMED"}
+
+    boundaries = _count_session_boundaries(db_session, monkeypatch)
+
+    def fail_event(*_args, **_kwargs):
+        raise RuntimeError("pickup cancel event failure")
+
+    monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
+
+    with pytest.raises(RuntimeError, match="pickup cancel event failure"):
+        shipping_actions_svc.pickup_cancel(db_session, request_id)
+
+    db_session.expire_all()
+    with Session(bind=db_session.get_bind()) as verify_db:
+        assert _prepared_request_state(verify_db, request_id, item_ids) == before
+    assert boundaries == {"commit": 0, "rollback": 1}
+
+
 def test_independent_component_change_wrapper_rolls_back_inventory_and_logs_on_late_failure(
     db_session, make_item, make_bom, make_location, monkeypatch
 ) -> None:

@@ -29,7 +29,8 @@ export type UseIoPreselectArgs = {
   fromDepartment: string | null;
   toDepartment: string | null;
   deptIoDirection: "in" | "out" | null;
-  addItem: (item: Item) => Promise<void> | void;
+  forceManual?: boolean;
+  addItem: (item: Item, sourceKind?: "manual") => Promise<void> | void;
   setHighlightItemId: (id: string | null) => void;
 };
 
@@ -43,6 +44,7 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
     fromDepartment,
     toDepartment,
     deptIoDirection,
+    forceManual = false,
     addItem,
     setHighlightItemId,
   } = args;
@@ -55,12 +57,15 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
     if (!preselectedItem) return;
     // BOM 부모 set 이 아직 로딩 안 됨 — 보류 (S1 race 대응)
     if (!bomParentsLoaded) return;
-    const handledKey = `${preselectedItem.item_id}__${workType}__${subType}__${fromDepartment ?? ""}__${toDepartment ?? ""}`;
+    const handledKey = `${preselectedItem.item_id}__${workType}__${subType}__${fromDepartment ?? ""}__${toDepartment ?? ""}__${forceManual}`;
     if (handledRef.current === handledKey) return;
     // process workType + 방향 미선택이면 자동 추가 보류 (Step 2에서 방향 선택 후 다시 진입해야 함)
     if (workType === "process" && deptIoDirection == null) return;
     handledRef.current = handledKey;
-    if (bomParents.has(preselectedItem.item_id)) {
+    if (forceManual) {
+      setHighlightItemId(null);
+      void addItem(preselectedItem, "manual");
+    } else if (bomParents.has(preselectedItem.item_id)) {
       // BOM 부모: 자동 카트 추가하지 않고 Step 3 picker 에서 해당 row 만 강조.
       // 낱개/BOM 선택은 사용자가 직접.
       setHighlightItemId(preselectedItem.item_id);
@@ -70,5 +75,5 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
       void addItem(preselectedItem);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id, workType, subType, fromDepartment, toDepartment, deptIoDirection, bomParents, bomParentsLoaded]);
+  }, [preselectedItem?.item_id, workType, subType, fromDepartment, toDepartment, deptIoDirection, forceManual, bomParents, bomParentsLoaded]);
 }
