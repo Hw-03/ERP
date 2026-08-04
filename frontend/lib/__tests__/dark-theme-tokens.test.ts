@@ -29,6 +29,15 @@ const DARK_PROCESS = {
   "--c-process-pr": "#b1aac2", "--c-process-pa": "#c89b78", "--c-process-pf": "#9dabca",
 };
 
+const DARK_DEPARTMENTS = {
+  "--c-department-tube": "#75b58a",
+  "--c-department-high-pressure": "#cfb36a",
+  "--c-department-vacuum": "#aa98c8",
+  "--c-department-tuning": "#b5b5b5",
+  "--c-department-assembly": "#78a7d8",
+  "--c-department-shipping": "#b68e6c",
+};
+
 function hexToLuminance(hex: string): number {
   const channels = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
   const [red, green, blue] = channels.map((channel) => (
@@ -70,6 +79,7 @@ describe("다크 테마 색상 계약", () => {
     expect(tokens).toMatchObject(DARK_FOREGROUND);
     expect(tokens).toMatchObject(DARK_SOLID);
     expect(tokens).toMatchObject(DARK_PROCESS);
+    expect(tokens).toMatchObject(DARK_DEPARTMENTS);
   });
 
   it("전경·공정색과 채움색이 각각 필요한 대비를 충족한다", () => {

@@ -8,6 +8,7 @@ import {
   setCurrentOperator,
   type Operator,
 } from "../useCurrentOperator";
+import * as currentOperatorStorage from "../useCurrentOperator";
 import { sendClientEvent } from "@/lib/client-events";
 
 vi.mock("@/lib/client-events", () => ({
@@ -59,6 +60,41 @@ describe("useCurrentOperator storage", () => {
     const { hidden_sidebar_tabs: _hidden, ...legacyOperator } = baseOperator;
     window.sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify(legacyOperator));
     expect(readCurrentOperator()?.hidden_sidebar_tabs).toEqual([]);
+  });
+
+  it("defaults a missing or invalid sidebar mode to hover", () => {
+    window.sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify(baseOperator));
+    expect(
+      (readCurrentOperator() as unknown as { sidebar_mode: string })?.sidebar_mode,
+    ).toBe("hover");
+
+    window.sessionStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({ ...baseOperator, sidebar_mode: "floating" }),
+    );
+    expect(
+      (readCurrentOperator() as unknown as { sidebar_mode: string })?.sidebar_mode,
+    ).toBe("hover");
+  });
+
+  it("updates only current operator preferences without logging another login", () => {
+    setCurrentOperator(baseOperator, "boot-1");
+    vi.mocked(sendClientEvent).mockClear();
+    const updateCurrentOperatorPreferences = (
+      currentOperatorStorage as unknown as {
+        updateCurrentOperatorPreferences: (patch: { sidebar_mode: string }) => void;
+      }
+    ).updateCurrentOperatorPreferences;
+
+    expect(updateCurrentOperatorPreferences).toBeTypeOf("function");
+    updateCurrentOperatorPreferences({ sidebar_mode: "expanded" });
+
+    expect(
+      (readCurrentOperator() as unknown as { sidebar_mode: string })?.sidebar_mode,
+    ).toBe("expanded");
+    expect(readCurrentOperator()?.name).toBe(baseOperator.name);
+    expect(getStoredBootId()).toBe("boot-1");
+    expect(sendClientEvent).not.toHaveBeenCalled();
   });
 
   it("defaults missing login notification popup settings to enabled", () => {

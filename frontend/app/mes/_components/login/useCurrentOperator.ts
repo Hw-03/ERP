@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { sendClientEvent } from "@/lib/client-events";
 import { getClientEventSource } from "@/lib/operator-log-context";
+import { normalizeSidebarMode, type SidebarMode } from "@/lib/sidebar-mode";
 
 export interface Operator {
   employee_id: string;
@@ -23,6 +24,8 @@ export interface Operator {
   department_role: DepartmentRole;
   /** 개인별 테마 설정 (light | dark | null). 누락 시 null. */
   theme?: string | null;
+  /** 데스크톱 사이드바 표시 방식. 누락되거나 잘못된 값은 읽을 때 hover로 정규화. */
+  sidebar_mode?: SidebarMode;
   /** 조립 부서 직원의 담당 모델 slot 목록 (priority 순서). 누락 시 []. */
   assigned_model_slots: number[];
   /** 입출고 화면 접근 권한. 누락 시 true (기존 세션 호환). */
@@ -78,6 +81,7 @@ function readOperator(): Operator | null {
       warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
       department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
       theme: parsed.theme ?? null,
+      sidebar_mode: normalizeSidebarMode(parsed.sidebar_mode) ?? "hover",
       assigned_model_slots: slots,
       io_enabled: parsed.io_enabled ?? true,
       hidden_sidebar_tabs: hiddenTabs,
@@ -105,6 +109,15 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
   window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
   if (bootId) window.sessionStorage.setItem(BOOT_KEY, bootId);
   sendClientEvent({ event: "ui_login", source: getClientEventSource() });
+  window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
+}
+
+/** Updates UI preferences without creating another login audit event. */
+export function updateCurrentOperatorPreferences(patch: { sidebar_mode: SidebarMode }): void {
+  if (typeof window === "undefined") return;
+  const operator = readOperator();
+  if (!operator) return;
+  window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify({ ...operator, ...patch }));
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 

@@ -9,7 +9,7 @@
  */
 
 import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
-import type { Department, DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "./types";
+import type { Department, DepartmentRole, Employee, EmployeeLevel, SidebarMode, WarehouseRole } from "./types";
 
 export const employeesApi = {
   getEmployees: (params?: { department?: Department; activeOnly?: boolean }) => {
@@ -84,4 +84,9 @@ export const employeesApi = {
   // 직원 테마 설정 저장
   setEmployeeTheme: (employeeId: string, theme: string | null) =>
     putJson<Employee>(toApiUrl(`/api/employees/${employeeId}/theme`), { theme }),
+
+  setEmployeeSidebarMode: (employeeId: string, sidebarMode: SidebarMode) =>
+    putJson<Employee>(toApiUrl(`/api/employees/${employeeId}/sidebar-mode`), {
+      sidebar_mode: sidebarMode,
+    }),
 };

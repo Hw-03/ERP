@@ -79,7 +79,7 @@ describe("DailyWorkActivity", () => {
     expect(screen.getByText("+1 EA")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "창고 거래 상세 접기" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "거래 상세 접기" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("daily-work-activity-details")).toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
+    expect(screen.getByTestId("daily-work-activity-details")).not.toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
   });
 
   it("재고 변화가 많아도 모두 두 열에 표시하고 추가 펼치기를 만들지 않는다", () => {
@@ -149,7 +149,7 @@ describe("DailyWorkActivity", () => {
     expect(screen.getByText("생산 입고")).toBeInTheDocument();
   });
 
-  it("읽기 전용 일보의 펼친 상세도 데스크톱 카드 내부에서 스크롤한다", () => {
+  it("읽기 전용 일보의 펼친 상세는 카드 내부 높이를 제한하지 않는다", () => {
     render(
       <DailyWorkActivity
         activity={{
@@ -163,6 +163,6 @@ describe("DailyWorkActivity", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
-    expect(screen.getByTestId("daily-work-activity-details")).toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
+    expect(screen.getByTestId("daily-work-activity-details")).not.toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
   });
 });

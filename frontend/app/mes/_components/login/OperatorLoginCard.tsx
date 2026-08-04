@@ -11,6 +11,7 @@ import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { api, type Employee } from "@/lib/api";
 import { PIN_LENGTH } from "@/lib/auth/constants";
+import { normalizeSidebarMode } from "@/lib/sidebar-mode";
 import { markLoginNotificationPopupPending, setCurrentOperator, type Operator } from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
 import { EmployeeCombobox } from "./EmployeeCombobox";
@@ -51,6 +52,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         warehouse_role: emp.warehouse_role ?? "none",
         department_role: emp.department_role ?? "none",
         theme: emp.theme ?? null,
+        sidebar_mode: normalizeSidebarMode(emp.sidebar_mode) ?? "hover",
         assigned_model_slots: emp.assigned_model_slots ?? [],
         io_enabled: emp.io_enabled ?? true,
         hidden_sidebar_tabs: emp.hidden_sidebar_tabs ?? [],

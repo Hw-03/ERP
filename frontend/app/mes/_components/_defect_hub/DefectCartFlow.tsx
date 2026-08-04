@@ -383,7 +383,7 @@ export function DefectCartFlow({
                 <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3">
                   {PRODUCTION_LINES.map((d) => {
                     const active = dept === d;
-                    const deptColor = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2);
+                    const deptColor = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2, d);
                     return (
                       <button key={d} type="button" onClick={() => setDept(d)} className="h-full rounded-[18px] border text-3xl font-black transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: active ? tint(deptColor, 14) : LEGACY_COLORS.s2, borderColor: active ? deptColor : LEGACY_COLORS.border, borderWidth: active ? 2 : 1, color: active ? deptColor : LEGACY_COLORS.muted2 }}>
                         {d}

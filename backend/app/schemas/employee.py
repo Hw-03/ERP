@@ -86,6 +86,7 @@ class EmployeeResponse(BaseModel):
     pin_last_changed: Optional[UtcDatetime] = None
     pin_is_default: bool = True
     theme: Optional[str] = None
+    sidebar_mode: str = "hover"
     # 담당 모델 slot 목록 (priority 순서대로 정렬되어 반환됨)
     assigned_model_slots: List[int] = Field(default_factory=list)
     # 직원별 좌측 사이드바/모바일 탭 숨김 목록.
@@ -99,3 +100,7 @@ class EmployeeLoginNotificationPopupUpdate(BaseModel):
 
 class EmployeeThemeUpdate(BaseModel):
     theme: Optional[str] = Field(None, max_length=10)
+
+
+class EmployeeSidebarModeUpdate(BaseModel):
+    sidebar_mode: str = Field(..., max_length=10)

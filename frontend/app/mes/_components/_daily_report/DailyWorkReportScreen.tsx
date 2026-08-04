@@ -164,7 +164,7 @@ export function DailyWorkReportScreen({
 
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
-      <div className="scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-0">
+      <div className="scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pb-0">
         <header className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-h-11 items-center gap-3">

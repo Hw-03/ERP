@@ -19,7 +19,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -152,6 +152,8 @@ def get_weekly_report(
                     label=PROCESS_TYPE_LABELS.get(code, code),
                     item_count=0,
                     prev_qty=Decimal("0"),
+                    increase_qty=Decimal("0"),
+                    decrease_qty=Decimal("0"),
                     produce_qty=Decimal("0"),
                     receive_qty=Decimal("0"),
                     out_qty=Decimal("0"),
@@ -180,6 +182,24 @@ def get_weekly_report(
             TransactionLog.item_id,
             TransactionLog.transaction_type,
             func.coalesce(func.sum(TransactionLog.quantity_change), 0).label("qty_sum"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (TransactionLog.quantity_change > 0, TransactionLog.quantity_change),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("increase_sum"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (TransactionLog.quantity_change < 0, -TransactionLog.quantity_change),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("decrease_sum"),
         )
         .filter(
             TransactionLog.item_id.in_(item_ids),
@@ -194,10 +214,14 @@ def get_weekly_report(
     receive_map: dict[str, Decimal] = {}   # RECEIVE — '입고' 칸 (생산과 분리)
     out_map: dict[str, Decimal] = {}       # SHIP+BACKFLUSH — '출고' 칸
     net_map: dict[str, Decimal] = {}       # 전체 거래 합 — 전주재고/증감 역산용(폐기·분해 포함)
-    for item_id, tx_type, qty_sum in tx_rows:
+    increase_map: dict[str, Decimal] = {}  # 양수 거래 합 — 상쇄 전 증가량
+    decrease_map: dict[str, Decimal] = {}  # 음수 거래 절댓값 합 — 상쇄 전 감소량
+    for item_id, tx_type, qty_sum, increase_sum, decrease_sum in tx_rows:
         iid = str(item_id)
         val = Decimal(str(qty_sum))
         net_map[iid] = net_map.get(iid, Decimal("0")) + val
+        increase_map[iid] = increase_map.get(iid, Decimal("0")) + Decimal(str(increase_sum))
+        decrease_map[iid] = decrease_map.get(iid, Decimal("0")) + Decimal(str(decrease_sum))
         if tx_type == TransactionTypeEnum.PRODUCE:
             produce_map[iid] = produce_map.get(iid, Decimal("0")) + val
         elif tx_type == TransactionTypeEnum.RECEIVE:
@@ -240,6 +264,8 @@ def get_weekly_report(
         label = PROCESS_TYPE_LABELS.get(code, code)
         dept = _DEPT_NAMES.get(code, code)
         g_prev = sum((i.prev_qty for i in items), Decimal("0"))
+        g_increase = sum((increase_map.get(i.item_id, Decimal("0")) for i in items), Decimal("0"))
+        g_decrease = sum((decrease_map.get(i.item_id, Decimal("0")) for i in items), Decimal("0"))
         g_produce = sum((i.produce_qty for i in items), Decimal("0"))
         g_receive = sum((i.receive_qty for i in items), Decimal("0"))
         g_out = sum((i.out_qty for i in items), Decimal("0"))
@@ -252,6 +278,8 @@ def get_weekly_report(
                 label=label,
                 item_count=len(items),
                 prev_qty=g_prev,
+                increase_qty=g_increase,
+                decrease_qty=g_decrease,
                 produce_qty=g_produce,
                 receive_qty=g_receive,
                 out_qty=g_out,

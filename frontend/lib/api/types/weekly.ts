@@ -16,6 +16,8 @@ export interface WeeklyGroupReport {
   label: string;
   item_count: number;
   prev_qty: number;
+  increase_qty: number;
+  decrease_qty: number;
   produce_qty: number;
   receive_qty: number;
   out_qty: number;

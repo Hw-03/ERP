@@ -125,3 +125,6 @@ outputs/
 
 # verify_local / 로컬 dev 실행 로그 (재생성 가능)
 frontend/frontend-dev-verify.log
+
+# brainstorming 스킬 로컬 서버 런타임 상태 (재생성 가능)
+.superpowers/
