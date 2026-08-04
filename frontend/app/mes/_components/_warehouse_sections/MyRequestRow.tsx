@@ -34,10 +34,12 @@ export function MyRequestRow({
   req,
   onCancelRequest,
   onRevertToDraft,
+  highlighted,
 }: {
   req: StockRequest;
   onCancelRequest: () => void;
   onRevertToDraft?: () => void;
+  highlighted?: boolean;
 }) {
   const cancelable = req.status === "submitted" || req.status === "reserved";
   const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
@@ -56,7 +58,8 @@ export function MyRequestRow({
   return (
     <div
       className="rounded-[14px] border px-5 py-4"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      data-stock-request-id={req.request_id}
+      style={{ background: LEGACY_COLORS.s2, borderColor: highlighted ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
         <span

@@ -111,11 +111,13 @@ export function IoComposeView({
   preselectedItem,
   restoreDraft: draftToRestore,
   restoreNonce,
+  restoreStep,
   defaultWorkType,
   entryIntent,
   onStatusChange,
   onSubmitSuccess,
   onItemConversionFocusChange,
+  onDraftSaved,
 }: IoComposeViewProps) {
   const revision = useRealtimeRevision();
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
@@ -270,6 +272,7 @@ export function IoComposeView({
     autosaveBatchIdRef,
     state,
     onStatusChange,
+    restoreStep,
   });
 
   useEffect(() => {
@@ -407,6 +410,7 @@ export function IoComposeView({
         bundles: state.bundles,
       });
       autosaveBatchIdRef.current = saved.batch_id;
+      onDraftSaved?.(saved.batch_id, state.step);
     },
     async () => {
       // '저장하지 않고 이동' — 수동 저장본은 서버에 유지(다음 진입 시 복원됨).
@@ -532,6 +536,7 @@ export function IoComposeView({
         bundles: state.bundles,
       });
       autosaveBatchIdRef.current = response.batch_id;
+      onDraftSaved?.(response.batch_id, state.step);
       setContentDirty(false); // 저장 버튼으로 명시적 저장 → 이후 수정 전까지 경고 없음
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, "0");

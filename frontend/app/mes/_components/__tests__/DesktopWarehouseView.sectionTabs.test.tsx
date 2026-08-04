@@ -1,6 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { DesktopWarehouseView } from "../DesktopWarehouseView";
+
+const currentComposeProps = vi.hoisted(() => ({
+  value: null as null | {
+    restoreDraft?: { batch_id: string } | null;
+    restoreStep?: number;
+  },
+}));
+
+const apiMocks = vi.hoisted(() => ({
+  listStockRequestDrafts: vi.fn(),
+  listDrafts: vi.fn(),
+}));
+
+vi.mock("@/lib/api", () => ({ api: apiMocks }));
 
 vi.mock("@/app/mes/_components/_warehouse_hooks/useWarehouseData", () => ({
   useWarehouseData: () => ({
@@ -32,11 +46,18 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
 }));
 
 vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
-  IoComposeView: ({ onItemConversionFocusChange }: { onItemConversionFocusChange: (focused: boolean) => void }) => (
-    <button type="button" data-testid="item-conversion-focus" onClick={() => onItemConversionFocusChange(true)}>
-      품목 전환 포커스
-    </button>
-  ),
+  IoComposeView: (props: {
+    onItemConversionFocusChange: (focused: boolean) => void;
+    restoreDraft?: { batch_id: string } | null;
+    restoreStep?: number;
+  }) => {
+    currentComposeProps.value = props;
+    return (
+      <button type="button" data-testid="item-conversion-focus" onClick={() => props.onItemConversionFocusChange(true)}>
+        품목 전환 포커스
+      </button>
+    );
+  },
 }));
 
 vi.mock("@/app/mes/_components/login/useCurrentOperator", () => ({
@@ -51,6 +72,11 @@ vi.mock("@/app/mes/_components/login/useCurrentOperator", () => ({
 describe("DesktopWarehouseView", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=mine");
+    apiMocks.listStockRequestDrafts.mockReset();
+    apiMocks.listDrafts.mockReset();
+    apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
+    apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
+    currentComposeProps.value = null;
   });
 
   it("내 요청 URL로 직접 진입해도 상단 기본 탭 3개를 표시한다", () => {
@@ -162,7 +188,48 @@ describe("DesktopWarehouseView", () => {
     fireEvent.click(screen.getByRole("button", { name: "continue draft" }));
 
     const params = new URLSearchParams(window.location.search);
-    expect(params.get("section")).toBeNull();
-    expect(params.get("step")).toBeNull();
+    expect(params.get("section")).toBe("compose");
+    expect(params.get("step")).toBe("4");
+    expect(params.get("draftId")).toBe("draft-2");
+  });
+
+  it("restores the URL draft even when the legacy draft count fails", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    apiMocks.listStockRequestDrafts.mockRejectedValue(new Error("legacy unavailable"));
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-1" }]);
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByTestId("item-conversion-focus")).toBeInTheDocument());
+    expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-1");
+    expect(currentComposeProps.value?.restoreStep).toBe(4);
+  });
+
+  it("keeps a URL draft restore error visible and retries instead of opening a blank compose", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=3&draftId=draft-1");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts
+      .mockRejectedValueOnce(new Error("draft unavailable"))
+      .mockResolvedValueOnce([{ batch_id: "draft-1" }]);
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("저장한 작업을 불러오지 못했습니다.");
+    expect(screen.queryByTestId("item-conversion-focus")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-1"));
+    expect(apiMocks.listDrafts).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not open a blank compose when the URL draft no longer exists", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=2&draftId=missing");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([]);
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("저장한 작업을 찾을 수 없습니다.");
+    expect(screen.queryByTestId("item-conversion-focus")).not.toBeInTheDocument();
   });
 });

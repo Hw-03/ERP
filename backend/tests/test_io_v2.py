@@ -1113,6 +1113,94 @@ def test_io_submit_merges_duplicate_manual_single_item_bundles(
     assert tx[0].quantity_change == Decimal("2")
 
 
+def test_io_draft_resave_and_submit_merges_duplicate_manual_single_item_bundles(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Draft Duplicate Adj In", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("0"))
+    requester = _make_employee(db_session, department_role="primary")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "manual",
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    first_bundle = preview.json()["bundles"][0]
+    duplicate_bundle = {
+        **first_bundle,
+        "bundle_id": str(uuid.uuid4()),
+        "lines": [{**first_bundle["lines"][0], "line_id": str(uuid.uuid4())}],
+    }
+
+    saved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": [first_bundle, duplicate_bundle],
+        },
+    )
+    assert saved.status_code == 200, saved.json()
+    batch_id = saved.json()["batch_id"]
+
+    fetched = client.get(
+        "/api/io/draft",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+        },
+    )
+    assert fetched.status_code == 200, fetched.json()
+    fetched_bundles = fetched.json()["bundles"]
+    assert len(fetched_bundles) == 1
+    assert Decimal(str(fetched_bundles[0]["quantity"])) == Decimal("2")
+
+    resaved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "batch_id": batch_id,
+            "bundles": fetched_bundles,
+        },
+    )
+    assert resaved.status_code == 200, resaved.json()
+    assert resaved.json()["batch_id"] == batch_id
+
+    submitted = client.post(
+        f"/api/io/draft/{batch_id}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert submitted.status_code == 201, submitted.json()
+    assert db_session.query(IoBundle).count() == 1
+    assert db_session.query(IoLine).count() == 1
+    persisted_bundle = db_session.query(IoBundle).one()
+    persisted_line = db_session.query(IoLine).one()
+    assert persisted_bundle.quantity == Decimal("2")
+    assert persisted_line.quantity == Decimal("2")
+    tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
+    assert len(tx) == 1
+    assert tx[0].quantity_change == Decimal("2")
+
+
 def _manual_produce_payload(requester: Employee, item) -> dict:
     return {
         "requester_employee_id": str(requester.employee_id),

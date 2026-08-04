@@ -11,6 +11,7 @@ import { ResultModal } from "./common/ResultModal";
 import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 import { NotificationBell } from "./notifications/NotificationBell";
+import type { NotificationNavigationTarget } from "./notifications/NotificationBell";
 
 const DEFAULT_STATUS = "DEXCOWIN MES System";
 
@@ -45,7 +46,7 @@ export function DesktopTopbar({
   status?: string;
   statusNonce?: number;
   titleAddon?: ReactNode;
-  onNavigate?: (tab: string, section: string | null) => void;
+  onNavigate?: (target: NotificationNavigationTarget) => void;
 }) {
   const operator = useCurrentOperator();
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;

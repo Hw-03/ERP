@@ -32,7 +32,7 @@ const STATUS_TONE: Record<ShippingRequestStatus, string> = {
 
 export function MobileShippingScreen() {
   const [tab, setTab] = useState<MobileShippingTab>("prep");
-  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationErrors, setMutationErrors] = useState<Record<string, string>>({});
   const [pendingId, setPendingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const requestsQuery = useShippingRequestsQuery(undefined, { live: true });
@@ -81,24 +81,38 @@ export function MobileShippingScreen() {
   }
 
   async function updateChecklist(req: ShippingRequest, itemId: string, checked: boolean) {
+    if (req.status !== "PREPARING") return;
     setPendingId(`${req.request_id}-${itemId}`);
-    setMutationError(null);
+    setMutationErrors((current) => {
+      const { [req.request_id]: _cleared, ...remaining } = current;
+      return remaining;
+    });
     try {
       upsert(await api.updateShippingChecklist(req.request_id, { checks: [{ item_id: itemId, checked }] }));
     } catch (err) {
-      setMutationError(err instanceof Error ? err.message : "체크리스트 수정에 실패했습니다.");
+      setMutationErrors((current) => ({
+        ...current,
+        [req.request_id]: err instanceof Error ? err.message : "체크리스트 수정에 실패했습니다.",
+      }));
     } finally {
       setPendingId(null);
     }
   }
 
   async function clearChecklist(req: ShippingRequest) {
+    if (req.status !== "PREPARING") return;
     setPendingId(`${req.request_id}-clear`);
-    setMutationError(null);
+    setMutationErrors((current) => {
+      const { [req.request_id]: _cleared, ...remaining } = current;
+      return remaining;
+    });
     try {
       upsert(await api.clearShippingChecklist(req.request_id));
     } catch (err) {
-      setMutationError(err instanceof Error ? err.message : "체크리스트 전체 해제에 실패했습니다.");
+      setMutationErrors((current) => ({
+        ...current,
+        [req.request_id]: err instanceof Error ? err.message : "체크리스트 전체 해제에 실패했습니다.",
+      }));
     } finally {
       setPendingId(null);
     }
@@ -108,8 +122,7 @@ export function MobileShippingScreen() {
     || (requestsQuery.isPlaceholderData && requestsQuery.isFetching)
     || (tab === "history" && (historyQuery.isLoading || (historyQuery.isPlaceholderData && historyQuery.isFetching)));
   const queryError = tab === "history" ? historyQuery.error : requestsQuery.error;
-  const error = mutationError
-    ?? (queryError instanceof Error ? queryError.message : queryError ? "출하 데이터를 불러오지 못했습니다." : null);
+  const error = queryError instanceof Error ? queryError.message : queryError ? "출하 데이터를 불러오지 못했습니다." : null;
 
   return (
     <div className="mw0 scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
@@ -156,6 +169,7 @@ export function MobileShippingScreen() {
                 key={req.request_id}
                 request={req}
                 pendingId={pendingId}
+                error={mutationErrors[req.request_id] ?? null}
                 onCheck={updateChecklist}
                 onClear={clearChecklist}
               />
@@ -358,18 +372,22 @@ function PreparationRevisionNotice({ request }: { request: ShippingRequest }) {
 function MobilePrepCard({
   request,
   pendingId,
+  error,
   onCheck,
   onClear,
 }: {
   request: ShippingRequest;
   pendingId: string | null;
+  error: string | null;
   onCheck: (req: ShippingRequest, itemId: string, checked: boolean) => void;
   onClear: (req: ShippingRequest) => void;
 }) {
+  const editable = request.status === "PREPARING";
   return (
     <div className="mw0 oh rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <CardHeader request={request} />
       <PreparationRevisionNotice request={request} />
+      {error && <InlineState title="오류" body={error} tone={LEGACY_COLORS.red} compact />}
       <div className="mt-3 rounded-[14px] border px-3 py-2 text-xs font-black" style={{ background: tint(LEGACY_COLORS.green, 12), borderColor: tint(LEGACY_COLORS.green, 36), color: LEGACY_COLORS.green }}>
         총 {request.request_quantity ?? 1}대 출하
       </div>
@@ -387,7 +405,7 @@ function MobilePrepCard({
                 type="checkbox"
                 aria-label={`${line.item_name} 체크`}
                 checked={line.checked}
-                disabled={pendingId !== null}
+                disabled={!editable || pendingId !== null}
                 onChange={(event) => onCheck(request, line.item_id, event.target.checked)}
                 className="h-5 w-5"
               />
@@ -403,7 +421,7 @@ function MobilePrepCard({
       <button
         type="button"
         onClick={() => onClear(request)}
-        disabled={pendingId !== null || request.checklist_lines.length === 0}
+        disabled={!editable || pendingId !== null || request.checklist_lines.length === 0}
         className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[12px] border px-3 py-2 text-sm font-black disabled:opacity-45"
         style={{ background: tint(LEGACY_COLORS.yellow, 12), borderColor: tint(LEGACY_COLORS.yellow, 45), color: LEGACY_COLORS.yellow }}
       >

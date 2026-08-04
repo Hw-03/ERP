@@ -79,11 +79,17 @@ export function IoDraftWorkCard({
       0,
     );
     const lines = draft.bundles.reduce((sum, b) => sum + (b.lines?.length ?? 0), 0);
+    const firstIncludedLine = draft.bundles
+      .flatMap((bundle) => bundle.lines ?? [])
+      .find((line) => line.included);
+    const useLineLocations =
+      (draft.sub_type === "warehouse_to_dept" || draft.sub_type === "dept_to_warehouse") &&
+      firstIncludedLine;
     const dept = placeArrow(
-      draft.from_department,
-      null,
-      draft.to_department,
-      null,
+      useLineLocations ? firstIncludedLine.from_department : draft.from_department,
+      useLineLocations ? firstIncludedLine.from_bucket : null,
+      useLineLocations ? firstIncludedLine.to_department : draft.to_department,
+      useLineLocations ? firstIncludedLine.to_bucket : null,
     );
     const sub = deptIoDisplayLabel(draft.sub_type) ?? subTypeLabel(draft.sub_type);
     const work = IO_WORK_TYPES.find((w) => w.id === draft.work_type) ?? null;

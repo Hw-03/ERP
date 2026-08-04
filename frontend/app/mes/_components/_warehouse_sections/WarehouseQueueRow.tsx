@@ -35,6 +35,7 @@ export interface WarehouseQueueRowProps {
   closeReject: () => void;
   submitApprove: (id: string) => void;
   submitReject: (id: string) => void;
+  highlighted?: boolean;
 }
 
 export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
@@ -47,6 +48,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
     setRejectReason, setRejectPin, setShowRejectFor,
     closeApprove, closeReject,
     submitApprove, submitReject,
+    highlighted,
   } = props;
 
   const noteText = formatRequestNotes(req.notes);
@@ -54,8 +56,9 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
   return (
     <div
       key={req.request_id}
-      className="rounded-[14px] border px-5 py-4"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      data-stock-request-id={req.request_id}
+      className={`rounded-[14px] border px-5 py-4${highlighted ? " ring-2 ring-[var(--c-blue)]" : ""}`}
+      style={{ background: LEGACY_COLORS.s2, borderColor: highlighted ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}
     >
       <div className="flex flex-wrap items-center gap-2 text-sm" style={{ color: LEGACY_COLORS.text }}>
         <span

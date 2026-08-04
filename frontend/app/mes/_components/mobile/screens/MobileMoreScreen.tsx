@@ -4,6 +4,7 @@ import { BarChart2, ClipboardCheck, ClipboardList, MapPinned, PackageCheck, type
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { Operator } from "../../login/useCurrentOperator";
 import { NotificationBell } from "../../notifications/NotificationBell";
+import type { NotificationNavigationTarget } from "../../notifications/NotificationBell";
 
 export type MobileMoreEntryId = "assemblyChecklist" | "dailyReport" | "weekly" | "shipping" | "warehouseMap";
 
@@ -62,7 +63,7 @@ export function MobileMoreScreen({
   operator: Operator | null;
   unreadCount?: number;
   onProfile: () => void;
-  onNotificationNavigate: (tab: string, section: string | null) => void;
+  onNotificationNavigate: (target: NotificationNavigationTarget) => void;
   onChecklist: () => void;
   onDailyReport: () => void;
   onWeekly: () => void;

@@ -1,11 +1,19 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MobileDefectCartFlow } from "../MobileDefectCartFlow";
 import { MobileDefectProcessPanel } from "../MobileDefectProcessPanel";
 import type { DefectLocation } from "@/lib/api/types/defects";
+import { defectsApi } from "@/lib/api/defects";
+import { stockRequestsApi } from "@/lib/api/stock-requests";
 
 vi.mock("../../../_defect_hub/DisassembleTree", () => ({
-  DisassembleTree: () => <div data-testid="disassemble-tree" />,
+  DisassembleTree: ({ onChange }: { onChange: (decisions: unknown[]) => void }) => (
+    <div data-testid="disassemble-tree">
+      <button type="button" onClick={() => onChange([{ child_item_id: "child-1", action: "recover" }])}>
+        set tree decision
+      </button>
+    </div>
+  ),
   toServerDecision: (decision: unknown) => decision,
   validateDecisionTree: () => true,
 }));
@@ -142,5 +150,56 @@ describe("mobile defect compact headers", () => {
 
     expect(screen.getByTestId("mobile-defect-picker-pane")).toHaveClass("min-h-[300px]", "flex-[1_1_300px]");
     expect(screen.getByTestId("mobile-defect-cart-scroll")).toHaveClass("max-h-[min(26dvh,220px)]", "overflow-y-auto");
+  });
+
+  it("opens confirmation before mobile normal recovery and calls unquarantine once after confirmation", async () => {
+    vi.mocked(defectsApi.unquarantine).mockResolvedValueOnce(undefined);
+    const onDone = vi.fn();
+    const { container } = render(
+      <MobileDefectProcessPanel
+        location={location}
+        currentEmployee={employee}
+        onDone={onDone}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
+
+    expect(defectsApi.unquarantine).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
+
+    await waitFor(() => expect(defectsApi.unquarantine).toHaveBeenCalledTimes(1));
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends the defect_disassemble payload after a BOM rework tree is confirmed", async () => {
+    vi.mocked(stockRequestsApi.createStockRequest).mockResolvedValueOnce({} as never);
+    const { container } = render(
+      <MobileDefectProcessPanel
+        location={location}
+        currentEmployee={employee}
+        onDone={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(container.querySelectorAll("button")[6]);
+    fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
+    fireEvent.click(screen.getByRole("button", { name: "set tree decision" }));
+    fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
+
+    await waitFor(() => expect(stockRequestsApi.createStockRequest).toHaveBeenCalledTimes(1));
+    const payload = vi.mocked(stockRequestsApi.createStockRequest).mock.calls[0][0];
+    expect(payload).toMatchObject({
+      request_type: "defect_disassemble",
+      lines: [expect.objectContaining({ item_id: "item-1", quantity: 3, from_bucket: "defective" })],
+    });
+    expect(JSON.parse(payload.notes ?? "{}")).toEqual({
+      child_decisions: [{ child_item_id: "child-1", action: "recover" }],
+    });
   });
 });

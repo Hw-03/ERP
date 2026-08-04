@@ -43,7 +43,7 @@ interface Props {
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
   defaultSource?: SourceKind;
-  onDone: () => void;
+  onDone: (directAction: DirectAction | null) => void;
   onCancel: () => void;
 }
 
@@ -213,7 +213,7 @@ export function DefectCartFlow({
     });
     setBusy(false);
     if (nextFailures.length === 0) {
-      onDone();
+      onDone(directAction);
       return;
     }
     setLines((prev) => prev.filter((l) => failedKeys.has(l.key)));

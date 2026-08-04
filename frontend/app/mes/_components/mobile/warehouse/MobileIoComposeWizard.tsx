@@ -91,6 +91,7 @@ export function MobileIoComposeWizard({
   preselectedItem,
   restoreDraft: draftToRestore,
   restoreNonce,
+  restoreStep,
   defaultWorkType,
   entryIntent,
   onStatusChange,
@@ -98,10 +99,11 @@ export function MobileIoComposeWizard({
   onDirtyChange,
   flushDraftRef,
   onStepChange,
+  onDraftSaved,
 }: IoComposeViewProps & {
   // 모바일 전용 — 섹션 탭 이탈 가드(D2)용. 데스크톱 IoComposeView 는 미사용.
   onDirtyChange?: (dirty: boolean) => void;
-  flushDraftRef?: MutableRefObject<(() => void) | null>;
+  flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
   onStepChange?: (step: IoStep) => void;
 }) {
   const revision = useRealtimeRevision();
@@ -172,6 +174,7 @@ export function MobileIoComposeWizard({
     autosaveBatchIdRef,
     state,
     onStatusChange,
+    restoreStep,
   });
 
   // 4단계 진입 시 재고 스냅샷 갱신 — 취소·승인 등으로 재고가 바뀐 뒤 재추가할 때 stale 표시 방지.
@@ -192,8 +195,14 @@ export function MobileIoComposeWizard({
   // 창에서 마지막 변경이 유실되지 않도록). 매 렌더 최신 클로저로 갱신, 언마운트 시 해제.
   useEffect(() => {
     if (!flushDraftRef) return;
-    flushDraftRef.current = () => {
-      void handleSaveDraft();
+    flushDraftRef.current = async () => {
+      try {
+        await saveCurrentDraft();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
+        setToast({ message, type: "error" });
+        throw err;
+      }
     };
     return () => {
       flushDraftRef.current = null;
@@ -343,28 +352,36 @@ export function MobileIoComposeWizard({
     state.goTo(2);
   }
 
-  async function handleSaveDraft() {
+  async function saveCurrentDraft(): Promise<string | null> {
     if (!employeeId) {
       setError("작업자를 선택하세요.");
-      return;
+      throw new Error("작업자를 선택하세요.");
     }
-    if (state.bundles.length === 0) return;
+    if (state.bundles.length === 0) return null;
+    const response = await saveDraft({
+      employeeId,
+      workType: state.workType,
+      subType: state.subType,
+      fromDepartment: state.fromDepartment,
+      toDepartment: state.toDepartment,
+      referenceNo: state.referenceNo,
+      notes: state.notes,
+      batchId: autosaveBatchIdRef.current,
+      bundles: state.bundles,
+    });
+    autosaveBatchIdRef.current = response.batch_id;
+    onDraftSaved?.(response.batch_id, state.step);
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    onStatusChange(`저장됨 · ${hh}:${mm}`);
+    return response.batch_id;
+  }
+
+  async function handleSaveDraft() {
     try {
-      const response = await saveDraft({
-        employeeId,
-        workType: state.workType,
-        subType: state.subType,
-        fromDepartment: state.fromDepartment,
-        toDepartment: state.toDepartment,
-        referenceNo: state.referenceNo,
-        notes: state.notes,
-        bundles: state.bundles,
-      });
-      autosaveBatchIdRef.current = response.batch_id;
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, "0");
-      const mm = String(now.getMinutes()).padStart(2, "0");
-      onStatusChange(`저장됨 · ${hh}:${mm}`);
+      const batchId = await saveCurrentDraft();
+      if (!batchId) return;
       setToast({ message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.", type: "success" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
@@ -578,10 +595,7 @@ export function MobileIoComposeWizard({
                 void handleSaveDraft();
               }}
               saving={drafting}
-              onSubmit={() => {
-                void handleSubmit();
-              }}
-              submitting={submitting}
+              onReview={() => state.goTo(5)}
               busy={previewing}
               error={error}
             />
