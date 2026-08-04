@@ -267,6 +267,7 @@ function DeptGrid({
           const active = d === value;
           const deptColor = departmentDisplayColor(
             MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple,
+            d,
           );
           return (
             <button

@@ -104,7 +104,7 @@ export function DeptDetailView({
 
   const isValidHex = /^#[0-9a-fA-F]{6}$/.test(editForm.color_hex);
   const previewColor = isValidHex ? editForm.color_hex : savedColor;
-  const displayedPreviewColor = departmentDisplayColor(previewColor);
+  const displayedPreviewColor = departmentDisplayColor(previewColor, editForm.name);
   const colorChanged = isValidHex && previewColor.toLowerCase() !== savedColor.toLowerCase();
 
   return (

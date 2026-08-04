@@ -379,7 +379,7 @@ export function MobileDefectCartFlow({
                 <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
                   {PRODUCTION_LINES.map((d) => {
                     const active = dept === d;
-                    const c = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2);
+                    const c = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2, d);
                     return (
                       <button
                         key={d}

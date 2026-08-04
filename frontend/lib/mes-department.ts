@@ -16,6 +16,24 @@
 const FALLBACK_COLOR = "#475569"; // slate-600 — 미정의 부서 기본
 const FALLBACK_INITIAL = "기"; // "기타"
 
+const STANDARD_PRODUCTION_DEPARTMENT_COLORS: Record<string, string> = {
+  "\uD29C\uBE0C": "#2f805d",
+  "\uACE0\uC555": "#9a672d",
+  "\uC9C4\uACF5": "#7052a8",
+  "\uD29C\uB2DD": "#80600d",
+  "\uC870\uB9BD": "#2f6faf",
+  "\uCD9C\uD558": "#9f4d43",
+};
+
+const STANDARD_PRODUCTION_DEPARTMENT_DISPLAY_TOKENS: Record<string, string> = {
+  "\uD29C\uBE0C": "var(--c-department-tube)",
+  "\uACE0\uC555": "var(--c-department-high-pressure)",
+  "\uC9C4\uACF5": "var(--c-department-vacuum)",
+  "\uD29C\uB2DD": "var(--c-department-tuning)",
+  "\uC870\uB9BD": "var(--c-department-assembly)",
+  "\uCD9C\uD558": "var(--c-department-shipping)",
+};
+
 const DEPARTMENT_ALIAS: Record<string, string> = {
   "연구소": "연구",
   "AS팀": "AS",
@@ -74,6 +92,8 @@ export const MES_DEPARTMENT_COLORS: Record<string, string> = {
 /**
  * 부서 이니셜 (한 글자, 카드/배지에 사용).
  */
+Object.assign(MES_DEPARTMENT_COLORS, STANDARD_PRODUCTION_DEPARTMENT_COLORS);
+
 const MES_DEPARTMENT_INITIALS: Record<string, string> = {
   "조립": "조",
   "고압": "고",
@@ -116,7 +136,11 @@ export function getDepartmentFallbackColor(departmentName: string): string {
 }
 
 /** 원본 부서색을 현재 테마에 맞는 표시색으로 변환한다. */
-export function departmentDisplayColor(color: string): string {
+export function departmentDisplayColor(color: string, departmentName?: string | null): string {
+  const normalized = departmentName ? normalizeDepartmentName(departmentName) : undefined;
+  const source = normalized ? STANDARD_PRODUCTION_DEPARTMENT_COLORS[normalized] : undefined;
+  const token = normalized ? STANDARD_PRODUCTION_DEPARTMENT_DISPLAY_TOKENS[normalized] : undefined;
+  if (source === color.trim().toLowerCase() && token) return token;
   return `color-mix(in srgb, ${color} var(--c-department-color-source-weight), var(--c-department-color-neutral))`;
 }
 

@@ -54,7 +54,10 @@ export function DepartmentsProvider({ children }: { children: ReactNode }) {
     return (name?: string | null) => {
       if (!name) return departmentDisplayColor(employeeColor(name));
       const normalized = normalizeDepartment(name);
-      return departmentDisplayColor(byName.get(name) ?? byName.get(normalized) ?? employeeColor(name));
+      return departmentDisplayColor(
+        byName.get(name) ?? byName.get(normalized) ?? employeeColor(name),
+        normalized,
+      );
     };
   }, [departments]);
 
