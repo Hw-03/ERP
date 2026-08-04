@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 import zipfile
 from datetime import date, datetime
 from io import BytesIO
 from types import SimpleNamespace
 
 from openpyxl import load_workbook
+import pytest
 
 from app.services.f704_02_ledger import F704LedgerEntry, TEMPLATE_PATH, _remark, _requester, render_workbook
 
@@ -93,6 +96,18 @@ def test_remark_uses_original_work_memo_fields_and_ignores_system_note():
     assert _remark(None, None, None) == ""
 
 
+def test_remark_hides_daily_development_notes():
+    hidden_notes = (
+        "DEV-DAILY-20260803: assembly direct warehouse issue",
+        "DEV-DAILY-20260803: assembly BOM component issue",
+        "DEV-DAILY-20260803: high voltage direct warehouse issue",
+        "DEV-DAILY-20260803: high voltage direct warehouse return",
+    )
+
+    for note in hidden_notes:
+        assert _remark(SimpleNamespace(notes=note), None, None) == ""
+
+
 def test_template_keeps_both_forms_but_has_no_ledger_values():
     workbook = load_workbook(TEMPLATE_PATH, data_only=False)
 
@@ -112,6 +127,103 @@ def test_template_keeps_both_forms_but_has_no_ledger_values():
             "비고",
         ]
         assert all(cell.value is None for cell in worksheet[3][11:])
+        assert worksheet["F3"].alignment.horizontal == "center"
         assert worksheet["A61"].fill.fill_type is None
+        assert worksheet["L61"].fill.fill_type is None
+        assert not any(
+            worksheet[f"E{row}"].alignment.shrinkToFit
+            for row in range(4, worksheet.max_row + 1)
+        )
+        assert all(
+            worksheet[f"F{row}"].number_format == "#,##0"
+            for row in range(4, worksheet.max_row + 1)
+        )
         for row in worksheet.iter_rows(min_row=4, max_col=11):
             assert all(cell.value is None for cell in row[1:])
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Microsoft Excel COM 검증은 Windows에서만 실행한다.")
+def test_excel_opens_template_and_rendered_workbook(tmp_path):
+    """Excel이 원본 템플릿과 생성 결과를 복구 없이 직접 열 수 있어야 한다."""
+    rendered_path = tmp_path / "f704-rendered.xlsx"
+    rendered_path.write_bytes(render_workbook([_entry(1)]))
+    script = """
+$ErrorActionPreference = 'Stop'
+$excel = New-Object -ComObject Excel.Application
+try {
+    $excel.Visible = $false
+    $excel.DisplayAlerts = $false
+    $book = $excel.Workbooks.Open($env:F704_XLSX_PATH)
+    $book.Close($false)
+} finally {
+    $excel.Quit()
+    [Runtime.InteropServices.Marshal]::FinalReleaseComObject($excel) | Out-Null
+}
+"""
+    for path in (TEMPLATE_PATH, rendered_path):
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            check=False,
+            capture_output=True,
+            env={**os.environ, "F704_XLSX_PATH": str(path)},
+        )
+        assert result.returncode == 0, (result.stderr or b"").decode("utf-8", "replace")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Microsoft Excel COM 검증은 Windows에서만 실행한다.")
+def test_excel_opens_later_template_rows_when_quantity_is_written(tmp_path):
+    """빈 수량 셀이 있는 후반 행에도 Excel 순서대로 셀을 써야 한다."""
+    rendered_path = tmp_path / "f704-later-row.xlsx"
+    rendered_path.write_bytes(render_workbook(_entry(index) for index in range(1, 242)))
+    script = """
+$ErrorActionPreference = 'Stop'
+$excel = New-Object -ComObject Excel.Application
+try {
+    $excel.Visible = $false
+    $excel.DisplayAlerts = $false
+    $book = $excel.Workbooks.Open($env:F704_XLSX_PATH)
+    $book.Close($false)
+} finally {
+    $excel.Quit()
+    [Runtime.InteropServices.Marshal]::FinalReleaseComObject($excel) | Out-Null
+}
+"""
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", script],
+        check=False,
+        capture_output=True,
+        env={**os.environ, "F704_XLSX_PATH": str(rendered_path)},
+    )
+    assert result.returncode == 0, (result.stderr or b"").decode("utf-8", "replace")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Microsoft Excel COM 검증은 Windows에서만 실행한다.")
+def test_excel_template_has_no_fill_past_last_visible_column():
+    """61행의 행 서식은 O열 이후 빈 영역에도 채우기를 남기면 안 된다."""
+    script = """
+$ErrorActionPreference = 'Stop'
+$excel = New-Object -ComObject Excel.Application
+try {
+    $excel.Visible = $false
+    $excel.DisplayAlerts = $false
+    $book = $excel.Workbooks.Open($env:F704_XLSX_PATH)
+    foreach ($sheet in @($book.Worksheets)) {
+        foreach ($cell in @('O61', 'XFD61')) {
+            if ($sheet.Range($cell).Interior.Pattern -ne -4142) {
+                throw "Unexpected fill at $($sheet.Name)!$cell"
+            }
+        }
+    }
+    $book.Close($false)
+} finally {
+    $excel.Quit()
+    [Runtime.InteropServices.Marshal]::FinalReleaseComObject($excel) | Out-Null
+}
+"""
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", script],
+        check=False,
+        capture_output=True,
+        env={**os.environ, "F704_XLSX_PATH": str(TEMPLATE_PATH)},
+    )
+    assert result.returncode == 0, (result.stderr or b"").decode("utf-8", "replace")

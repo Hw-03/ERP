@@ -41,6 +41,14 @@ _XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 _Q = lambda name: f"{{{_XLSX_NS}}}{name}"
 _CELL_REF_RE = re.compile(r"([A-Z]+)(\d+)$")
 _DATA_START_ROW = 4
+_SUPPRESSED_REMARKS = frozenset(
+    {
+        "DEV-DAILY-20260803: assembly direct warehouse issue",
+        "DEV-DAILY-20260803: assembly BOM component issue",
+        "DEV-DAILY-20260803: high voltage direct warehouse issue",
+        "DEV-DAILY-20260803: high voltage direct warehouse return",
+    }
+)
 _IGNORABLE_NAMESPACE_DECLARATIONS = {
     "x14ac": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac",
     "xr": "http://schemas.microsoft.com/office/spreadsheetml/2014/revision",
@@ -225,7 +233,8 @@ def _remark(
         shipping_request.notes if shipping_request is not None else None,
     ):
         if notes and notes.strip():
-            return notes.strip().replace("\r", " ").replace("\n", " ")
+            remark = notes.strip().replace("\r", " ").replace("\n", " ")
+            return "" if remark in _SUPPRESSED_REMARKS else remark
     return ""
 
 
@@ -358,11 +367,24 @@ def _column_name(cell: ET.Element) -> str:
     return match.group(1)
 
 
+def _column_number(column: str) -> int:
+    """A1 열 문자를 정렬 가능한 1부터 시작하는 번호로 바꾼다."""
+    value = 0
+    for character in column:
+        value = value * 26 + ord(character) - ord("A") + 1
+    return value
+
+
 def _cell_by_column(row: ET.Element, column: str, row_number: int) -> ET.Element:
     for cell in row.findall(_Q("c")):
         if _column_name(cell) == column:
             return cell
     cell = ET.Element(_Q("c"), {"r": f"{column}{row_number}"})
+    target_column_number = _column_number(column)
+    for index, existing in enumerate(row.findall(_Q("c"))):
+        if _column_number(_column_name(existing)) > target_column_number:
+            row.insert(index, cell)
+            return cell
     row.append(cell)
     return cell
 
