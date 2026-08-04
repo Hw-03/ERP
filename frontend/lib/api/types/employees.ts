@@ -4,6 +4,9 @@
  */
 
 import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "./shared";
+import type { SidebarMode } from "../../sidebar-mode";
+
+export type { SidebarMode } from "../../sidebar-mode";
 
 export interface Employee {
   employee_id: string;
@@ -31,6 +34,8 @@ export interface Employee {
   pin_is_default?: boolean;
   /** 개인별 테마 설정 (light | dark | null). */
   theme?: string | null;
+  /** 데스크톱 사이드바 표시 방식. 이전 서버 응답과의 호환을 위해 optional. */
+  sidebar_mode?: SidebarMode;
   /** 조립 부서 직원의 담당 모델 slot 목록. 배열 순서 = 우선순위 (앞=상위). */
   assigned_model_slots?: number[];
   /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. 누락 시 []로 간주. */

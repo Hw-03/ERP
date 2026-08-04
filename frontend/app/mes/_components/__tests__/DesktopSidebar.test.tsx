@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { DesktopSidebar } from "../DesktopSidebar";
 
 vi.mock("next/image", () => ({
@@ -8,6 +8,12 @@ vi.mock("next/image", () => ({
 }));
 
 describe("DesktopSidebar", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
   it("keeps weekly report followed by daily work report as the final work menu order", () => {
     render(
       <DesktopSidebar
@@ -117,5 +123,40 @@ describe("DesktopSidebar", () => {
 
     expect(sidebarSlot).toHaveStyle({ width: "220px" });
     expect(sidebar).not.toHaveStyle({ width: "220px" });
+  });
+
+  it("cycles through collapsed, expanded, and hover behavior", () => {
+    vi.useFakeTimers();
+    const { container } = render(
+      <DesktopSidebar
+        activeTab="dashboard"
+        onTabChange={vi.fn()}
+        visibleTabs={["dashboard", "admin"]}
+      />,
+    );
+    const sidebarSlot = container.firstElementChild as HTMLElement;
+
+    fireEvent.mouseEnter(sidebarSlot);
+    expect(sidebarSlot).toHaveStyle({ width: "220px" });
+
+    fireEvent.click(screen.getByRole("button", { name: /사이드바 현재 호버 모드/ }));
+    expect(sidebarSlot).toHaveStyle({ width: "72px" });
+    fireEvent.mouseEnter(sidebarSlot);
+    expect(sidebarSlot).toHaveStyle({ width: "72px" });
+
+    fireEvent.click(screen.getByRole("button", { name: /사이드바 현재 접힘 고정/ }));
+    expect(sidebarSlot).toHaveStyle({ width: "220px" });
+    fireEvent.mouseLeave(sidebarSlot);
+    act(() => vi.advanceTimersByTime(220));
+    expect(sidebarSlot).toHaveStyle({ width: "220px" });
+
+    fireEvent.mouseEnter(sidebarSlot);
+    fireEvent.click(screen.getByRole("button", { name: /사이드바 현재 펼침 고정/ }));
+    expect(sidebarSlot).toHaveStyle({ width: "220px" });
+    fireEvent.mouseLeave(sidebarSlot);
+    act(() => vi.advanceTimersByTime(219));
+    expect(sidebarSlot).toHaveStyle({ width: "220px" });
+    act(() => vi.advanceTimersByTime(1));
+    expect(sidebarSlot).toHaveStyle({ width: "72px" });
   });
 });

@@ -2318,6 +2318,11 @@
             "title": "Role",
             "type": "string"
           },
+          "sidebar_mode": {
+            "default": "hover",
+            "title": "Sidebar Mode",
+            "type": "string"
+          },
           "theme": {
             "anyOf": [
               {
@@ -2354,6 +2359,20 @@
           "updated_at"
         ],
         "title": "EmployeeResponse",
+        "type": "object"
+      },
+      "EmployeeSidebarModeUpdate": {
+        "properties": {
+          "sidebar_mode": {
+            "maxLength": 10,
+            "title": "Sidebar Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sidebar_mode"
+        ],
+        "title": "EmployeeSidebarModeUpdate",
         "type": "object"
       },
       "EmployeeThemeUpdate": {
@@ -13739,6 +13758,60 @@
           }
         },
         "summary": "Reset Employee Pin",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/employees/{employee_id}/sidebar-mode": {
+      "put": {
+        "description": "직원별 데스크톱 사이드바 동작 모드를 저장한다.",
+        "operationId": "update_employee_sidebar_mode_api_employees__employee_id__sidebar_mode_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeSidebarModeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Employee Sidebar Mode",
         "tags": [
           "Employees"
         ]

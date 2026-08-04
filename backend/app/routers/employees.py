@@ -17,6 +17,7 @@ from app.schemas import (
     EmployeePinResetRequest,
     EmployeeLoginNotificationPopupUpdate,
     EmployeeResponse,
+    EmployeeSidebarModeUpdate,
     EmployeeThemeUpdate,
     EmployeeUpdate,
     PinVerifyRequest,
@@ -43,6 +44,7 @@ SIDEBAR_TAB_IDS: tuple[str, ...] = (
     "admin",
 )
 SIDEBAR_TAB_ID_SET = set(SIDEBAR_TAB_IDS)
+SIDEBAR_MODES = {"hover", "collapsed", "expanded"}
 IO_RELATED_TAB_IDS: tuple[str, str] = ("warehouse", "defect")
 
 
@@ -621,6 +623,30 @@ def update_employee_theme(
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
+@router.put("/{employee_id}/sidebar-mode", response_model=EmployeeResponse, status_code=status.HTTP_200_OK)
+def update_employee_sidebar_mode(
+    employee_id: uuid.UUID,
+    payload: EmployeeSidebarModeUpdate,
+    db: Session = Depends(get_db),
+):
+    """직원별 데스크톱 사이드바 동작 모드를 저장한다."""
+    if payload.sidebar_mode not in SIDEBAR_MODES:
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "사이드바 모드는 hover, collapsed, expanded 중 하나여야 합니다.",
+        )
+
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    employee.sidebar_mode = payload.sidebar_mode
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_only(db)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+
+
 
 def _effective_hidden_sidebar_tabs(employee: Employee) -> List[str]:
     tabs = _parse_hidden_sidebar_tabs(getattr(employee, "hidden_sidebar_tabs", ""))
@@ -651,6 +677,7 @@ def _to_response(
         pin_last_changed=getattr(employee, "pin_last_changed", None),
         pin_is_default=pin_is_default,
         theme=getattr(employee, "theme", None),
+        sidebar_mode=(getattr(employee, "sidebar_mode", "hover") or "hover"),
         assigned_model_slots=assigned_model_slots or [],
         hidden_sidebar_tabs=_effective_hidden_sidebar_tabs(employee),
         login_notification_popup_enabled=bool(getattr(employee, "login_notification_popup_enabled", True)),

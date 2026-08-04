@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
 import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { SidebarModeToggle, useSidebarMode } from "./SidebarModeToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import type { DesktopTabId } from "./tabAccess";
 export type { DesktopTabId } from "./tabAccess";
@@ -47,26 +48,35 @@ export function DesktopSidebar({
   onTabChange: (tab: DesktopTabId) => void;
   visibleTabs: DesktopTabId[];
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const { mode, cycleMode } = useSidebarMode();
+  const [hoverExpanded, setHoverExpanded] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<DesktopTabId | null>(null);
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expanded = mode === "expanded" || (mode === "hover" && hoverExpanded);
 
   const openSidebar = useCallback(() => {
     if (collapseTimerRef.current) {
       clearTimeout(collapseTimerRef.current);
       collapseTimerRef.current = null;
     }
-    setExpanded(true);
+    setHoverExpanded(true);
   }, []);
 
   const closeSidebarSoon = useCallback(() => {
     if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
     collapseTimerRef.current = setTimeout(() => {
-      setExpanded(false);
+      setHoverExpanded(false);
       setHoveredTab(null);
       collapseTimerRef.current = null;
     }, 220);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    },
+    [],
+  );
 
   return (
     <div
@@ -164,6 +174,7 @@ export function DesktopSidebar({
             />
           ))}
           <ThemeToggle expanded={expanded} />
+          <SidebarModeToggle expanded={expanded} mode={mode} onCycle={cycleMode} />
         </div>
       </aside>
     </div>

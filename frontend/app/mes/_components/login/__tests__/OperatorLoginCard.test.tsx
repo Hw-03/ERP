@@ -135,4 +135,21 @@ describe("OperatorLoginCard", () => {
       );
     });
   });
+
+  it("stores the employee sidebar mode in the current operator session", async () => {
+    state.verifyEmployeePin.mockResolvedValue({
+      ...makeEmployee(),
+      sidebar_mode: "expanded",
+    } as Employee);
+
+    render(<OperatorLoginCard onLogin={() => {}} />);
+    await submitLogin();
+
+    await waitFor(() => {
+      expect(state.setCurrentOperator).toHaveBeenCalledWith(
+        expect.objectContaining({ sidebar_mode: "expanded" }),
+        "boot-1",
+      );
+    });
+  });
 });

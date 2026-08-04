@@ -83,6 +83,7 @@ class Employee(Base):
         server_default=func.now(),
     )
     theme = Column(String(10), nullable=True)
+    sidebar_mode = Column(String(10), nullable=False, default="hover", server_default="hover")
 
     __table_args__ = (
         CheckConstraint(
