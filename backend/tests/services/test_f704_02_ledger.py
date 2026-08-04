@@ -32,7 +32,6 @@ def _entry(sequence: int) -> F704LedgerEntry:
         created_at=datetime(2026, 1, 1, 9, 0),
         log_id=f"log-{sequence}",
         item_code=f"9-TR-{sequence:04d}",
-        model_name="COCOON",
         item_name=f"확장 품목 {sequence}",
         quantity=1,
         direction="입고",
@@ -48,9 +47,10 @@ def test_render_workbook_extends_template_rows_with_same_data_style():
 
     worksheet = load_workbook(BytesIO(rendered), data_only=False)["양식"]
     assert worksheet["A1937"].value == 1934
-    assert worksheet["F1937"].value == "확장 품목 1934"
-    assert worksheet.auto_filter.ref == "A3:M1937"
-    assert worksheet["H1937"].style_id == worksheet["H1936"].style_id
+    assert worksheet["E1937"].value == "확장 품목 1934"
+    assert worksheet["F1937"].value == 1
+    assert worksheet.auto_filter.ref == "A3:K1937"
+    assert worksheet["F1937"].style_id == worksheet["F1936"].style_id
 
 
 def test_render_workbook_opens_ledger_at_first_data_row():
@@ -98,5 +98,20 @@ def test_template_keeps_both_forms_but_has_no_ledger_values():
 
     assert workbook.sheetnames == ["양식", "양식_출력용"]
     for worksheet in workbook.worksheets:
-        for row in worksheet.iter_rows(min_row=4, max_col=13):
+        assert [cell.value for cell in worksheet[3][:11]] == [
+            "No",
+            "날 짜",
+            "발주번호",
+            "품번",
+            "품  명",
+            "수량",
+            "입고\n출고",
+            "입/출고처",
+            "담당자",
+            "검수",
+            "비고",
+        ]
+        assert all(cell.value is None for cell in worksheet[3][11:])
+        assert worksheet["A61"].fill.fill_type is None
+        for row in worksheet.iter_rows(min_row=4, max_col=11):
             assert all(cell.value is None for cell in row[1:])

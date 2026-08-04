@@ -17,7 +17,6 @@ from app.models import (
     IoBatch,
     IoBundle,
     IoLine,
-    ProductSymbol,
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
@@ -158,16 +157,15 @@ def test_f704_download_includes_kst_year_warehouse_receive(client, db_session, m
     worksheet = workbook["양식"]
     assert worksheet["A4"].value == 1
     assert worksheet["B4"].value.date().isoformat() == "2026-01-01"
-    assert worksheet["F4"].value == "KST 입고 품목"
-    assert worksheet["H4"].value == 5
-    assert worksheet["I4"].value == "입고"
-    assert worksheet["F5"].value is None
+    assert worksheet["E4"].value == "KST 입고 품목"
+    assert worksheet["F4"].value == 5
+    assert worksheet["G4"].value == "입고"
+    assert worksheet["E5"].value is None
 
 
 def test_f704_download_uses_requester_for_warehouse_to_production(client, db_session, make_item):
     """수량변화가 0인 창고→생산 이동도 실제 라인과 요청자를 따라 한 행으로 남긴다."""
     item = make_item(name="생산 이동 품목")
-    db_session.add(ProductSymbol(slot=9, symbol="9", model_name="COCOON"))
     batch = _add_requester_batch_and_line(db_session, item)
     db_session.add(
         TransactionLog(
@@ -190,13 +188,13 @@ def test_f704_download_uses_requester_for_warehouse_to_production(client, db_ses
 
     assert response.status_code == 200, response.text
     worksheet = load_workbook(BytesIO(response.content), data_only=False)["양식"]
-    assert worksheet["E4"].value == "COCOON"
-    assert worksheet["H4"].value == 7
-    assert worksheet["I4"].value == "출고"
-    assert worksheet["J4"].value == "조립"
-    assert worksheet["K4"].value == "요청자 김"
-    assert worksheet["M4"].value is None
-    assert "처리자 홍" not in (worksheet["M4"].value or "")
+    assert worksheet["E4"].value == item.item_name
+    assert worksheet["F4"].value == 7
+    assert worksheet["G4"].value == "출고"
+    assert worksheet["H4"].value == "조립"
+    assert worksheet["I4"].value == "요청자 김"
+    assert worksheet["K4"].value is None
+    assert "처리자 홍" not in (worksheet["K4"].value or "")
 
 
 def test_f704_download_uses_legacy_request_note_not_system_transaction_note(client, db_session, make_item):
@@ -242,7 +240,7 @@ def test_f704_download_uses_legacy_request_note_not_system_transaction_note(clie
 
     assert response.status_code == 200, response.text
     worksheet = load_workbook(BytesIO(response.content), data_only=False)["양식"]
-    assert worksheet["M4"].value == "original request memo"
+    assert worksheet["K4"].value == "original request memo"
 
 
 def test_f704_download_excludes_recorded_nonwarehouse_effect(client, db_session, make_item):
@@ -332,9 +330,9 @@ def test_f704_download_preserves_template_supporting_parts(client, db_session):
     assert worksheet.freeze_panes == "A4"
     assert worksheet.page_setup.orientation == "landscape"
     assert worksheet.page_setup.scale == 61
-    assert worksheet["K3"].value == template_worksheet["K3"].value == "담당자"
-    assert worksheet.column_dimensions["K"].hidden is False
-    assert worksheet.column_dimensions["L"].hidden is True
+    assert worksheet["I3"].value == template_worksheet["I3"].value == "담당자"
+    assert worksheet.column_dimensions["I"].hidden is False
+    assert worksheet.column_dimensions["J"].hidden is True
     assert worksheet.auto_filter.ref == template_worksheet.auto_filter.ref
     assert worksheet.page_setup == template_worksheet.page_setup
     assert worksheet.page_margins == template_worksheet.page_margins
@@ -378,4 +376,4 @@ def test_f704_download_preserves_template_supporting_parts(client, db_session):
             template_dimension.min,
             template_dimension.max,
         )
-        assert rendered_dimension.hidden is (False if column == "K" else template_dimension.hidden)
+        assert rendered_dimension.hidden is (False if column == "I" else template_dimension.hidden)

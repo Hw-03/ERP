@@ -25,7 +25,6 @@ from app.models import (
     IoBundle,
     IoLine,
     Item,
-    ProductSymbol,
     ShippingRequest,
     StockRequest,
     TransactionLog,
@@ -60,7 +59,6 @@ class F704LedgerEntry:
     created_at: datetime
     log_id: str
     item_code: str
-    model_name: str
     item_name: str
     quantity: int
     direction: str
@@ -215,12 +213,6 @@ def _requester(
     return ""
 
 
-def _model_name(item: Item, symbols: dict[str, str]) -> str:
-    """단일 제품 기호에 연결된 모델명만 표시하고 공용 부품은 비운다."""
-    symbol = (item.model_symbol or "").strip()
-    return symbols.get(symbol, "") if len(symbol) == 1 else ""
-
-
 def _remark(
     batch: IoBatch | None,
     stock_request: StockRequest | None,
@@ -297,12 +289,6 @@ def collect_entries(db: Session, year: int) -> list[F704LedgerEntry]:
     )
     shipping_by_id = {request.request_id: request for request in shipping_requests}
 
-    symbols = {
-        symbol.symbol: symbol.model_name
-        for symbol in db.query(ProductSymbol).all()
-        if symbol.symbol and symbol.model_name
-    }
-
     entries: list[F704LedgerEntry] = []
     for log, item in logs_and_items:
         batch = batch_by_id.get(log.operation_batch_id)
@@ -324,7 +310,6 @@ def collect_entries(db: Session, year: int) -> list[F704LedgerEntry]:
                 created_at=created_at,
                 log_id=str(log.log_id),
                 item_code=item.mes_code or "",
-                model_name=_model_name(item, symbols),
                 item_name=item.item_name or "",
                 quantity=abs(delta),
                 direction="입고" if delta > 0 else "출고",
@@ -410,10 +395,10 @@ def _unhide_requester_column(sheet_root: ET.Element) -> None:
     if columns is None:
         raise RuntimeError("F704-02 템플릿에 열 정의가 없습니다.")
     for column in columns.findall(_Q("col")):
-        if int(column.attrib["min"]) <= 11 <= int(column.attrib["max"]):
+        if int(column.attrib["min"]) <= 9 <= int(column.attrib["max"]):
             column.attrib.pop("hidden", None)
             return
-    raise RuntimeError("F704-02 템플릿에 담당자(K) 열이 없습니다.")
+    raise RuntimeError("F704-02 템플릿에 담당자(I) 열이 없습니다.")
 
 
 def _reset_ledger_initial_view(sheet_root: ET.Element) -> None:
@@ -438,10 +423,10 @@ def _reset_ledger_initial_view(sheet_root: ET.Element) -> None:
 def _update_ranges(sheet_root: ET.Element, last_row: int) -> None:
     dimension = sheet_root.find(_Q("dimension"))
     if dimension is not None:
-        dimension.set("ref", f"A1:P{last_row}")
+        dimension.set("ref", f"A1:N{last_row}")
     auto_filter = sheet_root.find(_Q("autoFilter"))
     if auto_filter is not None:
-        auto_filter.set("ref", f"A3:M{last_row}")
+        auto_filter.set("ref", f"A3:K{last_row}")
 
 
 def _restore_ignorable_namespace_declarations(
@@ -487,15 +472,13 @@ def _populate_worksheet(template_xml: bytes, entries: Iterable[F704LedgerEntry])
             "B": ("number", _excel_date(entry.occurred_on)),
             "C": ("text", ""),
             "D": ("text", entry.item_code),
-            "E": ("text", entry.model_name),
-            "F": ("text", entry.item_name),
-            "G": ("text", ""),
-            "H": ("number", entry.quantity),
-            "I": ("text", entry.direction),
-            "J": ("text", entry.counterpart),
-            "K": ("text", entry.requester),
-            "L": ("text", ""),
-            "M": ("text", entry.remark),
+            "E": ("text", entry.item_name),
+            "F": ("number", entry.quantity),
+            "G": ("text", entry.direction),
+            "H": ("text", entry.counterpart),
+            "I": ("text", entry.requester),
+            "J": ("text", ""),
+            "K": ("text", entry.remark),
         }
         for column, (kind, value) in values.items():
             cell = _cell_by_column(row, column, row_number)
