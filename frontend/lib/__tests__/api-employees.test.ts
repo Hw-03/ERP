@@ -111,3 +111,26 @@ describe("employeesApi.setLoginPopup", () => {
     expect(JSON.parse(init.body as string)).toEqual({ login_notification_popup_enabled: true });
   });
 });
+
+describe("employeesApi.setEmployeeSidebarMode", () => {
+  it("PUTs the employee sidebar mode preference", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ employee_id: "emp-1", sidebar_mode: "expanded" })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const setEmployeeSidebarMode = (
+      employeesApi as unknown as {
+        setEmployeeSidebarMode: (employeeId: string, mode: string) => Promise<unknown>;
+      }
+    ).setEmployeeSidebarMode;
+
+    expect(setEmployeeSidebarMode).toBeTypeOf("function");
+    await setEmployeeSidebarMode("emp-1", "expanded");
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/employees/emp-1/sidebar-mode");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({ sidebar_mode: "expanded" });
+  });
+});
