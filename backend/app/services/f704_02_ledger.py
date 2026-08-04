@@ -221,14 +221,20 @@ def _model_name(item: Item, symbols: dict[str, str]) -> str:
     return symbols.get(symbol, "") if len(symbol) == 1 else ""
 
 
-def _remark(log: TransactionLog) -> str:
-    """참조번호와 메모를 한 셀에 중복 없이 합친다."""
-    values = [
-        value.strip().replace("\r", " ").replace("\n", " ")
-        for value in (log.reference_no, log.notes)
-        if value and value.strip()
-    ]
-    return " · ".join(values)
+def _remark(
+    batch: IoBatch | None,
+    stock_request: StockRequest | None,
+    shipping_request: ShippingRequest | None,
+) -> str:
+    """F704 비고에는 사용자가 입력한 원본 작업 메모만 표시한다."""
+    for notes in (
+        batch.notes if batch is not None else None,
+        stock_request.notes if stock_request is not None else None,
+        shipping_request.notes if shipping_request is not None else None,
+    ):
+        if notes and notes.strip():
+            return notes.strip().replace("\r", " ").replace("\n", " ")
+    return ""
 
 
 def _line_map(db: Session, batch_ids: set[object]) -> dict[tuple[object, object], list[IoLine]]:
@@ -271,11 +277,18 @@ def collect_entries(db: Session, year: int) -> list[F704LedgerEntry]:
     lines_by_batch_item = _line_map(db, batch_ids)
 
     stock_request_ids = {batch.stock_request_id for batch in batches if batch.stock_request_id}
-    stock_requests = (
-        db.query(StockRequest).filter(StockRequest.request_id.in_(stock_request_ids)).all()
-        if stock_request_ids else []
-    )
+    stock_request_references = {log.reference_no for log, _item in logs_and_items if log.reference_no}
+    stock_requests = []
+    if stock_request_ids:
+        stock_requests.extend(
+            db.query(StockRequest).filter(StockRequest.request_id.in_(stock_request_ids)).all()
+        )
+    if stock_request_references:
+        stock_requests.extend(
+            db.query(StockRequest).filter(StockRequest.request_code.in_(stock_request_references)).all()
+        )
     stock_request_by_id = {request.request_id: request for request in stock_requests}
+    stock_request_by_reference = {request.request_code: request for request in stock_requests if request.request_code}
 
     shipping_ids = {log.shipping_request_id for log, _item in logs_and_items if log.shipping_request_id}
     shipping_requests = (
@@ -299,7 +312,11 @@ def collect_entries(db: Session, year: int) -> list[F704LedgerEntry]:
         if delta is None:
             continue
         created_at = _to_kst(log.created_at)
-        stock_request = stock_request_by_id.get(batch.stock_request_id) if batch is not None else None
+        stock_request = (
+            stock_request_by_id.get(batch.stock_request_id)
+            if batch is not None and batch.stock_request_id
+            else None
+        ) or stock_request_by_reference.get(log.reference_no)
         shipping_request = shipping_by_id.get(log.shipping_request_id)
         entries.append(
             F704LedgerEntry(
@@ -313,7 +330,7 @@ def collect_entries(db: Session, year: int) -> list[F704LedgerEntry]:
                 direction="입고" if delta > 0 else "출고",
                 counterpart=_counterpart(log, batch, line, delta),
                 requester=_requester(batch, stock_request, shipping_request),
-                remark=_remark(log),
+                remark=_remark(batch, stock_request, shipping_request),
             )
         )
     return entries

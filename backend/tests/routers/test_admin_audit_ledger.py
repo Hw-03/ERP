@@ -18,6 +18,9 @@ from app.models import (
     IoBundle,
     IoLine,
     ProductSymbol,
+    StockRequest,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -192,7 +195,54 @@ def test_f704_download_uses_requester_for_warehouse_to_production(client, db_ses
     assert worksheet["I4"].value == "출고"
     assert worksheet["J4"].value == "조립"
     assert worksheet["K4"].value == "요청자 김"
+    assert worksheet["M4"].value is None
     assert "처리자 홍" not in (worksheet["M4"].value or "")
+
+
+def test_f704_download_uses_legacy_request_note_not_system_transaction_note(client, db_session, make_item):
+    item = make_item(name="legacy memo item")
+    requester = Employee(
+        employee_id=uuid.uuid4(),
+        employee_code="LEGACY-REQ",
+        name="Legacy requester",
+        role="employee",
+        department="production",
+    )
+    db_session.add(requester)
+    db_session.flush()
+    db_session.add(
+        StockRequest(
+            request_id=uuid.uuid4(),
+            request_code="SR-2026-LEGACY",
+            requester_employee_id=requester.employee_id,
+            requester_name=requester.name,
+            requester_department=requester.department,
+            request_type=StockRequestTypeEnum.RAW_SHIP,
+            status=StockRequestStatusEnum.COMPLETED,
+            notes="original request memo",
+        )
+    )
+    db_session.add(
+        TransactionLog(
+            log_id=uuid.uuid4(),
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.SHIP,
+            quantity_change=Decimal("-2"),
+            quantity_before=Decimal("2"),
+            quantity_after=Decimal("0"),
+            reference_no="SR-2026-LEGACY",
+            notes="automatic request processing",
+            inventory_effect=[{"scope": "warehouse", "delta": -2}],
+            created_at=datetime(2026, 4, 2, 1, 0),
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/admin/audit-ledger/f704-02.xlsx?year=2026", headers=ADMIN_HEADERS)
+
+    assert response.status_code == 200, response.text
+    worksheet = load_workbook(BytesIO(response.content), data_only=False)["양식"]
+    assert worksheet["M4"].value == "original request memo"
 
 
 def test_f704_download_excludes_recorded_nonwarehouse_effect(client, db_session, make_item):

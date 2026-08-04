@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 from openpyxl import load_workbook
 
-from app.services.f704_02_ledger import F704LedgerEntry, TEMPLATE_PATH, _requester, render_workbook
+from app.services.f704_02_ledger import F704LedgerEntry, TEMPLATE_PATH, _remark, _requester, render_workbook
 
 
 _IGNORABLE_ATTRIBUTE_RE = re.compile(rb"(?:[A-Za-z_][\w.-]*:)?Ignorable=[\"']([^\"']+)[\"']")
@@ -84,6 +84,13 @@ def test_requester_uses_io_batch_then_stock_request_then_shipping_request():
     assert _requester(batch, stock_request, shipping_request) == "IO requester"
     assert _requester(SimpleNamespace(requester_name=" "), stock_request, shipping_request) == "stock requester"
     assert _requester(None, None, shipping_request) == "shipping requester"
+
+
+def test_remark_uses_original_work_memo_fields_and_ignores_system_note():
+    assert _remark(SimpleNamespace(notes=" 작업 메모\n"), None, None) == "작업 메모"
+    assert _remark(None, SimpleNamespace(notes=" 요청 메모 "), None) == "요청 메모"
+    assert _remark(None, None, SimpleNamespace(notes=" 출하 메모 ")) == "출하 메모"
+    assert _remark(None, None, None) == ""
 
 
 def test_template_keeps_both_forms_but_has_no_ledger_values():
