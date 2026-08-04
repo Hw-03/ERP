@@ -12,8 +12,7 @@ const state = vi.hoisted(() => ({
   getItemsExportUrl: vi.fn(),
   getTransactions: vi.fn(),
   getTransactionsExportUrl: vi.fn(),
-  refetchAuditFiles: vi.fn(),
-  triggerAuditBackfill: vi.fn(),
+  useAuditCsvListQuery: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -38,13 +37,7 @@ vi.mock("@/lib/api/admin", () => ({
 }));
 
 vi.mock("@/lib/queries/useSettingsQuery", () => ({
-  useAuditCsvListQuery: () => ({
-    data: [{ month: "2026-05", file_name: "inout_2026-05.csv", row_count: 2, size_bytes: 128 }],
-    isLoading: false,
-    error: null,
-    refetch: state.refetchAuditFiles,
-  }),
-  useTriggerAuditBackfillMutation: () => ({ isPending: false, mutate: state.triggerAuditBackfill }),
+  useAuditCsvListQuery: state.useAuditCsvListQuery,
 }));
 
 import { AdminExportSection } from "../AdminExportSection";
@@ -76,6 +69,11 @@ describe("AdminExportSection", () => {
     state.getItemsExportUrl.mockReturnValue("/api/items/export.xlsx");
     state.getTransactionsExportUrl.mockReturnValue("/api/inventory/transactions/export.xlsx");
     state.fetchBlob.mockResolvedValue(new Blob(["xlsx"]));
+    state.useAuditCsvListQuery.mockReturnValue({
+      data: [{ month: "2026-05", file_name: "inout_2026-05.csv", row_count: 2, size_bytes: 128 }],
+      isLoading: false,
+      error: null,
+    });
   });
 
   afterEach(() => {
@@ -84,7 +82,7 @@ describe("AdminExportSection", () => {
     vi.restoreAllMocks();
   });
 
-  it("F704·F705·데이터 내보내기·내부 원본 로그를 독립 작업 카드로 표시한다", () => {
+  it("F704·F705와 두 모드를 가진 데이터 내보내기 카드만 표시한다", () => {
     render(<AdminExportSection />);
 
     const section = screen.getByTestId("admin-export-section");
@@ -93,10 +91,9 @@ describe("AdminExportSection", () => {
     const f704 = within(officialGroup).getByRole("region", { name: "F704-02 연간 자재 입출고관리대장" });
     const f705 = within(officialGroup).getByRole("region", { name: "F705-02 연간 생산일지" });
     const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
-    const secondaryGrid = screen.getByTestId("export-secondary-grid");
+    const modeGroup = within(dataExport).getByRole("group", { name: "내보내기 유형" });
     const controlPanel = screen.getByTestId("export-control-panel");
     const downloadAction = screen.getByTestId("export-download-action");
-    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
 
     expect(section).toHaveClass("h-full", "min-h-0", "flex-1", "overflow-hidden");
     expect(scrollContainer).toHaveClass("min-h-0", "flex-1", "overflow-y-auto", "xl:overflow-hidden");
@@ -107,25 +104,20 @@ describe("AdminExportSection", () => {
     expect(f704).toHaveClass("h-full");
     expect(f705).toHaveClass("h-full");
     expect(f704.compareDocumentPosition(f705) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(secondaryGrid).toHaveClass(
-      "grid",
-      "shrink-0",
-      "xl:min-h-0",
-      "xl:flex-1",
-      "xl:grid-cols-2",
-    );
-    expect(dataExport).toHaveClass("min-h-0", "xl:h-full", "xl:overflow-hidden");
+    expect(screen.getAllByRole("region")).toHaveLength(3);
+    expect(screen.queryByTestId("export-secondary-grid")).not.toBeInTheDocument();
+    expect(dataExport).toHaveClass("min-h-0", "xl:flex-1", "xl:overflow-hidden");
     expect(controlPanel).toHaveClass("min-h-0", "xl:overflow-y-auto");
     expect(downloadAction).toHaveClass("mt-auto", "shrink-0");
-    expect(auditPanel).toHaveClass("min-h-0", "xl:h-full", "xl:overflow-hidden");
-    expect(within(dataExport).queryByText("내부 원본 로그 (월별)")).not.toBeInTheDocument();
-    expect(auditPanel.querySelector("details")).not.toBeInTheDocument();
+    expect(within(modeGroup).getByRole("button", { name: "일반 데이터" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(modeGroup).getByRole("button", { name: "내부 원본 로그" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByTestId("audit-csv-controls")).not.toBeInTheDocument();
+    expect(state.useAuditCsvListQuery).not.toHaveBeenCalled();
 
     for (const title of [
       "F704-02 연간 자재 입출고관리대장",
       "F705-02 연간 생산일지",
       "데이터 내보내기",
-      "내부 원본 로그 (월별)",
     ]) {
       expect(screen.getByRole("heading", { name: title })).toHaveClass("text-[18px]", "font-black");
     }
@@ -138,6 +130,12 @@ describe("AdminExportSection", () => {
     expect(screen.queryByText("일반 데이터부터 공식 서식·원본 로그까지 목적별로 내려받습니다.")).not.toBeInTheDocument();
     expect(screen.queryByText("선택 연도의 MES 생산 이력을 원본 F705-02 서식으로 내려받습니다.")).not.toBeInTheDocument();
     expect(screen.queryByText(/선택한 연도의 실제 창고 입·출고만/)).not.toBeInTheDocument();
+
+    fireEvent.click(within(modeGroup).getByRole("button", { name: "내부 원본 로그" }));
+
+    expect(within(dataExport).getByTestId("audit-csv-controls")).toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("export-control-panel")).not.toBeInTheDocument();
+    expect(state.useAuditCsvListQuery).toHaveBeenCalledOnce();
   });
 
   it("범위에 맞는 형식·기간·비활성 옵션만 표시하고 비지원 형식은 CSV로 되돌린다", () => {
@@ -319,16 +317,17 @@ describe("AdminExportSection", () => {
     expect(await within(f704).findByRole("alert")).toHaveTextContent("F704 다운로드 실패");
   });
 
-  it("내부 원본 로그는 데이터 카드와 분리되어 항상 펼쳐진다", () => {
+  it("모드 전환 후에도 일반 데이터 선택 상태를 보존한다", () => {
     render(<AdminExportSection />);
     const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
-    const auditPanel = screen.getByRole("region", { name: "내부 원본 로그 (월별)" });
 
-    expect(within(dataExport).queryByText("내부 원본 로그 (월별)")).not.toBeInTheDocument();
-    expect(auditPanel.querySelector("details")).not.toBeInTheDocument();
-    const header = within(auditPanel).getByTestId("audit-log-header");
-    expect(within(header).queryByRole("button", { name: "백필 재실행" })).not.toBeInTheDocument();
-    expect(within(header).queryByRole("button", { name: "새로고침" })).not.toBeInTheDocument();
-    expect(within(auditPanel).queryByRole("heading", { name: "시스템 원본 로그 (월별)" })).not.toBeInTheDocument();
+    fireEvent.click(within(dataExport).getByRole("button", { name: "품목" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "Excel" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "내부 원본 로그" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "일반 데이터" }));
+
+    expect(within(dataExport).getByRole("button", { name: "품목 Excel 다운로드" })).toBeEnabled();
+    expect(within(dataExport).getByRole("button", { name: "품목" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(dataExport).getByRole("button", { name: "Excel" })).toHaveAttribute("aria-pressed", "true");
   });
 });

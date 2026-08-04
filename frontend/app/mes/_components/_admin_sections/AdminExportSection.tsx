@@ -8,11 +8,12 @@ import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { FilterChip } from "../common/FilterChip";
-import { AdminAuditCsvSection } from "./AdminAuditCsvSection";
+import { AdminAuditCsvControls } from "./AdminAuditCsvControls";
 
 type RangePreset = "today" | "7d" | "30d" | "90d";
 type DataScope = "all" | "items" | "transactions" | "employees" | "bom";
 type ExportFormat = "csv" | "xlsx";
+type ExportMode = "general" | "audit";
 type ExportFeedback = { kind: "success" | "error"; message: string };
 
 const EXPORT_PAGE_SIZE = 2000;
@@ -167,6 +168,7 @@ export function AdminExportSection() {
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [preset, setPreset] = useState<RangePreset>("30d");
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [mode, setMode] = useState<ExportMode>("general");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<ExportFeedback | null>(null);
   const [f704Year, setF704Year] = useState(() => new Date().getFullYear());
@@ -343,19 +345,36 @@ export function AdminExportSection() {
           </ExportSurface>
         </div>
 
-        <div
-          data-testid="export-secondary-grid"
-          role="group"
-          aria-label="보조 데이터 내보내기"
-          className="grid shrink-0 gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-2"
+        <ExportSurface
+          ariaLabel="데이터 내보내기"
+          tone={LEGACY_COLORS.blue}
+          icon={<FileText className="h-5 w-5" />}
+          title="데이터 내보내기"
+          className="min-h-0 shrink-0 xl:flex-1 xl:overflow-hidden"
         >
-          <ExportSurface
-            ariaLabel="데이터 내보내기"
-            tone={LEGACY_COLORS.blue}
-            icon={<FileText className="h-5 w-5" />}
-            title="데이터 내보내기"
-            className="min-h-0 xl:h-full xl:overflow-hidden"
+          <div
+            role="group"
+            aria-label="내보내기 유형"
+            className="mt-4 flex flex-wrap gap-1.5"
           >
+            <FilterChip
+              active={mode === "general"}
+              label="일반 데이터"
+              onClick={() => setMode("general")}
+              size="sm"
+              className="min-h-11"
+            />
+            <FilterChip
+              active={mode === "audit"}
+              label="내부 원본 로그"
+              onClick={() => setMode("audit")}
+              size="sm"
+              className="min-h-11"
+            />
+          </div>
+
+          {mode === "general" ? (
+            <div data-testid="general-export-controls" className="flex min-h-0 flex-1 flex-col">
             <div data-testid="export-control-panel" className="mt-4 min-h-0 flex-1 xl:overflow-y-auto xl:pr-1">
               <div className="flex flex-col gap-4">
                 <div role="group" aria-label="데이터 범위">
@@ -457,10 +476,13 @@ export function AdminExportSection() {
                 {busy ? "내보내는 중..." : downloadLabel}
               </Button>
             </div>
-          </ExportSurface>
-
-          <AdminAuditCsvSection />
-        </div>
+            </div>
+          ) : (
+            <div className="mt-4 flex min-h-0 flex-1 flex-col">
+              <AdminAuditCsvControls />
+            </div>
+          )}
+        </ExportSurface>
       </div>
     </div>
   );

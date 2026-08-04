@@ -1,5 +1,7 @@
 # 관리자 내보내기 독립 카드 구현 계획
 
+> 상태: 2026-08-04 승인·구현된 `2026-08-04-admin-export-unified-card.md`가 이 계획의 독립 카드 구조를 대체한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **GOAL:** 관리자 내보내기의 데이터 추출과 내부 원본 로그를 독립 카드로 분리하고 실행 버튼과 로그 스크롤 위치를 안정화한다.
