@@ -135,7 +135,7 @@ describe("DailyWorkReportScreen", () => {
     expect(outer).not.toHaveClass("lg:overflow-y-auto");
   });
 
-  it("전체 일보의 읽기 전용 MES 상세도 카드 내부 스크롤 경계를 사용한다", () => {
+  it("전체 일보의 읽기 전용 MES 상세는 일보 본문 스크롤로 확인한다", () => {
     queryState.reports = [{ employee_id: "employee-2", employee_name: "다른 작성자", department: "조립" }];
     queryState.selectedReport = {
       data: { employee_name: "다른 작성자", department: "조립", content: "다른 작업 내역" },
@@ -157,7 +157,8 @@ describe("DailyWorkReportScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "다른 작성자 조립" }));
     fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
 
-    expect(screen.getByTestId("daily-work-activity-details")).toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
+    expect(screen.getByTestId("daily-work-activity-details")).not.toHaveClass("lg:max-h-56", "lg:overflow-y-auto");
+    expect(screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header")?.parentElement).toHaveClass("lg:overflow-y-auto");
     expect(screen.queryByRole("textbox", { name: "작업 내역" })).not.toBeInTheDocument();
   });
 
@@ -227,7 +228,7 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.getByRole("dialog", { name: "일보 날짜 선택" })).toBeInTheDocument();
   });
 
-  it("데스크톱에서는 작업 내역이 남은 세로 공간을 채운다", () => {
+  it("데스크톱에서는 작업 내역이 본문을 채우는 628px 높이를 유지한다", () => {
     render(
       <DailyWorkReportScreen
         employeeId="employee-1"
@@ -236,8 +237,8 @@ describe("DailyWorkReportScreen", () => {
     );
 
     const editor = screen.getByRole("textbox", { name: "작업 내역" }).closest("section");
-    expect(editor).toHaveClass("lg:min-h-0", "lg:flex-1");
-    expect(editor).not.toHaveClass("lg:h-[424px]", "lg:flex-none");
+    expect(editor).toHaveClass("lg:h-[628px]", "lg:flex-none");
+    expect(editor).not.toHaveClass("lg:flex-1");
   });
 
   it("작성한 직원 칩은 데스크톱에서 카드 내부 스크롤 경계를 둔다", () => {
@@ -253,15 +254,15 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.getByTestId("daily-work-report-author-chips")).toHaveClass("lg:max-h-36", "lg:overflow-y-auto");
   });
 
-  it("데스크톱 전체 일보는 외부 스크롤 대신 고정 카드와 내부 스크롤 경계를 사용한다", () => {
+  it("데스크톱 전체 일보는 MES 상세 확장 시 본문에서 스크롤한다", () => {
     queryState.reports = [{ employee_id: "employee-2", employee_name: "다른 작성자", department: "조립" }];
 
     render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never} />);
 
     const header = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header");
     const activity = screen.getByRole("region", { name: "MES 작업 기록" });
-    expect(header?.parentElement).toHaveClass("lg:overflow-hidden");
-    expect(header?.parentElement).not.toHaveClass("lg:overflow-y-auto");
+    expect(header?.parentElement).toHaveClass("lg:overflow-y-auto");
+    expect(header?.parentElement).not.toHaveClass("lg:overflow-hidden");
     expect(header).toHaveClass("lg:shrink-0");
     expect(activity).toHaveClass("lg:shrink-0");
 

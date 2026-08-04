@@ -86,6 +86,15 @@ describe("DailyWorkReportEditor", () => {
     expect(input).not.toHaveClass("resize-y");
   });
 
+  it("작업 내역 입력 글자를 제목과 같은 18px로 표시한다", () => {
+    render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} />);
+
+    const input = screen.getByRole("textbox", { name: "작업 내역" });
+    expect(input).toHaveClass("text-lg");
+    expect(input).not.toHaveClass("text-sm");
+    expect(input).not.toHaveClass("text-base");
+  });
+
   it("작업 내역 제목과 글자 수를 같은 세로선에 맞춘다", () => {
     render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} />);
 
@@ -93,14 +102,14 @@ describe("DailyWorkReportEditor", () => {
     expect(heading.parentElement?.parentElement).toHaveClass("items-center");
   });
 
-  it("채울 수 있는 편집기는 데스크톱의 남는 높이를 사용한다", () => {
+  it("편집기는 데스크톱 본문을 채우는 628px 높이를 유지한다", () => {
     render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} fillAvailableHeight />);
 
     const input = screen.getByRole("textbox", { name: "작업 내역" });
     expect(input).toHaveClass("lg:min-h-0");
     expect(input).toHaveClass("lg:flex-1");
-    expect(input.parentElement).toHaveClass("lg:min-h-0", "lg:flex-1");
-    expect(input.parentElement).not.toHaveClass("lg:h-[424px]", "lg:flex-none");
+    expect(input.parentElement).toHaveClass("lg:h-[628px]", "lg:flex-none");
+    expect(input.parentElement).not.toHaveClass("lg:flex-1");
   });
 
   it("서버 저장 시각을 KST로 표시하고 수정하면 저장 필요 상태로 전환한다", () => {

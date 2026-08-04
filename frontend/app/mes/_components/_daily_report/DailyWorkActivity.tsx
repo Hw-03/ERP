@@ -167,7 +167,7 @@ export function DailyWorkActivity({ activity }: { activity: DailyWorkActivityDat
       )}
 
       {openOperation && activity.details.length > 0 && (
-        <div data-testid="daily-work-activity-details" className="mt-2 space-y-2 lg:max-h-56 lg:overflow-y-auto lg:pr-1">
+        <div data-testid="daily-work-activity-details" className="mt-2 space-y-2">
           {activity.details.filter((group) => operationKeyForGroup(group) === openOperation).map((group) => (
             <DailyWorkActivityDetail key={group.key} group={group} />
           ))}
