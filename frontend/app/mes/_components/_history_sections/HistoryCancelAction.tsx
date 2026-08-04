@@ -357,7 +357,7 @@ export function HistoryCancelAction({
           onClick={() => void submitCancellation()}
           disabled={step === "submitting" || !reason.trim() || !pin}
           className="min-h-11 flex-1 rounded-[12px] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.red }}
+          style={{ background: LEGACY_COLORS.redSolid }}
         >
           {step === "submitting" ? "처리 중…" : "취소 확정"}
         </button>
@@ -505,7 +505,7 @@ export function HistoryMobileCancelConfirmation({
           onClick={() => void controller.submitCancellation()}
           disabled={controller.step === "submitting" || !controller.reason.trim() || !controller.pin}
           className="flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.red }}
+          style={{ background: LEGACY_COLORS.redSolid }}
         >
           {controller.step === "submitting"
             ? "처리 중…"

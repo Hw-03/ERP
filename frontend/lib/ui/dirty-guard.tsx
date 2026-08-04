@@ -128,7 +128,7 @@ function DirtyModal({
                 onClick={onSaveAndProceed}
                 disabled={modal.busy}
                 className="flex w-full items-center justify-center gap-2 rounded-[16px] px-5 py-3.5 text-base font-black text-white transition-all hover:brightness-105 disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.blue }}
+                style={{ background: LEGACY_COLORS.blueSolid }}
               >
                 <Save className="h-5 w-5" />
                 {modal.busy ? "저장 중..." : "저장하고 이동"}
@@ -167,7 +167,7 @@ function DirtyModal({
                 onClick={onProceedWithoutSave}
                 disabled={modal.busy}
                 className="w-full rounded-[16px] px-5 py-3.5 text-base font-black text-white transition-all hover:brightness-105 disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.red }}
+                style={{ background: LEGACY_COLORS.redSolid }}
               >
                 나가기
               </button>

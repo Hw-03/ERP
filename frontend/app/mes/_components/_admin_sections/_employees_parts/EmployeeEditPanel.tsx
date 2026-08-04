@@ -118,7 +118,7 @@ export function EmployeeEditPanel({
       <button
         onClick={onSave}
         className="w-full rounded-[14px] px-4 py-2.5 text-sm font-bold text-white"
-        style={{ background: LEGACY_COLORS.blue }}
+        style={{ background: LEGACY_COLORS.blueSolid }}
       >
         저장
       </button>

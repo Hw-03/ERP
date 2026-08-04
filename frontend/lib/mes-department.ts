@@ -115,6 +115,11 @@ export function getDepartmentFallbackColor(departmentName: string): string {
   return MES_DEPARTMENT_COLORS[key] ?? FALLBACK_COLOR;
 }
 
+/** 원본 부서색을 현재 테마에 맞는 표시색으로 변환한다. */
+export function departmentDisplayColor(color: string): string {
+  return `color-mix(in srgb, ${color} var(--c-department-color-source-weight), var(--c-department-color-neutral))`;
+}
+
 type DepartmentColorSource = {
   name: string;
   color_hex?: string | null;

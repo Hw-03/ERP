@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
-import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { WeeklyProductionModelRow } from "@/lib/api/types/weekly";
+import { useDeptColorLookup } from "../DepartmentsContext";
 
 type NumCol = keyof Pick<
   WeeklyProductionModelRow,
@@ -33,6 +34,7 @@ interface Props {
 export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix({
   rows,
 }: Props) {
+  const getDeptColor = useDeptColorLookup();
   const altBg = tint(LEGACY_COLORS.s2, 50, LEGACY_COLORS.s1);
 
   // 주차 전환 시 행 순서가 변하지 않도록 model_key 사전 순으로 안정 정렬.
@@ -74,7 +76,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
               모델
             </th>
             {COLS.map((c) => {
-              const deptColor = getDepartmentFallbackColor(c.dept);
+              const deptColor = getDeptColor(c.dept);
               return (
                 <th
                   key={c.key}
@@ -105,7 +107,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                 </td>
                 {COLS.map((c) => {
                   const val = row[c.key];
-                  const deptColor = getDepartmentFallbackColor(c.dept);
+                  const deptColor = getDeptColor(c.dept);
                   const hasVal = val > 0;
                   // 열 최댓값 대비 비율로 8~40% 선형 보간
                   const tintPct = hasVal

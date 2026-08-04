@@ -315,7 +315,7 @@ export function IoTargetPicker({
               onClick={() => void handleSaveOrder()}
               disabled={putMyOrder.isPending}
               className="flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[12px] font-black text-white transition-colors hover:brightness-110 disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.blue }}
+              style={{ background: LEGACY_COLORS.blueSolid }}
             >
               <Save className="h-3 w-3" />
               저장
@@ -693,7 +693,7 @@ function ItemTable({
                           addSingleItem();
                         }}
                         className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
-                        style={{ background: LEGACY_COLORS.blue }}
+                        style={{ background: LEGACY_COLORS.blueSolid }}
                         title="선택 — 선택 품목만 처리"
                       >
                         <Plus className="h-3 w-3" />

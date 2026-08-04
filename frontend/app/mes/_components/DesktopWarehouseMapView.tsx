@@ -1165,7 +1165,7 @@ function WarehouseZonePanel({
                 gap: 6,
                 height: 36,
                 borderRadius: 12,
-                background: LEGACY_COLORS.blue,
+                background: LEGACY_COLORS.blueSolid,
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 800,
@@ -1280,7 +1280,7 @@ function WarehouseZonePanel({
                   alignItems: "center",
                   justifyContent: "center",
                   color: "#fff",
-                  background: LEGACY_COLORS.blue,
+                  background: LEGACY_COLORS.blueSolid,
                   cursor: busy || !selectedItemId ? "not-allowed" : "pointer",
                   opacity: busy || !selectedItemId ? 0.5 : 1,
                 }}

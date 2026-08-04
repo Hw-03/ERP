@@ -4,6 +4,7 @@ import {
   getDepartmentFallbackColor,
   getDepartmentInitial,
   normalizeDepartmentName,
+  departmentDisplayColor,
   LEGACY_COLORS,
   OPTION_COLOR,
   optionColor,
@@ -36,12 +37,22 @@ describe("mes/color barrel — department exports", () => {
     expect(normalizeDepartmentName(null)).toBe("기타");
     expect(normalizeDepartmentName("연구소")).toBe("연구");
   });
+
+  it("re-exports the theme-aware department display helper", () => {
+    expect(departmentDisplayColor("#3b82f6")).toContain("--c-department-color-source-weight");
+  });
 });
 
 describe("mes/color barrel — LEGACY_COLORS", () => {
   it("re-exports LEGACY_COLORS with css var tokens", () => {
     expect(LEGACY_COLORS.bg).toBe("var(--c-bg)");
     expect(LEGACY_COLORS.blue).toBe("var(--c-blue)");
+    expect(LEGACY_COLORS.blueSolid).toBe("var(--c-blue-solid)");
+    expect(LEGACY_COLORS.greenSolid).toBe("var(--c-green-solid)");
+    expect(LEGACY_COLORS.redSolid).toBe("var(--c-red-solid)");
+    expect(LEGACY_COLORS.yellowSolid).toBe("var(--c-yellow-solid)");
+    expect(LEGACY_COLORS.purpleSolid).toBe("var(--c-purple-solid)");
+    expect(LEGACY_COLORS.cyanSolid).toBe("var(--c-cyan-solid)");
     expect(LEGACY_COLORS.green).toBe("var(--c-green)");
     expect(LEGACY_COLORS.red).toBe("var(--c-red)");
     expect(LEGACY_COLORS.muted).toBe("var(--c-muted)");

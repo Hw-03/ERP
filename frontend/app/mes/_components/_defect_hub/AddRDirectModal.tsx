@@ -438,7 +438,7 @@ export function AddRDirectModal({
             onClick={() => setConfirmOpen(true)}
             disabled={!canSubmit}
             className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-            style={{ background: LEGACY_COLORS.red }}
+            style={{ background: LEGACY_COLORS.redSolid }}
           >
             즉시 폐기 →
           </button>

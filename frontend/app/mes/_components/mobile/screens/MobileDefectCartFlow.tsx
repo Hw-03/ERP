@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
-import { LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
+import { departmentDisplayColor, LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
@@ -379,7 +379,7 @@ export function MobileDefectCartFlow({
                 <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
                   {PRODUCTION_LINES.map((d) => {
                     const active = dept === d;
-                    const c = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2;
+                    const c = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2);
                     return (
                       <button
                         key={d}

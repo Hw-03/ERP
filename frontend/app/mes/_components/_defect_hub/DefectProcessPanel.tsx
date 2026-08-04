@@ -225,7 +225,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             disabled={busy || !reworkReady}
             onClick={() => setConfirmOpen(true)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-            style={{ background: LEGACY_COLORS.yellow }}
+            style={{ background: LEGACY_COLORS.yellowSolid }}
           >
             {busy ? "처리 중..." : "최종 처리 →"}
           </button>
@@ -409,7 +409,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             disabled={busy}
             onClick={() => setStep(2)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-            style={{ background: LEGACY_COLORS.yellow }}
+            style={{ background: LEGACY_COLORS.yellowSolid }}
           >
             다음 →
           </button>

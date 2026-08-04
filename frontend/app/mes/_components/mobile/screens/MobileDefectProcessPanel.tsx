@@ -199,7 +199,7 @@ export function MobileDefectProcessPanel({
               "w-full rounded-[16px] px-4 py-[14px] font-black text-white transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
               TYPO.body,
             )}
-            style={{ background: LEGACY_COLORS.yellow }}
+            style={{ background: LEGACY_COLORS.yellowSolid }}
           >
             {busy ? "처리 중..." : "최종 처리 →"}
           </button>

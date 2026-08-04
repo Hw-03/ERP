@@ -2,7 +2,7 @@
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
+import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import type { IoSubType, IoWorkType, OperatorLike } from "../../_warehouse_v2/types";
 import {
   IO_SUB_TYPES,
@@ -111,8 +111,9 @@ function DeptGrid({
       <div className={`grid flex-1 auto-rows-fr ${colsClass} gap-2`}>
         {options.map((d) => {
           const active = d === value;
-          const color =
-            MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple;
+          const color = departmentDisplayColor(
+            MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple,
+          );
           return (
             <button
               key={d}

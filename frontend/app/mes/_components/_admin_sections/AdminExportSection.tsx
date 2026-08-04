@@ -299,7 +299,7 @@ export function AdminExportSection() {
                 loading={f704Downloading}
                 onClick={() => void handleF704Download()}
                 className="min-h-11 w-full sm:w-auto"
-                style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
+                style={{ background: LEGACY_COLORS.greenSolid, color: LEGACY_COLORS.white }}
               >
                 {f704Downloading ? "대장 생성 중..." : "F704-02 대장 다운로드"}
               </Button>
@@ -334,7 +334,7 @@ export function AdminExportSection() {
                 loading={f705Downloading}
                 onClick={() => void handleF705Download()}
                 className="min-h-11 w-full sm:w-auto"
-                style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
+                style={{ background: LEGACY_COLORS.greenSolid, color: LEGACY_COLORS.white }}
               >
                 {f705Downloading ? "생산일지 생성 중..." : "F705-02 생산일지 다운로드"}
               </Button>

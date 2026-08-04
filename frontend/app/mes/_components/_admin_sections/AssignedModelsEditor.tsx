@@ -63,7 +63,7 @@ export function AssignedModelsEditor({
             >
               <span
                 className="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[12px] font-bold"
-                style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
+                style={{ background: LEGACY_COLORS.blueSolid, color: "#fff" }}
               >
                 {idx + 1}
               </span>

@@ -204,7 +204,7 @@ export function DesktopInventoryView({
           {/* ── 재고 테이블 ── */}
           <section
             className="card"
-            style={{ backgroundImage: "linear-gradient(rgba(101, 169, 255, 0.08), rgba(101, 169, 255, 0.08))" }}
+            style={{ backgroundImage: "linear-gradient(color-mix(in srgb, var(--c-blue) 8%, transparent), color-mix(in srgb, var(--c-blue) 8%, transparent))" }}
           >
             <InventoryTableStickyHeader
               searchValue={localSearch}

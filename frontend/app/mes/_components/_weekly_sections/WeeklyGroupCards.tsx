@@ -1,10 +1,11 @@
 "use client";
 
 import { memo, useMemo, useState } from "react";
-import { LEGACY_COLORS, employeeColor } from "@/lib/mes/color";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
+import { useDeptColorLookup } from "../DepartmentsContext";
 
 // 0/무변동 값 de-emphasis — 단 WCAG AA 충족 필요(투명 30% 는 미달) → 솔리드 muted2(5.55:1).
 const ZERO_FADE = LEGACY_COLORS.muted2;
@@ -20,6 +21,7 @@ interface Props {
 
 function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
+  const getDeptColor = useDeptColorLookup();
 
   // 튜브→고압→진공→튜닝→조립→출하 순 고정 (주차마다 순서 흔들림 방지)
   const sortedGroups = useMemo(
@@ -38,8 +40,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
         const isHover = hovered === g.process_code;
         const isDecreasing = g.delta < 0;
         const isQuiet = g.delta === 0 && !isActive;
-        const accentColor = employeeColor(g.dept_name);
-        const tone = isDecreasing ? LEGACY_COLORS.red : accentColor;
+        const accentColor = getDeptColor(g.dept_name);
         const deltaColor =
           g.delta > 0 ? LEGACY_COLORS.green
           : g.delta < 0 ? LEGACY_COLORS.red
@@ -56,19 +57,17 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             className="relative flex min-h-0 flex-1 flex-col justify-center overflow-hidden rounded-[12px] border text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
-                ? tint(tone, 8, LEGACY_COLORS.s2)
+                ? tint(accentColor, 8, LEGACY_COLORS.s2)
                 : isHover
                 ? LEGACY_COLORS.s2
                 : LEGACY_COLORS.s1,
               borderColor: isActive
-                ? tone
-                : isDecreasing
-                ? tint(LEGACY_COLORS.red, 30, LEGACY_COLORS.border)
+                ? accentColor
                 : isQuiet
                 ? tint(LEGACY_COLORS.border, 60, "transparent")
                 : LEGACY_COLORS.border,
               boxShadow: isActive
-                ? `0 0 0 1px ${tint(tone, 20)}, var(--c-card-shadow)`
+                ? `0 0 0 1px ${tint(accentColor, 20)}, var(--c-card-shadow)`
                 : undefined,
             }}
           >
@@ -76,8 +75,8 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             <div
               className="absolute bottom-0 left-0 top-0 w-[3px]"
               style={{
-                background: isActive || isDecreasing
-                  ? tone
+                background: isActive
+                  ? accentColor
                   : isQuiet
                   ? tint(accentColor, 15)
                   : tint(accentColor, 35),
@@ -96,10 +95,10 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 style={{
                   background: isQuiet
                     ? tint(LEGACY_COLORS.muted2, 10, LEGACY_COLORS.s2)
-                    : tint(tone, 16, LEGACY_COLORS.s2),
+                    : tint(accentColor, 16, LEGACY_COLORS.s2),
                   color: isQuiet
                     ? LEGACY_COLORS.muted2
-                    : `color-mix(in srgb, ${tone} 42%, ${LEGACY_COLORS.text})`,
+                    : `color-mix(in srgb, ${accentColor} 42%, ${LEGACY_COLORS.text})`,
                 }}
               >
                 {g.process_code}

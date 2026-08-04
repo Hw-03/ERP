@@ -3,7 +3,7 @@
 import { ArrowDownToLine, ArrowUpFromLine, PackageCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
+import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import type { IoSubType, IoWorkType, OperatorLike } from "./types";
 import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, deptVisibility, isExitWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
 
@@ -265,7 +265,9 @@ function DeptGrid({
       <div className={fill ? `grid min-h-0 flex-1 ${colsClass} gap-3` : `grid ${colsClass} gap-3`}>
         {items.map((d) => {
           const active = d === value;
-          const deptColor = MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple;
+          const deptColor = departmentDisplayColor(
+            MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple,
+          );
           return (
             <button
               key={d}

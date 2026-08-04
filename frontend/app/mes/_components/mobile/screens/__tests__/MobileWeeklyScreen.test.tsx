@@ -8,6 +8,10 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+vi.mock("../../../DepartmentsContext", () => ({
+  useDeptColorLookup: () => () => "#3b82f6",
+}));
+
 describe("MobileWeeklyScreen", () => {
   it("centers the week picker and returns to the More menu", () => {
     const onExit = vi.fn();

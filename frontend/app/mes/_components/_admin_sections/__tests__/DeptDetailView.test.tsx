@@ -33,6 +33,9 @@ describe("DeptDetailView", () => {
     );
 
     expect(screen.getByTitle("현재 저장된 색상")).toBeInTheDocument();
+    expect(screen.getByTestId("department-dark-color-preview").getAttribute("style")).toContain(
+      "color-mix(in srgb, #2f74e7 var(--c-department-color-source-weight), var(--c-department-color-neutral))",
+    );
 
     const toggle = screen.getByRole("button", { name: "전체 색상 보기" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");

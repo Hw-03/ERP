@@ -41,7 +41,7 @@ export function DeptAddForm({
         type="submit"
         disabled={!canSubmit}
         className="rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-opacity disabled:opacity-40"
-        style={{ background: LEGACY_COLORS.blue }}
+        style={{ background: LEGACY_COLORS.blueSolid }}
       >
         부서 추가
       </button>

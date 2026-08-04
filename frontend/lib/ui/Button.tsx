@@ -29,7 +29,7 @@ const ICON_SIZE: Record<ButtonSize, string> = {
 function getVariantStyle(variant: ButtonVariant): React.CSSProperties {
   switch (variant) {
     case "primary":
-      return { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white };
+      return { background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white };
     case "secondary":
       return {
         background: LEGACY_COLORS.s2,
@@ -43,7 +43,7 @@ function getVariantStyle(variant: ButtonVariant): React.CSSProperties {
         color: LEGACY_COLORS.muted2,
       };
     case "danger":
-      return { background: LEGACY_COLORS.red, color: LEGACY_COLORS.white };
+      return { background: LEGACY_COLORS.redSolid, color: LEGACY_COLORS.white };
   }
 }
 

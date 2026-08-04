@@ -202,7 +202,7 @@ function TabButton({
       style={{
         background: expanded
           ? active
-            ? "linear-gradient(135deg, rgba(101,169,255,.16), rgba(78,201,245,.08))"
+            ? "linear-gradient(135deg, color-mix(in srgb, var(--c-blue) 14%, transparent), color-mix(in srgb, var(--c-cyan) 7%, transparent))"
             : hovered
             ? "color-mix(in srgb, var(--c-cyan) var(--sidebar-hover-mix, 18%), transparent)"
             : "transparent"
@@ -217,7 +217,7 @@ function TabButton({
         <div
           className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
           style={{
-            background: active ? LEGACY_COLORS.blue : "transparent",
+            background: active ? LEGACY_COLORS.blueSolid : "transparent",
             color: active ? LEGACY_COLORS.white : tab.color,
           }}
         >
