@@ -6,7 +6,6 @@ import { useDesktopRightPanelBody } from "../DesktopRightPanel";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import type {
   HistoryDetailSummary,
-  HistoryDetailImpact,
   HistoryDetailSummaryTone,
 } from "./historyDetailSummary";
 
@@ -179,7 +178,6 @@ export function HistoryKeyPointSummary({
           {impactStatus === "ready" && summary.impactGroups.map((group) => {
             const isToggleable = hasMultipleImpactLocations || autoCollapsedImpactIdentity === summary.impactIdentity;
             const isExpanded = !isToggleable || expandedImpactGroups.has(group.key);
-            const amount = getImpactGroupAmount(group.effects);
             const contentId = `history-impact-${summary.impactIdentity}-${group.key}`;
 
             return (
@@ -197,7 +195,7 @@ export function HistoryKeyPointSummary({
                     }}
                   >
                     <span className="min-w-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                      {group.label ?? "재고"} · {group.effects.length}품목{amount ? ` · ${amount}` : ""}
+                      {group.label ?? "재고"} · {group.effects.length}품목
                     </span>
                     <ChevronDown
                       className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -319,15 +317,6 @@ function HistoryImpactTooltip({
       </div>
     </Tooltip>
   );
-}
-
-function getImpactGroupAmount(effects: HistoryDetailImpact[]): string | null {
-  const units = new Set(effects.map((effect) => effect.unit).filter(Boolean));
-  if (units.size !== 1) return null;
-  const delta = effects.reduce((total, effect) => total + effect.delta, 0);
-  if (delta === 0) return null;
-  const [unit] = Array.from(units);
-  return `${delta > 0 ? "+" : ""}${delta} ${unit}`;
 }
 
 function ConversionEndpoint({

@@ -51,6 +51,7 @@ describe("BomUnmatchedRawsDrawer", () => {
 
     const drawer = container.firstElementChild as HTMLDivElement;
     expect(drawer.style.background).toBe(LEGACY_COLORS.bg);
+    expect(drawer).not.toHaveClass("border");
     expect(screen.queryByText("Raw material")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button"));
@@ -58,6 +59,8 @@ describe("BomUnmatchedRawsDrawer", () => {
     const list = closestWithClass(screen.getByText("Raw material"), "max-h-[30vh]");
     expect(list.style.background).toBe(LEGACY_COLORS.bg);
     expect(list).toHaveClass("max-h-[30vh]", "overflow-y-auto");
+    expect(list.style.borderTop).toBe(`1px solid ${LEGACY_COLORS.border}`);
+    expect(screen.getByText("Raw material").closest(".grid")?.style.borderBottom).toBe(`1px solid ${LEGACY_COLORS.border}`);
     expect(screen.getByText("RAW-001")).toBeInTheDocument();
   });
 });

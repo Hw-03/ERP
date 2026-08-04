@@ -520,7 +520,7 @@ describe("history immediate UX presentation policies", () => {
     expect(row.stock?.label).toBe("불량 재고 398 EA");
   });
 
-  it("shows the department-to-disposal route for direct defect scrapping", () => {
+  it("shows quarantine-to-disposal for direct defect scrapping", () => {
     const row = getHistoryRowPresentation(makeLog({
       transaction_type: "DEFECT_SCRAP",
       department: "조립",
@@ -530,10 +530,8 @@ describe("history immediate UX presentation policies", () => {
       department: null,
     }));
 
-    expect(row.flow).toMatchObject({ label: "조립 → 폐기", from: "조립", to: "폐기" });
-    expect(legacy.flow).toMatchObject({ label: "폐기" });
-    expect(legacy.flow.from).toBeUndefined();
-    expect(legacy.flow.to).toBeUndefined();
+    expect(row.flow).toMatchObject({ label: "격리 → 폐기", from: "격리", to: "폐기" });
+    expect(legacy.flow).toMatchObject({ label: "격리 → 폐기", from: "격리", to: "폐기" });
   });
 
   it.each([

@@ -212,7 +212,7 @@ def test_unversioned_onboarding_stamps_0002_then_runs_department_backfill(
             ) == "창고"
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260728_0009"
+            ) == "20260728_0011"
         assert result.business_data_unchanged is True
     finally:
         engine.dispose()

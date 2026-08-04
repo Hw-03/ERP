@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { forwardRef, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Download,
@@ -123,6 +123,12 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
   const [f705Year, setF705Year] = useState(() => new Date().getFullYear());
   const [f705Downloading, setF705Downloading] = useState(false);
   const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const primaryExportsRef = useRef<HTMLElement>(null);
+  const recentExportsRef = useRef<HTMLElement>(null);
+  const originalLogsRef = useRef<HTMLDivElement>(null);
+  const selectedCsvRef = useRef<HTMLElement>(null);
+  const excelExportsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setRecent(loadRecent());
@@ -315,6 +321,17 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
     setRecent([]);
   }
 
+  function handleQuickNavigation(targetRef: RefObject<HTMLElement>) {
+    const container = scrollContainerRef.current;
+    const target = targetRef.current;
+    if (!container || !target) return;
+
+    const top = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    container.scrollTo({ top, behavior });
+    target.focus({ preventScroll: true });
+  }
+
   return (
     <div className="flex min-h-0 flex-col">
       <AdminPageHeader
@@ -325,10 +342,29 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             일반 데이터부터 공식 서식·원본 로그까지 목적별로 내려받습니다.
           </p>
         }
+        actions={
+          <nav aria-label="내보내기 바로가기" className="flex w-fit max-w-[calc(100vw-2rem)] flex-wrap justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(primaryExportsRef)} className="min-h-11">
+              주요 내보내기
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(originalLogsRef)} className="min-h-11">
+              원본 로그
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(selectedCsvRef)} className="min-h-11">
+              선택 CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(recentExportsRef)} className="min-h-11">
+              최근 내보내기
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleQuickNavigation(excelExportsRef)} className="min-h-11">
+              품목·입출고 Excel
+            </Button>
+          </nav>
+        }
       />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
-        <section aria-labelledby="primary-exports-title" className="flex flex-col gap-3">
+      <div ref={scrollContainerRef} data-testid="export-scroll-container" className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+        <section ref={primaryExportsRef} tabIndex={-1} aria-labelledby="primary-exports-title" className="flex flex-col gap-3">
           <div>
             <h3 id="primary-exports-title" className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
               주요 내보내기
@@ -338,9 +374,8 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             </p>
           </div>
 
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.2fr)]">
-            <div className="flex flex-col gap-3">
-              <ExportSurface
+          <div className="flex flex-col gap-3">
+            <ExportSurface
                 ariaLabel="F705-02 연간 생산일지"
                 tone={LEGACY_COLORS.green}
                 icon={<FileSpreadsheet className="h-5 w-5" />}
@@ -381,45 +416,24 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                     {f705DownloadError}
                   </p>
                 )}
-              </ExportSurface>
+            </ExportSurface>
 
-              <ExportSurface
-                ariaLabel="품목·입출고 Excel"
-                tone={LEGACY_COLORS.green}
-                icon={<FileSpreadsheet className="h-5 w-5" />}
-                title="품목·입출고 Excel"
-                description="품목 전체와 최근 30일 입출고 내역을 Excel 2개 파일로 내려받습니다."
-              >
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
-                      품목 전체
-                    </span>
-                    <span className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
-                      최근 30일 입출고
-                    </span>
-                  </div>
-                  <Button
-                    size="md"
-                    iconLeft={<Download />}
-                    disabled={busy}
-                    onClick={handleExcelAll}
-                    className="min-h-11 w-full sm:w-auto"
-                    style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
-                  >
-                    Excel 2개 다운로드
-                  </Button>
-                </div>
-              </ExportSurface>
-            </div>
+          </div>
+        </section>
 
-            <ExportSurface
-              ariaLabel="선택 데이터 내보내기 (CSV)"
-              tone={LEGACY_COLORS.blue}
-              icon={<FileText className="h-5 w-5" />}
-              title="선택 데이터 내보내기 (CSV)"
-              description="필요한 데이터 범위와 옵션을 선택해 CSV 파일로 내보냅니다."
-            >
+        <div ref={originalLogsRef} tabIndex={-1} data-testid="original-logs-section">
+          <AdminAuditCsvSection embedded />
+        </div>
+
+        <ExportSurface
+          ref={selectedCsvRef}
+          tabIndex={-1}
+          ariaLabel="선택 데이터 내보내기 (CSV)"
+          tone={LEGACY_COLORS.blue}
+          icon={<FileText className="h-5 w-5" />}
+          title="선택 데이터 내보내기 (CSV)"
+          description="필요한 데이터 범위와 옵션을 선택해 CSV 파일로 내보냅니다."
+        >
               <div className="mt-4 flex flex-col gap-4">
                 <div role="group" aria-label="CSV 데이터 범위">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -523,11 +537,11 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
                   {busy ? "내보내는 중..." : "선택 데이터 내보내기"}
                 </Button>
               </div>
-            </ExportSurface>
-          </div>
-        </section>
+        </ExportSurface>
 
         <section
+          ref={recentExportsRef}
+          tabIndex={-1}
           aria-labelledby="recent-exports-title"
           className="rounded-[20px] border p-4"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
@@ -633,27 +647,43 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
           </details>
         </section>
 
-        <section
-          aria-labelledby="external-submission-logs-title"
-          className="flex flex-col gap-4 border-t pt-5"
-          style={{ borderColor: LEGACY_COLORS.border }}
+        <ExportSurface
+          ref={excelExportsRef}
+          tabIndex={-1}
+          ariaLabel="품목·입출고 Excel"
+          tone={LEGACY_COLORS.green}
+          icon={<FileSpreadsheet className="h-5 w-5" />}
+          title="품목·입출고 Excel"
+          description="품목 전체와 최근 30일 입출고 내역을 Excel 2개 파일로 내려받습니다."
         >
-          <div>
-            <h3 id="external-submission-logs-title" className="text-[16px] font-black" style={{ color: LEGACY_COLORS.text }}>
-              외부 제출·원본 로그
-            </h3>
-            <p className="mt-1 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              외부 심사용 F704-02 대장과 시스템 원본 로그를 관리합니다.
-            </p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
+                품목 전체
+              </span>
+              <span className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
+                최근 30일 입출고
+              </span>
+            </div>
+            <Button
+              size="md"
+              iconLeft={<Download />}
+              disabled={busy}
+              onClick={handleExcelAll}
+              className="min-h-11 w-full sm:w-auto"
+              style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
+            >
+              Excel 2개 다운로드
+            </Button>
           </div>
-          <AdminAuditCsvSection embedded />
-        </section>
+        </ExportSurface>
       </div>
     </div>
   );
 }
 
 interface ExportSurfaceProps {
+  tabIndex?: number;
   ariaLabel: string;
   tone: string;
   icon: ReactNode;
@@ -662,9 +692,14 @@ interface ExportSurfaceProps {
   children: ReactNode;
 }
 
-function ExportSurface({ ariaLabel, tone, icon, title, description, children }: ExportSurfaceProps) {
+const ExportSurface = forwardRef<HTMLElement, ExportSurfaceProps>(function ExportSurface(
+  { tabIndex, ariaLabel, tone, icon, title, description, children },
+  ref,
+) {
   return (
     <section
+      ref={ref}
+      tabIndex={tabIndex}
       aria-label={ariaLabel}
       className="rounded-[20px] border p-4"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
@@ -691,7 +726,7 @@ function ExportSurface({ ariaLabel, tone, icon, title, description, children }: 
       {children}
     </section>
   );
-}
+});
 
 function Label({ children }: { children: React.ReactNode }) {
   return (

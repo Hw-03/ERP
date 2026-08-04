@@ -199,7 +199,7 @@ export function AdminDepartmentsSection({
           <AdminListPanel
             title="부서 목록"
             countLabel={`${filteredDepartments.length}개`}
-            width={300}
+            width={336}
             searchValue={search}
             searchPlaceholder="부서명 검색"
             onSearchChange={setSearch}
@@ -217,7 +217,7 @@ export function AdminDepartmentsSection({
               <div
                 data-admin-list-header="departments"
                 role="row"
-                className="sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
+                className="sticky top-0 z-10 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
               >
                 <span role="columnheader">부서명</span>
@@ -250,7 +250,7 @@ export function AdminDepartmentsSection({
                   }}
                   aria-selected={active}
                   tabIndex={0}
-                  className="grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_76px] items-center border-b px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+                  className="grid w-full grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_88px] items-center border-b px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
                   style={{
                     background: active
                       ? `color-mix(in srgb, ${color} 14%, transparent)`
@@ -272,7 +272,7 @@ export function AdminDepartmentsSection({
                     DPT-{String(dept.id).padStart(2, "0")} · {empCount}명
                   </div>
                   <div role="gridcell" className="flex justify-center">
-                    <StatusPill label={dept.is_active ? "사용 중" : "비활성"} tone={dept.is_active ? "success" : "neutral"} showDot maxWidth={70} />
+                    <StatusPill label={dept.is_active ? "사용 중" : "비활성"} tone={dept.is_active ? "success" : "neutral"} showDot maxWidth={84} />
                   </div>
                 </div>
               );

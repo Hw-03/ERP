@@ -220,7 +220,7 @@ export function DeptDetailView({
                       type="button"
                       aria-label={`${swatch.name} ${swatch.hex}`}
                       aria-pressed={selected}
-                      className="h-11 w-11 rounded-lg border-2 transition-transform hover:scale-105 active:scale-[0.98]"
+                      className="no-btn-inset h-11 w-11 rounded-lg border-2 transition-transform hover:scale-105 active:scale-[0.98]"
                       style={{
                         background: swatch.hex,
                         borderColor: selected ? LEGACY_COLORS.text : "transparent",

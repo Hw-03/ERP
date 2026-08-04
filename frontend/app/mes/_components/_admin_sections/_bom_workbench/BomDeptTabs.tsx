@@ -19,7 +19,7 @@ export function BomDeptTabs({ value, onChange }: Props) {
   ];
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div data-testid="bom-department-filters" className="flex min-h-[54px] flex-wrap items-center gap-2">
       {chips.map((chip) => {
         const active = chip.letter === value;
         const isAll = chip.letter === "ALL";
@@ -30,7 +30,7 @@ export function BomDeptTabs({ value, onChange }: Props) {
             type="button"
             onClick={() => onChange(chip.letter)}
             aria-pressed={active}
-            className="flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors"
+            className="flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors"
             style={{
               background: active ? color : LEGACY_COLORS.s1,
               color: active ? LEGACY_COLORS.white : LEGACY_COLORS.text,

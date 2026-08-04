@@ -50,14 +50,14 @@ export function AdminDangerZone({
 
   return (
     <>
-      <div className="flex min-h-0 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <AdminPageHeader
           icon={ShieldCheck}
           title="보안"
         />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
-          <div className="w-full max-w-[560px]">
+          <div className="mx-auto mb-auto mt-[clamp(48px,8vh,80px)] w-full max-w-[560px]">
             <div
               className="rounded-[16px] border p-5"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}

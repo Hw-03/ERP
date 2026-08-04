@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { BomWorkbench } from "../BomWorkbench";
 
@@ -38,5 +38,27 @@ describe("BomWorkbench", () => {
 
     const parentListCard = closestWithClass(parentScrollRegion!, "rounded-2xl");
     expect(parentListCard.parentElement).toHaveClass("flex", "flex-1", "min-h-0", "flex-col");
+  });
+
+  it("aligns the department filter and header actions to their height contracts", () => {
+    render(
+      <BomWorkbench
+        items={[]}
+        allBomRows={[]}
+        refreshAllBom={() => undefined}
+        refreshItems={async () => undefined}
+        onStatusChange={() => undefined}
+        onError={() => undefined}
+      />,
+    );
+
+    const departmentFilters = screen.getByTestId("bom-department-filters");
+    expect(departmentFilters).toHaveClass("min-h-[54px]");
+    for (const filter of departmentFilters.querySelectorAll("button")) {
+      expect(filter).toHaveClass("min-h-10");
+    }
+
+    expect(screen.getByText("BOM 내보내기").closest("button")).toHaveClass("h-[42px]");
+    expect(screen.getByText("편집").closest("button")?.parentElement).toHaveClass("h-[42px]");
   });
 });

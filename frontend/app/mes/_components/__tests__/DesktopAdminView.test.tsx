@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { DesktopAdminView } from "../DesktopAdminView";
 
 const state = vi.hoisted(() => ({
+  unlocked: true,
   sectionParam: null as string | null,
   searchString: "tab=admin",
   selectSection: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("@/lib/ui/Toast", () => ({
 
 vi.mock("../_admin_hooks/useAdminViewState", () => ({
   useAdminViewState: () => ({
-    unlocked: true,
+    unlocked: state.unlocked,
     adminPin: "0000",
     section: "models",
     selectedDept: null,
@@ -60,7 +61,22 @@ vi.mock("../_admin_sections/AdminSectionContent", () => ({
 }));
 
 describe("DesktopAdminView", () => {
+  it("applies the soft selection depth only to the unlocked admin workspace", () => {
+    render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(screen.getByText("관리자 본문").closest("[data-selection-depth='soft']")).toBeInTheDocument();
+  });
+
+  it("does not render the soft selection depth while the admin workspace is locked", () => {
+    state.unlocked = false;
+
+    const { container } = render(<DesktopAdminView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(container.querySelector("[data-selection-depth='soft']")).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
+    state.unlocked = true;
     state.sectionParam = null;
     state.searchString = "tab=admin";
     state.selectSection.mockReset();

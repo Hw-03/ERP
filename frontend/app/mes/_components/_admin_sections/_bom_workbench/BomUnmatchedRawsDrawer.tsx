@@ -26,8 +26,8 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
 
   return (
     <div
-      className="rounded-2xl border"
-      style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
+      className="rounded-2xl"
+      style={{ background: LEGACY_COLORS.bg }}
     >
       <button
         type="button"

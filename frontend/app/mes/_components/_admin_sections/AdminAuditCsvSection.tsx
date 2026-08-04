@@ -344,21 +344,6 @@ export function AdminAuditCsvSection({ embedded = false }: { embedded?: boolean 
           )}
         </section>
 
-        <div
-          className="rounded-[10px] border px-3 py-2 text-[12px] leading-relaxed"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.muted2,
-          }}
-        >
-          <details>
-            <summary className="cursor-pointer font-bold">시스템 원본 컬럼 구성 (11)</summary>
-            <div className="mt-2">
-              일시 · 거래유형 · 품목코드 · 품목명 · 수량 · 변경전 재고 · 변경후 재고 · 참조번호 · 처리자 · 비고 · 거래ID
-            </div>
-          </details>
-        </div>
       </div>
     </div>
   );

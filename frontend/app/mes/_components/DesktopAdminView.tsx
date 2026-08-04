@@ -95,7 +95,7 @@ export function DesktopAdminView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-y-auto pr-4 lg:overflow-hidden">
+    <div data-selection-depth="soft" className="flex min-h-0 flex-1 overflow-y-auto pr-4 lg:overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <AdminSectionTabs
           section={section}

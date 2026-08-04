@@ -556,11 +556,25 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
   }
 
   function selectHistoryMonth(year: number, month: number) {
+    if (historyYear === year && historyMonth === month) return;
     setHistoryYear(year);
     setHistoryMonth(month);
     setHistorySearch("");
     setHistoryAppliedSearch("");
     void loadHistoryPage({ status: historyStatus, year, month });
+  }
+
+  function selectHistoryYear(year: number) {
+    if (historyYear === year) return;
+    historyRequestGenerationRef.current += 1;
+    setHistoryYear(year);
+    setHistoryMonth(null);
+    setHistorySearch("");
+    setHistoryAppliedSearch("");
+    setHistoryRows([]);
+    setHistoryNextCursor(null);
+    setHistoryHasMore(false);
+    setHistoryLoading(false);
   }
 
   function searchHistory() {
@@ -1286,6 +1300,7 @@ export function DesktopShippingView({ onStatusChange, operator = null }: {
           hasMore={historyHasMore}
           onBack={() => navigateView("hub")}
           onStatus={selectHistoryStatus}
+          onYear={selectHistoryYear}
           onMonth={selectHistoryMonth}
           onSearchChange={setHistorySearch}
           onSearch={searchHistory}
@@ -1423,17 +1438,13 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
     { status: "PREPARING", label: "준비 중" },
     { status: "PREPARED", label: "준비 완료" },
   ];
-  const total = requests.length;
   return (
     <div data-testid="shipping-request-list-panel" className={`${SHIPPING_FLEX_COL_CLASS} gap-3`}>
-      <div className={SHIPPING_ROW_CLASS}>
+      <div className="flex min-h-11 items-center gap-3">
         <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <div className="min-w-0">
-          <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 관리</div>
-          <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행 중 출하 {total}건 · 요청 생성, 준비 체크, 픽업 완료까지 이어서 처리합니다.</div>
-        </div>
+        <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 관리</div>
       </div>
 
       <div data-testid="shipping-request-list-grid" className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
@@ -1766,6 +1777,7 @@ function HistoryListEntry({
   hasMore,
   onBack,
   onStatus,
+  onYear,
   onMonth,
   onSearchChange,
   onSearch,
@@ -1784,6 +1796,7 @@ function HistoryListEntry({
   hasMore: boolean;
   onBack: () => void;
   onStatus: (status: ShippingHistoryStatus) => void;
+  onYear: (year: number) => void;
   onMonth: (year: number, month: number) => void;
   onSearchChange: (value: string) => void;
   onSearch: () => void;
@@ -1820,13 +1833,18 @@ function HistoryListEntry({
     <div className={SHIPPING_FLEX_COL_CLASS}>
       <Panel dataTestId="shipping-history-list" className={SHIPPING_FLEX_COL_CLASS}>
         <div className={SHIPPING_TOP_ROW_CLASS}>
-          <div className={SHIPPING_ROW_CLASS}>
+          <div className="flex min-h-11 items-center gap-3">
             <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <PanelTitle icon={History} title="출하 이력" subtitle="상태와 연월 폴더로 찾거나 전체 기간을 검색합니다." />
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: tint(LEGACY_COLORS.blue, 14), color: LEGACY_COLORS.blue }}>
+                <History className="h-5 w-5" />
+              </div>
+              <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 이력</div>
+            </div>
           </div>
-          <div className="flex min-h-11 rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          <div data-selection-depth="soft" className="flex min-h-11 rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
             {([[
               "PICKED_UP",
               "출하 완료",
@@ -1835,7 +1853,7 @@ function HistoryListEntry({
               "요청 취소",
             ]] as const).map(([value, label]) => {
               const active = status === value;
-              const tone = value === "PICKED_UP" ? LEGACY_COLORS.purple : LEGACY_COLORS.red;
+              const tone = value === "PICKED_UP" ? LEGACY_COLORS.green : LEGACY_COLORS.red;
               return (
                 <button
                   key={value}
@@ -1889,7 +1907,7 @@ function HistoryListEntry({
                     <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
                       {searchGroups.filter((group) => group.year === year).map((group) => (
                         <details key={`${group.year}-${group.month}`} open className="rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-                          <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black" style={{ color: LEGACY_COLORS.purple }}>{group.month}월 · {group.rows.length}건</summary>
+                          <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>{group.month}월 · {group.rows.length}건</summary>
                           {renderRows(group.rows)}
                         </details>
                       ))}
@@ -1902,18 +1920,30 @@ function HistoryListEntry({
             <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력 없음" body={historyEmptyBody} /></div>
           ) : (
             <div className="grid flex-1 content-start gap-2">
-              {years.map((year, yearIndex) => (
-                <details key={year} open={year === selectedYear || yearIndex === 0} className="rounded-[14px] border" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-                  <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{year}년</summary>
+              {years.map((year) => (
+                <details key={year} open={year === selectedYear} className="rounded-[14px] border" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                  <summary
+                    className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black"
+                    style={{ color: LEGACY_COLORS.text }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onYear(year);
+                    }}
+                  >
+                    {year}년
+                  </summary>
                   <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
                     {months.filter((row) => row.year === year).map((row) => {
                       const selected = selectedYear === row.year && selectedMonth === row.month;
                       return (
-                        <details key={`${row.year}-${row.month}`} open={selected} className="rounded-[12px] border" style={{ background: selected ? tint(LEGACY_COLORS.purple, 8) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.purple, 38) : LEGACY_COLORS.border }}>
+                        <details key={`${row.year}-${row.month}`} open={selected} className="rounded-[12px] border" style={{ background: selected ? tint(LEGACY_COLORS.blue, 8) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.blue, 38) : LEGACY_COLORS.border }}>
                           <summary
                             className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black"
-                            style={{ color: selected ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
-                            onClick={() => onMonth(row.year, row.month)}
+                            style={{ color: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              onMonth(row.year, row.month);
+                            }}
                           >
                             {row.month}월 · {row.count}건
                           </summary>
@@ -3170,7 +3200,7 @@ function serialNumberText(value: string | null) {
 
 function RequestRow({ request, active, onClick }: { request: ShippingRequest; active: boolean; onClick: () => void }) {
   const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
-  const dateLabel = request.status === "PICKED_UP" ? "출하 완료" : request.status === "CANCELLED" ? "요청 취소" : "생성";
+  const dateLabel = request.status === "PICKED_UP" ? "출하 완료" : request.status === "CANCELLED" ? "요청 취소" : "요청 일시:";
   const dateValue = request.status === "PICKED_UP"
     ? request.picked_up_at
     : request.status === "CANCELLED"
@@ -3196,13 +3226,13 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
           <div className="truncate text-sm font-black">{finalPfName}</div>
           <div className="flex min-w-0 items-center gap-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             <SummaryCode code={request.base_pf_mes_code ?? "-"} testId={`shipping-request-code-${request.request_id}`} />
-            <span className="truncate">· {request.requested_by_name ?? "요청자 없음"}</span>
           </div>
         </div>
         <StatusBadge status={request.status} compact />
       </div>
-      <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        {dateLabel} {formatDate(dateValue)}{baseLabel}
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span>{dateLabel} {formatDate(dateValue)}{baseLabel}</span>
+        <span>요청자: {request.requested_by_name ?? "요청자 없음"}</span>
       </div>
       <div className="mt-1 truncate text-xs font-black" style={{ color: request.invoice_number ? LEGACY_COLORS.text : LEGACY_COLORS.yellow }}>
         인보이스 번호 · {request.invoice_number ?? "미입력"}

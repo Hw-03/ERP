@@ -58,6 +58,12 @@ describe("AdminAuditCsvSection audit downloads", () => {
     expect(screen.queryByRole("heading", { name: "입출고 로그" })).not.toBeInTheDocument();
   });
 
+  it("시스템 원본 컬럼 구성 안내를 노출하지 않는다", () => {
+    render(<AdminAuditCsvSection embedded />);
+
+    expect(screen.queryByText("시스템 원본 컬럼 구성 (11)")).not.toBeInTheDocument();
+  });
+
   it("downloads XLSX and CSV through the authenticated API and shows a download error", async () => {
     state.downloadAuditFile
       .mockRejectedValueOnce(new Error("다운로드 서버 오류"))

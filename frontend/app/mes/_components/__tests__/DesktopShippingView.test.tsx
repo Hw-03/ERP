@@ -1214,6 +1214,28 @@ describe("DesktopShippingView", () => {
     expect(screen.getByText("요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다.")).toBeInTheDocument();
   });
 
+  it("balances the request-list header and labels request metadata explicitly", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({ request_id: "requested-meta", status: "REQUESTED", requested_by_name: "김건호" }),
+      request({ request_id: "requested-missing", status: "REQUESTED", requested_by_name: null }),
+    ]);
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+
+    const panel = await screen.findByTestId("shipping-request-list-panel");
+    expect(within(panel).queryByText(/진행 중 출하/)).not.toBeInTheDocument();
+    expect(within(panel).getByText("출하 관리")).toHaveClass("text-xl");
+
+    const named = container.querySelector('[data-shipping-request-id="requested-meta"]') as HTMLElement;
+    expect(named).toHaveTextContent("요청 일시:");
+    expect(named).toHaveTextContent("요청자: 김건호");
+    expect(named).not.toHaveTextContent("· 김건호");
+
+    const missing = container.querySelector('[data-shipping-request-id="requested-missing"]') as HTMLElement;
+    expect(missing).toHaveTextContent("요청자: 요청자 없음");
+  });
+
   it("keeps wizard step labels on one line and blocks invalid next navigation", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -2103,6 +2125,74 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByText("7월 · 1건", { selector: "summary" })).toBeInTheDocument();
     expect(await screen.findByText(/인보이스 번호 · INV-C/)).toBeInTheDocument();
     expect(screen.getByText(/요청 취소 07/)).toBeInTheDocument();
+  });
+
+  it("uses semantic history colors, a balanced title, and controlled month disclosure", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([
+      { year: 2026, month: 7, count: 1 },
+      { year: 2026, month: 6, count: 2 },
+      { year: 2025, month: 12, count: 3 },
+    ]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params?: any) => ({
+      requests: [request({
+        request_id: `history-${params?.month ?? "search"}`,
+        status: params?.status ?? "PICKED_UP",
+        picked_up_at: "2026-07-20T01:00:00Z",
+      })],
+      next_cursor: null,
+      has_more: false,
+    }));
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const historyPanel = await screen.findByTestId("shipping-history-list");
+    expect(within(historyPanel).queryByText("상태와 연월 폴더로 찾거나 전체 기간을 검색합니다.")).not.toBeInTheDocument();
+    expect(within(historyPanel).getByText("출하 이력")).toHaveClass("text-xl");
+
+    const complete = within(historyPanel).getByRole("button", { name: "출하 완료" });
+    const statusGroup = complete.parentElement;
+    expect(statusGroup).toHaveAttribute("data-selection-depth", "soft");
+    expect(complete).toHaveStyle({ color: LEGACY_COLORS.green });
+
+    const june = await within(historyPanel).findByText("6월 · 2건", { selector: "summary" });
+    const callsBeforeJune = vi.mocked(api.getShippingHistory).mock.calls.length;
+    fireEvent.click(june);
+    await waitFor(() => expect(june.closest("details")).toHaveAttribute("open"));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "PICKED_UP", year: 2026, month: 6, limit: 50 }),
+    ));
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeJune + 1);
+    expect(june).toHaveStyle({ color: LEGACY_COLORS.blue });
+
+    fireEvent.click(june);
+    expect(june.closest("details")).toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeJune + 1);
+
+    const year2025 = within(historyPanel).getByText("2025년", { selector: "summary" });
+    const year2026 = within(historyPanel).getByText("2026년", { selector: "summary" });
+    const callsBeforeYearChange = vi.mocked(api.getShippingHistory).mock.calls.length;
+    fireEvent.click(year2025);
+    expect(year2025.closest("details")).toHaveAttribute("open");
+    expect(year2026.closest("details")).not.toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeYearChange);
+
+    const december = within(historyPanel).getByText("12월 · 3건", { selector: "summary" });
+    fireEvent.click(december);
+    await waitFor(() => expect(
+      within(historyPanel).getByText("12월 · 3건", { selector: "summary" }).closest("details"),
+    ).toHaveAttribute("open"));
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeYearChange + 1);
+    fireEvent.click(within(historyPanel).getByText("2025년", { selector: "summary" }));
+    expect(within(historyPanel).getByText("2025년", { selector: "summary" }).closest("details")).toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeYearChange + 1);
+    fireEvent.click(within(historyPanel).getByText("2026년", { selector: "summary" }));
+    expect(within(historyPanel).getByText("2025년", { selector: "summary" }).closest("details")).not.toHaveAttribute("open");
+    expect(within(historyPanel).getByText("2026년", { selector: "summary" }).closest("details")).toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeYearChange + 1);
+
+    fireEvent.click(within(historyPanel).getByRole("button", { name: "요청 취소" }));
+    expect(within(historyPanel).getByRole("button", { name: "요청 취소" })).toHaveStyle({ color: LEGACY_COLORS.red });
   });
 
   it("ignores an older completed-history response after switching to cancelled", async () => {

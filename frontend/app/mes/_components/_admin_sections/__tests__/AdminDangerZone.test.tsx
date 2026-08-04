@@ -13,6 +13,19 @@ function AdminDangerZoneHarness({ isSaving = false }: { isSaving?: boolean }) {
 }
 
 describe("AdminDangerZone", () => {
+  it("places the security card below the header while preserving its scroll region", () => {
+    const { container } = render(<AdminDangerZoneHarness />);
+
+    expect(container.firstElementChild).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+    expect(container.querySelector(".overflow-y-auto")).toHaveClass("flex", "flex-1", "flex-col");
+    expect(container.querySelector(".max-w-\\[560px\\]")).toHaveClass(
+      "mx-auto",
+      "mb-auto",
+      "mt-[clamp(48px,8vh,80px)]",
+      "w-full",
+    );
+  });
+
   it("저장 중에는 세 PIN 입력과 변경 버튼을 비활성화한다", () => {
     render(<AdminDangerZoneHarness isSaving />);
 

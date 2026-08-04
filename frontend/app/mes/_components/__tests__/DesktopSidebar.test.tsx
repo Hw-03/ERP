@@ -8,6 +8,26 @@ vi.mock("next/image", () => ({
 }));
 
 describe("DesktopSidebar", () => {
+  it("keeps weekly report followed by daily work report as the final work menu order", () => {
+    render(
+      <DesktopSidebar
+        activeTab="dashboard"
+        onTabChange={vi.fn()}
+        visibleTabs={["dashboard", "warehouse", "shipping", "defect", "history", "warehouseMap", "weekly", "dailyReport", "admin"]}
+      />,
+    );
+
+    const mainLabels = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent ?? "")
+      .filter((text) => ["주간보고", "일일 작업 일지"].some((label) => text.includes(label)));
+
+    expect(mainLabels).toEqual([
+      expect.stringContaining("주간보고"),
+      expect.stringContaining("일일 작업 일지"),
+    ]);
+  });
+
   it("places history directly below warehouse in the main sidebar order", () => {
     render(
       <DesktopSidebar
