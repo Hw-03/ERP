@@ -122,6 +122,34 @@ describe("ItemFormFields", () => {
     expect(container.querySelector("strong")).not.toBeInTheDocument();
   });
 
+  it("모델 칩과 품목코드 미리보기를 제품기호 오름차순으로 표시한다", () => {
+    render(
+      <ItemFormFields
+        form={baseForm({
+          model_slots: [1, 3, 4],
+          mes_code: "348-AR-0723",
+          process_type_code: "AR",
+        })}
+        setForm={vi.fn()}
+        showMesCode
+        productModels={[
+          { slot: 1, symbol: "3", model_name: "DX3000", is_reserved: false },
+          { slot: 3, symbol: "8", model_name: "SOLO", is_reserved: false },
+          { slot: 4, symbol: "4", model_name: "ADX4000W", is_reserved: false },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("348-AR-0723", { selector: "[aria-readonly]" })).toBeInTheDocument();
+
+    const dx3000 = screen.getByRole("button", { name: "DX3000 (3)" });
+    const adx4000w = screen.getByRole("button", { name: "ADX4000W (4)" });
+    const solo = screen.getByRole("button", { name: "SOLO (8)" });
+
+    expect(dx3000.compareDocumentPosition(adx4000w) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(adx4000w.compareDocumentPosition(solo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("renders a semantic sales-review checkbox with guidance", () => {
     const setForm = vi.fn();
     render(<ItemFormFields form={baseForm()} setForm={setForm} />);
