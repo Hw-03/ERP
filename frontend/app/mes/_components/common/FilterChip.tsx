@@ -17,6 +17,7 @@ function FilterChipImpl({ active, label, onClick, tone = LEGACY_COLORS.blue, siz
   const px = size === "sm" ? "px-3 py-1" : "px-4 py-2";
   return (
     <Button
+      aria-pressed={active}
       variant={active ? "ghost" : "secondary"}
       onClick={onClick}
       className={`whitespace-nowrap rounded-full ${px} text-sm ${className}`}
