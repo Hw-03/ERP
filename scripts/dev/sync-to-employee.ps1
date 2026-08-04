@@ -130,7 +130,7 @@ $schemaPatterns = @(
 $backendDryRun = robocopy "$DevRoot\backend" $EmpBackend /L /MIR `
     /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" `
     /XD __pycache__ .git .venv data logs .pytest_cache _backup `
-    /NJH /NDL /NP /NC 2>&1 | Out-String -Stream
+    /NJH /NDL /NP 2>&1 | Out-String -Stream
 $schemaHits = $backendDryRun | Where-Object {
     $line = $_
     $schemaPatterns | Where-Object { $line -match $_ }
@@ -181,7 +181,7 @@ if ($DryRun) {
     $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
         /XD .next .next-prod node_modules _archive coverage test-results logs `
         /XF .env.local `
-        /NJH /NDL /NP /NC 2>&1 | Out-String -Stream
+        /NJH /NDL /NP 2>&1 | Out-String -Stream
     Write-Host "[dry-run] 프론트엔드 변경 예정 파일:"
     $frontendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
     Write-Host "[dry-run] 아무것도 변경하지 않았습니다."

@@ -150,6 +150,8 @@ Assert-ContentNotMatch $SyncToEmployeeScript 'failed=\(\\d\+\)|\$failedCount' "e
 Assert-ContentMatch $SyncToEmployeeScript '\\\\alembic\\\\' "schema guard must detect Alembic revision changes."
 Assert-ContentMatch $SyncToEmployeeScript 'alembic\\\.ini' "schema guard must detect alembic.ini changes."
 Assert-ContentMatch $SyncToEmployeeScript 'migration_type_compare\\\.py' "schema guard must detect migration type comparison changes."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)\$backendDryRun\s*=\s*robocopy.*?/NJH\s+/NDL\s+/NP\s+2>&1' "backend dry-run must retain robocopy file classes for schema detection and reporting."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)\$frontendDryRun\s*=\s*robocopy.*?/NJH\s+/NDL\s+/NP\s+2>&1' "frontend dry-run must retain robocopy file classes for change reporting."
 Assert-ContentMatch $SyncToEmployeeScript '(?s)_verify_backup\.py.*check_inventory_integrity\.py.*--db-url.*Write-RecoveryInstructions.*exit\s+8' "post-verification must run schema and inventory checks and leave recovery guidance on failure."
 Assert-ContentMatch $SyncToEmployeeScript 'restore_db\.py.*--sqlite.*--target.*--check' "migration or post-verification failure must print the exact restore_db.py command."
 Assert-ContentNotMatch $SyncToEmployeeScript '&\s+.*restore_db\.py' "employee deployment must never auto-restore the database."
