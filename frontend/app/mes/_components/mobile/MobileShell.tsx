@@ -41,6 +41,7 @@ import type { MobileMoreEntryId } from "./screens/MobileMoreScreen";
 import { isSidebarTabVisible } from "../tabAccess";
 import { MobileViewportFrame } from "./MobileViewportFrame";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import type { NotificationNavigationTarget } from "../notifications/NotificationBell";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
 export type MobileTabId =
@@ -143,7 +144,11 @@ function NavButton({
   );
 }
 
-export function MobileShell() {
+export function MobileShell({
+  onBeforeViewportSwitchChange,
+}: {
+  onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+}) {
   const revision = useRealtimeRevision();
   const operator = useCurrentOperator();
   const employeeId = operator?.employee_id;
@@ -173,10 +178,23 @@ export function MobileShell() {
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
   // 항목 16 — 입출고 작성 중(담은 묶음 있음) 하단 네비로 이탈 시 확인 시트.
   const [warehouseDirty, setWarehouseDirty] = useState(false);
-  const warehouseFlushRef = useRef<(() => void) | null>(null);
+  const warehouseFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [dailyReportDirty, setDailyReportDirty] = useState(false);
   const dailyReportFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
+
+  const flushBeforeViewportSwitch = useCallback(async () => {
+    if (activeTab === "dailyReport") {
+      await dailyReportFlushRef.current?.();
+    } else if (activeTab === "warehouse") {
+      await warehouseFlushRef.current?.();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    onBeforeViewportSwitchChange?.(flushBeforeViewportSwitch);
+    return () => onBeforeViewportSwitchChange?.(null);
+  }, [flushBeforeViewportSwitch, onBeforeViewportSwitchChange]);
 
   const unreadNotifications = notificationsData?.unread_count ?? 0;
 
@@ -236,7 +254,7 @@ export function MobileShell() {
     commitMobileTab(target);
   }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, warehouseDirty]);
 
-  const handleNotificationNavigate = useCallback((tab: string, section: string | null) => {
+  const handleNotificationNavigate = useCallback(({ tab, section }: NotificationNavigationTarget) => {
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
     const target = tab as MobileTabId;
     if (!canOpenMobileTab(target)) return;

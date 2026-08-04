@@ -50,7 +50,7 @@ export function MobileWarehouseScreen({
   // 항목 16 — 하단 네비 이탈 가드용. compose 작성 중 여부를 상위(MobileShell)에 보고하고,
   // 상위가 이탈 직전 draft flush 를 호출할 수 있게 ref 를 공유받는다.
   onComposeDirtyChange?: (dirty: boolean) => void;
-  flushDraftRef?: MutableRefObject<(() => void) | null>;
+  flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
 }) {
   const revision = useRealtimeRevision();
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
@@ -84,7 +84,7 @@ export function MobileWarehouseScreen({
   const [composeDirty, setComposeDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<WarehouseSectionTab | null>(null);
   // 항목 16 — flush ref 는 상위(MobileShell)가 내려주면 공유, 없으면 로컬 사용(섹션 가드 단독 동작 보장).
-  const localFlushRef = useRef<(() => void) | null>(null);
+  const localFlushRef = useRef<(() => Promise<void>) | null>(null);
   const flushDraftRef = externalFlushRef ?? localFlushRef;
 
   // 작성 중 여부를 상위로 보고 → 하단 네비 탭 이탈 가드에 사용.
