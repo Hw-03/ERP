@@ -14,7 +14,7 @@ import {
 import { useRefreshDepartments } from "../DepartmentsContext";
 
 export const COLOR_PALETTE = [
-  "#2f805d", "#9a672d", "#7052a8", "#80600d",
+  "#2f805d", "#85630d", "#7052a8", "#5c5c5c",
   "#2f6faf", "#9f4d43", "#be185d", "#b45309", "#4d7c0f",
   "#9333ea", "#0284c7", "#dc2626", "#059669",
 ];

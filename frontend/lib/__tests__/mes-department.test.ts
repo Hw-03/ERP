@@ -34,7 +34,7 @@ describe("getDepartmentFallbackColor", () => {
   it("부서명 기준 hex 반환", () => {
     // 조립/고압/튜브: 가시성 개선 mid-tone (라이트/다크 양쪽 보임)
     expect(getDepartmentFallbackColor("조립")).toBe("#2f6faf");
-    expect(getDepartmentFallbackColor("고압")).toBe("#9a672d");
+    expect(getDepartmentFallbackColor("고압")).toBe("#85630d");
     expect(getDepartmentFallbackColor("튜브")).toBe("#2f805d");
     expect(getDepartmentFallbackColor("연구")).toBe("#b45309");
   });

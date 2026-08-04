@@ -64,10 +64,10 @@ describe("employeeColor (Round-10F 정책 (A))", () => {
   it("returns MES_DEPARTMENT_COLORS hex for known 부서", () => {
     // 조립/고압/튜브 는 가시성 개선 mid-tone (라이트/다크 모두 보임).
     expect(employeeColor("조립")).toBe("#2f6faf");
-    expect(employeeColor("고압")).toBe("#9a672d");
+    expect(employeeColor("고압")).toBe("#85630d");
     expect(employeeColor("튜브")).toBe("#2f805d");
     expect(employeeColor("진공")).toBe("#7052a8");
-    expect(employeeColor("튜닝")).toBe("#80600d");
+    expect(employeeColor("튜닝")).toBe("#5c5c5c");
     expect(employeeColor("AS")).toBe("#be185d");
     expect(employeeColor("연구")).toBe("#b45309");
     expect(employeeColor("영업")).toBe("#b91c1c");
