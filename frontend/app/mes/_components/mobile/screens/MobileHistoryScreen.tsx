@@ -18,6 +18,7 @@ import { useToggleSet } from "../../_hooks/useToggleSet";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { parseUtc, toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
@@ -45,6 +46,7 @@ const SEARCH_DEBOUNCE_MS = 350;
  */
 export function MobileHistoryScreen() {
   const queryClient = useQueryClient();
+  const realtimeRevision = useRealtimeRevision();
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const { data: productModels } = useModelsQuery();
   const { selected: selectedModels, toggle: toggleModel, setSelected: setSelectedModels } = useToggleSet();
@@ -99,6 +101,7 @@ export function MobileHistoryScreen() {
     department: deptParam,
     model: modelParam,
     totalCount: summary?.total ?? null,
+    realtimeRevision,
   });
   const {
     logs,
@@ -125,20 +128,25 @@ export function MobileHistoryScreen() {
         d.getDate(),
       ).padStart(2, "0")}`;
     const ctrl = new AbortController();
+    let active = true;
     void api
       .getTransactions(
         { limit: 2000, skip: 0, dateFrom: ymd(firstDay), dateTo: ymd(lastDay) },
         { signal: ctrl.signal },
       )
       .then((data) => {
+        if (!active) return;
         setCalendarLogs(data);
         setCalendarLoading(false);
       })
       .catch((err) => {
-        if ((err as Error)?.name !== "AbortError") setCalendarLoading(false);
+        if (active && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
       });
-    return () => ctrl.abort();
-  }, [calendarOpen, calendarYear, calendarMonth]);
+    return () => {
+      active = false;
+      ctrl.abort();
+    };
+  }, [calendarOpen, calendarYear, calendarMonth, realtimeRevision]);
 
   function prevMonth() {
     if (calendarMonth === 0) {
@@ -204,6 +212,7 @@ export function MobileHistoryScreen() {
       searchParam ?? null,
       department ?? null,
       model ?? null,
+      realtimeRevision ?? null,
     ]);
     summaryKeyRef.current = myKey;
     setSummary(null);
@@ -226,7 +235,7 @@ export function MobileHistoryScreen() {
         setSummaryLoading(false);
       });
     return () => ctrl.abort();
-  }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam]);
+  }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam, realtimeRevision]);
 
   const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
   const [baselineLoading, setBaselineLoading] = useState(false);
@@ -235,7 +244,7 @@ export function MobileHistoryScreen() {
   useEffect(() => {
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
     const dateTo = selectedDay ?? undefined;
-    const myKey = JSON.stringify([dateFrom ?? null, dateTo ?? null]);
+    const myKey = JSON.stringify([dateFrom ?? null, dateTo ?? null, realtimeRevision ?? null]);
     baselineKeyRef.current = myKey;
     setBaselineSummary(null);
     setBaselineLoading(true);
@@ -254,7 +263,11 @@ export function MobileHistoryScreen() {
         setBaselineLoading(false);
       });
     return () => ctrl.abort();
-  }, [dateFilter, selectedDay]);
+  }, [dateFilter, selectedDay, realtimeRevision]);
+
+  useEffect(() => {
+    if (realtimeRevision !== null) setBatchCache(new Map());
+  }, [realtimeRevision]);
 
   useEffect(() => {
     const decision = advanceHistoryLoadReconcileState(loadReconcileRef.current, {

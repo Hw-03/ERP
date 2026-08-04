@@ -13,6 +13,7 @@ import type { Handover } from "@/lib/api/types";
 import type { Operator } from "../login/useCurrentOperator";
 import { HandoverComposeForm } from "./HandoverComposeForm";
 import { printHandover } from "./handoverPrint";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 type SubTab = "compose" | "mine" | "inbox";
 
@@ -39,6 +40,7 @@ export function HandoverSectionPanel({
   // 인수 확인: 받는 부서(고압/진공) 소속만. 현장 물리 인수 행위이므로 결재권자는 제외.
   const canReceive = ["고압", "진공"].includes(operator?.department ?? "");
 
+  const revision = useRealtimeRevision();
   const [subTab, setSubTab] = useState<SubTab>(
     canCompose ? "compose" : canReceive ? "inbox" : "mine",
   );
@@ -58,19 +60,31 @@ export function HandoverSectionPanel({
 
   useEffect(() => {
     if (!operatorEmployeeId) return;
+    let active = true;
     api
       .listHandovers({ authorEmployeeId: operatorEmployeeId })
-      .then(setMine)
+      .then((rows) => {
+        if (active) setMine(rows);
+      })
       .catch(() => {});
-  }, [operatorEmployeeId, refreshNonce, localNonce]);
+    return () => {
+      active = false;
+    };
+  }, [operatorEmployeeId, refreshNonce, localNonce, revision]);
 
   useEffect(() => {
     if (!operatorEmployeeId || !canReceive) return;
+    let active = true;
     api
       .listHandoverInbox(operatorEmployeeId)
-      .then(setInbox)
+      .then((rows) => {
+        if (active) setInbox(rows);
+      })
       .catch(() => {});
-  }, [operatorEmployeeId, canReceive, refreshNonce, localNonce]);
+    return () => {
+      active = false;
+    };
+  }, [operatorEmployeeId, canReceive, refreshNonce, localNonce, revision]);
 
   const tabs = useMemo(() => {
     const t: { id: SubTab; label: string; count?: number }[] = [];

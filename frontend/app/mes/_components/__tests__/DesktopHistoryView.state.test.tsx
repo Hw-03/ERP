@@ -17,6 +17,7 @@ const testState = vi.hoisted(() => ({
   summaryQuery: vi.fn(),
   referenceSummaryQuery: { data: [], isLoading: false, refetch: vi.fn() },
   queryClient: null as QueryClient | null,
+  realtimeRevision: null as number | null,
 }));
 
 vi.mock("@tanstack/react-query", async () => {
@@ -48,6 +49,10 @@ vi.mock("@/lib/api/production", () => ({
 
 vi.mock("@/lib/queries/useModelsQuery", () => ({
   useModelsQuery: () => ({ data: [] }),
+}));
+
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => testState.realtimeRevision,
 }));
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
@@ -82,11 +87,13 @@ vi.mock("../_history_sections/HistoryTable", () => ({
     onSelectBatch,
     setBatchCache,
     onRetry,
+    cacheEpoch,
   }: any) => (
     <div
       data-testid="history-table-state"
       data-selection={selection?.kind ?? "none"}
       data-list-cancelled={filteredLogs.length > 0 && filteredLogs.every((log: TransactionLog) => log.cancelled) ? "yes" : "no"}
+      data-cache-epoch={cacheEpoch ?? "null"}
     >
       <button type="button" onClick={() => filteredLogs[0] && onSelectLog(filteredLogs[0])}>
         단건 선택
@@ -233,6 +240,7 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false } },
   });
   testState.historyArgs = null;
+  testState.realtimeRevision = null;
   testState.batch = makeBatch();
   testState.drillTarget = null;
   testState.capturedLogUpdated = null;
@@ -250,6 +258,16 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it("passes the realtime revision to HistoryTable as its cache epoch", () => {
+    testState.realtimeRevision = 41;
+    const { rerender } = render(<DesktopHistoryView />);
+    expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-cache-epoch", "41");
+
+    testState.realtimeRevision = 42;
+    rerender(<DesktopHistoryView />);
+    expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-cache-epoch", "42");
+  });
+
   it("restores cached batch metadata immediately when the history tab remounts", () => {
     const firstMount = render(<DesktopHistoryView />);
 

@@ -12,7 +12,7 @@
  *   한 화면에 통합한다. "구조 편집"(AdminWarehouseStructureSection)은 앵글·통로·PL 구조물 단위라 분리 유지.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Eye, Pencil, ShieldCheck } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { employeesApi } from "@/lib/api/employees";
@@ -23,6 +23,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useCurrentOperator } from "./login/useCurrentOperator";
 import { DesktopWarehouseMapView } from "./DesktopWarehouseMapView";
 import { AdminWarehouseStructureSection } from "./_admin_sections/AdminWarehouseStructureSection";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 const EDITOR_TABS = [
   { id: "map" as const, label: "박스 관리" },
@@ -38,6 +39,7 @@ export function DesktopWarehouseMapTab({
   fullscreen?: boolean;
   onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
+  const revision = useRealtimeRevision();
   const operator = useCurrentOperator();
   const isManager =
     operator?.warehouse_role === "primary" || operator?.warehouse_role === "deputy";
@@ -52,15 +54,51 @@ export function DesktopWarehouseMapTab({
   const [editorError, setEditorError] = useState<string | null>(null);
   // 박스 합 ≠ 창고 총재고인 품목(미배치/불일치) — 전환기 배치 진행 가늠용.
   const [mismatches, setMismatches] = useState<ReconcileRow[]>([]);
+  const currentRevisionRef = useRef(revision);
+  const editModeRef = useRef(editMode);
+  const itemRequestGenerationRef = useRef(0);
+  const reconcileRequestGenerationRef = useRef(0);
+  const appliedItemsRevisionRef = useRef<number | null | undefined>(undefined);
+  const appliedReconcileRevisionRef = useRef<number | null | undefined>(undefined);
+  currentRevisionRef.current = revision;
+  editModeRef.current = editMode;
 
-  async function refreshMismatches() {
+  const refreshItems = useCallback(async (requestRevision = currentRevisionRef.current) => {
+    const generation = ++itemRequestGenerationRef.current;
+    const nextItems = await itemsApi.getItems({});
+    if (
+      generation !== itemRequestGenerationRef.current
+      || requestRevision !== currentRevisionRef.current
+    ) {
+      return false;
+    }
+    setItems(nextItems);
+    if (editModeRef.current) {
+      appliedItemsRevisionRef.current = requestRevision;
+    }
+    return true;
+  }, []);
+
+  const refreshMismatches = useCallback(async (requestRevision = currentRevisionRef.current) => {
+    const generation = ++reconcileRequestGenerationRef.current;
     try {
       const res = await warehouseMapApi.reconcile();
+      if (
+        generation !== reconcileRequestGenerationRef.current
+        || requestRevision !== currentRevisionRef.current
+      ) {
+        return false;
+      }
       setMismatches(res.rows.filter((r) => r.status !== "ok"));
+      if (editModeRef.current) {
+        appliedReconcileRevisionRef.current = requestRevision;
+      }
+      return true;
     } catch {
       /* 대조는 보조 정보 — 실패해도 편집은 계속 */
+      return false;
     }
-  }
+  }, []);
 
   // operator 자격증명을 ref 로 보관하고 provider 는 ref 를 읽게 해 stale 클로저 방지.
   const credsRef = useRef<{ code: string; pin: string } | null>(null);
@@ -72,6 +110,24 @@ export function DesktopWarehouseMapTab({
     };
   }, []);
 
+  useEffect(() => {
+    if (!editMode || revision === null) return;
+    if (appliedItemsRevisionRef.current !== revision) {
+      void refreshItems(revision).catch(() => {});
+    }
+    if (appliedReconcileRevisionRef.current !== revision) {
+      void refreshMismatches(revision);
+    }
+  }, [editMode, refreshItems, refreshMismatches, revision]);
+
+  useEffect(() => {
+    return () => {
+      editModeRef.current = false;
+      itemRequestGenerationRef.current += 1;
+      reconcileRequestGenerationRef.current += 1;
+    };
+  }, []);
+
   async function confirmPin() {
     if (!operator || !pin) return;
     setVerifying(true);
@@ -79,8 +135,7 @@ export function DesktopWarehouseMapTab({
     try {
       await employeesApi.verifyEmployeePin(operator.employee_id, pin);
       credsRef.current = { code: operator.employee_code, pin };
-      const list = await itemsApi.getItems({});
-      setItems(list);
+      await refreshItems();
       void refreshMismatches();
       setEditMode(true);
       setPinOpen(false);
@@ -95,6 +150,9 @@ export function DesktopWarehouseMapTab({
 
   function exitEditMode() {
     credsRef.current = null;
+    editModeRef.current = false;
+    itemRequestGenerationRef.current += 1;
+    reconcileRequestGenerationRef.current += 1;
     setEditMode(false);
     setEditorError(null);
     onStatusChange?.("창고 지도");

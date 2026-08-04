@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import type { WarehouseMap } from "@/lib/api/warehouse-map";
 import { DesktopWarehouseMapView } from "../DesktopWarehouseMapView";
 
 const mapApiMock = vi.hoisted(() => ({
@@ -19,7 +20,7 @@ vi.mock("@/lib/api/warehouse-map", async () => {
   };
 });
 
-const mapFixture = {
+const mapFixture: WarehouseMap = {
   angles: [
     {
       id: 1,
@@ -54,7 +55,7 @@ function renderWithClient(ui: ReactElement) {
       queries: { retry: false },
     },
   });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return { client, ...render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>) };
 }
 
 describe("DesktopWarehouseMapView fullscreen", () => {
@@ -97,5 +98,153 @@ describe("DesktopWarehouseMapView fullscreen", () => {
     fireEvent.click(screen.getByText("앵글 1"));
 
     expect(container.querySelector('[class*="stageEnter"]')).not.toBeNull();
+  });
+
+  it("reconnects the selected search result to refreshed map objects without resetting navigation", async () => {
+    const initialMap: WarehouseMap = {
+      ...mapFixture,
+      boxes: [{
+        box_id: "box-1",
+        angle_id: 1,
+        row_no: 1,
+        layer_no: 1,
+        jari_index: 0,
+        size: "SMALL",
+        stack_order: 0,
+        items: [{
+          item_id: "item-1",
+          item_name: "검색 품목",
+          mes_code: "M-1",
+          quantity: 2,
+          department: null,
+          color_hex: null,
+        }],
+      }],
+    };
+    const refreshedMap: WarehouseMap = {
+      ...initialMap,
+      angles: [{ ...initialMap.angles[0], label: "앵글 최신" }],
+      boxes: [{
+        ...initialMap.boxes[0],
+        items: [{
+          ...initialMap.boxes[0].items[0],
+          item_name: "검색 품목 최신",
+          quantity: 7,
+        }],
+      }],
+    };
+    mapApiMock.getMap.mockResolvedValueOnce(initialMap);
+    const { client } = renderWithClient(<DesktopWarehouseMapView />);
+
+    await screen.findByText("앵글 1");
+    const search = await screen.findByPlaceholderText(/품목명.*코드 검색/);
+    fireEvent.change(search, { target: { value: "검색 품목" } });
+    expect(await screen.findByRole("button", { name: /앵글 1.*×2/ })).toBeInTheDocument();
+    expect(screen.getAllByText("A열", { exact: true }).length).toBeGreaterThan(0);
+
+    client.setQueryData(["warehouseMap", "map"], refreshedMap);
+
+    expect(await screen.findByRole("button", { name: /앵글 최신.*×7/ })).toBeInTheDocument();
+    expect(screen.getByText(/검색 품목 최신.*M-1/)).toBeInTheDocument();
+    expect(search).toHaveValue("검색 품목");
+    expect(screen.getAllByText("A열", { exact: true }).length).toBeGreaterThan(0);
+  });
+
+  it("reconnects an open angle and cell panel to refreshed map objects", async () => {
+    const refreshedMap: WarehouseMap = {
+      ...mapFixture,
+      angles: [{ ...mapFixture.angles[0], label: "앵글 최신" }],
+    };
+    mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
+    const { client } = renderWithClient(<DesktopWarehouseMapView />);
+
+    fireEvent.click(await screen.findByText("앵글 1"));
+    fireEvent.click(await screen.findByTitle("A열 1층"));
+    expect(await screen.findByText("앵글 1 · A열 · 1층")).toBeInTheDocument();
+
+    client.setQueryData(["warehouseMap", "map"], refreshedMap);
+
+    expect(await screen.findByText("앵글 최신 · A열 · 1층")).toBeInTheDocument();
+    expect(screen.queryByText("앵글 1 · A열 · 1층")).not.toBeInTheDocument();
+  });
+
+  it("closes an open box editor when refreshed map data arrives", async () => {
+    const refreshedMap: WarehouseMap = {
+      ...mapFixture,
+      angles: [{ ...mapFixture.angles[0], label: "앵글 최신" }],
+    };
+    mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
+    const { client } = renderWithClient(<DesktopWarehouseMapView editable items={[]} />);
+
+    fireEvent.click(await screen.findByText("앵글 1"));
+    fireEvent.click(await screen.findByTitle("A열 1층"));
+    fireEvent.click(await screen.findByRole("button", { name: "박스 넣기" }));
+    expect(await screen.findByText("자리 1 — 박스 넣기")).toBeInTheDocument();
+
+    client.setQueryData(["warehouseMap", "map"], refreshedMap);
+
+    await waitFor(() => expect(screen.queryByText("자리 1 — 박스 넣기")).not.toBeInTheDocument());
+    expect(screen.getByText("앵글 최신 · A열 · 1층")).toBeInTheDocument();
+  });
+
+  it("closes an invalid cell panel and clamps its row after the map shrinks", async () => {
+    const expandedMap: WarehouseMap = {
+      ...mapFixture,
+      angles: [{ ...mapFixture.angles[0], rows: 2, layers: 2 }],
+    };
+    mapApiMock.getMap.mockResolvedValueOnce(expandedMap);
+    const { client } = renderWithClient(<DesktopWarehouseMapView />);
+
+    fireEvent.click(await screen.findByText("앵글 1"));
+    fireEvent.click(await screen.findByTitle("B열 2층"));
+    expect(await screen.findByText("앵글 1 · B열 · 2층")).toBeInTheDocument();
+
+    client.setQueryData(["warehouseMap", "map"], mapFixture);
+
+    await waitFor(() => expect(screen.queryByText("앵글 1 · B열 · 2층")).not.toBeInTheDocument());
+    expect(screen.getAllByText("A열", { exact: true }).length).toBeGreaterThan(0);
+  });
+
+  it("returns to the floor when the open angle is removed", async () => {
+    const withoutAngles: WarehouseMap = {
+      ...mapFixture,
+      angles: [],
+    };
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
+    const { client } = renderWithClient(<DesktopWarehouseMapView />);
+
+    fireEvent.click(await screen.findByText("앵글 1"));
+    expect(screen.getByText("앵글 1", { exact: true })).toBeInTheDocument();
+
+    client.setQueryData(["warehouseMap", "map"], withoutAngles);
+
+    await waitFor(() => expect(screen.queryByText("앵글 1", { exact: true })).not.toBeInTheDocument());
+    expect(screen.getByText("▼ 입구", { exact: true })).toBeInTheDocument();
+    expect(replaceState).toHaveBeenLastCalledWith({ wmDepth: 0 }, "");
+    replaceState.mockRestore();
+  });
+
+  it("falls back to the floor when browser history points to a removed angle", async () => {
+    const mapWithSecondAngle: WarehouseMap = {
+      ...mapFixture,
+      angles: [
+        ...mapFixture.angles,
+        { ...mapFixture.angles[0], id: 2, label: "앵글 2", pos_x: 160 },
+      ],
+    };
+    mapApiMock.getMap.mockResolvedValueOnce(mapWithSecondAngle);
+    renderWithClient(<DesktopWarehouseMapView />);
+
+    fireEvent.click(await screen.findByText("앵글 2"));
+    expect(screen.queryByText("▼ 입구", { exact: true })).not.toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", {
+        state: { wm: { stage: "row", angleId: 999, row: 1 }, wmDepth: 1 },
+      }));
+    });
+
+    expect(await screen.findByText("▼ 입구", { exact: true })).toBeInTheDocument();
   });
 });

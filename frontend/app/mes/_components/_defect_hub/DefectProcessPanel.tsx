@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -32,27 +32,67 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
+  const [decisionParentQty, setDecisionParentQty] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const locationIdentityRef = useRef({
+    itemId: location.item_id,
+    department: location.department,
+  });
+  const maxQty = Math.max(1, Number(location.quantity) || 1);
+  const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
   useEffect(() => {
+    const previousIdentity = locationIdentityRef.current;
+    if (
+      previousIdentity.itemId === location.item_id &&
+      previousIdentity.department === location.department
+    ) return;
+    locationIdentityRef.current = {
+      itemId: location.item_id,
+      department: location.department,
+    };
     setStep(1);
     setAction("unquarantine");
-    setProcessQty(Number(location.quantity));
+    setProcessQty(Math.max(1, Number(location.quantity) || 1));
     setCategory("");
     setMemo("");
     setDecisions([]);
+    setDecisionParentQty(null);
     setBusy(false);
     setErrorMsg(null);
     setConfirmOpen(false);
   }, [location.item_id, location.department, location.quantity]);
 
   useEffect(() => {
-    if (action !== "disassemble") setDecisions([]);
+    const freshMax = Math.max(1, Number(location.quantity) || 1);
+    setProcessQty((currentQty) => Math.max(1, Math.min(freshMax, currentQty)));
+  }, [location.quantity]);
+
+  useEffect(() => {
+    if (action !== "disassemble") {
+      setDecisions([]);
+      setDecisionParentQty(null);
+    }
   }, [action]);
 
-  const reworkReady = decisions.length > 0 && validateDecisionTree(decisions);
+  useEffect(() => {
+    if (decisionParentQty !== null && decisionParentQty !== boundedProcessQty) {
+      setDecisions([]);
+      setDecisionParentQty(null);
+      setConfirmOpen(false);
+    }
+  }, [boundedProcessQty, decisionParentQty]);
+
+  const reworkReady = decisionParentQty === boundedProcessQty
+    && decisions.length > 0
+    && validateDecisionTree(decisions);
+
+  function handleDecisionsChange(next: ChildDecision[]) {
+    setDecisions(next);
+    setDecisionParentQty(next.length > 0 ? boundedProcessQty : null);
+  }
 
   async function handleSubmit() {
     if (busy || (action === "disassemble" && !reworkReady)) return;
@@ -62,7 +102,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
           item_id: location.item_id,
-          qty: processQty,
+          qty: boundedProcessQty,
           dept: location.department,
           reason_category: category || null,
           reason_memo: memo || null,
@@ -77,7 +117,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           notes: memo || null,
           lines: [{
             item_id: location.item_id,
-            quantity: processQty,
+            quantity: boundedProcessQty,
             from_bucket: "defective",
             from_department: location.department as Department,
             to_bucket: "none",
@@ -92,7 +132,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           notes: memo || null,
           lines: [{
             item_id: location.item_id,
-            quantity: processQty,
+            quantity: boundedProcessQty,
             from_bucket: "defective",
             from_department: location.department as Department,
             to_bucket: "none",
@@ -108,7 +148,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [{
             item_id: location.item_id,
-            quantity: processQty,
+            quantity: boundedProcessQty,
             from_bucket: "defective",
             from_department: location.department as Department,
             to_bucket: "none",
@@ -169,10 +209,10 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
                 <input
                   type="number"
                   min={1}
-                  max={Number(location.quantity)}
-                  value={processQty}
+                  max={maxQty}
+                  value={boundedProcessQty}
                   onChange={(e) => {
-                    const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
+                    const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
                     setProcessQty(v);
                     setDecisions([]);
                   }}
@@ -206,10 +246,10 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
                 parentItemId={location.item_id}
                 parentItemName={location.item_name}
                 parentMesCode={location.mes_code}
-                parentQty={processQty}
+                parentQty={boundedProcessQty}
                 parentDept={location.department}
                 decisions={decisions}
-                onChange={setDecisions}
+                onChange={handleDecisionsChange}
               />
             </div>
           </div>
@@ -241,7 +281,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
         >
-          <span style={{ color: LEGACY_COLORS.text }}>{location.item_name} × {processQty}개를 재작업합니다.</span>
+          <span style={{ color: LEGACY_COLORS.text }}>{location.item_name} × {boundedProcessQty}개를 재작업합니다.</span>
         </ConfirmModal>
       </div>
     );
@@ -305,10 +345,10 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           <input
             type="number"
             min={1}
-            max={Number(location.quantity)}
-            value={processQty}
+            max={maxQty}
+            value={boundedProcessQty}
             onChange={(e) => {
-              const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
+              const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
               setProcessQty(v);
                     setDecisions([]);
             }}
@@ -444,8 +484,8 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
       >
         <span style={{ color: LEGACY_COLORS.text }}>
           {action === "scrap"
-            ? `${location.item_name} × ${processQty}개를 폐기합니다.`
-            : `${location.item_name} × ${processQty}개를 반품합니다.`}
+            ? `${location.item_name} × ${boundedProcessQty}개를 폐기합니다.`
+            : `${location.item_name} × ${boundedProcessQty}개를 반품합니다.`}
         </span>
       </ConfirmModal>
     </div>

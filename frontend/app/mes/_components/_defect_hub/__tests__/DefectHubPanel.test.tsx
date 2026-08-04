@@ -3,6 +3,12 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DefectHubPanel } from "../DefectHubPanel";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
 
+const realtime = vi.hoisted(() => ({ revision: null as number | null }));
+
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => realtime.revision,
+}));
+
 // defectsApi 모킹
 vi.mock("@/lib/api/defects", () => ({
   defectsApi: {
@@ -13,8 +19,8 @@ vi.mock("@/lib/api/defects", () => ({
 
 // 통합 처리 패널 모킹 — DOM 렌더만 검증 (실제 API 호출 X)
 vi.mock("../../mobile/screens/MobileDefectProcessPanel", () => ({
-  MobileDefectProcessPanel: ({ location }: { location: { mes_code: string } }) => (
-    <div data-testid="process-panel">{location.mes_code}</div>
+  MobileDefectProcessPanel: ({ location }: { location: { mes_code: string; quantity: number } }) => (
+    <div data-testid="process-panel">{location.mes_code}:{location.quantity}</div>
   ),
 }));
 // 격리 추가·바로 처리 다품목 카트 모킹 — DOM 렌더만 검증
@@ -62,6 +68,9 @@ const mockEmployee = {
 };
 
 beforeEach(() => {
+  realtime.revision = null;
+  vi.mocked(defectsApi.getDefectKpi).mockClear();
+  vi.mocked(defectsApi.listDefects).mockClear();
   vi.mocked(defectsApi.getDefectKpi).mockResolvedValue(mockKpi);
   vi.mocked(defectsApi.listDefects).mockResolvedValue(mockLocations);
 });
@@ -191,5 +200,49 @@ describe("DefectHubPanel", () => {
     const panel = await screen.findByTestId("process-panel");
     expect(panel).toBeInTheDocument();
     expect(panel).toHaveTextContent("7-TR-0001");
+  });
+});
+
+describe("DefectHubPanel realtime refresh", () => {
+  it("reloads KPI and locations on revision without leaving an in-progress cart", async () => {
+    const props = { currentEmployee: mockEmployee };
+    const { rerender } = render(<DefectHubPanel {...props} />);
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    expect(await screen.findByTestId("cart-flow")).toHaveTextContent("add");
+    await waitFor(() => {
+      expect(defectsApi.getDefectKpi).toHaveBeenCalledTimes(1);
+      expect(defectsApi.listDefects).toHaveBeenCalledTimes(1);
+    });
+
+    realtime.revision = 1;
+    rerender(<DefectHubPanel {...props} />);
+
+    await waitFor(() => {
+      expect(defectsApi.getDefectKpi).toHaveBeenCalledTimes(2);
+      expect(defectsApi.listDefects).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByTestId("cart-flow")).toHaveTextContent("add");
+  });
+
+  it("reconnects a process view to the fresh location and returns to the list when it disappears", async () => {
+    const props = { currentEmployee: { ...mockEmployee, department: "기타" } };
+    const { rerender } = render(<DefectHubPanel {...props} />);
+    fireEvent.click(screen.getByText("격리 목록"));
+    fireEvent.click((await screen.findAllByText("처리"))[0]);
+    expect(screen.getByTestId("process-panel")).toHaveTextContent("7-TR-0001:3");
+
+    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
+      { ...mockLocations[0], quantity: 1 },
+      mockLocations[1],
+    ]);
+    realtime.revision = 1;
+    rerender(<DefectHubPanel {...props} />);
+    await waitFor(() => expect(screen.getByTestId("process-panel")).toHaveTextContent("7-TR-0001:1"));
+
+    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([]);
+    realtime.revision = 2;
+    rerender(<DefectHubPanel {...props} />);
+    await waitFor(() => expect(screen.queryByTestId("process-panel")).not.toBeInTheDocument());
+    expect(screen.getByText("격리 중")).toBeInTheDocument();
   });
 });

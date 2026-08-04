@@ -9,6 +9,7 @@ import sys
 import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Iterator
@@ -44,6 +45,7 @@ ASSEMBLY_CHECKLIST_TABLES = frozenset(
     }
 )
 SHIPPING_SALES_WORKFLOW_TABLES = frozenset({"shipping_request_revisions"})
+REALTIME_INFRASTRUCTURE_TABLES = frozenset({"data_revision"})
 POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "assembly_checklist",
     "shipping_request_revisions",
@@ -52,6 +54,7 @@ POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "cancelled_at",
     "cancelled_by_employee_id",
     "cancelled_by_name",
+    "data_revision",
 )
 SCHEMA_STATE_METADATA = sa.MetaData()
 SCHEMA_STATE = sa.Table(
@@ -547,6 +550,92 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
     return tuple(differences)
 
 
+def _valid_data_revision_updated_at(value: object) -> bool:
+    """Accept native datetimes and the ISO timestamp returned by SQLite."""
+
+    if isinstance(value, datetime):
+        return True
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def _data_revision_differences(
+    connection: Connection,
+    *,
+    known_schema_differences: tuple[str, ...] | None = None,
+) -> tuple[str, ...]:
+    """Validate the head-only realtime infrastructure excluded from fingerprints."""
+
+    all_schema_differences = (
+        known_schema_differences
+        if known_schema_differences is not None
+        else schema_differences(connection)
+    )
+    schema_evidence = tuple(
+        difference
+        for difference in all_schema_differences
+        if any(table_name in difference for table_name in REALTIME_INFRASTRUCTURE_TABLES)
+    )
+    if schema_evidence:
+        return schema_evidence
+
+    expected_timestamp_default = {
+        "sqlite": "current_timestamp",
+        "postgresql": "now()",
+    }.get(connection.dialect.name)
+    columns = {
+        str(column["name"]): column
+        for column in sa.inspect(connection).get_columns("data_revision")
+    }
+    actual_timestamp_default = re.sub(
+        r"\s+",
+        "",
+        str(columns.get("updated_at", {}).get("default") or "").lower(),
+    )
+    if (
+        expected_timestamp_default is None
+        or actual_timestamp_default != expected_timestamp_default
+    ):
+        return (
+            "server default mismatch: data_revision.updated_at "
+            f"expected={expected_timestamp_default!r} "
+            f"actual={actual_timestamp_default!r}",
+        )
+
+    rows = connection.execute(
+        sa.text(
+            "SELECT id, revision, updated_at "
+            "FROM data_revision ORDER BY id"
+        )
+    ).all()
+    if len(rows) != 1:
+        return (
+            "data_revision singleton row count mismatch: "
+            f"expected=1 actual={len(rows)}",
+        )
+
+    row = rows[0]
+    if row.id != 1:
+        return (f"data_revision singleton id is invalid: expected=1 actual={row.id!r}",)
+    if (
+        isinstance(row.revision, bool)
+        or not isinstance(row.revision, int)
+        or row.revision < 0
+    ):
+        return (
+            "data_revision singleton revision is invalid: "
+            f"expected non-negative integer actual={row.revision!r}",
+        )
+    if not _valid_data_revision_updated_at(row.updated_at):
+        return ("data_revision singleton updated_at is invalid",)
+    return ()
+
+
 def validate_unversioned_data(connection: Connection) -> None:
     """Validate legacy item rows without mutating them."""
     null_count = connection.scalar(
@@ -580,7 +669,9 @@ def _is_pre_assembly_checklist_schema(
 
     missing_tables = set(Base.metadata.tables) - tables
     expected_missing_tables = (
-        ASSEMBLY_CHECKLIST_TABLES | SHIPPING_SALES_WORKFLOW_TABLES
+        ASSEMBLY_CHECKLIST_TABLES
+        | SHIPPING_SALES_WORKFLOW_TABLES
+        | REALTIME_INFRASTRUCTURE_TABLES
     )
 
     def is_expected_addition(difference: str) -> bool:
@@ -644,6 +735,11 @@ def inspect_schema(connection: Connection) -> SchemaInspection:
                 differences = schema_differences(connection)
         elif revision == head:
             differences = schema_differences(connection)
+        if revision == head:
+            infrastructure_differences = _data_revision_differences(connection)
+            differences = tuple(
+                dict.fromkeys((*differences, *infrastructure_differences))
+            )
         return SchemaInspection(
             SchemaState.VERSIONED,
             revision=revision,
@@ -726,6 +822,17 @@ def take_verified_backup(
 
 def _assert_head_schema(connection: Connection) -> None:
     differences = schema_differences(connection)
+    differences = tuple(
+        dict.fromkeys(
+            (
+                *differences,
+                *_data_revision_differences(
+                    connection,
+                    known_schema_differences=differences,
+                ),
+            )
+        )
+    )
     if differences:
         raise SchemaMismatchError(differences)
 

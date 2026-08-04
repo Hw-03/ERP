@@ -34,6 +34,11 @@ const testState = vi.hoisted(() => ({
   historyResult: null as HistoryResult | null,
   historyArgs: [] as HistoryHookArgs[],
   getTransactionsSummary: vi.fn(),
+  realtimeRevision: 1 as number | null,
+}));
+
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => testState.realtimeRevision,
 }));
 
 vi.mock("../../../_hooks/useHistoryData", () => ({
@@ -204,6 +209,7 @@ function renderScreen() {
 beforeEach(() => {
   testState.historyArgs.length = 0;
   testState.getTransactionsSummary.mockReset();
+  testState.realtimeRevision = 1;
   testState.historyResult = {
     logs: [],
     setLogs: vi.fn(),
@@ -219,6 +225,27 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history data states", () => {
+  it("re-fetches summaries and passes the realtime revision to local history data", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <MobileHistoryScreen />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(testState.getTransactionsSummary).toHaveBeenCalledTimes(2));
+    expect(testState.historyArgs.at(-1)).toMatchObject({ realtimeRevision: 1 });
+
+    testState.realtimeRevision = 2;
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MobileHistoryScreen />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(testState.getTransactionsSummary).toHaveBeenCalledTimes(4));
+    expect(testState.historyArgs.at(-1)).toMatchObject({ realtimeRevision: 2 });
+  });
+
   it("wires the initial transaction error and retry action to the mobile list", async () => {
     const retry = vi.fn();
     testState.historyResult = {

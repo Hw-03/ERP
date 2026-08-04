@@ -70,6 +70,89 @@ describe("useDesktopHistoryGroups", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("cancels an in-flight same-key group request before a realtime revision refresh", async () => {
+    const staleRequest = deferred<Response>();
+    const freshRequest = deferred<Response>();
+    let staleSignal: AbortSignal | null = null;
+    const firstPage = { groups: [makeGroup(0)], next_cursor: null, has_more: false };
+    const refreshedPage = { groups: [makeGroup(1)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        staleSignal = init?.signal as AbortSignal | null ?? null;
+        return staleRequest.promise;
+      })
+      .mockImplementationOnce(() => freshRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 30 * 60_000 } },
+    });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(staleSignal?.aborted).toBe(true);
+    await act(async () => freshRequest.resolve(makeResponse(refreshedPage)));
+    await waitFor(() => expect(result.current.groups).toEqual(refreshedPage.groups));
+
+    await act(async () => staleRequest.resolve(makeResponse(firstPage)));
+    expect(result.current.groups).toEqual(refreshedPage.groups);
+  });
+
+  it("revalidates every loaded cursor page on a realtime revision", async () => {
+    const firstPage = {
+      groups: Array.from({ length: 100 }, (_, index) => makeGroup(index)),
+      next_cursor: "cursor-100",
+      has_more: true,
+    };
+    const secondPage = { groups: [makeGroup(100)], next_cursor: null, has_more: false };
+    const refreshedFirstPage = {
+      groups: Array.from({ length: 100 }, (_, index) => makeGroup(index + 1000)),
+      next_cursor: "fresh-cursor-100",
+      has_more: true,
+    };
+    const refreshedSecondPage = {
+      groups: Array.from({ length: 100 }, (_, index) => makeGroup(index)),
+      next_cursor: "fresh-cursor-200",
+      has_more: true,
+    };
+    const refreshedThirdPage = { groups: [makeGroup(100)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(firstPage))
+      .mockResolvedValueOnce(makeResponse(secondPage))
+      .mockResolvedValueOnce(makeResponse(refreshedFirstPage))
+      .mockResolvedValueOnce(makeResponse(refreshedSecondPage))
+      .mockResolvedValueOnce(makeResponse(refreshedThirdPage));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 0 } },
+    });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.loadMore());
+    expect(result.current.groups).toHaveLength(101);
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
+    expect(String(fetchSpy.mock.calls[4][0])).toContain("cursor=fresh-cursor-200");
+    expect(result.current.groups).toEqual([
+      ...refreshedFirstPage.groups,
+      ...refreshedSecondPage.groups,
+      ...refreshedThirdPage.groups,
+    ]);
+  });
+
   it("대표 행 100개를 받고 다음 요청에는 서버 커서를 전달해 완결된 묶음을 덧붙인다", async () => {
     const firstPage = { groups: Array.from({ length: 100 }, (_, index) => makeGroup(index)), next_cursor: "cursor-100", has_more: true };
     const secondPage = { groups: [makeGroup(100)], next_cursor: null, has_more: false };

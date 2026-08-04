@@ -6,6 +6,7 @@ import { AppSelect } from "../../common/AppSelect";
 import { PROCESS_TYPE_OPTIONS, UNIT_OPTIONS } from "../adminShared";
 import { useDepartments } from "../../DepartmentsContext";
 import type { ProductModel } from "@/lib/api";
+import { modelSlotsToSymbolPrefix, sortModelsBySymbol } from "@/lib/mes/item-code";
 
 export type ItemFormData = {
   item_name: string;
@@ -66,11 +67,7 @@ const MATERIAL_TYPE_OPTIONS = ["원자재", "부자재", "불용", "기타"] as 
 
 /** model_slots + process_type_code 로 권장 prefix 계산 */
 function previewCodePrefix(slots: number[], processType: string, models: ProductModel[]): string {
-  const sorted = [...slots].sort((a, b) => a - b);
-  const symbols = sorted
-    .map((s) => models.find((m) => m.slot === s)?.symbol)
-    .filter(Boolean)
-    .join("");
+  const symbols = modelSlotsToSymbolPrefix(slots, models);
   if (!symbols || !processType) return "";
   return `${symbols}-${processType}-`;
 }
@@ -186,15 +183,12 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
           {form.model_slots.length > 0 && (
             <div className="mb-2 text-xs" style={{ color: LEGACY_COLORS.purple }}>
               제품 기호:{" "}
-              {productModels.filter((m) => form.model_slots.includes(m.slot))
-                .map((m) => m.symbol)
-                .sort()
-                .join("")}
+              {modelSlotsToSymbolPrefix(form.model_slots, productModels)}
             </div>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {productModels.map(({ slot, model_name, symbol }) => {
+          {sortModelsBySymbol(productModels).map(({ slot, model_name, symbol }) => {
             const checked = form.model_slots.includes(slot);
             return (
               <button

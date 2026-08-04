@@ -1,7 +1,22 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoLine } from "@/lib/api/types/io";
 import { BomBatchDetail } from "../BomBatchDetail";
+
+const realtimeState = vi.hoisted(() => ({
+  revision: 1 as number | null,
+}));
+
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => realtimeState.revision,
+}));
+
+vi.mock("@/lib/api/io", () => ({
+  ioApi: {
+    getBatch: vi.fn(),
+  },
+}));
 
 function makeLine(overrides: Partial<IoLine>): IoLine {
   return {
@@ -139,7 +154,49 @@ function makeMultiItemAdjustmentBatch(): IoBatch {
   return batch;
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  realtimeState.revision = 1;
+});
+
 describe("BomBatchDetail", () => {
+  it("refreshes an open BOM batch and republishes the fresh batch without collapsing it", async () => {
+    const staleBatch = makeBatch();
+    staleBatch.bundles[0].title = "Stale BOM Bundle";
+    staleBatch.bundles[0].lines[1].item_name = "Stale BOM Child";
+    const freshBatch = makeBatch();
+    freshBatch.bundles[0].title = "Fresh BOM Bundle";
+    freshBatch.bundles[0].lines[1].item_name = "Fresh BOM Child";
+    const onCached = vi.fn();
+    vi.mocked(ioApi.getBatch).mockResolvedValue(freshBatch);
+    const cache = new Map([[staleBatch.batch_id, staleBatch]]);
+    const { rerender } = render(
+      <table>
+        <tbody>
+          <BomBatchDetail batchId={staleBatch.batch_id} colSpan={8} cache={cache} onCached={onCached} />
+        </tbody>
+      </table>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+    expect(screen.getByText("Stale BOM Child")).toBeInTheDocument();
+
+    realtimeState.revision = 2;
+    rerender(
+      <table>
+        <tbody>
+          <BomBatchDetail batchId={staleBatch.batch_id} colSpan={8} cache={cache} onCached={onCached} />
+        </tbody>
+      </table>,
+    );
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText("Fresh BOM Bundle")).toBeInTheDocument());
+    expect(onCached).toHaveBeenCalledWith(staleBatch.batch_id, freshBatch);
+    expect(screen.getByText("Fresh BOM Child")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "BOM 구성 접기" })).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("uses an operation label for a warehouse-to-department BOM bundle while preserving its component names", () => {
     const batch = makeBatch();
     batch.sub_type = "warehouse_to_dept";

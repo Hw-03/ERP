@@ -14,6 +14,10 @@ const navigationMock = vi.hoisted(() => ({
   searchParams: null as URLSearchParams | null,
 }));
 
+const realtimeMock = vi.hoisted(() => ({
+  revision: 1 as number | null,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: navigationMock.push,
@@ -25,6 +29,9 @@ vi.mock("next/navigation", () => ({
     }
     return navigationMock.searchParams;
   },
+}));
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => realtimeMock.revision,
 }));
 vi.mock("@/lib/api", () => ({
   api: {
@@ -214,6 +221,7 @@ function render(ui: ReactElement) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  realtimeMock.revision = 1;
   navigationMock.search = "tab=shipping";
   vi.mocked(api.getItems).mockResolvedValue(items);
   vi.mocked(api.getShippingRequests).mockResolvedValue([
@@ -421,6 +429,186 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(api.getItems).toHaveBeenCalledWith({ limit: 2000 }));
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+  });
+
+  it("refreshes loaded PF candidates when the first realtime snapshot arrives without resetting the request draft", async () => {
+    const refreshedPf = item("pf-2", "Realtime PF", "PF", "PF-002");
+    let pfLoads = 0;
+    vi.mocked(api.getItems).mockImplementation(async (params?: any) => {
+      if (params?.process_type_code === "PF") {
+        pfLoads += 1;
+        return pfLoads === 1 ? [items[0]] : [items[0], refreshedPf];
+      }
+      return items;
+    });
+    realtimeMock.revision = null;
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    const quantityInput = await screen.findByRole("spinbutton", { name: "출하 수량" });
+    fireEvent.change(quantityInput, { target: { value: "7" } });
+    expect(await screen.findByTestId("shipping-pf-option-pf-1")).toBeInTheDocument();
+
+    await act(async () => {
+      realtimeMock.revision = 2;
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    });
+
+    expect(await screen.findByTestId("shipping-pf-option-pf-2")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-wizard-step-1")).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "출하 수량" })).toHaveValue(7);
+  });
+
+  it("re-fetches PF candidates when a revision arrives during the initial PF request", async () => {
+    const initialPfRequest = deferred<Item[]>();
+    const stalePf = item("pf-stale", "Stale PF", "PF", "PF-STALE");
+    const freshPf = item("pf-fresh", "Fresh PF", "PF", "PF-FRESH");
+    let pfLoads = 0;
+    vi.mocked(api.getItems).mockImplementation((params?: any) => {
+      if (params?.process_type_code === "PF") {
+        pfLoads += 1;
+        return pfLoads === 1 ? initialPfRequest.promise : Promise.resolve([freshPf]);
+      }
+      return Promise.resolve(items);
+    });
+    realtimeMock.revision = null;
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await waitFor(() => expect(pfLoads).toBe(1));
+
+    await act(async () => {
+      realtimeMock.revision = 2;
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    });
+    expect(pfLoads).toBe(1);
+    await act(async () => {
+      initialPfRequest.resolve([stalePf]);
+    });
+
+    await waitFor(() => expect(pfLoads).toBe(2));
+    expect(await screen.findByTestId("shipping-pf-option-pf-fresh")).toBeInTheDocument();
+    expect(screen.queryByTestId("shipping-pf-option-pf-stale")).not.toBeInTheDocument();
+  });
+
+  it("re-fetches the full catalog when a revision arrives during the initial full request", async () => {
+    const initialFullRequest = deferred<Item[]>();
+    const freshPa = item("pa-fresh", "Fresh PA", "PA", "PA-FRESH");
+    let fullLoads = 0;
+    vi.mocked(api.getItems).mockImplementation((params?: any) => {
+      if (params?.process_type_code === "PF") return Promise.resolve([items[0]]);
+      if (params?.limit === 2000) {
+        fullLoads += 1;
+        return fullLoads === 1 ? initialFullRequest.promise : Promise.resolve([...items, freshPa]);
+      }
+      return Promise.resolve(items);
+    });
+    realtimeMock.revision = null;
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(fullLoads).toBe(1));
+
+    await act(async () => {
+      realtimeMock.revision = 2;
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    });
+    expect(fullLoads).toBe(1);
+    await act(async () => {
+      initialFullRequest.resolve(items);
+    });
+
+    await waitFor(() => expect(fullLoads).toBe(2));
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-bom-search-pf"), { target: { value: "Fresh PA" } });
+    expect(await screen.findByTestId("shipping-bom-add-pf-pa-fresh")).toBeInTheDocument();
+  });
+
+  it("applies a successful full catalog refresh when the PF refresh fails", async () => {
+    const refreshedPa = item("pa-realtime", "Realtime PA", "PA", "PA-REALTIME");
+    let pfLoads = 0;
+    let fullLoads = 0;
+    vi.mocked(api.getItems).mockImplementation(async (params?: any) => {
+      if (params?.process_type_code === "PF") {
+        pfLoads += 1;
+        if (pfLoads === 1) return [items[0]];
+        throw new Error("PF refresh failed");
+      }
+      if (params?.limit === 2000) {
+        fullLoads += 1;
+        return fullLoads === 1 ? items : [...items, refreshedPa];
+      }
+      return items;
+    });
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(fullLoads).toBe(1));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "출하 수량" }), { target: { value: "7" } });
+
+    await act(async () => {
+      realtimeMock.revision = 2;
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    });
+    await waitFor(() => expect(fullLoads).toBe(2));
+    await waitFor(() => expect(pfLoads).toBe(2));
+    expect(screen.getByRole("spinbutton", { name: "출하 수량" })).toHaveValue(7);
+
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-bom-search-pf"), { target: { value: "Realtime PA" } });
+    expect(await screen.findByTestId("shipping-bom-add-pf-pa-realtime")).toBeInTheDocument();
+  });
+
+  it("applies both catalog refreshes when the PF response changes length first", async () => {
+    const pfRefresh = deferred<Item[]>();
+    const fullRefresh = deferred<Item[]>();
+    const freshPf = item("pf-both-fresh", "Both Fresh PF", "PF", "PF-BOTH");
+    const freshPa = item("pa-both-fresh", "Both Fresh PA", "PA", "PA-BOTH");
+    let pfLoads = 0;
+    let fullLoads = 0;
+    vi.mocked(api.getItems).mockImplementation((params?: any) => {
+      if (params?.process_type_code === "PF") {
+        pfLoads += 1;
+        return pfLoads === 1 ? Promise.resolve([items[0]]) : pfRefresh.promise;
+      }
+      if (params?.limit === 2000) {
+        fullLoads += 1;
+        return fullLoads === 1 ? Promise.resolve(items) : fullRefresh.promise;
+      }
+      return Promise.resolve(items);
+    });
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(fullLoads).toBe(1));
+
+    await act(async () => {
+      realtimeMock.revision = 2;
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    });
+    await waitFor(() => expect(pfLoads).toBe(2));
+    await waitFor(() => expect(fullLoads).toBe(2));
+
+    await act(async () => {
+      pfRefresh.resolve([items[0], freshPf]);
+    });
+    fireEvent.change(screen.getByTestId("shipping-pf-search"), { target: { value: "Both Fresh PF" } });
+    expect(await screen.findByTestId("shipping-pf-option-pf-both-fresh")).toBeInTheDocument();
+    await act(async () => {
+      fullRefresh.resolve([...items, freshPa]);
+    });
+
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-bom-search-pf"), { target: { value: "Both Fresh PA" } });
+    expect(await screen.findByTestId("shipping-bom-add-pf-pa-both-fresh")).toBeInTheDocument();
   });
 
   it("shows a loading state while PF candidates are loading", async () => {
@@ -745,6 +933,150 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-history-detail")).toBeInTheDocument();
     expect(screen.queryByText("SHIP-req")).not.toBeInTheDocument();
     expect(screen.getAllByText("픽업 완료").length).toBeGreaterThan(0);
+  });
+
+  it("refreshes the current shipping history page when the first realtime snapshot arrives", async () => {
+    const picked = request({
+      request_id: "realtime-history",
+      status: "PICKED_UP",
+      invoice_number: "INV-BEFORE",
+      picked_up_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [picked], next_cursor: null, has_more: false });
+    realtimeMock.revision = null;
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByTestId("shipping-history-list")).toBeInTheDocument();
+    await waitFor(() => expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      realtimeMock.revision = 2;
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    });
+
+    await waitFor(() => expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("shipping-history-list")).toBeInTheDocument();
+  });
+
+  it("keeps an applied history search and avoids a duplicate overview fetch on realtime refresh", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    const initial = request({ request_id: "search-initial", status: "PICKED_UP", invoice_number: "INV-INITIAL", picked_up_at: "2026-07-01T01:00:00Z" });
+    const searched = request({ request_id: "search-kept", status: "PICKED_UP", invoice_number: "INV-KEEP", picked_up_at: "2026-07-02T01:00:00Z" });
+    const refreshed = request({ request_id: "search-fresh", status: "PICKED_UP", invoice_number: "INV-KEEP-FRESH", picked_up_at: "2026-07-03T01:00:00Z" });
+    const revisionSearch = deferred<{ requests: ShippingRequest[]; next_cursor: null; has_more: false }>();
+    let searchLoads = 0;
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params?: any) => {
+      if (params?.q === "INV-KEEP") {
+        searchLoads += 1;
+        return searchLoads === 1
+          ? { requests: [searched], next_cursor: null, has_more: false }
+          : revisionSearch.promise;
+      }
+      return { requests: [initial], next_cursor: null, has_more: false };
+    });
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByText(/INV-INITIAL/)).toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "출하 이력 검색" });
+    fireEvent.change(search, { target: { value: "INV-KEEP" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+    expect(await screen.findByText(/INV-KEEP/)).toBeInTheDocument();
+
+    realtimeMock.revision = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await waitFor(() => expect(searchLoads).toBe(2));
+    await act(async () => {
+      revisionSearch.resolve({ requests: [refreshed], next_cursor: null, has_more: false });
+      await revisionSearch.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("searchbox", { name: "출하 이력 검색" })).toHaveValue("INV-KEEP");
+    expect(screen.getByText(/INV-KEEP-FRESH/)).toBeInTheDocument();
+    expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(1);
+    expect(api.getShippingHistory).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the selected history month and avoids a duplicate overview fetch on realtime refresh", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([
+      { year: 2026, month: 7, count: 1 },
+      { year: 2026, month: 6, count: 1 },
+    ]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params?: any) => ({
+      requests: [request({
+        request_id: `history-${params?.month ?? "overview"}`,
+        status: "PICKED_UP",
+        invoice_number: `INV-${params?.month ?? "OVERVIEW"}`,
+        picked_up_at: params?.month === 6 ? "2026-06-20T01:00:00Z" : "2026-07-20T01:00:00Z",
+      })],
+      next_cursor: null,
+      has_more: false,
+    }));
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const june = await screen.findByText("6월 · 1건", { selector: "summary" });
+    fireEvent.click(june);
+    await waitFor(() => expect(june.closest("details")).toHaveAttribute("open"));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      realtimeMock.revision = 2;
+      rerender(<DesktopShippingView onStatusChange={() => {}} />);
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(3));
+
+    expect(screen.getByText("6월 · 1건", { selector: "summary" }).closest("details")).toHaveAttribute("open");
+    expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(2);
+    expect(api.getShippingHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "PICKED_UP", year: 2026, month: 6, limit: 50 }),
+    );
+  });
+
+  it("keeps a realtime history detail request alive while the refreshed page resolves", async () => {
+    const stale = request({ request_id: "detail-race", status: "PICKED_UP", invoice_number: "INV-STALE", picked_up_at: "2026-07-20T01:00:00Z" });
+    const pageRefresh = deferred<{ requests: ShippingRequest[]; next_cursor: null; has_more: false }>();
+    const detailRefresh = deferred<ShippingRequest>();
+    let detailSignal: AbortSignal | undefined;
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=detail-race&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([stale]);
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(() => (
+      realtimeMock.revision === 2
+        ? pageRefresh.promise
+        : Promise.resolve({ requests: [stale], next_cursor: null, has_more: false })
+    ));
+    vi.mocked(api.getShippingRequest).mockImplementation((_requestId, options) => {
+      if (realtimeMock.revision === 2) {
+        detailSignal = options?.signal;
+        return detailRefresh.promise;
+      }
+      return Promise.resolve(stale);
+    });
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-history-detail");
+    expect(await within(detail).findByRole("textbox", { name: "인보이스 번호" })).toHaveValue("INV-STALE");
+    const historyCallsBeforeRevision = vi.mocked(api.getShippingHistory).mock.calls.length;
+    const detailCallsBeforeRevision = vi.mocked(api.getShippingRequest).mock.calls.length;
+
+    realtimeMock.revision = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await waitFor(() => expect(api.getShippingRequest).toHaveBeenCalledTimes(detailCallsBeforeRevision + 1));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledTimes(historyCallsBeforeRevision + 1));
+
+    await act(async () => pageRefresh.resolve({ requests: [stale], next_cursor: null, has_more: false }));
+    expect(detailSignal?.aborted).toBe(false);
+    await act(async () => detailRefresh.resolve({ ...stale, invoice_number: "INV-FRESH" }));
+
+    expect(within(detail).getByRole("textbox", { name: "인보이스 번호" })).toHaveValue("INV-FRESH");
+    expect(screen.getByTestId("shipping-history-detail")).toBeInTheDocument();
   });
 
   it("shows shipping management and history as the only shipping hub choices", async () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import { productionApi } from "@/lib/api/production";
@@ -7,6 +7,14 @@ import {
   HistoryCancelAction,
   useHistoryCancellationScopeLogs,
 } from "../HistoryCancelAction";
+
+const realtimeState = vi.hoisted(() => ({
+  revision: 1 as number | null,
+}));
+
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => realtimeState.revision,
+}));
 
 vi.mock("@/lib/api/production", () => ({
   productionApi: {
@@ -63,7 +71,7 @@ function ScopeHarness({ visibleLogs }: { visibleLogs: TransactionLog[] }) {
     operationBatchId: "batch-1",
   });
   return (
-    <div data-testid="scope-state" data-status={scope.status}>
+    <div data-testid="scope-state" data-status={scope.status} data-scope-key={scope.scopeKey}>
       {scope.logs.map((log) => `${log.log_id}:${log.item_name}:${log.cancelled}`).join("|")}
     </div>
   );
@@ -71,9 +79,50 @@ function ScopeHarness({ visibleLogs }: { visibleLogs: TransactionLog[] }) {
 
 beforeEach(() => {
   vi.mocked(productionApi.getTransactions).mockReset();
+  realtimeState.revision = 1;
 });
 
 describe("HistoryCancelAction", () => {
+  it("refreshes the same open cancellation scope on realtime revision and ignores the stale response", async () => {
+    let staleSignal: AbortSignal | undefined;
+    let resolveStale: (logs: TransactionLog[]) => void = () => {};
+    let resolveFresh: (logs: TransactionLog[]) => void = () => {};
+    vi.mocked(productionApi.getTransactions)
+      .mockImplementationOnce((_params, options) => new Promise<TransactionLog[]>((resolve) => {
+        staleSignal = options?.signal;
+        resolveStale = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<TransactionLog[]>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const selected = makeScopeLog("selected", "Selected item");
+    const { rerender } = render(<ScopeHarness visibleLogs={[selected]} />);
+    await waitFor(() => expect(productionApi.getTransactions).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("scope-state")).toHaveAttribute(
+      "data-scope-key",
+      "batch:batch-1|operation:batch-1",
+    );
+
+    realtimeState.revision = 2;
+    rerender(<ScopeHarness visibleLogs={[selected]} />);
+
+    await waitFor(() => expect(productionApi.getTransactions).toHaveBeenCalledTimes(2));
+    expect(staleSignal?.aborted).toBe(true);
+    await act(async () => resolveFresh([makeScopeLog("selected", "Fresh selected item")]));
+    await waitFor(() => {
+      expect(screen.getByTestId("scope-state")).toHaveAttribute("data-status", "ready");
+      expect(screen.getByTestId("scope-state")).toHaveTextContent("selected:Fresh selected item:false");
+    });
+    expect(screen.getByTestId("scope-state")).toHaveAttribute(
+      "data-scope-key",
+      "batch:batch-1|operation:batch-1",
+    );
+
+    await act(async () => resolveStale([makeScopeLog("selected", "Stale selected item")]));
+    expect(screen.queryByText(/Stale selected item/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("scope-state")).toHaveTextContent("Fresh selected item");
+  });
+
   it("preserves hidden exact-scope logs while synchronizing visible cancellation", async () => {
     const visible = makeScopeLog("visible", "visible-item");
     const hidden = makeScopeLog("hidden", "hidden-item");
@@ -171,6 +220,39 @@ describe("HistoryCancelAction", () => {
     fireEvent.click(screen.getByRole("button", { name: "이 이력 1건 취소" }));
     expect(screen.getByLabelText("취소 사유")).toHaveValue("");
     expect(screen.getByLabelText("PIN")).toHaveValue("");
+  });
+
+  it("keeps the confirmation draft when refreshed data preserves the target identity", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(
+      <HistoryCancelAction
+        panelOpen
+        identity="log:log-101"
+        scope="single"
+        effects={effects}
+        cancelled={false}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이 이력 1건 취소" }));
+    fireEvent.change(screen.getByLabelText("취소 사유"), { target: { value: "작성 중 사유" } });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "1234" } });
+
+    rerender(
+      <HistoryCancelAction
+        panelOpen
+        identity="log:log-101"
+        scope="single"
+        effects={[...effects]}
+        cancelled={false}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    expect(screen.getByLabelText("취소 사유")).toHaveValue("작성 중 사유");
+    expect(screen.getByLabelText("PIN")).toHaveValue("1234");
+    expect(screen.getByRole("button", { name: "취소 확정" })).toBeInTheDocument();
   });
 
   it("blocks duplicate submissions while the first request is pending", async () => {

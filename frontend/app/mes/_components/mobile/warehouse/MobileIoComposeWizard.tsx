@@ -46,6 +46,7 @@ import {
   collectShortageItemIds,
   shortageLines,
 } from "../../_warehouse_v2/pullFromWarehouse";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 /**
  * IoComposeView 의 로컬 헬퍼 복제. utils 로 추출하지 않은 이유:
@@ -103,6 +104,7 @@ export function MobileIoComposeWizard({
   flushDraftRef?: MutableRefObject<(() => void) | null>;
   onStepChange?: (step: IoStep) => void;
 }) {
+  const revision = useRealtimeRevision();
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
   const [error, setError] = useState<string | null>(null);
@@ -160,7 +162,7 @@ export function MobileIoComposeWizard({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [revision]);
 
   useIoDraftRestore({
     draftToRestore,

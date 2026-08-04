@@ -23,6 +23,7 @@ export interface UseHistoryDataArgs {
   model?: string;
   /** 현재 조건의 서버 summary total. 없으면 마지막 페이지 크기로 더보기를 판단한다. */
   totalCount?: number | null;
+  realtimeRevision?: number | null;
 }
 
 export interface UseHistoryDataResult {
@@ -80,6 +81,7 @@ export function useHistoryData({
   department,
   model = "",
   totalCount,
+  realtimeRevision,
 }: UseHistoryDataArgs): UseHistoryDataResult {
   const queryClient = useQueryClient();
 
@@ -135,6 +137,9 @@ export function useHistoryData({
   const [lastBatchSize, setLastBatchSize] = useState<number | null>(() => initialCached?.length ?? null);
   const isFirstRunRef = useRef(true);
   const generationRef = useRef(0);
+  const realtimeRevisionRef = useRef(realtimeRevision);
+  const loadedPageCountRef = useRef(1);
+  const loadedTailLogIdRef = useRef(initialCached?.at(-1)?.log_id ?? null);
 
   // 조건 변화 → 초기화 + 재조회. 첫 페이지(skip=0)는 React Query 캐시를 경유해서
   // 같은 조합을 다시 볼 때(탭 재방문) 재요청 없이 즉시 채운다.
@@ -144,9 +149,15 @@ export function useHistoryData({
     loadingRef.current = true;
     const isRetry = retryQueryKeyRef.current === queryKey;
     retryQueryKeyRef.current = null;
+    const queryChanged = queryKeyRef.current !== queryKey;
+    const revisionChanged = realtimeRevisionRef.current !== realtimeRevision;
+    const shouldRefreshLoadedDepth = revisionChanged && !queryChanged;
+    const pagesToRefresh = shouldRefreshLoadedDepth ? loadedPageCountRef.current : 1;
+    const refreshAnchorLogId = shouldRefreshLoadedDepth ? loadedTailLogIdRef.current : null;
     queryKeyRef.current = queryKey;
     const myKey = queryKey;
     const params = pageParams(0);
+    const exactQueryKey = queryKeys.transactions.list(params);
 
     // 첫 실행(마운트)이고 위 lazy init 에서 이미 캐시를 반영했다면 logs/loading
     // 을 다시 초기화하지 않는다 — 화면은 그대로 두고 아래에서 백그라운드
@@ -164,17 +175,41 @@ export function useHistoryData({
       setLoading(true);
     }
 
-    void queryClient
-      .fetchQuery({
-        queryKey: queryKeys.transactions.list(params),
-        queryFn: ({ signal }) => productionApi.getTransactions(params, { signal }),
-        staleTime: STALE_TIME.VOLATILE,
-      })
-      .then((data) => {
+    void (async () => {
+      const refreshedPages: TransactionLog[][] = [];
+      for (let pageIndex = 0; ; pageIndex += 1) {
+        const pageSkip = pageIndex * HISTORY_PAGE_SIZE;
+        const pageQueryParams = pageIndex === 0 ? params : pageParams(pageSkip);
+        const pageQueryKey = pageIndex === 0
+          ? exactQueryKey
+          : queryKeys.transactions.list(pageQueryParams);
+        if (revisionChanged) {
+          await queryClient.cancelQueries({ queryKey: pageQueryKey, exact: true });
+          await queryClient.invalidateQueries({ queryKey: pageQueryKey, exact: true, refetchType: "none" });
+        }
+        const page = await queryClient.fetchQuery({
+          queryKey: pageQueryKey,
+          queryFn: ({ signal }) => productionApi.getTransactions(pageQueryParams, { signal }),
+          staleTime: STALE_TIME.VOLATILE,
+        });
+        refreshedPages.push(page);
+        const reachedPreviousDepth = pageIndex + 1 >= pagesToRefresh;
+        const reachedRefreshAnchor = refreshAnchorLogId === null
+          || page.some((log) => log.log_id === refreshAnchorLogId);
+        if (page.length < HISTORY_PAGE_SIZE || (reachedPreviousDepth && reachedRefreshAnchor)) break;
+      }
+      return refreshedPages;
+    })()
+      .then((pages) => {
         if (generationRef.current !== generation || queryKeyRef.current !== myKey) return; // stale
-        skipRef.current = 0;
+        const data = pages.flat();
+        const lastPage = pages.at(-1) ?? [];
+        skipRef.current = Math.max(0, pages.length - 1) * HISTORY_PAGE_SIZE;
+        loadedPageCountRef.current = Math.max(1, pages.length);
+        loadedTailLogIdRef.current = data.at(-1)?.log_id ?? null;
+        realtimeRevisionRef.current = realtimeRevision;
         setLogs(data);
-        setLastBatchSize(data.length);
+        setLastBatchSize(lastPage.length);
         setError(null);
         setLoadMoreError(null);
         loadingRef.current = false;
@@ -188,7 +223,7 @@ export function useHistoryData({
       });
     // primitive 분해된 query string 으로 비교하므로 안전.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, queryClient, retryNonce]);
+  }, [queryKey, queryClient, retryNonce, realtimeRevision]);
 
   const retry = useCallback(() => {
     retryQueryKeyRef.current = queryKey;
@@ -215,6 +250,8 @@ export function useHistoryData({
       });
       if (generationRef.current !== generation || queryKeyRef.current !== myKey) return; // stale — append 금지
       skipRef.current = nextSkip;
+      loadedPageCountRef.current += 1;
+      loadedTailLogIdRef.current = more.at(-1)?.log_id ?? loadedTailLogIdRef.current;
       setLogs((prev) => [...prev, ...more]);
       setLastBatchSize(more.length);
       setLoadMoreError(null);

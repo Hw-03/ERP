@@ -1,11 +1,20 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import { productionApi } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { HistoryDetailMemo, HistoryDetailPanel } from "../HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../HistoryBatchDetailPanel";
+
+const realtimeState = vi.hoisted(() => ({
+  revision: 1 as number | null,
+}));
+
+vi.mock("@/lib/queries/realtime", () => ({
+  useRealtimeRevision: () => realtimeState.revision,
+}));
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -154,10 +163,60 @@ function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  realtimeState.revision = 1;
   vi.mocked(productionApi.getTransactions).mockResolvedValue([]);
 });
 
 describe("desktop history detail panels", () => {
+  it("re-fetches the selected log edits on a realtime revision and ignores the aborted response", async () => {
+    let firstSignal: AbortSignal | undefined;
+    let resolveFirst: (edits: TransactionEditLog[]) => void = () => {};
+    let resolveSecond: (edits: TransactionEditLog[]) => void = () => {};
+    const selected = makeLog({ log_id: "realtime-log", edit_count: undefined });
+    vi.mocked(api.getTransactionEdits)
+      .mockImplementationOnce((_logId, options) => new Promise<TransactionEditLog[]>((resolve) => {
+        firstSignal = options?.signal;
+        resolveFirst = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<TransactionEditLog[]>((resolve) => {
+        resolveSecond = resolve;
+      }));
+    const { rerender } = render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={selected}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+    await waitFor(() => expect(api.getTransactionEdits).toHaveBeenCalledTimes(1));
+
+    realtimeState.revision = 2;
+    rerender(
+      <HistoryDetailPanel
+        panelOpen
+        selected={selected}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    await waitFor(() => expect(api.getTransactionEdits).toHaveBeenCalledTimes(2));
+    expect(firstSignal?.aborted).toBe(true);
+    await act(async () => {
+      resolveSecond([{ edit_id: "fresh", original_log_id: "realtime-log", edited_by_employee_id: "e2", edited_by_name: "Fresh editor", reason: "fresh", before_payload: "{}", after_payload: "{}", correction_log_id: null, created_at: "2026-08-04T00:00:00Z" }]);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /\uC218\uC815 \uC774\uB825.*1/ }));
+    expect(await screen.findByText("Fresh editor")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFirst([{ edit_id: "stale", original_log_id: "realtime-log", edited_by_employee_id: "e1", edited_by_name: "Stale editor", reason: "stale", before_payload: "{}", after_payload: "{}", correction_log_id: null, created_at: "2026-08-04T00:00:00Z" }]);
+    });
+    expect(screen.queryByText("Stale editor")).not.toBeInTheDocument();
+  });
+
   it("aborts a prior edit request and ignores its late response after the selected log changes", async () => {
     let firstSignal: AbortSignal | undefined;
     let resolveFirst: (edits: TransactionEditLog[]) => void = () => {};
@@ -279,6 +338,96 @@ describe("desktop history detail panels", () => {
     });
     expect(screen.getByText("Flow B")).toBeInTheDocument();
     expect(screen.queryByText("Flow A")).not.toBeInTheDocument();
+  });
+
+  it("re-fetches the selected log batch flow on a realtime revision", async () => {
+    let staleSignal: AbortSignal | undefined;
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce((_batchId, options) => new Promise<IoBatch>((resolve) => {
+        staleSignal = options?.signal;
+        resolveStale = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const selected = makeLog({ log_id: "same-log", operation_batch_id: "same-batch" });
+    const { rerender } = render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={selected}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+      />,
+    );
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+
+    realtimeState.revision = 2;
+    rerender(
+      <HistoryDetailPanel
+        panelOpen
+        selected={selected}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+    expect(staleSignal?.aborted).toBe(true);
+    await act(async () => resolveFresh(makeBatch({ batch_id: "same-batch", from_department: "Fresh Flow", to_department: "Fresh Flow" })));
+    expect(await screen.findByText("Fresh Flow")).toBeInTheDocument();
+
+    await act(async () => resolveStale(makeBatch({ batch_id: "same-batch", from_department: "Stale Flow", to_department: "Stale Flow" })));
+    expect(screen.queryByText("Stale Flow")).not.toBeInTheDocument();
+  });
+
+  it("refreshes an open batch detail and its shared cache on a realtime revision", async () => {
+    let staleSignal: AbortSignal | undefined;
+    let resolveStale: (batch: IoBatch) => void = () => {};
+    let resolveFresh: (batch: IoBatch) => void = () => {};
+    vi.mocked(ioApi.getBatch)
+      .mockImplementationOnce((_batchId, options) => new Promise<IoBatch>((resolve) => {
+        staleSignal = options?.signal;
+        resolveStale = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise<IoBatch>((resolve) => {
+        resolveFresh = resolve;
+      }));
+    const logs = [makeLog({ log_id: "batch-log", operation_batch_id: "same-batch" })];
+
+    function BatchHarness() {
+      const [cache, setCache] = useState<Map<string, IoBatch>>(new Map());
+      return (
+        <>
+          <span data-testid="shared-batch-cache">{cache.get("same-batch")?.from_department ?? "empty"}</span>
+          <HistoryBatchDetailPanel
+            panelOpen
+            batchId="same-batch"
+            logs={logs}
+            batchCache={cache}
+            setBatchCache={setCache}
+            onBatchCancelled={() => {}}
+          />
+        </>
+      );
+    }
+
+    const { rerender } = render(<BatchHarness />);
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+
+    realtimeState.revision = 2;
+    rerender(<BatchHarness />);
+
+    await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(2));
+    expect(staleSignal?.aborted).toBe(true);
+    await act(async () => resolveFresh(makeBatch({ batch_id: "same-batch", from_department: "Fresh Batch", to_department: "Fresh Batch" })));
+    expect((await screen.findAllByText("Fresh Batch")).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId("shared-batch-cache")).toHaveTextContent("Fresh Batch");
+
+    await act(async () => resolveStale(makeBatch({ batch_id: "same-batch", from_department: "Stale Batch", to_department: "Stale Batch" })));
+    expect(screen.queryByText("Stale Batch")).not.toBeInTheDocument();
+    expect(screen.getByTestId("shared-batch-cache")).toHaveTextContent("Fresh Batch");
   });
 
   it("summarizes excluded batch lines without listing their item names", () => {

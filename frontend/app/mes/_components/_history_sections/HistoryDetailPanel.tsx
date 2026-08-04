@@ -5,6 +5,7 @@ import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from 
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
@@ -59,6 +60,7 @@ export function HistoryDetailPanel({
   variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
+  const realtimeRevision = useRealtimeRevision();
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
   const [flow, setFlow] = useState<FlowState>({ status: "idle" });
@@ -96,9 +98,9 @@ export function HistoryDetailPanel({
       cancelled = true;
       controller.abort();
     };
-    // selected 객체 전체가 아니라 log_id 만 deps — 같은 로그를 가리키는 새 객체로
-    // 교체돼도(목록 갱신 등) 수정이력을 불필요하게 재조회하지 않도록 의도적 최소화.
-  }, [selected?.log_id]); // eslint-disable-line react-hooks/exhaustive-deps
+    // selected 객체 전체가 아니라 log_id 와 realtime revision만 deps — 같은 로그를 가리키는 새 객체로
+    // 교체돼도(목록 갱신 등) 수정이력을 불필요하게 재조회하지 않되, 외부 수정은 즉시 반영한다.
+  }, [selected?.log_id, realtimeRevision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     if (!selected) {
@@ -126,8 +128,8 @@ export function HistoryDetailPanel({
       controller.abort();
     };
     // log_id / operation_batch_id 필드만 deps — selected 객체 identity 가 바뀌어도
-    // 두 ID 가 같으면 배치 흐름을 재요청하지 않도록 의도적 최소화.
-  }, [selected?.log_id, selected?.operation_batch_id]); // eslint-disable-line react-hooks/exhaustive-deps
+    // 두 ID 가 같으면 불필요하게 재요청하지 않되, 외부 배치 변경은 즉시 반영한다.
+  }, [selected?.log_id, selected?.operation_batch_id, realtimeRevision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!selected) {
     return (

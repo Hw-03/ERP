@@ -55,14 +55,6 @@ export function useInventoryData(opts: UseInventoryDataOptions): UseInventoryDat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query.error]);
 
-  useEffect(() => {
-    const onItems = () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
-    };
-    window.addEventListener("items", onItems);
-    return () => window.removeEventListener("items", onItems);
-  }, [queryClient]);
-
   const loadItems = useCallback(async () => {
     await query.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps

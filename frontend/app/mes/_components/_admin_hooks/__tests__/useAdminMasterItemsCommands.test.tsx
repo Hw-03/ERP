@@ -13,9 +13,14 @@ vi.mock("@/lib/queries/useItemsQuery", () => ({
 
 import { useAdminMasterItemsCommands } from "../useAdminMasterItemsCommands";
 
-function wrapper({ children }: { children: ReactNode }) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+function makeClient(): QueryClient {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
+function makeWrapper(client: QueryClient) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
 }
 
 const baseArgs = (over: Partial<Parameters<typeof useAdminMasterItemsCommands>[0]> = {}) => ({
@@ -34,7 +39,7 @@ describe("useAdminMasterItemsCommands", () => {
 
   it("초기 — addMode=false, addForm 빈값", () => {
     const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), {
-      wrapper,
+      wrapper: makeWrapper(makeClient()),
     });
     expect(result.current.addMode).toBe(false);
     expect(result.current.addForm.item_name).toBe("");
@@ -42,7 +47,7 @@ describe("useAdminMasterItemsCommands", () => {
 
   it("setAddMode 토글", () => {
     const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), {
-      wrapper,
+      wrapper: makeWrapper(makeClient()),
     });
     act(() => {
       result.current.setAddMode(true);
@@ -52,7 +57,9 @@ describe("useAdminMasterItemsCommands", () => {
 
   it("add — item_name 비어있으면 onError, createMutation 미호출", async () => {
     const args = baseArgs();
-    const { result } = renderHook(() => useAdminMasterItemsCommands(args), { wrapper });
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
     await act(async () => {
       result.current.add();
     });
@@ -67,7 +74,9 @@ describe("useAdminMasterItemsCommands", () => {
       mes_code: "N-001",
     });
     const args = baseArgs();
-    const { result } = renderHook(() => useAdminMasterItemsCommands(args), { wrapper });
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
     act(() => {
       result.current.setAddMode(true);
       result.current.setAddForm((f) => ({ ...f, item_name: "신규", sales_review_required: true }));
@@ -81,15 +90,17 @@ describe("useAdminMasterItemsCommands", () => {
     expect(result.current.addMode).toBe(false);
   });
 
-  it("emits item-change event after add success", async () => {
+  it("add는 mutation layer가 invalidation을 소유하므로 command에서 중복 무효화하지 않는다", async () => {
     createMutateAsync.mockResolvedValue({
       item_id: "101",
       item_name: "New item",
       mes_code: "N-101",
     });
-    const onItemsChanged = vi.fn();
-    window.addEventListener("items", onItemsChanged);
-    const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), { wrapper });
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), {
+      wrapper: makeWrapper(client),
+    });
     act(() => {
       result.current.setAddForm((form) => ({ ...form, item_name: "New item" }));
     });
@@ -98,7 +109,6 @@ describe("useAdminMasterItemsCommands", () => {
       result.current.add();
     });
 
-    await waitFor(() => expect(onItemsChanged).toHaveBeenCalledTimes(1));
-    window.removeEventListener("items", onItemsChanged);
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });

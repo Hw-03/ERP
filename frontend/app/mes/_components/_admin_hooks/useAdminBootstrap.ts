@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   type BOMDetailEntry,
@@ -10,6 +10,7 @@ import {
   type ProductModel,
 } from "@/lib/api";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 /**
  * 관리자 화면의 5개 도메인 부트스트랩 + BOM 새로고침 훅.
@@ -48,12 +49,15 @@ export interface UseAdminBootstrapResult {
 
 export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBootstrapResult {
   const { unlocked, globalSearch, onError } = opts;
+  const realtimeRevision = useRealtimeRevision();
 
   const [items, setItems] = useState<Item[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
   const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
+  const itemsRequestId = useRef(0);
+  const allBomRequestId = useRef(0);
 
   // models 만 React Query 로 분리 — enabled(unlocked) 로 게이트 보존.
   const { data: modelsData } = useModelsQuery({ enabled: unlocked });
@@ -62,24 +66,34 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   }, [modelsData]);
 
   const loadData = useCallback(async () => {
+    const requestId = ++itemsRequestId.current;
     const [nextItems, nextEmployees, nextDepts] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees({ activeOnly: false }),
       api.getDepartments(),
     ]);
-    setItems(nextItems);
+    if (requestId === itemsRequestId.current) setItems(nextItems);
     setEmployees(nextEmployees);
     setDepartments(nextDepts);
   }, [globalSearch]);
 
   const refreshAllBom = useCallback(() => {
-    void api.getAllBOM().then(setAllBomRows).catch(() => setAllBomRows([]));
+    const requestId = ++allBomRequestId.current;
+    void api
+      .getAllBOM()
+      .then((rows) => {
+        if (requestId === allBomRequestId.current) setAllBomRows(rows);
+      })
+      .catch(() => {
+        if (requestId === allBomRequestId.current) setAllBomRows([]);
+      });
   }, []);
 
   // 품목만 재조회 — BOM 완료 토글 후 bom_completed_at 반영용
   const refreshItems = useCallback(async () => {
+    const requestId = ++itemsRequestId.current;
     const next = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-    setItems(next);
+    if (requestId === itemsRequestId.current) setItems(next);
   }, [globalSearch]);
 
   // items/employees/departments 부트스트랩 — unlocked + globalSearch 변화 시
@@ -95,6 +109,14 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     if (!unlocked) return;
     refreshAllBom();
   }, [unlocked, refreshAllBom]);
+
+  useEffect(() => {
+    if (!unlocked || realtimeRevision === null) return;
+    void refreshItems().catch((nextError) =>
+      onError(nextError instanceof Error ? nextError.message : "품목 목록을 새로고침하지 못했습니다."),
+    );
+    refreshAllBom();
+  }, [unlocked, realtimeRevision, refreshItems, refreshAllBom, onError]);
 
   return {
     items, setItems,

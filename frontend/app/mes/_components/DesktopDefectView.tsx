@@ -16,6 +16,7 @@ import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -73,6 +74,7 @@ function DefectViewInner({
   defectDeptFilter?: string | null;
   onStatusChange?: (status: string) => void;
 }) {
+  const realtimeRevision = useRealtimeRevision();
   const noop = useMemo(() => () => {}, []);
   // 피커용 품목/모델 — 입출고와 동일하게 자체 로드(shell 은 넘겨주지 않음).
   const { items, productModels } = useWarehouseData({
@@ -106,6 +108,16 @@ function DefectViewInner({
         const locData = await defectsApi.listDefects();
         if (!cancelled) {
           setLocations(locData);
+          setView((currentView) => {
+            if (currentView.kind !== "process") return currentView;
+            const freshLocation = locData.find(
+              (location) =>
+                location.item_id === currentView.location.item_id &&
+                location.department === currentView.location.department &&
+                Number(location.quantity) > 0,
+            );
+            return freshLocation ? { kind: "process", location: freshLocation } : { kind: "list" };
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -119,7 +131,7 @@ function DefectViewInner({
     return () => {
       cancelled = true;
     };
-  }, [reloadNonce]);
+  }, [reloadNonce, realtimeRevision]);
 
   // 부서/scope 범위만 적용 — KPI 집계와 목록이 공유하는 모집단
   const scopedLocations = useMemo(() => {

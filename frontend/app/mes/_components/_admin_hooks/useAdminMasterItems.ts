@@ -3,7 +3,7 @@
 // AdminMasterItemsSection 전용 wrapper hook.
 // W5: List/Form/Commands 3-hook 으로 분해 후 호환 표면 유지.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Item, ProductModel } from "@/lib/api";
 import { useAdminMasterItemsList } from "./useAdminMasterItemsList";
 import { useAdminMasterItemsForm } from "./useAdminMasterItemsForm";
@@ -94,6 +94,12 @@ export function useAdminMasterItems({
     onShowSave,
     adminPin,
   });
+
+  useEffect(() => {
+    if (!selectedItem || form.dirty) return;
+    const refreshedItem = items.find((item) => item.item_id === selectedItem.item_id);
+    if (refreshedItem && refreshedItem !== selectedItem) setSelectedItem(refreshedItem);
+  }, [items, selectedItem, form.dirty]);
 
   return {
     selectedItem,

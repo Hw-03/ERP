@@ -2,13 +2,24 @@
 
 from datetime import datetime
 
-from sqlalchemy import CHAR, Column, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import (
+    BigInteger,
+    CHAR,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.engine import Dialect
 from sqlalchemy.types import TypeDecorator, TypeEngine
 
 from app.models.base import Base, UUIDString
 
-__all__ = ["ModelPfPin", "SystemSetting"]
+__all__ = ["DataRevision", "ModelPfPin", "SystemSetting"]
 
 
 class _ModelPfSymbolType(TypeDecorator):
@@ -94,3 +105,16 @@ class SystemSetting(Base):
         onupdate=datetime.utcnow,
         server_default=func.now(),
     )
+
+
+class DataRevision(Base):
+    """Single row advanced atomically by every committed application session."""
+
+    __tablename__ = "data_revision"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_data_revision_singleton"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    revision = Column(BigInteger, nullable=False)
+    updated_at = Column(DateTime, nullable=False, server_default=func.now())

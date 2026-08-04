@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { queryKeys } from "@/lib/queries/keys";
 
 const updateItemMock = vi.fn();
 vi.mock("@/lib/api", () => ({
@@ -9,6 +12,23 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { useAdminMasterItemsForm } from "../useAdminMasterItemsForm";
+
+function makeClient(): QueryClient {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
+function makeWrapper(client: QueryClient) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+}
+
+function renderFormHook(
+  args: Parameters<typeof useAdminMasterItemsForm>[0],
+  client = makeClient(),
+) {
+  return renderHook(() => useAdminMasterItemsForm(args), { wrapper: makeWrapper(client) });
+}
 
 const I = (over: Partial<any> = {}): any => ({
   item_id: "1",
@@ -36,16 +56,14 @@ describe("useAdminMasterItemsForm", () => {
   });
 
   it("selectedItem null → 빈 form, dirty=false", () => {
-    const { result } = renderHook(() => useAdminMasterItemsForm(baseArgs()));
+    const { result } = renderFormHook(baseArgs());
     expect(result.current.form.item_name).toBe("");
     expect(result.current.dirty).toBe(false);
   });
 
   it("selectedItem 주어지면 form 자동 채워짐, dirty=false", () => {
     const item = I({ sales_review_required: true });
-    const { result } = renderHook(() =>
-      useAdminMasterItemsForm(baseArgs({ selectedItem: item })),
-    );
+    const { result } = renderFormHook(baseArgs({ selectedItem: item }));
     expect(result.current.form.item_name).toBe("프로브");
     expect(result.current.form.mes_code).toBe("P-001");
     expect(result.current.form.sales_review_required).toBe(true);
@@ -53,9 +71,7 @@ describe("useAdminMasterItemsForm", () => {
   });
 
   it("setForm 호출 시 dirty=true", () => {
-    const { result } = renderHook(() =>
-      useAdminMasterItemsForm(baseArgs({ selectedItem: I() })),
-    );
+    const { result } = renderFormHook(baseArgs({ selectedItem: I() }));
     act(() => {
       result.current.setForm((f) => ({ ...f, item_name: "변경됨", sales_review_required: true }));
     });
@@ -63,7 +79,7 @@ describe("useAdminMasterItemsForm", () => {
   });
 
   it("save — selectedItem 없으면 updateItem 호출 안 함", async () => {
-    const { result } = renderHook(() => useAdminMasterItemsForm(baseArgs()));
+    const { result } = renderFormHook(baseArgs());
     await act(async () => {
       await result.current.save();
     });
@@ -74,7 +90,7 @@ describe("useAdminMasterItemsForm", () => {
     const updated = I({ item_name: "변경됨" });
     updateItemMock.mockResolvedValue(updated);
     const args = baseArgs({ selectedItem: I() });
-    const { result } = renderHook(() => useAdminMasterItemsForm(args));
+    const { result } = renderFormHook(args);
     act(() => {
       result.current.setForm((f) => ({ ...f, item_name: "변경됨", sales_review_required: true }));
     });
@@ -88,18 +104,17 @@ describe("useAdminMasterItemsForm", () => {
     expect(updateItemMock).toHaveBeenCalledWith("1", expect.objectContaining({ sales_review_required: true }));
   });
 
-  it("emits item-change event after save success", async () => {
+  it("save 성공 후 shared items query root를 무효화한다", async () => {
     const updated = I({ item_name: "Changed" });
     updateItemMock.mockResolvedValue(updated);
-    const onItemsChanged = vi.fn();
-    window.addEventListener("items", onItemsChanged);
-    const { result } = renderHook(() => useAdminMasterItemsForm(baseArgs({ selectedItem: I() })));
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    const { result } = renderFormHook(baseArgs({ selectedItem: I() }), client);
 
     await act(async () => {
       await result.current.save();
     });
 
-    await waitFor(() => expect(onItemsChanged).toHaveBeenCalledTimes(1));
-    window.removeEventListener("items", onItemsChanged);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.items.all });
   });
 });

@@ -97,7 +97,7 @@ describe("useInventoryData", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1); // 재요청 없음
   });
 
-  it('"items" 커스텀 이벤트 발생 시 items 쿼리를 invalidate', async () => {
+  it('"items" window 이벤트를 구독하지 않는다', async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(sampleItems)));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     const onStatusChange = vi.fn();
@@ -109,12 +109,11 @@ describe("useInventoryData", () => {
       { wrapper: makeWrapper(client) },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
+    invalidateSpy.mockClear();
 
     window.dispatchEvent(new Event("items"));
 
-    await waitFor(() =>
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.items.all }),
-    );
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
   it("setItems 호출 시 React Query 캐시가 즉시 갱신됨", async () => {

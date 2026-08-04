@@ -1,10 +1,11 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { GitBranch, Package, XCircle } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
@@ -80,6 +81,7 @@ export function HistoryBatchDetailPanel({
   variant = "default",
 }: Props) {
   const operator = useCurrentOperator();
+  const realtimeRevision = useRealtimeRevision();
   const operationBatchId = logs[0]?.operation_batch_id ?? null;
   const cached = operationBatchId ? batchCache.get(operationBatchId) ?? null : null;
   const [state, setState] = useState<FetchState>(
@@ -89,14 +91,17 @@ export function HistoryBatchDetailPanel({
         ? { status: "loading" }
         : { status: "unavailable" },
   );
+  const batchRevisionRef = useRef(realtimeRevision);
 
   useLayoutEffect(() => {
+    const revisionChanged = batchRevisionRef.current !== realtimeRevision;
+    batchRevisionRef.current = realtimeRevision;
     if (!operationBatchId) {
       setState({ status: "unavailable" });
       return;
     }
     const hit = batchCache.get(operationBatchId);
-    if (hit) {
+    if (hit && !revisionChanged) {
       setState({ status: "available", batch: hit });
       return;
     }
@@ -107,7 +112,8 @@ export function HistoryBatchDetailPanel({
       .then((b) => {
         if (cancelled) return;
         setBatchCache((prev) => {
-          if (prev.has(operationBatchId)) return prev;
+          if (prev.get(operationBatchId) === b) return prev;
+          if (!revisionChanged && prev.has(operationBatchId)) return prev;
           const m = new Map(prev);
           m.set(operationBatchId, b);
           return m;
@@ -122,7 +128,7 @@ export function HistoryBatchDetailPanel({
       cancelled = true;
       controller.abort();
     };
-  }, [operationBatchId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [operationBatchId, realtimeRevision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const first = logs[0];
   const cancelScope = getHistoryCancelScope(first);

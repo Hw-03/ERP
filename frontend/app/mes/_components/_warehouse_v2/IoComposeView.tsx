@@ -29,6 +29,7 @@ import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { IoComposeViewProps } from "./types";
 import { ItemConversionWorkView } from "./ItemConversionView";
 import { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "../common/StatusTargetNotice";
+import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -116,6 +117,7 @@ export function IoComposeView({
   onSubmitSuccess,
   onItemConversionFocusChange,
 }: IoComposeViewProps) {
+  const revision = useRealtimeRevision();
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
   const [error, setError] = useState<string | null>(null);
@@ -258,7 +260,7 @@ export function IoComposeView({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [revision]);
 
   useIoDraftRestore({
     draftToRestore,
