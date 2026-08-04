@@ -271,6 +271,48 @@ def test_existing_groups_structure_unchanged(client, db_session):
     assert isinstance(body["production_matrix"], list)
 
 
+# ── 공정별 재고 증가·감소 분리 집계 ──────────────────────────────────────
+
+def test_group_inventory_changes_keep_positive_and_negative_sides(client, db_session):
+    """같은 거래 유형의 양수·음수도 먼저 상쇄하지 않고 공정별로 분리 집계한다."""
+    item = _make_prod_item(db_session, name="AF 재고증감 분리", process_code="AF",
+                           model_symbol="7", qty=_dec(11))
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.PRODUCE,
+             qty=_dec(40), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.ADJUST,
+             qty=_dec(5), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.SHIP,
+             qty=_dec(-30), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.ADJUST,
+             qty=_dec(-3), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.DEFECT_SCRAP,
+             qty=_dec(-1), at=_WEEK_MID)
+    _add_log(db_session, item.item_id, tx_type=TransactionTypeEnum.RECEIVE,
+             qty=_dec(99), at=_WEEK_BEFORE)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    group = {g["process_code"]: g for g in resp.json()["groups"]}["AF"]
+    assert _dec(group["increase_qty"]) == _dec(45)
+    assert _dec(group["decrease_qty"]) == _dec(34)
+    assert _dec(group["delta"]) == _dec(11)
+    assert _dec(group["increase_qty"]) - _dec(group["decrease_qty"]) == _dec(group["delta"])
+
+
+def test_empty_groups_include_zero_inventory_change_sides(client, db_session):
+    """품목이 없는 주간보고도 모든 공정에 증가·감소 0을 명시한다."""
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    assert len(resp.json()["groups"]) == 6
+    assert all(group["increase_qty"] == 0 for group in resp.json()["groups"])
+    assert all(group["decrease_qty"] == 0 for group in resp.json()["groups"])
+
+
 # ── 품목 상세: 생산(PRODUCE) vs 입고(RECEIVE) 분리 + 전주재고 정확화 (2026-06-16~) ──
 
 def test_item_produce_and_receive_separated(client, db_session):

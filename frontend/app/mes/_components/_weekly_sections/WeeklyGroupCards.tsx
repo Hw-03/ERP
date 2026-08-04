@@ -38,13 +38,9 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
       {sortedGroups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
-        const isDecreasing = g.delta < 0;
-        const isQuiet = g.delta === 0 && !isActive;
+        const hasInventoryActivity = g.increase_qty > 0 || g.decrease_qty > 0;
+        const isQuiet = !hasInventoryActivity && !isActive;
         const accentColor = getDeptColor(g.dept_name);
-        const deltaColor =
-          g.delta > 0 ? LEGACY_COLORS.green
-          : g.delta < 0 ? LEGACY_COLORS.red
-          : ZERO_FADE;
 
         return (
           <button
@@ -82,7 +78,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                   : tint(accentColor, 35),
               }}
             />
-            {/* 상단 행 한 줄: 부서명 · 공정코드 · 증감 */}
+            {/* 상단 행 한 줄: 부서명 · 공정코드 · 증가 · 감소 */}
             <div className="flex items-center gap-2 py-1 pl-2.5 pr-2">
               <span
                 className="text-[14px] font-black tracking-[-0.01em] leading-none"
@@ -103,33 +99,19 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               >
                 {g.process_code}
               </span>
-              <div className="ml-auto flex items-center gap-1.5">
-                {g.delta !== 0 ? (
-                  <span
-                    className="text-[17px] font-black leading-none tabular-nums"
-                    style={{ color: deltaColor }}
-                  >
-                    {g.delta > 0 ? `+${formatQty(g.delta)}` : formatQty(g.delta)}
-                  </span>
-                ) : (
-                  <>
-                    <span
-                      className="text-[15px] font-semibold leading-none"
-                      style={{ color: ZERO_FADE }}
-                    >
-                      ±0
-                    </span>
-                    <span
-                      className="rounded-[4px] px-1 py-0.5 text-[10px] font-semibold"
-                      style={{
-                        background: tint(LEGACY_COLORS.muted2, 6, LEGACY_COLORS.s2),
-                        color: ZERO_FADE,
-                      }}
-                    >
-                      변동 없음
-                    </span>
-                  </>
-                )}
+              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                <span
+                  className="text-[17px] font-black leading-none tabular-nums"
+                  style={{ color: g.increase_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
+                >
+                  +{formatQty(g.increase_qty)}
+                </span>
+                <span
+                  className="text-[17px] font-black leading-none tabular-nums"
+                  style={{ color: g.decrease_qty > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
+                >
+                  -{formatQty(g.decrease_qty)}
+                </span>
               </div>
             </div>
             {/* 하단 행 한 줄: 입고 · 출고 · 현재.

@@ -10304,6 +10304,10 @@
             "title": "Current Qty",
             "type": "integer"
           },
+          "decrease_qty": {
+            "title": "Decrease Qty",
+            "type": "integer"
+          },
           "delta": {
             "title": "Delta",
             "type": "integer"
@@ -10311,6 +10315,10 @@
           "dept_name": {
             "title": "Dept Name",
             "type": "string"
+          },
+          "increase_qty": {
+            "title": "Increase Qty",
+            "type": "integer"
           },
           "item_count": {
             "title": "Item Count",
@@ -10354,6 +10362,8 @@
           "label",
           "item_count",
           "prev_qty",
+          "increase_qty",
+          "decrease_qty",
           "produce_qty",
           "receive_qty",
           "out_qty",

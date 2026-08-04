@@ -24,6 +24,8 @@ class WeeklyGroupReport(BaseModel):
     label: str
     item_count: int
     prev_qty: int
+    increase_qty: int
+    decrease_qty: int
     produce_qty: int
     receive_qty: int
     out_qty: int
