@@ -67,7 +67,7 @@ describe("useAdminMasterItemsCommands", () => {
     expect(createMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("add — 성공 시 setItems/setSelectedItem 호출 + addMode=false", async () => {
+  it("add — 성공 시 목록을 임시 선두 배치하지 않고 선택 상태만 갱신한다", async () => {
     createMutateAsync.mockResolvedValue({
       item_id: "100",
       item_name: "신규",
@@ -84,7 +84,7 @@ describe("useAdminMasterItemsCommands", () => {
     await act(async () => {
       result.current.add();
     });
-    await waitFor(() => expect(args.setItems).toHaveBeenCalled());
+    expect(args.setItems).not.toHaveBeenCalled();
     expect(args.setSelectedItem).toHaveBeenCalled();
     expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ sales_review_required: true }));
     expect(result.current.addMode).toBe(false);

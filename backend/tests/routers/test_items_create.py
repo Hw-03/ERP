@@ -81,6 +81,22 @@ def test_create_item_preserves_explicit_sales_review_and_defaults_af_to_required
     assert _get_item(client, defaulted_non_af.json()["item_id"]).json()["sales_review_required"] is False
 
 
+def test_create_item_places_new_process_code_in_common_display_order(client, seed_symbol):
+    for name, code in [
+        ("tube-finished", "TF"),
+        ("high-voltage-raw", "HR"),
+        ("tube-raw", "TR"),
+        ("tube-assembly", "TA"),
+    ]:
+        response = _create_item(client, name=name, process_type_code=code)
+        assert response.status_code == 201, response.text
+
+    listed = client.get("/api/items", params={"limit": 20})
+
+    assert listed.status_code == 200, listed.text
+    assert [item["process_type_code"] for item in listed.json()] == ["TR", "TA", "TF", "HR"]
+
+
 def test_create_two_departments_split(client, seed_symbol):
     """2000 + [고압1000, 진공1000] → warehouse 0, PRODUCTION 2행, quantity 2000."""
     res = _create_item(

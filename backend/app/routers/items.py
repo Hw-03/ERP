@@ -10,8 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Query as SAQuery, Session
 
-from sqlalchemy import func
-
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
 from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
@@ -36,6 +34,7 @@ from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_math
+from app.services.item_display_order import insert_item_at_process_end
 from app.services._tx import commit_and_refresh
 from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
@@ -168,9 +167,7 @@ def create_item(
 
     serial = next_serial_no(model_sym, pt, db)
 
-    # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
-    next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
-
+    # 신규 항목은 공정 코드 그룹의 끝에 삽입한다. sort_order NULL 이 SQLite 맨앞으로 정렬되는 것을 막는다.
     item = Item(
         item_name=payload.item_name,
         unit=payload.unit,
@@ -182,10 +179,10 @@ def create_item(
         process_type_code=pt,
         model_symbol=model_sym,
         serial_no=serial,
-        sort_order=next_sort,
     )
     db.add(item)
     db.flush()
+    insert_item_at_process_end(db, item)
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
     locs = payload.initial_locations or []

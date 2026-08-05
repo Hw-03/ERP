@@ -72,7 +72,6 @@ export function useAdminMasterItemsCommands({
         initial_quantity: totalQty > 0 ? totalQty : undefined,
         initial_locations: builtLocs.length > 0 ? builtLocs : undefined,
       });
-      setItems((current) => [created, ...current]);
       setSelectedItem(created);
       setAddMode(false);
       setAddForm(() => EMPTY_ADD_FORM);

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -28,6 +29,14 @@ def _regular_backup_name(suffix: str) -> str:
     """Return a collision-resistant regular backup filename."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     return f"mes_{timestamp}_{uuid4().hex}{suffix}"
+
+
+def _labeled_backup_name(label: str, suffix: str) -> str:
+    """Return a descriptive, collision-resistant backup filename."""
+    if not re.fullmatch(r"[a-z0-9-]+", label):
+        raise ValueError("backup label must contain only lowercase letters, digits, and hyphens")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"mes-before-{label}-{timestamp}-{uuid4().hex[:8]}{suffix}"
 
 
 def _private_backup_path(published_path: Path) -> Path:
@@ -56,7 +65,7 @@ def _verify_sqlite_backup(path: Path) -> None:
         raise SystemExit(result.returncode)
 
 
-def backup_sqlite(db_path: str) -> Path:
+def backup_sqlite(db_path: str, *, label: str | None = None) -> Path:
     _reject_legacy_backup_override()
     src = Path(db_path).resolve()
     if not src.exists():
@@ -64,7 +73,8 @@ def backup_sqlite(db_path: str) -> Path:
         raise SystemExit(1)
 
     backup_dir = runtime_path("backups", "sqlite", create=True)
-    published = backup_dir / _regular_backup_name(".db")
+    filename = _labeled_backup_name(label, ".db") if label else _regular_backup_name(".db")
+    published = backup_dir / filename
     staged = _private_backup_path(published)
 
     source = None
@@ -146,6 +156,7 @@ def backup_postgres(container: str | None, host: str, port: int, user: str, dbna
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Back up DEXCOWIN MES DB")
     parser.add_argument("--sqlite", metavar="PATH", help="SQLite DB file path")
+    parser.add_argument("--label", help="Descriptive lowercase-hyphen backup label")
     parser.add_argument("--postgres", action="store_true", help="Run PostgreSQL backup")
     parser.add_argument("--container", help="Docker container name for PostgreSQL")
     parser.add_argument("--host", default="localhost")
@@ -162,7 +173,7 @@ def main() -> int:
     print("=" * 50)
 
     if args.sqlite:
-        backup_sqlite(args.sqlite)
+        backup_sqlite(args.sqlite, label=args.label)
     elif args.postgres:
         backup_postgres(args.container, args.host, args.port, args.user, args.dbname)
     else:
@@ -170,7 +181,7 @@ def main() -> int:
         if not default_path.exists():
             print("[BACKUP] pass --sqlite <path> or --postgres", file=sys.stderr)
             return 1
-        backup_sqlite(str(default_path))
+        backup_sqlite(str(default_path), label=args.label)
     return 0
 
 
