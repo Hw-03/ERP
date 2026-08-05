@@ -29,6 +29,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/ui/dirty-guard", () => ({
   DirtyGuardProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useConfirmNavigation: () => (next: () => void) => next(),
+  useFlushDirtyEntries: () => async () => {},
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({
@@ -109,6 +110,7 @@ describe("DesktopMesShell tab transition", () => {
   const originalStartViewTransition = document.startViewTransition;
 
   beforeEach(() => {
+    window.history.replaceState({}, "", "/mes?tab=history");
     routerPush.mockClear();
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();

@@ -92,6 +92,8 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
 
     const submitButtons = screen.getAllByRole("button", { name: /정상 복귀/ });
     fireEvent.click(submitButtons[submitButtons.length - 1]);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
     await waitFor(() => {
       expect(apiMocks.unquarantine).toHaveBeenCalledWith(expect.objectContaining({
         item_id: "item-1",

@@ -471,14 +471,14 @@ describe("DailyWorkReportScreen", () => {
 
     const departmentMeta = screen.getByText("부서").parentElement;
     const authorMeta = screen.getByText("작성자").parentElement;
-    expect(departmentMeta?.getAttribute("style")).toContain("rgb(59, 130, 246)");
+    expect(departmentMeta?.getAttribute("style")).toContain("rgb(47, 111, 175)");
     expect(departmentMeta?.querySelector(".h-2.w-2")).toBeNull();
     expect(authorMeta?.querySelector(".h-2.w-2")).toBeNull();
 
     fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
 
     const employeeButton = screen.getByText("고압").closest("button");
-    expect(employeeButton?.getAttribute("style")).toContain("rgb(217, 119, 6)");
+    expect(employeeButton?.getAttribute("style")).toContain("rgb(133, 99, 13)");
     expect(employeeButton?.querySelector(".h-2.w-2")).toBeNull();
   });
 });

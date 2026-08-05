@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { isDepartmentApprover } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
@@ -10,7 +10,10 @@ import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPan
 import { IoComposeView } from "./_warehouse_v2/IoComposeView";
 import { readCurrentOperator } from "./login/useCurrentOperator";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
+import type { IoStep } from "./_warehouse_v2/useIoWorkState";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { LoadFailureCard } from "./common/LoadFailureCard";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
 // 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
@@ -41,6 +44,12 @@ export function DesktopWarehouseView({
   });
 
   const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
+  const urlDraftId = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("draftId");
+  const urlRestoreStep = typeof window === "undefined"
+    ? undefined
+    : parseIoStep(new URLSearchParams(window.location.search).get("step"));
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   // 알림 클릭 딥링크 — URL ?section= 으로 초기 섹션 결정 (권한 없으면 compose 폴백).
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
@@ -71,6 +80,10 @@ export function DesktopWarehouseView({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  const [urlDraftPending, setUrlDraftPending] = useState(() => Boolean(urlDraftId));
+  const [urlDraftRestoreError, setUrlDraftRestoreError] = useState<string | null>(null);
+  const [urlDraftRestoreNonce, setUrlDraftRestoreNonce] = useState(0);
+  const restoredUrlDraftRef = useRef<string | null>(null);
   // '이어서 하기' 클릭마다 증가 — 같은 draft 재선택(batch_id 불변)에도 복원이 재발동하도록.
   const [restoreNonce, setRestoreNonce] = useState(0);
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
@@ -109,22 +122,55 @@ export function DesktopWarehouseView({
 
   useEffect(() => {
     if (!operatorEmployeeId) return;
-    let active = true;
-    Promise.all([
-      api.listStockRequestDrafts(operatorEmployeeId),
-      api.listDrafts(operatorEmployeeId),
-    ])
-      .then(([legacyRows, ioRows]) => {
-        if (!active) return;
-        const n = legacyRows.length + ioRows.length;
+    let cancelled = false;
+    const legacyDraftsPromise = api.listStockRequestDrafts(operatorEmployeeId);
+    const ioDraftsPromise = api.listDrafts(operatorEmployeeId);
+
+    void Promise.allSettled([legacyDraftsPromise, ioDraftsPromise])
+      .then(([legacyResult, ioResult]) => {
+        if (cancelled) return;
+        const legacyCount = legacyResult.status === "fulfilled" ? legacyResult.value.length : 0;
+        const ioCount = ioResult.status === "fulfilled" ? ioResult.value.length : 0;
+        const n = legacyCount + ioCount;
         setCartCount(n);
         cartCountCache.set(operatorEmployeeId, n);
+      });
+
+    if (!urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
+      setUrlDraftPending(false);
+      setUrlDraftRestoreError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setUrlDraftPending(true);
+    setUrlDraftRestoreError(null);
+    void ioDraftsPromise
+      .then((ioRows) => {
+        if (cancelled) return;
+        const matchingDraft = ioRows.find((draft) => draft.batch_id === urlDraftId);
+        if (!matchingDraft) {
+          setUrlDraftRestoreError("저장한 작업을 찾을 수 없습니다.");
+          setUrlDraftPending(false);
+          return;
+        }
+        restoredUrlDraftRef.current = urlDraftId;
+        setRestoreIoDraft(matchingDraft);
+        setRestoreNonce((value) => value + 1);
+        setSectionTab("compose");
+        setUrlDraftPending(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        setUrlDraftRestoreError("저장한 작업을 불러오지 못했습니다.");
+        setUrlDraftPending(false);
+      });
+
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [operatorEmployeeId, panelRefreshNonce, revision]);
+  }, [operatorEmployeeId, panelRefreshNonce, revision, urlDraftId, urlDraftRestoreNonce]);
 
   useEffect(() => {
     if (!canSeeQueue) return;
@@ -243,6 +289,7 @@ export function DesktopWarehouseView({
             setRestoreIoDraft(draft);
             setRestoreNonce((n) => n + 1);
             handleSectionTabChange("compose");
+            persistWarehouseDraftUrl(draft.batch_id, draft.sub_type === "adjust_in" || draft.sub_type === "adjust_out" ? 3 : 4);
           }}
           bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
           onSubmitSuccess={onSubmitSuccess}
@@ -255,7 +302,20 @@ export function DesktopWarehouseView({
 
         {isComposeSection && (
           <div className="min-h-0 flex-1">
-            <IoComposeView
+            {urlDraftPending ? (
+              <div className="flex h-full items-center justify-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                저장한 작업을 불러오는 중입니다.
+              </div>
+            ) : urlDraftRestoreError ? (
+              <div className="flex h-full items-center justify-center px-4">
+                <LoadFailureCard
+                  prefix={urlDraftRestoreError}
+                  message="현재 작업 위치를 유지했습니다."
+                  retryLabel="다시 시도"
+                  onRetry={() => setUrlDraftRestoreNonce((value) => value + 1)}
+                />
+              </div>
+            ) : <IoComposeView
               globalSearch={globalSearch}
               operator={operator}
               employees={employees}
@@ -265,6 +325,7 @@ export function DesktopWarehouseView({
               preselectedItem={preselectedItem}
               restoreDraft={restoreIoDraft}
               restoreNonce={restoreNonce}
+              restoreStep={urlRestoreStep}
               entryIntent={entryIntent}
               onStatusChange={(status) => {
                 onStatusChange(status);
@@ -275,10 +336,25 @@ export function DesktopWarehouseView({
                 onSubmitSuccess?.();
               }}
               onItemConversionFocusChange={setItemConversionFocused}
-            />
+              onDraftSaved={persistWarehouseDraftUrl}
+            />}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+function parseIoStep(raw: string | null): IoStep | undefined {
+  const step = Number(raw);
+  return step >= 1 && step <= 5 ? step as IoStep : undefined;
+}
+
+function persistWarehouseDraftUrl(batchId: string, step: IoStep): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("tab", "warehouse");
+  url.searchParams.set("section", "compose");
+  url.searchParams.set("step", String(step));
+  url.searchParams.set("draftId", batchId);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }

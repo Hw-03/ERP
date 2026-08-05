@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
 import { SIDEBAR_TAB_IDS } from "../tabAccess";
@@ -33,6 +33,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/ui/dirty-guard", () => ({
   DirtyGuardProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useConfirmNavigation: () => (next: () => void) => next(),
+  useFlushDirtyEntries: () => async () => {},
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({
@@ -83,6 +84,10 @@ vi.mock("../DesktopWarehouseMapTab", () => ({
 }));
 
 describe("DesktopMesShell warehouse map fullscreen", () => {
+  beforeEach(() => {
+    window.history.replaceState({}, "", "/mes?tab=warehouseMap");
+  });
+
   it("mocks colors for every desktop tab", () => {
     expect(Object.keys(desktopTabIconColors).sort()).toEqual([...SIDEBAR_TAB_IDS].sort());
   });

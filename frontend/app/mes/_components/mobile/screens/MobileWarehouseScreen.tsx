@@ -12,10 +12,13 @@ import {
 import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraftPanelTabs";
 import { readCurrentOperator } from "../../login/useCurrentOperator";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
+import type { IoStep } from "../../_warehouse_v2/useIoWorkState";
 import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
 import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
+import { AsyncState } from "../primitives/AsyncState";
 import panelStyles from "./mobileWarehousePanels.module.css";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 // 인수인계 수신 부서 — DesktopWarehouseView 와 동일 도메인 상수(미export 라 동일값 복제).
 const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
@@ -60,6 +63,12 @@ export function MobileWarehouseScreen({
 
   const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
+  const urlDraftId = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("draftId");
+  const urlRestoreStep = typeof window === "undefined"
+    ? undefined
+    : parseIoStep(new URLSearchParams(window.location.search).get("step"));
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
@@ -74,6 +83,10 @@ export function MobileWarehouseScreen({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  const [urlDraftPending, setUrlDraftPending] = useState(() => Boolean(urlDraftId));
+  const [urlDraftRestoreError, setUrlDraftRestoreError] = useState<string | null>(null);
+  const [urlDraftRestoreNonce, setUrlDraftRestoreNonce] = useState(0);
+  const restoredUrlDraftRef = useRef<string | null>(null);
   // '이어서 하기' 클릭마다 증가 — 같은 draft 재선택에도 복원이 재발동하도록.
   const [restoreNonce, setRestoreNonce] = useState(0);
   const [composeStep, setComposeStep] = useState(1);
@@ -116,22 +129,55 @@ export function MobileWarehouseScreen({
 
   useEffect(() => {
     if (!operatorEmployeeId) return;
-    let active = true;
-    Promise.all([
-      api.listStockRequestDrafts(operatorEmployeeId),
-      api.listDrafts(operatorEmployeeId),
-    ])
-      .then(([legacyRows, ioRows]) => {
-        if (!active) return;
-        const n = legacyRows.length + ioRows.length;
+    let cancelled = false;
+    const legacyDraftsPromise = api.listStockRequestDrafts(operatorEmployeeId);
+    const ioDraftsPromise = api.listDrafts(operatorEmployeeId);
+
+    void Promise.allSettled([legacyDraftsPromise, ioDraftsPromise])
+      .then(([legacyResult, ioResult]) => {
+        if (cancelled) return;
+        const legacyCount = legacyResult.status === "fulfilled" ? legacyResult.value.length : 0;
+        const ioCount = ioResult.status === "fulfilled" ? ioResult.value.length : 0;
+        const n = legacyCount + ioCount;
         setCartCount(n);
         cartCountCache.set(operatorEmployeeId, n);
+      });
+
+    if (!urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
+      setUrlDraftPending(false);
+      setUrlDraftRestoreError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setUrlDraftPending(true);
+    setUrlDraftRestoreError(null);
+    void ioDraftsPromise
+      .then((ioRows) => {
+        if (cancelled) return;
+        const matchingDraft = ioRows.find((draft) => draft.batch_id === urlDraftId);
+        if (!matchingDraft) {
+          setUrlDraftRestoreError("저장한 작업을 찾을 수 없습니다.");
+          setUrlDraftPending(false);
+          return;
+        }
+        restoredUrlDraftRef.current = urlDraftId;
+        setRestoreIoDraft(matchingDraft);
+        setRestoreNonce((value) => value + 1);
+        setSectionTab("compose");
+        setUrlDraftPending(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        setUrlDraftRestoreError("저장한 작업을 불러오지 못했습니다.");
+        setUrlDraftPending(false);
+      });
+
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [operatorEmployeeId, panelRefreshNonce, revision]);
+  }, [operatorEmployeeId, panelRefreshNonce, revision, urlDraftId, urlDraftRestoreNonce]);
 
   useEffect(() => {
     if (!canSeeQueue) return;
@@ -219,7 +265,21 @@ export function MobileWarehouseScreen({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {sectionTab === "compose" ? (
+        {sectionTab === "compose" ? urlDraftPending ? (
+          <div className="flex h-full items-center justify-center px-4 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            저장한 작업을 불러오는 중입니다.
+          </div>
+        ) : urlDraftRestoreError ? (
+          <div role="alert" className="h-full overflow-y-auto px-4 py-6">
+            <AsyncState
+              loading={false}
+              error={`${urlDraftRestoreError} 현재 작업 위치를 유지했습니다.`}
+              onRetry={() => setUrlDraftRestoreNonce((value) => value + 1)}
+            >
+              {null}
+            </AsyncState>
+          </div>
+        ) : (
           <MobileIoComposeWizard
             globalSearch={globalSearch}
             operator={operator}
@@ -230,6 +290,7 @@ export function MobileWarehouseScreen({
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
             restoreNonce={restoreNonce}
+            restoreStep={urlRestoreStep}
             entryIntent={entryIntent}
             onDirtyChange={setComposeDirty}
             flushDraftRef={flushDraftRef}
@@ -242,6 +303,7 @@ export function MobileWarehouseScreen({
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
+            onDraftSaved={persistWarehouseDraftUrl}
           />
         ) : (
           <div className={`h-full overflow-y-auto px-3 pb-6 ${panelStyles.touchScope}`}>
@@ -261,6 +323,7 @@ export function MobileWarehouseScreen({
                 setRestoreIoDraft(draft);
                 setRestoreNonce((n) => n + 1);
                 setSectionTab("compose");
+                persistWarehouseDraftUrl(draft.batch_id, defaultDraftStep(draft));
               }}
               bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
               onSubmitSuccess={onSubmitSuccess}
@@ -294,4 +357,22 @@ export function MobileWarehouseScreen({
       />
     </div>
   );
+}
+
+function parseIoStep(raw: string | null): IoStep | undefined {
+  const step = Number(raw);
+  return step >= 1 && step <= 5 ? step as IoStep : undefined;
+}
+
+function persistWarehouseDraftUrl(batchId: string, step: IoStep): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("tab", "warehouse");
+  url.searchParams.set("section", "compose");
+  url.searchParams.set("step", String(step));
+  url.searchParams.set("draftId", batchId);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function defaultDraftStep(draft: IoBatch): IoStep {
+  return draft.sub_type === "adjust_in" || draft.sub_type === "adjust_out" ? 3 : 4;
 }
