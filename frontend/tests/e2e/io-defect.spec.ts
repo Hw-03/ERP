@@ -69,6 +69,10 @@ test.describe("불량 — 격리 / 해제", () => {
     // 정상 복귀는 ConfirmModal 없이 직접 제출.
     // 재설계 후 "정상 복귀" ActionCard 와 제출 버튼이 공존 → 화살표 포함 제출 버튼만 정확히 겨냥.
     await page.getByRole("button", { name: "정상 복귀 →" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "즉시 처리", exact: true })
+      .click();
 
     // 처리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 재진입 (재로드 경합 flaky 방지)
     await expect(
