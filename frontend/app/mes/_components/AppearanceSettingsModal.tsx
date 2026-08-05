@@ -18,17 +18,18 @@ type ChoiceOption<T extends string> = {
   description: string;
   Icon: ElementType;
   iconTestId: string;
+  color: string;
 };
 
 const THEME_OPTIONS: ChoiceOption<AppearancePreferences["theme"]>[] = [
-  { value: "light", label: "라이트 테마", description: "밝은 화면", Icon: Sun, iconTestId: "appearance-choice-icon-light" },
-  { value: "dark", label: "다크 테마", description: "어두운 화면", Icon: Moon, iconTestId: "appearance-choice-icon-dark" },
+  { value: "light", label: "라이트 테마", description: "밝은 화면", Icon: Sun, iconTestId: "appearance-choice-icon-light", color: LEGACY_COLORS.yellow },
+  { value: "dark", label: "다크 테마", description: "어두운 화면", Icon: Moon, iconTestId: "appearance-choice-icon-dark", color: LEGACY_COLORS.purple },
 ];
 
 const SIDEBAR_OPTIONS: ChoiceOption<SidebarMode>[] = [
-  { value: "hover", label: "자동 펼침", description: "마우스를 올리면 펼쳐집니다.", Icon: PanelLeftDashed, iconTestId: "appearance-choice-icon-hover" },
-  { value: "collapsed", label: "접힘 고정", description: "항상 아이콘만 표시합니다.", Icon: PanelLeftClose, iconTestId: "appearance-choice-icon-collapsed" },
-  { value: "expanded", label: "펼침 고정", description: "항상 전체 메뉴를 표시합니다.", Icon: PanelLeftOpen, iconTestId: "appearance-choice-icon-expanded" },
+  { value: "hover", label: "자동 펼침", description: "마우스를 올리면 펼쳐집니다.", Icon: PanelLeftDashed, iconTestId: "appearance-choice-icon-hover", color: LEGACY_COLORS.cyan },
+  { value: "collapsed", label: "접힘 고정", description: "항상 아이콘만 표시합니다.", Icon: PanelLeftClose, iconTestId: "appearance-choice-icon-collapsed", color: LEGACY_COLORS.blue },
+  { value: "expanded", label: "펼침 고정", description: "항상 전체 메뉴를 표시합니다.", Icon: PanelLeftOpen, iconTestId: "appearance-choice-icon-expanded", color: LEGACY_COLORS.green },
 ];
 
 export function AppearanceSettingsModal({
@@ -194,9 +195,6 @@ export function AppearanceSettingsModal({
               <h2 id="appearance-settings-title" className="text-lg font-black sm:text-2xl" style={{ color: LEGACY_COLORS.text }}>
                 설정
               </h2>
-              <p className="mt-1 text-sm sm:text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-                화면 표시와 개인 설정을 관리하세요.
-              </p>
             </div>
             <button
               type="button"
@@ -211,9 +209,16 @@ export function AppearanceSettingsModal({
           </div>
         </header>
 
-        <div className="grid flex-1 gap-5 overflow-y-auto px-4 py-6 lg:grid-cols-2 sm:px-7 sm:py-8">
-          <SettingsCard title="테마" description="화면 색상을 선택합니다.">
-            <div className="grid grid-cols-2 gap-3">
+        <div data-testid="settings-layout" className="relative grid flex-1 content-start gap-y-6 overflow-y-auto px-4 py-6 lg:grid-cols-2 lg:grid-rows-2 lg:gap-x-8 sm:px-7 sm:py-8">
+          <div
+            aria-hidden="true"
+            data-testid="settings-column-divider"
+            className="pointer-events-none absolute inset-y-6 left-1/2 hidden -translate-x-px lg:block lg:border-l"
+            style={{ borderColor: LEGACY_COLORS.border }}
+          />
+          <div data-testid="settings-left-column" className="contents">
+          <SettingsCard testId="settings-theme-group" title="테마" className="lg:col-start-1 lg:row-start-1">
+            <div className="space-y-3">
               {THEME_OPTIONS.map((option) => (
                 <ChoiceButton
                   key={option.value}
@@ -226,24 +231,9 @@ export function AppearanceSettingsModal({
             </div>
           </SettingsCard>
 
-          <SettingsCard title="사이드바 표시 방식" description="데스크톱 왼쪽 메뉴의 펼침 방식을 선택합니다.">
+          <SettingsCard testId="settings-personal-group" title="개인 설정" className="lg:col-start-2 lg:row-start-1">
             <div className="space-y-3">
-              {SIDEBAR_OPTIONS.map((option) => (
-                <ChoiceButton
-                  key={option.value}
-                  {...option}
-                  selected={draft.sidebarMode === option.value}
-                  disabled={busy}
-                  onClick={() => setDraft((current) => ({ ...current, sidebarMode: option.value }))}
-                  wide
-                />
-              ))}
-            </div>
-          </SettingsCard>
-
-          <SettingsCard title="개인 설정" description="내 PIN과 로그인 알림 표시를 관리합니다.">
-            <div className="space-y-3">
-              <div className="rounded-2xl border p-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+              <div data-testid="settings-pin-item">
                 <button
                   type="button"
                   aria-label="PIN 재설정"
@@ -253,9 +243,10 @@ export function AppearanceSettingsModal({
                     setPinExpanded((current) => !current);
                     setPinFeedback(null);
                   }}
-                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-left transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-[68px] w-full items-center gap-3 rounded-[14px] px-2 text-left transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: LEGACY_COLORS.s1 }}
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.cyan }}>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)`, color: LEGACY_COLORS.purple }}>
                     <KeyRound className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -308,8 +299,8 @@ export function AppearanceSettingsModal({
                 )}
               </div>
 
-              <div className="flex min-h-[68px] items-center gap-3 rounded-2xl border p-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.cyan }}>
+              <div className="flex min-h-[68px] items-center gap-3 rounded-[16px] p-3" style={{ background: LEGACY_COLORS.s1 }}>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`, color: LEGACY_COLORS.yellow }}>
                   <BellRing className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -325,8 +316,8 @@ export function AppearanceSettingsModal({
                   onClick={() => void handleLoginPopupToggle()}
                   className="relative h-11 w-[60px] shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                   style={{
-                    background: loginPopupEnabled ? LEGACY_COLORS.cyan : LEGACY_COLORS.s2,
-                    borderColor: loginPopupEnabled ? LEGACY_COLORS.cyan : LEGACY_COLORS.border,
+                    background: loginPopupEnabled ? LEGACY_COLORS.yellow : LEGACY_COLORS.s2,
+                    borderColor: loginPopupEnabled ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
                   }}
                 >
                   <span
@@ -350,23 +341,44 @@ export function AppearanceSettingsModal({
               )}
             </div>
           </SettingsCard>
+          </div>
+
+          <div data-testid="settings-right-column" className="contents">
+            <SettingsCard testId="settings-sidebar-group" title="사이드바 표시 방식" className="lg:col-start-1 lg:row-start-2">
+              <div className="space-y-3">
+                {SIDEBAR_OPTIONS.map((option) => (
+                  <ChoiceButton
+                    key={option.value}
+                    {...option}
+                    selected={draft.sidebarMode === option.value}
+                    disabled={busy}
+                    onClick={() => setDraft((current) => ({ ...current, sidebarMode: option.value }))}
+                  />
+                ))}
+              </div>
+            </SettingsCard>
 
           {canOpenAdmin && (
-            <SettingsCard title="관리" description="마스터와 운영 설정으로 이동합니다.">
+            <SettingsCard testId="settings-admin-group" title="관리" className="lg:col-start-2 lg:row-start-2">
               <button
                 type="button"
                 aria-label="관리"
                 disabled={busy}
                 onClick={openAdminPinEntry}
-                className="flex min-h-[210px] w-full flex-col items-center justify-center rounded-2xl border p-5 text-center transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.cyan }}
+                className="flex min-h-[68px] w-full items-center gap-3 rounded-[16px] p-3 text-left transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: LEGACY_COLORS.s1 }}
               >
-                <Settings2 className="h-10 w-10" />
-                <span className="mt-4 text-lg font-black" style={{ color: LEGACY_COLORS.text }}>관리</span>
-                <span className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>PIN을 입력해 시작합니다.</span>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
+                  <Settings2 className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>관리</span>
+                  <span className="mt-0.5 block text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>PIN을 입력해 시작합니다.</span>
+                </span>
               </button>
             </SettingsCard>
           )}
+          </div>
         </div>
 
         <footer className="flex items-center justify-end gap-3 border-t px-4 py-4 sm:px-7 sm:py-5" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -395,12 +407,24 @@ export function AppearanceSettingsModal({
   );
 }
 
-function SettingsCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+function SettingsCard({
+  testId,
+  title,
+  className,
+  children,
+}: {
+  testId: string;
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <section className="rounded-[24px] border p-5 sm:p-6" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <h3 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{title}</h3>
-      <p className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{description}</p>
-      <div className="mt-5">{children}</div>
+    <section data-testid={testId} className={className}>
+      <div className="flex items-center gap-3">
+        <h3 className="shrink-0 text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{title}</h3>
+        <span data-testid={`${testId}-divider`} className="flex-1 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
+      </div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -410,15 +434,14 @@ function ChoiceButton({
   description,
   Icon,
   iconTestId,
+  color,
   selected,
   disabled,
   onClick,
-  wide = false,
 }: ChoiceOption<string> & {
   selected: boolean;
   disabled: boolean;
   onClick: () => void;
-  wide?: boolean;
 }) {
   return (
     <button
@@ -427,17 +450,17 @@ function ChoiceButton({
       aria-pressed={selected}
       disabled={disabled}
       onClick={onClick}
-      className={`flex min-h-[82px] items-center rounded-2xl border p-4 text-left transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${wide ? "w-full" : ""}`}
+      className="flex min-h-[68px] w-full items-center rounded-[16px] border p-3 text-left transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
       style={{
-        borderColor: selected ? LEGACY_COLORS.cyan : LEGACY_COLORS.border,
-        background: selected ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 12%, transparent)` : LEGACY_COLORS.s1,
+        borderColor: selected ? color : LEGACY_COLORS.border,
+        background: selected ? `color-mix(in srgb, ${color} 12%, transparent)` : LEGACY_COLORS.s1,
       }}
     >
       <span
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]"
         style={{
-          background: selected ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)` : LEGACY_COLORS.s2,
-          color: selected ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2,
+          background: selected ? `color-mix(in srgb, ${color} 14%, transparent)` : LEGACY_COLORS.s2,
+          color,
         }}
       >
         <Icon data-testid={iconTestId} className="h-6 w-6" />
@@ -446,7 +469,7 @@ function ChoiceButton({
         <span className="block font-black" style={{ color: LEGACY_COLORS.text }}>{label}</span>
         <span className="mt-1 block text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{description}</span>
       </span>
-      {selected && <Check className="ml-3 h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.cyan }} />}
+      {selected && <Check className="ml-3 h-5 w-5 shrink-0" style={{ color }} />}
     </button>
   );
 }

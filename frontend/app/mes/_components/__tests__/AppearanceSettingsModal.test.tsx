@@ -86,6 +86,56 @@ describe("AppearanceSettingsModal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("uses the sidebar semantic colors for the compact choice rows", () => {
+    renderModal();
+
+    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveStyle({ borderColor: "var(--c-yellow)" });
+    expect(screen.getByTestId("appearance-choice-icon-dark").parentElement).toHaveStyle({ color: "var(--c-purple)" });
+    expect(screen.getByTestId("appearance-choice-icon-collapsed").parentElement).toHaveStyle({ color: "var(--c-blue)" });
+
+    fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
+
+    expect(screen.getByRole("button", { name: "다크 테마" })).toHaveStyle({ borderColor: "var(--c-purple)" });
+  });
+
+  it("opens and closes the PIN inputs from the borderless PIN row", () => {
+    renderModal();
+
+    const pinButton = screen.getByRole("button", { name: "PIN 재설정" });
+    expect(screen.getByTestId("settings-pin-item")).not.toHaveClass("border");
+    expect(pinButton).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(pinButton);
+    expect(screen.getByLabelText("현재 PIN")).toBeInTheDocument();
+
+    fireEvent.click(pinButton);
+    expect(screen.queryByLabelText("현재 PIN")).not.toBeInTheDocument();
+  });
+
+  it("uses a vertical desktop divider instead of boxed setting groups", () => {
+    renderModal({ canOpenAdmin: true, onOpenAdminPinEntry: vi.fn() });
+
+    expect(screen.getByTestId("settings-theme-group")).not.toHaveClass("border");
+    expect(screen.getByTestId("settings-sidebar-group")).not.toHaveClass("border");
+    expect(screen.getByTestId("settings-layout")).toHaveClass("content-start", "gap-y-6");
+    expect(screen.getByTestId("settings-layout")).not.toHaveClass("content-between");
+    expect(screen.getByTestId("settings-column-divider")).toHaveClass("lg:border-l");
+    expect(screen.getByTestId("settings-theme-group")).toHaveClass("lg:col-start-1", "lg:row-start-1");
+    expect(screen.getByTestId("settings-sidebar-group")).toHaveClass("lg:col-start-1", "lg:row-start-2");
+    expect(screen.getByTestId("settings-personal-group")).toHaveClass("lg:col-start-2", "lg:row-start-1");
+    expect(screen.getByTestId("settings-admin-group")).toHaveClass("lg:col-start-2", "lg:row-start-2");
+    expect(screen.getByTestId("settings-theme-group-divider")).toHaveClass("border-t");
+  });
+
+  it("keeps only setting names above the rows without redundant descriptions", () => {
+    renderModal();
+
+    expect(screen.queryByText("화면 표시와 개인 설정을 관리하세요.")).not.toBeInTheDocument();
+    expect(screen.queryByText("화면 색상을 선택합니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("데스크톱 왼쪽 메뉴의 펼침 방식을 선택합니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("내 PIN과 로그인 알림 표시를 관리합니다.")).not.toBeInTheDocument();
+  });
+
   it("keeps the modal open when Escape is pressed during saving", async () => {
     let resolveSave: (() => void) | undefined;
     const onSave = vi.fn(() => new Promise<void>((resolve) => {
