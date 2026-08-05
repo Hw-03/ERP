@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { matchesSearchText } from "@/lib/searchText";
+import { QuantityInput } from "../common/QuantityInput";
 
 interface WorkProps {
   items: Item[];
@@ -453,13 +454,12 @@ function SelectionStep({
         </div>
         <label className="icf flex min-h-12 items-center gap-3 rounded-[14px] border px-4">
           <span className="icm shrink-0 text-xs font-black">전환 수량</span>
-          <input
+          <QuantityInput
             data-testid="item-conversion-quantity"
-            type="number"
             min={1}
             value={quantity}
             onChange={(event) => onQuantity(event.target.value)}
-            className="ict h-full min-w-0 flex-1 bg-transparent text-base font-black outline-none focus-visible:ring-2"
+            className="h-full min-w-0 flex-1 border-0 bg-transparent text-base font-black"
           />
         </label>
         <button

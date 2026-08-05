@@ -9,6 +9,7 @@ import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type Dep
 import { BOM_EDIT_LIST_GRID_TEMPLATE, BomTableHeader, BomTableItemRow } from "./BomTablePrimitives";
 import { EmptyState } from "../../common";
 import { matchesSearchText } from "@/lib/searchText";
+import { QuantityInput } from "../../common/QuantityInput";
 
 /**
  * 가운데 하위품목 추가 패널.
@@ -228,9 +229,8 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                     <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted }}>
                       수량
                     </span>
-                    <input
+                    <QuantityInput
                       ref={qtyRef}
-                      type="number"
                       min="0"
                       step="any"
                       value={qtyDraft}
@@ -244,7 +244,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                           closeRow();
                         }
                       }}
-                      className="w-24 rounded-md border px-2 py-1 text-right text-sm font-semibold outline-none"
+                      className="w-24 rounded-md border px-2 py-1 text-sm font-semibold"
                       style={{
                         background: LEGACY_COLORS.s1,
                         borderColor: LEGACY_COLORS.blue,

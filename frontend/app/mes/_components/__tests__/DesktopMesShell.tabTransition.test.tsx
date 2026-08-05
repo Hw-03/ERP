@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,7 @@ const queryClientMock = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
 }));
 const shippingViewProps = vi.hoisted(() => vi.fn());
+const adminViewMounts = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientMock,
@@ -57,11 +58,14 @@ vi.mock("../DesktopSidebar", () => ({
   DesktopSidebar: ({
     activeTab,
     onTabChange,
+    onOpenAdminPinEntry,
   }: {
     activeTab: DesktopTabId;
     onTabChange: (tab: DesktopTabId) => void;
+    onOpenAdminPinEntry: () => void;
   }) => (
     <nav>
+      <button type="button" onClick={onOpenAdminPinEntry}>admin pin entry</button>
       {sidebarTabs.map((tab) => (
         <button
           key={tab}
@@ -98,7 +102,17 @@ vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <main>defect c
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <main>history content</main> }));
 vi.mock("../DesktopDailyWorkReportView", () => ({ DesktopDailyWorkReportView: () => <main>daily report content</main> }));
 vi.mock("../DesktopWeeklyReportView", () => ({ DesktopWeeklyReportView: () => <main>weekly content</main> }));
-vi.mock("../DesktopAdminView", () => ({ DesktopAdminView: () => <main>admin content</main> }));
+vi.mock("../DesktopAdminView", async () => {
+  const { useEffect } = await import("react");
+  return {
+    DesktopAdminView: () => {
+      useEffect(() => {
+        adminViewMounts();
+      }, []);
+      return <main>admin content</main>;
+    },
+  };
+});
 vi.mock("../DesktopWarehouseMapTab", () => ({ DesktopWarehouseMapTab: () => <main>warehouse map content</main> }));
 vi.mock("../CapacityDetailModal", () => ({ CapacityDetailModal: () => <div /> }));
 vi.mock("../_weekly_sections/WeeklyWeekPicker", () => ({
@@ -115,6 +129,7 @@ describe("DesktopMesShell tab transition", () => {
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
     shippingViewProps.mockClear();
+    adminViewMounts.mockClear();
     vi.mocked(sendClientEvent).mockClear();
   });
 
@@ -178,6 +193,16 @@ describe("DesktopMesShell tab transition", () => {
     expect(shippingViewProps).toHaveBeenLastCalledWith(
       expect.not.objectContaining({ onStartPrepareWork: expect.any(Function) }),
     );
+  });
+
+  it("remounts the admin PIN entry when requested from an already active admin tab", async () => {
+    render(<DesktopMesShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "admin pin entry" }));
+    await waitFor(() => expect(adminViewMounts).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "admin pin entry" }));
+    await waitFor(() => expect(adminViewMounts).toHaveBeenCalledTimes(2));
   });
 
   it.each(["dashboard", "history", "dailyReport", "weekly"] as const)(

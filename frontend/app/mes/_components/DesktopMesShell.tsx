@@ -109,6 +109,7 @@ function DesktopMesShellInner({
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [adminPinEntryNonce, setAdminPinEntryNonce] = useState(0);
   const [warehouseMapFullscreen, setWarehouseMapFullscreen] = useState(false);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
@@ -199,6 +200,14 @@ function DesktopMesShellInner({
     };
     confirmAdminNavigation(doSwitch);
   }
+
+  const handleOpenAdminPinEntry = useCallback(() => {
+    if (!canOpenTab("admin")) return;
+    confirmAdminNavigation(() => {
+      setAdminPinEntryNonce((current) => current + 1);
+      commitDesktopTab("admin");
+    });
+  }, [canOpenTab, commitDesktopTab, confirmAdminNavigation]);
 
   // 알림 클릭 딥링크 — 해당 탭(+섹션)으로 이동. section 은 입출고 섹션(queue/dept-queue/mine).
   function handleNotificationNavigate({ tab, section, relatedRequestId }: NotificationNavigationTarget) {
@@ -335,7 +344,7 @@ function DesktopMesShellInner({
   }, [canOpenTab, commitDesktopTab]);
 
   const content = useMemo(() => {
-    const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
+    const key = activeTab === "admin" ? `admin-${adminPinEntryNonce}` : `${activeTab}-${refreshNonce}`;
     if (activeTab === "dashboard") {
       return (
         <DesktopInventoryView
@@ -410,7 +419,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
+  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
 
   return (
     <>
@@ -425,6 +434,7 @@ function DesktopMesShellInner({
           <DesktopSidebar
             activeTab={activeTab}
             onTabChange={handleTabChange}
+            onOpenAdminPinEntry={handleOpenAdminPinEntry}
             visibleTabs={visibleTabs}
           />
 

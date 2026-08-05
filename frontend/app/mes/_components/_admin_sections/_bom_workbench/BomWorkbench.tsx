@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRightLeft, Network, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
@@ -17,7 +17,7 @@ import { BomStatsRow, type StatusFilter } from "./BomStatsRow";
 import { BomParentHeader } from "./BomParentHeader";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
-import { bomStatusOf, stageOf, type BomDeptFilter } from "./bomDept";
+import { bomStatusOf, DEPT_LETTERS, deptOf, stageOf, type BomDeptFilter } from "./bomDept";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 interface Props {
@@ -31,6 +31,44 @@ interface Props {
 
 type Mode = "edit" | "whereused";
 type DeleteRequest = { bomId: string; childName: string };
+type BomWorkbenchHistoryState = { dept: BomDeptFilter; mode: Mode; parentId: string };
+
+const BOM_WORKBENCH_HISTORY_KEY = "bomWorkbench";
+
+function readBomWorkbenchHistoryState(value: unknown): BomWorkbenchHistoryState | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = (value as Record<string, unknown>)[BOM_WORKBENCH_HISTORY_KEY];
+  if (!candidate || typeof candidate !== "object") return null;
+  const { dept, mode, parentId } = candidate as Record<string, unknown>;
+  const validDept = dept === "ALL" || DEPT_LETTERS.includes(dept as (typeof DEPT_LETTERS)[number]);
+  if (!validDept || (mode !== "edit" && mode !== "whereused") || typeof parentId !== "string") return null;
+  return { dept: dept as BomDeptFilter, mode, parentId };
+}
+
+function writeBomWorkbenchHistoryState(method: "push" | "replace", state: BomWorkbenchHistoryState): void {
+  const current = window.history.state;
+  const merged = {
+    ...(current && typeof current === "object" ? current : {}),
+    [BOM_WORKBENCH_HISTORY_KEY]: state,
+  };
+  if (method === "push") window.history.pushState(merged, "");
+  else window.history.replaceState(merged, "");
+}
+
+function isSameBomWorkbenchHistoryState(
+  left: BomWorkbenchHistoryState | null,
+  right: BomWorkbenchHistoryState,
+): boolean {
+  return left?.dept === right.dept && left.mode === right.mode && left.parentId === right.parentId;
+}
+
+function candidatesFor(items: Item[], dept: BomDeptFilter, mode: Mode): Item[] {
+  return items.filter((item) => {
+    if (item.deleted_at) return false;
+    if (dept !== "ALL" && item.process_type_code?.[0] !== dept) return false;
+    return mode === "whereused" || stageOf(item.process_type_code) !== "R";
+  });
+}
 
 export function BomWorkbench({
   items,
@@ -50,10 +88,32 @@ export function BomWorkbench({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [historyValidationDeferred, setHistoryValidationDeferred] = useState(false);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  useEffect(() => {
+    const restore = (state: unknown): void => {
+      const restored = readBomWorkbenchHistoryState(state);
+      if (!restored) return;
+      setDept(restored.dept);
+      setMode(restored.mode);
+      setParentId(restored.parentId);
+      setHistoryValidationDeferred(itemsRef.current.length === 0 && restored.parentId !== "");
+    };
+    restore(window.history.state);
+    setHistoryReady(true);
+    const handlePopState = (event: PopStateEvent): void => restore(event.state);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const activeItems = useMemo(() => items.filter((item) => !item.deleted_at), [items]);
 
   const completedSet = useMemo(
-    () => new Set(items.filter((i) => i.bom_completed_at).map((i) => i.item_id)),
-    [items],
+    () => new Set(activeItems.filter((i) => i.bom_completed_at).map((i) => i.item_id)),
+    [activeItems],
   );
   const childCountMap = useMemo(() => {
     const m = new Map<string, number>();
@@ -63,12 +123,8 @@ export function BomWorkbench({
 
   // 현재 부서의 부모 후보 (R 단계 제외, "ALL"일 때는 부서 필터 스킵)
   const parentCandidates = useMemo(
-    () =>
-      items.filter((i) => {
-        if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
-        return stageOf(i.process_type_code) !== "R";
-      }),
-    [items, dept],
+    () => candidatesFor(activeItems, dept, "edit"),
+    [activeItems, dept],
   );
 
   // 4-state KPI
@@ -86,18 +142,21 @@ export function BomWorkbench({
   }, [parentCandidates, completedSet, childCountMap]);
 
   // 첫 부모 자동 선택 (부서/모드 바뀔 때, "ALL"일 때는 부서 필터 스킵)
-  const modeCandidates = useMemo(() => {
-    return items.filter((i) => {
-      if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
-      if (mode === "edit") return stageOf(i.process_type_code) !== "R";
-      return true;
-    });
-  }, [items, dept, mode]);
+  const modeCandidates = useMemo(() => candidatesFor(activeItems, dept, mode), [activeItems, dept, mode]);
 
   useEffect(() => {
-    if (parentId && modeCandidates.some((c) => c.item_id === parentId)) return;
-    setParentId(modeCandidates[0]?.item_id ?? "");
-  }, [dept, mode, modeCandidates, parentId]);
+    if (!historyReady) return;
+    if (historyValidationDeferred && items.length === 0) return;
+    if (historyValidationDeferred) setHistoryValidationDeferred(false);
+    const stableParentId = parentId && modeCandidates.some((candidate) => candidate.item_id === parentId)
+      ? parentId
+      : modeCandidates[0]?.item_id ?? "";
+    const stableState = { dept, mode, parentId: stableParentId };
+    if (stableParentId !== parentId) setParentId(stableParentId);
+    if (!isSameBomWorkbenchHistoryState(readBomWorkbenchHistoryState(window.history.state), stableState)) {
+      writeBomWorkbenchHistoryState("replace", stableState);
+    }
+  }, [dept, historyReady, historyValidationDeferred, items.length, mode, modeCandidates, parentId]);
 
   // 선택된 부모의 직계 자식
   useEffect(() => {
@@ -131,14 +190,53 @@ export function BomWorkbench({
     };
   }, [parentId, realtimeRevision]);
 
-  function handleDeptChange(next: BomDeptFilter) {
+  function handleDeptChange(next: BomDeptFilter): void {
+    if (next === dept) return;
+    const nextParentId = candidatesFor(activeItems, next, mode)[0]?.item_id ?? "";
+    writeBomWorkbenchHistoryState("push", { dept: next, mode, parentId: nextParentId });
     setDept(next);
-    setParentId("");
+    setParentId(nextParentId);
+  }
+
+  function handleModeChange(next: Mode): void {
+    if (next === mode) return;
+    const nextCandidates = candidatesFor(activeItems, dept, next);
+    const nextParentId = nextCandidates.some((candidate) => candidate.item_id === parentId)
+      ? parentId
+      : nextCandidates[0]?.item_id ?? "";
+    writeBomWorkbenchHistoryState("push", { dept, mode: next, parentId: nextParentId });
+    setMode(next);
+    setParentId(nextParentId);
+  }
+
+  function handleParentSelect(nextParentId: string): void {
+    if (nextParentId === parentId) return;
+    writeBomWorkbenchHistoryState("push", { dept, mode, parentId: nextParentId });
+    setParentId(nextParentId);
+  }
+
+  function handleWhereUsedParentSelect(nextParentId: string): void {
+    const nextParent = activeItems.find((item) => item.item_id === nextParentId);
+    if (!nextParent) {
+      const fallbackParentId = candidatesFor(activeItems, dept, "edit")[0]?.item_id ?? "";
+      const fallbackState = { dept, mode: "edit" as const, parentId: fallbackParentId };
+      if (!isSameBomWorkbenchHistoryState(readBomWorkbenchHistoryState(window.history.state), fallbackState)) {
+        writeBomWorkbenchHistoryState("replace", fallbackState);
+      }
+      setMode("edit");
+      setParentId(fallbackParentId);
+      return;
+    }
+    const nextDept = dept === "ALL" ? dept : deptOf(nextParent?.process_type_code) ?? dept;
+    writeBomWorkbenchHistoryState("push", { dept: nextDept, mode: "edit", parentId: nextParentId });
+    setDept(nextDept);
+    setMode("edit");
+    setParentId(nextParentId);
   }
 
   const parent = useMemo(
-    () => items.find((i) => i.item_id === parentId) ?? null,
-    [items, parentId],
+    () => activeItems.find((i) => i.item_id === parentId) ?? null,
+    [activeItems, parentId],
   );
   const isCompleted = parent ? completedSet.has(parent.item_id) : false;
 
@@ -262,7 +360,7 @@ export function BomWorkbench({
               variant={mode === "edit" ? "primary" : "ghost"}
               size="sm"
               iconLeft={<Pencil size={13} />}
-              onClick={() => setMode("edit")}
+              onClick={() => handleModeChange("edit")}
               className="h-11 min-w-[82px] rounded-full"
               style={
                 mode === "edit"
@@ -276,7 +374,7 @@ export function BomWorkbench({
               variant={mode === "whereused" ? "primary" : "ghost"}
               size="sm"
               iconLeft={<ArrowRightLeft size={13} />}
-              onClick={() => setMode("whereused")}
+              onClick={() => handleModeChange("whereused")}
               className="h-11 min-w-[82px] rounded-full"
               style={
                 mode === "whereused"
@@ -316,12 +414,12 @@ export function BomWorkbench({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           <BomParentList
             dept={dept}
-            items={items}
+            items={activeItems}
             allBomRows={allBomRows}
             completedSet={completedSet}
             statusFilter={statusFilter}
             selectedId={parentId}
-            onSelect={setParentId}
+            onSelect={handleParentSelect}
             mode={mode}
           />
         </div>
@@ -367,10 +465,7 @@ export function BomWorkbench({
               selected={parent}
               rows={whereUsedRows}
               items={items}
-              onSelectParent={(id) => {
-                setMode("edit");
-                setParentId(id);
-              }}
+              onSelectParent={handleWhereUsedParentSelect}
             />
           </div>
         )}

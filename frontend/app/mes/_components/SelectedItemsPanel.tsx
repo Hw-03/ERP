@@ -7,6 +7,7 @@ import { mesCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
+import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
 
 export type SelectedEntry = { item: Item; quantity: number };
 
@@ -67,25 +68,12 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
             )}
 
             {/* 스테퍼 */}
-            <div className="flex flex-col items-center gap-0.5">
-              <span className="text-[9px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                수량
-              </span>
-              <div className="flex items-center gap-1">
-                <StepBtn tone={LEGACY_COLORS.red} onClick={() => onQuantityChange(item.item_id, Math.max(1, quantity - 10))}>-10</StepBtn>
-                <StepBtn tone={LEGACY_COLORS.red} onClick={() => onQuantityChange(item.item_id, Math.max(1, quantity - 1))}>-1</StepBtn>
-                <input
-                  type="number"
-                  min={1}
-                  value={quantity}
-                  onChange={(e) => onQuantityChange(item.item_id, Math.max(1, Number(e.target.value) || 1))}
-                  className="w-[72px] rounded-[10px] border px-2 py-1.5 text-center text-sm font-black tabular-nums outline-none"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                />
-                <StepBtn tone={LEGACY_COLORS.green} onClick={() => onQuantityChange(item.item_id, quantity + 1)}>+1</StepBtn>
-                <StepBtn tone={LEGACY_COLORS.green} onClick={() => onQuantityChange(item.item_id, quantity + 10)}>+10</StepBtn>
-              </div>
-            </div>
+            <QuantityStepper
+              value={quantity}
+              min={1}
+              step={1}
+              onChange={(next) => onQuantityChange(item.item_id, next)}
+            />
 
             {/* 현재 재고 */}
             <div className="text-right">
@@ -125,21 +113,5 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
         );
       })}
     </div>
-  );
-}
-
-function StepBtn({ tone, onClick, children }: { tone: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className="rounded-[10px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110"
-      style={{
-        background: `color-mix(in srgb, ${tone} 10%, transparent)`,
-        borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
-        color: tone,
-      }}
-    >
-      {children}
-    </button>
   );
 }

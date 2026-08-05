@@ -238,8 +238,8 @@ describe("MobileShippingScreen", () => {
 
     expect(screen.getByText("출하 수량")).toBeInTheDocument();
     expect(screen.getByText("2대 → 3대")).toBeInTheDocument();
-    expect(screen.getByText(/수량 변경.*\[PA\] 기존 케이블.*PR-001.*1 → 2 EA/)).toBeInTheDocument();
-    expect(screen.getByText(/추가.*\[PF\] 신규 브래킷.*PR-002.*1 EA/)).toBeInTheDocument();
+    expect(screen.getByText(/수량 변경.*\[PA\] 기존 케이블.*PR-001.*1EA → 2EA/)).toBeInTheDocument();
+    expect(screen.getByText(/추가.*\[PF\] 신규 브래킷.*PR-002.*1EA/)).toBeInTheDocument();
     expect(screen.getByText(/삭제.*동반 박스.*PR-BOX.*1 EA/)).toBeInTheDocument();
   });
 
@@ -295,7 +295,7 @@ describe("MobileShippingScreen", () => {
     expect(await screen.findByText("수정됨")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "변경 내용 보기" }));
 
-    expect(screen.getByText(/수량 변경.*케이블.*1 → 2 EA/)).toBeInTheDocument();
+    expect(screen.getByText(/수량 변경.*케이블.*1EA → 2EA/)).toBeInTheDocument();
     expect(screen.getByText(/포함 상태 변경.*케이블.*포함 → 제외/)).toBeInTheDocument();
     expect(screen.getByText(/포함 상태 변경.*브래킷.*제외 → 포함/)).toBeInTheDocument();
     expect(screen.queryByText("구성 순서가 변경되었습니다.")).not.toBeInTheDocument();

@@ -214,7 +214,10 @@ describe("ItemConversionView", () => {
     expect(screen.queryByText("미선택")).not.toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-target-guide")).toHaveTextContent("기존 품목을 선택하세요");
-    expect(screen.getByTestId("item-conversion-quantity")).toBeInTheDocument();
+    const quantityInput = screen.getByTestId("item-conversion-quantity");
+    expect(quantityInput).toBeInTheDocument();
+    expect(quantityInput).toHaveClass("quantity-input");
+    expect(quantityInput).not.toHaveClass("ict");
     expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("기존 품목을 선택하세요");
     expect(screen.queryByText("선택 초기화")).not.toBeInTheDocument();
   });

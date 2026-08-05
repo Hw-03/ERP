@@ -5,6 +5,7 @@ import { Box, GripVertical, Plus, Save, Trash2 } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { Button } from "@/lib/ui/Button";
 import { EmptyState } from "../common";
 import { StatusPill } from "../common/StatusPill";
@@ -578,8 +579,8 @@ function BomList({
               <span className="min-w-0 flex-1 truncate" style={{ color: LEGACY_COLORS.text }}>
                 {row.name}
               </span>
-              <span className="text-[12px] font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
-                {formatQty(row.qty)} {row.unit}
+              <span className="w-20 shrink-0 text-center text-[12px] font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+                {formatBomQuantity(row.qty, row.unit)}
               </span>
             </div>
           ))

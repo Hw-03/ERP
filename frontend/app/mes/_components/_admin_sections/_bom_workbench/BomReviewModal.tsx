@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { formatQty } from "@/lib/mes/format";
+import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import { BomBadge } from "./BomBadge";
@@ -126,10 +126,10 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
                     </TruncatedText>
                   </div>
                   <span
-                    className="font-semibold"
+                    className="text-center font-semibold tabular-nums"
                     style={{ color: bad ? LEGACY_COLORS.red : LEGACY_COLORS.muted }}
                   >
-                    ×{formatQty(r.quantity)} {r.unit || child?.unit || "EA"}
+                    {formatBomQuantity(r.quantity, r.unit || child?.unit)}
                   </span>
                 </div>
               );

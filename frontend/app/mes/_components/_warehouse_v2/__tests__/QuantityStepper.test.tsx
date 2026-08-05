@@ -73,4 +73,20 @@ describe("QuantityStepper", () => {
     expect(onChange).toHaveBeenNthCalledWith(1, 1);
     expect(onChange).toHaveBeenNthCalledWith(2, 1);
   });
+
+  it("uses the shared quantity-input surface with the existing quick controls", () => {
+    render(<QuantityStepper value={12} onChange={() => {}} label="공통 수량" />);
+
+    const input = screen.getByRole("spinbutton", { name: "공통 수량" });
+    expect(input).toHaveClass("quantity-input", "h-11", "w-[72px]");
+    expect(input).not.toHaveClass(
+      "[appearance:textfield]",
+      "[&::-webkit-inner-spin-button]:appearance-none",
+      "[&::-webkit-outer-spin-button]:appearance-none",
+    );
+    expect(screen.getByRole("button", { name: "-10" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "-1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+10" })).toBeInTheDocument();
+  });
 });

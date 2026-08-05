@@ -15,8 +15,7 @@ import {
 import { employeesApi } from "@/lib/api/employees";
 import {
   consumeLoginNotificationPopupPending,
-  getStoredBootId,
-  setCurrentOperator,
+  updateCurrentOperatorPreferences,
   useCurrentOperator,
 } from "../login/useCurrentOperator";
 import { NotificationPanel } from "./NotificationPanel";
@@ -268,7 +267,7 @@ export function NotificationBell({
     setLoginPopupUpdating(true);
     try {
       await employeesApi.setLoginPopup(employeeId, nextEnabled);
-      setCurrentOperator({ ...operator, loginPopupEnabled: nextEnabled }, getStoredBootId() ?? undefined);
+      updateCurrentOperatorPreferences({ loginPopupEnabled: nextEnabled });
     } catch {
       // 설정 저장 실패 시 기존 상태를 유지한다. 오류 오버레이로 화면을 막지 않는다.
     } finally {

@@ -7,6 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { InlineErrorNote } from "./InlineErrorNote";
+import { QuantityInput } from "../common/QuantityInput";
 
 export interface ChildDecision {
   item_id: string;
@@ -196,13 +197,12 @@ export function DisassembleTree({
         </div>
         <div className="flex flex-wrap items-center gap-3 px-4 pb-3">
           <span className="text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>하위 기본 정상</span>
-          <input
-            type="number"
+          <QuantityInput
             min={0}
             max={parentQty}
             value={parentNormalQty}
             onChange={(e) => handleParentNormalChange(Number(e.target.value))}
-            className="h-11 w-20 rounded-[10px] border px-2 text-center text-base font-black"
+            className="h-11 w-20 rounded-[10px] border px-2 text-base font-black"
             style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1, color: LEGACY_COLORS.text }}
             aria-label="하위 기본 정상 수량"
           />
@@ -387,13 +387,12 @@ function QtyInput({ label, value, color, onChange, ariaLabel }: { label: string;
   return (
     <label className="flex items-center gap-1.5">
       <span className="text-xs font-black" style={{ color }}>{label}</span>
-      <input
-        type="number"
+      <QuantityInput
         min={0}
         step="1"
         value={Number(value) || 0}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-11 w-20 rounded-[10px] border px-2 text-center text-base font-black"
+        className="h-11 w-20 rounded-[10px] border px-2 text-base font-black"
         style={{ borderColor: color, background: LEGACY_COLORS.s1, color: LEGACY_COLORS.text }}
         aria-label={ariaLabel}
       />

@@ -6,9 +6,9 @@ import {
   markLoginNotificationPopupPending,
   readCurrentOperator,
   setCurrentOperator,
+  updateCurrentOperatorPreferences,
   type Operator,
 } from "../useCurrentOperator";
-import * as currentOperatorStorage from "../useCurrentOperator";
 import { sendClientEvent } from "@/lib/client-events";
 
 vi.mock("@/lib/client-events", () => ({
@@ -77,21 +77,16 @@ describe("useCurrentOperator storage", () => {
     ).toBe("hover");
   });
 
-  it("updates only current operator preferences without logging another login", () => {
+  it("updates sidebar and login popup preferences without logging another login", () => {
     setCurrentOperator(baseOperator, "boot-1");
     vi.mocked(sendClientEvent).mockClear();
-    const updateCurrentOperatorPreferences = (
-      currentOperatorStorage as unknown as {
-        updateCurrentOperatorPreferences: (patch: { sidebar_mode: string }) => void;
-      }
-    ).updateCurrentOperatorPreferences;
 
-    expect(updateCurrentOperatorPreferences).toBeTypeOf("function");
-    updateCurrentOperatorPreferences({ sidebar_mode: "expanded" });
+    updateCurrentOperatorPreferences({ sidebar_mode: "expanded", loginPopupEnabled: true });
 
     expect(
       (readCurrentOperator() as unknown as { sidebar_mode: string })?.sidebar_mode,
     ).toBe("expanded");
+    expect(readCurrentOperator()?.loginPopupEnabled).toBe(true);
     expect(readCurrentOperator()?.name).toBe(baseOperator.name);
     expect(getStoredBootId()).toBe("boot-1");
     expect(sendClientEvent).not.toHaveBeenCalled();

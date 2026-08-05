@@ -13,6 +13,7 @@ import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDeci
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { REASON_CATEGORIES } from "./reasonCategories";
+import { QuantityInput } from "../common/QuantityInput";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -206,8 +207,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             <div className="flex flex-col gap-1">
               <span className="text-xs font-black uppercase tracking-[0.8px]" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
+                <QuantityInput
                   min={1}
                   max={maxQty}
                   value={boundedProcessQty}
@@ -216,7 +216,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
                     setProcessQty(v);
                     setDecisions([]);
                   }}
-                  className="w-24 rounded-[10px] border px-3 py-2 text-center text-base font-black"
+                  className="w-24 rounded-[10px] border px-3 py-2 text-base font-black"
                   style={{ borderColor: tint(LEGACY_COLORS.blue, 35), background: LEGACY_COLORS.s1, color: LEGACY_COLORS.blue }}
                 />
                 <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/ {formatQty(location.quantity)}개</span>
@@ -342,8 +342,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
         {/* 처리 수량 */}
         <div className="flex items-center gap-3">
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
-          <input
-            type="number"
+          <QuantityInput
             min={1}
             max={maxQty}
             value={boundedProcessQty}
@@ -352,7 +351,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
               setProcessQty(v);
                     setDecisions([]);
             }}
-            className="w-28 rounded-[10px] border px-3 py-2.5 text-center text-base font-black"
+            className="w-28 rounded-[10px] border px-3 py-2.5 text-base font-black"
             style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
           />
           <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/ 총 {formatQty(location.quantity)}개</span>

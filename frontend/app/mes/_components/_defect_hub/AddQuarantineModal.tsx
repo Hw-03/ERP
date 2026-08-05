@@ -12,6 +12,7 @@ import { itemsApi } from "@/lib/api/items";
 import type { Item } from "@/lib/api/types";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
+import { QuantityInput } from "../common/QuantityInput";
 
 const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
@@ -365,14 +366,13 @@ export function AddQuarantineModal({
           <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
             격리 수량 <span style={{ color: LEGACY_COLORS.red }}>*</span>
           </label>
-          <input
-            type="number"
+          <QuantityInput
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             min={0}
             step="0.01"
             placeholder="예: 3"
-            className="w-full rounded-[10px] border px-3 py-2 text-sm font-bold outline-none"
+            className="w-full rounded-[10px] border px-3 py-2 text-sm font-bold"
             style={{
               background: LEGACY_COLORS.s2,
               borderColor: LEGACY_COLORS.border,

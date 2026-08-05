@@ -13,6 +13,7 @@ import { DefectItemPicker } from "./DefectItemPicker";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { ConfirmModal } from "@/lib/ui";
 import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDecision } from "./DisassembleTree";
+import { QuantityInput } from "../common/QuantityInput";
 
 const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
@@ -444,7 +445,7 @@ export function DefectCartFlow({
 
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>수량</span>
-                          <input type="number" min={0} step="1" value={line.qty} onChange={(e) => updateLine(line.key, { qty: e.target.value, decisions: [] })} placeholder="예: 3" className="w-16 rounded-[8px] border px-2 py-1 text-center text-sm font-bold outline-none" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }} />
+                          <QuantityInput min={0} step="1" value={line.qty} onChange={(e) => updateLine(line.key, { qty: e.target.value, decisions: [] })} placeholder="예: 3" className="w-16 rounded-[8px] border px-2 py-1 text-sm font-bold" />
                           {idx < lines.length - 1 && (line.category || line.memo) && !isRework && (
                             <button type="button" onClick={() => copyReasonDown(idx)} className="ml-auto flex items-center gap-1 text-xs font-bold hover:underline" style={{ color: LEGACY_COLORS.blue }}>
                               <Copy className="h-3 w-3" />

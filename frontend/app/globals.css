@@ -867,6 +867,60 @@
   line-height: 1.25;
 }
 
+.quantity-input {
+  position: relative;
+  appearance: auto;
+  color-scheme: light;
+  border-color: var(--c-border);
+  background: var(--c-s2);
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+:root[data-theme="dark"] .quantity-input {
+  color-scheme: dark;
+}
+
+.quantity-input::-webkit-inner-spin-button {
+  /* Keep the native control above, not inside, the centered text layout. */
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-end: 4px;
+  z-index: 1;
+  margin: 0;
+  appearance: auto;
+}
+
+.quantity-input:focus-visible {
+  border-color: var(--c-blue);
+  outline: 2px solid var(--c-blue);
+  outline-offset: 1px;
+}
+
+.quantity-input:disabled {
+  opacity: 0.6;
+}
+
+.bom-modal-grid {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1.5fr) 96px minmax(120px, 1fr) 96px 112px;
+  align-items: center;
+}
+
+.bom-modal-toggle {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.bom-modal-toggle:focus-visible {
+  outline: 2px solid var(--c-blue);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

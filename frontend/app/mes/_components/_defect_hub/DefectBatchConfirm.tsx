@@ -10,6 +10,7 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { Department } from "@/lib/api/types/shared";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { QuantityInput } from "../common/QuantityInput";
 
 export type BatchAction = "unquarantine" | "scrap" | "return";
 
@@ -194,13 +195,12 @@ export function DefectBatchConfirm({
                 </div>
                 {action === "unquarantine" ? (
                   <div className="flex shrink-0 items-center gap-1">
-                    <input
-                      type="number"
+                    <QuantityInput
                       value={r.qty}
                       min={1}
                       max={Number(loc.quantity)}
                       onChange={(e) => setReason(key, { qty: e.target.value })}
-                      className="w-20 rounded-[8px] border px-2 py-1 text-right text-sm font-bold"
+                      className="w-20 rounded-[8px] border px-2 py-1 text-sm font-bold"
                       style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
                     />
                     <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>

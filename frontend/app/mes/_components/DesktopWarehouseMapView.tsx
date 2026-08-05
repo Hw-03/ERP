@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { QuantityInput } from "./common/QuantityInput";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 import { SlidePanel } from "./common/SlidePanel";
 import { LoadingSkeleton } from "./common/LoadingSkeleton";
@@ -1342,8 +1343,7 @@ function WarehouseZonePanel({
                   </div>
                   {editable ? (
                     <>
-                      <input
-                        type="number"
+                      <QuantityInput
                         min={0}
                         value={line.quantity}
                         onChange={(e) => updateLine(line.item_id, Number(e.target.value))}

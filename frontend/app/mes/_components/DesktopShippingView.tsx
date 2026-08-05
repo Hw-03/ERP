@@ -37,8 +37,10 @@ import { queryKeys } from "@/lib/queries/keys";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { processTypeColor } from "@/lib/mes/process";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { QuantityInput } from "./common/QuantityInput";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
@@ -52,6 +54,15 @@ function isShippingViewMode(value: string | null): value is ViewMode {
   return Boolean(value && VIEW_MODE_VALUES.includes(value as ViewMode));
 }
 type RequestWizardStep = 1 | 2 | 3 | 4 | 5;
+type RequestWizardNavigation = "push" | "replace";
+type PendingUrlSearch = { from: string; to: string };
+type RequestWizardPushEntry = {
+  fromSearch: string;
+  toSearch: string;
+  fromStep: RequestWizardStep;
+  toStep: RequestWizardStep;
+};
+type RequestDraftLegacyAliases = { requestId: string; searches: Set<string> };
 type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM" };
 type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit: string };
 type PendingAction =
@@ -79,6 +90,9 @@ type NameValidationNotice = {
   id: number;
   message: string;
 };
+
+const UNINITIALIZED_REQUEST_DRAFT = Symbol("uninitialized-request-draft");
+type RequestDraftIdentity = typeof UNINITIALIZED_REQUEST_DRAFT | string | null;
 
 const EMPTY_STOCK_SHORTAGES: ShippingRequest["stock_shortages"] = [];
 const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
@@ -154,6 +168,18 @@ function toPositiveInt(value: string | number) {
 function isValidPositiveInt(value: string | number) {
   const n = Number(value);
   return Number.isInteger(n) && n >= 1;
+}
+
+function requestWizardStepFromParam(value: string | null): RequestWizardStep | null {
+  const step = Number(value);
+  return Number.isInteger(step) && step >= 1 && step <= 5 ? step as RequestWizardStep : null;
+}
+
+function isUnsavedRequestWorkSearch(search: string): boolean {
+  const params = new URLSearchParams(search);
+  return params.get("tab") === "shipping"
+    && params.get("shippingView") === "requestWork"
+    && !params.has("shippingRequestId");
 }
 
 function formatDate(value: string | null) {
@@ -274,7 +300,15 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const router = useRouter();
   const searchParams = useSearchParams();
   const lastUrlSearchRef = useRef(searchParams.toString());
-  const pendingUrlSearchRef = useRef<string | null>(null);
+  const pendingUrlSearchRef = useRef<PendingUrlSearch | null>(null);
+  const requestWizardPushStackRef = useRef<RequestWizardPushEntry[]>([]);
+  const requestWizardForwardStackRef = useRef<RequestWizardPushEntry[]>([]);
+  const requestDraftIdentityRef = useRef<RequestDraftIdentity>(UNINITIALIZED_REQUEST_DRAFT);
+  const requestDraftLegacyAliasesRef = useRef<RequestDraftLegacyAliases | null>(null);
+  function clearRequestWizardHistory(): void {
+    requestWizardPushStackRef.current = [];
+    requestWizardForwardStackRef.current = [];
+  }
   const [view, setView] = useState<ViewMode>("hub");
   const [items, setItems] = useState<Item[]>([]);
   const [pfItems, setPfItems] = useState<Item[]>([]);
@@ -394,6 +428,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     nextView: ViewMode,
     requestId?: string | null,
     historyStatusOverride?: ShippingHistoryStatus,
+    requestStepOverride?: RequestWizardStep,
   ) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", "shipping");
@@ -401,6 +436,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       params.delete("shippingView");
       params.delete("shippingRequestId");
       params.delete("shippingHistoryStatus");
+      params.delete("shippingStep");
     } else {
       params.set("shippingView", nextView);
       if (requestId) params.set("shippingRequestId", requestId);
@@ -409,6 +445,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         params.set("shippingHistoryStatus", historyStatusOverride ?? historyStatus);
       }
       else params.delete("shippingHistoryStatus");
+      if (nextView === "requestWork") params.set("shippingStep", String(requestStepOverride ?? requestWizardStep));
+      else params.delete("shippingStep");
     }
     return `?${params.toString()}`;
   }
@@ -417,11 +455,51 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     nextView: ViewMode,
     requestId?: string | null,
     historyStatusOverride?: ShippingHistoryStatus,
+    requestStepOverride?: RequestWizardStep,
   ) {
-    const url = buildShippingUrl(nextView, requestId, historyStatusOverride);
-    pendingUrlSearchRef.current = url.startsWith("?") ? url.slice(1) : url;
+    if (nextView !== "requestWork") {
+      clearRequestWizardHistory();
+    }
+    const url = buildShippingUrl(nextView, requestId, historyStatusOverride, requestStepOverride);
+    const toSearch = url.startsWith("?") ? url.slice(1) : url;
+    pendingUrlSearchRef.current = { from: searchParams.toString(), to: toSearch };
     setView(nextView);
     router.push(url, { scroll: false });
+  }
+
+  function navigateRequestWizardStep(nextStep: RequestWizardStep, navigation: RequestWizardNavigation = "push"): void {
+    if (nextStep === requestWizardStep) return;
+    const url = buildShippingUrl("requestWork", editingId, undefined, nextStep);
+    const currentSearch = searchParams.toString();
+    const toSearch = url.startsWith("?") ? url.slice(1) : url;
+    if (navigation === "replace") {
+      const lastPushedEntry = requestWizardPushStackRef.current.at(-1);
+      if (
+        lastPushedEntry
+        && lastPushedEntry.fromStep === nextStep
+        && lastPushedEntry.toStep === requestWizardStep
+        && lastPushedEntry.toSearch === currentSearch
+      ) {
+        const previousEntry = requestWizardPushStackRef.current.pop();
+        if (previousEntry) requestWizardForwardStackRef.current.push(previousEntry);
+        pendingUrlSearchRef.current = { from: currentSearch, to: lastPushedEntry.fromSearch };
+        setRequestWizardStep(nextStep);
+        router.back();
+        return;
+      }
+      clearRequestWizardHistory();
+    } else {
+      requestWizardForwardStackRef.current = [];
+      requestWizardPushStackRef.current.push({
+        fromSearch: currentSearch,
+        toSearch,
+        fromStep: requestWizardStep,
+        toStep: nextStep,
+      });
+    }
+    pendingUrlSearchRef.current = { from: currentSearch, to: toSearch };
+    setRequestWizardStep(nextStep);
+    router[navigation](url, { scroll: false });
   }
 
   const upsertRequest = useCallback((next: ShippingRequest) => {
@@ -621,7 +699,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       const params = new URLSearchParams(searchParams.toString());
       params.set("shippingHistoryStatus", status);
       const url = `?${params.toString()}`;
-      pendingUrlSearchRef.current = params.toString();
+      pendingUrlSearchRef.current = { from: searchParams.toString(), to: params.toString() };
       router.replace(url, { scroll: false });
     }
   }
@@ -737,8 +815,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           const params = new URLSearchParams(searchParams.toString());
           params.set("shippingHistoryStatus", actualStatus);
           const normalizedSearch = params.toString();
-          if (pendingUrlSearchRef.current !== normalizedSearch) {
-            pendingUrlSearchRef.current = normalizedSearch;
+          if (pendingUrlSearchRef.current?.to !== normalizedSearch) {
+            pendingUrlSearchRef.current = { from: searchParams.toString(), to: normalizedSearch };
             router.replace(`?${normalizedSearch}`, { scroll: false });
           }
         }
@@ -786,17 +864,47 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") return;
     const currentSearch = searchParams.toString();
-    if (pendingUrlSearchRef.current) {
-      if (currentSearch === pendingUrlSearchRef.current) {
+    let settledPendingNavigation = false;
+    const pendingUrlSearch = pendingUrlSearchRef.current;
+    if (pendingUrlSearch) {
+      if (currentSearch === pendingUrlSearch.to) {
         pendingUrlSearchRef.current = null;
-      } else {
+        settledPendingNavigation = true;
+      } else if (currentSearch === pendingUrlSearch.from) {
         return;
+      } else {
+        pendingUrlSearchRef.current = null;
+        clearRequestWizardHistory();
+      }
+    }
+    if (!settledPendingNavigation && currentSearch !== lastUrlSearchRef.current) {
+      const lastPushedEntry = requestWizardPushStackRef.current.at(-1);
+      const lastForwardEntry = requestWizardForwardStackRef.current.at(-1);
+      if (
+        lastPushedEntry
+        && currentSearch === lastPushedEntry.fromSearch
+        && lastUrlSearchRef.current === lastPushedEntry.toSearch
+      ) {
+        const previousEntry = requestWizardPushStackRef.current.pop();
+        if (previousEntry) requestWizardForwardStackRef.current.push(previousEntry);
+      } else if (
+        lastForwardEntry
+        && lastUrlSearchRef.current === lastForwardEntry.fromSearch
+        && currentSearch === lastForwardEntry.toSearch
+      ) {
+        const nextEntry = requestWizardForwardStackRef.current.pop();
+        if (nextEntry) requestWizardPushStackRef.current.push(nextEntry);
+      } else {
+        clearRequestWizardHistory();
       }
     }
     const hasSubview = searchParams.has("shippingView");
     if (!hasSubview && lastUrlSearchRef.current === currentSearch && view !== "hub") return;
     lastUrlSearchRef.current = currentSearch;
     const nextView = isShippingViewMode(searchParams.get("shippingView")) ? searchParams.get("shippingView") as ViewMode : "hub";
+    if (nextView !== "requestWork") {
+      clearRequestWizardHistory();
+    }
     const requestId = searchParams.get("shippingRequestId");
     const urlHistoryStatus = searchParams.get("shippingHistoryStatus");
     if (
@@ -844,10 +952,59 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       setView("historyWork");
       return;
     }
-    if (view === "requestWork" && editingId === requestId) return;
-    if (requestId) {
-      const found = requests.find((req) => req.request_id === requestId);
+    const legacyAliases = requestDraftLegacyAliasesRef.current;
+    const legacyAliasRequestId = !requestId
+      && legacyAliases
+      && legacyAliases.searches.has(currentSearch)
+      && requestDraftIdentityRef.current === legacyAliases.requestId
+      && editingId === legacyAliases.requestId
+      ? legacyAliases.requestId
+      : null;
+    const effectiveRequestId = requestId ?? legacyAliasRequestId;
+    const defaultRequestStep: RequestWizardStep = effectiveRequestId ? 2 : 1;
+    const requestedStep = requestWizardStepFromParam(searchParams.get("shippingStep"));
+    const found = effectiveRequestId ? requests.find((req) => req.request_id === effectiveRequestId) : null;
+    if (effectiveRequestId && !found) {
+      if (!loading) setView("requestList");
+      return;
+    }
+    const draftMatchesUrl = requestDraftIdentityRef.current !== UNINITIALIZED_REQUEST_DRAFT
+      && requestDraftIdentityRef.current === effectiveRequestId;
+    const effectiveBasePfId = draftMatchesUrl ? basePfId : found?.base_pf_item_id ?? "";
+    const effectiveQuantity = draftMatchesUrl ? requestQuantity : found?.request_quantity ?? 1;
+    let nextRequestStep = requestedStep ?? defaultRequestStep;
+    if (nextRequestStep >= 2 && (!effectiveBasePfId || !isValidPositiveInt(effectiveQuantity))) {
+      nextRequestStep = 1;
+    }
+    const missingRequiredName = draftMatchesUrl && matchResult && (
+      (matchResult.requires_pa_name && !customPaName.trim())
+      || (matchResult.requires_pf_name && !customPfName.trim())
+    );
+    if (nextRequestStep >= 4 && missingRequiredName) nextRequestStep = 3;
+
+    if (legacyAliasRequestId || searchParams.get("shippingStep") !== String(nextRequestStep)) {
+      const params = new URLSearchParams(searchParams.toString());
+      if (legacyAliasRequestId) params.set("shippingRequestId", legacyAliasRequestId);
+      params.set("shippingStep", String(nextRequestStep));
+      const normalizedSearch = params.toString();
+      if (pendingUrlSearchRef.current?.to !== normalizedSearch) {
+        if (legacyAliasRequestId) legacyAliases?.searches.delete(currentSearch);
+        clearRequestWizardHistory();
+        pendingUrlSearchRef.current = { from: currentSearch, to: normalizedSearch };
+        router.replace(`?${normalizedSearch}`, { scroll: false });
+      }
+    }
+    if (draftMatchesUrl) {
+      if (requestWizardStep !== nextRequestStep) setRequestWizardStep(nextRequestStep);
+      if (view !== "requestWork") setView("requestWork");
+      return;
+    }
+    if (effectiveRequestId) {
       if (found) {
+        if (requestDraftLegacyAliasesRef.current?.requestId !== found.request_id) {
+          requestDraftLegacyAliasesRef.current = null;
+        }
+        requestDraftIdentityRef.current = found.request_id;
         setEditingId(found.request_id);
         setBasePfId(found.base_pf_item_id);
         setInvoiceNumber(found.invoice_number ?? "");
@@ -859,25 +1016,39 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         setCompanionDraft(requestCompanionDraft(found));
         setDraftLines(requestBomLines(found));
         setMatchResult(null);
-        setRequestWizardStep(2);
+        setRequestWizardStep(nextRequestStep);
         setView("requestWork");
         void ensureItemsLoaded();
         void ensurePfItemsLoaded();
       } else if (!loading) setView("requestList");
       return;
     }
+    requestDraftLegacyAliasesRef.current = null;
+    requestDraftIdentityRef.current = null;
     setEditingId(null);
+    setBasePfId("");
     setInvoiceNumber("");
-    setRequestWizardStep(1);
+    setRequestedBy(operator?.name ?? "");
+    setRequestWizardStep(nextRequestStep);
     setRequestQuantity(1);
     setCompanionDraft([]);
+    setCustomPaName("");
+    setCustomPfName("");
+    setNotes("");
+    setDraftLines([]);
+    setMatchResult(null);
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
-  }, [searchParams, requests, loading, view, historyStatus, editingId, ensurePfItemsLoaded, ensureItemsLoaded]);
+  // Router method identity is not part of the URL state being restored.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, requests, loading, view, historyStatus, editingId, basePfId, requestQuantity, requestWizardStep, matchResult, customPaName, customPfName, ensurePfItemsLoaded, ensureItemsLoaded]);
 
   function clearDraft() {
-    navigateView("requestWork");
+    clearRequestWizardHistory();
+    requestDraftLegacyAliasesRef.current = null;
+    requestDraftIdentityRef.current = null;
+    navigateView("requestWork", null, undefined, 1);
     setRequestWizardStep(1);
     setEditingId(null);
     setBasePfId("");
@@ -894,6 +1065,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }
 
   function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork", syncUrl = true) {
+    clearRequestWizardHistory();
+    if (requestDraftLegacyAliasesRef.current?.requestId !== req.request_id) {
+      requestDraftLegacyAliasesRef.current = null;
+    }
+    requestDraftIdentityRef.current = req.request_id;
     setEditingId(req.request_id);
     setBasePfId(req.base_pf_item_id);
     setInvoiceNumber(req.invoice_number ?? "");
@@ -906,7 +1082,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setDraftLines(requestBomLines(req));
     setMatchResult(null);
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
-    if (syncUrl) navigateView(nextView, req.request_id);
+    if (syncUrl) navigateView(nextView, req.request_id, undefined, nextView === "requestWork" ? 2 : undefined);
     else setView(nextView);
     if (nextView === "requestWork") void ensureItemsLoaded();
   }
@@ -961,7 +1137,6 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
 
   async function handleBasePfChange(nextBasePfId: string) {
     setBasePfId(nextBasePfId);
-    setEditingId(null);
     setRequestWizardStep(1);
     const loadedItems = await ensureItemsLoaded();
     if (!loadedItems) return;
@@ -1002,6 +1177,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setPending("save");
     setError(null);
     try {
+      const wasNewDraft = editingId === null;
       const payload = draftPayload();
       const saved = editingId
         ? await api.updateShippingRequest(editingId, payload)
@@ -1010,7 +1186,23 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       if (editingId) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(saved.request_id) });
       }
+      requestDraftIdentityRef.current = saved.request_id;
       setEditingId(saved.request_id);
+      if (wasNewDraft) {
+        const currentSearch = searchParams.toString();
+        const legacySearches = new Set<string>();
+        for (const entry of requestWizardPushStackRef.current) {
+          if (isUnsavedRequestWorkSearch(entry.fromSearch)) legacySearches.add(entry.fromSearch);
+          if (isUnsavedRequestWorkSearch(entry.toSearch)) legacySearches.add(entry.toSearch);
+        }
+        legacySearches.delete(currentSearch);
+        requestDraftLegacyAliasesRef.current = { requestId: saved.request_id, searches: legacySearches };
+        const url = buildShippingUrl("requestWork", saved.request_id, undefined, requestWizardStep);
+        const toSearch = url.startsWith("?") ? url.slice(1) : url;
+        clearRequestWizardHistory();
+        pendingUrlSearchRef.current = { from: currentSearch, to: toSearch };
+        router.replace(url, { scroll: false });
+      }
       onStatusChange(editingId ? "출하 요청을 수정했습니다." : "출하 요청을 생성했습니다.");
       if (saved.status === "PREPARING") {
         navigateView("requestList");
@@ -1173,6 +1365,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       } else if (action.kind === "delete") {
         await api.deleteShippingRequest(action.request.request_id);
         setRequests((prev) => prev.filter((row) => row.request_id !== action.request.request_id));
+        clearRequestWizardHistory();
+        if (requestDraftIdentityRef.current === action.request.request_id) {
+          requestDraftIdentityRef.current = UNINITIALIZED_REQUEST_DRAFT;
+        }
+        if (requestDraftLegacyAliasesRef.current?.requestId === action.request.request_id) {
+          requestDraftLegacyAliasesRef.current = null;
+        }
         setEditingId(null);
         navigateView("requestList");
         onStatusChange("출하 요청을 취소했습니다.");
@@ -1336,7 +1535,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             canEditDraft={canEditDraft}
             pending={pending}
             wizardStep={requestWizardStep}
-            onWizardStep={setRequestWizardStep}
+            onWizardStep={navigateRequestWizardStep}
             onNew={clearDraft}
             onSelectRequest={(req) => loadRequestIntoDraft(req, "requestDetail")}
             onBasePfChange={(value) => void handleBasePfChange(value)}
@@ -1762,7 +1961,7 @@ function revisionSummary(changes: Array<{ field: string }>): string {
   return labels.length > 0 ? `${labels.join(" · ")} 수정` : "출하 요청 수정";
 }
 
-function revisionValue(value: unknown, request: ShippingRequest): string {
+function revisionValue(value: unknown, request: ShippingRequest, isBomChange = false): string {
   if (value === null || value === undefined || value === "") return "없음";
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
   if (Array.isArray(value)) {
@@ -1781,7 +1980,12 @@ function revisionValue(value: unknown, request: ShippingRequest): string {
       const mesCode = hasSnapshotCode ? snapshotCode : currentLine?.mes_code ?? null;
       const itemLabel = itemName ? `${itemName}${mesCode ? ` (${mesCode})` : ""}` : itemId || "품목";
       const stage = typeof line.parent_stage === "string" ? `${line.parent_stage} · ` : "";
-      const quantity = line.quantity === undefined ? "" : ` × ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`;
+      const unit = typeof line.unit === "string" ? line.unit : undefined;
+      const quantity = line.quantity === undefined
+        ? ""
+        : isBomChange
+          ? ` ${formatBomQuantity(Number(line.quantity), unit)}`
+          : ` × ${line.quantity}${unit ? ` ${unit}` : ""}`;
       const inclusion = line.included === false ? " · 제외" : "";
       return `${stage}${itemLabel}${quantity}${inclusion}`;
     }).join(", ");
@@ -1840,7 +2044,7 @@ function RevisionHistory({ request }: { request: ShippingRequest }) {
                     {revision.changes.map((change, index) => (
                       <div key={`${change.field}-${index}`} className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
                         <span className="font-black" style={{ color: LEGACY_COLORS.muted2 }}>{REVISION_FIELD_LABELS[change.field] ?? change.field}</span>
-                        <span>{` · ${revisionValue(change.before, request)} → ${revisionValue(change.after, request)}`}</span>
+                        <span>{` · ${revisionValue(change.before, request, change.field === "bom_lines")} → ${revisionValue(change.after, request, change.field === "bom_lines")}`}</span>
                       </div>
                     ))}
                   </div>
@@ -2109,7 +2313,7 @@ function RequestSection(props: {
   canEditDraft: boolean;
   pending: PendingAction;
   wizardStep: RequestWizardStep;
-  onWizardStep: (step: RequestWizardStep) => void;
+  onWizardStep: (step: RequestWizardStep, navigation?: RequestWizardNavigation) => void;
   onNew: () => void;
   onSelectRequest: (req: ShippingRequest) => void;
   onBasePfChange: (value: string) => void;
@@ -2213,7 +2417,7 @@ function RequestSection(props: {
       : props.wizardStep >= 3
         ? `현재 출하 수량 ${requestQty}대 · 변경은 상단 수량 변경`
         : `현재 출하 수량 ${requestQty}대`;
-  const goPrev = () => props.onWizardStep(Math.max(1, props.wizardStep - 1) as RequestWizardStep);
+  const goPrev = () => props.onWizardStep(Math.max(1, props.wizardStep - 1) as RequestWizardStep, "replace");
   const goNext = () => {
     if (nameChangePromptActive) {
       const required = [paNameNeedsChange ? "PA" : null, pfNameNeedsChange ? "PF" : null].filter(Boolean).join("/");
@@ -2221,12 +2425,12 @@ function RequestSection(props: {
       return;
     }
     if (!canGoNext) return;
-    props.onWizardStep(Math.min(5, props.wizardStep + 1) as RequestWizardStep);
+    props.onWizardStep(Math.min(5, props.wizardStep + 1) as RequestWizardStep, "push");
   };
   const goEditQuantity = () => {
     if (props.pending !== null) return;
     setFocusRequestQuantity(true);
-    props.onWizardStep(1);
+    props.onWizardStep(1, "push");
   };
 
   useEffect(() => {
@@ -2261,7 +2465,7 @@ function RequestSection(props: {
                   key={title}
                   type="button"
                   onClick={() => {
-                    if (canOpenStep(step)) props.onWizardStep(step);
+                    if (canOpenStep(step)) props.onWizardStep(step, "push");
                   }}
                   disabled={!canOpenStep(step)}
                   className="min-h-12 rounded-[14px] border px-3 py-2 text-left text-xs font-black transition-all disabled:cursor-not-allowed disabled:opacity-40"
@@ -2759,8 +2963,8 @@ function PrepRequirementList({
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                   <SummaryCode code={line.mes_code ?? "코드 없음"} testId={`shipping-prep-code-${line.child_item_id}`} />
-                  <span>1대 기준 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</span>
-                  <span>총 필요 {line.quantity * requestQuantity}{line.unit ? ` ${line.unit}` : ""}</span>
+                  <span>1대 기준 {formatBomQuantity(line.quantity, line.unit)}</span>
+                  <span>총 필요 {formatBomQuantity(line.quantity * requestQuantity, line.unit)}</span>
                 </div>
               </div>
             );
@@ -3000,14 +3204,13 @@ function CompanionEditor({
                     <SummaryCode code={item?.mes_code ?? "코드 없음"} testId={`shipping-companion-code-${line.item_id}`} />
                   </div>
                 </div>
-                <input
-                  type="number"
+                <QuantityInput
                   min={1}
                   value={line.quantity}
                   disabled={disabled}
                   aria-label={`${item?.item_name ?? "동반 출하품"} 수량`}
                   onChange={(event) => onUpdate(line.key, { quantity: toPositiveInt(event.target.value), unit: item?.unit ?? line.unit ?? "EA" })}
-                  className={`${SHIPPING_QTY_INPUT_CLASS} self-stretch lg:col-start-2 lg:row-start-1`}
+                  className="min-h-9 h-full w-full self-stretch rounded-[9px] border px-2 text-sm font-black lg:col-start-2 lg:row-start-1"
                   style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                 />
                 <button type="button" aria-label={`${item?.item_name ?? "동반 출하품"} 제거`} onClick={() => onRemove(line.key)} disabled={disabled} className="inline-flex min-h-9 h-full self-stretch items-center justify-center gap-1 rounded-[9px] border px-2 text-xs font-black lg:col-start-3 lg:row-start-1" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}>
@@ -3103,14 +3306,13 @@ function BomEditor({
                     <span className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{item?.mes_code ?? "품목 미선택"}</span>
                   </div>
                 </div>
-                <input
-                  type="number"
+                <QuantityInput
                   min={1}
                   value={line.quantity}
                   disabled={disabled || isExcluded}
                   onChange={(event) => onUpdate(line.key, { quantity: toNumber(event.target.value) })}
                   data-testid="shipping-bom-line-controls"
-                  className={`${SHIPPING_QTY_INPUT_CLASS} self-stretch lg:col-start-2 lg:row-start-1`}
+                  className="min-h-9 h-full w-full self-stretch rounded-[9px] border px-2 text-sm font-black lg:col-start-2 lg:row-start-1"
                   style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                 />
                 <button
@@ -3188,7 +3390,7 @@ function LineSummary({ request }: { request: ShippingRequest }) {
       key: `${line.line_id ?? line.child_item_id}-${line.parent_stage}`,
       title: line.item_name,
       code: line.mes_code ?? "코드 없음",
-      quantity: `${line.quantity}${line.unit ? " " + line.unit : ""}`,
+      quantity: formatBomQuantity(line.quantity, line.unit),
     };
   };
   const companionLines = request.companion_lines.map((line) => ({
@@ -3279,7 +3481,7 @@ function ShippingActionConfirmModal({
         : "최종 PF와 동반 출하품을 출하 처리합니다.";
   const lines = isPrepare
     ? [
-        ...request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} · 1대 ${line.quantity}${line.unit ? ` ${line.unit}` : ""} / 총 ${line.quantity * requestQty}${line.unit ? ` ${line.unit}` : ""}`),
+        ...request.bom_lines.filter((line) => line.included).map((line) => `${line.parent_stage} · ${line.item_name} · 1대 ${formatBomQuantity(line.quantity, line.unit)} / 총 ${formatBomQuantity(line.quantity * requestQty, line.unit)}`),
         ...request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`),
       ]
     : kind === "cancel"
@@ -3483,7 +3685,7 @@ function BomChangeSummaryCard({
               </div>
               <div className="mt-0.5 flex flex-wrap gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 <SummaryCode code={item?.mes_code ?? "코드 없음"} testId={`shipping-bom-change-code-${line.child_item_id}`} />
-                <span>총 {line.quantity}{line.unit ? ` ${line.unit}` : ""}</span>
+                <span>총 {formatBomQuantity(line.quantity, line.unit)}</span>
               </div>
             </div>
           );
@@ -3585,7 +3787,9 @@ function FinalRequirementGroup({
                   <SummaryCode code={itemCode} testId={`shipping-final-code-${row.id}`} />
                 </div>
               </div>
-              <span data-testid={`shipping-final-quantity-${row.id}`} className="shrink-0 self-center text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>총 {row.quantity} {row.unit}</span>
+              <span data-testid={`shipping-final-quantity-${row.id}`} className="shrink-0 self-center text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+                총 {group.id === "companion" ? `${row.quantity} ${row.unit}` : formatBomQuantity(row.quantity, row.unit)}
+              </span>
             </div>
           );
         })}
@@ -3772,7 +3976,6 @@ const SHIPPING_PANEL_CLASS = "flex min-h-0 flex-col rounded-[14px] border p-3";
 const SHIPPING_TEXT_INPUT_CLASS = "h-12 w-full min-w-0 rounded-[12px] border px-3 text-sm font-bold outline-none focus-visible:ring-2";
 const SHIPPING_SCROLL_LIST_CLASS = "grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1";
 const SHIPPING_EMPTY_BOX_CLASS = "flex min-h-[88px] items-center justify-center rounded-[12px] border text-xs font-bold";
-const SHIPPING_QTY_INPUT_CLASS = "min-h-9 h-full w-full rounded-[9px] border px-2 text-center text-sm font-black outline-none";
 const SHIPPING_FLEX_COL_CLASS = "flex min-h-0 flex-1 flex-col";
 const SHIPPING_ROW_CLASS = "flex min-w-0 items-center gap-3";
 const SHIPPING_TOP_ROW_CLASS = "flex flex-wrap items-start justify-between gap-3";

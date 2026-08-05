@@ -26,6 +26,8 @@ const state = vi.hoisted(() => ({
   deleteRead: vi.fn(),
   setLoginPopup: vi.fn(),
   setCurrentOperator: vi.fn(),
+  updateCurrentOperatorPreferences: vi.fn(),
+  getStoredBootId: vi.fn(() => "boot-1"),
 }));
 
 vi.mock("@/lib/queries/useNotificationsQuery", () => ({
@@ -44,7 +46,8 @@ vi.mock("@/lib/api/employees", () => ({
 vi.mock("../../login/useCurrentOperator", () => ({
   useCurrentOperator: () => state.operator,
   setCurrentOperator: state.setCurrentOperator,
-  getStoredBootId: () => "boot-1",
+  updateCurrentOperatorPreferences: state.updateCurrentOperatorPreferences,
+  getStoredBootId: state.getStoredBootId,
   consumeLoginNotificationPopupPending: (employeeId: string) => {
     if (window.sessionStorage.getItem("dexcowin_mes_login_popup_pending") !== employeeId) return false;
     window.sessionStorage.removeItem("dexcowin_mes_login_popup_pending");
@@ -84,6 +87,8 @@ describe("NotificationBell", () => {
     state.setLoginPopup.mockReset();
     state.setLoginPopup.mockResolvedValue({});
     state.setCurrentOperator.mockClear();
+    state.updateCurrentOperatorPreferences.mockClear();
+    state.getStoredBootId.mockClear();
   });
 
   it("shows the desktop login dialog once when unread notifications exist", async () => {
@@ -153,6 +158,20 @@ describe("NotificationBell", () => {
     fireEvent.click(screen.getByRole("button"));
 
     expect(screen.getByText("New handover")).toBeInTheDocument();
+  });
+
+  it("updates the login popup preference without emitting a login event", async () => {
+    render(<NotificationBell loginDialogEnabled={false} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "알림 2건" }));
+    fireEvent.click(screen.getByRole("switch", { name: "로그인 팝업" }));
+
+    await waitFor(() => {
+      expect(state.setLoginPopup).toHaveBeenCalledWith("emp-1", false);
+      expect(state.updateCurrentOperatorPreferences).toHaveBeenCalledWith({ loginPopupEnabled: false });
+    });
+    expect(state.setCurrentOperator).not.toHaveBeenCalled();
+    expect(state.getStoredBootId).not.toHaveBeenCalled();
   });
 
   it("does not consume the login popup flag from a hidden shell", async () => {

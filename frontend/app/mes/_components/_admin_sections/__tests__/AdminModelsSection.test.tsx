@@ -94,7 +94,7 @@ describe("AdminModelsSection", () => {
     });
   });
 
-  it("keeps the model code in the list and header only", async () => {
+  it("모델 기호를 목록과 상세에 표시하고 슬롯 기반 코드는 노출하지 않는다", async () => {
     render(
       <DirtyGuardProvider>
         <AdminModelsSection items={[]} allBomRows={[]} />
@@ -103,9 +103,10 @@ describe("AdminModelsSection", () => {
 
     await screen.findByDisplayValue("DX3000");
 
-    await waitFor(() => {
-      expect(screen.getAllByText("M-0001")).toHaveLength(2);
-    });
+    expect(screen.getByRole("columnheader", { name: "모델 기호" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("A")).toHaveLength(2));
+    expect(screen.queryByText(/M-\d{4}/)).not.toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "DX3000 A 사용 중" })).toBeInTheDocument();
   });
 
   it("uses the shared primary action size for the selected model save button", async () => {
@@ -149,7 +150,7 @@ describe("AdminModelsSection", () => {
   });
 
   it("renders models as selectable flat table rows with reorder handles and status cells", async () => {
-    context.productModels.push({ slot: 2, symbol: "B", model_name: null, is_reserved: false });
+    context.productModels.push({ slot: 2, symbol: "", model_name: null, is_reserved: false });
     const { container, unmount } = render(
       <DirtyGuardProvider>
         <AdminModelsSection items={[]} allBomRows={[]} />
@@ -162,11 +163,11 @@ describe("AdminModelsSection", () => {
       const grid = screen.getByRole("grid", { name: "모델 목록" });
       expect(within(grid).getByRole("columnheader", { name: "정렬" })).toBeInTheDocument();
       expect(within(grid).getByRole("columnheader", { name: "모델명" })).toBeInTheDocument();
-      expect(within(grid).getByRole("columnheader", { name: "모델 코드" })).toBeInTheDocument();
+      expect(within(grid).getByRole("columnheader", { name: "모델 기호" })).toBeInTheDocument();
       expect(within(grid).getByRole("columnheader", { name: "상태" })).toBeInTheDocument();
 
-      const activeRow = within(grid).getByRole("row", { name: /DX3000.*M-0001.*사용 중/ });
-      const idleRow = within(grid).getByRole("row", { name: /슬롯 2.*M-0002.*비활성/ });
+      const activeRow = within(grid).getByRole("row", { name: "DX3000 A 사용 중" });
+      const idleRow = within(grid).getByRole("row", { name: "미등록 모델 미지정 비활성" });
 
       expect(activeRow).toHaveAttribute("aria-selected", "true");
       expect(idleRow).toHaveAttribute("aria-selected", "false");
@@ -175,14 +176,19 @@ describe("AdminModelsSection", () => {
       expect(within(activeRow).getByLabelText("드래그 핸들")).toBeInTheDocument();
       expect(within(activeRow).getAllByRole("gridcell")).toHaveLength(4);
       expect(activeRow.querySelector(".h-10.w-10.rounded-full")).not.toBeInTheDocument();
+      expect(within(grid).queryByText("슬롯 2")).not.toBeInTheDocument();
 
       fireEvent.click(idleRow);
       await waitFor(() => {
-        expect(within(grid).getByRole("row", { name: /슬롯 2.*M-0002.*비활성/ })).toHaveAttribute(
+        expect(within(grid).getByRole("row", { name: "미등록 모델 미지정 비활성" })).toHaveAttribute(
           "aria-selected",
           "true",
         );
       });
+      expect(screen.getAllByText("미등록 모델")).toHaveLength(2);
+      fireEvent.click(screen.getByRole("button", { name: "이 모델 삭제" }));
+      expect(screen.getByText("'미등록 모델' 모델을 삭제하시겠습니까?")).toBeInTheDocument();
+      expect(screen.queryByText("슬롯 2")).not.toBeInTheDocument();
     } finally {
       unmount();
       context.productModels.splice(1, 1);

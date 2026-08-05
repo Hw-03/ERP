@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ChevronDown, ClipboardList, History, PackageCheck, RotateCcw, Truck, XCircle } from "lucide-react";
 import { api, type ShippingRequest, type ShippingRequestRevisionChange, type ShippingRequestStatus } from "@/lib/api";
+import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { queryKeys } from "@/lib/queries/keys";
@@ -253,11 +254,14 @@ function snapshotName(line: RevisionSnapshotLine): string {
   return `${stage}${name}${code}`;
 }
 
-function snapshotDescription(line: RevisionSnapshotLine): string {
-  return `${snapshotName(line)} · ${line.quantity ?? "-"} ${line.unit}`;
+function snapshotDescription(line: RevisionSnapshotLine, compactQuantity = false): string {
+  const quantity = compactQuantity && line.quantity !== null
+    ? formatBomQuantity(line.quantity, line.unit)
+    : `${line.quantity ?? "-"} ${line.unit}`;
+  return `${snapshotName(line)} · ${quantity}`;
 }
 
-function arrayChangeDetails(change: ShippingRequestRevisionChange): string[] {
+function arrayChangeDetails(change: ShippingRequestRevisionChange, compactQuantity = false): string[] {
   const before = snapshotLines(change.before);
   const after = snapshotLines(change.after);
   const beforeByKey = new Map(before.map((line, index) => [snapshotKey(line, index), line]));
@@ -272,12 +276,18 @@ function arrayChangeDetails(change: ShippingRequestRevisionChange): string[] {
     const previous = beforeByKey.get(key);
     const next = afterByKey.get(key);
     if (!previous && next) {
-      details.push(`추가: ${snapshotDescription(next)}`);
+      details.push(`추가: ${snapshotDescription(next, compactQuantity)}`);
     } else if (previous && !next) {
-      details.push(`삭제: ${snapshotDescription(previous)}`);
+      details.push(`삭제: ${snapshotDescription(previous, compactQuantity)}`);
     } else if (previous && next) {
       if (previous.quantity !== next.quantity) {
-        details.push(`수량 변경: ${snapshotName(next)} · ${previous.quantity ?? "-"} → ${next.quantity ?? "-"} ${next.unit}`);
+        const previousQuantity = compactQuantity && previous.quantity !== null
+          ? formatBomQuantity(previous.quantity, previous.unit)
+          : `${previous.quantity ?? "-"}`;
+        const nextQuantity = compactQuantity && next.quantity !== null
+          ? formatBomQuantity(next.quantity, next.unit)
+          : `${next.quantity ?? "-"} ${next.unit}`;
+        details.push(`수량 변경: ${snapshotName(next)} · ${previousQuantity} → ${nextQuantity}`);
       }
       if (previous.included !== next.included && (previous.included !== undefined || next.included !== undefined)) {
         const before = previous.included === undefined ? "미지정" : previous.included ? "포함" : "제외";
@@ -289,7 +299,7 @@ function arrayChangeDetails(change: ShippingRequestRevisionChange): string[] {
         || previous.mesCode !== next.mesCode
         || previous.unit !== next.unit;
       if (metadataChanged) {
-        details.push(`변경: ${snapshotDescription(previous)} → ${snapshotDescription(next)}`);
+        details.push(`변경: ${snapshotDescription(previous, compactQuantity)} → ${snapshotDescription(next, compactQuantity)}`);
       }
     }
   }
@@ -350,7 +360,7 @@ function PreparationRevisionNotice({ request }: { request: ShippingRequest }) {
         <div className="grid gap-2 border-t pt-2" style={{ borderColor: tint(LEGACY_COLORS.yellow, 35) }}>
           {revision.changes.map((change) => {
             const details = change.field === "bom_lines" || change.field === "companion_lines"
-              ? arrayChangeDetails(change)
+              ? arrayChangeDetails(change, change.field === "bom_lines")
               : scalarChangeDetails(change);
             return (
               <div key={change.field} className="rounded-[10px] px-2 py-2" style={{ background: LEGACY_COLORS.s2 }}>

@@ -7,6 +7,7 @@ import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { api, type Item } from "@/lib/api";
 import type { Handover } from "@/lib/api/types";
+import { QuantityInput } from "../common/QuantityInput";
 
 const RECEIVE_DEPARTMENTS = ["고압", "진공"];
 const DRAFT_TITLE_PLACEHOLDER = "(작성 중)";
@@ -260,12 +261,11 @@ export function HandoverComposeForm({
                     </span>
                   )}
                 </span>
-                <input
-                  type="number"
+                <QuantityInput
                   min={1}
                   value={l.quantity}
                   onChange={(e) => setQty(l.item_id, Number(e.target.value))}
-                  className="w-20 rounded-[10px] border px-2 py-1 text-center text-sm outline-none"
+                  className="w-20 rounded-[10px] border px-2 py-1 text-sm"
                   style={fieldStyle}
                   aria-label={`${l.item_name} 수량`}
                 />

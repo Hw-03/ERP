@@ -187,9 +187,9 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
           <AdminKpiBar
             placement="header"
             items={[
-              { key: "total", label: "전체 모델", value: productModels.length, hint: "등록된 슬롯", tone: LEGACY_COLORS.blue },
+              { key: "total", label: "전체 모델", value: productModels.length, hint: "등록된 모델", tone: LEGACY_COLORS.blue },
               { key: "use", label: "사용 중", value: inUse.length, hint: "이름이 등록된 모델", tone: LEGACY_COLORS.green },
-              { key: "idle", label: "비활성", value: idle, hint: "이름 없는 빈 슬롯", tone: LEGACY_COLORS.muted2 },
+              { key: "idle", label: "비활성", value: idle, hint: "이름 없는 모델", tone: LEGACY_COLORS.muted2 },
             ]}
           />
         }
@@ -218,23 +218,25 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             >
               <span role="columnheader" className="text-center">정렬</span>
               <span role="columnheader">모델명</span>
-              <span role="columnheader" className="text-center">모델 코드</span>
+              <span role="columnheader" className="text-center">모델 기호</span>
               <span role="columnheader" className="text-center">상태</span>
             </div>
           }
           emptyState={<EmptyState variant="no-data" compact title="등록된 모델이 없습니다." />}
           renderItem={(model) => {
             const active = selected?.slot === model.slot;
-            const used = Boolean(model.model_name);
+            const modelNameLabel = model.model_name?.trim() || "미등록 모델";
+            const used = Boolean(model.model_name?.trim());
             const isDragging = dragSlot === model.slot;
             const isDropTarget =
               dragSlot !== null && dropTargetSlot === model.slot && dragSlot !== model.slot;
+            const symbolLabel = model.symbol?.trim() || "미지정";
             return (
               <div
                 key={model.slot}
                 role="row"
                 aria-selected={active}
-                aria-label={`${model.model_name ?? `슬롯 ${model.slot}`} M-${String(model.slot).padStart(4, "0")} ${used ? "사용 중" : "비활성"}`}
+                aria-label={`${modelNameLabel} ${symbolLabel} ${used ? "사용 중" : "비활성"}`}
                 tabIndex={0}
                 draggable
                 onDragStart={(e) => handleDragStart(e, model.slot)}
@@ -271,14 +273,14 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                   />
                 </div>
                 <div role="gridcell" className="min-w-0 truncate text-[14px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
-                  {model.model_name ?? `슬롯 ${model.slot}`}
+                  {modelNameLabel}
                 </div>
                 <div
                   role="gridcell"
-                  className="truncate text-center font-mono text-[12px] font-semibold tabular-nums"
+                  className="truncate text-center text-[12px] font-semibold"
                   style={{ color: LEGACY_COLORS.muted }}
                 >
-                  M-{String(model.slot).padStart(4, "0")}
+                  {symbolLabel}
                 </div>
                 <div role="gridcell" className="flex justify-center">
                   <StatusPill
@@ -298,14 +300,14 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             addMode
               ? "새 모델 추가"
               : selected
-                ? selected.model_name ?? `슬롯 ${selected.slot}`
+                ? selected.model_name?.trim() || "미등록 모델"
                 : "모델을 선택하세요"
           }
           status={
             !addMode && selected ? (
               <StatusPill
-                label={selected.model_name ? "사용 중" : "비활성"}
-                tone={selected.model_name ? "success" : "neutral"}
+                label={selected.model_name?.trim() ? "사용 중" : "비활성"}
+                tone={selected.model_name?.trim() ? "success" : "neutral"}
               />
             ) : null
           }
@@ -313,7 +315,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
             addMode
               ? "모델명과 기호(선택)를 입력하세요."
               : selected
-                ? `M-${String(selected.slot).padStart(4, "0")}`
+                ? selected.symbol?.trim() || "미지정"
                 : undefined
           }
           actions={
@@ -371,7 +373,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
 
       <ConfirmModal
         open={deleteTarget !== null}
-        title={`'${deleteTargetModel?.model_name ?? `슬롯 ${deleteTarget}`}' 모델을 삭제하시겠습니까?`}
+        title={`'${deleteTargetModel?.model_name?.trim() || "미등록 모델"}' 모델을 삭제하시겠습니까?`}
         tone="danger"
         cautionMessage="이 작업은 되돌릴 수 없습니다. 연결된 BOM·품목 매핑이 해제됩니다."
         confirmLabel="삭제"

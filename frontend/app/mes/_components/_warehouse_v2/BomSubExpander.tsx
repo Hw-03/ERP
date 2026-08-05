@@ -6,8 +6,9 @@ import { api } from "@/lib/api";
 import type { BOMTreeNode } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { formatQty } from "@/lib/mes/format";
-import { mesCodeDeptBadge } from "@/lib/mes/process";
+import { mesCodeDeptBadge, processStageLabel, processTypeColor } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 
@@ -88,7 +89,7 @@ function BomTreeItem({
   const deptBadge = node.mes_code ? mesCodeDeptBadge(node.mes_code, getDeptColor) : null;
   const qty = node.required_quantity;
 
-  // 우측 메타(부서 · 코드 · ×수량) — 1줄(collapsed)·펼침(reflow) 양쪽에서 동일하게 재사용.
+  // 우측 메타(부서 · 코드 · 소요량) — 1줄(collapsed)·펼침(reflow) 양쪽에서 동일하게 재사용.
   const metaChildren = (
     <>
       {/* 부서 — 색 = 1차 앵커. 좌정렬 */}
@@ -112,13 +113,12 @@ function BomTreeItem({
         {node.mes_code || ""}
       </span>
 
-      {/* 수량 — 실행후 자리(col4)에 가운데 정렬 강조. ×는 약한 접두 */}
+      {/* 소요량 — 실행후 자리(col4)에 가운데 정렬 강조. */}
       <span
         className="text-center text-xs tabular-nums leading-none"
         style={{ gridColumn: "4", color: qty > 1 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, fontWeight: qty > 1 ? 800 : 600 }}
       >
-        <span className="mr-px text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>×</span>
-        {qty}
+        {formatBomQuantity(qty, node.unit)}
       </span>
       {stock && (
         <span
@@ -200,8 +200,7 @@ function BomTreeItem({
                 className="text-center text-xs tabular-nums leading-none"
                 style={{ color: qty > 1 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, fontWeight: qty > 1 ? 800 : 600 }}
               >
-                <span className="mr-px text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>×</span>
-                {qty}
+                {formatBomQuantity(qty, node.unit)}
               </span>
               <span className="text-right text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
                 현재 재고 {formatQty(node.current_stock)} {node.unit}
@@ -279,6 +278,85 @@ function BomTreeItem({
   );
 }
 
+function ModalBomTreeItem({ node, depth }: { node: BOMTreeNode; depth: number }) {
+  const [open, setOpen] = useState(false);
+  const hasKids = node.children.length > 0;
+  const processTypeCode = node.process_type_code;
+
+  return (
+    <>
+      <li
+        data-testid="bom-modal-row"
+        data-depth={depth}
+        className="bom-modal-grid min-h-[52px] border-b text-sm"
+        style={{
+          borderColor: LEGACY_COLORS.border,
+          background: LEGACY_COLORS.s1,
+        }}
+      >
+        <div className="flex h-11 w-11 items-center justify-center">
+          {hasKids ? (
+            <button
+              type="button"
+              onClick={() => setOpen((current) => !current)}
+              className="bom-modal-toggle"
+              style={{ color: LEGACY_COLORS.muted2 }}
+              aria-expanded={open}
+              title={open ? "접기" : "펼치기"}
+            >
+              <ChevronRight
+                className="h-4 w-4 transition-transform duration-150"
+                style={{ transform: open ? "rotate(90deg)" : "none" }}
+              />
+            </button>
+          ) : (
+            <span aria-hidden className="h-11 w-11" />
+          )}
+        </div>
+        <span
+          data-testid="bom-modal-name-cell"
+          className="min-w-0 break-words px-3 py-2 font-semibold leading-snug"
+          style={{ color: LEGACY_COLORS.text, paddingLeft: 12 + depth * 20 }}
+        >
+          {node.item_name}
+        </span>
+        <span className="flex justify-center px-2">
+          {processTypeCode ? (
+            <span
+              className="rounded-full px-2 py-1 text-xs font-bold leading-none"
+              style={{
+                color: processTypeColor(processTypeCode),
+                background: `color-mix(in srgb, ${processTypeColor(processTypeCode)} 12%, transparent)`,
+              }}
+              title={processTypeCode}
+            >
+              {processStageLabel(processTypeCode)}
+            </span>
+          ) : (
+            <span style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+          )}
+        </span>
+        <span
+          className="min-w-0 truncate px-3 font-mono text-sm"
+          style={{ color: LEGACY_COLORS.muted2 }}
+          title={node.mes_code || undefined}
+        >
+          {node.mes_code || "-"}
+        </span>
+        <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+          {formatBomQuantity(node.required_quantity, node.unit)}
+        </span>
+        <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted }}>
+          {formatQty(node.current_stock)} {node.unit}
+        </span>
+      </li>
+      {open && hasKids && node.children.map((child) => (
+        <ModalBomTreeItem key={child.item_id} node={child} depth={depth + 1} />
+      ))}
+    </>
+  );
+}
+
 interface Props {
   itemId: string;
   open: boolean;
@@ -353,12 +431,22 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
       </div>}
 
       {tree === null && (
-        <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div
+          className={modal ? "rounded-[18px] border px-4 py-8 text-center text-sm" : "px-3 py-3 text-xs"}
+          style={modal
+            ? { color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }
+            : { color: LEGACY_COLORS.muted2 }}
+        >
           불러오는 중…
         </div>
       )}
       {tree === false && (
-        <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.red }}>
+        <div
+          className={modal ? "rounded-[18px] border px-4 py-5 text-center text-sm" : "px-3 py-3 text-xs"}
+          style={modal
+            ? { color: LEGACY_COLORS.red, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }
+            : { color: LEGACY_COLORS.red }}
+        >
           하위 구성을 불러오지 못했습니다.
         </div>
       )}
@@ -368,8 +456,8 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
           setTree(null);
           setRequestVersion((version) => version + 1);
         }}
-        className="mb-4 rounded-lg border px-3 py-2 text-sm font-bold"
-        style={{ borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}
+        className="mt-3 min-h-11 rounded-[10px] border px-4 py-2 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+        style={{ borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red, background: LEGACY_COLORS.s2 }}
       >다시 시도</button>}
       {tree && <>
         {modal && <div
@@ -381,10 +469,10 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
           }}
         >
           <span
-            className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black"
+            className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-black"
             style={{ color: LEGACY_COLORS.blue, background: tint(LEGACY_COLORS.blue, 12) }}
           >
-            <GitBranch className="h-3 w-3" />
+            <GitBranch className="h-4 w-4" />
             BOM
           </span>
           <div className="min-w-0">
@@ -397,25 +485,41 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
           </div>
         </div>}
         {tree.children.length === 0 ? (
-          <div className="px-3 py-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div
+            className={modal ? "rounded-[18px] border px-4 py-8 text-center text-sm" : "px-3 py-3 text-xs"}
+            style={modal
+              ? { color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }
+              : { color: LEGACY_COLORS.muted2 }}
+          >
             하위 품목이 없습니다.
           </div>
         ) : modal ? (
           <div
             data-testid="bom-modal-tree-list"
-            className="w-full overflow-hidden rounded-[18px] border p-2"
+            className="w-full overflow-clip rounded-[18px] border"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
           >
-            <ul className="space-y-1">
-              {tree.children.map((child, index) => <BomTreeItem
+            <div
+              data-testid="bom-modal-grid-header"
+              className="bom-modal-grid sticky top-0 z-10 min-h-11 border-b text-xs font-bold"
+              style={{
+                background: "var(--c-popup-bg)",
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.muted2,
+              }}
+            >
+              <span aria-hidden />
+              <span className="px-3">구성품명</span>
+              <span className="text-center">유형</span>
+              <span className="px-3">품목코드</span>
+              <span className="text-center">소요량</span>
+              <span className="text-center">현재재고</span>
+            </div>
+            <ul>
+              {tree.children.map((child) => <ModalBomTreeItem
                 key={child.item_id}
                 node={child}
-                rails={[]}
-                isLast={index === tree.children.length - 1}
-                compact={compact}
-                tapToExpandName={modal || tapToExpandName}
-                stock={modal}
-                modal={modal}
+                depth={0}
               />)}
             </ul>
           </div>

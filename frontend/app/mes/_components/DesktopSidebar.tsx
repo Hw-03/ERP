@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Settings2, Truck, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Truck, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppearanceSettingsModal } from "./AppearanceSettingsModal";
 import { useAppearancePreferences } from "./useAppearancePreferences";
@@ -35,17 +35,15 @@ const MAIN_TABS: TabDef[] = [
   { id: "dailyReport", label: "일일 작업 일보", subtitle: "작업 내역과 MES 거래", icon: ClipboardList, color: DESKTOP_TAB_ICON_COLORS.dailyReport },
 ];
 
-const BOTTOM_TABS: TabDef[] = [
-  { id: "admin", label: "관리", subtitle: "마스터와 운영 설정", icon: Settings2, color: DESKTOP_TAB_ICON_COLORS.admin },
-];
-
 export function DesktopSidebar({
   activeTab,
   onTabChange,
+  onOpenAdminPinEntry,
   visibleTabs,
 }: {
   activeTab: DesktopTabId;
   onTabChange: (tab: DesktopTabId) => void;
+  onOpenAdminPinEntry?: () => void;
   visibleTabs: DesktopTabId[];
 }) {
   const { preferences, savePreferences } = useAppearancePreferences();
@@ -54,6 +52,7 @@ export function DesktopSidebar({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expanded = preferences.sidebarMode === "expanded" || (preferences.sidebarMode === "hover" && hoverExpanded);
+  const canOpenAdmin = visibleTabs.includes("admin");
 
   const openSidebar = useCallback(() => {
     if (collapseTimerRef.current) {
@@ -162,19 +161,12 @@ export function DesktopSidebar({
 
         {/* ?섎떒 怨좎젙: 愿由?+ ?뚮쭏 */}
         <div className="mt-auto space-y-1.5 pt-1.5">
-          {BOTTOM_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
-            <TabButton
-              key={tab.id}
-              tab={tab}
-              active={tab.id === activeTab}
-              expanded={expanded}
-              hovered={hoveredTab === tab.id}
-              onTabChange={onTabChange}
-              onKeepExpanded={openSidebar}
-              onHover={setHoveredTab}
-            />
-          ))}
-          <SettingsButton expanded={expanded} onClick={() => setSettingsOpen(true)} />
+          <SettingsButton
+            expanded={expanded}
+            canOpenAdmin={canOpenAdmin}
+            onClick={() => setSettingsOpen(true)}
+            onOpenAdminPinEntry={onOpenAdminPinEntry}
+          />
         </div>
       </aside>
       <AppearanceSettingsModal
@@ -182,12 +174,24 @@ export function DesktopSidebar({
         preferences={preferences}
         onClose={() => setSettingsOpen(false)}
         onSave={savePreferences}
+        canOpenAdmin={canOpenAdmin}
+        onOpenAdminPinEntry={onOpenAdminPinEntry}
       />
     </div>
   );
 }
 
-function SettingsButton({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+function SettingsButton({
+  expanded,
+  canOpenAdmin,
+  onClick,
+  onOpenAdminPinEntry,
+}: {
+  expanded: boolean;
+  canOpenAdmin: boolean;
+  onClick: () => void;
+  onOpenAdminPinEntry?: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -196,6 +200,11 @@ function SettingsButton({ expanded, onClick }: { expanded: boolean; onClick: () 
       aria-label="설정"
       title="설정"
       onClick={onClick}
+      onContextMenu={(event) => {
+        if (!canOpenAdmin || !onOpenAdminPinEntry) return;
+        event.preventDefault();
+        onOpenAdminPinEntry();
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="group flex items-center justify-start rounded-[20px] -mx-1.5 w-[calc(100%+12px)] pl-1.5 transition-all duration-150 hover:scale-[1.015]"

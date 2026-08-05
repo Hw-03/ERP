@@ -2,7 +2,7 @@
 
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { formatQty } from "@/lib/mes/format";
+import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { TruncatedText } from "@/lib/ui";
 import { EmptyState } from "../../common/EmptyState";
 import { BomBadge } from "./BomBadge";
@@ -80,8 +80,8 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
                       {r.parent_mes_code ?? "(코드 없음)"}
                     </TruncatedText>
                   </div>
-                  <div className="text-right text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
-                    ×{formatQty(r.quantity)} {r.unit || "EA"}
+                  <div className="text-center text-sm font-semibold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+                    {formatBomQuantity(r.quantity, r.unit)}
                   </div>
                 </button>
               );

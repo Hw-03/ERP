@@ -113,7 +113,10 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
 }
 
 /** Updates UI preferences without creating another login audit event. */
-export function updateCurrentOperatorPreferences(patch: { sidebar_mode: SidebarMode }): void {
+export function updateCurrentOperatorPreferences(patch: {
+  sidebar_mode?: SidebarMode;
+  loginPopupEnabled?: boolean;
+}): void {
   if (typeof window === "undefined") return;
   const operator = readOperator();
   if (!operator) return;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { QuantityInput } from "../common/QuantityInput";
 import type { Item } from "@/lib/api";
 import { Button } from "@/lib/ui/Button";
 import { matchesSearchText } from "@/lib/searchText";
@@ -337,8 +338,7 @@ export function AddBoxScreen({
                 {/* 수량 + 여유 재고 (선택 시만) */}
                 {selected && (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                    <input
-                      type="number"
+                    <QuantityInput
                       min={0}
                       value={qty}
                       onClick={(e) => e.stopPropagation()}

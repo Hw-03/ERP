@@ -12,6 +12,7 @@ import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDeci
 import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { QuantityInput } from "../common/QuantityInput";
 
 type DisposalAction = "unquarantine" | "scrap" | "disassemble";
 
@@ -177,8 +178,7 @@ export function PaPfDefectWizard({
           {/* 처리 수량 */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
-            <input
-              type="number"
+            <QuantityInput
               min={1}
               max={Number(location.quantity)}
               value={processQty}
@@ -187,7 +187,7 @@ export function PaPfDefectWizard({
                 setProcessQty(v);
                 setDecisions([]);
               }}
-              className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
+              className="w-16 rounded-[8px] border px-2 py-1 text-base font-black"
               style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
             />
             <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>

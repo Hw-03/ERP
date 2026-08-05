@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { formatQty } from "@/lib/mes/format";
+import { formatBomQuantity } from "@/lib/mes/bomFormat";
+import { QuantityInput } from "../../common/QuantityInput";
 import { BomBadge } from "./BomBadge";
 import {
   BOM_CURRENT_ROW_GRID_TEMPLATE,
@@ -92,9 +93,8 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
       </span>
       <div className="flex justify-center">
         {editing ? (
-          <input
+          <QuantityInput
             ref={inputRef}
-            type="number"
             min="0"
             step="0.01"
             value={draft}
@@ -110,7 +110,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
                 cancel();
               }
             }}
-            className="h-[30px] w-full rounded-md border px-2 py-1 text-right text-sm font-semibold outline-none"
+            className="h-[30px] w-full rounded-md border px-2 py-1 text-sm font-semibold"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.blue,
@@ -130,7 +130,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
             }}
             title="클릭하여 수량 수정"
           >
-            ×{formatQty(row.quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} {unit}
+            {formatBomQuantity(row.quantity, unit)}
           </button>
         )}
       </div>

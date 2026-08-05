@@ -3,6 +3,7 @@
 import type { ReactNode, Ref } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { QuantityInput } from "../common/QuantityInput";
 
 interface QuantityStepperProps {
   value: number;
@@ -55,7 +56,7 @@ export function QuantityStepper({
   return (
     <div className={`flex flex-col items-center gap-0.5 ${className}`}>
       <span
-        className="text-[9px] font-bold uppercase tracking-[1.5px]"
+        className="text-xs font-bold uppercase tracking-[1.5px]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         {label}
@@ -67,9 +68,8 @@ export function QuantityStepper({
         <StepButton tone={LEGACY_COLORS.red} disabled={minusDisabled} onClick={() => changeBy(-1)}>
           -1
         </StepButton>
-        <input
+        <QuantityInput
           aria-label={label}
-          type="number"
           min={minimum}
           step={step}
           value={current}
@@ -78,12 +78,7 @@ export function QuantityStepper({
           title={inputTitle}
           onChange={(event) => changeInput(event.target.value)}
           onFocus={(event) => event.currentTarget.select()}
-          className="w-[72px] min-h-[44px] rounded-[10px] border px-2 py-2 text-center text-base font-black tabular-nums outline-none focus:border-[var(--c-blue)] disabled:opacity-60 lg:min-h-0 lg:py-1.5 lg:text-sm"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
-          }}
+          className="h-11 min-h-[44px] w-[72px] rounded-[10px] border px-2 py-2 text-base font-black"
         />
         <StepButton tone={LEGACY_COLORS.green} disabled={plusDisabled} onClick={() => changeBy(1)}>
           +1
@@ -112,7 +107,7 @@ function StepButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="min-h-[44px] rounded-[10px] border px-3 py-2 text-sm font-black transition-colors hover:brightness-110 disabled:opacity-40 lg:min-h-0 lg:px-2 lg:py-1 lg:text-xs"
+      className="h-11 min-h-[44px] rounded-[10px] border px-3 py-2 text-sm font-black transition-colors hover:brightness-110 disabled:opacity-40"
       style={{
         background: tint(tone, 10),
         borderColor: tint(tone, 30),

@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { DesktopSidebar } from "../DesktopSidebar";
+import { DesktopSidebar, type DesktopTabId } from "../DesktopSidebar";
 import { api } from "@/lib/api";
 import { readCurrentOperator } from "../login/useCurrentOperator";
 
@@ -126,6 +126,32 @@ describe("DesktopSidebar", () => {
 
     expect(sidebarSlot).toHaveStyle({ width: "220px" });
     expect(sidebar).not.toHaveStyle({ width: "220px" });
+  });
+
+  it("removes the old management button and opens the PIN entry only for visible admins", () => {
+    const onOpenAdminPinEntry = vi.fn();
+    const visibleAdminProps = {
+      activeTab: "dashboard" as const,
+      onTabChange: vi.fn(),
+      visibleTabs: ["dashboard", "admin"] as DesktopTabId[],
+      onOpenAdminPinEntry,
+    };
+    const { rerender } = render(
+      <DesktopSidebar {...(visibleAdminProps as unknown as React.ComponentProps<typeof DesktopSidebar>)} />,
+    );
+
+    expect(screen.queryByRole("button", { name: "관리" })).not.toBeInTheDocument();
+    const allowedEvent = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    screen.getByRole("button", { name: "설정" }).dispatchEvent(allowedEvent);
+    expect(allowedEvent.defaultPrevented).toBe(true);
+    expect(onOpenAdminPinEntry).toHaveBeenCalledOnce();
+
+    const hiddenAdminProps = { ...visibleAdminProps, visibleTabs: ["dashboard"] as DesktopTabId[] };
+    rerender(<DesktopSidebar {...(hiddenAdminProps as unknown as React.ComponentProps<typeof DesktopSidebar>)} />);
+    const blockedEvent = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    screen.getByRole("button", { name: "설정" }).dispatchEvent(blockedEvent);
+    expect(blockedEvent.defaultPrevented).toBe(false);
+    expect(onOpenAdminPinEntry).toHaveBeenCalledOnce();
   });
 
   it("설정 모달에서 고른 테마와 표시 방식을 저장할 때만 적용한다", async () => {

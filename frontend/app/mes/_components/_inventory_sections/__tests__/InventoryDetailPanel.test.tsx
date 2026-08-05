@@ -251,10 +251,14 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
     expect(dialog).toHaveTextContent("구성품 A");
-    expect(dialog).toHaveTextContent("현재 재고 10 EA");
+    expect(dialog).toHaveTextContent("10 EA");
     expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
+    expect(dialog).toHaveStyle({ background: "var(--c-bg)" });
     expect(screen.getByTestId("bom-detail-modal-panel")).toHaveClass("w-[calc(100vw-128px)]", "max-h-[84vh]");
-    expect(screen.getByTestId("bom-detail-modal-panel")).toHaveStyle({ minHeight: "min(500px, 84vh)" });
+    expect(screen.getByTestId("bom-detail-modal-panel")).toHaveStyle({
+      background: "var(--c-popup-bg)",
+      minHeight: "min(500px, 84vh)",
+    });
     expect(screen.getByRole("button", { name: "하위 구성 보기" }).querySelector("svg.lucide-chevron-right")).toBeNull();
     expect(within(dialog).queryByText("닫기")).not.toBeInTheDocument();
     expect(dialog.querySelector("footer")).toBeNull();
@@ -354,6 +358,47 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(closeButton).toHaveFocus();
   });
 
+  it("renders modal BOM rows as one aligned grid without tree rails", async () => {
+    const nestedTree: BOMTreeNode = {
+      ...bomTree,
+      children: [{
+        ...bomTree.children[0],
+        item_name: "direct-component",
+        process_type_code: "PA",
+        required_quantity: 1.5,
+        children: [{
+          ...bomTree.children[0],
+          item_id: "nested-component",
+          item_name: "nested-component",
+          required_quantity: 3,
+          current_stock: 7,
+          children: [],
+        }],
+      }],
+    };
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(nestedTree);
+    render(<BomSubExpander itemId="item-1" open modal />);
+
+    const directName = await screen.findByText("direct-component");
+    const row = directName.closest("[data-testid='bom-modal-row']")!;
+    expect(screen.getByTestId("bom-modal-grid-header")).toHaveClass("bom-modal-grid", "sticky", "top-0");
+    expect(row).toHaveClass("bom-modal-grid");
+    expect(within(row).getByRole("button", { expanded: false })).toHaveClass("bom-modal-toggle");
+    expect(within(row).getByText("Packaging")).toBeInTheDocument();
+    expect(within(row).queryByText("조립")).not.toBeInTheDocument();
+    expect(within(row).getByText("1.5EA")).toHaveClass("text-center");
+    expect(within(row).getByText("10 EA")).toHaveClass("text-center");
+    expect(screen.queryByTestId("bom-modal-rail")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("bom-modal-connector")).not.toBeInTheDocument();
+    expect(screen.queryByText("nested-component")).not.toBeInTheDocument();
+
+    fireEvent.click(within(row).getByRole("button", { expanded: false }));
+    const nestedName = await screen.findByText("nested-component");
+    const nestedRow = nestedName.closest("[data-testid='bom-modal-row']")!;
+    expect(nestedRow).toHaveAttribute("data-depth", "1");
+    expect(within(nestedRow).getByTestId("bom-modal-name-cell")).toHaveStyle({ paddingLeft: "32px" });
+  });
+
   it("does not render stale BOM responses after item changes and a rapid reopen", async () => {
     const first = deferred<BOMTreeNode>();
     const second = deferred<BOMTreeNode>();
@@ -426,7 +471,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     rerender(<BomSubExpander itemId="item-1" open modal />);
 
     await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(/20 EA/)).toBeInTheDocument();
+    expect(await screen.findByText("20 EA")).toBeInTheDocument();
     expect(screen.getByText("nested-visible")).toBeInTheDocument();
     expect(within(branchRow).getByRole("button")).toHaveAttribute("aria-expanded", "true");
   });
@@ -455,18 +500,13 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(row).toBeDefined();
     const rowContext = within(row!);
     expect(rowContext.getByText(longItemName)).toBeInTheDocument();
-    expect(rowContext.getByText("조립")).toBeInTheDocument();
+    expect(rowContext.getByText("-")).toBeInTheDocument();
     expect(rowContext.getByText("46-AA-0081")).toBeInTheDocument();
-    expect(rowContext.getByText("2")).toBeInTheDocument();
-    expect(rowContext.getByText("현재 재고 10 EA")).toBeInTheDocument();
-    expect(rowContext.getByTestId("bom-modal-row-meta")).toHaveClass(
-      "w-full",
-      "grid-cols-[minmax(0,1fr)_auto]",
-      "sm:grid-cols-[4.5rem_minmax(0,1fr)_3.5rem_8rem]",
-      "sm:min-w-[18.25rem]",
-    );
-    expect(rowContext.getByTestId("bom-modal-connector")).toHaveClass("self-stretch");
-    expect(rowContext.getByTestId("bom-modal-connector-line")).toHaveStyle({ height: "100%" });
+    expect(rowContext.getByText("2EA")).toHaveClass("text-center");
+    expect(rowContext.getByText("10 EA")).toHaveClass("text-center");
+    expect(row).toHaveClass("bom-modal-grid");
+    expect(rowContext.getByTestId("bom-modal-name-cell")).toHaveClass("break-words");
+    expect(rowContext.queryByTestId("bom-modal-connector")).not.toBeInTheDocument();
     fireEvent.click(rowContext.getByRole("button", { expanded: false }));
     expect(await screen.findByText("하위 구성품")).toBeInTheDocument();
   });

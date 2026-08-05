@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect } from "../../common/AppSelect";
+import { QuantityInput } from "../../common/QuantityInput";
 import { PROCESS_TYPE_OPTIONS, UNIT_OPTIONS } from "../adminShared";
 import { useDepartments } from "../../DepartmentsContext";
 import type { ProductModel } from "@/lib/api";
@@ -243,8 +244,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
                     options={locationOptions}
                   />
                 </div>
-                <input
-                  type="number"
+                <QuantityInput
                   min={1}
                   step={1}
                   value={row.quantity}
@@ -318,16 +318,26 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
       ] as const).map(({ key, label, type, placeholder }) => (
         <div key={key}>
           <FieldLabel label={label} badge="선택" />
-          <input
-            type={type}
-            min={type === "number" ? 0 : undefined}
-            step={type === "number" ? 1 : undefined}
-            value={form[key] ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-            placeholder={placeholder}
-            className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-            style={inputStyle}
-          />
+          {type === "number" ? (
+            <QuantityInput
+              min={0}
+              step={1}
+              value={form[key] ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              placeholder={placeholder}
+              className="w-full rounded-[18px] border px-4 py-3 text-base"
+              style={inputStyle}
+            />
+          ) : (
+            <input
+              type={type}
+              value={form[key] ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              placeholder={placeholder}
+              className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
+              style={inputStyle}
+            />
+          )}
         </div>
       ))}
 

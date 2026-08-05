@@ -42,7 +42,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
   return createPortal(
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,.55)" }}
+      style={{ background: LEGACY_COLORS.bg }}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -53,7 +53,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
         data-testid="bom-detail-modal-panel"
         className="flex w-[calc(100vw-128px)] max-h-[84vh] min-h-0 flex-col overflow-hidden rounded-[24px] border"
         style={{
-          background: LEGACY_COLORS.s1,
+          background: "var(--c-popup-bg)",
           borderColor: LEGACY_COLORS.border,
           boxShadow: "var(--c-card-shadow)",
           minHeight: "min(500px, 84vh)",
@@ -74,10 +74,10 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
             type="button"
             aria-label="닫기"
             onClick={onClose}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border transition-colors hover:brightness-125"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border transition-colors hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
