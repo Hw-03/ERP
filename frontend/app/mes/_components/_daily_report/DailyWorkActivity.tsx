@@ -124,7 +124,7 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
   );
 }
 
-export function DailyWorkActivity({ activity }: { activity: DailyWorkActivityData }) {
+export function DailyWorkActivity({ activity, onDetailOpenChange }: { activity: DailyWorkActivityData; onDetailOpenChange?: (isOpen: boolean) => void }) {
   const [openOperation, setOpenOperation] = useState<string | null>(null);
 
   return (
@@ -140,7 +140,11 @@ export function DailyWorkActivity({ activity }: { activity: DailyWorkActivityDat
             <button
               key={summary.operation_key}
               type="button"
-              onClick={() => setOpenOperation((current) => current === summary.operation_key ? null : summary.operation_key)}
+              onClick={() => setOpenOperation((current) => {
+                const next = current === summary.operation_key ? null : summary.operation_key;
+                onDetailOpenChange?.(next !== null);
+                return next;
+              })}
               aria-label={`${summary.operation_label} 거래 상세 ${isOpen ? "접기" : "펼치기"}`}
               className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-[14px] border px-3 text-left transition active:scale-[0.98]"
               style={{ background: isOpen ? LEGACY_COLORS.s3 : LEGACY_COLORS.s2, borderColor: isOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}

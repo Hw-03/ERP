@@ -228,7 +228,7 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.getByRole("dialog", { name: "일보 날짜 선택" })).toBeInTheDocument();
   });
 
-  it("데스크톱에서는 작업 내역이 본문을 채우는 628px 높이를 유지한다", () => {
+  it("데스크톱 빈 MES 기록 상태에서는 작업 영역이 스크롤 없이 본문을 채운다", () => {
     render(
       <DailyWorkReportScreen
         employeeId="employee-1"
@@ -236,9 +236,12 @@ describe("DailyWorkReportScreen", () => {
       />,
     );
 
+    const header = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header");
     const editor = screen.getByRole("textbox", { name: "작업 내역" }).closest("section");
-    expect(editor).toHaveClass("lg:h-[628px]", "lg:flex-none");
-    expect(editor).not.toHaveClass("lg:flex-1");
+    expect(header?.parentElement).toHaveClass("lg:overflow-hidden");
+    expect(header?.parentElement).not.toHaveClass("lg:overflow-y-auto");
+    expect(editor).toHaveClass("lg:flex-1");
+    expect(editor).not.toHaveClass("lg:h-[628px]", "lg:flex-none");
   });
 
   it("작성한 직원 칩은 데스크톱에서 카드 내부 스크롤 경계를 둔다", () => {
@@ -254,20 +257,41 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.getByTestId("daily-work-report-author-chips")).toHaveClass("lg:max-h-36", "lg:overflow-y-auto");
   });
 
-  it("데스크톱 전체 일보는 MES 상세 확장 시 본문에서 스크롤한다", () => {
+  it("데스크톱 본인 일보는 MES 상세를 열기 전 본문 스크롤을 만들지 않는다", () => {
     queryState.reports = [{ employee_id: "employee-2", employee_name: "다른 작성자", department: "조립" }];
 
     render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never} />);
 
     const header = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header");
     const activity = screen.getByRole("region", { name: "MES 작업 기록" });
-    expect(header?.parentElement).toHaveClass("lg:overflow-y-auto");
-    expect(header?.parentElement).not.toHaveClass("lg:overflow-hidden");
+    expect(header?.parentElement).toHaveClass("lg:overflow-hidden");
+    expect(header?.parentElement).not.toHaveClass("lg:overflow-y-auto");
     expect(header).toHaveClass("lg:shrink-0");
     expect(activity).toHaveClass("lg:shrink-0");
 
     fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
     expect(screen.getByTestId("daily-work-report-author-chips").closest("section")).toHaveClass("lg:shrink-0");
+  });
+
+  it("데스크톱 본인 일보는 MES 상세를 열면 본문 스크롤을 허용한다", () => {
+    queryState.activity = {
+      data: {
+        work_date: "2026-08-03",
+        employee_id: "employee-1",
+        cancelled_count: 0,
+        summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 1, quantity_by_unit: { EA: 1 } }],
+        details: [{ type: "solo", key: "log-1", logs: [] }],
+      } as never,
+      isError: false,
+    };
+
+    render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never} />);
+
+    const header = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header");
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+
+    expect(header?.parentElement).toHaveClass("lg:overflow-y-auto");
+    expect(header?.parentElement).not.toHaveClass("lg:overflow-hidden");
   });
 
   it("실패한 저장 오류는 날짜·탭·작성자 대상 변경 뒤에 남지 않는다", async () => {

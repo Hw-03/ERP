@@ -64,6 +64,7 @@ export function DailyWorkReportScreen({
   const [workDate, setWorkDate] = useState(() => toKstDateKey());
   const [tab, setTab] = useState<ReportTab>("mine");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [isActivityDetailOpen, setIsActivityDetailOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const today = toKstDateKey();
@@ -137,6 +138,7 @@ export function DailyWorkReportScreen({
       setSaveError(null);
       setTab(next);
       setSelectedEmployeeId(null);
+      setIsActivityDetailOpen(false);
     }, "저장하지 않은 내용이 있습니다. 이동하면 작성 중인 일보가 사라집니다.");
   };
 
@@ -148,6 +150,7 @@ export function DailyWorkReportScreen({
       setSaveError(null);
       setWorkDate(next);
       setSelectedEmployeeId(null);
+      setIsActivityDetailOpen(false);
     }, "저장하지 않은 내용이 있습니다. 날짜를 바꾸면 작성 중인 일보가 사라집니다.");
   };
 
@@ -164,7 +167,7 @@ export function DailyWorkReportScreen({
 
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
-      <div className="scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pb-0">
+      <div className={`scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:pb-0 ${editable && !isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
         <header className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-h-11 items-center gap-3">
@@ -212,6 +215,7 @@ export function DailyWorkReportScreen({
                       setDirty(false);
                       setSaveError(null);
                       setSelectedEmployeeId(entry.employee_id);
+                      setIsActivityDetailOpen(false);
                     }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
                       <span>{entry.employee_name}</span><span className="ml-1.5 text-xs font-medium" style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
                     </button>
@@ -225,7 +229,7 @@ export function DailyWorkReportScreen({
         {targetEmployeeId ? (
           <div className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${editable ? "" : "lg:overflow-y-auto lg:pr-1"}`}>
             {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." />}
-            {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : activityQuery.data ? <DailyWorkActivity activity={activityQuery.data} /> : <PanelPlaceholder>MES 거래를 불러오는 중입니다.</PanelPlaceholder>}
+            {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : activityQuery.data ? <DailyWorkActivity activity={activityQuery.data} onDetailOpenChange={setIsActivityDetailOpen} /> : <PanelPlaceholder>MES 거래를 불러오는 중입니다.</PanelPlaceholder>}
             <DailyWorkReportEditor
               initialContent={report?.content ?? ""}
               initialUpdatedAt={report?.updated_at ?? null}
@@ -240,7 +244,7 @@ export function DailyWorkReportScreen({
                 setSaveError(null);
               }}
               saveRef={editorSaveRef}
-              fillAvailableHeight={editable}
+              fillAvailableHeight={editable && !isActivityDetailOpen}
             />
           </div>
         ) : tab === "all" ? <PanelPlaceholder>작성한 직원을 선택하세요.</PanelPlaceholder> : null}

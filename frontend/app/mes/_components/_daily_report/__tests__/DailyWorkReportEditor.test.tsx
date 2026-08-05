@@ -102,14 +102,14 @@ describe("DailyWorkReportEditor", () => {
     expect(heading.parentElement?.parentElement).toHaveClass("items-center");
   });
 
-  it("편집기는 데스크톱 본문을 채우는 628px 높이를 유지한다", () => {
+  it("편집기는 데스크톱 본문의 남은 높이를 채운다", () => {
     render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} fillAvailableHeight />);
 
     const input = screen.getByRole("textbox", { name: "작업 내역" });
     expect(input).toHaveClass("lg:min-h-0");
     expect(input).toHaveClass("lg:flex-1");
-    expect(input.parentElement).toHaveClass("lg:h-[628px]", "lg:flex-none");
-    expect(input.parentElement).not.toHaveClass("lg:flex-1");
+    expect(input.parentElement).toHaveClass("lg:min-h-0", "lg:flex-1");
+    expect(input.parentElement).not.toHaveClass("lg:h-[628px]", "lg:flex-none");
   });
 
   it("서버 저장 시각을 KST로 표시하고 수정하면 저장 필요 상태로 전환한다", () => {

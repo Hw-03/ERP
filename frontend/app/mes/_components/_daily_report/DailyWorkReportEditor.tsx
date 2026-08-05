@@ -161,7 +161,7 @@ export function DailyWorkReportEditor({
           : null;
 
   return (
-    <section className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:h-[628px] lg:flex-none lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <section className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
