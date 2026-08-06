@@ -21,9 +21,14 @@ type ChoiceOption<T extends string> = {
   color: string;
 };
 
+type HoverableSettingsRow = "pin" | "login" | "admin";
+
+const BRIGHT_YELLOW = `color-mix(in srgb, ${LEGACY_COLORS.yellow} 72%, ${LEGACY_COLORS.white})`;
+const SETTINGS_ROW_SURFACE_CLASS = "min-h-[68px] w-full items-center gap-3 rounded-[16px] border p-3";
+
 const THEME_OPTIONS: ChoiceOption<AppearancePreferences["theme"]>[] = [
-  { value: "light", label: "라이트 테마", description: "밝은 화면", Icon: Sun, iconTestId: "appearance-choice-icon-light", color: LEGACY_COLORS.yellow },
-  { value: "dark", label: "다크 테마", description: "어두운 화면", Icon: Moon, iconTestId: "appearance-choice-icon-dark", color: LEGACY_COLORS.purple },
+  { value: "light", label: "라이트 테마", description: "밝은 화면", Icon: Sun, iconTestId: "appearance-choice-icon-light", color: BRIGHT_YELLOW },
+  { value: "dark", label: "다크 테마", description: "어두운 화면", Icon: Moon, iconTestId: "appearance-choice-icon-dark", color: LEGACY_COLORS.text },
 ];
 
 const SIDEBAR_OPTIONS: ChoiceOption<SidebarMode>[] = [
@@ -60,7 +65,14 @@ export function AppearanceSettingsModal({
   const [loginPopupEnabled, setLoginPopupEnabled] = useState(false);
   const [loginPopupSaving, setLoginPopupSaving] = useState(false);
   const [loginPopupFeedback, setLoginPopupFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [hoveredSettingsRow, setHoveredSettingsRow] = useState<HoverableSettingsRow | null>(null);
   const busy = saving || pinSaving || loginPopupSaving;
+
+  const settingsRowBackground = (row: HoverableSettingsRow, color: string) => (
+    hoveredSettingsRow === row
+      ? `color-mix(in srgb, ${color} 8%, ${LEGACY_COLORS.s1})`
+      : LEGACY_COLORS.s1
+  );
 
   const resetPinSettings = useCallback(() => {
     setPinExpanded(false);
@@ -75,6 +87,11 @@ export function AppearanceSettingsModal({
     resetPinSettings();
     onClose();
   }, [busy, onClose, resetPinSettings]);
+
+  const closePinPopup = useCallback(() => {
+    if (pinSaving) return;
+    resetPinSettings();
+  }, [pinSaving, resetPinSettings]);
 
   useEffect(() => {
     if (!open) {
@@ -95,11 +112,16 @@ export function AppearanceSettingsModal({
   useEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeWithoutSaving();
+      if (event.key !== "Escape") return;
+      if (pinExpanded) {
+        closePinPopup();
+        return;
+      }
+      closeWithoutSaving();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [open, closeWithoutSaving]);
+  }, [open, pinExpanded, closePinPopup, closeWithoutSaving]);
 
   if (!open) return null;
 
@@ -239,24 +261,53 @@ export function AppearanceSettingsModal({
                   aria-label="PIN 재설정"
                   aria-expanded={pinExpanded}
                   disabled={!operator || busy}
+                  onPointerEnter={() => setHoveredSettingsRow("pin")}
+                  onPointerLeave={() => setHoveredSettingsRow(null)}
                   onClick={() => {
-                    setPinExpanded((current) => !current);
+                    setPinExpanded(true);
                     setPinFeedback(null);
                   }}
-                  className="flex min-h-[68px] w-full items-center gap-3 rounded-[14px] px-2 text-left transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ background: LEGACY_COLORS.s1 }}
+                  className={`no-btn-inset flex ${SETTINGS_ROW_SURFACE_CLASS} text-left transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50`}
+                  style={{ background: settingsRowBackground("pin", LEGACY_COLORS.purple), borderColor: LEGACY_COLORS.border }}
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)`, color: LEGACY_COLORS.purple }}>
-                    <KeyRound className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>PIN 재설정</span>
-                    <span className="mt-0.5 block text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>현재 PIN 확인 후 즉시 변경합니다.</span>
-                  </span>
+                  <SettingsRowContent
+                    testId="settings-row-content-pin"
+                    label="PIN 재설정"
+                    description="현재 PIN 확인 후 즉시 변경합니다."
+                    Icon={KeyRound}
+                    color={LEGACY_COLORS.purple}
+                  />
                 </button>
 
                 {pinExpanded && (
-                  <div className="mt-3 grid gap-3 border-t pt-3 sm:grid-cols-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                  <div
+                    data-testid="settings-pin-popup-backdrop"
+                    className="fixed inset-0 z-[310] flex items-center justify-center p-4"
+                    style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.bg} 82%, transparent)` }}
+                    onClick={closePinPopup}
+                  >
+                    <section
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="settings-pin-popup-title"
+                      className="w-full max-w-[min(820px,94vw)] rounded-[24px] border p-5 sm:p-7"
+                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <header className="mb-5 flex items-center justify-between">
+                        <h3 id="settings-pin-popup-title" className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>PIN 재설정</h3>
+                        <button
+                          type="button"
+                          aria-label="PIN 재설정 닫기"
+                          disabled={pinSaving}
+                          onClick={closePinPopup}
+                          className="no-btn-inset flex h-9 w-9 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-40"
+                          style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </header>
+                  <div className="grid gap-3 sm:grid-cols-3">
                     {[
                       { id: "settings-pin-current", label: "현재 PIN", value: pinCurrent, onChange: setPinCurrent },
                       { id: "settings-pin-new", label: "새 PIN", value: pinNew, onChange: setPinNew },
@@ -287,8 +338,19 @@ export function AppearanceSettingsModal({
                       {pinSaving ? "PIN 변경 중…" : "PIN 변경 저장"}
                     </button>
                   </div>
+                      {pinFeedback && (
+                        <p
+                          role={pinFeedback.tone === "error" ? "alert" : "status"}
+                          className="mt-3 text-[12px] font-bold"
+                          style={{ color: pinFeedback.tone === "error" ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
+                        >
+                          {pinFeedback.text}
+                        </p>
+                      )}
+                    </section>
+                  </div>
                 )}
-                {pinFeedback && (
+                {pinFeedback && !pinExpanded && (
                   <p
                     role={pinFeedback.tone === "error" ? "alert" : "status"}
                     className="mt-2 text-[12px] font-bold"
@@ -299,14 +361,20 @@ export function AppearanceSettingsModal({
                 )}
               </div>
 
-              <div className="flex min-h-[68px] items-center gap-3 rounded-[16px] p-3" style={{ background: LEGACY_COLORS.s1 }}>
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`, color: LEGACY_COLORS.yellow }}>
-                  <BellRing className="h-5 w-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>로그인 알림 팝업</span>
-                  <span className="mt-0.5 block text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>로그인할 때 읽지 않은 알림을 바로 표시합니다.</span>
-                </span>
+              <div
+                data-testid="settings-login-popup-row"
+                className={`flex ${SETTINGS_ROW_SURFACE_CLASS}`}
+                style={{ background: settingsRowBackground("login", LEGACY_COLORS.green), borderColor: LEGACY_COLORS.border }}
+                onPointerEnter={() => setHoveredSettingsRow("login")}
+                onPointerLeave={() => setHoveredSettingsRow(null)}
+              >
+                <SettingsRowContent
+                  testId="settings-row-content-login-popup"
+                  label="로그인 알림 팝업"
+                  description="로그인할 때 읽지 않은 알림을 바로 표시합니다."
+                  Icon={BellRing}
+                  color={LEGACY_COLORS.green}
+                />
                 <button
                   type="button"
                   role="switch"
@@ -314,18 +382,16 @@ export function AppearanceSettingsModal({
                   aria-checked={loginPopupEnabled}
                   disabled={!operator || busy}
                   onClick={() => void handleLoginPopupToggle()}
-                  className="relative h-11 w-[60px] shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  className="no-btn-inset relative h-8 w-[52px] shrink-0 rounded-full border-0 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                   style={{
-                    background: loginPopupEnabled ? LEGACY_COLORS.yellow : LEGACY_COLORS.s2,
-                    borderColor: loginPopupEnabled ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
+                    background: loginPopupEnabled ? LEGACY_COLORS.green : LEGACY_COLORS.s3,
                   }}
                 >
                   <span
-                    className="absolute top-[7px] h-7 w-7 rounded-full transition-transform"
+                    className="absolute left-0.5 top-0.5 h-7 w-7 rounded-full shadow-sm transition-transform"
                     style={{
-                      left: 7,
                       background: LEGACY_COLORS.white,
-                      transform: loginPopupEnabled ? "translateX(18px)" : "translateX(0)",
+                      transform: loginPopupEnabled ? "translateX(20px)" : "translateX(0)",
                     }}
                   />
                 </button>
@@ -364,17 +430,19 @@ export function AppearanceSettingsModal({
                 type="button"
                 aria-label="관리"
                 disabled={busy}
+                onPointerEnter={() => setHoveredSettingsRow("admin")}
+                onPointerLeave={() => setHoveredSettingsRow(null)}
                 onClick={openAdminPinEntry}
-                className="flex min-h-[68px] w-full items-center gap-3 rounded-[16px] p-3 text-left transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.s1 }}
+                className={`no-btn-inset flex ${SETTINGS_ROW_SURFACE_CLASS} text-left transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50`}
+                style={{ background: settingsRowBackground("admin", LEGACY_COLORS.muted2), borderColor: LEGACY_COLORS.border }}
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
-                  <Settings2 className="h-5 w-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>관리</span>
-                  <span className="mt-0.5 block text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>PIN을 입력해 시작합니다.</span>
-                </span>
+                <SettingsRowContent
+                  testId="settings-row-content-admin"
+                  label="관리"
+                  description="PIN을 입력해 시작합니다."
+                  Icon={Settings2}
+                  color={LEGACY_COLORS.muted2}
+                />
               </button>
             </SettingsCard>
           )}
@@ -430,6 +498,7 @@ function SettingsCard({
 }
 
 function ChoiceButton({
+  value,
   label,
   description,
   Icon,
@@ -443,6 +512,8 @@ function ChoiceButton({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <button
       type="button"
@@ -450,12 +521,53 @@ function ChoiceButton({
       aria-pressed={selected}
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-[68px] w-full items-center rounded-[16px] border p-3 text-left transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      className={`no-btn-inset flex ${SETTINGS_ROW_SURFACE_CLASS} text-left transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50`}
       style={{
-        borderColor: selected ? color : LEGACY_COLORS.border,
-        background: selected ? `color-mix(in srgb, ${color} 12%, transparent)` : LEGACY_COLORS.s1,
+        borderColor: LEGACY_COLORS.border,
+        background: selected
+          ? `color-mix(in srgb, ${color} 12%, transparent)`
+          : hovered
+            ? `color-mix(in srgb, ${color} 8%, ${LEGACY_COLORS.s1})`
+            : LEGACY_COLORS.s1,
       }}
     >
+      <SettingsRowContent
+        testId={`settings-row-content-theme-${value}`}
+        label={label}
+        description={description}
+        Icon={Icon}
+        iconTestId={iconTestId}
+        color={color}
+        selected={selected}
+        trailing={selected ? <Check className="h-5 w-5 shrink-0" style={{ color }} /> : undefined}
+      />
+    </button>
+  );
+}
+
+function SettingsRowContent({
+  testId,
+  label,
+  description,
+  Icon,
+  color,
+  iconTestId,
+  selected = false,
+  trailing,
+}: {
+  testId: string;
+  label: string;
+  description: string;
+  Icon: ElementType;
+  color: string;
+  iconTestId?: string;
+  selected?: boolean;
+  trailing?: ReactNode;
+}) {
+  return (
+    <>
       <span
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]"
         style={{
@@ -463,13 +575,13 @@ function ChoiceButton({
           color,
         }}
       >
-        <Icon data-testid={iconTestId} className="h-6 w-6" />
+        <Icon data-testid={iconTestId} className="h-5 w-5" />
       </span>
-      <span className="ml-3 min-w-0 flex-1">
-        <span className="block font-black" style={{ color: LEGACY_COLORS.text }}>{label}</span>
-        <span className="mt-1 block text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{description}</span>
+      <span data-testid={testId} className="min-w-0 flex-1">
+        <span className="block text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>{label}</span>
+        <span className="mt-0.5 block text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>{description}</span>
       </span>
-      {selected && <Check className="ml-3 h-5 w-5 shrink-0" style={{ color }} />}
-    </button>
+      {trailing}
+    </>
   );
 }

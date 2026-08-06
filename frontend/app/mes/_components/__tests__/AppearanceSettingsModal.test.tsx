@@ -89,16 +89,47 @@ describe("AppearanceSettingsModal", () => {
   it("uses the sidebar semantic colors for the compact choice rows", () => {
     renderModal();
 
-    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveStyle({ borderColor: "var(--c-yellow)" });
-    expect(screen.getByTestId("appearance-choice-icon-dark").parentElement).toHaveStyle({ color: "var(--c-purple)" });
+    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveStyle({ borderColor: "var(--c-border)" });
+    expect(screen.getByTestId("appearance-choice-icon-light").parentElement).toHaveStyle({ color: "color-mix(in srgb, var(--c-yellow) 72%, #ffffff)" });
+    expect(screen.getByTestId("appearance-choice-icon-dark").parentElement).toHaveStyle({ color: "var(--c-text)" });
     expect(screen.getByTestId("appearance-choice-icon-collapsed").parentElement).toHaveStyle({ color: "var(--c-blue)" });
 
     fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
 
-    expect(screen.getByRole("button", { name: "다크 테마" })).toHaveStyle({ borderColor: "var(--c-purple)" });
+    expect(screen.getByRole("button", { name: "다크 테마" })).toHaveStyle({ borderColor: "var(--c-border)" });
   });
 
-  it("opens and closes the PIN inputs from the borderless PIN row", () => {
+  it("uses matching row content and a green iPhone-style login switch", () => {
+    renderModal();
+
+    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveClass("rounded-[16px]", "border", "p-3");
+    expect(screen.getByRole("button", { name: "PIN 재설정" })).toHaveClass("rounded-[16px]", "border", "p-3");
+    expect(screen.getByTestId("settings-login-popup-row")).toHaveClass("rounded-[16px]", "border", "p-3");
+    expect(screen.getByTestId("settings-row-content-theme-light")).toHaveClass("min-w-0", "flex-1");
+    expect(screen.getByTestId("settings-row-content-pin")).toHaveClass("min-w-0", "flex-1");
+    expect(screen.getByTestId("settings-row-content-login-popup")).toHaveClass("min-w-0", "flex-1");
+    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveClass("no-btn-inset");
+    expect(screen.getByRole("button", { name: "라이트 테마" })).not.toHaveClass("hover:brightness-110");
+    const darkTheme = screen.getByRole("button", { name: "다크 테마" });
+    fireEvent.pointerEnter(darkTheme);
+    expect(darkTheme).toHaveStyle({ background: "color-mix(in srgb, var(--c-text) 8%, var(--c-s1))" });
+    fireEvent.pointerLeave(darkTheme);
+    expect(darkTheme).toHaveStyle({ background: "var(--c-s1)" });
+    const pinReset = screen.getByRole("button", { name: "PIN 재설정" });
+    fireEvent.pointerEnter(pinReset);
+    expect(pinReset).toHaveStyle({ background: "color-mix(in srgb, var(--c-purple) 8%, var(--c-s1))" });
+    fireEvent.pointerLeave(pinReset);
+    expect(pinReset).toHaveStyle({ background: "var(--c-s1)" });
+    const loginPopupRow = screen.getByTestId("settings-login-popup-row");
+    fireEvent.pointerEnter(loginPopupRow);
+    expect(loginPopupRow).toHaveStyle({ background: "color-mix(in srgb, var(--c-green) 8%, var(--c-s1))" });
+    fireEvent.pointerLeave(loginPopupRow);
+    expect(loginPopupRow).toHaveStyle({ background: "var(--c-s1)" });
+    expect(screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" })).toHaveClass("no-btn-inset", "border-0");
+    expect(screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" })).toHaveStyle({ background: "var(--c-green)" });
+  });
+
+  it("opens the PIN reset form in a centered popup", () => {
     renderModal();
 
     const pinButton = screen.getByRole("button", { name: "PIN 재설정" });
@@ -106,9 +137,11 @@ describe("AppearanceSettingsModal", () => {
     expect(pinButton).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(pinButton);
+    expect(screen.getByRole("dialog", { name: "PIN 재설정" })).toBeInTheDocument();
     expect(screen.getByLabelText("현재 PIN")).toBeInTheDocument();
 
-    fireEvent.click(pinButton);
+    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정 닫기" }));
+    expect(pinButton).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByLabelText("현재 PIN")).not.toBeInTheDocument();
   });
 
@@ -166,7 +199,12 @@ describe("AppearanceSettingsModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
     fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
-    fireEvent.click(screen.getByRole("button", { name: "관리" }));
+    const adminButton = screen.getByRole("button", { name: "관리" });
+    fireEvent.pointerEnter(adminButton);
+    expect(adminButton).toHaveStyle({ background: "color-mix(in srgb, var(--c-muted2) 8%, var(--c-s1))" });
+    fireEvent.pointerLeave(adminButton);
+    expect(adminButton).toHaveStyle({ background: "var(--c-s1)" });
+    fireEvent.click(adminButton);
     expect(onOpenAdminPinEntry).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "PIN 재설정" })).toHaveAttribute("aria-expanded", "false");
 
