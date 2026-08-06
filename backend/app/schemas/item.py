@@ -20,9 +20,9 @@ class ItemCreate(BaseModel):
     process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
     unit: str = Field("EA", max_length=20, description="단위")
     legacy_part: Optional[str] = Field(None, max_length=50)
-    legacy_item_type: str = Field(..., min_length=1, max_length=50)
+    legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
-    min_stock: int = Field(..., ge=0)
+    min_stock: Optional[int] = None
     sales_review_required: Optional[bool] = None
     initial_quantity: int = Field(..., gt=0, description="초기 재고 수량")
     model_slots: List[int] = Field(..., min_length=1, description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")

@@ -64,12 +64,12 @@ def test_create_no_locations_all_warehouse(client, seed_symbol):
     assert body["locations"] == []
 
 
-def test_create_item_requires_required_registration_fields(client, seed_symbol):
+def test_create_item_allows_optional_material_classification_and_minimum_stock(client, seed_symbol):
     missing_material_type = _create_item(client, name="자재분류 없음", legacy_item_type=None)
-    assert missing_material_type.status_code == 422
+    assert missing_material_type.status_code == 201, missing_material_type.text
 
     missing_min_stock = _create_item(client, name="안전재고 없음", min_stock=None)
-    assert missing_min_stock.status_code == 422
+    assert missing_min_stock.status_code == 201, missing_min_stock.text
 
     missing_product = _create_item(client, name="사용 제품 없음", model_slots=None)
     assert missing_product.status_code == 422

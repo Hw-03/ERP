@@ -169,11 +169,11 @@ describe("ItemFormFields", () => {
     expect(screen.getByRole("spinbutton")).toHaveClass("!text-left");
   });
 
-  it("marks material classification and minimum stock as required", () => {
+  it("marks material classification and minimum stock as optional outside item registration", () => {
     render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
 
-    expect(screen.getByText("자재분류", { selector: "div" }).parentElement).toHaveTextContent("필수");
-    expect(screen.getByText("안전재고", { selector: "div" }).parentElement).toHaveTextContent("필수");
+    expect(screen.getByText("자재분류", { selector: "div" }).parentElement).toHaveTextContent("선택");
+    expect(screen.getByText("안전재고", { selector: "div" }).parentElement).toHaveTextContent("선택");
   });
 
   it("marks product selection and initial stock location as required with centered badges", () => {
@@ -188,8 +188,32 @@ describe("ItemFormFields", () => {
 
     expect(screen.getByText("사용 제품", { selector: "div" }).parentElement).toHaveTextContent("필수");
     expect(screen.getByText("초기 재고 위치", { selector: "div" }).parentElement).toHaveTextContent("필수");
+    expect(screen.getByText("자재분류", { selector: "div" }).parentElement).toHaveTextContent("선택");
+    expect(screen.getByText("안전재고", { selector: "div" }).parentElement).toHaveTextContent("선택");
     for (const badge of screen.getAllByText("필수", { selector: "span" })) {
       expect(badge).toHaveClass("inline-flex", "items-center", "justify-center", "text-center");
     }
+  });
+
+  it("places material classification and minimum stock in an even two-column row", () => {
+    render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
+
+    const materialField = screen.getByText("자재분류", { selector: "div" }).parentElement;
+    const stockField = screen.getByText("안전재고", { selector: "div" }).parentElement;
+    const pairRow = materialField?.parentElement;
+
+    expect(pairRow).toHaveClass("grid", "sm:grid-cols-2", "gap-4");
+    expect(pairRow).toContainElement(stockField);
+  });
+
+  it("places supplier and unit in an even two-column row", () => {
+    render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
+
+    const supplierField = screen.getByText("공급사", { selector: "div" }).parentElement;
+    const unitField = screen.getByText("단위", { selector: "div" }).parentElement;
+    const pairRow = supplierField?.parentElement;
+
+    expect(pairRow).toHaveClass("grid", "sm:grid-cols-2", "gap-4");
+    expect(pairRow).toContainElement(unitField);
   });
 });

@@ -127,37 +127,7 @@ describe("useAdminMasterItemsCommands", () => {
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
-  it("requires material classification and minimum stock before creating an item", async () => {
-    createMutateAsync.mockResolvedValue({
-      item_id: "102",
-      item_name: "신규 품목",
-      mes_code: "9-HR-0001",
-    });
-    const args = baseArgs();
-    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
-      wrapper: makeWrapper(makeClient()),
-    });
-    act(() => {
-      result.current.setAddForm((form) => ({ ...form, item_name: "신규 품목" }));
-    });
-
-    await act(async () => {
-      result.current.add();
-    });
-    await waitFor(() => expect(args.onError).toHaveBeenCalledWith("자재분류를 선택하세요."));
-    expect(createMutateAsync).not.toHaveBeenCalled();
-
-    act(() => {
-      result.current.setAddForm((form) => ({ ...form, legacy_item_type: "원자재" }));
-    });
-    await act(async () => {
-      result.current.add();
-    });
-    await waitFor(() => expect(args.onError).toHaveBeenLastCalledWith("안전재고를 입력하세요."));
-    expect(createMutateAsync).not.toHaveBeenCalled();
-  });
-
-  it("requires at least one product and an initial stock location before creating an item", async () => {
+  it("allows empty material classification and minimum stock while requiring a product and initial stock location", async () => {
     const args = baseArgs();
     const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
       wrapper: makeWrapper(makeClient()),
@@ -166,8 +136,6 @@ describe("useAdminMasterItemsCommands", () => {
       result.current.setAddForm((form) => ({
         ...form,
         item_name: "신규 품목",
-        legacy_item_type: "원자재",
-        min_stock: "0",
       }));
     });
 

@@ -54,14 +54,6 @@ export function useAdminMasterItemsCommands({
       onError("품목명을 입력하세요.");
       return;
     }
-    if (!addForm.legacy_item_type) {
-      onError("자재분류를 선택하세요.");
-      return;
-    }
-    if (addForm.min_stock === "") {
-      onError("안전재고를 입력하세요.");
-      return;
-    }
     if (addForm.model_slots.length === 0) {
       onError("사용 제품을 하나 이상 선택하세요.");
       return;
@@ -82,9 +74,9 @@ export function useAdminMasterItemsCommands({
         unit: addForm.unit || "EA",
         model_slots: addForm.model_slots.length > 0 ? addForm.model_slots : undefined,
         sales_review_required: addForm.sales_review_required,
-        legacy_item_type: addForm.legacy_item_type,
+        legacy_item_type: addForm.legacy_item_type || undefined,
         supplier: addForm.supplier || undefined,
-        min_stock: Number(addForm.min_stock),
+        min_stock: addForm.min_stock === "" ? undefined : Number(addForm.min_stock),
         initial_quantity: totalQty > 0 ? totalQty : undefined,
         initial_locations: builtLocs.length > 0 ? builtLocs : undefined,
       });

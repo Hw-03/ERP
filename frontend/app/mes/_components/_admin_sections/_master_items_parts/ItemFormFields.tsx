@@ -294,58 +294,57 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         </div>
       )}
 
-      <div>
-        <FieldLabel label="자재분류" badge="필수" />
-        <AppSelect
-          value={form.legacy_item_type}
-          onChange={(v) => setForm((f) => ({ ...f, legacy_item_type: v }))}
-          size="lg"
-          triggerAriaLabel="자재분류"
-          triggerStyle={{ background: LEGACY_COLORS.s1 }}
-          options={materialOptions}
-          placeholder="선택"
-        />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <FieldLabel label="자재분류" badge="선택" />
+          <AppSelect
+            value={form.legacy_item_type}
+            onChange={(v) => setForm((f) => ({ ...f, legacy_item_type: v }))}
+            size="lg"
+            triggerAriaLabel="자재분류"
+            triggerStyle={{ background: LEGACY_COLORS.s1 }}
+            options={materialOptions}
+            placeholder="선택"
+          />
+        </div>
+
+        <div>
+          <FieldLabel label="안전재고" badge="선택" />
+          <QuantityInput
+            min={0}
+            step={1}
+            value={form.min_stock ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, min_stock: e.target.value }))}
+            placeholder="0"
+            className="w-full rounded-[18px] border px-4 py-3 text-base !text-left"
+            style={inputStyle}
+          />
+        </div>
       </div>
 
-      {([
-        { key: "min_stock",        label: "안전재고", type: "number", placeholder: "0" },
-        { key: "supplier",         label: "공급사",   type: "text",   placeholder: "예: 삼성특수금속" },
-      ] as const).map(({ key, label, type, placeholder }) => (
-        <div key={key}>
-          <FieldLabel label={label} badge={key === "min_stock" ? "필수" : "선택"} />
-          {type === "number" ? (
-            <QuantityInput
-              min={0}
-              step={1}
-              value={form[key] ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-              placeholder={placeholder}
-              className="w-full rounded-[18px] border px-4 py-3 text-base !text-left"
-              style={inputStyle}
-            />
-          ) : (
-            <input
-              type={type}
-              value={form[key] ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-              placeholder={placeholder}
-              className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-              style={inputStyle}
-            />
-          )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <FieldLabel label="공급사" badge="선택" />
+          <input
+            type="text"
+            value={form.supplier ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, supplier: e.target.value }))}
+            placeholder="예: 삼성특수금속"
+            className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
+            style={inputStyle}
+          />
         </div>
-      ))}
 
-      {/* 단위 */}
-      <div>
-        <FieldLabel label="단위" badge="선택" />
-        <AppSelect
-          value={form.unit}
-          onChange={(v) => setForm((f) => ({ ...f, unit: v }))}
-          size="lg"
-          triggerStyle={{ background: LEGACY_COLORS.s1 }}
-          options={UNIT_OPTIONS.map((u) => ({ value: u, label: u }))}
-        />
+        <div>
+          <FieldLabel label="단위" badge="선택" />
+          <AppSelect
+            value={form.unit}
+            onChange={(v) => setForm((f) => ({ ...f, unit: v }))}
+            size="lg"
+            triggerStyle={{ background: LEGACY_COLORS.s1 }}
+            options={UNIT_OPTIONS.map((u) => ({ value: u, label: u }))}
+          />
+        </div>
       </div>
 
       {showMesCode && (
