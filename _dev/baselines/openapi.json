@@ -4177,16 +4177,10 @@
             "title": "Initial Locations"
           },
           "initial_quantity": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "초기 재고 수량 (기본 0)",
-            "title": "Initial Quantity"
+            "description": "초기 재고 수량",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Quantity",
+            "type": "integer"
           },
           "item_name": {
             "description": "품목명",
@@ -4195,16 +4189,10 @@
             "type": "string"
           },
           "legacy_item_type": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Item Type"
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Legacy Item Type",
+            "type": "string"
           },
           "legacy_part": {
             "anyOf": [
@@ -4219,22 +4207,16 @@
             "title": "Legacy Part"
           },
           "min_stock": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Stock"
+            "minimum": 0.0,
+            "title": "Min Stock",
+            "type": "integer"
           },
           "model_slots": {
-            "default": [],
             "description": "사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)",
             "items": {
               "type": "integer"
             },
+            "minItems": 1,
             "title": "Model Slots",
             "type": "array"
           },
@@ -4283,7 +4265,11 @@
           }
         },
         "required": [
-          "item_name"
+          "item_name",
+          "legacy_item_type",
+          "min_stock",
+          "initial_quantity",
+          "model_slots"
         ],
         "title": "ItemCreate",
         "type": "object"
