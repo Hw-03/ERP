@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, GripVertical, Plus, Save, Trash2 } from "lucide-react";
+import { Box, GripVertical, Plus, Save, Trash2, X } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -18,6 +18,7 @@ import {
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 import { AddItemForm } from "./_master_items_parts/AddItemForm";
 import { EditItemForm } from "./_master_items_parts/EditItemForm";
+import { EMPTY_ADD_FORM } from "./adminShared";
 import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 
 type DetailTab = "info" | "stock" | "bom";
@@ -41,6 +42,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setItemSearch,
     addMode,
     setAddMode,
+    setAddForm,
     saveItem,
     dirty,
     reorderItems,
@@ -162,6 +164,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
       setAddMode(true);
       setSelectedItem(null);
     });
+  }
+
+  function handleCancelAdd() {
+    setAddMode(false);
+    setAddForm(() => EMPTY_ADD_FORM);
   }
 
   function handleSelectItem(item: Item, isSelected: boolean) {
@@ -321,6 +328,23 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             addMode
               ? "필요한 항목을 채우고 추가 버튼을 눌러주세요."
               : undefined
+          }
+          actions={
+            addMode ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="새 품목 추가 닫기"
+                onClick={handleCancelAdd}
+                className="h-8 w-8 !rounded-full !border-0 !p-0"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
+                  color: LEGACY_COLORS.red,
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            ) : undefined
           }
           tabActions={
             !addMode &&

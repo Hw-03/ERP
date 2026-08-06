@@ -45,14 +45,14 @@ export function InventoryItemsTable({
 }: Props) {
   const headerColumns = compact
     ? [
-        { label: "상태", nowrap: true, width: "90px" },
+        { label: "상태", nowrap: true, width: "90px", center: true },
         { label: "품목명", nowrap: false, minWidth: "140px" },
       ]
     : [
-        { label: "상태", nowrap: true, width: "90px" },
+        { label: "상태", nowrap: true, width: "90px", center: true },
         { label: "이미지", nowrap: true, width: "60px", center: true, hidden: true },
         { label: "품목명", nowrap: false, minWidth: "140px" },
-        { label: "품목 코드", nowrap: true, width: "160px", hidden: true },
+        { label: "품목 코드", nowrap: true, width: "160px", center: true, hidden: true },
         { label: "부서별 재고", nowrap: true, width: "220px", center: true, hidden: true },
       ];
   // 좌측 사이드바 탭 전환 시 실제 렌더 비용(Long Task) 완화: displayLimit(최대

@@ -60,9 +60,36 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 
 afterEach(() => {
   context.selectedItem = null;
+  context.addMode = false;
+  context.addForm = {};
 });
 
 describe("AdminMasterItemsSection", () => {
+  it("places the add-form close button in the card header without repeating the title", () => {
+    context.addMode = true;
+    context.addForm = {
+      item_name: "",
+      legacy_item_type: "",
+      supplier: "",
+      min_stock: "",
+      process_type_code: "TR",
+      unit: "EA",
+      model_slots: [],
+      sales_review_required: false,
+      initial_quantity: "",
+      initial_locations: [],
+    };
+    render(
+      <DirtyGuardProvider>
+        <AdminMasterItemsSection allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    const closeButton = screen.getByRole("button", { name: "새 품목 추가 닫기" });
+    expect(closeButton).toHaveClass("h-8", "w-8", "!rounded-full");
+    expect(screen.getAllByText("새 품목 추가")).toHaveLength(1);
+  });
+
   it("passes the available detail height into the item workspace", () => {
     const { container } = render(
       <DirtyGuardProvider>

@@ -22,12 +22,18 @@ def seed_symbol(db_session):
 
 
 def _create_item(client, *, name="테스트품목", process_type_code="HR",
-                 initial_quantity=None, initial_locations=None, sales_review_required=None):
+                 initial_quantity=1, initial_locations=None, sales_review_required=None,
+                 legacy_item_type="원자재", min_stock=0, model_slots=[1]):
     payload = {
         "item_name": name,
         "process_type_code": process_type_code,
-        "model_slots": [1],
     }
+    if model_slots is not None:
+        payload["model_slots"] = model_slots
+    if legacy_item_type is not None:
+        payload["legacy_item_type"] = legacy_item_type
+    if min_stock is not None:
+        payload["min_stock"] = min_stock
     if initial_quantity is not None:
         payload["initial_quantity"] = initial_quantity
     if initial_locations is not None:
@@ -56,6 +62,20 @@ def test_create_no_locations_all_warehouse(client, seed_symbol):
     assert body["warehouse_qty"] == 2000
     assert body["production_total"] == 0
     assert body["locations"] == []
+
+
+def test_create_item_requires_required_registration_fields(client, seed_symbol):
+    missing_material_type = _create_item(client, name="자재분류 없음", legacy_item_type=None)
+    assert missing_material_type.status_code == 422
+
+    missing_min_stock = _create_item(client, name="안전재고 없음", min_stock=None)
+    assert missing_min_stock.status_code == 422
+
+    missing_product = _create_item(client, name="사용 제품 없음", model_slots=None)
+    assert missing_product.status_code == 422
+
+    missing_initial_stock = _create_item(client, name="초기 재고 없음", initial_quantity=None)
+    assert missing_initial_stock.status_code == 422
 
 
 def test_create_item_preserves_explicit_sales_review_and_defaults_af_to_required(client, seed_symbol):

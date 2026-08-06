@@ -61,7 +61,7 @@ describe("ItemFormFields", () => {
     expect(codePreview?.parentElement?.nextElementSibling).toBe(checkbox.closest("label"));
   });
 
-  it("keeps the no-product guidance beneath the product chips", () => {
+  it("does not render redundant no-product guidance beneath the product chips", () => {
     render(
       <ItemFormFields
         form={baseForm()}
@@ -71,7 +71,7 @@ describe("ItemFormFields", () => {
       />,
     );
 
-    expect(screen.getByText(/사용 제품이 지정되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/사용 제품이 지정되지 않았습니다/)).not.toBeInTheDocument();
   });
 
   it("offers warehouse as an initial stock location", () => {
@@ -161,5 +161,35 @@ describe("ItemFormFields", () => {
     fireEvent.click(checkbox);
     const updater = setForm.mock.calls[0][0] as (form: ItemFormData) => ItemFormData;
     expect(updater(baseForm()).sales_review_required).toBe(true);
+  });
+
+  it("left-aligns the minimum-stock quantity input", () => {
+    render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
+
+    expect(screen.getByRole("spinbutton")).toHaveClass("!text-left");
+  });
+
+  it("marks material classification and minimum stock as required", () => {
+    render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
+
+    expect(screen.getByText("자재분류", { selector: "div" }).parentElement).toHaveTextContent("필수");
+    expect(screen.getByText("안전재고", { selector: "div" }).parentElement).toHaveTextContent("필수");
+  });
+
+  it("marks product selection and initial stock location as required with centered badges", () => {
+    render(
+      <ItemFormFields
+        form={baseForm()}
+        setForm={vi.fn()}
+        showInitialLocations
+        productModels={[{ slot: 1, symbol: "3", model_name: "DX3000", is_reserved: false }]}
+      />,
+    );
+
+    expect(screen.getByText("사용 제품", { selector: "div" }).parentElement).toHaveTextContent("필수");
+    expect(screen.getByText("초기 재고 위치", { selector: "div" }).parentElement).toHaveTextContent("필수");
+    for (const badge of screen.getAllByText("필수", { selector: "span" })) {
+      expect(badge).toHaveClass("inline-flex", "items-center", "justify-center", "text-center");
+    }
   });
 });

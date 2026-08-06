@@ -103,6 +103,8 @@ async function seed() {
     process_type_code: "TR",
     unit: "EA",
     model_slots: [1],
+    legacy_item_type: "원자재",
+    min_stock: 0,
     initial_quantity: 500,
   });
   const parentItem = await postJson(`${BACKEND_URL}/api/items`, {
@@ -110,7 +112,9 @@ async function seed() {
     process_type_code: "TA",
     unit: "EA",
     model_slots: [1],
-    initial_quantity: 0,
+    legacy_item_type: "원자재",
+    min_stock: 0,
+    initial_quantity: 1,
   });
   // BOM: 부모(TA) → 자식(TR) x2 — produce 의 자동 전개 대상.
   await postJson(`${BACKEND_URL}/api/bom`, {

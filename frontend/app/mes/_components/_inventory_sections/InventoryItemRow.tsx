@@ -133,7 +133,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
 
   return (
     <tr {...rowProps}>
-      <td className="border-b px-4 py-5 align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="border-b px-4 py-5 text-center align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
         <span
           className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"
           style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
@@ -167,7 +167,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
         </td>
       {!compact && (
         <>
-      <td className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-sm" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}>
+      <td className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-center text-sm" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}>
         {item.mes_code ?? "-"}
       </td>
       <td className="hidden sm:table-cell border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>

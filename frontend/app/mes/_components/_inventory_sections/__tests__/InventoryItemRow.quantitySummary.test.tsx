@@ -128,4 +128,46 @@ describe("InventoryItemRow quantity summary", () => {
     expect(screen.getByRole("columnheader", { name: "총재고" })).toHaveClass("text-center");
     expect(screen.getByTestId("inventory-total-stock")).toHaveClass("text-center");
   });
+
+  it("centers the dashboard item-code header and values", () => {
+    render(
+      <InventoryItemsTable
+        error={null}
+        loading={false}
+        filteredItems={[makeItem()]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+        selectedItem={null}
+        onSelectItem={() => {}}
+        activeFilterCount={0}
+        hasKpiFilter={false}
+        onRetry={() => {}}
+        onResetAllFilters={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "품목 코드" })).toHaveClass("text-center");
+    expect(screen.getByText("3-TR-0001").closest("td")).toHaveClass("text-center");
+  });
+
+  it("centers the dashboard status header and values", () => {
+    render(
+      <InventoryItemsTable
+        error={null}
+        loading={false}
+        filteredItems={[makeItem()]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+        selectedItem={null}
+        onSelectItem={() => {}}
+        activeFilterCount={0}
+        hasKpiFilter={false}
+        onRetry={() => {}}
+        onResetAllFilters={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "상태" })).toHaveClass("text-center");
+    expect(screen.getByText("정상").closest("td")).toHaveClass("text-center");
+  });
 });

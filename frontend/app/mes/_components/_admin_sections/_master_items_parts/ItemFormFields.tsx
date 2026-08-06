@@ -42,7 +42,7 @@ function FieldLabel({ label, badge }: { label: string; badge?: "필수" | "선�
       {label}
       {badge && (
         <span
-          className="rounded-full px-1.5 py-0.5 text-[12px] font-bold"
+          className="inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-center text-[12px] font-bold leading-none"
           style={{
             background: badge === "필수"
               ? `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`
@@ -180,7 +180,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
       {/* 사용 제품 (모델 슬롯) */}
       <div>
         <div className="flex flex-wrap items-center gap-x-2">
-          <FieldLabel label="사용 제품" />
+          <FieldLabel label="사용 제품" badge="필수" />
           {form.model_slots.length > 0 && (
             <div className="mb-2 text-xs" style={{ color: LEGACY_COLORS.purple }}>
               제품 기호:{" "}
@@ -215,16 +215,11 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
             );
           })}
         </div>
-        {form.model_slots.length === 0 && (
-          <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            사용 제품이 지정되지 않았습니다. 위 칩을 클릭해 모델 슬롯을 선택하세요.
-          </div>
-        )}
       </div>
 
       {showInitialLocations && (
         <div>
-          <FieldLabel label="초기 재고 위치" badge="선택" />
+          <FieldLabel label="초기 재고 위치" badge="필수" />
           <div className="flex flex-col gap-2">
             {locs.map((row, idx) => (
               <div key={idx} className="flex items-center gap-2">
@@ -300,7 +295,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
       )}
 
       <div>
-        <FieldLabel label="자재분류" badge="선택" />
+        <FieldLabel label="자재분류" badge="필수" />
         <AppSelect
           value={form.legacy_item_type}
           onChange={(v) => setForm((f) => ({ ...f, legacy_item_type: v }))}
@@ -317,7 +312,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
         { key: "supplier",         label: "공급사",   type: "text",   placeholder: "예: 삼성특수금속" },
       ] as const).map(({ key, label, type, placeholder }) => (
         <div key={key}>
-          <FieldLabel label={label} badge="선택" />
+          <FieldLabel label={label} badge={key === "min_stock" ? "필수" : "선택"} />
           {type === "number" ? (
             <QuantityInput
               min={0}
@@ -325,7 +320,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
               value={form[key] ?? ""}
               onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
               placeholder={placeholder}
-              className="w-full rounded-[18px] border px-4 py-3 text-base"
+              className="w-full rounded-[18px] border px-4 py-3 text-base !text-left"
               style={inputStyle}
             />
           ) : (

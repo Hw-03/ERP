@@ -79,7 +79,15 @@ describe("useAdminMasterItemsCommands", () => {
     });
     act(() => {
       result.current.setAddMode(true);
-      result.current.setAddForm((f) => ({ ...f, item_name: "신규", sales_review_required: true }));
+      result.current.setAddForm((f) => ({
+        ...f,
+        item_name: "신규",
+        sales_review_required: true,
+        legacy_item_type: "원자재",
+        min_stock: "0",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+      }));
     });
     await act(async () => {
       result.current.add();
@@ -102,7 +110,14 @@ describe("useAdminMasterItemsCommands", () => {
       wrapper: makeWrapper(client),
     });
     act(() => {
-      result.current.setAddForm((form) => ({ ...form, item_name: "New item" }));
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "New item",
+        legacy_item_type: "원자재",
+        min_stock: "0",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+      }));
     });
 
     await act(async () => {
@@ -110,5 +125,64 @@ describe("useAdminMasterItemsCommands", () => {
     });
 
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it("requires material classification and minimum stock before creating an item", async () => {
+    createMutateAsync.mockResolvedValue({
+      item_id: "102",
+      item_name: "신규 품목",
+      mes_code: "9-HR-0001",
+    });
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({ ...form, item_name: "신규 품목" }));
+    });
+
+    await act(async () => {
+      result.current.add();
+    });
+    await waitFor(() => expect(args.onError).toHaveBeenCalledWith("자재분류를 선택하세요."));
+    expect(createMutateAsync).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.setAddForm((form) => ({ ...form, legacy_item_type: "원자재" }));
+    });
+    await act(async () => {
+      result.current.add();
+    });
+    await waitFor(() => expect(args.onError).toHaveBeenLastCalledWith("안전재고를 입력하세요."));
+    expect(createMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("requires at least one product and an initial stock location before creating an item", async () => {
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "신규 품목",
+        legacy_item_type: "원자재",
+        min_stock: "0",
+      }));
+    });
+
+    await act(async () => {
+      result.current.add();
+    });
+    await waitFor(() => expect(args.onError).toHaveBeenCalledWith("사용 제품을 하나 이상 선택하세요."));
+
+    act(() => {
+      result.current.setAddForm((form) => ({ ...form, model_slots: [1] }));
+    });
+    await act(async () => {
+      result.current.add();
+    });
+    await waitFor(() => expect(args.onError).toHaveBeenLastCalledWith("초기 재고 위치와 수량을 입력하세요."));
+    expect(createMutateAsync).not.toHaveBeenCalled();
   });
 });

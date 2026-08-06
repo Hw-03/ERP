@@ -30,6 +30,13 @@ vi.mock("../../../DepartmentsContext", () => ({
 }));
 
 describe("AddItemForm", () => {
+  it("does not render a duplicate heading or the obsolete item-code hint", () => {
+    render(<AddItemForm />);
+
+    expect(screen.queryByText("새 품목 추가")).not.toBeInTheDocument();
+    expect(screen.queryByText(/품번은 카테고리 기반으로 자동 부여됩니다/)).not.toBeInTheDocument();
+  });
+
   it("selecting AF defaults sales review to required", () => {
     render(<AddItemForm />);
 
