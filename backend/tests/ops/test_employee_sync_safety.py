@@ -463,13 +463,14 @@ def test_employee_sync_auto_schema_preflight_runs_before_stopping_services() -> 
     assert "exit 9" in script[preflight:stop]
 
 
-def test_automatic_sync_uses_dry_run_and_never_forces_active_employee() -> None:
+def test_automatic_sync_uses_dry_run_and_never_blocks_on_source_git_state() -> None:
     script = AUTO_SYNC_SCRIPT.read_text(encoding="utf-8-sig")
 
     assert "-DryRun" in script
     assert "-AutoSchema" in script
-    assert "git status --porcelain" in script
-    assert "git rev-list" in script
+    assert "git status --porcelain" not in script
+    assert "git rev-list" not in script
+    assert "@{u}" not in script
     assert "-Force" not in script
 
 
