@@ -91,7 +91,9 @@ export function useAdminMasterItemsCommands({
   }
 
   function reorder(ordered: Item[]) {
-    const items = ordered.map((it, i) => ({ item_id: it.item_id, display_order: i }));
+    const items = ordered
+      .filter((item) => !item.deleted_at)
+      .map((item, index) => ({ item_id: item.item_id, display_order: index }));
     // 낙관적 업데이트 — 즉시 새 순서로 보이게.
     // sort_order 는 백엔드 전용 컬럼이라 프론트 Item 타입에 없음 → 순서만 갈아끼움.
     setItems(() => ordered);

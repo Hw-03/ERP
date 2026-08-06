@@ -16,8 +16,8 @@ def test_reorder_items_updates_sort_order(client, make_item, db_session):
         "/api/items/reorder",
         json={
             "items": [
-                {"item_id": str(i1.item_id), "display_order": 5},
-                {"item_id": str(i2.item_id), "display_order": 2},
+                {"item_id": str(i1.item_id), "display_order": 1},
+                {"item_id": str(i2.item_id), "display_order": 0},
             ],
             "pin": "0000",
         },
@@ -27,8 +27,30 @@ def test_reorder_items_updates_sort_order(client, make_item, db_session):
 
     db_session.refresh(i1)
     db_session.refresh(i2)
-    assert i1.sort_order == 5
-    assert i2.sort_order == 2
+    assert i1.sort_order == 1
+    assert i2.sort_order == 0
+
+
+def test_reorder_items_rejects_partial_active_item_list(client, make_item, db_session):
+    i1 = make_item(name="first")
+    i2 = make_item(name="second")
+    i3 = make_item(name="third")
+    i1.sort_order, i2.sort_order, i3.sort_order = 0, 1, 2
+    db_session.commit()
+
+    resp = client.patch(
+        "/api/items/reorder",
+        json={
+            "items": [{"item_id": str(i2.item_id), "display_order": 0}],
+            "pin": "0000",
+        },
+    )
+
+    assert resp.status_code == 422, resp.json()
+    db_session.refresh(i1)
+    db_session.refresh(i2)
+    db_session.refresh(i3)
+    assert [i1.sort_order, i2.sort_order, i3.sort_order] == [0, 1, 2]
 
 
 def test_reorder_items_wrong_pin_403(client, make_item, db_session):

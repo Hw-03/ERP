@@ -333,11 +333,22 @@ def reorder_items(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    """드래그 reorder 결과를 영구 저장. 모델 reorder 와 동일 패턴.
+    """전체 활성 품목의 드래그 reorder 결과를 영구 저장한다."""
+    active_item_ids = {
+        item_id
+        for (item_id,) in db.query(Item.item_id).filter(Item.deleted_at.is_(None)).all()
+    }
+    submitted_item_ids = [item.item_id for item in payload.items]
+    if (
+        len(submitted_item_ids) != len(active_item_ids)
+        or set(submitted_item_ids) != active_item_ids
+    ):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "활성 품목 전체 목록에서만 표시 순서를 변경할 수 있습니다.",
+        )
 
-    - PIN 검증 후 payload.items 의 (item_id, display_order) 쌍을 Item.sort_order 로 일괄 갱신.
-    - 존재하지 않는 item_id 는 조용히 스킵 (부분 갱신 허용).
-    """
     reorder_by_display_order(
         db, Item, "item_id",
         [(item.item_id, item.display_order) for item in payload.items],

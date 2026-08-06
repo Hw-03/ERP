@@ -45,6 +45,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setAddForm,
     saveItem,
     dirty,
+    canReorderItems,
     reorderItems,
     deleteItem,
     restoreItem,
@@ -67,10 +68,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
 
   function findItemIdAtPoint(x: number, y: number): string | null {
     const el = document.elementFromPoint(x, y);
-    return el?.closest("[data-item-id]")?.getAttribute("data-item-id") ?? null;
+    return el?.closest('[data-item-reorderable="true"]')?.getAttribute("data-item-id") ?? null;
   }
 
   function handleGripPointerDown(e: React.PointerEvent, id: string) {
+    if (!canReorderItems) return;
     e.preventDefault();
     e.stopPropagation();
     dragIdRef.current = id;
@@ -80,6 +82,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   }
 
   function handleGripPointerMove(e: React.PointerEvent, id: string) {
+    if (!canReorderItems) return;
     if (dragIdRef.current !== id) return;
     if (!isDraggingRef.current && Math.abs(e.clientY - pointerStartYRef.current) > 5) {
       isDraggingRef.current = true;
@@ -95,6 +98,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   }
 
   function handleGripPointerUp(e: React.PointerEvent, id: string) {
+    if (!canReorderItems) return;
     if (isDraggingRef.current && dragIdRef.current && dropTargetIdRef.current) {
       const fromIdx = visibleItems.findIndex((it) => it.item_id === dragIdRef.current);
       const toIdx = visibleItems.findIndex((it) => it.item_id === dropTargetIdRef.current);
@@ -219,15 +223,26 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           listAriaLabel="품목 목록"
           listClassName="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5"
           listHeader={
-            <div
-              role="row"
-              className="grid grid-cols-[minmax(0,1fr)_110px_80px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-            >
-              <span role="columnheader">품목명</span>
-              <span role="columnheader" className="text-center">품목 코드</span>
-              <span role="columnheader" className="text-center">상태</span>
-            </div>
+            <>
+              <div
+                role="row"
+                className="grid grid-cols-[minmax(0,1fr)_110px_80px] border-b px-3 py-2 text-[11px] font-bold tracking-[0.08em]"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+              >
+                <span role="columnheader">품목명</span>
+                <span role="columnheader" className="text-center">품목 코드</span>
+                <span role="columnheader" className="text-center">상태</span>
+              </div>
+              {!canReorderItems && (
+                <div
+                  data-testid="item-reorder-locked-hint"
+                  className="border-b px-3 py-1.5 text-[11px] font-medium"
+                  style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                >
+                  전체 목록에서만 순서를 변경할 수 있습니다.
+                </div>
+              )}
+            </>
           }
           items={visibleItems}
           emptyState={
@@ -258,6 +273,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               <div
                 key={item.item_id}
                 data-item-id={item.item_id}
+                data-item-reorderable={canReorderItems && !isDeleted ? "true" : undefined}
                 role="row"
                 aria-selected={isSelected}
                 tabIndex={0}
@@ -281,14 +297,17 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   />
                 )}
                 <div role="gridcell" className="flex min-w-0 items-center gap-2">
-                    <GripVertical
-                      className="h-4 w-4 shrink-0 cursor-grab"
-                      style={{ color: LEGACY_COLORS.muted2, touchAction: "none" }}
-                      aria-label="드래그 핸들"
-                      onPointerDown={(e) => handleGripPointerDown(e, item.item_id)}
-                      onPointerMove={(e) => handleGripPointerMove(e, item.item_id)}
-                      onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
-                    />
+                    {canReorderItems && !isDeleted && (
+                      <GripVertical
+                        data-testid="item-reorder-grip"
+                        className="h-4 w-4 shrink-0 cursor-grab"
+                        style={{ color: LEGACY_COLORS.muted2, touchAction: "none" }}
+                        aria-label="드래그 핸들"
+                        onPointerDown={(e) => handleGripPointerDown(e, item.item_id)}
+                        onPointerMove={(e) => handleGripPointerMove(e, item.item_id)}
+                        onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
+                      />
+                    )}
                     <span
                       className="min-w-0 flex-1 truncate text-[14px] font-semibold"
                       style={{

@@ -24,6 +24,7 @@ export type UseAdminMasterItemsListState = {
   setItemSearch: (v: string) => void;
   filter: ItemFilter;
   visibleItems: Item[];
+  canReorderItems: boolean;
 };
 
 export function useAdminMasterItemsList({
@@ -31,6 +32,7 @@ export function useAdminMasterItemsList({
   globalSearch,
 }: UseAdminMasterItemsListArgs): UseAdminMasterItemsListState {
   const [itemSearch, setItemSearch] = useState("");
+  const hasSearch = Boolean(`${globalSearch} ${itemSearch}`.trim());
 
   const visibleItems = useMemo(() => {
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
@@ -44,5 +46,6 @@ export function useAdminMasterItemsList({
     setItemSearch,
     filter: { itemSearch, globalSearch },
     visibleItems,
+    canReorderItems: !hasSearch,
   };
 }

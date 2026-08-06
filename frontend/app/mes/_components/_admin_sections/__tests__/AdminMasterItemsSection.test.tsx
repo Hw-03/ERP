@@ -22,6 +22,7 @@ const context: any = {
   setAddMode: vi.fn(),
   saveItem: vi.fn(),
   dirty: false,
+  canReorderItems: true,
   reorderItems: vi.fn(),
   deleteItem: vi.fn(),
   restoreItem: vi.fn(),
@@ -62,9 +63,22 @@ afterEach(() => {
   context.selectedItem = null;
   context.addMode = false;
   context.addForm = {};
+  context.canReorderItems = true;
 });
 
 describe("AdminMasterItemsSection", () => {
+  it("locks item reordering while the list is filtered", () => {
+    context.canReorderItems = false;
+    render(
+      <DirtyGuardProvider>
+        <AdminMasterItemsSection allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    expect(screen.getByTestId("item-reorder-locked-hint")).toBeInTheDocument();
+    expect(screen.queryByTestId("item-reorder-grip")).not.toBeInTheDocument();
+  });
+
   it("places the add-form close button in the card header without repeating the title", () => {
     context.addMode = true;
     context.addForm = {

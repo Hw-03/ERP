@@ -47,6 +47,7 @@ export type AdminMasterItemsState = {
   addForm: AddForm;
   setAddForm: (updater: (f: AddForm) => AddForm) => void;
   visibleItems: Item[];
+  canReorderItems: boolean;
   addItem: () => void;
   reorderItems: (ordered: Item[]) => void;
   saveItemField: (
@@ -111,6 +112,7 @@ export function useAdminMasterItems({
     addForm: commands.addForm,
     setAddForm: commands.setAddForm,
     visibleItems: list.visibleItems,
+    canReorderItems: list.canReorderItems,
     addItem: commands.add,
     reorderItems: commands.reorder,
     saveItemField: form.saveField,

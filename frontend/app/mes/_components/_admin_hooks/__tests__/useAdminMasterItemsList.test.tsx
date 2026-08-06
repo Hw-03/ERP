@@ -19,6 +19,7 @@ describe("useAdminMasterItemsList", () => {
       useAdminMasterItemsList({ items, globalSearch: "" }),
     );
     expect(result.current.visibleItems).toHaveLength(3);
+    expect(result.current.canReorderItems).toBe(true);
   });
 
   it("itemSearch 적용 시 visibleItems 필터링", () => {
@@ -38,6 +39,7 @@ describe("useAdminMasterItemsList", () => {
     );
     expect(result.current.visibleItems).toHaveLength(1);
     expect(result.current.visibleItems[0]!.mes_code).toBe("C-002");
+    expect(result.current.canReorderItems).toBe(false);
   });
 
   it("globalSearch + itemSearch 조합 — 공백으로 합쳐 부분 매치", () => {

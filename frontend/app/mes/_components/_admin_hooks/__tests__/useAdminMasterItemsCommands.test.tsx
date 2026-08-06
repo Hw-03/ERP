@@ -35,6 +35,7 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminMasterItemsCommands>[0
 describe("useAdminMasterItemsCommands", () => {
   beforeEach(() => {
     createMutateAsync.mockReset();
+    reorderMutate.mockReset();
   });
 
   it("초기 — addMode=false, addForm 빈값", () => {
@@ -152,5 +153,22 @@ describe("useAdminMasterItemsCommands", () => {
     });
     await waitFor(() => expect(args.onError).toHaveBeenLastCalledWith("초기 재고 위치와 수량을 입력하세요."));
     expect(createMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("reorder sends only active items", () => {
+    const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    const active = { item_id: "active", deleted_at: null } as any;
+    const deleted = { item_id: "deleted", deleted_at: "2026-08-06T00:00:00" } as any;
+
+    act(() => {
+      result.current.reorder([active, deleted]);
+    });
+
+    expect(reorderMutate).toHaveBeenCalledWith(
+      { items: [{ item_id: "active", display_order: 0 }], pin: "0000" },
+      expect.any(Object),
+    );
   });
 });
