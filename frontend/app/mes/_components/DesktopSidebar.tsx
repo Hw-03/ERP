@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Truck, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Settings2, Truck, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { AppearanceSettingsModal } from "./AppearanceSettingsModal";
-import { useAppearancePreferences } from "./useAppearancePreferences";
+import type { SidebarMode } from "@/lib/sidebar-mode";
 import type { DesktopTabId } from "./tabAccess";
 export type { DesktopTabId } from "./tabAccess";
 
@@ -22,6 +21,7 @@ export const DESKTOP_TAB_ICON_COLORS: Record<DesktopTabId, string> = {
   dailyReport: LEGACY_COLORS.blue,
   weekly: LEGACY_COLORS.yellow,
   admin: LEGACY_COLORS.muted2,
+  settings: LEGACY_COLORS.cyan,
 };
 // ??ぉ 3-6 ???ъ씠?쒕컮 ?꾩씠肄섏뿉 ??퀎 怨좎쑀??鍮꾪솢?????쒖떆). ?쒖꽦? 湲곗〈 blue 諛뺤뒪+white ?꾩씠肄??좎?.
 const MAIN_TABS: TabDef[] = [
@@ -35,23 +35,27 @@ const MAIN_TABS: TabDef[] = [
   { id: "dailyReport", label: "일일 작업 일보", subtitle: "작업 내역과 MES 거래", icon: ClipboardList, color: DESKTOP_TAB_ICON_COLORS.dailyReport },
 ];
 
+const SIDEBAR_COLLAPSED_WIDTH = 72;
+const SIDEBAR_EXPANDED_WIDTH = 220;
+
 export function DesktopSidebar({
   activeTab,
   onTabChange,
   onOpenAdminPinEntry,
   visibleTabs,
+  sidebarMode = "hover",
 }: {
   activeTab: DesktopTabId;
   onTabChange: (tab: DesktopTabId) => void;
   onOpenAdminPinEntry?: () => void;
   visibleTabs: DesktopTabId[];
+  sidebarMode?: SidebarMode;
 }) {
-  const { preferences, savePreferences } = useAppearancePreferences();
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<DesktopTabId | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expanded = preferences.sidebarMode === "expanded" || (preferences.sidebarMode === "hover" && hoverExpanded);
+  const expanded = sidebarMode === "expanded" || (sidebarMode === "hover" && hoverExpanded);
+  const sidebarWidth = expanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
   const canOpenAdmin = visibleTabs.includes("admin");
 
   const openSidebar = useCallback(() => {
@@ -82,14 +86,14 @@ export function DesktopSidebar({
     <div
       className="shrink-0"
       style={{
-        width: expanded ? 220 : 72,
+        width: sidebarWidth,
         transition: "width 180ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
-      onMouseEnter={openSidebar}
-      onMouseLeave={closeSidebarSoon}
     >
       <aside
         className="flex h-full w-full flex-col overflow-hidden rounded-[32px] border px-3 py-5"
+        onMouseEnter={openSidebar}
+        onMouseLeave={closeSidebarSoon}
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
@@ -163,36 +167,35 @@ export function DesktopSidebar({
         <div className="mt-auto space-y-1.5 pt-1.5">
           <SettingsButton
             expanded={expanded}
+            active={activeTab === "settings" || activeTab === "admin"}
+            showAdminIcon={activeTab === "admin"}
             canOpenAdmin={canOpenAdmin}
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => onTabChange("settings")}
             onOpenAdminPinEntry={onOpenAdminPinEntry}
           />
         </div>
       </aside>
-      <AppearanceSettingsModal
-        open={settingsOpen}
-        preferences={preferences}
-        onClose={() => setSettingsOpen(false)}
-        onSave={savePreferences}
-        canOpenAdmin={canOpenAdmin}
-        onOpenAdminPinEntry={onOpenAdminPinEntry}
-      />
     </div>
   );
 }
 
 function SettingsButton({
   expanded,
+  active,
+  showAdminIcon,
   canOpenAdmin,
   onClick,
   onOpenAdminPinEntry,
 }: {
   expanded: boolean;
+  active: boolean;
+  showAdminIcon: boolean;
   canOpenAdmin: boolean;
   onClick: () => void;
   onOpenAdminPinEntry?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const Icon = showAdminIcon ? Settings2 : Settings;
 
   return (
     <button
@@ -200,6 +203,7 @@ function SettingsButton({
       aria-label="설정"
       title="설정"
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       onContextMenu={(event) => {
         if (!canOpenAdmin || !onOpenAdminPinEntry) return;
         event.preventDefault();
@@ -209,17 +213,21 @@ function SettingsButton({
       onMouseLeave={() => setHovered(false)}
       className="group flex items-center justify-start rounded-[20px] -mx-1.5 w-[calc(100%+12px)] pl-1.5 transition-all duration-150 hover:scale-[1.015]"
       style={{
-        background: expanded && hovered
-          ? "color-mix(in srgb, var(--c-cyan) var(--sidebar-hover-mix, 18%), transparent)"
+        background: expanded
+          ? active
+            ? "linear-gradient(135deg, color-mix(in srgb, var(--c-blue) 14%, transparent), color-mix(in srgb, var(--c-cyan) 7%, transparent))"
+            : hovered
+              ? "color-mix(in srgb, var(--c-cyan) var(--sidebar-hover-mix, 18%), transparent)"
+              : "transparent"
           : "transparent",
       }}
     >
       <div className="relative my-1 shrink-0">
         <div
           className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
-          style={{ color: LEGACY_COLORS.cyan }}
+          style={{ background: active ? LEGACY_COLORS.blueSolid : "transparent", color: active ? LEGACY_COLORS.white : LEGACY_COLORS.cyan }}
         >
-          <Settings className="h-5 w-5" />
+          <Icon className="h-5 w-5" />
         </div>
       </div>
       <div
@@ -235,7 +243,7 @@ function SettingsButton({
           paddingLeft: expanded ? undefined : 0,
         }}
       >
-        <div className="truncate text-left text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+        <div className="truncate text-left text-base font-bold" style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>
           설정
         </div>
         <div className="truncate text-left text-sm" style={{ color: LEGACY_COLORS.muted2 }}>

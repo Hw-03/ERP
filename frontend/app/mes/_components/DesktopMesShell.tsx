@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings2, Truck, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Settings2, Truck, Warehouse } from "lucide-react";
 import { DESKTOP_TAB_ICON_COLORS, DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import type { NotificationNavigationTarget } from "./notifications/NotificationBell";
@@ -17,6 +17,8 @@ import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
 import { DesktopWeeklyReportView } from "./DesktopWeeklyReportView";
 import { DesktopDailyWorkReportView } from "./DesktopDailyWorkReportView";
+import { DesktopSettingsView } from "./AppearanceSettingsModal";
+import { useAppearancePreferences } from "./useAppearancePreferences";
 import { useCurrentOperator } from "./login/useCurrentOperator";
 import {
   WeeklyWeekPicker,
@@ -42,7 +44,7 @@ import {
   SIDEBAR_TAB_IDS,
 } from "./tabAccess";
 
-const VALID_TABS = new Set<DesktopTabId>(SIDEBAR_TAB_IDS);
+const VALID_TABS = new Set<DesktopTabId>([...SIDEBAR_TAB_IDS, "settings"]);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
 const MS_PER_DAY = 86400000;
 
@@ -62,6 +64,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   dailyReport: { title: "일일 작업 일보", icon: ClipboardList },
   weekly: { title: "주간보고", icon: BarChart2 },
   admin: { title: "관리자", icon: Settings2 },
+  settings: { title: "설정", icon: Settings },
 };
 
 export function DesktopMesShell({
@@ -87,13 +90,14 @@ function DesktopMesShellInner({
   const confirmAdminNavigation = useConfirmNavigation();
   const flushDirtyEntries = useFlushDirtyEntries();
   const operator = useCurrentOperator();
+  const { preferences, savePreferences } = useAppearancePreferences();
   const visibleTabs = useMemo(
     () => filterVisibleSidebarTabs(SIDEBAR_TAB_IDS, operator),
     [operator],
   );
   const fallbackTab = visibleTabs[0] ?? "dashboard";
   const canOpenTab = useCallback(
-    (tab: DesktopTabId) => visibleTabs.includes(tab),
+    (tab: DesktopTabId) => tab === "settings" || visibleTabs.includes(tab),
     [visibleTabs],
   );
 
@@ -414,12 +418,23 @@ function DesktopMesShellInner({
     if (activeTab === "weekly") {
       return <DesktopWeeklyReportView key={key} weekMon={weekMon} />;
     }
+    if (activeTab === "settings") {
+      return (
+        <DesktopSettingsView
+          key={key}
+          preferences={preferences}
+          onSave={savePreferences}
+          canOpenAdmin={canOpenTab("admin")}
+          onOpenAdminPinEntry={handleOpenAdminPinEntry}
+        />
+      );
+    }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
     // deps 는 실제로 렌더 결과를 바꾸는 값만 나열. handleStatusChange(useCallback []),
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen]);
+  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry]);
 
   return (
     <>
@@ -436,6 +451,7 @@ function DesktopMesShellInner({
             onTabChange={handleTabChange}
             onOpenAdminPinEntry={handleOpenAdminPinEntry}
             visibleTabs={visibleTabs}
+            sidebarMode={preferences.sidebarMode}
           />
 
           <div className="min-w-0 flex-1 flex flex-col">

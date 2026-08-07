@@ -15,6 +15,7 @@ const desktopTabIconColors = vi.hoisted(() => ({
   dailyReport: "#fff",
   weekly: "#fff",
   admin: "#fff",
+  settings: "#fff",
 }));
 
 const queryClientMock = vi.hoisted(() => ({
@@ -42,6 +43,8 @@ vi.mock("@/lib/queries/useProductionQuery", () => ({
 
 vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => null,
+  readCurrentOperator: () => null,
+  setCurrentOperator: vi.fn(),
 }));
 
 vi.mock("../DesktopSidebar", () => ({
@@ -89,7 +92,7 @@ describe("DesktopMesShell warehouse map fullscreen", () => {
   });
 
   it("mocks colors for every desktop tab", () => {
-    expect(Object.keys(desktopTabIconColors).sort()).toEqual([...SIDEBAR_TAB_IDS].sort());
+    expect(Object.keys(desktopTabIconColors).sort()).toEqual([...SIDEBAR_TAB_IDS, "settings"].sort());
   });
 
   it("re-renders the warehouse map tab when fullscreen changes", () => {

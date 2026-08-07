@@ -37,17 +37,13 @@ const SIDEBAR_OPTIONS: ChoiceOption<SidebarMode>[] = [
   { value: "expanded", label: "펼침 고정", description: "항상 전체 메뉴를 표시합니다.", Icon: PanelLeftOpen, iconTestId: "appearance-choice-icon-expanded", color: LEGACY_COLORS.green },
 ];
 
-export function AppearanceSettingsModal({
-  open,
+export function DesktopSettingsView({
   preferences,
-  onClose,
   onSave,
   canOpenAdmin = false,
   onOpenAdminPinEntry,
 }: {
-  open: boolean;
   preferences: AppearancePreferences;
-  onClose: () => void;
   onSave: (next: AppearancePreferences) => Promise<void>;
   canOpenAdmin?: boolean;
   onOpenAdminPinEntry?: () => void;
@@ -82,11 +78,13 @@ export function AppearanceSettingsModal({
     setPinFeedback(null);
   }, []);
 
-  const closeWithoutSaving = useCallback(() => {
+  const cancelChanges = useCallback(() => {
     if (busy) return;
+    setDraft(preferences);
+    setError(null);
     resetPinSettings();
-    onClose();
-  }, [busy, onClose, resetPinSettings]);
+    setLoginPopupFeedback(null);
+  }, [busy, preferences, resetPinSettings]);
 
   const closePinPopup = useCallback(() => {
     if (pinSaving) return;
@@ -94,43 +92,29 @@ export function AppearanceSettingsModal({
   }, [pinSaving, resetPinSettings]);
 
   useEffect(() => {
-    if (!open) {
-      resetPinSettings();
-      return;
-    }
     setDraft(preferences);
     setError(null);
     resetPinSettings();
     setLoginPopupFeedback(null);
-  }, [open, preferences, resetPinSettings]);
+  }, [preferences, resetPinSettings]);
 
   useEffect(() => {
-    if (!open) return;
     setLoginPopupEnabled(operator?.loginPopupEnabled ?? false);
-  }, [open, operator?.employee_id, operator?.loginPopupEnabled]);
+  }, [operator?.employee_id, operator?.loginPopupEnabled]);
 
   useEffect(() => {
-    if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (pinExpanded) {
-        closePinPopup();
-        return;
-      }
-      closeWithoutSaving();
+      if (event.key === "Escape" && pinExpanded) closePinPopup();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [open, pinExpanded, closePinPopup, closeWithoutSaving]);
-
-  if (!open) return null;
+  }, [pinExpanded, closePinPopup]);
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
       await onSave(draft);
-      closeWithoutSaving();
     } catch {
       setError("설정을 저장하지 못했습니다. 다시 시도해 주세요.");
     } finally {
@@ -141,7 +125,6 @@ export function AppearanceSettingsModal({
   const openAdminPinEntry = () => {
     if (busy || !canOpenAdmin || !onOpenAdminPinEntry) return;
     onOpenAdminPinEntry();
-    closeWithoutSaving();
   };
 
   const handlePinChange = async () => {
@@ -197,40 +180,11 @@ export function AppearanceSettingsModal({
     pinConfirm.length !== PIN_LENGTH;
 
   return (
-    <div
-      data-testid="appearance-settings-backdrop"
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
-      style={{ background: LEGACY_COLORS.bg }}
-      onClick={closeWithoutSaving}
-    >
       <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="appearance-settings-title"
-        className="flex h-[min(900px,92vh)] w-full max-w-[min(1600px,97vw)] flex-col rounded-[28px] border"
+        data-testid="desktop-settings-view"
+        className="relative flex h-full w-full flex-col overflow-hidden rounded-[28px] border"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-        onClick={(event) => event.stopPropagation()}
       >
-        <header className="border-b px-4 pb-3 pt-4 sm:px-7 sm:pb-5 sm:pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 id="appearance-settings-title" className="text-lg font-black sm:text-2xl" style={{ color: LEGACY_COLORS.text }}>
-                설정
-              </h2>
-            </div>
-            <button
-              type="button"
-              aria-label="닫기"
-              disabled={busy}
-              onClick={closeWithoutSaving}
-              className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`, color: LEGACY_COLORS.red }}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </header>
-
         <div data-testid="settings-layout" className="relative grid flex-1 content-start gap-y-6 overflow-y-auto px-4 py-6 lg:grid-cols-2 lg:grid-rows-2 lg:gap-x-8 sm:px-7 sm:py-8">
           <div
             aria-hidden="true"
@@ -282,7 +236,7 @@ export function AppearanceSettingsModal({
                 {pinExpanded && (
                   <div
                     data-testid="settings-pin-popup-backdrop"
-                    className="fixed inset-0 z-[310] flex items-center justify-center p-4"
+                    className="absolute inset-0 z-10 flex items-center justify-center p-4"
                     style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.bg} 82%, transparent)` }}
                     onClick={closePinPopup}
                   >
@@ -454,7 +408,7 @@ export function AppearanceSettingsModal({
           <button
             type="button"
             disabled={busy}
-            onClick={closeWithoutSaving}
+            onClick={cancelChanges}
             className="rounded-xl px-5 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{ color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2 }}
           >
@@ -471,7 +425,6 @@ export function AppearanceSettingsModal({
           </button>
         </footer>
       </section>
-    </div>
   );
 }
 

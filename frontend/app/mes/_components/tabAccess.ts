@@ -11,7 +11,8 @@ export const SIDEBAR_TAB_IDS = [
 ] as const;
 
 export type SidebarTabId = (typeof SIDEBAR_TAB_IDS)[number];
-export type DesktopTabId = SidebarTabId;
+/** 설정은 직원별 표시 탭 권한과 무관하게 항상 사용할 수 있는 데스크톱 유틸리티 탭이다. */
+export type DesktopTabId = SidebarTabId | "settings";
 
 export const IO_RELATED_SIDEBAR_TAB_IDS = ["warehouse", "defect"] as const;
 

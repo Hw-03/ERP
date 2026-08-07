@@ -39,9 +39,11 @@ vi.mock("@/lib/queries/useProductionQuery", () => ({
 
 vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => null,
+  readCurrentOperator: () => null,
+  setCurrentOperator: vi.fn(),
 }));
 
-const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "history", "dailyReport", "weekly", "warehouseMap"];
+const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "history", "dailyReport", "weekly", "warehouseMap", "settings"];
 
 vi.mock("../DesktopSidebar", () => ({
   DESKTOP_TAB_ICON_COLORS: {
@@ -54,6 +56,7 @@ vi.mock("../DesktopSidebar", () => ({
     dailyReport: "#fff",
     weekly: "#fff",
     admin: "#fff",
+    settings: "#fff",
   },
   DesktopSidebar: ({
     activeTab,
@@ -193,6 +196,15 @@ describe("DesktopMesShell tab transition", () => {
     expect(shippingViewProps).toHaveBeenLastCalledWith(
       expect.not.objectContaining({ onStartPrepareWork: expect.any(Function) }),
     );
+  });
+
+  it("opens settings from a direct tab URL even when it is not an employee-visible business tab", () => {
+    window.history.replaceState({}, "", "/mes?tab=settings");
+
+    render(<DesktopMesShell />);
+
+    expect(screen.getByRole("banner")).toHaveTextContent("설정");
+    expect(screen.getByRole("button", { name: "settings" })).toHaveAttribute("aria-current", "page");
   });
 
   it("remounts the admin PIN entry when requested from an already active admin tab", async () => {

@@ -1,9 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  AppearanceSettingsModal,
-  type AppearancePreferences,
-} from "../AppearanceSettingsModal";
+import { DesktopSettingsView, type AppearancePreferences } from "../AppearanceSettingsModal";
 
 const state = vi.hoisted(() => ({
   operator: {
@@ -22,343 +19,113 @@ const state = vi.hoisted(() => ({
   },
   changeMyPin: vi.fn(),
   setLoginPopup: vi.fn(),
-  setCurrentOperator: vi.fn(),
   updateCurrentOperatorPreferences: vi.fn(),
-  getStoredBootId: vi.fn(() => "boot-1"),
 }));
 
-vi.mock("@/lib/api", () => ({
-  api: { changeMyPin: state.changeMyPin },
-}));
-
-vi.mock("@/lib/api/employees", () => ({
-  employeesApi: { setLoginPopup: state.setLoginPopup },
-}));
-
+vi.mock("@/lib/api", () => ({ api: { changeMyPin: state.changeMyPin } }));
+vi.mock("@/lib/api/employees", () => ({ employeesApi: { setLoginPopup: state.setLoginPopup } }));
 vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => state.operator,
-  setCurrentOperator: state.setCurrentOperator,
   updateCurrentOperatorPreferences: state.updateCurrentOperatorPreferences,
-  getStoredBootId: state.getStoredBootId,
 }));
 
-const initialPreferences: AppearancePreferences = {
-  theme: "light",
-  sidebarMode: "hover",
-};
+const initialPreferences: AppearancePreferences = { theme: "light", sidebarMode: "hover" };
 
-function renderModal(overrides: Partial<React.ComponentProps<typeof AppearanceSettingsModal>> = {}) {
-  const onClose = vi.fn();
+function renderSettings(overrides: Partial<React.ComponentProps<typeof DesktopSettingsView>> = {}) {
   const onSave = vi.fn().mockResolvedValue(undefined);
-  render(
-    <AppearanceSettingsModal
-      open
-      preferences={initialPreferences}
-      onClose={onClose}
-      onSave={onSave}
-      {...overrides}
-    />,
-  );
-  return { onClose, onSave };
+  render(<DesktopSettingsView preferences={initialPreferences} onSave={onSave} {...overrides} />);
+  return { onSave };
 }
 
-describe("AppearanceSettingsModal", () => {
+describe("DesktopSettingsView", () => {
   beforeEach(() => {
     state.operator.loginPopupEnabled = true;
     state.changeMyPin.mockReset();
     state.changeMyPin.mockResolvedValue(undefined);
     state.setLoginPopup.mockReset();
     state.setLoginPopup.mockResolvedValue({});
-    state.setCurrentOperator.mockReset();
     state.updateCurrentOperatorPreferences.mockReset();
-    state.getStoredBootId.mockClear();
   });
 
-  it("shows icon choices, an opaque backdrop, and closes on Escape", () => {
-    const { onClose } = renderModal();
+  it("renders as normal settings content without a page-covering settings dialog", () => {
+    renderSettings();
 
-    expect(screen.getByTestId("appearance-settings-backdrop")).toHaveStyle({ background: "var(--c-bg)" });
-    expect(screen.getByTestId("appearance-choice-icon-light")).toBeInTheDocument();
-    expect(screen.getByTestId("appearance-choice-icon-expanded")).toBeInTheDocument();
-
-    fireEvent.keyDown(window, { key: "Escape" });
-
-    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("desktop-settings-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("appearance-settings-backdrop")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "설정" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "라이트 테마" })).toBeInTheDocument();
   });
 
-  it("uses the sidebar semantic colors for the compact choice rows", () => {
-    renderModal();
-
-    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveStyle({ borderColor: "var(--c-border)" });
-    expect(screen.getByTestId("appearance-choice-icon-light").parentElement).toHaveStyle({ color: "color-mix(in srgb, var(--c-yellow) 72%, #ffffff)" });
-    expect(screen.getByTestId("appearance-choice-icon-dark").parentElement).toHaveStyle({ color: "var(--c-text)" });
-    expect(screen.getByTestId("appearance-choice-icon-collapsed").parentElement).toHaveStyle({ color: "var(--c-blue)" });
-
-    fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
-
-    expect(screen.getByRole("button", { name: "다크 테마" })).toHaveStyle({ borderColor: "var(--c-border)" });
-  });
-
-  it("uses matching row content and a green iPhone-style login switch", () => {
-    renderModal();
-
-    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveClass("rounded-[16px]", "border", "p-3");
-    expect(screen.getByRole("button", { name: "PIN 재설정" })).toHaveClass("rounded-[16px]", "border", "p-3");
-    expect(screen.getByTestId("settings-login-popup-row")).toHaveClass("rounded-[16px]", "border", "p-3");
-    expect(screen.getByTestId("settings-row-content-theme-light")).toHaveClass("min-w-0", "flex-1");
-    expect(screen.getByTestId("settings-row-content-pin")).toHaveClass("min-w-0", "flex-1");
-    expect(screen.getByTestId("settings-row-content-login-popup")).toHaveClass("min-w-0", "flex-1");
-    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveClass("no-btn-inset");
-    expect(screen.getByRole("button", { name: "라이트 테마" })).not.toHaveClass("hover:brightness-110");
-    const darkTheme = screen.getByRole("button", { name: "다크 테마" });
-    fireEvent.pointerEnter(darkTheme);
-    expect(darkTheme).toHaveStyle({ background: "color-mix(in srgb, var(--c-text) 8%, var(--c-s1))" });
-    fireEvent.pointerLeave(darkTheme);
-    expect(darkTheme).toHaveStyle({ background: "var(--c-s1)" });
-    const pinReset = screen.getByRole("button", { name: "PIN 재설정" });
-    fireEvent.pointerEnter(pinReset);
-    expect(pinReset).toHaveStyle({ background: "color-mix(in srgb, var(--c-purple) 8%, var(--c-s1))" });
-    fireEvent.pointerLeave(pinReset);
-    expect(pinReset).toHaveStyle({ background: "var(--c-s1)" });
-    const loginPopupRow = screen.getByTestId("settings-login-popup-row");
-    fireEvent.pointerEnter(loginPopupRow);
-    expect(loginPopupRow).toHaveStyle({ background: "color-mix(in srgb, var(--c-green) 8%, var(--c-s1))" });
-    fireEvent.pointerLeave(loginPopupRow);
-    expect(loginPopupRow).toHaveStyle({ background: "var(--c-s1)" });
-    expect(screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" })).toHaveClass("no-btn-inset", "border-0");
-    expect(screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" })).toHaveStyle({ background: "var(--c-green)" });
-  });
-
-  it("opens the PIN reset form in a centered popup", () => {
-    renderModal();
-
-    const pinButton = screen.getByRole("button", { name: "PIN 재설정" });
-    expect(screen.getByTestId("settings-pin-item")).not.toHaveClass("border");
-    expect(pinButton).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(pinButton);
-    expect(screen.getByRole("dialog", { name: "PIN 재설정" })).toBeInTheDocument();
-    expect(screen.getByLabelText("현재 PIN")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정 닫기" }));
-    expect(pinButton).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByLabelText("현재 PIN")).not.toBeInTheDocument();
-  });
-
-  it("uses a vertical desktop divider instead of boxed setting groups", () => {
-    renderModal({ canOpenAdmin: true, onOpenAdminPinEntry: vi.fn() });
-
-    expect(screen.getByTestId("settings-theme-group")).not.toHaveClass("border");
-    expect(screen.getByTestId("settings-sidebar-group")).not.toHaveClass("border");
-    expect(screen.getByTestId("settings-layout")).toHaveClass("content-start", "gap-y-6");
-    expect(screen.getByTestId("settings-layout")).not.toHaveClass("content-between");
-    expect(screen.getByTestId("settings-column-divider")).toHaveClass("lg:border-l");
-    expect(screen.getByTestId("settings-theme-group")).toHaveClass("lg:col-start-1", "lg:row-start-1");
-    expect(screen.getByTestId("settings-sidebar-group")).toHaveClass("lg:col-start-1", "lg:row-start-2");
-    expect(screen.getByTestId("settings-personal-group")).toHaveClass("lg:col-start-2", "lg:row-start-1");
-    expect(screen.getByTestId("settings-admin-group")).toHaveClass("lg:col-start-2", "lg:row-start-2");
-    expect(screen.getByTestId("settings-theme-group-divider")).toHaveClass("border-t");
-  });
-
-  it("keeps only setting names above the rows without redundant descriptions", () => {
-    renderModal();
-
-    expect(screen.queryByText("화면 표시와 개인 설정을 관리하세요.")).not.toBeInTheDocument();
-    expect(screen.queryByText("화면 색상을 선택합니다.")).not.toBeInTheDocument();
-    expect(screen.queryByText("데스크톱 왼쪽 메뉴의 펼침 방식을 선택합니다.")).not.toBeInTheDocument();
-    expect(screen.queryByText("내 PIN과 로그인 알림 표시를 관리합니다.")).not.toBeInTheDocument();
-  });
-
-  it("keeps the modal open when Escape is pressed during saving", async () => {
-    let resolveSave: (() => void) | undefined;
-    const onSave = vi.fn(() => new Promise<void>((resolve) => {
-      resolveSave = resolve;
-    }));
-    const { onClose } = renderModal({ onSave });
-
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(onClose).not.toHaveBeenCalled();
-
-    resolveSave?.();
-    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-  });
-
-  it("shows the management shortcut only when the admin tab is available", () => {
-    const onOpenAdminPinEntry = vi.fn();
-    const adminProps = { canOpenAdmin: true, onOpenAdminPinEntry };
-    const { rerender } = render(
-      <AppearanceSettingsModal
-        open
-        preferences={initialPreferences}
-        onClose={vi.fn()}
-        onSave={vi.fn().mockResolvedValue(undefined)}
-        {...(adminProps as unknown as React.ComponentProps<typeof AppearanceSettingsModal>)}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
-    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
-    const adminButton = screen.getByRole("button", { name: "관리" });
-    fireEvent.pointerEnter(adminButton);
-    expect(adminButton).toHaveStyle({ background: "color-mix(in srgb, var(--c-muted2) 8%, var(--c-s1))" });
-    fireEvent.pointerLeave(adminButton);
-    expect(adminButton).toHaveStyle({ background: "var(--c-s1)" });
-    fireEvent.click(adminButton);
-    expect(onOpenAdminPinEntry).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "PIN 재설정" })).toHaveAttribute("aria-expanded", "false");
-
-    rerender(
-      <AppearanceSettingsModal
-        open
-        preferences={initialPreferences}
-        onClose={vi.fn()}
-        onSave={vi.fn().mockResolvedValue(undefined)}
-      />,
-    );
-    expect(screen.queryByRole("button", { name: "관리" })).not.toBeInTheDocument();
-  });
-
-  it("저장 전 선택은 임시 상태로만 유지하고 취소하면 저장하지 않는다", () => {
-    const { onClose, onSave } = renderModal();
-
-    fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
-    fireEvent.click(screen.getByRole("button", { name: "접힘 고정" }));
-
-    expect(screen.getByRole("button", { name: "다크 테마" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "접힘 고정" })).toHaveAttribute("aria-pressed", "true");
-    expect(onSave).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "취소" }));
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(onSave).not.toHaveBeenCalled();
-  });
-
-  it("저장하면 두 설정을 함께 전달하고 모달을 닫는다", async () => {
-    const { onClose, onSave } = renderModal();
+  it("keeps theme and sidebar choices as a draft until saved", async () => {
+    const { onSave } = renderSettings();
 
     fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
     fireEvent.click(screen.getByRole("button", { name: "펼침 고정" }));
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(onSave).not.toHaveBeenCalled();
 
-    await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith({ theme: "dark", sidebarMode: "expanded" });
-    });
-    expect(onClose).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ theme: "dark", sidebarMode: "expanded" }));
   });
 
-  it("저장 실패 시 선택값과 오류를 유지한다", async () => {
-    const onSave = vi.fn().mockRejectedValueOnce(new Error("network"));
-    renderModal({ onSave });
+  it("resets unsaved appearance choices when cancelled without leaving the page", () => {
+    const { onSave } = renderSettings();
 
     fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
-
-    expect(await screen.findByText("설정을 저장하지 못했습니다. 다시 시도해 주세요.")).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "설정" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "다크 테마" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("현재 PIN과 일치하는 새 PIN을 즉시 변경하고 중복 제출을 막는다", async () => {
-    let resolveChange: (() => void) | undefined;
-    state.changeMyPin.mockImplementationOnce(() => new Promise<void>((resolve) => {
-      resolveChange = resolve;
-    }));
-    renderModal();
-
-    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
-    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
-    fireEvent.change(screen.getByLabelText("새 PIN"), { target: { value: "5678" } });
-    fireEvent.change(screen.getByLabelText("새 PIN 확인"), { target: { value: "5678" } });
-
-    const submit = screen.getByRole("button", { name: "PIN 변경 저장" });
-    fireEvent.click(submit);
-    fireEvent.click(submit);
-
-    expect(state.changeMyPin).toHaveBeenCalledOnce();
-    expect(state.changeMyPin).toHaveBeenCalledWith("emp-1", "1234", "5678");
-    expect(submit).toBeDisabled();
-
-    resolveChange?.();
-    expect(await screen.findByText("PIN이 변경되었습니다.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("현재 PIN")).not.toBeInTheDocument();
-  });
-
-  it("PIN 불일치와 API 실패를 같은 펼침 영역에서 안내한다", async () => {
-    state.changeMyPin.mockRejectedValueOnce(new Error("현재 PIN이 올바르지 않습니다."));
-    renderModal();
-
-    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
-    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
-    fireEvent.change(screen.getByLabelText("새 PIN"), { target: { value: "5678" } });
-    fireEvent.change(screen.getByLabelText("새 PIN 확인"), { target: { value: "5679" } });
-    fireEvent.click(screen.getByRole("button", { name: "PIN 변경 저장" }));
-
-    expect(await screen.findByText("새 PIN과 확인 PIN이 일치하지 않습니다.")).toBeInTheDocument();
-    expect(state.changeMyPin).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText("새 PIN 확인"), { target: { value: "5678" } });
-    fireEvent.click(screen.getByRole("button", { name: "PIN 변경 저장" }));
-
-    expect(await screen.findByText("현재 PIN이 올바르지 않습니다.")).toBeInTheDocument();
-    expect(screen.getByLabelText("현재 PIN")).toHaveValue("1234");
-  });
-
-  it("닫기 요청 시 재오픈 effect 전에 PIN 펼침·입력·오류를 초기화한다", async () => {
-    const props = {
-      preferences: initialPreferences,
-      onClose: vi.fn(),
-      onSave: vi.fn().mockResolvedValue(undefined),
-    };
-    const { rerender } = render(<AppearanceSettingsModal open {...props} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
-    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
-    fireEvent.change(screen.getByLabelText("새 PIN"), { target: { value: "5678" } });
-    fireEvent.change(screen.getByLabelText("새 PIN 확인"), { target: { value: "5679" } });
-    fireEvent.click(screen.getByRole("button", { name: "PIN 변경 저장" }));
-    expect(await screen.findByText("새 PIN과 확인 PIN이 일치하지 않습니다.")).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
 
-    expect(props.onClose).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "PIN 재설정" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByLabelText("현재 PIN")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("새 PIN")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("새 PIN 확인")).not.toBeInTheDocument();
-    expect(screen.queryByText("새 PIN과 확인 PIN이 일치하지 않습니다.")).not.toBeInTheDocument();
-
-    rerender(<AppearanceSettingsModal open={false} {...props} />);
-    rerender(<AppearanceSettingsModal open {...props} />);
-    expect(screen.getByRole("button", { name: "PIN 재설정" })).toHaveAttribute("aria-expanded", "false");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByTestId("desktop-settings-view")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "라이트 테마" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("로그인 알림 팝업 설정을 즉시 저장하고 현재 작업자 상태를 공유한다", async () => {
-    renderModal();
+  it("opens the PIN form only as a local settings dialog and closes it with Escape", () => {
+    renderSettings();
 
-    const toggle = screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" });
-    expect(toggle).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
+    expect(screen.getByRole("dialog", { name: "PIN 재설정" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
 
-    await waitFor(() => {
-      expect(state.setLoginPopup).toHaveBeenCalledWith("emp-1", false);
-    });
+    expect(screen.queryByRole("dialog", { name: "PIN 재설정" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("desktop-settings-view")).toBeInTheDocument();
+  });
+
+  it("validates and submits a PIN change", async () => {
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
+    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
+    fireEvent.change(screen.getByLabelText("새 PIN"), { target: { value: "5678" } });
+    fireEvent.change(screen.getByLabelText("새 PIN 확인"), { target: { value: "5678" } });
+    fireEvent.click(screen.getByRole("button", { name: "PIN 변경 저장" }));
+
+    await waitFor(() => expect(state.changeMyPin).toHaveBeenCalledWith("emp-1", "1234", "5678"));
+    expect(await screen.findByText("PIN이 변경되었습니다.")).toBeInTheDocument();
+  });
+
+  it("updates the login popup preference immediately", async () => {
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" }));
+
+    await waitFor(() => expect(state.setLoginPopup).toHaveBeenCalledWith("emp-1", false));
     expect(state.updateCurrentOperatorPreferences).toHaveBeenCalledWith({ loginPopupEnabled: false });
-    expect(state.setCurrentOperator).not.toHaveBeenCalled();
-    expect(state.getStoredBootId).not.toHaveBeenCalled();
-    expect(toggle).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText("알림 팝업 설정을 저장했습니다.")).toBeInTheDocument();
   });
 
-  it("로그인 알림 팝업 저장 실패 시 기존 설정을 유지한다", async () => {
-    state.setLoginPopup.mockRejectedValueOnce(new Error("network"));
-    renderModal();
+  it("shows the admin PIN shortcut only when the employee can open admin", () => {
+    const onOpenAdminPinEntry = vi.fn();
+    const { rerender } = render(
+      <DesktopSettingsView
+        preferences={initialPreferences}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        canOpenAdmin
+        onOpenAdminPinEntry={onOpenAdminPinEntry}
+      />,
+    );
 
-    const toggle = screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" });
-    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: "관리" }));
+    expect(onOpenAdminPinEntry).toHaveBeenCalledOnce();
 
-    expect(await screen.findByText("알림 팝업 설정을 저장하지 못했습니다.")).toBeInTheDocument();
-    expect(toggle).toHaveAttribute("aria-checked", "true");
-    expect(state.setCurrentOperator).not.toHaveBeenCalled();
+    rerender(<DesktopSettingsView preferences={initialPreferences} onSave={vi.fn().mockResolvedValue(undefined)} />);
+    expect(screen.queryByRole("button", { name: "관리" })).not.toBeInTheDocument();
   });
 });
