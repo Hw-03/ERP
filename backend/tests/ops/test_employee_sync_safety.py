@@ -472,6 +472,9 @@ def test_automatic_sync_uses_dry_run_and_never_blocks_on_source_git_state() -> N
     assert "git rev-list" not in script
     assert "@{u}" not in script
     assert "-Force" not in script
+    assert "return [int] $LASTEXITCODE" not in script
+    assert "$script:EmployeeSyncExit" in script
+    assert "| Out-Host" in script
 
 
 def test_start_bat_checks_schema_read_only_before_starting_servers() -> None:
