@@ -4189,10 +4189,16 @@
             "type": "string"
           },
           "legacy_item_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Legacy Item Type",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Item Type"
           },
           "legacy_part": {
             "anyOf": [
@@ -4207,9 +4213,15 @@
             "title": "Legacy Part"
           },
           "min_stock": {
-            "minimum": 0.0,
-            "title": "Min Stock",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Stock"
           },
           "model_slots": {
             "description": "사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)",
@@ -4266,8 +4278,6 @@
         },
         "required": [
           "item_name",
-          "legacy_item_type",
-          "min_stock",
           "initial_quantity",
           "model_slots"
         ],
@@ -6237,6 +6247,58 @@
         "title": "ShippingBomLineResponse",
         "type": "object"
       },
+      "ShippingBomMatchCandidate": {
+        "properties": {
+          "pa_item_id": {
+            "format": "uuid",
+            "title": "Pa Item Id",
+            "type": "string"
+          },
+          "pa_item_name": {
+            "title": "Pa Item Name",
+            "type": "string"
+          },
+          "pa_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pa Mes Code"
+          },
+          "pf_item_id": {
+            "format": "uuid",
+            "title": "Pf Item Id",
+            "type": "string"
+          },
+          "pf_item_name": {
+            "title": "Pf Item Name",
+            "type": "string"
+          },
+          "pf_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pf Mes Code"
+          }
+        },
+        "required": [
+          "pf_item_id",
+          "pf_item_name",
+          "pa_item_id",
+          "pa_item_name"
+        ],
+        "title": "ShippingBomMatchCandidate",
+        "type": "object"
+      },
       "ShippingBomMatchRequest": {
         "properties": {
           "base_pf_item_id": {
@@ -6261,6 +6323,11 @@
       },
       "ShippingBomMatchResponse": {
         "properties": {
+          "base_pf_matches": {
+            "default": false,
+            "title": "Base Pf Matches",
+            "type": "boolean"
+          },
           "matched_pa_item_id": {
             "anyOf": [
               {
@@ -6306,6 +6373,14 @@
               }
             ],
             "title": "Matched Pf Item Name"
+          },
+          "pf_candidates": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ShippingBomMatchCandidate"
+            },
+            "title": "Pf Candidates",
+            "type": "array"
           },
           "preview_pa_mes_code": {
             "anyOf": [
@@ -6995,6 +7070,15 @@
         "title": "ShippingEventResponse",
         "type": "object"
       },
+      "ShippingFinalizationModeEnum": {
+        "enum": [
+          "KEEP_BASE",
+          "REUSE_CANDIDATE",
+          "CREATE_NEW"
+        ],
+        "title": "ShippingFinalizationModeEnum",
+        "type": "string"
+      },
       "ShippingHistoryMonthResponse": {
         "properties": {
           "count": {
@@ -7167,6 +7251,16 @@
             ],
             "title": "Custom Pf Name"
           },
+          "finalization_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingFinalizationModeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "invoice_number": {
             "anyOf": [
               {
@@ -7207,6 +7301,18 @@
               }
             ],
             "title": "Requested By Name"
+          },
+          "reuse_pf_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reuse Pf Item Id"
           }
         },
         "required": [
@@ -7385,6 +7491,9 @@
             ],
             "title": "Final Pf Item Name"
           },
+          "finalization_mode": {
+            "$ref": "#/components/schemas/ShippingFinalizationModeEnum"
+          },
           "invoice_number": {
             "anyOf": [
               {
@@ -7485,6 +7594,18 @@
             ],
             "title": "Requested By Name"
           },
+          "reuse_pf_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reuse Pf Item Id"
+          },
           "serial_numbers": {
             "anyOf": [
               {
@@ -7531,6 +7652,7 @@
           "status",
           "base_pf_item_id",
           "base_pf_item_name",
+          "finalization_mode",
           "created_at",
           "updated_at"
         ],
@@ -7676,6 +7798,16 @@
             ],
             "title": "Custom Pf Name"
           },
+          "finalization_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingFinalizationModeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "invoice_number": {
             "anyOf": [
               {
@@ -7722,6 +7854,18 @@
               }
             ],
             "title": "Requested By Name"
+          },
+          "reuse_pf_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reuse Pf Item Id"
           }
         },
         "title": "ShippingRequestUpdate",
@@ -16988,7 +17132,7 @@
     },
     "/api/items/reorder": {
       "patch": {
-        "description": "드래그 reorder 결과를 영구 저장. 모델 reorder 와 동일 패턴.\n\n- PIN 검증 후 payload.items 의 (item_id, display_order) 쌍을 Item.sort_order 로 일괄 갱신.\n- 존재하지 않는 item_id 는 조용히 스킵 (부분 갱신 허용).",
+        "description": "전체 활성 품목의 드래그 reorder 결과를 영구 저장한다.",
         "operationId": "reorder_items_api_items_reorder_patch",
         "parameters": [
           {
