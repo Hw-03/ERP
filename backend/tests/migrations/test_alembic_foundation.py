@@ -184,12 +184,20 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260804_0013"
+            ) == "20260807_0016"
             shipping_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("shipping_requests")
             }
             assert shipping_columns["serial_numbers"]["nullable"] is True
+            assert shipping_columns["finalization_mode"]["nullable"] is False
+            assert shipping_columns["reuse_pf_item_id"]["nullable"] is True
+            assert any(
+                foreign_key["constrained_columns"] == ["reuse_pf_item_id"]
+                and foreign_key["referred_table"] == "items"
+                and foreign_key["options"].get("ondelete") == "SET NULL"
+                for foreign_key in inspector.get_foreign_keys("shipping_requests")
+            )
             assert "uq_shipping_requests_invoice_number" not in {
                 index["name"] for index in inspector.get_indexes("shipping_requests")
             }

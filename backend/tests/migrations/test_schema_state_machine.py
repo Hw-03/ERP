@@ -32,7 +32,7 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260804_0013"
+HEAD_REVISION = "20260807_0016"
 
 
 def test_schema_state_exposes_explicit_legacy_onboarding_state():
