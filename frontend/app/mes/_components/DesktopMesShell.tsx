@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ElementType } from "react";
+import type { ElementType, ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BarChart2, Boxes, ClipboardList, History, MapPinned, Settings, Settings2, Truck, Warehouse } from "lucide-react";
@@ -115,6 +115,7 @@ function DesktopMesShellInner({
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [adminPinEntryNonce, setAdminPinEntryNonce] = useState(0);
   const [warehouseMapFullscreen, setWarehouseMapFullscreen] = useState(false);
+  const [dailyReportTopbarControls, setDailyReportTopbarControls] = useState<ReactNode>(null);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
 
@@ -213,6 +214,10 @@ function DesktopMesShellInner({
     });
   }, [canOpenTab, commitDesktopTab, confirmAdminNavigation]);
 
+  const handleDailyReportTopbarControlsChange = useCallback((controls: ReactNode | null) => {
+    setDailyReportTopbarControls(controls);
+  }, []);
+
   // 알림 클릭 딥링크 — 해당 탭(+섹션)으로 이동. section 은 입출고 섹션(queue/dept-queue/mine).
   function handleNotificationNavigate({ tab, section, relatedRequestId }: NotificationNavigationTarget) {
     if (!VALID_TABS.has(tab as DesktopTabId) || !canOpenTab(tab as DesktopTabId)) return;
@@ -272,6 +277,10 @@ function DesktopMesShellInner({
       setWarehouseMapFullscreen(false);
     }
   }, [activeTab, warehouseMapFullscreen]);
+
+  useEffect(() => {
+    if (activeTab !== "dailyReport") setDailyReportTopbarControls(null);
+  }, [activeTab]);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
 
@@ -413,7 +422,7 @@ function DesktopMesShellInner({
       return <DesktopHistoryView key={key} />;
     }
     if (activeTab === "dailyReport") {
-      return <DesktopDailyWorkReportView key={key} operator={operator} />;
+      return <DesktopDailyWorkReportView key={key} operator={operator} onTopbarControlsChange={handleDailyReportTopbarControlsChange} />;
     }
     if (activeTab === "weekly") {
       return <DesktopWeeklyReportView key={key} weekMon={weekMon} />;
@@ -434,7 +443,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry]);
+  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
 
   return (
     <>
@@ -469,7 +478,7 @@ function DesktopMesShellInner({
               titleAddon={
                 activeTab === "weekly" ? (
                   <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
-                ) : undefined
+                ) : activeTab === "dailyReport" ? dailyReportTopbarControls : undefined
               }
                 onNavigate={handleNotificationNavigate}
               />

@@ -73,10 +73,20 @@ _REQUEST_TYPE_LABEL: dict[str, str] = {
 
 
 def _summary(request: StockRequest) -> str:
-    code = request.request_code or str(request.request_id)[:8]
     rtype = getattr(request.request_type, "value", str(request.request_type))
     label = _REQUEST_TYPE_LABEL.get(rtype, rtype)
-    return f"{request.requester_name} · {label} · {code}"
+    lines = list(request.lines or [])
+    if not lines:
+        return f"{request.requester_name} · {label}"
+
+    representative_item = lines[0].item_name_snapshot
+    item_summary = (
+        f"{representative_item} 외 {len(lines) - 1}건"
+        if len(lines) > 1
+        else representative_item
+    )
+    total_quantity = sum(int(line.quantity or 0) for line in lines)
+    return f"{request.requester_name} · {label} · {item_summary} · 총 {total_quantity:,}개"
 
 
 def _add(

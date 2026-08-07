@@ -4,6 +4,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { REQUEST_TYPE_LABEL } from "@/lib/io/glossary";
 import type { AppNotification } from "@/lib/api/types";
+import { formatKstDateTime } from "@/lib/mes-format";
 
 const TONE: Record<string, string> = {
   approval_request: LEGACY_COLORS.blue,
@@ -22,14 +23,6 @@ function humanizeBody(body: string): string {
     .split(" · ")
     .map((tok) => REQUEST_TYPE_LABEL[tok] ?? tok)
     .join(" · ");
-}
-
-function timeLabel(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
 }
 
 function LoginPopupSwitch({
@@ -93,8 +86,13 @@ export function NotificationPanel({
 
   return (
     <div
-      className="absolute right-0 top-full z-50 mt-2 w-[320px] rounded-[20px] border p-2 shadow-lg"
-      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      data-testid="notification-panel"
+      className="absolute right-0 top-full z-50 mt-2 w-[min(420px,calc(100vw-32px))] rounded-[20px] border p-2"
+      style={{
+        background: "var(--c-popup-bg)",
+        borderColor: LEGACY_COLORS.border,
+        boxShadow: "var(--c-popup-shadow)",
+      }}
     >
       <div className="px-3 py-2">
         <div className="flex items-center justify-between gap-3">
@@ -144,7 +142,7 @@ export function NotificationPanel({
         )}
       </div>
       <div className="my-1 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
-      <div className="max-h-[360px] overflow-y-auto">
+      <div className="max-h-[440px] overflow-y-auto">
         {items.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted }}>
             알림이 없습니다.
@@ -173,7 +171,7 @@ export function NotificationPanel({
                       {n.title}
                     </span>
                     <span className="ml-auto shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                      {timeLabel(n.created_at)}
+                      {formatKstDateTime(n.created_at)}
                     </span>
                   </div>
                   {n.body && (

@@ -255,7 +255,7 @@ export function DesktopWarehouseView({
       >
         <WarehouseHeader loadFailure={loadFailure} />
         <div
-          className={`shrink-0 overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ${
+          className={`sticky top-0 z-20 shrink-0 overflow-hidden bg-[var(--c-bg)] transition-[max-height,opacity,transform,margin] duration-200 ${
             hideSectionTabs ? "-mb-3 max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"
           }`}
           aria-hidden={hideSectionTabs}
@@ -298,6 +298,7 @@ export function DesktopWarehouseView({
             setCartCount(n);
             if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
           }}
+          onStartCompose={() => handleSectionTabChange("compose")}
         />
 
         {isComposeSection && (

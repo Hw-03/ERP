@@ -32,6 +32,7 @@ export interface WarehouseDraftPanelTabsProps {
   onSubmitSuccess?: () => void;
   resetDraftTracking: () => void;
   onCartCountChange?: (n: number) => void;
+  onStartCompose?: () => void;
   targetRequestId?: string | null;
 }
 
@@ -52,6 +53,7 @@ export function WarehouseDraftPanelTabs({
   onSubmitSuccess,
   resetDraftTracking,
   onCartCountChange,
+  onStartCompose,
   targetRequestId,
 }: WarehouseDraftPanelTabsProps) {
   if (sectionTab === "cart") {
@@ -73,6 +75,7 @@ export function WarehouseDraftPanelTabs({
           onSubmitSuccess?.();
         }}
         onCountChange={onCartCountChange}
+        onStartCompose={onStartCompose}
       />
     );
   }

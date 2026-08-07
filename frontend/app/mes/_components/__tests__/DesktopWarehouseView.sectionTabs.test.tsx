@@ -96,7 +96,7 @@ describe("DesktopWarehouseView", () => {
     tabs.forEach((tab) => expect(tab).toBeVisible());
   });
 
-  it("keeps the section-tab container from shrinking under a long Mine list", () => {
+  it("keeps the section tabs sticky above a long Mine list", () => {
     const { container } = render(
       <DesktopWarehouseView
         globalSearch=""
@@ -104,7 +104,12 @@ describe("DesktopWarehouseView", () => {
       />,
     );
 
-    expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveClass("shrink-0");
+    expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveClass(
+      "sticky",
+      "top-0",
+      "z-20",
+      "shrink-0",
+    );
   });
 
   it("uses only the shared shell spacing above the section tabs", () => {

@@ -247,12 +247,6 @@ export function DesktopWarehouseMapTab({
       )}
 
 
-      {!editMode && (
-        <button type="button" onClick={() => onFullscreenChange?.(true)} className="self-end rounded-[12px] border px-3 py-2 text-[13px] font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-          전체화면
-        </button>
-      )}
-
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {editMode ? (
           <div className="flex min-h-0 flex-1 flex-col">

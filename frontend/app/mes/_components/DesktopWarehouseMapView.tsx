@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { ChevronLeft, MapPin, Maximize2, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { QuantityInput } from "./common/QuantityInput";
@@ -767,6 +767,29 @@ export function DesktopWarehouseMapView({
               </span>
             ))}
           </div>
+
+          {onFullscreenChange && (
+            <button
+              type="button"
+              data-testid="warehouse-map-fullscreen-button"
+              onClick={() => onFullscreenChange(true)}
+              className="flex shrink-0 items-center gap-1.5"
+              style={{
+                height: 32,
+                padding: "0 12px",
+                borderRadius: 12,
+                background: LEGACY_COLORS.s2,
+                border: `1px solid ${LEGACY_COLORS.border}`,
+                color: LEGACY_COLORS.text,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <Maximize2 size={14} />
+              전체화면
+            </button>
+          )}
 
 
           {/* Search — 헤더 중앙에 절대 고정 (stage 전환 시 위치 불변) */}

@@ -43,6 +43,21 @@ describe("DailyWorkReportScreen", () => {
     registerDirtyMock.mockClear();
   });
 
+  it("registers its controls in the desktop top bar and removes the duplicate inner header", () => {
+    const onTopbarControlsChange = vi.fn();
+
+    render(
+      <DailyWorkReportScreen
+        employeeId="employee-1"
+        operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never}
+        onTopbarControlsChange={onTopbarControlsChange}
+      />,
+    );
+
+    expect(onTopbarControlsChange).toHaveBeenCalledWith(expect.anything());
+    expect(screen.queryByRole("heading", { name: "일일 작업 일보" })).not.toBeInTheDocument();
+  });
+
   it("미작성 본인 일보에도 로그인 작업자의 부서와 작성자를 보여 준다", () => {
     render(
       <DailyWorkReportScreen

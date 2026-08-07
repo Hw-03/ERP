@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert, ClipboardList, FileText, Users } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getDepartmentFallbackColor, LEGACY_COLORS } from "@/lib/mes/color";
 import { useDailyWorkActivityQuery, useDailyWorkReportQuery, useDailyWorkReportsQuery, useSaveDailyWorkReport } from "@/lib/queries/useDailyWorkReportsQuery";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
@@ -48,18 +48,62 @@ function PanelPlaceholder({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DailyWorkReportHeaderControls({
+  workDate,
+  today,
+  onDateChange,
+  department,
+  employeeName,
+  departmentColor,
+  tab,
+  onTabChange,
+  compact = false,
+}: {
+  workDate: string;
+  today: string;
+  onDateChange: (next: string) => void;
+  department: string;
+  employeeName: string;
+  departmentColor: string;
+  tab: ReportTab;
+  onTabChange: (next: ReportTab) => void;
+  compact?: boolean;
+}) {
+  return (
+    <>
+      <DailyWorkDatePicker value={workDate} maxDate={today} onChange={onDateChange} />
+      <dl className={`flex flex-wrap items-center gap-2 ${compact ? "hidden 2xl:flex" : ""}`}>
+        <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${departmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${departmentColor} 35%, transparent)` }}>
+          <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>부서</dt>
+          <dd className="text-sm font-black" style={{ color: departmentColor }}>{department}</dd>
+        </div>
+        <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${departmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${departmentColor} 35%, transparent)` }}>
+          <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작성자</dt>
+          <dd className="text-sm font-black" style={{ color: departmentColor }}>{employeeName}</dd>
+        </div>
+      </dl>
+      <div className="ml-auto inline-flex shrink-0 rounded-[14px] p-1" role="tablist" aria-label="일보 보기" style={{ background: LEGACY_COLORS.s2 }}>
+        <button type="button" role="tab" aria-selected={tab === "mine"} onClick={() => onTabChange("mine")} className="flex min-h-10 items-center rounded-[10px] px-3.5 text-sm font-black transition" style={{ color: tab === "mine" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "mine" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "mine" ? "var(--c-card-shadow)" : "none" }}><FileText className="mr-2 h-4 w-4" />내 일보</button>
+        <button type="button" role="tab" aria-selected={tab === "all"} onClick={() => onTabChange("all")} className="flex min-h-10 items-center rounded-[10px] px-3.5 text-sm font-black transition" style={{ color: tab === "all" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "all" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "all" ? "var(--c-card-shadow)" : "none" }}><Users className="mr-2 h-4 w-4" />전체 일보</button>
+      </div>
+    </>
+  );
+}
+
 export function DailyWorkReportScreen({
   employeeId,
   operator,
   onDirtyChange,
   saveRef,
   confirmNavigation,
+  onTopbarControlsChange,
 }: {
   employeeId: string | null | undefined;
   operator?: Operator | null;
   onDirtyChange?: (dirty: boolean) => void;
   saveRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   confirmNavigation?: (proceed: () => void) => void;
+  onTopbarControlsChange?: (controls: ReactNode | null) => void;
 }) {
   const [workDate, setWorkDate] = useState(() => toKstDateKey());
   const [tab, setTab] = useState<ReportTab>("mine");
@@ -86,7 +130,6 @@ export function DailyWorkReportScreen({
   const headerDepartment = report?.department ?? selectedListEntry?.department ?? operator?.department ?? "-";
   const headerDepartmentColor = getDepartmentFallbackColor(headerDepartment);
   const editorResetKey = `${tab}:${workDate}:${targetEmployeeId ?? ""}`;
-
   const save = useCallback(async () => {
     if (!employeeId || !editable) return;
     setSaveError(null);
@@ -121,16 +164,16 @@ export function DailyWorkReportScreen({
     }
   }, [employeeId, saveMutation, workDate]);
 
-  const requestChange = (proceed: () => void, message: string) => {
+  const requestChange = useCallback((proceed: () => void, message: string) => {
     if (confirmNavigation) {
       confirmNavigation(proceed);
       return;
     }
     if (dirty && !window.confirm(message)) return;
     proceed();
-  };
+  }, [confirmNavigation, dirty]);
 
-  const changeTab = (next: ReportTab) => {
+  const changeTab = useCallback((next: ReportTab) => {
     if (next === tab) return;
     requestChange(() => {
       targetVersionRef.current += 1;
@@ -140,9 +183,9 @@ export function DailyWorkReportScreen({
       setSelectedEmployeeId(null);
       setIsActivityDetailOpen(false);
     }, "저장하지 않은 내용이 있습니다. 이동하면 작성 중인 일보가 사라집니다.");
-  };
+  }, [requestChange, tab]);
 
-  const changeDate = (next: string) => {
+  const changeDate = useCallback((next: string) => {
     if (!next || next > today) return;
     requestChange(() => {
       targetVersionRef.current += 1;
@@ -152,7 +195,37 @@ export function DailyWorkReportScreen({
       setSelectedEmployeeId(null);
       setIsActivityDetailOpen(false);
     }, "저장하지 않은 내용이 있습니다. 날짜를 바꾸면 작성 중인 일보가 사라집니다.");
-  };
+  }, [requestChange, today]);
+
+  const topbarControls = useMemo(() => onTopbarControlsChange ? (
+    <DailyWorkReportHeaderControls
+      workDate={workDate}
+      today={today}
+      onDateChange={changeDate}
+      department={headerDepartment}
+      employeeName={headerEmployeeName}
+      departmentColor={headerDepartmentColor}
+      tab={tab}
+      onTabChange={changeTab}
+      compact
+    />
+  ) : null, [
+    changeDate,
+    changeTab,
+    headerDepartment,
+    headerDepartmentColor,
+    headerEmployeeName,
+    onTopbarControlsChange,
+    tab,
+    today,
+    workDate,
+  ]);
+
+  useEffect(() => {
+    if (!onTopbarControlsChange) return;
+    onTopbarControlsChange(topbarControls);
+    return () => onTopbarControlsChange(null);
+  }, [onTopbarControlsChange, topbarControls]);
 
   const editorSaveRef = useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
@@ -168,7 +241,7 @@ export function DailyWorkReportScreen({
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
       <div className={`scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:pb-0 ${editable && !isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
-        <header className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        {!onTopbarControlsChange && <header className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-h-11 items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
@@ -176,23 +249,18 @@ export function DailyWorkReportScreen({
               </span>
               <h1 className="whitespace-nowrap text-xl font-black">일일 작업 일보</h1>
             </div>
-            <DailyWorkDatePicker value={workDate} maxDate={today} onChange={changeDate} />
-            <dl className="flex flex-wrap items-center gap-2">
-              <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${headerDepartmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${headerDepartmentColor} 35%, transparent)` }}>
-                <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>부서</dt>
-                <dd className="text-sm font-black" style={{ color: headerDepartmentColor }}>{headerDepartment}</dd>
-              </div>
-              <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${headerDepartmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${headerDepartmentColor} 35%, transparent)` }}>
-                <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작성자</dt>
-                <dd className="text-sm font-black" style={{ color: headerDepartmentColor }}>{headerEmployeeName}</dd>
-              </div>
-            </dl>
-            <div className="ml-auto inline-flex rounded-[14px] p-1" role="tablist" aria-label="일보 보기" style={{ background: LEGACY_COLORS.s2 }}>
-              <button type="button" role="tab" aria-selected={tab === "mine"} onClick={() => changeTab("mine")} className="flex min-h-10 items-center rounded-[10px] px-3.5 text-sm font-black transition" style={{ color: tab === "mine" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "mine" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "mine" ? "var(--c-card-shadow)" : "none" }}><FileText className="mr-2 h-4 w-4" />내 일보</button>
-              <button type="button" role="tab" aria-selected={tab === "all"} onClick={() => changeTab("all")} className="flex min-h-10 items-center rounded-[10px] px-3.5 text-sm font-black transition" style={{ color: tab === "all" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "all" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "all" ? "var(--c-card-shadow)" : "none" }}><Users className="mr-2 h-4 w-4" />전체 일보</button>
-            </div>
+            <DailyWorkReportHeaderControls
+              workDate={workDate}
+              today={today}
+              onDateChange={changeDate}
+              department={headerDepartment}
+              employeeName={headerEmployeeName}
+              departmentColor={headerDepartmentColor}
+              tab={tab}
+              onTabChange={changeTab}
+            />
           </div>
-        </header>
+        </header>}
 
         {tab === "all" && (
           <section className="rounded-[20px] border p-4 lg:shrink-0 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>

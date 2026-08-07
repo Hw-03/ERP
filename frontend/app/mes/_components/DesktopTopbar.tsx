@@ -80,7 +80,7 @@ export function DesktopTopbar({
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {Icon && (
               <div
                 data-testid="desktop-topbar-icon"
@@ -93,8 +93,8 @@ export function DesktopTopbar({
                 <Icon className="h-5 w-5" />
               </div>
             )}
-            <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
-            {titleAddon}
+            <div className="shrink-0 text-[24px] font-black tracking-[-0.02em]">{title}</div>
+            {titleAddon && <div data-testid="desktop-topbar-title-addon" className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">{titleAddon}</div>}
           </div>
         </div>
 
@@ -157,8 +157,13 @@ export function DesktopTopbar({
 
             {dropdownOpen && (
               <div
-                className="absolute right-0 top-full z-50 mt-2 min-w-[200px] rounded-[20px] border p-2 shadow-lg"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+                data-testid="desktop-user-menu"
+                className="absolute right-0 top-full z-50 mt-2 min-w-[200px] rounded-[20px] border p-2"
+                style={{
+                  background: "var(--c-popup-bg)",
+                  borderColor: LEGACY_COLORS.border,
+                  boxShadow: "var(--c-popup-shadow)",
+                }}
               >
                 <div className="px-3 py-2">
                   <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>

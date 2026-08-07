@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopTopbar } from "../DesktopTopbar";
 
 const notificationBellState = vi.hoisted(() => ({
   loginDialogEnabled: undefined as boolean | undefined,
+  operator: null as null | { employee_id: string; name: string; department: string; warehouse_role: string; department_role: string },
 }));
 
 vi.mock("../login/useCurrentOperator", () => ({
-  useCurrentOperator: () => null,
+  useCurrentOperator: () => notificationBellState.operator,
   clearCurrentOperator: vi.fn(),
 }));
 
@@ -64,5 +65,23 @@ describe("DesktopTopbar", () => {
     );
 
     expect(notificationBellState.loginDialogEnabled).toBe(true);
+  });
+
+  it("uses an opaque popup surface for the user menu", () => {
+    notificationBellState.operator = {
+      employee_id: "emp-1",
+      name: "김현우",
+      department: "조립",
+      warehouse_role: "none",
+      department_role: "none",
+    };
+
+    render(<DesktopTopbar title="대시보드" onRefresh={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /김현우/ }));
+
+    expect(screen.getByTestId("desktop-user-menu")).toHaveStyle({
+      background: "var(--c-popup-bg)",
+      boxShadow: "var(--c-popup-shadow)",
+    });
   });
 });

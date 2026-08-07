@@ -84,7 +84,12 @@ vi.mock("../DesktopSidebar", () => ({
 }));
 
 vi.mock("../DesktopTopbar", () => ({
-  DesktopTopbar: ({ title }: { title: string }) => <header>{title}</header>,
+  DesktopTopbar: ({ title, titleAddon }: { title: string; titleAddon?: ReactNode }) => (
+    <header>
+      {title}
+      <div data-testid="desktop-topbar-title-addon">{titleAddon}</div>
+    </header>
+  ),
 }));
 
 vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => <main>dashboard content</main> }));
@@ -103,7 +108,18 @@ vi.mock("../DesktopShippingView", () => ({
 }));
 vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <main>defect content</main> }));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <main>history content</main> }));
-vi.mock("../DesktopDailyWorkReportView", () => ({ DesktopDailyWorkReportView: () => <main>daily report content</main> }));
+vi.mock("../DesktopDailyWorkReportView", async () => {
+  const { useEffect } = await import("react");
+  return {
+    DesktopDailyWorkReportView: ({ onTopbarControlsChange }: { onTopbarControlsChange?: (node: ReactNode | null) => void }) => {
+      useEffect(() => {
+        onTopbarControlsChange?.(<span>daily topbar controls</span>);
+        return () => onTopbarControlsChange?.(null);
+      }, [onTopbarControlsChange]);
+      return <main>daily report content</main>;
+    },
+  };
+});
 vi.mock("../DesktopWeeklyReportView", () => ({ DesktopWeeklyReportView: () => <main>weekly content</main> }));
 vi.mock("../DesktopAdminView", async () => {
   const { useEffect } = await import("react");
@@ -196,6 +212,16 @@ describe("DesktopMesShell tab transition", () => {
     expect(shippingViewProps).toHaveBeenLastCalledWith(
       expect.not.objectContaining({ onStartPrepareWork: expect.any(Function) }),
     );
+  });
+
+  it("shows daily report controls in the top bar only while the daily tab is active", () => {
+    window.history.replaceState({}, "", "/mes?tab=dailyReport");
+
+    render(<DesktopMesShell />);
+
+    expect(screen.getByTestId("desktop-topbar-title-addon")).toHaveTextContent("daily topbar controls");
+    fireEvent.click(screen.getByRole("button", { name: "history" }));
+    expect(screen.getByTestId("desktop-topbar-title-addon")).toBeEmptyDOMElement();
   });
 
   it("opens settings from a direct tab URL even when it is not an employee-visible business tab", () => {

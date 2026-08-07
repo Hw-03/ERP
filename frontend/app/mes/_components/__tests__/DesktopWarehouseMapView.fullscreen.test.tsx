@@ -68,6 +68,20 @@ describe("DesktopWarehouseMapView fullscreen", () => {
     expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toBeInTheDocument();
   });
 
+  it("places the fullscreen control inside the regular map header", async () => {
+    const onFullscreenChange = vi.fn();
+    mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
+
+    renderWithClient(<DesktopWarehouseMapView onFullscreenChange={onFullscreenChange} />);
+
+    expect(await screen.findByText("앵글 1")).toBeInTheDocument();
+    const control = screen.getByTestId("warehouse-map-fullscreen-button");
+    expect(screen.getByTestId("warehouse-map-card")).toContainElement(control);
+
+    fireEvent.click(control);
+    expect(onFullscreenChange).toHaveBeenCalledWith(true);
+  });
+
   it("removes map chrome in fullscreen and exits on Escape", async () => {
     const onFullscreenChange = vi.fn();
     mapApiMock.getMap.mockResolvedValueOnce(mapFixture);

@@ -16,6 +16,7 @@ from app.models import (
     EmployeeLevelEnum,
     Notification,
     StockRequest,
+    StockRequestLine,
     StockRequestTypeEnum,
 )
 from app.services import notifications as notif_svc
@@ -89,7 +90,20 @@ def test_internal_use_notification_summary_uses_korean_label():
         request_code="SR-IU-1",
     )
 
-    assert notif_svc._summary(request) == "AS requester · AS·연구 사용출고 · SR-IU-1"
+    assert notif_svc._summary(request) == "AS requester · AS·연구 사용출고"
+
+
+def test_request_notification_summary_uses_representative_item_and_total_quantity():
+    request = StockRequest(
+        requester_name="김현우",
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+    )
+    request.lines = [
+        StockRequestLine(item_name_snapshot="ADX4000W LVDS Cable", quantity=2),
+        StockRequestLine(item_name_snapshot="COCOON POWER BUTTON", quantity=3),
+    ]
+
+    assert notif_svc._summary(request) == "김현우 · 창고 → 부서 · ADX4000W LVDS Cable 외 1건 · 총 5개"
 
 
 def _unread(client, emp) -> int:

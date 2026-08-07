@@ -393,7 +393,7 @@ export function DesktopSettingsView({
                 <SettingsRowContent
                   testId="settings-row-content-admin"
                   label="관리"
-                  description="PIN을 입력해 시작합니다."
+                  description="기준 정보, BOM, 보안 설정을 관리합니다."
                   Icon={Settings2}
                   color={LEGACY_COLORS.muted2}
                 />

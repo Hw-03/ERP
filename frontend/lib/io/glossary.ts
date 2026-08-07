@@ -30,11 +30,11 @@ export const WORK_TYPE_LABEL: Record<IoWorkType, string> = {
 };
 
 export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
-  receive: "발주 품목 입고",
-  warehouse_io: "창고↔부서",
-  process: "부서 내 작업",
-  defect: "불량 재고 격리",
-  internal_use: "창고 재고를 AS·연구 용도로 반출",
+  receive: "발주 품목을 창고에 입고합니다.",
+  warehouse_io: "창고와 부서 간 재고를 이동합니다.",
+  process: "부서 작업에 맞춰 재고를 처리합니다.",
+  defect: "불량 재고를 격리 처리합니다.",
+  internal_use: "창고 재고를 AS·연구 용도로 반출합니다.",
 };
 
 // ──────────────────────────────────────────────────────────────────

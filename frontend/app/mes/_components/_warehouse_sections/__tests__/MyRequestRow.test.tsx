@@ -21,6 +21,30 @@ function makeRequest(overrides: Partial<StockRequest> = {}): StockRequest {
 }
 
 describe("MyRequestRow request timestamp", () => {
+  it("groups request type, status, full KST timestamp, and flow summary in the header", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({
+          lines: [
+            {
+              line_id: "line-1",
+              mes_code_snapshot: "46-AR-0093",
+              item_name_snapshot: "ADX4000W LVDS Cable",
+              quantity: 2,
+              from_department: "창고",
+              to_department: "조립",
+            },
+          ],
+        })}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("my-request-heading")).toHaveTextContent("창고 → 부서");
+    expect(screen.getByTestId("my-request-summary")).toHaveTextContent("창고 → 조립 · 1건");
+    expect(screen.getByText("2026년 08월 04일 09시 05분")).toBeInTheDocument();
+  });
+
   it("상대시간 대신 실제 제출 일시를 표시", () => {
     render(
       <MyRequestRow

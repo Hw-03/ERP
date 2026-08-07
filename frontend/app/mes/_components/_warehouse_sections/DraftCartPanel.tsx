@@ -1,5 +1,6 @@
 "use client";
 
+import { FilePenLine } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { IoBatch, StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -21,6 +22,7 @@ interface Props {
   onContinueIo?: (draft: IoBatch) => void;
   onChanged: () => void;
   onCountChange?: (n: number) => void;
+  onStartCompose?: () => void;
 }
 
 type DeleteTarget =
@@ -35,6 +37,7 @@ export function DraftCartPanel({
   onContinueIo,
   onChanged,
   onCountChange,
+  onStartCompose,
 }: Props) {
   const { data, isLoading: loading, error: qError, refetch } = useDraftCartQuery(employeeId);
   const drafts = data?.stockDrafts ?? [];
@@ -122,12 +125,19 @@ export function DraftCartPanel({
         </div>
       )}
       {empty && (
-        <EmptyState
-          variant="no-data"
-          compact
-          title="작업 중인 요청이 없습니다."
-          description="요청 작성 화면에서 입력하면 임시저장할 수 있습니다."
-        />
+        <div
+          className="rounded-[20px] border px-6 py-4"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        >
+          <EmptyState
+            variant="no-data"
+            compact
+            icon={<FilePenLine className="h-6 w-6" style={{ color: LEGACY_COLORS.green }} />}
+            title="작업 중인 요청이 없습니다."
+            description="요청 작성 화면에서 입력하면 임시저장할 수 있습니다."
+            action={onStartCompose ? { label: "요청 작성", onClick: onStartCompose } : undefined}
+          />
+        </div>
       )}
 
       {ioDrafts.map((draft) => (

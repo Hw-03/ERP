@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
-import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryFilterPanel } from "./_history_sections/HistoryFilterPanel";
 import { HistoryCalendarPanel } from "./_history_sections/HistoryCalendarPanel";
@@ -469,8 +468,7 @@ export function DesktopHistoryView() {
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       {/* ── 좌측: 스크롤 영역 ── */}
       <div
-      className="sg min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
+      className="sg min-h-0 min-w-0 flex-1 overflow-y-auto"
       >
         <div className="flex flex-col gap-3 pb-6">
           <HistoryStatsBar

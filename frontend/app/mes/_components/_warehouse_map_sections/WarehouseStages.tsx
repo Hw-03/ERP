@@ -8,6 +8,8 @@ import { cellColor, cellKey, cellOccupied, jariStacks, rowLabel } from "./helper
 import styles from "./warehouseMap.module.css";
 
 type CellIndex = Map<string, WarehouseBox[]>;
+const FLOOR_STAGE_WIDTH = 880;
+const FLOOR_STAGE_HEIGHT = 300;
 
 // ═══════════════════════════════════════════════════════
 // Floor stage — 평면도 (앵글 9개, 880×300 좌표계, fit-to-card)
@@ -34,9 +36,11 @@ export function FloorStage({
     const el = stageRef.current;
     if (!el) return;
     const fit = () => {
-      const aw = el.clientWidth - 32;
-      const ah = el.clientHeight - 32;
-      if (aw > 0 && ah > 0) setScale(Math.min(aw / 880, ah / 300));
+      const aw = el.clientWidth - 16;
+      const ah = el.clientHeight - 16;
+      if (aw > 0 && ah > 0) {
+        setScale(Math.min(aw / FLOOR_STAGE_WIDTH, ah / FLOOR_STAGE_HEIGHT));
+      }
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -49,23 +53,33 @@ export function FloorStage({
   return (
     <div
       ref={stageRef}
+      data-testid="warehouse-floor-stage"
       style={{
         flex: 1,
         minHeight: 0,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 16,
+        padding: 8,
         background: LEGACY_COLORS.s2,
         overflow: "hidden",
       }}
     >
-      <div style={{ transform: `scale(${scale})`, transformOrigin: "center center" }}>
+      <div
+        style={{
+          width: FLOOR_STAGE_WIDTH * scale,
+          height: FLOOR_STAGE_HEIGHT * scale,
+          flexShrink: 0,
+        }}
+      >
         <div
+          data-testid="warehouse-floor-canvas"
           style={{
             position: "relative",
-            width: 880,
-            height: 300,
+            width: FLOOR_STAGE_WIDTH,
+            height: FLOOR_STAGE_HEIGHT,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
             background: LEGACY_COLORS.s4,
             border: `1px solid ${LEGACY_COLORS.borderStrong}`,
             borderRadius: 18,

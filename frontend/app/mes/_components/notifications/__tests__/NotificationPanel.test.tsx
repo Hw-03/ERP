@@ -32,6 +32,25 @@ function makeNotification(overrides: Partial<AppNotification> = {}): AppNotifica
 }
 
 describe("NotificationPanel", () => {
+  it("uses an opaque wider panel and shows the full KST timestamp", () => {
+    render(
+      <NotificationPanel
+        items={[makeNotification()]}
+        unread={1}
+        {...emptyHandlers}
+      />,
+    );
+
+    const panel = screen.getByTestId("notification-panel");
+    expect(panel).toHaveClass("w-[min(420px,calc(100vw-32px))]");
+    expect(panel).toHaveStyle({
+      background: "var(--c-popup-bg)",
+      boxShadow: "var(--c-popup-shadow)",
+    });
+    expect(screen.getByText("2026년 07월 01일 10시 00분")).toBeInTheDocument();
+    expect(panel.querySelector(".overflow-y-auto")).toHaveClass("max-h-[440px]");
+  });
+
   it("keeps the title row separate from login popup controls", () => {
     render(
       <NotificationPanel

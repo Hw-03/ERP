@@ -43,6 +43,7 @@ import { processTypeColor } from "@/lib/mes/process";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { QuantityInput } from "./common/QuantityInput";
 import { StatusTargetNotice } from "./common/StatusTargetNotice";
+import { DesktopWorkHubCard } from "./common/DesktopWorkHubCard";
 import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
@@ -1772,32 +1773,27 @@ function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
 function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void }) {
   return (
     <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-2">
-      <HubCard id="request" icon={ClipboardList} title="출하 관리" detail="요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다." count={counts.request} tone={LEGACY_COLORS.blue} onClick={() => onOpen("request")} />
-      <HubCard id="history" icon={History} title="출하 이력" detail="픽업 완료된 출하와 연결 입출고 로그를 확인합니다." count={counts.history} tone={LEGACY_COLORS.purple} onClick={() => onOpen("history")} />
+      <DesktopWorkHubCard
+        shippingHubCardId="request"
+        icon={ClipboardList}
+        title="출하 관리"
+        description="요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다."
+        tone={LEGACY_COLORS.blue}
+        onClick={() => onOpen("request")}
+        className="min-h-[360px]"
+        meta={<span data-testid="shipping-hub-count-request" className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(LEGACY_COLORS.blue, 18), color: LEGACY_COLORS.blue }}>{counts.request}</span>}
+      />
+      <DesktopWorkHubCard
+        shippingHubCardId="history"
+        icon={History}
+        title="출하 이력"
+        description="픽업 완료된 출하와 연결 입출고 로그를 확인합니다."
+        tone={LEGACY_COLORS.purple}
+        onClick={() => onOpen("history")}
+        className="min-h-[360px]"
+        meta={<span data-testid="shipping-hub-count-history" className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(LEGACY_COLORS.purple, 18), color: LEGACY_COLORS.purple }}>{counts.history}</span>}
+      />
     </div>
-  );
-}
-
-function HubCard({ id, icon: Icon, title, detail, count, tone, onClick }: { id: SectionTab; icon: typeof PackageCheck; title: string; detail: string; count?: number; tone: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      data-shipping-hub-card={id}
-      onClick={onClick}
-      className="flex h-full min-h-[360px] min-w-0 flex-col items-start justify-between rounded-[22px] border p-7 text-left transition-all hover:brightness-110 active:scale-[0.99] xl:p-8"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-    >
-      <div className="flex w-full items-start justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
-          <Icon className="h-8 w-8 shrink-0" style={{ color: tone }} />
-          <div className="min-w-0">
-            <div className="text-3xl font-black leading-tight xl:text-4xl" style={{ color: LEGACY_COLORS.text }}>{title}</div>
-          </div>
-        </div>
-        {count !== undefined && <span data-testid={"shipping-hub-count-" + id} className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(tone, 18), color: tone }}>{count}</span>}
-      </div>
-      <div className="mt-auto text-sm font-black leading-tight xl:text-base" style={{ color: LEGACY_COLORS.muted2 }}>{detail}</div>
-    </button>
   );
 }
 

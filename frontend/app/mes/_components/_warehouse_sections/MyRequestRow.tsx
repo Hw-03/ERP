@@ -57,50 +57,53 @@ export function MyRequestRow({
 
   return (
     <div
-      className="rounded-[14px] border px-5 py-4"
+      className="rounded-[20px] border px-5 py-4"
       data-stock-request-id={req.request_id}
       style={{ background: LEGACY_COLORS.s2, borderColor: highlighted ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}
     >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div data-testid="my-request-heading" className="flex flex-wrap items-center gap-2">
+            <span
+              className="text-lg font-black leading-tight"
+              style={{ color: LEGACY_COLORS.text }}
+            >
+              {typeLabel}
+            </span>
+            <span
+              className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              style={{
+                background: `color-mix(in srgb, ${statusColor} 18%, transparent)`,
+                color: statusColor,
+              }}
+            >
+              {STATUS_LABEL[req.status] ?? req.status}
+            </span>
+          </div>
+          {(flowLabel || req.lines.length > 0) && (
+            <div data-testid="my-request-summary" className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-medium" style={{ color: LEGACY_COLORS.muted }}>
+              {flowLabel && <span>{flowLabel}</span>}
+              {flowLabel && req.lines.length > 0 && <span aria-hidden="true"> · </span>}
+              {req.lines.length > 0 && <span>{req.lines.length}건</span>}
+            </div>
+          )}
+        </div>
         <span
-          className="text-[18px] font-bold leading-tight"
-          style={{ color: LEGACY_COLORS.text }}
-        >
-          {typeLabel}
-        </span>
-        <span
-          className="rounded-full px-2 py-0.5 text-[11px] font-bold"
-          style={{
-            background: `color-mix(in srgb, ${statusColor} 18%, transparent)`,
-            color: statusColor,
-          }}
-        >
-          {STATUS_LABEL[req.status] ?? req.status}
-        </span>
-        <span
-          className="ml-auto whitespace-nowrap text-xs tabular-nums"
+          className="whitespace-nowrap pt-0.5 text-xs tabular-nums"
           style={{ color: LEGACY_COLORS.muted }}
         >
           {formatKstDateTime(req.submitted_at ?? req.created_at)}
         </span>
       </div>
 
-      {(flowLabel || req.lines.length > 0) && (
-        <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted }}>
-          {flowLabel}
-          {flowLabel && req.lines.length > 0 && " · "}
-          {req.lines.length > 0 && `${req.lines.length}건`}
-        </div>
-      )}
-
-      <div className="mt-3 flex flex-col text-sm" style={{ color: LEGACY_COLORS.text }}>
+      <div className="mt-4 flex flex-col overflow-hidden rounded-[14px] border text-sm" style={{ color: LEGACY_COLORS.text, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
         {(linesExpanded ? req.lines : req.lines.slice(0, 5)).map((line, idx) => {
           const displayedCount = linesExpanded ? req.lines.length : Math.min(req.lines.length, 5);
           const isLast = idx === displayedCount - 1 && (linesExpanded || req.lines.length <= 5);
           return (
             <div
               key={line.line_id}
-              className="flex flex-wrap items-center gap-2 py-1.5"
+              className="flex flex-wrap items-center gap-2 px-3 py-2"
               style={!isLast ? { borderBottom: `1px solid ${LEGACY_COLORS.border}` } : undefined}
             >
               <span style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code_snapshot ?? "-"}</span>
@@ -113,7 +116,7 @@ export function MyRequestRow({
           <button
             type="button"
             onClick={() => setLinesExpanded((v) => !v)}
-            className="no-btn-inset pt-1.5 text-left text-xs underline-offset-2 hover:underline"
+            className="no-btn-inset px-3 py-2 text-left text-xs underline-offset-2 hover:underline"
             style={{ color: LEGACY_COLORS.cyan }}
           >
             {linesExpanded ? "접기" : `외 ${req.lines.length - 5}건 더보기`}

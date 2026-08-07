@@ -70,5 +70,8 @@ describe("DesktopInventoryView scrollbar", () => {
     expect(scroller).not.toBeNull();
     expect(scroller).not.toHaveClass("scrollbar-hide");
     expect(scroller).toHaveClass("sg");
+    expect(scroller).not.toHaveClass("rounded-[28px]");
+    expect(scroller).not.toHaveClass("border");
+    expect(scroller).not.toHaveAttribute("style");
   });
 });

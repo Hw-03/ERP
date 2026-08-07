@@ -122,6 +122,7 @@ describe("DesktopSettingsView", () => {
       />,
     );
 
+    expect(screen.getByText("기준 정보, BOM, 보안 설정을 관리합니다.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "관리" }));
     expect(onOpenAdminPinEntry).toHaveBeenCalledOnce();
 

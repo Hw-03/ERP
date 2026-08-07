@@ -4,6 +4,7 @@ import { ArrowDownToLine, ArrowUpFromLine, PackageCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
+import { DesktopWorkHubCard } from "../common/DesktopWorkHubCard";
 import type { IoSubType, IoWorkType, OperatorLike } from "./types";
 import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, deptVisibility, isExitWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
 
@@ -39,52 +40,30 @@ export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeCh
         const active = selectedWorkType === row.id;
         const cardAccent = isExitWorkType(row.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
         return (
-          <button
+          <DesktopWorkHubCard
             key={row.id}
-            type="button"
-            aria-pressed={active}
             onClick={() => onWorkTypeChange(row.id)}
-            className="flex h-full min-h-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110"
-            style={{
-              background: active ? tint(cardAccent, 14) : LEGACY_COLORS.s2,
-              borderColor: active ? cardAccent : LEGACY_COLORS.border,
-              borderWidth: active ? 2 : 1,
-              color: active ? cardAccent : LEGACY_COLORS.text,
-            }}
-          >
-            <div className="flex items-center gap-5">
-              <Icon className="h-10 w-10 shrink-0" style={{ color: cardAccent }} />
-              <span className="text-4xl font-black leading-tight">{row.label}</span>
-            </div>
-            <span
-              className="text-xl font-bold leading-tight"
-              style={{ color: active ? cardAccent : LEGACY_COLORS.muted2 }}
-            >
-              {row.description}
-            </span>
-          </button>
+            icon={Icon}
+            title={row.label}
+            description={row.description}
+            tone={cardAccent}
+            active={active}
+            className="p-10"
+            size="large"
+          />
         );
       })}
       {canItemConversion && (
-        <button
-          type="button"
-          data-testid="warehouse-item-conversion-card"
-          onClick={onItemConversion}
-          className="flex h-full min-h-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
-          }}
-        >
-          <div className="flex items-center gap-5">
-            <PackageCheck className="h-10 w-10 shrink-0" style={{ color: LEGACY_COLORS.cyan }} />
-            <span className="text-4xl font-black leading-tight">품목 전환</span>
-          </div>
-          <span className="text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>
-            기존 PA 재고를 대상 PA 재고로 전환
-          </span>
-        </button>
+        <DesktopWorkHubCard
+          dataTestId="warehouse-item-conversion-card"
+          onClick={() => onItemConversion?.()}
+          icon={PackageCheck}
+          title="품목 전환"
+          description="기존 PA 재고를 대상 PA 재고로 전환합니다."
+          tone={LEGACY_COLORS.cyan}
+          className="p-10"
+          size="large"
+        />
       )}
     </div>
   );

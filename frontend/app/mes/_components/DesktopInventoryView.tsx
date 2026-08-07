@@ -2,7 +2,6 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
-import { LEGACY_COLORS } from "@/lib/mes/color";
 import { mesCodeDept } from "@/lib/mes/process";
 import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
@@ -156,8 +155,7 @@ export function DesktopInventoryView({
       {/* ── 좌측: 스크롤 컨테이너 ── */}
       <div
         ref={scrollRef}
-        className="sg min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
+        className="sg min-h-0 min-w-0 flex-1 overflow-y-auto"
       >
         <div className="flex flex-col gap-3 pb-6">
           {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}

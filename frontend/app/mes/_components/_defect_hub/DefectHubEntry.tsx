@@ -1,6 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { DesktopWorkHubCard } from "../common/DesktopWorkHubCard";
 import { DEFECT_HUB_CARDS, type DefectHubCardId } from "./defectHubCards";
 
 interface Props {
@@ -24,34 +25,16 @@ export function DefectHubEntry({ onSelect }: Props) {
         const Icon = card.icon;
         const accent = LEGACY_COLORS[card.accentKey];
         return (
-          <button
+          <DesktopWorkHubCard
             key={card.id}
-            type="button"
             onClick={() => onSelect(card.id)}
-            className="flex h-full min-h-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99]"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              borderWidth: 1,
-              color: LEGACY_COLORS.text,
-            }}
-          >
-            <div className="flex items-center gap-5">
-              <Icon
-                className="h-10 w-10 shrink-0"
-                style={{ color: accent }}
-              />
-              <span className="text-4xl font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>
-                {card.label}
-              </span>
-            </div>
-            <span
-              className="text-xl font-bold leading-tight"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              {card.description}
-            </span>
-          </button>
+            icon={Icon}
+            title={card.label}
+            description={card.description}
+            tone={accent}
+            className="p-10"
+            size="large"
+          />
         );
       })}
     </div>
