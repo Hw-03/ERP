@@ -207,6 +207,9 @@ class SyncSummary:
     absent_quantity_zeroed: int
     production_quantity_before: int
     production_quantity_after: int
+    warehouse_items_changed: int
+    warehouse_quantity_before: int
+    warehouse_quantity_after: int
     department_totals_before: dict[str, int]
     department_totals_after: dict[str, int]
     unresolved_details: tuple[dict[str, Any], ...]
@@ -715,11 +718,63 @@ def run_sync(
     employee_db_path: Path,
     snapshot: DepartmentSnapshot,
     *,
+    warehouse_targets: dict[str, int] | None = None,
     apply: bool = False,
 ) -> SyncSummary:
     """Validate and optionally apply one atomic six-department partial baseline."""
+    warehouse_targets = {
+        str(code).strip().upper(): quantity
+        for code, quantity in (warehouse_targets or {}).items()
+    }
+    for code, quantity in warehouse_targets.items():
+        if not code or isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 0:
+            raise DepartmentSyncError(
+                f"invalid warehouse target: {code}={quantity!r}"
+            )
     employee_items = _load_employee_items(employee_db_path)
     dev_items = db.query(Item).all()
+    dev_items_by_code = {str(item.mes_code): item for item in dev_items}
+    missing_warehouse_items = sorted(set(warehouse_targets) - dev_items_by_code.keys())
+    if missing_warehouse_items:
+        raise DepartmentSyncError(
+            f"warehouse target items missing: {', '.join(missing_warehouse_items)}"
+        )
+    deleted_warehouse_items = sorted(
+        code
+        for code in warehouse_targets
+        if dev_items_by_code[code].deleted_at is not None
+    )
+    if deleted_warehouse_items:
+        raise DepartmentSyncError(
+            f"warehouse target items are deleted: {', '.join(deleted_warehouse_items)}"
+        )
+    warehouse_item_ids = {
+        code: _normalize_item_id(dev_items_by_code[code].item_id)
+        for code in warehouse_targets
+    }
+    warehouse_inventories = {
+        _normalize_item_id(inventory.item_id): inventory
+        for inventory in db.query(Inventory).filter(
+            Inventory.item_id.in_(
+                [UUID(item_id) for item_id in warehouse_item_ids.values()]
+            )
+        )
+    }
+    warehouse_before = {
+        code: int(
+            warehouse_inventories.get(item_id).warehouse_qty or 0
+            if warehouse_inventories.get(item_id) is not None
+            else 0
+        )
+        for code, item_id in warehouse_item_ids.items()
+    }
+    for code, item_id in warehouse_item_ids.items():
+        inventory = warehouse_inventories.get(item_id)
+        pending = int(inventory.pending_quantity or 0) if inventory is not None else 0
+        if pending > warehouse_targets[code]:
+            raise DepartmentSyncError(
+                f"pending quantity exceeds warehouse target: {code} target={warehouse_targets[code]} pending={pending}"
+            )
     resolution = _resolve_rows(snapshot.rows, employee_items, dev_items)
     additions, updates = _validate_master_changes(db, resolution.applied_items)
     locations = (
@@ -777,6 +832,12 @@ def run_sync(
         absent_quantity_zeroed=absent_zeroed_quantity,
         production_quantity_before=sum(current.values()),
         production_quantity_after=sum(projected.values()),
+        warehouse_items_changed=sum(
+            warehouse_before[code] != target
+            for code, target in warehouse_targets.items()
+        ),
+        warehouse_quantity_before=sum(warehouse_before.values()),
+        warehouse_quantity_after=sum(warehouse_targets.values()),
         department_totals_before=before_by_department,
         department_totals_after=after_by_department,
         unresolved_details=resolution.unresolved_rows,
@@ -819,6 +880,7 @@ def run_sync(
                 location.quantity = target
             affected_item_ids.add(item_id)
         affected_item_ids.update(resolution.applied_items)
+        affected_item_ids.update(warehouse_item_ids.values())
         db.flush()
 
         totals = _location_totals(db, affected_item_ids)
@@ -838,6 +900,10 @@ def run_sync(
                     pending_quantity=0,
                 )
                 db.add(inventory)
+            for code, warehouse_item_id in warehouse_item_ids.items():
+                if warehouse_item_id == item_id:
+                    inventory.warehouse_qty = warehouse_targets[code]
+                    break
             inventory.quantity = int(inventory.warehouse_qty or 0) + totals.get(item_id, 0)
         db.commit()
     except Exception:
@@ -861,6 +927,7 @@ def execute_sync(
     employee_db_path: Path,
     apply: bool,
     confirm: str | None,
+    warehouse_targets: dict[str, int] | None = None,
     backup_fn: Callable[[str], object] | None = None,
     extractor: Callable[[Path], DepartmentSnapshot] = extract_source_rows,
 ) -> SyncSummary:
@@ -887,7 +954,13 @@ def execute_sync(
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         try:
             with SessionLocal() as db:
-                preview = run_sync(db, employee_snapshot, snapshot, apply=False)
+                preview = run_sync(
+                    db,
+                    employee_snapshot,
+                    snapshot,
+                    warehouse_targets=warehouse_targets,
+                    apply=False,
+                )
             if not apply:
                 return preview
             if backup_fn is None:
@@ -896,7 +969,13 @@ def execute_sync(
                 backup_fn = backup_sqlite
             backup_fn(str(dev_db_path.resolve()))
             with SessionLocal() as db:
-                return run_sync(db, employee_snapshot, snapshot, apply=True)
+                return run_sync(
+                    db,
+                    employee_snapshot,
+                    snapshot,
+                    warehouse_targets=warehouse_targets,
+                    apply=True,
+                )
         finally:
             engine.dispose()
 
@@ -930,19 +1009,44 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--employee-db", type=Path, default=Path(r"C:\ERP-dev\backend\mes.db"))
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--confirm")
+    parser.add_argument(
+        "--warehouse-target",
+        action="append",
+        default=[],
+        metavar="MES_CODE=QTY",
+        help="set an explicit warehouse quantity in the same transaction",
+    )
     return parser.parse_args(argv)
+
+
+def _parse_warehouse_targets(values: list[str]) -> dict[str, int]:
+    """Parse explicit non-negative warehouse targets from CLI arguments."""
+    targets: dict[str, int] = {}
+    for value in values:
+        code, separator, quantity_text = value.partition("=")
+        code = code.strip().upper()
+        if not separator or not code or not quantity_text.strip().isdigit():
+            raise DepartmentSyncError(
+                f"invalid --warehouse-target: {value!r}; expected MES_CODE=QTY"
+            )
+        if code in targets:
+            raise DepartmentSyncError(f"duplicate warehouse target: {code}")
+        targets[code] = int(quantity_text.strip())
+    return targets
 
 
 def main(argv: list[str] | None = None) -> int:
     """Execute the sync, print its JSON summary, and persist the report."""
     args = _parse_args(argv)
     try:
+        warehouse_targets = _parse_warehouse_targets(args.warehouse_target)
         summary = execute_sync(
             source_dir=args.source_dir,
             dev_db_path=args.dev_db,
             employee_db_path=args.employee_db,
             apply=args.apply,
             confirm=args.confirm,
+            warehouse_targets=warehouse_targets,
         )
     except DepartmentSyncError as exc:
         print(f"[DEPARTMENT SYNC] ERROR: {exc}", file=sys.stderr)

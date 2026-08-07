@@ -253,6 +253,84 @@ def test_run_sync_applies_confirmed_groups_protects_unconfirmed_and_zeroes_absen
     assert db_session.query(TransactionLog).count() == history_before
 
 
+def test_run_sync_applies_explicit_warehouse_targets_in_same_transaction(
+    tmp_path: Path,
+    db_session,
+    make_item,
+) -> None:
+    from app.models import Inventory, InventoryLocation, LocationStatusEnum
+    from scripts.ops.sync_department_inventory import DepartmentSnapshot, run_sync
+
+    target = make_item(
+        name="복귀 불용품",
+        process_type_code="NR",
+        warehouse_qty=0,
+        model_symbol="6",
+        serial_no=3,
+    )
+    untouched = make_item(
+        name="운영 재고",
+        process_type_code="AR",
+        warehouse_qty=91,
+        model_symbol="3",
+        serial_no=24,
+    )
+    db_session.add(
+        InventoryLocation(
+            item_id=target.item_id,
+            department="튜닝",
+            status=LocationStatusEnum.PRODUCTION,
+            quantity=300,
+        )
+    )
+    db_session.commit()
+    employee_db = tmp_path / "employee.db"
+    _write_employee_db(
+        employee_db,
+        [
+            _employee_item(
+                item_id=str(target.item_id),
+                mes_code=target.mes_code,
+                item_name=target.item_name,
+            ),
+            _employee_item(
+                item_id=str(untouched.item_id),
+                mes_code=untouched.mes_code,
+                item_name=untouched.item_name,
+            ),
+        ],
+    )
+    snapshot = DepartmentSnapshot(
+        rows=(
+            _row(
+                row_number=3,
+                code=target.mes_code,
+                name=target.item_name,
+                quantity=0,
+                department="튜닝",
+            ),
+        ),
+        source_hashes={},
+    )
+
+    summary = run_sync(
+        db_session,
+        employee_db,
+        snapshot,
+        warehouse_targets={target.mes_code: 70},
+        apply=True,
+    )
+
+    target_inventory = db_session.query(Inventory).filter_by(item_id=target.item_id).one()
+    untouched_inventory = db_session.query(Inventory).filter_by(item_id=untouched.item_id).one()
+    assert summary.warehouse_items_changed == 1
+    assert summary.warehouse_quantity_before == 0
+    assert summary.warehouse_quantity_after == 70
+    assert target_inventory.warehouse_qty == 70
+    assert target_inventory.quantity == 70
+    assert untouched_inventory.warehouse_qty == 91
+
+
 def test_run_sync_protects_entire_duplicate_group_when_one_row_is_unconfirmed(
     tmp_path: Path,
     db_session,
