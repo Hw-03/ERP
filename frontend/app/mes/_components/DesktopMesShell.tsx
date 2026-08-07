@@ -454,7 +454,14 @@ function DesktopMesShellInner({
         />
       )}
       <div className="flex h-screen overflow-hidden">
-        <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
+        <div
+          data-testid="desktop-shell-frame"
+          className="flex h-full w-full gap-3 px-3 py-3"
+          style={{
+            background: LEGACY_COLORS.bg,
+            color: LEGACY_COLORS.text,
+          }}
+        >
           <DesktopSidebar
             activeTab={activeTab}
             onTabChange={handleTabChange}

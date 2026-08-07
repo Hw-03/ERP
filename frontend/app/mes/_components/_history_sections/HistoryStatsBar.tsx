@@ -34,7 +34,7 @@ export function HistoryStatsBar({
 }: HistoryStatsBarProps) {
   const countsMatch = currentCount != null && baseline?.total != null && currentCount === baseline.total;
   return (
-    <section className="card" style={{ paddingTop: 16, paddingBottom: 16 }}>
+    <section className="card desktop-flat-surface" style={{ paddingTop: 16, paddingBottom: 16 }}>
       {/* 정직 카운트 */}
       <div className="mb-3 flex flex-wrap items-baseline gap-2">
         {countsMatch ? (

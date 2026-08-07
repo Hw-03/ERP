@@ -1707,7 +1707,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
-          boxShadow: "0 18px 50px rgba(148, 163, 184, 0.18)",
+          boxShadow: "none",
         }}
       >
         {error && <Notice tone={LEGACY_COLORS.red} title="오류" body={error} />}

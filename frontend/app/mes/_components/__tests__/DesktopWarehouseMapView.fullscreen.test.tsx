@@ -68,6 +68,18 @@ describe("DesktopWarehouseMapView fullscreen", () => {
     expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toBeInTheDocument();
   });
 
+  it("uses a rounded flat surface in regular mode", async () => {
+    mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
+
+    renderWithClient(<DesktopWarehouseMapView />);
+
+    await screen.findByTestId("warehouse-map-card");
+    const cardStyle = screen.getByTestId("warehouse-map-card").getAttribute("style") ?? "";
+    expect(cardStyle).toContain("border-radius: 24px");
+    expect(cardStyle).toContain("box-shadow: none");
+    expect(cardStyle).toContain("background-image: none");
+  });
+
   it("places the fullscreen control inside the regular map header", async () => {
     const onFullscreenChange = vi.fn();
     mapApiMock.getMap.mockResolvedValueOnce(mapFixture);

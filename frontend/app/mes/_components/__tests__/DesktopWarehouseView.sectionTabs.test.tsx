@@ -112,6 +112,17 @@ describe("DesktopWarehouseView", () => {
     );
   });
 
+  it("keeps warehouse section tabs free of inset elevation", () => {
+    render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    screen.getAllByRole("tab").forEach((tab) => expect(tab).toHaveClass("no-btn-inset"));
+  });
+
   it("uses only the shared shell spacing above the section tabs", () => {
     const { container } = render(
       <DesktopWarehouseView

@@ -155,11 +155,12 @@ export function DesktopInventoryView({
       {/* ── 좌측: 스크롤 컨테이너 ── */}
       <div
         ref={scrollRef}
-        className="sg min-h-0 min-w-0 flex-1 overflow-y-auto"
+        className="sg desktop-flat-surface min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px]"
+        style={{ background: "var(--c-s1)" }}
       >
         <div className="flex flex-col gap-3 pb-6">
           {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}
-          <section className="card" style={{ padding: "14px 16px" }}>
+          <section className="card desktop-flat-surface" style={{ padding: "14px 16px" }}>
             <InventoryKpiPanel
               cards={kpiCards}
               activeKey={kpi}
@@ -200,10 +201,7 @@ export function DesktopInventoryView({
           </section>
 
           {/* ── 재고 테이블 ── */}
-          <section
-            className="card"
-            style={{ backgroundImage: "linear-gradient(color-mix(in srgb, var(--c-blue) 8%, transparent), color-mix(in srgb, var(--c-blue) 8%, transparent))" }}
-          >
+          <section className="card desktop-flat-surface">
             <InventoryTableStickyHeader
               searchValue={localSearch}
               onSearchChange={setLocalSearch}

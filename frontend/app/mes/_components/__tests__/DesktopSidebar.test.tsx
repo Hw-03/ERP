@@ -13,6 +13,19 @@ describe("DesktopSidebar", () => {
     vi.restoreAllMocks();
   });
 
+  it("uses a flat sidebar surface without a card shadow", () => {
+    const { container } = render(
+      <DesktopSidebar
+        activeTab="dashboard"
+        onTabChange={vi.fn()}
+        visibleTabs={["dashboard"]}
+      />,
+    );
+
+    expect(container.querySelector("aside")).toHaveStyle({ boxShadow: "none" });
+    expect(container.querySelector("button[aria-current='page']")).toHaveAttribute("data-sidebar-tab");
+  });
+
   it("keeps weekly report followed by daily work report as the final work menu order", () => {
     render(
       <DesktopSidebar

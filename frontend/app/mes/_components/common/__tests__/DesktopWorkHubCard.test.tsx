@@ -20,6 +20,7 @@ describe("DesktopWorkHubCard", () => {
     );
 
     const card = screen.getByTestId("hub-card");
+    expect(card).toHaveClass("no-btn-inset");
     expect(card).toHaveTextContent("창고 입출고");
     expect(card).toHaveTextContent("창고와 부서 간 재고를 이동합니다.");
     expect(card).toHaveTextContent("7");

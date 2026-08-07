@@ -42,4 +42,17 @@ describe("HistoryStatsBar", () => {
     expect(screen.getByText("전체 437건")).toBeInTheDocument();
     expect(screen.queryByText("표시 전용")).not.toBeInTheDocument();
   });
+
+  it("uses a flat surface without a card elevation", () => {
+    const { container } = render(
+      <HistoryStatsBar
+        baseline={null}
+        currentCount={null}
+        loading={false}
+        periodLabel="이번 달"
+      />,
+    );
+
+    expect(container.querySelector("section")).toHaveClass("desktop-flat-surface");
+  });
 });

@@ -98,7 +98,7 @@ function TabButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="relative min-h-[60px] min-w-0 rounded-[12px] border px-1.5 py-3 transition-colors hover:brightness-110 lg:min-h-[44px] lg:px-4 lg:py-2.5"
+      className="no-btn-inset relative min-h-[60px] min-w-0 rounded-[12px] border px-1.5 py-3 transition-colors hover:brightness-110 lg:min-h-[44px] lg:px-4 lg:py-2.5"
       style={{ background: bg, borderColor: border }}
     >
       <div className="text-center text-sm leading-tight tracking-[-0.02em] break-keep lg:text-[22px]">

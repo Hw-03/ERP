@@ -103,4 +103,15 @@ describe("다크 테마 색상 계약", () => {
   it("공용 primary 버튼은 채움 전용 파랑 토큰을 사용한다", () => {
     expect(globalStyles()).toMatch(/\.btn-primary\s*\{[\s\S]*?background:\s*var\(--c-blue-solid\);/);
   });
+
+  it("데스크톱 고정 업무 표면과 버튼에는 inset 음영을 사용하지 않는다", () => {
+    const styles = globalStyles();
+
+    expect(styles).toMatch(/\.desktop-flat-surface\s*\{[\s\S]*?box-shadow:\s*none;[\s\S]*?background-image:\s*none;/);
+    expect(styles).toMatch(/@media \(min-width: 1024px\)\s*\{[\s\S]*?button[\s\S]*?box-shadow:\s*none;/);
+  });
+
+  it("사이드바 탭 버튼은 데스크톱 평면화 규칙에서 제외한다", () => {
+    expect(globalStyles()).toMatch(/button:not\(\[data-sidebar-tab\]\)/);
+  });
 });

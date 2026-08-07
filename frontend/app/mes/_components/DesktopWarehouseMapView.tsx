@@ -710,8 +710,8 @@ export function DesktopWarehouseMapView({
           borderRadius: fullscreen ? 0 : 24,
           background: fullscreen ? "transparent" : LEGACY_COLORS.s1,
           border: fullscreen ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-          boxShadow: fullscreen ? "none" : "var(--c-card-shadow)",
-          backgroundImage: fullscreen ? "none" : "var(--c-panel-glow)",
+          boxShadow: "none",
+          backgroundImage: "none",
           overflow: "hidden",
         }}
       >

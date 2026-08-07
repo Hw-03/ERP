@@ -97,7 +97,7 @@ export function DesktopSidebar({
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
-          boxShadow: "var(--c-card-shadow)",
+          boxShadow: "none",
         }}
       >
         {/* 濡쒓퀬 */}
@@ -200,6 +200,7 @@ function SettingsButton({
   return (
     <button
       type="button"
+      data-sidebar-tab
       aria-label="설정"
       title="설정"
       onClick={onClick}
@@ -275,6 +276,7 @@ function TabButton({
   const iconSizeClass = tab.id === "shipping" ? "h-[22px] w-[22px]" : "h-5 w-5";
   return (
     <button
+      data-sidebar-tab
       onClick={() => {
         onKeepExpanded();
         onTabChange(tab.id);

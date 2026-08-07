@@ -343,6 +343,13 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
+  it("uses a flat root surface without a desktop card shadow", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector("[data-testid='shipping-root-panel']")).toBeInTheDocument());
+    expect(container.querySelector("[data-testid='shipping-root-panel']")).toHaveStyle({ boxShadow: "none" });
+  });
+
   async function openHubCard(container: HTMLElement, id: "request" | "history") {
     let button: Element | null = null;
     await waitFor(() => {

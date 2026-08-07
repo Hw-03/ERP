@@ -43,7 +43,7 @@ vi.mock("../login/useCurrentOperator", () => ({
   setCurrentOperator: vi.fn(),
 }));
 
-const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "history", "dailyReport", "weekly", "warehouseMap", "settings"];
+const sidebarTabs: DesktopTabId[] = ["dashboard", "warehouse", "shipping", "defect", "history", "dailyReport", "weekly", "warehouseMap", "settings"];
 
 vi.mock("../DesktopSidebar", () => ({
   DESKTOP_TAB_ICON_COLORS: {
@@ -253,4 +253,23 @@ describe("DesktopMesShell tab transition", () => {
       expect(container.querySelector(".desktop-tab-content")).toHaveClass("mt-3");
     },
   );
+
+  it.each(["dashboard", "history", "warehouse", "shipping", "defect", "warehouseMap"] as const)(
+    "keeps the %s shell gutter on the page background",
+    (tab) => {
+      render(<DesktopMesShell />);
+
+      fireEvent.click(screen.getByRole("button", { name: tab }));
+
+      expect(screen.getByTestId("desktop-shell-frame")).toHaveStyle({ background: "var(--c-bg)" });
+    },
+  );
+
+  it("keeps the weekly report shell gutter unchanged", () => {
+    render(<DesktopMesShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "weekly" }));
+
+    expect(screen.getByTestId("desktop-shell-frame")).toHaveStyle({ background: "var(--c-bg)" });
+  });
 });

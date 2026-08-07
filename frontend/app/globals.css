@@ -251,6 +251,11 @@
     box-shadow: none;
   }
 
+  .desktop-flat-surface {
+    box-shadow: none;
+    background-image: none;
+  }
+
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
@@ -327,6 +332,26 @@
   :root[data-theme="dark"] button.no-btn-inset[aria-current]:not([aria-current="false"]),
   :root[data-theme="dark"] button.no-btn-inset[aria-pressed="true"] {
     box-shadow: none;
+  }
+
+  /* 데스크톱 업무 화면은 부상한 버튼 음영 대신 테두리와 색상으로만 상태를 표시한다. */
+  @media (min-width: 1024px) {
+    button:not([data-sidebar-tab]),
+    button[aria-current]:not([aria-current="false"]):not([data-sidebar-tab]),
+    button[aria-pressed="true"]:not([data-sidebar-tab]),
+    button[aria-selected="true"]:not([data-sidebar-tab]),
+    :root[data-theme="dark"] button:not([data-sidebar-tab]),
+    :root[data-theme="dark"] button[aria-current]:not([aria-current="false"]):not([data-sidebar-tab]),
+    :root[data-theme="dark"] button[aria-pressed="true"]:not([data-sidebar-tab]),
+    :root[data-theme="dark"] button[aria-selected="true"]:not([data-sidebar-tab]),
+    [data-selection-depth="soft"] button[aria-current]:not([aria-current="false"]):not([data-sidebar-tab]),
+    [data-selection-depth="soft"] button[aria-pressed="true"]:not([data-sidebar-tab]),
+    [data-selection-depth="soft"] button[aria-selected="true"]:not([data-sidebar-tab]),
+    :root[data-theme="dark"] [data-selection-depth="soft"] button[aria-current]:not([aria-current="false"]):not([data-sidebar-tab]),
+    :root[data-theme="dark"] [data-selection-depth="soft"] button[aria-pressed="true"]:not([data-sidebar-tab]),
+    :root[data-theme="dark"] [data-selection-depth="soft"] button[aria-selected="true"]:not([data-sidebar-tab]) {
+      box-shadow: none;
+    }
   }
 }
 
