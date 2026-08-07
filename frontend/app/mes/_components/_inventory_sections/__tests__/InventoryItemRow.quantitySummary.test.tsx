@@ -78,6 +78,47 @@ describe("InventoryItemRow quantity summary", () => {
     expect(within(summary).queryByText(/불량/)).toBeNull();
   });
 
+  it("hides zero-quantity warehouse stock while keeping positive stock chips", () => {
+    render(
+      <table>
+        <tbody>
+          <InventoryItemRow
+            item={makeItem({ warehouse_qty: 0 })}
+            selected={false}
+            onSelect={() => {}}
+          />
+        </tbody>
+      </table>,
+    );
+
+    const summary = screen.getByTestId("inventory-dept-stock-summary");
+    expect(within(summary).queryByText("창고 0")).toBeNull();
+    expect(within(summary).getByText("조립 8")).toBeInTheDocument();
+    expect(within(summary).getByText("불량 2")).toBeInTheDocument();
+  });
+
+  it("shows a dash when no positive stock chips remain", () => {
+    render(
+      <table>
+        <tbody>
+          <InventoryItemRow
+            item={makeItem({
+              quantity: 0,
+              warehouse_qty: 0,
+              locations: [],
+            })}
+            selected={false}
+            onSelect={() => {}}
+          />
+        </tbody>
+      </table>,
+    );
+
+    const summary = screen.getByTestId("inventory-dept-stock-summary");
+    expect(within(summary).getByText("-")).toBeInTheDocument();
+    expect(summary.querySelectorAll("span")).toHaveLength(0);
+  });
+
   it("renames inventory table headers to department stock and total stock", () => {
     render(
       <InventoryItemsTable

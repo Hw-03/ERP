@@ -76,9 +76,10 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   for (const loc of prodLocs) {
     prodQtyByDept.set(loc.department, (prodQtyByDept.get(loc.department) ?? 0) + Number(loc.quantity));
   }
-  const stockChips: { key: string; label: string; quantity: number; color: string }[] = [
-    { key: "warehouse", label: "창고", quantity: wh, color: "#3dd4a0" },
-  ];
+  const stockChips: { key: string; label: string; quantity: number; color: string }[] = [];
+  if (wh > 0) {
+    stockChips.push({ key: "warehouse", label: "창고", quantity: wh, color: "#3dd4a0" });
+  }
   for (const [dept, quantity] of Array.from(prodQtyByDept)) {
     stockChips.push({ key: `dept-${dept}`, label: dept, quantity, color: getDeptColor(dept) });
   }
@@ -172,19 +173,21 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
       </td>
       <td className="hidden sm:table-cell border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div data-testid="inventory-dept-stock-summary" className="flex min-w-[190px] flex-wrap items-center justify-center gap-1.5">
-          {stockChips.map((chip) => (
-            <span
-              key={chip.key}
-              className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold"
-              style={{
-                color: chip.color,
-                background: `color-mix(in srgb, ${chip.color} 14%, transparent)`,
-                borderColor: `color-mix(in srgb, ${chip.color} 35%, transparent)`,
-              }}
-            >
-              {chip.label} {formatQty(chip.quantity)}
-            </span>
-          ))}
+          {stockChips.length === 0
+            ? "-"
+            : stockChips.map((chip) => (
+              <span
+                key={chip.key}
+                className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold"
+                style={{
+                  color: chip.color,
+                  background: `color-mix(in srgb, ${chip.color} 14%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${chip.color} 35%, transparent)`,
+                }}
+              >
+                {chip.label} {formatQty(chip.quantity)}
+              </span>
+            ))}
         </div>
       </td>
         </>
