@@ -512,6 +512,89 @@ def test_match_bom_previews_unreserved_codes_for_new_pa_and_pf(db_session, make_
     assert match["preview_pf_mes_code"] == "4-PF-0010"
 
 
+def test_match_bom_lists_all_exact_pf_candidates_without_auto_selection(db_session, make_item, make_bom):
+    base_component = make_item(name="Base component", process_type_code="AF", model_symbol="4", serial_no=1)
+    requested_component = make_item(name="Requested component", process_type_code="AF", model_symbol="4", serial_no=2)
+    base_pa = make_item(name="Vector PA", process_type_code="PA", model_symbol="4", serial_no=3)
+    base_pf = make_item(name="Vector PF", process_type_code="PF", model_symbol="4", serial_no=4)
+    candidate_a_pa = make_item(name="Global PA", process_type_code="PA", model_symbol="4", serial_no=5)
+    candidate_a_pf = make_item(name="Global PF", process_type_code="PF", model_symbol="4", serial_no=6)
+    candidate_b_pa = make_item(name="Dealer PA", process_type_code="PA", model_symbol="4", serial_no=7)
+    candidate_b_pf = make_item(name="Dealer PF", process_type_code="PF", model_symbol="4", serial_no=8)
+
+    make_bom(base_pa.item_id, base_component.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    for pa, pf in ((candidate_a_pa, candidate_a_pf), (candidate_b_pa, candidate_b_pf)):
+        make_bom(pa.item_id, requested_component.item_id, Decimal("1"))
+        make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    match = shipping_svc.match_bom(
+        db_session,
+        bom_lines=[
+            _bom_line(base_pa, stage="PF", origin="DEFAULT"),
+            _bom_line(requested_component, stage="PA"),
+        ],
+        base_pf_item_id=base_pf.item_id,
+    )
+
+    assert match["base_pf_matches"] is False
+    assert [candidate["pf_item_id"] for candidate in match["pf_candidates"]] == [
+        candidate_a_pf.item_id,
+        candidate_b_pf.item_id,
+    ]
+    assert match["pf_candidates"][0]["pa_item_id"] == candidate_a_pa.item_id
+    assert match["pf_candidates"][1]["pa_item_id"] == candidate_b_pa.item_id
+
+
+def test_request_finalization_uses_only_the_explicitly_selected_pf_candidate(db_session, make_item, make_bom):
+    base_component = make_item(name="Base component", process_type_code="AF", model_symbol="4", serial_no=1)
+    requested_component = make_item(name="Requested component", process_type_code="AF", model_symbol="4", serial_no=2)
+    base_pa = make_item(name="Vector PA", process_type_code="PA", model_symbol="4", serial_no=3)
+    base_pf = make_item(name="Vector PF", process_type_code="PF", model_symbol="4", serial_no=4)
+    candidate_a_pa = make_item(name="Global PA", process_type_code="PA", model_symbol="4", serial_no=5)
+    candidate_a_pf = make_item(name="Global PF", process_type_code="PF", model_symbol="4", serial_no=6)
+    candidate_b_pa = make_item(name="Dealer PA", process_type_code="PA", model_symbol="4", serial_no=7)
+    candidate_b_pf = make_item(name="Dealer PF", process_type_code="PF", model_symbol="4", serial_no=8)
+
+    make_bom(base_pa.item_id, base_component.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    for pa, pf in ((candidate_a_pa, candidate_a_pf), (candidate_b_pa, candidate_b_pf)):
+        make_bom(pa.item_id, requested_component.item_id, Decimal("1"))
+        make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    bom_lines = [
+        _bom_line(base_pa, stage="PF", origin="DEFAULT"),
+        _bom_line(requested_component, stage="PA"),
+    ]
+    reused = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": base_pf.item_id,
+            "finalization_mode": "REUSE_CANDIDATE",
+            "reuse_pf_item_id": candidate_b_pf.item_id,
+            "bom_lines": bom_lines,
+        },
+    )
+    created = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": base_pf.item_id,
+            "finalization_mode": "CREATE_NEW",
+            "custom_pa_name": "Vector updated PA",
+            "custom_pf_name": "Vector updated PF",
+            "bom_lines": bom_lines,
+        },
+    )
+
+    assert reused.finalization_mode.value == "REUSE_CANDIDATE"
+    assert reused.final_pf_item_id == candidate_b_pf.item_id
+    assert reused.final_pa_item_id == candidate_b_pa.item_id
+    assert created.finalization_mode.value == "CREATE_NEW"
+    assert created.final_pf_item_id not in {candidate_a_pf.item_id, candidate_b_pf.item_id}
+
+
 
 def test_component_change_then_prepare_and_pickup_reserves_companions(
     db_session, make_item, make_bom, make_location
@@ -951,7 +1034,7 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
     assert _location_qty(db_session, cable, DepartmentEnum.SHIPPING) == 0
 
 
-def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_differs(
+def test_changed_bom_creates_a_new_pa_and_pf_when_no_existing_pf_candidate_is_selected(
     db_session, make_item, make_bom, make_location
 ):
     af = make_item(name="AF body", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
@@ -973,6 +1056,8 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
 
     assert match["matched_pa_item_id"] == pa.item_id
     assert match["matched_pf_item_id"] is None
+    assert match["base_pf_matches"] is False
+    assert match["pf_candidates"] == []
     assert match["requires_pa_name"] is False
     assert match["requires_pf_name"] is True
 
@@ -982,12 +1067,16 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
             "base_pf_item_id": pf.item_id,
             "requested_by_name": "shipping-user",
             "invoice_number": "SERVICE-INV-006",
+            "finalization_mode": "CREATE_NEW",
+            "custom_pa_name": "Bracket PA",
             "custom_pf_name": "Bracket PF",
             "bom_lines": bom_lines,
         },
     )
-    assert req.final_pa_item_id == pa.item_id
+    assert req.final_pa_item_id != pa.item_id
+    assert req.final_pa_item.item_name == "Bracket PA"
     assert req.final_pf_item.item_name == "Bracket PF"
+    make_location(req.final_pa_item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
 
     shipping_svc.send_to_prep(db_session, req.request_id)
     _submit_final_pf_production(
@@ -997,6 +1086,6 @@ def test_pa_match_reuses_existing_pa_and_requires_only_new_pf_name_when_pf_diffe
     )
     prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
-    assert prepared.final_pa_item_id == pa.item_id
+    assert prepared.final_pa_item_id == req.final_pa_item_id
     assert prepared.final_pf_item.item_name == "Bracket PF"
     assert db_session.query(BOM).filter(BOM.parent_item_id == prepared.final_pf_item_id).count() == 2

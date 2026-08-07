@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import ShippingRequestStatusEnum, TransactionTypeEnum
+from app.models import ShippingFinalizationModeEnum, ShippingRequestStatusEnum, TransactionTypeEnum
 from app.schemas.common import UtcDatetime
 
 
@@ -28,6 +28,8 @@ class ShippingCompanionLineInput(BaseModel):
 
 class ShippingRequestCreate(BaseModel):
     base_pf_item_id: uuid.UUID
+    finalization_mode: Optional[ShippingFinalizationModeEnum] = None
+    reuse_pf_item_id: Optional[uuid.UUID] = None
     request_quantity: int = Field(1, gt=0)
     requested_by_name: Optional[str] = Field(None, max_length=100)
     custom_pa_name: Optional[str] = Field(None, max_length=200)
@@ -39,6 +41,8 @@ class ShippingRequestCreate(BaseModel):
 
 
 class ShippingRequestUpdate(BaseModel):
+    finalization_mode: Optional[ShippingFinalizationModeEnum] = None
+    reuse_pf_item_id: Optional[uuid.UUID] = None
     request_quantity: Optional[int] = Field(None, gt=0)
     requested_by_name: Optional[str] = Field(None, max_length=100)
     custom_pa_name: Optional[str] = Field(None, max_length=200)
@@ -137,7 +141,18 @@ class ShippingBomMatchRequest(BaseModel):
     bom_lines: list[ShippingBomLineInput]
 
 
+class ShippingBomMatchCandidate(BaseModel):
+    pf_item_id: uuid.UUID
+    pf_item_name: str
+    pf_mes_code: Optional[str] = None
+    pa_item_id: uuid.UUID
+    pa_item_name: str
+    pa_mes_code: Optional[str] = None
+
+
 class ShippingBomMatchResponse(BaseModel):
+    base_pf_matches: bool = False
+    pf_candidates: list[ShippingBomMatchCandidate] = []
     matched_pa_item_id: Optional[uuid.UUID] = None
     matched_pf_item_id: Optional[uuid.UUID] = None
     matched_pa_item_name: Optional[str] = None
@@ -278,6 +293,8 @@ class ShippingRequestResponse(BaseModel):
     final_pa_item_name: Optional[str] = None
     final_pf_item_id: Optional[uuid.UUID] = None
     final_pf_item_name: Optional[str] = None
+    finalization_mode: ShippingFinalizationModeEnum
+    reuse_pf_item_id: Optional[uuid.UUID] = None
     requested_by_name: Optional[str] = None
     custom_pa_name: Optional[str] = None
     custom_pf_name: Optional[str] = None

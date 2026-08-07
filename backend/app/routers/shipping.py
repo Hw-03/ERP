@@ -178,6 +178,8 @@ def _to_response(
         final_pa_item_name=req.final_pa_item.item_name if req.final_pa_item else None,
         final_pf_item_id=req.final_pf_item_id,
         final_pf_item_name=req.final_pf_item.item_name if req.final_pf_item else None,
+        finalization_mode=req.finalization_mode,
+        reuse_pf_item_id=req.reuse_pf_item_id,
         requested_by_name=req.requested_by_name,
         custom_pa_name=req.custom_pa_name,
         custom_pf_name=req.custom_pf_name,
@@ -421,6 +423,8 @@ def create_request(
         shipping_actions_svc.create_request,
         {
             "base_pf_item_id": payload.base_pf_item_id,
+            "finalization_mode": payload.finalization_mode,
+            "reuse_pf_item_id": payload.reuse_pf_item_id,
             "requested_by_name": payload.requested_by_name,
             "request_quantity": payload.request_quantity,
             "custom_pa_name": payload.custom_pa_name,

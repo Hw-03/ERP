@@ -4,6 +4,7 @@ export type ShippingRequestStatus = "REQUESTED" | "PREPARING" | "PREPARED" | "PI
 export type ShippingHistoryStatus = "PICKED_UP" | "CANCELLED";
 export type ShippingBomParentStage = "PA" | "PF";
 export type ShippingBomLineOrigin = "DEFAULT" | "CUSTOM";
+export type ShippingFinalizationMode = "KEEP_BASE" | "REUSE_CANDIDATE" | "CREATE_NEW";
 
 export interface ShippingBomLineInput {
   parent_stage: ShippingBomParentStage;
@@ -22,6 +23,8 @@ export interface ShippingCompanionLineInput {
 
 export interface ShippingRequestCreatePayload {
   base_pf_item_id: string;
+  finalization_mode?: ShippingFinalizationMode;
+  reuse_pf_item_id?: string | null;
   invoice_number?: string | null;
   request_quantity?: number;
   requested_by_name?: string | null;
@@ -33,6 +36,8 @@ export interface ShippingRequestCreatePayload {
 }
 
 export interface ShippingRequestUpdatePayload {
+  finalization_mode?: ShippingFinalizationMode;
+  reuse_pf_item_id?: string | null;
   invoice_number?: string | null;
   request_quantity?: number;
   requested_by_name?: string | null;
@@ -222,6 +227,8 @@ export interface ShippingRequest {
   final_pa_item_name: string | null;
   final_pf_item_id: string | null;
   final_pf_item_name: string | null;
+  finalization_mode?: ShippingFinalizationMode;
+  reuse_pf_item_id?: string | null;
   requested_by_name: string | null;
   custom_pa_name: string | null;
   custom_pf_name: string | null;
@@ -269,7 +276,18 @@ export interface ShippingHistoryParams {
   limit?: number;
 }
 
+export interface ShippingBomMatchCandidate {
+  pf_item_id: string;
+  pf_item_name: string;
+  pf_mes_code: string | null;
+  pa_item_id: string;
+  pa_item_name: string;
+  pa_mes_code: string | null;
+}
+
 export interface ShippingBomMatchResponse {
+  base_pf_matches?: boolean;
+  pf_candidates?: ShippingBomMatchCandidate[];
   matched_pa_item_id: string | null;
   matched_pf_item_id: string | null;
   matched_pa_item_name: string | null;

@@ -2421,6 +2421,66 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
   });
 
+  it("lists every matching PF candidate and reuses only the one the user selects", async () => {
+    vi.mocked(api.matchShippingBom).mockResolvedValue({
+      base_pf_matches: false,
+      pf_candidates: [
+        {
+          pf_item_id: "pf-global",
+          pf_item_name: "Global PF",
+          pf_mes_code: "4-PF-0010",
+          pa_item_id: "pa-global",
+          pa_item_name: "Global PA",
+          pa_mes_code: "4-PA-0010",
+        },
+        {
+          pf_item_id: "pf-dealer",
+          pf_item_name: "Dealer PF",
+          pf_mes_code: "4-PF-0011",
+          pa_item_id: "pa-dealer",
+          pa_item_name: "Dealer PA",
+          pa_mes_code: "4-PA-0011",
+        },
+      ],
+      matched_pa_item_id: null,
+      matched_pf_item_id: null,
+      matched_pa_item_name: null,
+      matched_pf_item_name: null,
+      requires_pa_name: true,
+      requires_pf_name: true,
+      preview_pa_mes_code: "4-PA-0012",
+      preview_pf_mes_code: "4-PF-0012",
+    });
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-2");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-3");
+
+    expect(await screen.findByTestId("shipping-bom-candidate-pf-global")).toHaveTextContent("Global PA");
+    expect(screen.getByTestId("shipping-bom-candidate-pf-dealer")).toHaveTextContent("Dealer PA");
+    expect(screen.getByTestId("shipping-final-pf-summary")).not.toHaveTextContent("Global PF");
+
+    fireEvent.click(screen.getByTestId("shipping-bom-candidate-pf-dealer"));
+    expect(screen.getByTestId("shipping-final-pf-summary")).toHaveTextContent("Dealer PF");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-4");
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-5");
+    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledWith(expect.objectContaining({
+      finalization_mode: "REUSE_CANDIDATE",
+      reuse_pf_item_id: "pf-dealer",
+    })));
+  });
+
   it("shows a new PA first inside the final PF list when both new item names are entered", async () => {
     vi.mocked(api.matchShippingBom).mockResolvedValue({
       matched_pa_item_id: null,

@@ -26,6 +26,7 @@ import {
   type ShippingBomLineInput,
   type ShippingBomMatchResponse,
   type ShippingCompanionLineInput,
+  type ShippingFinalizationMode,
   type ShippingHistoryMonth,
   type ShippingHistoryParams,
   type ShippingHistoryStatus,
@@ -351,6 +352,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [notes, setNotes] = useState("");
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
   const [matchResult, setMatchResult] = useState<ShippingBomMatchResponse | null>(null);
+  const [finalizationMode, setFinalizationMode] = useState<ShippingFinalizationMode>("KEEP_BASE");
+  const [reusePfItemId, setReusePfItemId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [companionDraft, setCompanionDraft] = useState<CompanionDraftLine[]>([]);
   const [nameValidationNotice, setNameValidationNotice] = useState<NameValidationNotice | null>(null);
@@ -1037,6 +1040,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setNotes("");
     setDraftLines([]);
     setMatchResult(null);
+    setFinalizationMode("KEEP_BASE");
+    setReusePfItemId(null);
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
@@ -1061,6 +1066,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setNotes("");
     setDraftLines([]);
     setMatchResult(null);
+    setFinalizationMode("KEEP_BASE");
+    setReusePfItemId(null);
     void ensurePfItemsLoaded();
   }
 
@@ -1081,6 +1088,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setCompanionDraft(requestCompanionDraft(req));
     setDraftLines(requestBomLines(req));
     setMatchResult(null);
+    setFinalizationMode(req.finalization_mode ?? "KEEP_BASE");
+    setReusePfItemId(req.reuse_pf_item_id ?? null);
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
     if (syncUrl) navigateView(nextView, req.request_id, undefined, nextView === "requestWork" ? 2 : undefined);
     else setView(nextView);
@@ -1125,6 +1134,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       }
       setDraftLines(lines);
       setMatchResult(null);
+      setFinalizationMode("KEEP_BASE");
+      setReusePfItemId(null);
       onStatusChange("기본 BOM을 출하 요청에 불러왔습니다.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "기본 BOM을 불러오지 못했습니다.";
@@ -1151,6 +1162,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       custom_pa_name: customPaName.trim() || null,
       custom_pf_name: customPfName.trim() || null,
       notes: notes.trim() || null,
+      finalization_mode: finalizationMode,
+      reuse_pf_item_id: reusePfItemId,
       companion_lines: companionPayload(companionDraft, itemById),
       bom_lines: sortShippingDraftLines(draftLines, itemById)
         .filter((line) => line.child_item_id && Number(line.quantity) > 0)
@@ -1235,8 +1248,25 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         bom_lines: draftPayload().bom_lines,
       });
       setMatchResult(result);
-      const missingPaName = result.requires_pa_name && !customPaName.trim();
-      const missingPfName = result.requires_pf_name && !customPfName.trim();
+      const usesCandidateSelection = result.base_pf_matches !== undefined;
+      const resolvedMode = result.base_pf_matches ? "KEEP_BASE" : finalizationMode;
+      if (result.base_pf_matches !== undefined) {
+        setFinalizationMode((current) => result.base_pf_matches ? "KEEP_BASE" : current === "KEEP_BASE" ? "CREATE_NEW" : current);
+        if (result.base_pf_matches) setReusePfItemId(null);
+      }
+      const selectedCandidate = result.pf_candidates?.find((candidate) => candidate.pf_item_id === reusePfItemId);
+      if (usesCandidateSelection && !result.base_pf_matches && resolvedMode === "REUSE_CANDIDATE" && !selectedCandidate) {
+        const msg = "재사용할 기존 PF 후보를 다시 선택하세요.";
+        setError(msg);
+        onStatusChange(msg);
+        return false;
+      }
+      const missingPaName = usesCandidateSelection
+        ? !result.base_pf_matches && resolvedMode === "CREATE_NEW" && !customPaName.trim()
+        : result.requires_pa_name && !customPaName.trim();
+      const missingPfName = usesCandidateSelection
+        ? !result.base_pf_matches && resolvedMode === "CREATE_NEW" && !customPfName.trim()
+        : result.requires_pf_name && !customPfName.trim();
       if (missingPaName || missingPfName) {
         const required = [missingPaName ? "PA" : null, missingPfName ? "PF" : null].filter(Boolean).join("/");
         const msg = `동일 BOM 후보를 기준으로 새 ${required} 이름을 입력해야 준비 중으로 보낼 수 있습니다.`;
@@ -1318,7 +1348,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         bom_lines: draftPayload().bom_lines,
       });
       setMatchResult(result);
-      onStatusChange(result.matched_pf_item_id ? "동일 BOM 후보를 찾았습니다." : "동일한 PA/PF BOM 후보가 없습니다.");
+      if (result.base_pf_matches) {
+        setFinalizationMode("KEEP_BASE");
+        setReusePfItemId(null);
+      }
+      onStatusChange(result.base_pf_matches ? "기준 PF의 BOM과 같습니다." : (result.pf_candidates?.length ?? 0) > 0 ? "동일 BOM 후보를 찾았습니다." : "동일한 PA/PF BOM 후보가 없습니다.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "동일 BOM 확인에 실패했습니다.";
       setError(msg);
@@ -1405,6 +1439,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   function updateDraftLine(key: string, patch: Partial<DraftLine>) {
     setDraftLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
     setMatchResult(null);
+    setFinalizationMode("CREATE_NEW");
+    setReusePfItemId(null);
   }
 
   function addDraftLine(stage: "PA" | "PF", itemId: string) {
@@ -1419,11 +1455,15 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       return [...prev, { key: lineKey(), parent_stage: stage, child_item_id: itemId, quantity: 1, unit: item?.unit ?? "EA", included: true, origin: "CUSTOM" }];
     });
     setMatchResult(null);
+    setFinalizationMode("CREATE_NEW");
+    setReusePfItemId(null);
   }
 
   function removeDraftLine(key: string) {
     setDraftLines((prev) => prev.filter((line) => line.key !== key));
     setMatchResult(null);
+    setFinalizationMode("CREATE_NEW");
+    setReusePfItemId(null);
   }
 
   useEffect(() => {
@@ -1442,7 +1482,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
 
     const timer = window.setTimeout(() => {
       api.matchShippingBom({ base_pf_item_id: basePfId, bom_lines: bomLines })
-        .then((result) => setMatchResult(result))
+        .then((result) => {
+          setMatchResult(result);
+          if (result.base_pf_matches !== undefined) {
+            setFinalizationMode((current) => result.base_pf_matches ? "KEEP_BASE" : current === "KEEP_BASE" ? "CREATE_NEW" : current);
+            if (result.base_pf_matches) setReusePfItemId(null);
+          }
+        })
         .catch(() => undefined);
     }, 350);
 
@@ -1532,6 +1578,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             notes={notes}
             draftLines={draftLines}
             matchResult={matchResult}
+            finalizationMode={finalizationMode}
+            reusePfItemId={reusePfItemId}
             canEditDraft={canEditDraft}
             pending={pending}
             wizardStep={requestWizardStep}
@@ -1550,6 +1598,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             onUpdateLine={updateDraftLine}
             onAddLine={addDraftLine}
             onRemoveLine={removeDraftLine}
+            onFinalizationChoice={(mode, pfItemId = null) => {
+              setFinalizationMode(mode);
+              setReusePfItemId(mode === "REUSE_CANDIDATE" ? pfItemId : null);
+            }}
             onAddCompanion={(itemId) => {
               const item = itemById.get(itemId);
               if (!item) return;
@@ -2310,6 +2362,8 @@ function RequestSection(props: {
   notes: string;
   draftLines: DraftLine[];
   matchResult: ShippingBomMatchResponse | null;
+  finalizationMode: ShippingFinalizationMode;
+  reusePfItemId: string | null;
   canEditDraft: boolean;
   pending: PendingAction;
   wizardStep: RequestWizardStep;
@@ -2328,6 +2382,7 @@ function RequestSection(props: {
   onUpdateLine: (key: string, patch: Partial<DraftLine>) => void;
   onAddLine: (stage: "PA" | "PF", itemId: string) => void;
   onRemoveLine: (key: string) => void;
+  onFinalizationChoice: (mode: ShippingFinalizationMode, pfItemId?: string | null) => void;
   onAddCompanion: (itemId: string) => void;
   onUpdateCompanion: (key: string, patch: Partial<CompanionDraftLine>) => void;
   onRemoveCompanion: (key: string) => void;
@@ -2348,10 +2403,23 @@ function RequestSection(props: {
   const [focusRequestQuantity, setFocusRequestQuantity] = useState(false);
   const filteredPfItems = useMemo(() => filterItems(props.pfItems, pfQuery), [props.pfItems, pfQuery]);
   const locked = !props.canEditDraft;
-  const requiresPaName = Boolean(props.matchResult?.requires_pa_name);
-  const requiresPfName = Boolean(props.matchResult?.requires_pf_name);
-  const reusingExistingPa = Boolean(props.matchResult?.matched_pa_item_id);
-  const reusingExistingPf = Boolean(props.matchResult?.matched_pf_item_id);
+  const usesCandidateSelection = props.matchResult?.base_pf_matches !== undefined;
+  const basePfMatches = Boolean(props.matchResult?.base_pf_matches);
+  const pfCandidates = props.matchResult?.pf_candidates ?? [];
+  const selectedCandidate = pfCandidates.find((candidate) => candidate.pf_item_id === props.reusePfItemId);
+  const createsNewItems = usesCandidateSelection && !basePfMatches && props.finalizationMode === "CREATE_NEW";
+  const requiresPaName = usesCandidateSelection ? createsNewItems : Boolean(props.matchResult?.requires_pa_name);
+  const requiresPfName = usesCandidateSelection ? createsNewItems : Boolean(props.matchResult?.requires_pf_name);
+  const reusingExistingPa = usesCandidateSelection
+    ? props.finalizationMode === "REUSE_CANDIDATE" && Boolean(selectedCandidate)
+    : Boolean(props.matchResult?.matched_pa_item_id);
+  const reusingExistingPf = usesCandidateSelection
+    ? props.finalizationMode === "REUSE_CANDIDATE" && Boolean(selectedCandidate)
+    : Boolean(props.matchResult?.matched_pf_item_id);
+  const candidateChoiceMissing = usesCandidateSelection
+    && !basePfMatches
+    && props.finalizationMode === "REUSE_CANDIDATE"
+    && !selectedCandidate;
   const basePfItem = props.pfItems.find((item) => item.item_id === props.basePfId) ?? props.itemById.get(props.basePfId);
   const basePaLine = props.draftLines.find((line) => (
     line.parent_stage === "PF"
@@ -2365,7 +2433,7 @@ function RequestSection(props: {
   const missingNewBomNames = Boolean(props.matchResult && (paNameNeedsChange || pfNameNeedsChange));
   const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
   const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
-  const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || props.selectedRequest?.status === "PREPARED";
+  const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || candidateChoiceMissing || props.selectedRequest?.status === "PREPARED";
   const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "저장 및 전환"];
   const matchedPaItem = props.matchResult?.matched_pa_item_id ? props.itemById.get(props.matchResult.matched_pa_item_id) : undefined;
   const matchedPfItem = props.matchResult?.matched_pf_item_id ? props.itemById.get(props.matchResult.matched_pf_item_id) : undefined;
@@ -2376,12 +2444,12 @@ function RequestSection(props: {
     ? { code: previewCode }
     : { code: generatedCodeNotice };
   const finalPaSummary = reusingExistingPa
-    ? { label: "기존 PA 재사용", name: props.matchResult?.matched_pa_item_name ?? itemNameText(matchedPaItem), code: itemCodeText(matchedPaItem) }
+    ? { label: "기존 PA 재사용", name: selectedCandidate?.pa_item_name ?? props.matchResult?.matched_pa_item_name ?? itemNameText(matchedPaItem), code: selectedCandidate?.pa_mes_code ?? itemCodeText(matchedPaItem) }
     : requiresPaName
       ? { label: "새 PA 생성 예정", name: props.customPaName.trim() || "새 PA 이름 미입력", ...generatedCodeSummary(props.matchResult?.preview_pa_mes_code) }
       : { label: "PA 변경 없음", name: "요청 BOM 기준", code: "-" };
   const finalPfSummary = reusingExistingPf
-    ? { label: "기존 PF 재사용", name: props.matchResult?.matched_pf_item_name ?? itemNameText(matchedPfItem), code: itemCodeText(matchedPfItem) }
+    ? { label: "기존 PF 재사용", name: selectedCandidate?.pf_item_name ?? props.matchResult?.matched_pf_item_name ?? itemNameText(matchedPfItem), code: selectedCandidate?.pf_mes_code ?? itemCodeText(matchedPfItem) }
     : requiresPfName
       ? { label: "새 PF 생성 예정", name: props.customPfName.trim() || "새 PF 이름 미입력", ...generatedCodeSummary(props.matchResult?.preview_pf_mes_code) }
       : { label: "PF 변경 없음", name: "요청 BOM 기준", code: "-" };
@@ -2400,13 +2468,13 @@ function RequestSection(props: {
     if (locked && step !== props.wizardStep) return false;
     if (props.pending !== null && step !== props.wizardStep) return false;
     if (step >= 2 && (!props.basePfId || !validRequestQuantity)) return false;
-    if (step >= 4 && missingNewBomNames) return false;
+    if (step >= 4 && (missingNewBomNames || candidateChoiceMissing)) return false;
     return true;
   };
   const canGoNext = props.pending === null && !locked && (
     props.wizardStep === 1 ? Boolean(props.basePfId && validRequestQuantity) :
     props.wizardStep === 2 ? true :
-    props.wizardStep === 3 ? !missingNewBomNames :
+    props.wizardStep === 3 ? !missingNewBomNames && !candidateChoiceMissing :
     props.wizardStep < 5
   );
   const nameChangePromptActive = props.wizardStep === 3 && missingNewBomNames && props.pending === null && !locked;
@@ -2564,12 +2632,54 @@ function RequestSection(props: {
           {props.wizardStep === 3 && (
             <section data-testid="shipping-wizard-step-3" className="flex h-full min-h-0 flex-col">
               <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,7fr)_minmax(120px,3fr)_auto] gap-4 overflow-y-auto pr-1">
-                <ShippingConclusionCard
-                  metrics={[
-                    { value: finalPaSummary.label, name: finalPaSummary.name, code: finalPaSummary.code, tone: processTypeColor("PA"), testId: "shipping-final-pa-summary" },
-                    { value: finalPfSummary.label, name: finalPfSummary.name, code: finalPfSummary.code, tone: processTypeColor("PF"), testId: "shipping-final-pf-summary" },
-                  ]}
-                />
+                <div className="grid content-start gap-4">
+                  <ShippingConclusionCard
+                    metrics={[
+                      { value: finalPaSummary.label, name: finalPaSummary.name, code: finalPaSummary.code, tone: processTypeColor("PA"), testId: "shipping-final-pa-summary" },
+                      { value: finalPfSummary.label, name: finalPfSummary.name, code: finalPfSummary.code, tone: processTypeColor("PF"), testId: "shipping-final-pf-summary" },
+                    ]}
+                  />
+                  {usesCandidateSelection && !basePfMatches && (
+                    <section data-testid="shipping-bom-candidate-selection" className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                      <div className="mb-2">
+                        <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>동일 BOM 기존 품목</div>
+                        <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>같은 BOM이라도 국가·판매처가 다를 수 있습니다. 재사용할 PF가 맞는 경우에만 선택하세요.</div>
+                      </div>
+                      <div className="grid gap-2">
+                        {pfCandidates.map((candidate) => {
+                          const selected = props.finalizationMode === "REUSE_CANDIDATE" && props.reusePfItemId === candidate.pf_item_id;
+                          return (
+                            <button
+                              key={candidate.pf_item_id}
+                              type="button"
+                              data-testid={`shipping-bom-candidate-${candidate.pf_item_id}`}
+                              onClick={() => props.onFinalizationChoice("REUSE_CANDIDATE", candidate.pf_item_id)}
+                              disabled={locked || props.pending !== null}
+                              className="flex min-h-12 items-center justify-between gap-3 rounded-[10px] border px-3 py-2 text-left disabled:opacity-45"
+                              style={{ background: selected ? tint(LEGACY_COLORS.blue, 12) : LEGACY_COLORS.s1, borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-black">{candidate.pf_item_name}</span>
+                                <span className="block truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>PF {candidate.pf_mes_code ?? "-"} · 연결 PA {candidate.pa_item_name} ({candidate.pa_mes_code ?? "-"})</span>
+                              </span>
+                              {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          data-testid="shipping-bom-create-new"
+                          onClick={() => props.onFinalizationChoice("CREATE_NEW")}
+                          disabled={locked || props.pending !== null}
+                          className="min-h-12 rounded-[10px] border px-3 py-2 text-left text-sm font-black disabled:opacity-45"
+                          style={{ background: props.finalizationMode === "CREATE_NEW" ? tint(LEGACY_COLORS.green, 10) : LEGACY_COLORS.s1, borderColor: props.finalizationMode === "CREATE_NEW" ? LEGACY_COLORS.green : LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                        >
+                          새 PA·PF로 생성
+                        </button>
+                      </div>
+                    </section>
+                  )}
+                </div>
                 <div data-testid="shipping-match-quantity" className="flex min-h-[120px] flex-wrap items-center justify-between gap-3 rounded-[14px] border px-5 py-4" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
                   <span className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 수량 {requestQty}대</span>
                   <button

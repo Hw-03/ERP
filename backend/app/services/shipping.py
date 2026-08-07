@@ -22,6 +22,7 @@ from app.models import (
     ShippingRequestCompanionLine,
     ShippingRequestEvent,
     ShippingRequestRevision,
+    ShippingFinalizationModeEnum,
     ShippingRequestStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
@@ -242,6 +243,87 @@ def _find_item_by_signature(
     return None
 
 
+def _matching_pf_candidates(db: Session, normalized: list[dict]) -> list[dict]:
+    """Find every active PF whose direct PA/PF BOM matches the request draft."""
+    pa_signature = _stage_signature_from_lines(normalized, "PA")
+    candidates: list[dict] = []
+    pf_items = (
+        db.query(Item)
+        .filter(Item.process_type_code == "PF", Item.deleted_at.is_(None))
+        .all()
+    )
+    if not pf_items:
+        return candidates
+
+    pf_ids = [item.item_id for item in pf_items]
+    pf_children: dict[uuid.UUID, list[tuple[uuid.UUID, int, str]]] = {item_id: [] for item_id in pf_ids}
+    for row in db.query(BOM).filter(BOM.parent_item_id.in_(pf_ids)).all():
+        pf_children[row.parent_item_id].append((row.child_item_id, int(row.quantity or 0), row.unit or "EA"))
+
+    child_ids = {child_id for rows in pf_children.values() for child_id, _qty, _unit in rows}
+    child_items = {
+        item.item_id: item
+        for item in db.query(Item).filter(Item.item_id.in_(child_ids)).all()
+    }
+    pa_ids = {
+        child_id
+        for child_id, item in child_items.items()
+        if item.process_type_code == "PA" and item.deleted_at is None
+    }
+    pa_children: dict[uuid.UUID, list[tuple[uuid.UUID, int]]] = {item_id: [] for item_id in pa_ids}
+    if pa_ids:
+        for row in db.query(BOM).filter(BOM.parent_item_id.in_(pa_ids)).all():
+            pa_children[row.parent_item_id].append((row.child_item_id, int(row.quantity or 0)))
+
+    normalized_item_ids = {line["child_item_id"] for line in normalized if line.get("included", True)}
+    normalized_items = {
+        item.item_id: item
+        for item in db.query(Item).filter(Item.item_id.in_(normalized_item_ids)).all()
+    }
+
+    def expected_pf_signature(final_pa_id: uuid.UUID) -> tuple[tuple[str, int], ...]:
+        rows: list[tuple[uuid.UUID, int]] = []
+        replaced = False
+        for line in normalized:
+            if line["parent_stage"] != "PF" or not bool(line.get("included", True)):
+                continue
+            child_id = line["child_item_id"]
+            if normalized_items[child_id].process_type_code == "PA" and not replaced:
+                rows.append((final_pa_id, int(line["quantity"])))
+                replaced = True
+            else:
+                rows.append((child_id, int(line["quantity"])))
+        if not replaced:
+            rows.insert(0, (final_pa_id, 1))
+        return _signature(rows)
+
+    for pf in pf_items:
+        pf_signature = _signature((child_id, quantity) for child_id, quantity, _unit in pf_children[pf.item_id])
+        for pa_id, _quantity, _unit in pf_children[pf.item_id]:
+            pa = child_items.get(pa_id)
+            if pa is None or pa.process_type_code != "PA" or pa.deleted_at is not None:
+                continue
+            if _signature(pa_children.get(pa.item_id, [])) != pa_signature:
+                continue
+            if pf_signature != expected_pf_signature(pa.item_id):
+                continue
+            candidates.append(
+                {
+                    "pf_item_id": pf.item_id,
+                    "pf_item_name": pf.item_name,
+                    "pf_mes_code": pf.mes_code,
+                    "pa_item_id": pa.item_id,
+                    "pa_item_name": pa.item_name,
+                    "pa_mes_code": pa.mes_code,
+                }
+            )
+            break
+    return sorted(
+        candidates,
+        key=lambda row: (row["pf_mes_code"] or "", row["pf_item_name"], str(row["pf_item_id"])),
+    )
+
+
 def _default_lines_from_base_pf(db: Session, base_pf: Item) -> list[dict]:
     lines: list[dict] = []
     pf_children = _direct_children(db, base_pf.item_id)
@@ -383,6 +465,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     db.add(req)
     db.flush()
     _replace_bom_lines(db, req, _normalize_bom_lines(db, base_pf, payload.get("bom_lines")))
+    _apply_finalization_choice(db, req, payload, infer_when_missing=True)
     if payload.get("companion_lines") is not None:
         _replace_companions(db, req, payload.get("companion_lines") or [])
     db.refresh(req)
@@ -423,6 +506,10 @@ def update_request(
         _replace_bom_lines(db, req, _normalize_bom_lines(db, req.base_pf_item, payload.get("bom_lines")))
         db.refresh(req)
         _sync_checklist(db, req)
+    if "finalization_mode" in payload or "reuse_pf_item_id" in payload:
+        _apply_finalization_choice(db, req, payload, infer_when_missing=False)
+    elif "bom_lines" in payload:
+        _apply_finalization_choice(db, req, payload, infer_when_missing=True)
     if "companion_lines" in payload:
         _replace_companions(db, req, payload.get("companion_lines") or [])
     db.flush()
@@ -484,6 +571,7 @@ def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.REQUESTED:
         raise ShippingError("요청 상태에서만 준비 중으로 전환할 수 있습니다.")
+    _resolve_final_items(db, req)
     req.status = ShippingRequestStatusEnum.PREPARING
     req.updated_at = datetime.utcnow()
     _sync_checklist(db, req)
@@ -578,6 +666,60 @@ def _request_owned_final_item(db: Session, req: ShippingRequest, *, process_type
     return current
 
 
+def _request_bom_payload(req: ShippingRequest) -> list[dict]:
+    """Expose persisted request lines in the same shape used by BOM matching."""
+    return [
+        {
+            "parent_stage": line.parent_stage,
+            "child_item_id": line.child_item_id,
+            "quantity": int(line.quantity),
+            "unit": line.unit or "EA",
+            "included": bool(line.included),
+            "origin": line.origin,
+        }
+        for line in req.bom_lines
+    ]
+
+
+def _matching_candidate_for_pf(db: Session, req: ShippingRequest, pf_item_id: uuid.UUID) -> dict | None:
+    return next(
+        (candidate for candidate in _matching_pf_candidates(db, _request_bom_payload(req)) if candidate["pf_item_id"] == pf_item_id),
+        None,
+    )
+
+
+def _apply_finalization_choice(
+    db: Session,
+    req: ShippingRequest,
+    payload: dict,
+    *,
+    infer_when_missing: bool,
+) -> None:
+    """Persist an explicit choice, or retain safe behavior for legacy callers."""
+    raw_mode = payload.get("finalization_mode")
+    raw_candidate_id = payload.get("reuse_pf_item_id")
+    if raw_mode is None and infer_when_missing:
+        raw_mode = (
+            ShippingFinalizationModeEnum.KEEP_BASE
+            if _matching_candidate_for_pf(db, req, req.base_pf_item_id) is not None
+            else ShippingFinalizationModeEnum.CREATE_NEW
+        )
+    if raw_mode is None:
+        return
+    try:
+        mode = raw_mode if isinstance(raw_mode, ShippingFinalizationModeEnum) else ShippingFinalizationModeEnum(raw_mode)
+    except ValueError as exc:
+        raise ShippingError("최종 출하품 처리 방식을 확인할 수 없습니다.") from exc
+    candidate_id = uuid.UUID(str(raw_candidate_id)) if raw_candidate_id else None
+    if mode == ShippingFinalizationModeEnum.REUSE_CANDIDATE and candidate_id is None:
+        raise ShippingError("재사용할 기존 품목을 선택하세요.")
+    if mode != ShippingFinalizationModeEnum.REUSE_CANDIDATE:
+        candidate_id = None
+    req.finalization_mode = mode
+    req.reuse_pf_item_id = candidate_id
+    db.flush()
+
+
 def _pf_lines_with_final_pa(req: ShippingRequest, final_pa: Item) -> list[tuple[uuid.UUID, int, str]]:
     out: list[tuple[uuid.UUID, int, str]] = []
     replaced_pa = False
@@ -621,23 +763,27 @@ def _pf_lines_with_final_pa_from_lines(db: Session, lines: list[dict], final_pa:
 def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) -> dict:
     base_pf = _get_item(db, base_pf_item_id)
     normalized = _normalize_bom_lines(db, base_pf, bom_lines)
+    pf_candidates = _matching_pf_candidates(db, normalized)
+    base_pf_matches = any(candidate["pf_item_id"] == base_pf.item_id for candidate in pf_candidates)
     pa_sig = _stage_signature_from_lines(normalized, "PA")
     pa = _find_item_by_signature(db, process_type_code="PA", signature=pa_sig)
     pf = None
     if pa is not None:
         pf_sig = _signature((child_id, qty) for child_id, qty, _ in _pf_lines_with_final_pa_from_lines(db, normalized, pa))
         pf = _find_item_by_signature(db, process_type_code="PF", signature=pf_sig)
-    preview_pa_mes_code = None if pa is not None else make_mes_code(
+    preview_pa_mes_code = None if base_pf_matches else make_mes_code(
         base_pf.model_symbol,
         "PA",
         next_serial_no(base_pf.model_symbol, "PA", db),
     )
-    preview_pf_mes_code = None if pf is not None else make_mes_code(
+    preview_pf_mes_code = None if base_pf_matches else make_mes_code(
         base_pf.model_symbol,
         "PF",
         next_serial_no(base_pf.model_symbol, "PF", db),
     )
     return {
+        "base_pf_matches": base_pf_matches,
+        "pf_candidates": [] if base_pf_matches else pf_candidates,
         "matched_pa_item_id": pa.item_id if pa else None,
         "matched_pf_item_id": pf.item_id if pf else None,
         "matched_pa_item_name": pa.item_name if pa else None,
@@ -649,14 +795,10 @@ def match_bom(db: Session, bom_lines: list[dict], base_pf_item_id: uuid.UUID) ->
     }
 
 
-def _resolve_or_create_pa(db: Session, req: ShippingRequest) -> Item:
+def _create_or_update_request_pa(db: Session, req: ShippingRequest) -> Item:
     pa_lines = [(line.child_item_id, int(line.quantity), line.unit or "EA") for line in _request_stage_lines(req, "PA")]
     if not pa_lines:
         raise ShippingError("PA 구성 BOM이 비어 있습니다.")
-    sig = _signature((child_id, qty) for child_id, qty, _ in pa_lines)
-    found = _find_item_by_signature(db, process_type_code="PA", signature=sig)
-    if found is not None:
-        return found
     if not (req.custom_pa_name and req.custom_pa_name.strip()):
         raise ShippingError("동일 BOM이 없으므로 새 PA/PF 이름을 입력해야 합니다.")
     name = req.custom_pa_name.strip()
@@ -669,12 +811,8 @@ def _resolve_or_create_pa(db: Session, req: ShippingRequest) -> Item:
     return pa
 
 
-def _resolve_or_create_pf(db: Session, req: ShippingRequest, final_pa: Item) -> Item:
+def _create_or_update_request_pf(db: Session, req: ShippingRequest, final_pa: Item) -> Item:
     pf_lines = _pf_lines_with_final_pa(req, final_pa)
-    sig = _signature((child_id, qty) for child_id, qty, _ in pf_lines)
-    found = _find_item_by_signature(db, process_type_code="PF", signature=sig)
-    if found is not None:
-        return found
     if not (req.custom_pf_name and req.custom_pf_name.strip()):
         raise ShippingError("동일 BOM이 없으므로 새 PA/PF 이름을 입력해야 합니다.")
     name = req.custom_pf_name.strip()
@@ -688,8 +826,23 @@ def _resolve_or_create_pf(db: Session, req: ShippingRequest, final_pa: Item) -> 
 
 
 def _resolve_final_items(db: Session, req: ShippingRequest) -> tuple[Item, Item]:
-    final_pa = _resolve_or_create_pa(db, req)
-    final_pf = _resolve_or_create_pf(db, req, final_pa)
+    if req.finalization_mode == ShippingFinalizationModeEnum.KEEP_BASE:
+        candidate = _matching_candidate_for_pf(db, req, req.base_pf_item_id)
+        if candidate is None:
+            raise ShippingError("기준 PF의 BOM이 변경되었습니다. 기존 품목 재사용 또는 신규 생성을 선택하세요.")
+        final_pa = _get_item(db, candidate["pa_item_id"])
+        final_pf = req.base_pf_item
+    elif req.finalization_mode == ShippingFinalizationModeEnum.REUSE_CANDIDATE:
+        if req.reuse_pf_item_id is None:
+            raise ShippingError("재사용할 기존 품목을 선택하세요.")
+        candidate = _matching_candidate_for_pf(db, req, req.reuse_pf_item_id)
+        if candidate is None:
+            raise ShippingError("선택한 기존 품목의 BOM이 변경되었습니다. 후보를 다시 선택하세요.")
+        final_pa = _get_item(db, candidate["pa_item_id"])
+        final_pf = _get_item(db, candidate["pf_item_id"])
+    else:
+        final_pa = _create_or_update_request_pa(db, req)
+        final_pf = _create_or_update_request_pf(db, req, final_pa)
     req.final_pa_item_id = final_pa.item_id
     req.final_pf_item_id = final_pf.item_id
     db.flush()

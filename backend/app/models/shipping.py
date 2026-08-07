@@ -31,6 +31,7 @@ __all__ = [
     "ShippingAllocation",
     "ShippingRequestEvent",
     "ShippingRequestRevision",
+    "ShippingFinalizationModeEnum",
     "ShippingRequestStatusEnum",
 ]
 
@@ -41,6 +42,12 @@ class ShippingRequestStatusEnum(str, enum.Enum):
     PREPARED = "PREPARED"
     PICKED_UP = "PICKED_UP"
     CANCELLED = "CANCELLED"
+
+
+class ShippingFinalizationModeEnum(str, enum.Enum):
+    KEEP_BASE = "KEEP_BASE"
+    REUSE_CANDIDATE = "REUSE_CANDIDATE"
+    CREATE_NEW = "CREATE_NEW"
 
 
 class ShippingRequest(Base):
@@ -57,6 +64,13 @@ class ShippingRequest(Base):
     base_pf_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="RESTRICT"), nullable=False, index=True)
     final_pa_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="SET NULL"), nullable=True, index=True)
     final_pf_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="SET NULL"), nullable=True, index=True)
+    finalization_mode = Column(
+        SAEnum(ShippingFinalizationModeEnum, name="shipping_finalization_mode_enum", create_type=True),
+        nullable=False,
+        default=ShippingFinalizationModeEnum.KEEP_BASE,
+        server_default=ShippingFinalizationModeEnum.KEEP_BASE.value,
+    )
+    reuse_pf_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="SET NULL"), nullable=True, index=True)
     request_quantity = Column(IntQuantity, nullable=False, default=1, server_default="1")
     requested_by_name = Column(String(100), nullable=True)
     custom_pa_name = Column(String(200), nullable=True)
@@ -91,6 +105,7 @@ class ShippingRequest(Base):
     base_pf_item = relationship("Item", foreign_keys=[base_pf_item_id])
     final_pa_item = relationship("Item", foreign_keys=[final_pa_item_id])
     final_pf_item = relationship("Item", foreign_keys=[final_pf_item_id])
+    reuse_pf_item = relationship("Item", foreign_keys=[reuse_pf_item_id])
     bom_lines = relationship(
         "ShippingRequestBomLine",
         back_populates="request",

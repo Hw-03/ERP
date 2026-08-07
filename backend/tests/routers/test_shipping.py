@@ -1191,6 +1191,8 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
     update = client.patch(
         f"/api/shipping/requests/{request_id}",
         json={
+            "finalization_mode": "CREATE_NEW",
+            "custom_pa_name": "Bracket PA",
             "custom_pf_name": "Bracket PF",
             "bom_lines": [
                 _line(pa, stage="PF", origin="DEFAULT"),
@@ -1217,10 +1219,8 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
         },
     )
     assert match.status_code == 200, match.text
-    assert match.json()["matched_pa_item_name"] == "Shared PA"
-    assert match.json()["matched_pf_item_id"] == update.json()["final_pf_item_id"]
-    assert match.json()["requires_pa_name"] is False
-    assert match.json()["requires_pf_name"] is False
+    assert match.json()["base_pf_matches"] is False
+    assert [candidate["pf_item_id"] for candidate in match.json()["pf_candidates"]] == [update.json()["final_pf_item_id"]]
 
 
 def test_requested_and_preparing_shipping_requests_can_be_deleted(client, db_session, make_item, make_bom):
