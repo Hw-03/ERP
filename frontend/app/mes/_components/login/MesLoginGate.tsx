@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -203,6 +204,32 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
             opacity: 0.5,
           }}
         />
+      )}
+
+      {/* 데스크톱 로그인 여백에서 카드 방향을 안내하는 DEXRAY 마스코트 */}
+      {phase === "form" && process.env.NEXT_PUBLIC_MES_ENV !== "employee" && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute hidden lg:block"
+          style={{
+            left: "calc(50% + clamp(200px, 13vw, 260px))",
+            bottom: "clamp(120px, 25vh, 228px)",
+            width: "clamp(260px, min(18vw, 40vh), 380px)",
+            animation: "mes-card-rise 0.7s 0.08s ease both",
+            filter: "drop-shadow(0 20px 28px color-mix(in srgb, var(--c-text) 12%, transparent))",
+          }}
+        >
+          <Image
+            src="/images/login/dexray-pointing-left.webp"
+            alt=""
+            width={607}
+            height={640}
+            sizes="(min-width: 2112px) 380px, (min-width: 1444px) 18vw, (min-width: 1024px) 260px, 0px"
+            loading="eager"
+            draggable={false}
+            className="h-auto w-full select-none"
+          />
+        </div>
       )}
 
       {/* 카드 — form 단계에만 등장 (rise 애니메이션) */}
