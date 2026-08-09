@@ -44,6 +44,17 @@ describe("AdminSectionTabs", () => {
     });
   });
 
+  it("shows an accent outline only on the active section tab", () => {
+    render(<AdminSectionTabs section="models" onSelect={vi.fn()} />);
+
+    const activeTab = screen.getByRole("button", { name: "\uBAA8\uB378 \uAD00\uB9AC" });
+    const inactiveTab = screen.getByRole("button", { name: "\uD488\uBAA9 \uAD00\uB9AC" });
+
+    expect(activeTab).toHaveClass("border");
+    expect(activeTab).toHaveStyle({ borderColor: "color-mix(in srgb, var(--c-blue) 40%, transparent)" });
+    expect(inactiveTab).toHaveStyle({ borderColor: "transparent" });
+  });
+
   it("separates every group after the first with a left divider", () => {
     const { container } = render(<AdminSectionTabs section="models" onSelect={vi.fn()} />);
     const groups = container.querySelectorAll("[data-admin-tab-group]");

@@ -90,10 +90,13 @@ export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
                     type="button"
                     onClick={() => onSelect(tab.id)}
                     aria-current={active ? "page" : undefined}
-                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[12px] px-3 text-[14px] font-bold transition-colors hover:brightness-105 active:scale-[0.98]"
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[12px] border px-3 text-[14px] font-bold transition-colors hover:brightness-105 active:scale-[0.98]"
                     style={{
                       background: active
                         ? `color-mix(in srgb, ${tone} 14%, transparent)`
+                        : "transparent",
+                      borderColor: active
+                        ? `color-mix(in srgb, ${tone} 40%, transparent)`
                         : "transparent",
                       color: active ? tone : LEGACY_COLORS.muted2,
                     }}
