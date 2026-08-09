@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { DailyWorkDatePicker } from "../_daily_report/DailyWorkDatePicker";
 import { DesktopTopbar } from "../DesktopTopbar";
 
 const notificationBellState = vi.hoisted(() => ({
@@ -65,6 +66,22 @@ describe("DesktopTopbar", () => {
     );
 
     expect(notificationBellState.loginDialogEnabled).toBe(true);
+  });
+
+  it("allows an absolute-positioned date dialog to escape the title addon", () => {
+    render(
+      <DesktopTopbar
+        title="Daily report"
+        onRefresh={vi.fn()}
+        titleAddon={<DailyWorkDatePicker value="2026-08-10" maxDate="2026-08-10" onChange={vi.fn()} />}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-topbar-title-addon")).toHaveClass("overflow-visible");
+
+    fireEvent.click(screen.getByRole("button", { name: "일보 날짜 선택" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("uses an opaque popup surface for the user menu", () => {

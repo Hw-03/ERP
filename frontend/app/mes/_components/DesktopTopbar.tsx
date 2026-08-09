@@ -94,7 +94,7 @@ export function DesktopTopbar({
               </div>
             )}
             <div className="shrink-0 text-[24px] font-black tracking-[-0.02em]">{title}</div>
-            {titleAddon && <div data-testid="desktop-topbar-title-addon" className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">{titleAddon}</div>}
+            {titleAddon && <div data-testid="desktop-topbar-title-addon" className="flex min-w-0 flex-1 items-center gap-2 overflow-visible">{titleAddon}</div>}
           </div>
         </div>
 
