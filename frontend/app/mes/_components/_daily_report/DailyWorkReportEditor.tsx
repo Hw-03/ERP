@@ -39,30 +39,26 @@ export function DailyWorkReportEditor({
   fillAvailableHeight?: boolean;
 }) {
   const [content, setContent] = useState(initialContent);
+  const [savedContent, setSavedContent] = useState(initialContent);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [savingLocal, setSavingLocal] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(initialUpdatedAt ?? null);
   const [saveFailed, setSaveFailed] = useState(false);
   const [localSaveError, setLocalSaveError] = useState<string | null>(null);
-  const initialContentRef = useRef(initialContent);
-  const contentRef = useRef(initialContent);
   const appliedResetKeyRef = useRef(resetKey);
   const userEditedRef = useRef(false);
   const savePromiseRef = useRef<Promise<void> | null>(null);
   const contentVersionRef = useRef(0);
-  const saveRequestRef = useRef(0);
-  const dirty = content !== initialContentRef.current;
+  const dirty = content !== savedContent;
 
   useEffect(() => {
     if (appliedResetKeyRef.current !== resetKey) {
       appliedResetKeyRef.current = resetKey;
       contentVersionRef.current += 1;
-      saveRequestRef.current += 1;
       savePromiseRef.current = null;
       userEditedRef.current = false;
-      initialContentRef.current = initialContent;
-      contentRef.current = initialContent;
       setContent(initialContent);
+      setSavedContent(initialContent);
       setValidationError(null);
       setSavedAt(initialUpdatedAt ?? null);
       setSaveFailed(false);
@@ -71,9 +67,8 @@ export function DailyWorkReportEditor({
       return;
     }
     if (!userEditedRef.current) {
-      initialContentRef.current = initialContent;
-      contentRef.current = initialContent;
       setContent(initialContent);
+      setSavedContent(initialContent);
       setSavedAt(initialUpdatedAt ?? null);
     }
   }, [initialContent, initialUpdatedAt, resetKey]);
@@ -84,11 +79,10 @@ export function DailyWorkReportEditor({
 
   useEffect(() => () => {
     contentVersionRef.current += 1;
-    saveRequestRef.current += 1;
   }, []);
 
   const save = async () => {
-    if (savePromiseRef.current) return savePromiseRef.current;
+    if (savingLocal && savePromiseRef.current) return savePromiseRef.current;
     const next = content.trim();
     if (!next) {
       const error = new Error("일보 내용을 입력하세요.");
@@ -101,23 +95,23 @@ export function DailyWorkReportEditor({
     setSaveFailed(false);
     setSavingLocal(true);
     const contentVersion = contentVersionRef.current;
-    const saveRequest = ++saveRequestRef.current;
-    const promise = onSave(next)
+    let promise: Promise<void>;
+    promise = onSave(next)
       .then((updatedAt) => {
-        if (contentVersion !== contentVersionRef.current || contentRef.current !== next) return;
-        initialContentRef.current = next;
+        if (contentVersion !== contentVersionRef.current) return;
         userEditedRef.current = false;
         setContent(next);
+        setSavedContent(next);
         setSavedAt(updatedAt);
       })
       .catch((error: unknown) => {
-        if (contentVersion !== contentVersionRef.current || contentRef.current !== next) throw error;
+        if (contentVersion !== contentVersionRef.current) throw error;
         setSaveFailed(true);
         setLocalSaveError(error instanceof Error ? error.message : "일보를 저장하지 못했습니다.");
         throw error;
       })
       .finally(() => {
-        if (saveRequestRef.current !== saveRequest) return;
+        if (savePromiseRef.current !== promise) return;
         savePromiseRef.current = null;
         setSavingLocal(false);
       });
@@ -183,7 +177,6 @@ export function DailyWorkReportEditor({
           const nextContent = event.target.value;
           contentVersionRef.current += 1;
           userEditedRef.current = true;
-          contentRef.current = nextContent;
           setSaveFailed(false);
           setLocalSaveError(null);
           onEdit?.();

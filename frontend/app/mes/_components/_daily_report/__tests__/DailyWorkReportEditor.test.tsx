@@ -121,6 +121,27 @@ describe("DailyWorkReportEditor", () => {
     expect(screen.getByText("저장 필요")).toBeInTheDocument();
   });
 
+  it("같은 서버 저장 시각이 반환돼도 저장 성공 후 저장됨 상태로 전환한다", async () => {
+    render(<DailyWorkReportEditor initialContent="기존 내용" initialUpdatedAt="2026-08-04T02:30:00Z" editable saving={false} saveError={null} onSave={vi.fn().mockResolvedValue("2026-08-04T02:30:00Z")} />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "수정한 내용" } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByText("저장됨 · 11:30")).toBeInTheDocument();
+    expect(screen.queryByText("저장 필요")).not.toBeInTheDocument();
+  });
+
+  it("저장할 때 공백을 정리해도 저장됨 상태로 전환한다", async () => {
+    render(<DailyWorkReportEditor initialContent="기존 내용" initialUpdatedAt="2026-08-04T02:30:00Z" editable saving={false} saveError={null} onSave={vi.fn().mockResolvedValue("2026-08-04T02:30:00Z")} />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "수정한 내용 " } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByText("저장됨 · 11:30")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "작업 내역" })).toHaveValue("수정한 내용");
+    expect(screen.queryByText("저장 필요")).not.toBeInTheDocument();
+  });
+
   it("대상이 바뀌면 이전 저장 시각을 초기화한다", () => {
     const { rerender } = render(<DailyWorkReportEditor initialContent="첫 내용" initialUpdatedAt="2026-08-04T01:00:00Z" resetKey="employee-1:2026-08-04" editable saving={false} saveError={null} onSave={vi.fn().mockResolvedValue("2026-08-04T01:00:00Z")} />);
 
