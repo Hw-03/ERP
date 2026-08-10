@@ -104,12 +104,12 @@ describe("MesLoginGate mascot", () => {
     expect(getMascotImages(container)).toHaveLength(1);
   });
 
-  it("does not render the mascot on the employee server", () => {
+  it("renders the mascot on the employee server", () => {
     vi.stubEnv("NEXT_PUBLIC_MES_ENV", "employee");
     installMatchMedia({ reducedMotion: true });
 
     const { container } = renderLoginGate();
 
-    expect(getMascotImages(container)).toHaveLength(0);
+    expect(getMascotImages(container)).toHaveLength(1);
   });
 });

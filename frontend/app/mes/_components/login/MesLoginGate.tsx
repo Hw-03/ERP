@@ -207,7 +207,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       )}
 
       {/* 데스크톱 로그인 여백에서 카드 방향을 안내하는 DEXRAY 마스코트 */}
-      {phase === "form" && process.env.NEXT_PUBLIC_MES_ENV !== "employee" && (
+      {phase === "form" && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute hidden lg:block"
