@@ -41,6 +41,7 @@ _NF_STAGE_ORDER = 60
 
 _AF_CODE = "AF"
 _PF_CODE = "PF"
+_AF_CAPACITY_IGNORED_MES_CODES: frozenset[str] = frozenset({"4-PR-0058"})
 
 # child_item_id -> List[(parent_item_id, per-unit quantity)]
 ReverseBom = Dict[uuid.UUID, List[Tuple[uuid.UUID, Decimal]]]
@@ -89,6 +90,30 @@ def build_reverse_bom(bom_cache: BomCache) -> ReverseBom:
         for child_id, per_unit in children:
             reverse.setdefault(child_id, []).append((parent_id, per_unit))
     return reverse
+
+
+def build_af_capacity_bom_cache(
+    bom_cache: BomCache,
+    items_map: Dict[uuid.UUID, Item],
+) -> BomCache:
+    """AF 생산 가능 수량 계산에서만 제외할 품목을 뺀 BOM 캐시를 반환한다.
+
+    원본 캐시는 변경하지 않으므로 BOM 조회와 legacy PF 생산 가능 수량 계산은
+    기존 BOM 구성을 그대로 사용한다.
+    """
+    excluded_item_ids = {
+        item_id
+        for item_id, item in items_map.items()
+        if item.mes_code in _AF_CAPACITY_IGNORED_MES_CODES
+    }
+    return {
+        parent_id: [
+            (child_id, per_unit)
+            for child_id, per_unit in children
+            if child_id not in excluded_item_ids
+        ]
+        for parent_id, children in bom_cache.items()
+    }
 
 
 def _bottleneck_name(
@@ -494,11 +519,16 @@ def compute_af_capacity(
     *,
     items: List[Item],
     bom_cache: BomCache,
+    metadata_bom_cache: BomCache,
     reverse_bom: ReverseBom,
     fig_by_id: FigById,
     items_map: Dict[uuid.UUID, Item],
 ) -> dict:
-    """AF(조립 완제품) 기준 생산 가능 수량 블록."""
+    """AF(조립 완제품) 기준 생산 가능 수량 블록을 계산한다.
+
+    `bom_cache`는 수량 계산용이며, `metadata_bom_cache`는 원본 BOM 기준의
+    완결 상태와 직접 자식 존재 여부를 표시하는 데만 사용한다.
+    """
     af_items = [it for it in items if it.process_type_code == _AF_CODE]
     af_items.sort(key=lambda it: (it.model_symbol or "", it.mes_code or "", it.item_name or ""))
 
@@ -519,7 +549,7 @@ def compute_af_capacity(
 
     for af in af_items:
         af_id = af.item_id
-        has_direct_children = bool(bom_cache.get(af_id))
+        has_direct_children = bool(metadata_bom_cache.get(af_id))
         marked_complete = af.bom_completed_at is not None
         bom_status = "complete" if has_direct_children else "incomplete"
         if has_direct_children:
@@ -556,7 +586,9 @@ def compute_af_capacity(
                 "total_production": total_qty,
                 "fast_production_limiting_item": _bottleneck_label(fast_btl, items_map),
                 "total_production_limiting_item": _bottleneck_label(total_btl, items_map),
-                "bom_status": "complete" if (pf and bom_cache.get(pf_id)) else "incomplete",
+                "bom_status": (
+                    "complete" if (pf and metadata_bom_cache.get(pf_id)) else "incomplete"
+                ),
             })
             if pf_own > best_ship:
                 best_ship = pf_own
@@ -621,13 +653,14 @@ def compute_capacity(db: Session) -> dict:
     BOM 캐시·재고·공정단계 맵을 한 번만 만들어 두 계산이 공유한다.
     """
     bom_cache = build_bom_cache(db)
-    reverse_bom = build_reverse_bom(bom_cache)
 
     # 소프트 삭제 품목 제외. (소프트 삭제 시 BOM 연결도 제거되므로 legacy 경로는
     # bom_cache 기반이라 영향 없고, AF 목록만 깨끗해진다.)
     all_items = db.query(Item).filter(Item.deleted_at.is_(None)).all()
     items_map = {it.item_id: it for it in all_items}
     fig_by_id = stock_math.bulk_compute(db, [it.item_id for it in all_items])
+    af_bom_cache = build_af_capacity_bom_cache(bom_cache, items_map)
+    af_reverse_bom = build_reverse_bom(af_bom_cache)
 
     pt_by_code = {pt.code: pt for pt in db.query(ProcessType).all()}
     stage_by_item: Dict[uuid.UUID, int | None] = {
@@ -647,8 +680,9 @@ def compute_capacity(db: Session) -> dict:
     )
     af = compute_af_capacity(
         items=all_items,
-        bom_cache=bom_cache,
-        reverse_bom=reverse_bom,
+        bom_cache=af_bom_cache,
+        metadata_bom_cache=bom_cache,
+        reverse_bom=af_reverse_bom,
         fig_by_id=fig_by_id,
         items_map=items_map,
     )

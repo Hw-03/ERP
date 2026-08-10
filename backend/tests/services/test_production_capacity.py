@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from app.models import Item
+from app.models import BOM, Item
 from app.services.production_capacity import compute_capacity
 
 
@@ -93,6 +93,99 @@ def test_fast_production_includes_existing_af_stock(db_session, make_item, make_
 
     assert row["fast_production"] == 8  # AF재고 5 + 부품 3
     assert row["total_production"] == 8
+
+
+def test_license_label_is_ignored_for_af_capacity_calculation(
+    db_session, make_item, make_bom
+):
+    """OS 라이센스 라벨 재고는 AF 기반 생산 가능 수량을 제한하지 않는다."""
+    af = make_item(
+        name="ADX4000W 조립 완제품",
+        process_type_code="AF",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=1,
+    )
+    required_part = make_item(
+        name="필수 조립 부품",
+        process_type_code="AR",
+        warehouse_qty=Decimal("3"),
+        model_symbol="4",
+        serial_no=2,
+    )
+    license_label = make_item(
+        name="OS라이센스 라벨",
+        process_type_code="PR",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=58,
+    )
+    pf = make_item(
+        name="ADX4000W 포장 완제품",
+        process_type_code="PF",
+        warehouse_qty=Decimal("0"),
+        model_symbol="4",
+        serial_no=3,
+    )
+    make_bom(af.item_id, required_part.item_id, Decimal("1"))
+    make_bom(pf.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, license_label.item_id, Decimal("1"))
+    db_session.commit()
+
+    assert license_label.mes_code == "4-PR-0058"
+
+    result = compute_capacity(db_session)
+    row = _af_row(result, af.item_id)
+
+    license_label_bom = (
+        db_session.query(BOM)
+        .filter(
+            BOM.parent_item_id == pf.item_id,
+            BOM.child_item_id == license_label.item_id,
+        )
+        .one()
+    )
+    assert license_label_bom.quantity == 1
+    assert result["maximum"] == 0
+    assert row["ship_ready"] == 0
+    assert row["fast_production"] == 3
+    assert row["total_production"] == 3
+
+
+def test_license_label_only_bom_preserves_af_metadata(
+    db_session, make_item, make_bom
+):
+    """AF 계산에서 제외해도 원본 BOM 기준 완결 메타데이터는 유지한다."""
+    af = make_item(
+        name="라이센스 라벨 전용 조립 완제품",
+        process_type_code="AF",
+        model_symbol="4",
+        serial_no=1,
+    )
+    license_label = make_item(
+        name="OS라이센스 라벨",
+        process_type_code="PR",
+        model_symbol="4",
+        serial_no=58,
+    )
+    pf = make_item(
+        name="라이센스 라벨 전용 포장 완제품",
+        process_type_code="PF",
+        model_symbol="4",
+        serial_no=3,
+    )
+    make_bom(af.item_id, license_label.item_id, Decimal("1"))
+    make_bom(pf.item_id, af.item_id, Decimal("1"))
+    db_session.commit()
+
+    result = compute_capacity(db_session)
+    row = _af_row(result, af.item_id)
+    variant = _variants_for(result, af.item_id)[0]
+
+    assert license_label.mes_code == "4-PR-0058"
+    assert row["has_direct_children"] is True
+    assert row["bom_status"] == "complete"
+    assert variant["bom_status"] == "complete"
 
 
 def test_multiple_pf_variants_listed(db_session, make_item, make_bom):
