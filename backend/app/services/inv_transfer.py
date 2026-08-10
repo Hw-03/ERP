@@ -117,7 +117,7 @@ def transfer_to_warehouse(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
-    dept: DepartmentEnum,
+    dept: DepartmentEnum | str,
 ) -> Inventory:
     """부서 PRODUCTION → 창고 복귀. 총량 변동 없음."""
     if qty <= 0:
@@ -143,7 +143,8 @@ def transfer_to_warehouse(
             InventoryLocation.status == LocationStatusEnum.PRODUCTION,
         ).first()
         cur = loc_check.quantity if loc_check else Decimal("0")
-        raise ValueError(f"{dept.value} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
+        dept_name = dept.value if isinstance(dept, DepartmentEnum) else dept
+        raise ValueError(f"{dept_name} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
 
     db.execute(
         sa_update(Inventory)

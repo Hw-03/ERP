@@ -181,6 +181,17 @@ def test_transfer_to_warehouse_insufficient_raises(make_item, make_location, db_
     assert _loc_qty(db_session, item.item_id, ASSEMBLY) == D("3")
 
 
+def test_transfer_to_warehouse_insufficient_with_string_department_raises_value_error(
+    make_item, make_location, db_session
+):
+    """승인 요청의 문자열 부서도 재고 부족 시 업무 오류로 반환한다."""
+    item = make_item(name="X", warehouse_qty=D("2"))
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("3"))
+
+    with pytest.raises(ValueError, match="생산 재고 부족"):
+        svc.transfer_to_warehouse(db_session, item.item_id, D("5"), ASSEMBLY.value)
+
+
 def test_transfer_to_warehouse_zero_qty_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("0"))
     with pytest.raises(ValueError, match="0보다 커야"):
