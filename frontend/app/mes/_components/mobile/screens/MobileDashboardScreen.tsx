@@ -3,20 +3,25 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { mesCodeDept } from "@/lib/mes/process";
 import { ChevronDown, SlidersHorizontal, Zap } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { InlineSearch } from "../primitives";
 import { InventoryKpiPanel, type KpiFilter } from "../../_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel, capacityStatusBadge } from "../../_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilters } from "../../_inventory_sections/InventoryFilterBar";
+import { InventoryFilterLogicToggle } from "../../_inventory_sections/InventoryFilterToggleButton";
 import { InventoryItemsTable } from "../../_inventory_sections/InventoryItemsTable";
 import { InventoryDetailPanel } from "../../_inventory_sections/InventoryDetailPanel";
 import { useInventoryData } from "../../_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "../../_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
 import { useToggleSet } from "../../_hooks/useToggleSet";
-import { matchesKpi, matchesSearch } from "../../_inventory_sections/inventoryFilter";
+import {
+  matchesInventoryCategoryFilters,
+  matchesKpi,
+  matchesSearch,
+  type InventoryFilterLogic,
+} from "../../_inventory_sections/inventoryFilter";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
 
@@ -69,6 +74,7 @@ export function MobileDashboardScreen({
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>("OR");
   // 생산 가능 현황은 첫 화면 면적을 크게 차지하므로 기본 접힘 — 품목 목록을 위로 끌어올린다(리뷰 §4.2).
   const [capacityOpen, setCapacityOpen] = useState(false);
 
@@ -95,36 +101,18 @@ export function MobileDashboardScreen({
         // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 대시보드 재고 목록에 노출하지 않음.
         if (item.deleted_at) return false;
         if (!matchesSearch(item, deferredLocalSearch)) return false;
-        if (selectedDepts.length > 0) {
-          const inDept = selectedDepts.some((d) =>
-            d === "창고"
-              ? (item.warehouse_qty ?? 0) > 0
-              : item.department === d ||
-                mesCodeDept(item.mes_code) === d ||
-                item.locations.some((loc) => loc.department === d),
-          );
-          if (!inDept) return false;
-        }
-        if (selectedSlots.size > 0 || showUnclassified) {
-          const matchesSlot = selectedSlots.size > 0 && item.model_slots.some((s) => selectedSlots.has(s));
-          const matchesUnclassified = showUnclassified && item.model_slots.length === 0;
-          if (!matchesSlot && !matchesUnclassified) return false;
-        }
-        if (selectedProcessSteps.length > 0) {
-          // 데스크톱 DesktopInventoryView 와 동일 — 공용 InventoryFilters 의 "불량(DEFECT)"
-          // 칩은 공정 스테이지(R/A/F)가 아니라 DEFECTIVE 재고 보유 여부로 매칭한다.
-          const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
-          const hasDefect = item.locations.some(
-            (loc) => loc.status === "DEFECTIVE" && (loc.quantity ?? 0) > 0,
-          );
-          const matches = selectedProcessSteps.some(
-            (s) => s === stage || (s === "DEFECT" && hasDefect),
-          );
-          if (!matches) return false;
-        }
+        if (
+          !matchesInventoryCategoryFilters(item, {
+            selectedDepts,
+            selectedSlots,
+            showUnclassified,
+            selectedProcessSteps,
+            logic: filterLogic,
+          })
+        ) return false;
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps],
+    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps, filterLogic],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -138,7 +126,7 @@ export function MobileDashboardScreen({
     setFilterChanging(true);
     const t = setTimeout(() => setFilterChanging(false), 200);
     return () => clearTimeout(t);
-  }, [selectedDepts, selectedModels, selectedProcessSteps, kpi]);
+  }, [selectedDepts, selectedModels, selectedProcessSteps, filterLogic, kpi]);
 
   if (selectedItem) lastSelectedItemRef.current = selectedItem;
   const displayItem = selectedItem ?? lastSelectedItemRef.current;
@@ -161,6 +149,7 @@ export function MobileDashboardScreen({
     setSelectedProcessSteps([]);
     setLocalSearch("");
     setKpi("ALL");
+    setFilterLogic("OR");
   }, [setSelectedDepts, setSelectedModels, setSelectedProcessSteps]);
 
   const capacityBadge = capacityStatusBadge(capacityData);
@@ -273,6 +262,7 @@ export function MobileDashboardScreen({
                   </span>
                 )}
               </button>
+              <InventoryFilterLogicToggle open={filtersOpen} logic={filterLogic} onLogicChange={setFilterLogic} />
             </div>
             {isFiltered && (
               <div

@@ -2,7 +2,6 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
-import { mesCodeDept } from "@/lib/mes/process";
 import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilterToggleButton } from "./_inventory_sections/InventoryFilterToggleButton";
@@ -18,7 +17,12 @@ import { useItemImageManifest } from "./_hooks/useItemImageManifest";
 import { useToggleSet } from "./_hooks/useToggleSet";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
-import { matchesKpi, matchesSearch } from "./_inventory_sections/inventoryFilter";
+import {
+  matchesInventoryCategoryFilters,
+  matchesKpi,
+  matchesSearch,
+  type InventoryFilterLogic,
+} from "./_inventory_sections/inventoryFilter";
 
 const DESKTOP_PAGE_SIZE = 100;
 
@@ -65,6 +69,7 @@ export function DesktopInventoryView({
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>("OR");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSelectedItemRef = useRef<Item | null>(null);
@@ -92,34 +97,18 @@ export function DesktopInventoryView({
         // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 대시보드 재고 목록에 노출하지 않음.
         if (item.deleted_at) return false;
         if (!matchesSearch(item, deferredLocalSearch)) return false;
-        if (selectedDepts.length > 0) {
-          const inDept = selectedDepts.some((d) =>
-            d === "창고"
-              ? (item.warehouse_qty ?? 0) > 0
-              : item.department === d ||
-                mesCodeDept(item.mes_code) === d ||
-                item.locations.some((loc) => loc.department === d),
-          );
-          if (!inDept) return false;
-        }
-        if (selectedSlots.size > 0 || showUnclassified) {
-          const matchesSlot = selectedSlots.size > 0 && item.model_slots.some((s) => selectedSlots.has(s));
-          const matchesUnclassified = showUnclassified && item.model_slots.length === 0;
-          if (!matchesSlot && !matchesUnclassified) return false;
-        }
-        if (selectedProcessSteps.length > 0) {
-          const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
-          const hasDefect = item.locations.some(
-            (loc) => loc.status === "DEFECTIVE" && (loc.quantity ?? 0) > 0,
-          );
-          const matches = selectedProcessSteps.some(
-            (s) => s === stage || (s === "DEFECT" && hasDefect),
-          );
-          if (!matches) return false;
-        }
+        if (
+          !matchesInventoryCategoryFilters(item, {
+            selectedDepts,
+            selectedSlots,
+            showUnclassified,
+            selectedProcessSteps,
+            logic: filterLogic,
+          })
+        ) return false;
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps],
+    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps, filterLogic],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -148,6 +137,7 @@ export function DesktopInventoryView({
     setSelectedProcessSteps([]);
     setLocalSearch("");
     setKpi("ALL");
+    setFilterLogic("OR");
   }
 
   return (
@@ -173,7 +163,8 @@ export function DesktopInventoryView({
               <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
               <InventoryFilterToggleButton
                 filtersOpen={filtersOpen}
-                activeFilterCount={activeFilterCount}
+                logic={filterLogic}
+                onLogicChange={setFilterLogic}
                 onToggle={() => setFiltersOpen((prev) => !prev)}
               />
             </div>

@@ -1,6 +1,17 @@
 import type { Item } from "@/lib/api";
 import { matchesItemSearch } from "@/lib/itemSearch";
+import { mesCodeDept } from "@/lib/mes/process";
 import type { KpiFilter } from "./InventoryKpiPanel";
+
+export type InventoryFilterLogic = "OR" | "AND";
+
+type InventoryCategoryFilters = {
+  selectedDepts: string[];
+  selectedSlots: Set<number>;
+  showUnclassified: boolean;
+  selectedProcessSteps: string[];
+  logic: InventoryFilterLogic;
+};
 
 /**
  * Inventory 필터/계산 helper.
@@ -27,4 +38,45 @@ export function matchesKpi(item: Item, kpi: KpiFilter): boolean {
   if (kpi === "LOW") return qty > 0 && qty < min;
   if (kpi === "ZERO") return qty <= 0;
   return true;
+}
+
+export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCategoryFilters): boolean {
+  const selectedDepartmentMatches = filters.selectedDepts.map((department) => {
+    const hasDepartmentStock =
+      department === "창고"
+      ? (item.warehouse_qty ?? 0) > 0
+      : item.locations.some(
+          (location) => location.department === department && (location.quantity ?? 0) > 0,
+        );
+    return filters.logic === "AND"
+      ? hasDepartmentStock
+      : hasDepartmentStock || item.department === department || mesCodeDept(item.mes_code) === department;
+  });
+  const departmentMatch =
+    filters.selectedDepts.length > 0
+      ? filters.logic === "AND"
+        ? selectedDepartmentMatches.every(Boolean)
+        : selectedDepartmentMatches.some(Boolean)
+      : null;
+  const modelMatch =
+    filters.selectedSlots.size > 0 || filters.showUnclassified
+      ? (filters.selectedSlots.size > 0 && item.model_slots.some((slot) => filters.selectedSlots.has(slot))) ||
+        (filters.showUnclassified && item.model_slots.length === 0)
+      : null;
+  const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
+  const hasDefect = item.locations.some(
+    (location) => location.status === "DEFECTIVE" && (location.quantity ?? 0) > 0,
+  );
+  const processMatch =
+    filters.selectedProcessSteps.length > 0
+      ? filters.selectedProcessSteps.some(
+          (processStep) => processStep === stage || (processStep === "DEFECT" && hasDefect),
+        )
+      : null;
+  const activeMatches = [departmentMatch, modelMatch, processMatch].filter(
+    (match): match is boolean => match !== null,
+  );
+
+  if (activeMatches.length === 0) return true;
+  return filters.logic === "OR" ? activeMatches.some(Boolean) : activeMatches.every(Boolean);
 }

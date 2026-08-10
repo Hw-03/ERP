@@ -956,6 +956,25 @@
   outline: 2px solid var(--c-blue);
 }
 
+.ift {
+  display: grid;
+  flex-shrink: 0;
+  align-self: stretch;
+  grid-template-columns: 0fr;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(0.25rem);
+  transition: grid-template-columns 180ms ease-out, opacity 180ms ease-out, transform 180ms ease-out;
+}
+
+.ift.is-open {
+  grid-template-columns: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
