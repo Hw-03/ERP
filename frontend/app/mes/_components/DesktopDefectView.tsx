@@ -258,7 +258,7 @@ function DefectViewInner({
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
       >
         {view.kind === "hub" && (
-          <div key="hub" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
+          <div key="hub" className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
             <DefectHubEntry onSelect={handleHubSelect} />
           </div>
         )}

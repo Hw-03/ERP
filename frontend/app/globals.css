@@ -432,7 +432,17 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* === 불량 탭 뷰 전환 페이드 === */
+/* === 데스크톱 메인 탭 전환 === */
+@keyframes desktopTabEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-desktop-tab-enter {
+  animation: desktopTabEnter 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* === 불량 탭 내부 뷰 전환 === */
 @keyframes viewSlide {
   from { opacity: 0; transform: translateX(20px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -957,6 +967,7 @@
   }
   .flow-arrow,
   .animate-fade-in,
+  .animate-desktop-tab-enter,
   .animate-view-fade,
   .animate-pulse-slow,
   [data-anim="sheetUp"] {

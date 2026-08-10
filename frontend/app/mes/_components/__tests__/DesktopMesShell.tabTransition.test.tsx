@@ -214,6 +214,24 @@ describe("DesktopMesShell tab transition", () => {
     );
   });
 
+  it.each(sidebarTabs)("applies the shared content transition when navigating to %s", (tab) => {
+    render(<DesktopMesShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: tab }));
+
+    expect(screen.getByTestId("desktop-tab-transition")).toHaveAttribute("data-active-tab", tab);
+    expect(screen.getByTestId("desktop-tab-transition")).toHaveClass("animate-desktop-tab-enter");
+  });
+
+  it("does not restart the shared transition when the active tab is refreshed", () => {
+    render(<DesktopMesShell />);
+    const transition = screen.getByTestId("desktop-tab-transition");
+
+    fireEvent.click(screen.getByRole("button", { name: "history" }));
+
+    expect(screen.getByTestId("desktop-tab-transition")).toBe(transition);
+  });
+
   it("shows daily report controls in the top bar only while the daily tab is active", () => {
     window.history.replaceState({}, "", "/mes?tab=dailyReport");
 

@@ -107,4 +107,14 @@ describe("DesktopDefectView realtime refresh", () => {
     await waitFor(() => expect(screen.queryByTestId("process-location")).not.toBeInTheDocument());
     expect(screen.getByTestId("defect-list")).toBeInTheDocument();
   });
+
+  it("does not apply an inner transition to the initial hub but keeps it for internal views", async () => {
+    render(<DesktopDefectView operator={operator} />);
+
+    expect(screen.getByRole("button", { name: "Open list" }).parentElement).not.toHaveClass("animate-view-fade");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+
+    expect((await screen.findByTestId("defect-list")).parentElement).toHaveClass("animate-view-fade");
+  });
 });

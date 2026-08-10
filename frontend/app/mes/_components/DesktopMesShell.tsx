@@ -491,7 +491,16 @@ function DesktopMesShellInner({
               />
             )}
 
-            <div className={`${warehouseMapFullscreen ? "" : "mt-3"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>{content}</div>
+            <div className={`${warehouseMapFullscreen ? "" : "mt-3"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>
+              <div
+                key={activeTab}
+                data-testid="desktop-tab-transition"
+                data-active-tab={activeTab}
+                className="animate-desktop-tab-enter flex min-h-0 min-w-0 flex-1"
+              >
+                {content}
+              </div>
+            </div>
           </div>
         </div>
       </div>
