@@ -9,6 +9,11 @@ const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
  *   - start  → .next-prod
  */
 module.exports = (phase) => {
+  const backendInternalUrl = (
+    process.env.BACKEND_INTERNAL_URL ||
+    (phase === PHASE_DEVELOPMENT_SERVER ? "http://localhost:8011" : "http://localhost:8010")
+  ).trim();
+
   /** @type {import('next').NextConfig} */
   const config = {
     devIndicators: { buildActivity: false },
@@ -19,7 +24,7 @@ module.exports = (phase) => {
       return [
         {
           source: "/api/:path*",
-          destination: `${(process.env.BACKEND_INTERNAL_URL || "http://localhost:8010").trim()}/api/:path*`,
+          destination: `${backendInternalUrl}/api/:path*`,
         },
       ];
     },

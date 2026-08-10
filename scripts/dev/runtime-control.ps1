@@ -66,6 +66,8 @@ function Test-ProcessDescendsFrom {
     )
 
     $currentPid = $ProcessId
+    $currentStartedAt = Get-ProcessStartedAt -ProcessId $currentPid
+    if (-not $currentStartedAt) { return $false }
     $visited = @{}
     for ($depth = 0; $depth -lt 16 -and $currentPid -gt 0; $depth++) {
         if ($currentPid -in $AncestorPids) { return $true }
@@ -73,7 +75,19 @@ function Test-ProcessDescendsFrom {
         $visited[$currentPid] = $true
         $process = Get-CimInstance Win32_Process -Filter "ProcessId = $currentPid" -ErrorAction SilentlyContinue
         if (-not $process) { return $false }
-        $currentPid = [int] $process.ParentProcessId
+        $parentPid = [int] $process.ParentProcessId
+        $parentStartedAt = Get-ProcessStartedAt -ProcessId $parentPid
+        if (-not $parentStartedAt) { return $false }
+        try {
+            if ([DateTimeOffset]::Parse($parentStartedAt) -gt [DateTimeOffset]::Parse($currentStartedAt)) {
+                return $false
+            }
+        }
+        catch {
+            return $false
+        }
+        $currentPid = $parentPid
+        $currentStartedAt = $parentStartedAt
     }
     return $false
 }
@@ -106,17 +120,27 @@ function Test-ServiceProcessOwned {
         [Parameter(Mandatory = $true)][ValidateSet("frontend", "backend")][string] $Service,
         [Parameter(Mandatory = $true)][int] $Port,
         [Parameter(Mandatory = $true)][string] $RepoRoot,
-        [Parameter(Mandatory = $true)][string] $CommandLine
+        [Parameter(Mandatory = $true)][string] $CommandLine,
+        [int] $ProcessId = 0,
+        [int[]] $TrustedAncestorPids = @()
     )
 
     if ($Service -eq "backend") {
-        $backendRoot = [regex]::Escape((Join-Path $RepoRoot "backend"))
-        return $CommandLine -match $backendRoot -and $CommandLine -match 'uvicorn'
+        if ($ProcessId -le 0 -or $TrustedAncestorPids.Count -eq 0) { return $false }
+        $pythonExecutable = '(?:"[^"\r\n]*[\\/]python(?:\d+(?:\.\d+)*)?\.exe"|[^\s"]*[\\/]python(?:\d+(?:\.\d+)*)?\.exe|python(?:\d+(?:\.\d+)*)?\.exe)'
+        $backendPattern = '^\s*' + $pythonExecutable +
+            '\s+-m\s+uvicorn\s+app\.main:app(?=\s|$)(?=.*\s--port\s+' + [regex]::Escape([string] $Port) + '(?:\s|$)).*\s*$'
+        return $CommandLine -match $backendPattern -and
+            (Test-ProcessDescendsFrom -ProcessId $ProcessId -AncestorPids $TrustedAncestorPids)
     }
 
-    $frontendRoot = [regex]::Escape((Join-Path $RepoRoot "frontend"))
-    return $CommandLine -match $frontendRoot -and
-        $CommandLine -match '(next[\\/]dist[\\/]|scripts[\\/]dev\.js)'
+    $frontendRoot = [regex]::Escape(([System.IO.Path]::GetFullPath((Join-Path $RepoRoot "frontend"))).TrimEnd('\'))
+    $nodeExecutable = '(?:"[^"\r\n]*[\\/]node\.exe"|node(?:\.exe)?)'
+    $nextScript = $frontendRoot +
+        '[\\/]node_modules[\\/](?:\.pnpm[\\/][^\\/"\s]+[\\/]node_modules[\\/])?' +
+        'next[\\/]dist[\\/]server[\\/]lib[\\/]start-server\.js'
+    $frontendPattern = '^\s*' + $nodeExecutable + '\s+"?' + $nextScript + '"?\s*$'
+    return $CommandLine -match $frontendPattern
 }
 
 function Test-SupervisorProcessOwned {
@@ -277,6 +301,261 @@ function Write-RuntimeControlRequest {
     Write-JsonFileUtf8 -Path $Path -Value $Request
 }
 
+function Recover-CrashLoopPortListeners {
+    param(
+        [Parameter(Mandatory = $true)][object] $Profile,
+        [Parameter(Mandatory = $true)][ValidateSet("frontend", "backend")][string] $Service,
+        [Parameter(Mandatory = $true)][int] $Port,
+        [Parameter(Mandatory = $true)][string] $EventPath,
+        [int[]] $TrustedAncestorPids = @()
+    )
+
+    $listeners = @(Get-ListeningPortPids -Port $Port)
+    if ($listeners.Count -eq 0) { return $false }
+
+    $candidates = @()
+    foreach ($listenerPid in $listeners) {
+        $processId = [int] $listenerPid
+        $commandLine = Get-ProcessCommandLine -ProcessId $processId
+        if (-not (Test-ServiceProcessOwned `
+            -Service $Service -Port $Port -RepoRoot $Profile.RepoRoot -CommandLine $commandLine `
+            -ProcessId $processId -TrustedAncestorPids $TrustedAncestorPids)) {
+            Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service $Service `
+                -Event "port_conflict" `
+                -Details @{ port = $Port; pid = $processId; commandLine = $commandLine; reason = "crash_loop_unknown_listener" }
+            throw "[$Service] Refusing to recover unknown PID $processId on port $Port during crash-loop recovery."
+        }
+
+        $startedAt = Get-ProcessStartedAt -ProcessId $processId
+        if (-not $startedAt) {
+            Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service $Service `
+                -Event "port_conflict" `
+                -Details @{ port = $Port; pid = $processId; commandLine = $commandLine; reason = "crash_loop_listener_start_unavailable" }
+            throw "[$Service] Refusing to recover PID $processId because its process start time could not be captured."
+        }
+        $candidates += [pscustomobject]@{ ProcessId = $processId; StartedAt = $startedAt }
+    }
+
+    $terminatedPids = @()
+    foreach ($candidate in $candidates) {
+        $currentCommandLine = Get-ProcessCommandLine -ProcessId $candidate.ProcessId
+        $stillOwned = Test-ServiceProcessOwned `
+            -Service $Service `
+            -Port $Port `
+            -RepoRoot $Profile.RepoRoot `
+            -CommandLine $currentCommandLine `
+            -ProcessId $candidate.ProcessId `
+            -TrustedAncestorPids $TrustedAncestorPids
+        $startMatches = Test-ProcessStartMatches `
+            -ProcessId $candidate.ProcessId `
+            -ExpectedStartedAt $candidate.StartedAt
+        if (-not ($stillOwned -and $startMatches)) {
+            Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service $Service `
+                -Event "port_conflict" `
+                -Details @{ port = $Port; pid = $candidate.ProcessId; commandLine = $currentCommandLine; reason = "crash_loop_listener_ownership_changed" }
+            throw "[$Service] Refusing to recover PID $($candidate.ProcessId) because listener ownership changed."
+        }
+    }
+
+    foreach ($candidate in $candidates) {
+        $killCommandLine = Get-ProcessCommandLine -ProcessId $candidate.ProcessId
+        $killStillOwned = Test-ServiceProcessOwned `
+            -Service $Service `
+            -Port $Port `
+            -RepoRoot $Profile.RepoRoot `
+            -CommandLine $killCommandLine `
+            -ProcessId $candidate.ProcessId `
+            -TrustedAncestorPids $TrustedAncestorPids
+        $killStartMatches = Test-ProcessStartMatches `
+            -ProcessId $candidate.ProcessId `
+            -ExpectedStartedAt $candidate.StartedAt
+        if (-not ($killStillOwned -and $killStartMatches)) {
+            $reason = if ($terminatedPids.Count -gt 0) {
+                "crash_loop_listener_kill_revalidation_failed_after_partial_recovery"
+            }
+            else { "crash_loop_listener_kill_revalidation_failed" }
+            Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service $Service `
+                -Event "port_conflict" `
+                -Details @{
+                    port = $Port
+                    pid = $candidate.ProcessId
+                    commandLine = $killCommandLine
+                    reason = $reason
+                    terminatedPids = @($terminatedPids)
+                }
+            throw "[$Service] Refusing to recover PID $($candidate.ProcessId) because listener ownership changed immediately before kill."
+        }
+        Stop-ProcessTree -ProcessId $candidate.ProcessId
+        $terminatedPids += [int] $candidate.ProcessId
+    }
+    if (-not (Wait-ServicePortFree -Port $Port)) {
+        Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service $Service `
+            -Event "port_conflict" `
+            -Details @{ port = $Port; pids = @($candidates.ProcessId); reason = "crash_loop_listener_port_still_listening" }
+        throw "[$Service] Crash-loop recovery failed: port $Port is still listening. Check $EventPath"
+    }
+    Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service $Service `
+        -Event "orphan_listener_recovered" `
+        -Details @{ port = $Port; pids = @($candidates.ProcessId); source = "crash_loop" }
+    return $true
+}
+
+function Wait-RuntimeHttp200 {
+    param(
+        [Parameter(Mandatory = $true)][string] $Url,
+        [int] $Attempts = 30
+    )
+
+    for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+            if ($response.StatusCode -eq 200) { return $true }
+        }
+        catch {
+            # The supervised service may still be starting, compiling, or backing off.
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    return $false
+}
+
+function Get-RuntimeAppSessionBootId {
+    param([Parameter(Mandatory = $true)][string] $Url)
+
+    $response = Invoke-WebRequest -Uri $Url -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+    if ($response.StatusCode -ne 200) { throw "App session endpoint did not return 200: $Url" }
+    $session = $response.Content | ConvertFrom-Json
+    if (-not $session.boot_id) { throw "App session endpoint did not return boot_id: $Url" }
+    return [string] $session.boot_id
+}
+
+function Start-ProfileFrontendSupervisor {
+    param(
+        [Parameter(Mandatory = $true)][object] $Profile,
+        [Parameter(Mandatory = $true)][string] $FrontendDir,
+        [Parameter(Mandatory = $true)][string] $RuntimeRoot,
+        [Parameter(Mandatory = $true)][string] $StatePath,
+        [Parameter(Mandatory = $true)][string] $EventPath,
+        [Parameter(Mandatory = $true)][string] $ControlPath,
+        [Parameter(Mandatory = $true)][string] $StdoutLog,
+        [Parameter(Mandatory = $true)][string] $StderrLog
+    )
+
+    return Start-ServiceSupervisor `
+        -Profile $Profile `
+        -Service "frontend" `
+        -Port $Profile.FrontendPort `
+        -ServiceDir $FrontendDir `
+        -StatePath $StatePath `
+        -EventPath $EventPath `
+        -ControlPath $ControlPath `
+        -StdoutLog $StdoutLog `
+        -StderrLog $StderrLog `
+        -ChildCommand @("node", "scripts/dev.js") `
+        -Environment @{
+            MES_RUNTIME_ROOT = $RuntimeRoot
+            MES_SUPERVISED_FRONTEND = "1"
+            PORT = [string] $Profile.FrontendPort
+            BACKEND_INTERNAL_URL = $Profile.BackendInternalUrl
+        }
+}
+
+function Invoke-ProfileFrontendStartup {
+    param(
+        [Parameter(Mandatory = $true)][object] $Profile,
+        [Parameter(Mandatory = $true)][string] $FrontendDir,
+        [Parameter(Mandatory = $true)][string] $RuntimeRoot,
+        [Parameter(Mandatory = $true)][string] $StatePath,
+        [Parameter(Mandatory = $true)][string] $EventPath,
+        [Parameter(Mandatory = $true)][string] $ControlPath,
+        [Parameter(Mandatory = $true)][string] $StdoutLog,
+        [Parameter(Mandatory = $true)][string] $StderrLog
+    )
+
+    $mutexName = "Local\DEXCOWIN-MES-$($Profile.Name)-frontend-startup"
+    $mutex = [System.Threading.Mutex]::new($false, $mutexName)
+    $lockTaken = $false
+    try {
+        try {
+            $lockTaken = $mutex.WaitOne([TimeSpan]::FromSeconds(30))
+        }
+        catch [System.Threading.AbandonedMutexException] {
+            $lockTaken = $true
+        }
+        if (-not $lockTaken) {
+            throw "[frontend] Timed out waiting for another $($Profile.Name) startup request to finish."
+        }
+
+    $backendHealthUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"
+    if (-not (Wait-RuntimeHttp200 -Url $backendHealthUrl)) {
+        throw "[start-frontend] Backend is not live at $backendHealthUrl. Start the profile backend first."
+    }
+
+    $supervisorArgs = @{
+        Profile = $Profile
+        FrontendDir = $FrontendDir
+        RuntimeRoot = $RuntimeRoot
+        StatePath = $StatePath
+        EventPath = $EventPath
+        ControlPath = $ControlPath
+        StdoutLog = $StdoutLog
+        StderrLog = $StderrLog
+    }
+    $launch = Start-ProfileFrontendSupervisor @supervisorArgs
+
+    $healthUrl = "http://127.0.0.1:$($Profile.FrontendPort)/mes"
+    if (-not (Wait-RuntimeHttp200 -Url $healthUrl -Attempts 90)) {
+        $state = Get-RuntimeState -Path $StatePath
+        throw "[start-frontend] Frontend did not respond on $healthUrl. status=$($state.status). Check $EventPath"
+    }
+
+    $directSessionUrl = "http://127.0.0.1:$($Profile.BackendPort)/api/app-session"
+    $proxySessionUrl = "http://127.0.0.1:$($Profile.FrontendPort)/api/app-session"
+    $directBootId = Get-RuntimeAppSessionBootId -Url $directSessionUrl
+    $proxyBootId = Get-RuntimeAppSessionBootId -Url $proxySessionUrl
+    if ($directBootId -ne $proxyBootId) {
+        Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "frontend" `
+            -Event "backend_proxy_mismatch" `
+            -Details @{ directBootId = $directBootId; proxyBootId = $proxyBootId; directUrl = $directSessionUrl; proxyUrl = $proxySessionUrl; attempt = 1 }
+
+        Stop-SupervisedService `
+            -Profile $Profile `
+            -Service "frontend" `
+            -Port $Profile.FrontendPort `
+            -StatePath $StatePath `
+            -EventPath $EventPath `
+            -ControlPath $ControlPath `
+            -Source "start-frontend-proxy-mismatch"
+        $launch = Start-ProfileFrontendSupervisor @supervisorArgs
+        if (-not (Wait-RuntimeHttp200 -Url $healthUrl -Attempts 90)) {
+            throw "[start-frontend] Frontend did not recover on $healthUrl after backend proxy mismatch. Check $EventPath"
+        }
+        $directBootId = Get-RuntimeAppSessionBootId -Url $directSessionUrl
+        $proxyBootId = Get-RuntimeAppSessionBootId -Url $proxySessionUrl
+        if ($directBootId -ne $proxyBootId) {
+            Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "frontend" `
+                -Event "backend_proxy_mismatch" `
+                -Details @{ directBootId = $directBootId; proxyBootId = $proxyBootId; directUrl = $directSessionUrl; proxyUrl = $proxySessionUrl; attempt = 2 }
+            Stop-SupervisedService `
+                -Profile $Profile `
+                -Service "frontend" `
+                -Port $Profile.FrontendPort `
+                -StatePath $StatePath `
+                -EventPath $EventPath `
+                -ControlPath $ControlPath `
+                -Source "start-frontend-persistent-proxy-mismatch"
+            throw "[start-frontend] Frontend proxy boot_id ($proxyBootId) does not match backend boot_id ($directBootId) after controlled restart. Check $EventPath"
+        }
+    }
+
+    return [pscustomobject]@{ Launch = $launch; HealthUrl = $healthUrl }
+    }
+    finally {
+        if ($lockTaken) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
+    }
+}
+
 function Start-ServiceSupervisor {
     param(
         [Parameter(Mandatory = $true)][object] $Profile,
@@ -326,6 +605,9 @@ function Start-ServiceSupervisor {
     }
     if ($supervisorOwned) {
         if ($state.status -eq "crash_loop") {
+            Recover-CrashLoopPortListeners `
+                -Profile $Profile -Service $Service -Port $Port -EventPath $EventPath `
+                -TrustedAncestorPids @([int] $state.supervisorPid) | Out-Null
             $request = New-RuntimeControlRequest -Action "restart-reset" -Source "start-$Service.ps1"
             Write-RuntimeControlRequest -Path $ControlPath -Request $request
             return [pscustomobject]@{ SupervisorPid = [int] $state.supervisorPid; Existing = $true; Reset = $true }

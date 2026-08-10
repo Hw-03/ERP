@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 from collections import defaultdict
+from contextlib import closing
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -491,7 +492,7 @@ def _load_employee_items(path: Path) -> list[EmployeeItem]:
     if not path.is_file():
         raise DepartmentSyncError(f"employee DB not found: {path}")
     uri = f"file:{path.resolve().as_posix()}?mode=ro"
-    with sqlite3.connect(uri, uri=True) as connection:
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA query_only=ON")
         records = connection.execute(

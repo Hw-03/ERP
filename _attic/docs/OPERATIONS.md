@@ -181,8 +181,8 @@ curl http://127.0.0.1:8011/health/detailed
 ### 파일 로그 (Phase 4 추가)
 - 위치: `_attic/runtime/logs/backend/mes.log`
 - 런타임 stdout/stderr 및 상태 파일: `_attic/runtime/logs/backend/`, `_attic/runtime/logs/frontend/`
-- 회전: `RotatingFileHandler` 5MB × 5 backup (`mes.log.1` ~ `mes.log.5`)
-- 환경 변수: `LOG_LEVEL` (기본 INFO), `MES_RUNTIME_ROOT` (전체 런타임 루트 재정의)
+- 회전: `ConcurrentRotatingFileHandler` 기반 다중 프로세스 안전 회전, 5MiB × 기본 5 backup (`mes.log.1` ~ `mes.log.5`)
+- 환경 변수: `LOG_LEVEL` (기본 INFO), `LOG_BACKUP_COUNT` (1 이상의 정수, 기본 5; 잘못된 값은 기본값 사용), `MES_RUNTIME_ROOT` (전체 런타임 루트 재정의)
 - 내용: 전역 예외 핸들러가 잡은 ValueError/IntegrityError/Exception + INFO 레벨 메시지
 
 ### 관리자 감사로그 (Phase 5.2)

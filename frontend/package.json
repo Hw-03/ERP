@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/dev.js",
+    "dev": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\dev\\start-frontend.ps1",
     "dev:raw": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",

@@ -2,10 +2,11 @@
 
 운영 표준:
 - 콘솔 로그: 기존대로 (uvicorn access + 우리 INFO)
-- 파일 로그: _attic/runtime/logs/backend/mes.log (RotatingFileHandler, 5MB x 5 backup)
+- 파일 로그: _attic/runtime/logs/backend/mes.log (다중 프로세스 안전 회전, 5MiB x 5 backup)
 
 환경변수:
 - LOG_LEVEL (기본 INFO)
+- LOG_BACKUP_COUNT (기본 5)
 - MES_RUNTIME_ROOT (기본 프로젝트/_attic/runtime)
 
 main.py 가 startup 시 setup_logging() 한 번만 호출.
@@ -15,8 +16,9 @@ from __future__ import annotations
 
 import logging
 import os
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # .../backend
 _PROJECT_ROOT = _BACKEND_DIR.parent
@@ -37,7 +39,8 @@ def get_backend_log_dir() -> Path:
     return log_dir
 
 
-def setup_logging() -> logging.Logger:
+def setup_logging(*, max_bytes: int = 5 * 1024 * 1024) -> logging.Logger:
+    """Configure the shared MES logger with process-safe file rotation."""
     level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
     log_dir = get_backend_log_dir()
@@ -46,6 +49,8 @@ def setup_logging() -> logging.Logger:
     try:
         backup_count = int(os.environ.get("LOG_BACKUP_COUNT", "5"))
     except ValueError:
+        backup_count = 5
+    if backup_count < 1:
         backup_count = 5
 
     logger = logging.getLogger("mes")
@@ -59,9 +64,9 @@ def setup_logging() -> logging.Logger:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    file_handler = RotatingFileHandler(
+    file_handler = ConcurrentRotatingFileHandler(
         log_dir / "mes.log",
-        maxBytes=5 * 1024 * 1024,
+        maxBytes=max_bytes,
         backupCount=backup_count,
         encoding="utf-8",
     )

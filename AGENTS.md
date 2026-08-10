@@ -120,7 +120,7 @@ python bootstrap_db.py --all
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 ```
 
-- Stop backend (force-kills all PIDs on port 8010):
+- Stop backend (uses the current repo profile: C:\ERP=8011, C:\ERP-dev=8010):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1

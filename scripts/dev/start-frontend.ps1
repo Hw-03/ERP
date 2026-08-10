@@ -20,40 +20,17 @@ if (-not (Test-Path $FrontendDir)) {
 }
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-$launch = Start-ServiceSupervisor `
+$startup = Invoke-ProfileFrontendStartup `
     -Profile $Profile `
-    -Service "frontend" `
-    -Port $Profile.FrontendPort `
-    -ServiceDir $FrontendDir `
+    -FrontendDir $FrontendDir `
+    -RuntimeRoot $RuntimeRoot `
     -StatePath $StatePath `
     -EventPath $EventPath `
     -ControlPath $ControlPath `
     -StdoutLog $StdoutLog `
-    -StderrLog $StderrLog `
-    -ChildCommand @("node", "scripts/dev.js") `
-    -Environment @{
-        MES_RUNTIME_ROOT = $RuntimeRoot
-        PORT = [string] $Profile.FrontendPort
-        BACKEND_INTERNAL_URL = $Profile.BackendInternalUrl
-    }
-
-$healthUrl = "http://127.0.0.1:$($Profile.FrontendPort)/mes"
-$ok = $false
-for ($attempt = 0; $attempt -lt 90; $attempt++) {
-    Start-Sleep -Milliseconds 500
-    try {
-        $response = Invoke-WebRequest -Uri $healthUrl -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-        if ($response.StatusCode -eq 200) { $ok = $true; break }
-    }
-    catch {
-        # The supervisor may still be starting, compiling, or backing off.
-    }
-}
-
-if (-not $ok) {
-    $state = Get-RuntimeState -Path $StatePath
-    throw "[start-frontend] Frontend did not respond on $healthUrl. status=$($state.status). Check $EventPath"
-}
+    -StderrLog $StderrLog
+$launch = $startup.Launch
+$healthUrl = $startup.HealthUrl
 
 $mode = if ($launch.Existing) { "already running" } else { "started" }
 Write-Host "[start-frontend] OK - $($Profile.Label) frontend $mode on $healthUrl"

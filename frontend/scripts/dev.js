@@ -8,6 +8,24 @@ const os = require("os");
 const path = require("path");
 const { createDiagnostics, summarizeFrontendCompileError } = require("./dev-diagnostics");
 
+const requiredSupervisorEnvironment = [
+  "MES_SUPERVISED_FRONTEND",
+  "PORT",
+  "BACKEND_INTERNAL_URL",
+];
+const missingSupervisorEnvironment = requiredSupervisorEnvironment.filter((name) => {
+  const value = process.env[name];
+  return name === "MES_SUPERVISED_FRONTEND" ? value !== "1" : !value?.trim();
+});
+
+if (missingSupervisorEnvironment.length > 0) {
+  console.error(
+    `[frontend] scripts/dev.js is supervised-only. Missing: ${missingSupervisorEnvironment.join(", ")}.\n` +
+      "Run the official command instead: npm run dev (starts scripts/dev/start-frontend.ps1)."
+  );
+  process.exit(1);
+}
+
 const C = {
   reset: "\x1b[0m",
   bold: "\x1b[1m",

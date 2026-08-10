@@ -42,7 +42,7 @@
 | `services/_tx.py` 의 `commit_and_refresh` / `commit_only` | ✅ Phase 3 | inventory 10곳 적용. |
 | `services/export_helpers.py` 의 `csv_streaming_response` | ✅ Phase 3 | inventory + items 보일러플레이트 단축. |
 | **에러 응답 dict 표준화 (`_errors.py`)** | ✅ **Phase 4** | `routers/_errors.py` + `ErrorCode` 신설. production produce 등이 `{code, message, extra}` 사용. 프론트 `extractErrorMessage` 가 str/dict 양쪽 처리. |
-| **전역 예외 핸들러 + 로그 회전** | ✅ **Phase 4** | `app/_logging.py` (RotatingFileHandler 5MB×5), `main.py` 에 ValueError/IntegrityError/OperationalError/Exception 핸들러. |
+| **전역 예외 핸들러 + 로그 회전** | ✅ **Phase 4** | `app/_logging.py` (`ConcurrentRotatingFileHandler` 5MiB × 5 backup), `main.py` 에 ValueError/IntegrityError/OperationalError/Exception 핸들러. |
 | **inventory 라우터 패키지 분할** | ✅ **Phase 4** | 단일 807줄 → `routers/inventory/` (query, receive, transfer, defective, supplier, transactions, _shared, __init__). |
 | **export endpoint limit 강제** | ✅ **Phase 4** | `/transactions/export.csv|.xlsx` 가 `start_date/end_date` 필수 + 50,000행 상한. `EXPORT_RANGE_REQUIRED` / `EXPORT_RANGE_TOO_LARGE`. |
 | **stock_math bulk_compute 통일** | ✅ **Phase 4** | `get_item` 단건 + `list_inventory` 다건 모두 `bulk_compute` 경유. `to_response_bulk` 로 N+1 제거. |
