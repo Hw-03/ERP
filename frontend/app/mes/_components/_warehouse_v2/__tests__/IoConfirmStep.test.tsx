@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { IoBundle } from "@/lib/api";
+import type { IoBundle, IoSubType, IoWorkType } from "@/lib/api";
 import { IoConfirmStep } from "../IoConfirmStep";
 
 const parentLine = {
@@ -65,6 +65,38 @@ function renderConfirmStep() {
 }
 
 describe("IoConfirmStep", () => {
+  it("창고 보정 입고는 BOM 없이 즉시 반영 확인 문구를 사용한다", () => {
+    const adjustmentLine = {
+      ...parentLine,
+      direction: "adjust" as const,
+      from_bucket: "none" as const,
+      to_bucket: "warehouse" as const,
+      to_department: null,
+    };
+    render(
+      <IoConfirmStep
+        workType={"warehouse_adjust" as IoWorkType}
+        subType={"warehouse_adjust_in" as IoSubType}
+        bundles={[{ ...bundle, source_kind: "direct_item", lines: [adjustmentLine] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="none"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("보정 입고 · 반영 1건")).toBeInTheDocument();
+    expect(screen.queryByText(/BOM/)).not.toBeInTheDocument();
+    expect(screen.getByText("즉시 재고 반영")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "즉시 반영하기 1건" }));
+    expect(screen.getByText("창고 보정 입고를 진행하시겠습니까?")).toBeInTheDocument();
+  });
+
   it("internal use는 창고 결재·사용출고 확인 문구를 사용한다", () => {
     render(
       <IoConfirmStep

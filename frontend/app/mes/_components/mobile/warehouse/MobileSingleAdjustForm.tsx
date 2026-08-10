@@ -12,7 +12,7 @@ import { TYPO } from "../tokens";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 
 /**
- * 단품 입출고(adjust_in/adjust_out) 전용 인라인 빠른 폼.
+ * 단품 입출고(adjust_in/out, warehouse_adjust_in/out) 전용 인라인 빠른 폼.
  * 5단계 위저드(대상선택→실제반영→제출확인) 대신 한 화면에서
  * 검색/스캔 → 수량 → 제출까지 끝낸다. 모바일 전용 — 데스크톱과 재통합 금지.
  *
@@ -36,7 +36,7 @@ export function MobileSingleAdjustForm({
   busy,
   error,
 }: {
-  subType: IoSubType; // adjust_in | adjust_out
+  subType: IoSubType;
   items: Item[];
   bundles: IoBundle[];
   search: string;
@@ -52,7 +52,9 @@ export function MobileSingleAdjustForm({
   busy: boolean;
   error: string | null;
 }) {
-  const isOut = subType === "adjust_out";
+  const isOut = subType === "adjust_out" || subType === "warehouse_adjust_out";
+  const isWarehouseAdjust =
+    subType === "warehouse_adjust_in" || subType === "warehouse_adjust_out";
   const accent = isOut ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -154,7 +156,11 @@ export function MobileSingleAdjustForm({
         }}
       >
         <div className={clsx(TYPO.overline, "mb-2")} style={{ color: LEGACY_COLORS.muted2 }}>
-          {isOut ? "단품 출고 품목" : "단품 입고 품목"}
+          {isWarehouseAdjust
+            ? `보정 ${isOut ? "출고" : "입고"} 품목`
+            : isOut
+              ? "단품 출고 품목"
+              : "단품 입고 품목"}
         </div>
         {bundles.length === 0 ? (
           <div className={TYPO.body} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -165,6 +171,10 @@ export function MobileSingleAdjustForm({
             {bundles.map((b) => {
               const line = b.lines[0] as IoLine | undefined;
               const max = isOut && line ? getAvailable(line) ?? undefined : undefined;
+              const item = items.find((row) => row.item_id === line?.item_id);
+              const warehouseCurrent = item ? Number(item.warehouse_qty) || 0 : null;
+              const correction = isOut ? -Number(b.quantity) : Number(b.quantity);
+              const expected = warehouseCurrent === null ? null : warehouseCurrent + correction;
               return (
                 <div key={b.bundle_id} className="flex flex-col gap-2">
                   <div className="flex items-start justify-between gap-2">
@@ -174,7 +184,11 @@ export function MobileSingleAdjustForm({
                       </div>
                       <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
                         {b.source_mes_code ?? "-"}
-                        {max != null ? ` · 가용 ${formatQty(max)}` : ""}
+                        {isWarehouseAdjust && warehouseCurrent !== null
+                          ? ` · 현재 창고 ${formatQty(warehouseCurrent)}${max != null ? ` · 가용 ${formatQty(max)}` : ""} · 보정 ${correction > 0 ? "+" : ""}${formatQty(correction)} · 예정 ${formatQty(expected ?? 0)}`
+                          : max != null
+                            ? ` · 가용 ${formatQty(max)}`
+                            : ""}
                       </div>
                     </div>
                     <IconButton icon={Trash2} label="제거" size="sm" onClick={() => onRemoveBundle(b.bundle_id)} />
@@ -194,7 +208,9 @@ export function MobileSingleAdjustForm({
       </div>
 
       <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-        단품 {isOut ? "출고" : "입고"}는 부서 결재로 처리됩니다.
+        {isWarehouseAdjust
+          ? "창고 재고에 즉시 반영됩니다."
+          : `단품 ${isOut ? "출고" : "입고"}는 부서 결재로 처리됩니다.`}
       </div>
 
       <div className="grid grid-cols-2 gap-2">

@@ -1,7 +1,13 @@
 import type { Department } from "./shared";
 import type { ShippingTransactionLog } from "./shipping";
 
-export type IoWorkType = "receive" | "warehouse_io" | "process" | "defect" | "internal_use";
+export type IoWorkType =
+  | "receive"
+  | "warehouse_io"
+  | "warehouse_adjust"
+  | "process"
+  | "defect"
+  | "internal_use";
 
 export type IoSubType =
   | "receive_supplier"
@@ -12,6 +18,8 @@ export type IoSubType =
   | "dept_transfer"
   | "adjust_in"
   | "adjust_out"
+  | "warehouse_adjust_in"
+  | "warehouse_adjust_out"
   | "defect_quarantine"
   | "defect_restore"
   | "defect_process"

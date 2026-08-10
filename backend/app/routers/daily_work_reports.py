@@ -51,6 +51,8 @@ _OPERATION_BY_SUBTYPE = {
     "dept_transfer": ("process", "공정"),
     "adjust_in": ("process", "공정"),
     "adjust_out": ("process", "공정"),
+    "warehouse_adjust_in": ("warehouse", "창고"),
+    "warehouse_adjust_out": ("warehouse", "창고"),
     "receive_supplier": ("warehouse", "창고"),
     "supplier_return": ("defect", "불량"),
     "defect_quarantine": ("defect", "불량"),

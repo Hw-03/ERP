@@ -25,6 +25,7 @@ from app.services.io_preview import (  # noqa: F401
     WORK_TYPES,
     preview,
     validate_internal_use_requester,
+    validate_warehouse_adjust_requester,
 )
 
 # ---------------------------------------------------------------------------

@@ -152,7 +152,13 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
 function getAdjustmentDisplayBundles(batch: IoBatch): IoBundle[] {
   const bundles = getDisplayBundles(batch);
   const isLegacyAdjustmentIn = isManualOnlyProductionBatch(batch);
-  const isMultiItemAdjustment = (batch.sub_type === "adjust_in" || batch.sub_type === "adjust_out" || isLegacyAdjustmentIn)
+  const isMultiItemAdjustment = (
+    batch.sub_type === "adjust_in"
+    || batch.sub_type === "adjust_out"
+    || batch.sub_type === "warehouse_adjust_in"
+    || batch.sub_type === "warehouse_adjust_out"
+    || isLegacyAdjustmentIn
+  )
     && bundles.length > 1;
 
   if (!isMultiItemAdjustment) return bundles;
@@ -161,7 +167,13 @@ function getAdjustmentDisplayBundles(batch: IoBatch): IoBundle[] {
   return [{
     bundle_id: `history-adjustment-${batch.batch_id}`,
     source_kind: "manual",
-    title: batch.sub_type === "adjust_in" || isLegacyAdjustmentIn ? "수량보정 입고" : "출고",
+    title: batch.sub_type === "adjust_in"
+      || batch.sub_type === "warehouse_adjust_in"
+      || isLegacyAdjustmentIn
+      ? "수량보정 입고"
+      : batch.sub_type === "warehouse_adjust_out"
+        ? "수량보정 출고"
+        : "출고",
     source_item_id: null,
     source_mes_code: null,
     quantity: lines.reduce((total, line) => total + Math.abs(line.quantity), 0),

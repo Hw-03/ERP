@@ -53,7 +53,10 @@ export function useIoDraftRestore(params: {
     autosaveBatchIdRef.current = draftToRestore.batch_id;
     state.setWorkType(draftToRestore.work_type);
     state.setSubType(draftToRestore.sub_type);
-    if (draftToRestore.work_type === "process") {
+    if (
+      draftToRestore.work_type === "process" ||
+      draftToRestore.work_type === "warehouse_adjust"
+    ) {
       const dir = deptIoDirectionOf(draftToRestore.sub_type);
       state.setDeptIoDirectionRaw(dir);
     }
@@ -64,7 +67,12 @@ export function useIoDraftRestore(params: {
     state.setBundles(draftToRestore.bundles);
     state.goTo(
       restoreStep
-        ?? (draftToRestore.sub_type === "adjust_in" || draftToRestore.sub_type === "adjust_out" ? 3 : 4),
+        ?? (draftToRestore.sub_type === "adjust_in"
+          || draftToRestore.sub_type === "adjust_out"
+          || draftToRestore.sub_type === "warehouse_adjust_in"
+          || draftToRestore.sub_type === "warehouse_adjust_out"
+          ? 3
+          : 4),
     );
     onStatusChange("임시저장 작업을 불러왔습니다.");
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -26,9 +26,11 @@ import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/Io
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import {
   approvalKind,
+  ioDepartmentPayload,
   isExitWorkType,
   isSingleInlineSubType,
   pickerDirectionLabel,
+  singleItemSourceKind,
   targetDepartmentOf,
 } from "../../_warehouse_v2/ioWorkType";
 import {
@@ -220,6 +222,11 @@ export function MobileIoComposeWizard({
       state.setSubType(subTypeOverride);
     }
     try {
+      const departments = ioDepartmentPayload(
+        effectiveSubType,
+        state.fromDepartment,
+        state.toDepartment,
+      );
       // 이미 같은 품목이 카트에 있으면 수량 합산, 없으면 append.
       const existingIdx = state.bundles.findIndex((b) => b.source_item_id === item.item_id);
       const prevQty = existingIdx !== -1 ? state.bundles[existingIdx].quantity : 0;
@@ -227,8 +234,8 @@ export function MobileIoComposeWizard({
         employeeId,
         workType: state.workType,
         subType: effectiveSubType,
-        fromDepartment: state.fromDepartment,
-        toDepartment: state.toDepartment,
+        fromDepartment: departments.fromDepartment,
+        toDepartment: departments.toDepartment,
         target: { source_kind: sourceKind, item_id: item.item_id, quantity: prevQty + 1 },
       });
       const newBundles = response.bundles;
@@ -241,7 +248,7 @@ export function MobileIoComposeWizard({
       } else {
         state.setBundles((prev) => [...prev, ...newBundles]);
       }
-      if (effectiveSubType === "adjust_in" || effectiveSubType === "adjust_out") {
+      if (isSingleInlineSubType(effectiveSubType)) {
         setSearch("");
       }
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
@@ -362,8 +369,7 @@ export function MobileIoComposeWizard({
       employeeId,
       workType: state.workType,
       subType: state.subType,
-      fromDepartment: state.fromDepartment,
-      toDepartment: state.toDepartment,
+      ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
       referenceNo: state.referenceNo,
       notes: state.notes,
       batchId: autosaveBatchIdRef.current,
@@ -448,8 +454,7 @@ export function MobileIoComposeWizard({
         employeeId,
         workType: state.workType,
         subType: state.subType,
-        fromDepartment: state.fromDepartment,
-        toDepartment: state.toDepartment,
+        ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
         bundles: state.bundles,
@@ -494,7 +499,9 @@ export function MobileIoComposeWizard({
     step === 1
       ? "작업 유형 선택"
       : step === 2
-      ? "세부 작업과 부서"
+      ? state.workType === "warehouse_adjust"
+        ? "입고·출고 방향 선택"
+        : "세부 작업과 부서"
       : step === 3
       ? `${pickerDirectionLabel(state.subType)} 품목 선택`
       : step === 4
@@ -580,7 +587,7 @@ export function MobileIoComposeWizard({
               bundles={state.bundles}
               search={search}
               onSearchChange={setSearch}
-              onAddItem={(item) => addItem(item, "manual")}
+              onAddItem={(item) => addItem(item, singleItemSourceKind(state.subType))}
               onBundleQuantityChange={(bundleId, qty) =>
                 state.setBundles((prev) =>
                   applyBundleQuantityChange(prev, bundleId, qty, state.subType, getAvailable),
@@ -712,7 +719,11 @@ export function MobileIoComposeWizard({
       {step === 2 && (
         <StickyFooter flat>
           <PrimaryActionButton
-            label={state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
+            label={state.canAdvance[2]
+              ? "다음 단계로 →"
+              : state.workType === "warehouse_adjust"
+                ? "입고 또는 출고를 선택하세요"
+                : "세부 작업과 부서를 선택하세요"}
             intent={isExitWorkType(state.workType) ? "danger" : "primary"}
             disabled={!state.canAdvance[2]}
             onClick={() => {

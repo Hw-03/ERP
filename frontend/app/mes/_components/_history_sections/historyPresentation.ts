@@ -582,8 +582,9 @@ export function getHistoryListOperationLabel(
     case "DISASSEMBLE":
     case "BACKFLUSH":
     case "TRANSFER_DEPT":
-    case "ADJUST":
       return "부서 입출고";
+    case "ADJUST":
+      return log.department === "창고" ? "수량 조정" : "부서 입출고";
     case "MARK_DEFECTIVE":
     case "UNMARK_DEFECTIVE":
     case "DEFECT_SCRAP":

@@ -41,6 +41,7 @@ _SUMMARY_DEPT_TYPES = [
     TransactionTypeEnum.DISASSEMBLE,
 ]
 _SUMMARY_ADJUST_TYPES = [TransactionTypeEnum.ADJUST]
+_WAREHOUSE_ADJUST_SUBTYPES = {"warehouse_adjust_in", "warehouse_adjust_out"}
 _SUMMARY_DEFECT_TYPES = [
     TransactionTypeEnum.MARK_DEFECTIVE,
     TransactionTypeEnum.UNMARK_DEFECTIVE,
@@ -85,6 +86,13 @@ def _department_label_expr() -> ColumnElement:
         func.nullif(func.trim(IoBatch.requester_department), ""),
     )
     return case(
+        (
+            and_(
+                TransactionLog.transaction_type == TransactionTypeEnum.ADJUST,
+                IoBatch.sub_type.in_(_WAREHOUSE_ADJUST_SUBTYPES),
+            ),
+            "창고",
+        ),
         (
             TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE,
             resolved_department,
@@ -181,6 +189,8 @@ _SUBTYPE_OP: dict[str, str] = {
     "dept_transfer": "부서 이동",
     "adjust_in": "수량 조정",
     "adjust_out": "수량 조정",
+    "warehouse_adjust_in": "수량 조정",
+    "warehouse_adjust_out": "수량 조정",
     "receive_supplier": "원자재 입고",
     "supplier_return": "공급사 반품",
     "defect_quarantine": "불량 처리",
@@ -309,7 +319,14 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
         "warehouse": or_(
             and_(
                 IoBatch.sub_type.in_(
-                    ["receive_supplier", "warehouse_to_dept", "dept_to_warehouse", "internal_use_out"]
+                    [
+                        "receive_supplier",
+                        "warehouse_to_dept",
+                        "dept_to_warehouse",
+                        "internal_use_out",
+                        "warehouse_adjust_in",
+                        "warehouse_adjust_out",
+                    ]
                 ),
                 no_shipping_phase,
             ),

@@ -28,6 +28,9 @@ from app.services.io_preview import (
     _new_id,
     validate_internal_use_operation,
     validate_internal_use_requester,
+    validate_operation_sources,
+    validate_warehouse_adjust_operation,
+    validate_warehouse_adjust_requester,
 )
 
 
@@ -207,6 +210,22 @@ def _persist_batch(
         sub_type=payload.sub_type,
         to_department=payload.to_department,
         lines=(line for bundle in payload.bundles for line in bundle.lines),
+    )
+    validate_warehouse_adjust_requester(
+        requester,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+    )
+    validate_warehouse_adjust_operation(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        from_department=payload.from_department,
+        to_department=payload.to_department,
+        lines=(line for bundle in payload.bundles for line in bundle.lines),
+    )
+    validate_operation_sources(
+        payload.sub_type,
+        (bundle.source_kind for bundle in payload.bundles),
     )
     now = datetime.utcnow()
     batch = IoBatch(

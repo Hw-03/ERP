@@ -140,6 +140,18 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
                 work_type=payload.work_type,
                 sub_type=payload.sub_type,
             )
+        if payload.work_type == "warehouse_adjust" or payload.sub_type in {
+            "warehouse_adjust_in",
+            "warehouse_adjust_out",
+        }:
+            if payload.requester_employee_id is None:
+                raise ValueError("창고 수량보정 미리보기에는 requester_employee_id가 필요합니다.")
+            requester = io_svc._load_requester(db, payload.requester_employee_id)
+            io_svc.validate_warehouse_adjust_requester(
+                requester,
+                work_type=payload.work_type,
+                sub_type=payload.sub_type,
+            )
         return io_svc.preview(
             db,
             work_type=payload.work_type,

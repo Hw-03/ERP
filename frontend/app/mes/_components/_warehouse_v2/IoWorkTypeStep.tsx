@@ -17,7 +17,7 @@ interface WorkTypeProps {
 }
 
 /**
- * Step 1 본문 — 큰 작업 유형 카드 5개. WizardStepCard 안에 들어감.
+ * Step 1 본문 — 큰 작업 유형 카드. WizardStepCard 안에 들어감.
  */
 export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeChange, onItemConversion }: WorkTypeProps) {
   const visibleWorkTypes = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
@@ -102,6 +102,28 @@ export function IoSubTypeStep({
   onToDepartmentChange,
   onDeptIoDirectionChange,
 }: SubTypeProps) {
+  if (workType === "warehouse_adjust") {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <Step2Label label="방향" />
+        <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
+          <DirectionCard
+            dir="in"
+            active={deptIoDirection === "in"}
+            onClick={() => onDeptIoDirectionChange("in")}
+            variant="warehouse_adjust"
+          />
+          <DirectionCard
+            dir="out"
+            active={deptIoDirection === "out"}
+            onClick={() => onDeptIoDirectionChange("out")}
+            variant="warehouse_adjust"
+          />
+        </div>
+      </div>
+    );
+  }
+
   // process workType은 (입고/출고) 카드 + 대상 부서 그리드만 노출. 4 chip 숨김.
   if (workType === "process") {
     return (
@@ -279,10 +301,12 @@ function DirectionCard({
   dir,
   active,
   onClick,
+  variant = "process",
 }: {
   dir: DeptIoDirection;
   active: boolean;
   onClick: () => void;
+  variant?: "process" | "warehouse_adjust";
 }) {
   const Icon = dir === "in" ? ArrowDownToLine : ArrowUpFromLine;
   const activeColor = dir === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -299,7 +323,9 @@ function DirectionCard({
       }}
     >
       <Icon className="h-16 w-16 shrink-0" />
-      {dir === "in" ? (
+      {variant === "warehouse_adjust" ? (
+        <span className="text-4xl font-black">{dir === "in" ? "입고" : "출고"}</span>
+      ) : dir === "in" ? (
         <div className="flex flex-col items-center gap-2 leading-tight">
           <span className="text-4xl font-black">생산</span>
           <span

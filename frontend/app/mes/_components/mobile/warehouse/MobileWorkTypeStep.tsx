@@ -164,13 +164,16 @@ export function MobileSubTypeStep({
   onToDepartmentChange: (v: string) => void;
   onDeptIoDirectionChange: (d: DeptIoDirection) => void;
 }) {
-  if (workType === "process") {
+  if (workType === "process" || workType === "warehouse_adjust") {
+    const hasDepartment = workType === "process";
     return (
       // 항목 7 — 부서/방향/입력방식 섹션이 화면 높이를 균등 분할(버튼은 과대 stretch 없이 중앙 정렬).
       <div className="flex min-h-full flex-col gap-4">
-        <div className="flex flex-1 flex-col">
-          <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} />
-        </div>
+        {hasDepartment && (
+          <div className="flex flex-1 flex-col">
+            <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} />
+          </div>
+        )}
         <div className="flex flex-1 flex-col">
           <Label text="방향" />
           <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-3">

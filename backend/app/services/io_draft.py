@@ -21,6 +21,8 @@ from app.services.io_preview import (
     validate_internal_use_operation,
     validate_internal_use_requester,
     validate_operation_sources,
+    validate_warehouse_adjust_operation,
+    validate_warehouse_adjust_requester,
 )
 from app.services.io_persist import (
     _add_bundles_and_lines,
@@ -68,6 +70,18 @@ def save_draft(db: Session, payload) -> dict:
     validate_internal_use_operation(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
+        to_department=payload.to_department,
+        lines=(line for bundle in payload.bundles for line in bundle.lines),
+    )
+    validate_warehouse_adjust_requester(
+        requester,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+    )
+    validate_warehouse_adjust_operation(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        from_department=payload.from_department,
         to_department=payload.to_department,
         lines=(line for bundle in payload.bundles for line in bundle.lines),
     )

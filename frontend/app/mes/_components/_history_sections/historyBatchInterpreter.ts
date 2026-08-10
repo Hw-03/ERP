@@ -113,6 +113,8 @@ function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to
       return "재작업";
     case "adjust_in":
     case "adjust_out":
+    case "warehouse_adjust_in":
+    case "warehouse_adjust_out":
       return "수량 조정";
     default:
       return null;
@@ -308,6 +310,8 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   dept_transfer: _SUB_LABEL.dept_transfer,
   adjust_in: _SUB_LABEL.adjust_in,
   adjust_out: _SUB_LABEL.adjust_out,
+  warehouse_adjust_in: _TX_LABEL.ADJUST,
+  warehouse_adjust_out: _TX_LABEL.ADJUST,
   receive_supplier: _SUB_LABEL.receive_supplier,
   supplier_return: _SUB_LABEL.supplier_return,
   defect_quarantine: "불량 격리",
@@ -345,6 +349,8 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   internal_use_out: "창고에서 AS·연구 용도로 반출",
   adjust_in: "재고 수량 직접 수정",
   adjust_out: "재고 수량 직접 수정",
+  warehouse_adjust_in: "창고 재고 수량 직접 수정",
+  warehouse_adjust_out: "창고 재고 수량 직접 수정",
   // transaction_type
   RECEIVE: "창고로 들어옴",
   SHIP: "회사 밖으로 나감",
@@ -633,7 +639,9 @@ export function getHistoryLineSignedQuantity(
     case "internal_use_out":
     case "defect_quarantine":
     case "adjust_out": setDecrease(); break;
-    case "adjust_in": setIncrease(); break;
+    case "warehouse_adjust_out": setDecrease(); break;
+    case "adjust_in":
+    case "warehouse_adjust_in": setIncrease(); break;
     case "dept_transfer": setMove(); break;
     default: matched = false;
   }
@@ -812,6 +820,10 @@ export function getHistoryMovementSummary(
     parts.push({ label: `격리 해제 ${_distinctItemCount(included)}품목`, tone: "success" });
   } else if (sub === "defect_process" || tx === "DEFECT_SCRAP") {
     parts.push({ label: `폐기 ${_distinctItemCount(included)}품목`, tone: "danger" });
+  } else if (sub === "warehouse_adjust_in") {
+    parts.push(_verbItemPart("증가", "success", included));
+  } else if (sub === "warehouse_adjust_out") {
+    parts.push(_verbItemPart("감소", "danger", included));
   } else if (sub === "adjust_in" || sub === "adjust_out" || tx === "ADJUST") {
     const inc: typeof included = [];
     const dec: typeof included = [];

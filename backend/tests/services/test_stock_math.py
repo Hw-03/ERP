@@ -126,6 +126,15 @@ def test_figures_from_inventory_with_values():
         warehouse_qty = D("8")
         pending_quantity = D("2")
     figs = figures_from_inventory(_Stub(), prod=D("3"), defect=D("1"))
+    assert all(
+        isinstance(value, Decimal)
+        for value in (
+            figs.warehouse_qty,
+            figs.production_total,
+            figs.defective_total,
+            figs.pending,
+        )
+    )
     assert figs.warehouse_qty == D("8")
     assert figs.production_total == D("3")
     assert figs.defective_total == D("1")

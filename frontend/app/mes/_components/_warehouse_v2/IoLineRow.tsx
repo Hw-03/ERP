@@ -8,7 +8,12 @@ import { getStockState } from "@/lib/mes/inventory";
 import { mesCodeDeptBadge } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import type { IoLine, IoSubType, Item } from "./types";
-import { isBomForced, lineTagLabel, type LineTagTone } from "./ioWorkType";
+import {
+  isBomForced,
+  isWarehouseAdjustSubType,
+  lineTagLabel,
+  type LineTagTone,
+} from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { BomSubExpander } from "./BomSubExpander";
 import { ExpandableItemName } from "./ExpandableItemName";
@@ -44,7 +49,10 @@ export function isOutgoing(line: IoLine) {
   if (line.direction === "out" || line.direction === "move" || line.direction === "defective") {
     return true;
   }
-  if (line.direction === "adjust" && line.from_bucket === "production") {
+  if (
+    line.direction === "adjust" &&
+    (line.from_bucket === "production" || line.from_bucket === "warehouse")
+  ) {
     return true;
   }
   return false;
@@ -55,8 +63,12 @@ export function expectedAfter(line: IoLine, available: number | null) {
   const qty = Number(line.quantity) || 0;
   if (line.direction === "in") return available + qty;
   if (line.direction === "adjust") {
-    if (line.to_bucket === "production") return available + qty;
-    if (line.from_bucket === "production") return available - qty;
+    if (line.to_bucket === "production" || line.to_bucket === "warehouse") {
+      return available + qty;
+    }
+    if (line.from_bucket === "production" || line.from_bucket === "warehouse") {
+      return available - qty;
+    }
     return available;
   }
   if (line.direction === "out" || line.direction === "defective" || line.direction === "move")
@@ -96,7 +108,11 @@ export function IoLineRow({
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
   const deptBadge = item ? mesCodeDeptBadge(item.mes_code, getDeptColor) : null;
-  const expected = expectedAfter(line, available);
+  const isWarehouseAdjust = isWarehouseAdjustSubType(subType);
+  const displayedCurrent = isWarehouseAdjust && item
+    ? Number(item.warehouse_qty) || 0
+    : available;
+  const expected = expectedAfter(line, displayedCurrent);
   const tag = lineTagLabel(line, subType);
   const tagColor = toneToColor(tag.tone);
   const expectedColor =
@@ -225,13 +241,13 @@ export function IoLineRow({
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          {isOutgoing(line) ? "가능 재고" : "현재 재고"}
+          {isWarehouseAdjust ? "현재 창고" : isOutgoing(line) ? "가능 재고" : "현재 재고"}
         </div>
         <div
           className="text-base font-black tabular-nums"
-          style={{ color: stock ? stock.color : available === null ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
+          style={{ color: stock ? stock.color : displayedCurrent === null ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
         >
-          {available === null ? "-" : formatQty(available)}
+          {displayedCurrent === null ? "-" : formatQty(displayedCurrent)}
         </div>
       </div>
 

@@ -32,6 +32,11 @@ from app.repositories import inventory_repository
 _D0 = Decimal("0")
 
 
+def _as_decimal(value: object) -> Decimal:
+    """DB 숫자 타입 차이와 무관하게 StockFigures의 Decimal 계약을 지킨다."""
+    return Decimal(str(value or 0))
+
+
 @dataclass(frozen=True)
 class StockFigures:
     """한 품목의 재고 수치 모음. 모든 값 Decimal."""
@@ -63,8 +68,8 @@ class StockFigures:
 def compute_for(db: Session, item_id: uuid.UUID) -> StockFigures:
     """단일 품목의 재고 수치. 쿼리 2회 (Inventory + InventoryLocation GROUP BY)."""
     inv = inventory_repository.get(db, item_id)
-    wh = (inv.warehouse_qty if inv else None) or _D0
-    pending = (inv.pending_quantity if inv else None) or _D0
+    wh = _as_decimal(inv.warehouse_qty if inv else None)
+    pending = _as_decimal(inv.pending_quantity if inv else None)
 
     rows = (
         db.query(InventoryLocation.status, func.coalesce(func.sum(InventoryLocation.quantity), 0))
@@ -131,10 +136,10 @@ def bulk_compute(db: Session, item_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, 
     for iid in ids:
         inv = invs.get(iid)
         result[iid] = StockFigures(
-            warehouse_qty=(inv.warehouse_qty if inv else None) or _D0,
-            production_total=prod_by_id.get(iid, _D0),
-            defective_total=defect_by_id.get(iid, _D0),
-            pending=(inv.pending_quantity if inv else None) or _D0,
+            warehouse_qty=_as_decimal(inv.warehouse_qty if inv else None),
+            production_total=_as_decimal(prod_by_id.get(iid, _D0)),
+            defective_total=_as_decimal(defect_by_id.get(iid, _D0)),
+            pending=_as_decimal(inv.pending_quantity if inv else None),
         )
     return result
 
@@ -145,8 +150,8 @@ def figures_from_inventory(inv: Inventory | None, prod: Decimal = _D0, defect: D
     (라우터 조립 경로에서 쿼리 중복을 피하려고 쓴다.)
     """
     return StockFigures(
-        warehouse_qty=(inv.warehouse_qty if inv else None) or _D0,
-        production_total=prod or _D0,
-        defective_total=defect or _D0,
-        pending=(inv.pending_quantity if inv else None) or _D0,
+        warehouse_qty=_as_decimal(inv.warehouse_qty if inv else None),
+        production_total=_as_decimal(prod),
+        defective_total=_as_decimal(defect),
+        pending=_as_decimal(inv.pending_quantity if inv else None),
     )

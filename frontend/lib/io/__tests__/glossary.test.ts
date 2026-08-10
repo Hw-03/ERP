@@ -28,7 +28,14 @@ import type { TransactionType } from "@/lib/api/types/shared";
 
 describe("glossary — 키 완전성", () => {
   it("모든 IoWorkType 키가 WORK_TYPE_LABEL / WORK_TYPE_DESCRIPTION 에 있다", () => {
-    const expected: IoWorkType[] = ["receive", "warehouse_io", "process", "defect", "internal_use"];
+    const expected: IoWorkType[] = [
+      "receive",
+      "warehouse_io",
+      "warehouse_adjust",
+      "process",
+      "defect",
+      "internal_use",
+    ];
     for (const wt of expected) {
       expect(WORK_TYPE_LABEL[wt]).toBeTruthy();
       expect(WORK_TYPE_DESCRIPTION[wt]).toBeTruthy();
@@ -46,6 +53,8 @@ describe("glossary — 키 완전성", () => {
       "disassemble",
       "adjust_in",
       "adjust_out",
+      "warehouse_adjust_in",
+      "warehouse_adjust_out",
       "defect_quarantine",
       "defect_restore",
       "defect_process",
@@ -139,6 +148,16 @@ describe("glossary — 캐노니컬 라벨 고정", () => {
   it("warehouse_to_dept / dept_to_warehouse 는 방향 화살표 형식", () => {
     expect(SUB_TYPE_LABEL.warehouse_to_dept).toBe("창고 → 부서");
     expect(SUB_TYPE_LABEL.dept_to_warehouse).toBe("부서 → 창고");
+  });
+
+  it("창고 수량보정 작업과 입고·출고 세부 유형 용어를 제공한다", () => {
+    const workType = "warehouse_adjust" as IoWorkType;
+    const inbound = "warehouse_adjust_in" as IoSubType;
+    const outbound = "warehouse_adjust_out" as IoSubType;
+
+    expect(WORK_TYPE_LABEL[workType]).toBe("수량보정 입출고");
+    expect(SUB_TYPE_LABEL[inbound]).toBe("보정 입고");
+    expect(SUB_TYPE_LABEL[outbound]).toBe("보정 출고");
   });
 });
 

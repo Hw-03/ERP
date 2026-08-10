@@ -73,6 +73,31 @@ def _preview_internal_use(client, requester: Employee, item, *, to_department: s
     )
 
 
+def _preview_warehouse_adjust(
+    client,
+    requester: Employee,
+    item,
+    *,
+    sub_type: str,
+    quantity: int,
+):
+    return client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_adjust",
+            "sub_type": sub_type,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": quantity,
+                }
+            ],
+        },
+    )
+
+
 def _internal_use_bundles(
     item,
     *,
@@ -1322,6 +1347,273 @@ def test_io_immediate_adjust_out_decreases_production_quantity(
     assert len(tx) == 1
     # adjust_out 은 BACKFLUSH 가 아니라 ADJUST 로 남아야 한다
     assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
+
+
+def test_warehouse_adjust_in_immediately_increases_warehouse_stock(
+    client, db_session, make_item
+):
+    item = make_item(name="Warehouse Adj In", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="WH-ADJ-IN",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+
+    preview = _preview_warehouse_adjust(
+        client,
+        requester,
+        item,
+        sub_type="warehouse_adjust_in",
+        quantity=3,
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["requires_approval"] is False
+    line = preview.json()["bundles"][0]["lines"][0]
+    assert line["direction"] == "adjust"
+    assert line["from_bucket"] == "none"
+    assert line["to_bucket"] == "warehouse"
+    assert line["from_department"] is None
+    assert line["to_department"] is None
+    assert line["origin"] == "direct"
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_adjust",
+            "sub_type": "warehouse_adjust_in",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    assert submitted.json()["requires_approval"] is False
+    assert submitted.json()["stock_request_id"] is None
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("8")
+    assert db_session.query(StockRequest).count() == 0
+    log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
+    assert log.transaction_type == TransactionTypeEnum.ADJUST
+    assert log.quantity_change == Decimal("3")
+    assert log.department == "창고"
+    assert log.warehouse_qty_before == Decimal("5")
+    assert log.warehouse_qty_after == Decimal("8")
+
+    history = client.get(
+        "/api/inventory/transactions",
+        params={"department": "창고", "transaction_types": "ADJUST"},
+    )
+    assert history.status_code == 200, history.text
+    assert [row["log_id"] for row in history.json()] == [str(log.log_id)]
+
+    warehouse_history = client.get(
+        "/api/inventory/transactions",
+        params={"operation_keys": "warehouse"},
+    )
+    process_history = client.get(
+        "/api/inventory/transactions",
+        params={"operation_keys": "process"},
+    )
+    assert warehouse_history.status_code == 200, warehouse_history.text
+    assert process_history.status_code == 200, process_history.text
+    assert [row["log_id"] for row in warehouse_history.json()] == [str(log.log_id)]
+    assert process_history.json() == []
+
+
+def test_warehouse_adjust_out_immediately_decreases_warehouse_stock(
+    client, db_session, make_item
+):
+    item = make_item(name="Warehouse Adj Out", warehouse_qty=Decimal("8"))
+    requester = _make_employee(
+        db_session,
+        code="WH-ADJ-OUT",
+        warehouse_role="deputy",
+    )
+    db_session.commit()
+
+    preview = _preview_warehouse_adjust(
+        client,
+        requester,
+        item,
+        sub_type="warehouse_adjust_out",
+        quantity=3,
+    )
+    assert preview.status_code == 200, preview.text
+    line = preview.json()["bundles"][0]["lines"][0]
+    assert line["direction"] == "adjust"
+    assert line["from_bucket"] == "warehouse"
+    assert line["to_bucket"] == "none"
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_adjust",
+            "sub_type": "warehouse_adjust_out",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("5")
+    log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
+    assert log.transaction_type == TransactionTypeEnum.ADJUST
+    assert log.quantity_change == Decimal("-3")
+
+
+def test_warehouse_adjust_handles_multiple_direct_items_without_bom_expansion(
+    client, db_session, make_item
+):
+    first = make_item(name="Warehouse Adj Multi A", warehouse_qty=Decimal("1"))
+    second = make_item(name="Warehouse Adj Multi B", warehouse_qty=Decimal("2"))
+    requester = _make_employee(
+        db_session,
+        code="WH-ADJ-MULTI",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_adjust",
+            "sub_type": "warehouse_adjust_in",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(first.item_id),
+                    "quantity": 3,
+                },
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(second.item_id),
+                    "quantity": 4,
+                },
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    bundles = preview.json()["bundles"]
+    assert len(bundles) == 2
+    assert all(bundle["source_kind"] == "direct_item" for bundle in bundles)
+    assert all(len(bundle["lines"]) == 1 for bundle in bundles)
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_adjust",
+            "sub_type": "warehouse_adjust_in",
+            "bundles": bundles,
+        },
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    inventories = {
+        row.item_id: row.warehouse_qty
+        for row in db_session.query(Inventory)
+        .filter(Inventory.item_id.in_([first.item_id, second.item_id]))
+        .all()
+    }
+    assert inventories == {
+        first.item_id: Decimal("4"),
+        second.item_id: Decimal("6"),
+    }
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(TransactionLog).count() == 2
+
+
+def test_warehouse_adjust_rejects_non_warehouse_manager_on_all_write_paths(
+    client, db_session, make_item
+):
+    item = make_item(name="Warehouse Adj Forbidden", warehouse_qty=Decimal("5"))
+    manager = _make_employee(
+        db_session,
+        code="WH-ADJ-MGR",
+        warehouse_role="primary",
+    )
+    requester = _make_employee(db_session, code="WH-ADJ-NONE")
+    db_session.commit()
+
+    forbidden_preview = _preview_warehouse_adjust(
+        client,
+        requester,
+        item,
+        sub_type="warehouse_adjust_in",
+        quantity=1,
+    )
+    assert forbidden_preview.status_code == 403, forbidden_preview.text
+
+    manager_preview = _preview_warehouse_adjust(
+        client,
+        manager,
+        item,
+        sub_type="warehouse_adjust_in",
+        quantity=1,
+    )
+    assert manager_preview.status_code == 200, manager_preview.text
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "warehouse_adjust",
+        "sub_type": "warehouse_adjust_in",
+        "bundles": manager_preview.json()["bundles"],
+    }
+
+    drafted = client.put("/api/io/draft", json=payload)
+    submitted = client.post("/api/io/submit", json=payload)
+
+    assert drafted.status_code == 403, drafted.text
+    assert submitted.status_code == 403, submitted.text
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+
+def test_warehouse_adjust_out_rejects_stock_shortage_without_partial_change(
+    client, db_session, make_item
+):
+    item = make_item(
+        name="Warehouse Adj Shortage",
+        warehouse_qty=Decimal("5"),
+        pending=Decimal("4"),
+    )
+    requester = _make_employee(
+        db_session,
+        code="WH-ADJ-SHORT",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+
+    preview = _preview_warehouse_adjust(
+        client,
+        requester,
+        item,
+        sub_type="warehouse_adjust_out",
+        quantity=2,
+    )
+    assert preview.status_code == 200, preview.text
+    assert Decimal(str(preview.json()["bundles"][0]["lines"][0]["shortage"])) == Decimal("1")
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_adjust",
+            "sub_type": "warehouse_adjust_out",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert submitted.status_code == 422, submitted.text
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("5")
+    assert inventory.pending_quantity == Decimal("4")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_io_produce_component_sources_from_home_dept(

@@ -105,7 +105,7 @@ export function isReworkOperation(
  * batch 가 없으면 거래 타입 기반 (ambiguous 는 그대로).
  */
 export function classifyHistoryScope(
-  log: { transaction_type: string },
+  log: { transaction_type: string; department?: string | null },
   batch?: IoBatch | null,
 ): "warehouse_involved" | "department_internal" | "ambiguous" {
   if (batch) {
@@ -121,6 +121,7 @@ export function classifyHistoryScope(
     if (onlyProduction) return "department_internal";
     return "ambiguous";
   }
+  if (log.transaction_type === "ADJUST" && log.department === "창고") return "warehouse_involved";
   if (isWarehouseInvolvedType(log.transaction_type)) return "warehouse_involved";
   if (isDepartmentInternalType(log.transaction_type)) return "department_internal";
   return "ambiguous";

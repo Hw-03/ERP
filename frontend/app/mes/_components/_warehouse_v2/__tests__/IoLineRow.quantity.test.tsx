@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { Item } from "@/lib/api";
 import type { IoLine } from "@/lib/api/types/io";
 
 vi.mock("../../DepartmentsContext", () => ({
@@ -25,7 +26,7 @@ vi.mock("../BomSubExpander", () => ({
     ) : null,
 }));
 
-import { IoLineRow } from "../IoLineRow";
+import { IoLineRow, expectedAfter, isOutgoing } from "../IoLineRow";
 
 function makeLine(overrides: Partial<IoLine> = {}): IoLine {
   return {
@@ -52,6 +53,59 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
 }
 
 describe("IoLineRow quantity", () => {
+  it("calculates current and expected warehouse stock for adjustment in/out", () => {
+    const inbound = makeLine({
+      direction: "adjust",
+      from_bucket: "none",
+      to_bucket: "warehouse",
+      quantity: 3,
+    });
+    const outbound = makeLine({
+      direction: "adjust",
+      from_bucket: "warehouse",
+      to_bucket: "none",
+      quantity: 3,
+    });
+
+    expect(isOutgoing(inbound)).toBe(false);
+    expect(expectedAfter(inbound, 5)).toBe(8);
+    expect(isOutgoing(outbound)).toBe(true);
+    expect(expectedAfter(outbound, 5)).toBe(2);
+  });
+
+  it("shows actual warehouse stock and expected stock while using available stock for shortage", () => {
+    const onQuantityChange = vi.fn();
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "adjust",
+          from_bucket: "warehouse",
+          to_bucket: "none",
+          quantity: 3,
+        })}
+        subType="warehouse_adjust_out"
+        isChild={false}
+        item={{
+          quantity: 10,
+          warehouse_qty: 10,
+          min_stock: null,
+          mes_code: "T-001",
+        } as Item}
+        available={8}
+        onToggle={() => {}}
+        onQuantityChange={onQuantityChange}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("현재 창고")).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "9" } });
+    expect(onQuantityChange).toHaveBeenCalledWith(9, 1);
+  });
+
   it("does not mark supplier receipt as shortage when current stock is zero", () => {
     const onQuantityChange = vi.fn();
     render(

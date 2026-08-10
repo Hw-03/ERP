@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "../types";
+import type { IoSubType, IoWorkType } from "@/lib/api";
 import { IoTargetPicker } from "../IoTargetPicker";
 
 vi.mock("../useItemOrderDrag", () => ({
@@ -51,6 +52,25 @@ const baseProps = {
 };
 
 describe("IoTargetPicker row click", () => {
+  it("adds warehouse adjustment items as direct items without BOM or manual approval origin", () => {
+    const onAddItem = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType={"warehouse_adjust" as IoWorkType}
+        subType={"warehouse_adjust_in" as IoSubType}
+        onAddItem={onAddItem}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Clickable Item").closest("tr")!);
+
+    expect(onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: "item-1" }),
+      "direct_item",
+    );
+  });
+
   it("adds a single-only receive item when the row is clicked", () => {
     const onAddItem = vi.fn();
     render(<IoTargetPicker {...baseProps} onAddItem={onAddItem} />);

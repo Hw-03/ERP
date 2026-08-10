@@ -47,6 +47,7 @@ from app.routers.inventory._tx_filters import (
     _SUMMARY_WAREHOUSE_TYPES,
     _SUMMARY_DEPT_TYPES,
     _SUMMARY_ADJUST_TYPES,
+    _WAREHOUSE_ADJUST_SUBTYPES,
     _department_label_expr,
     _process_step_filter,
     _model_filter,
@@ -567,7 +568,21 @@ def get_transactions_summary(
     agg = query.with_entities(
         func.count(TransactionLog.log_id).label("total"),
         func.coalesce(
-            func.sum(case((TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES), 1), else_=0)),
+            func.sum(
+                case(
+                    (
+                        or_(
+                            TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES),
+                            (
+                                (TransactionLog.transaction_type == TransactionTypeEnum.ADJUST)
+                                & IoBatch.sub_type.in_(_WAREHOUSE_ADJUST_SUBTYPES)
+                            ),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ),
             0,
         ).label("warehouse_count"),
         func.coalesce(

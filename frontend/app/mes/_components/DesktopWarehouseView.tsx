@@ -289,7 +289,15 @@ export function DesktopWarehouseView({
             setRestoreIoDraft(draft);
             setRestoreNonce((n) => n + 1);
             handleSectionTabChange("compose");
-            persistWarehouseDraftUrl(draft.batch_id, draft.sub_type === "adjust_in" || draft.sub_type === "adjust_out" ? 3 : 4);
+            persistWarehouseDraftUrl(
+              draft.batch_id,
+              draft.sub_type === "adjust_in"
+                || draft.sub_type === "adjust_out"
+                || draft.sub_type === "warehouse_adjust_in"
+                || draft.sub_type === "warehouse_adjust_out"
+                ? 3
+                : 4,
+            );
           }}
           bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
           onSubmitSuccess={onSubmitSuccess}

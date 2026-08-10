@@ -322,6 +322,35 @@ describe("getHistoryFlowLabel", () => {
 // getBatchFlowEndpoints
 // ──────────────────────────────────────────────────────────────────
 describe("getBatchFlowEndpoints", () => {
+  it("창고 수량보정 입고·출고를 수량 조정과 창고 사이 흐름으로 표시한다", () => {
+    const inboundLine = makeLine({
+      direction: "adjust",
+      from_bucket: "none",
+      to_bucket: "warehouse",
+    });
+    const inbound = makeBatch({
+      work_type: "warehouse_adjust" as IoBatch["work_type"],
+      sub_type: "warehouse_adjust_in" as IoBatch["sub_type"],
+      bundles: [makeBundle({ lines: [inboundLine] })],
+    });
+    const outboundLine = makeLine({
+      direction: "adjust",
+      from_bucket: "warehouse",
+      to_bucket: "none",
+    });
+    const outbound = makeBatch({
+      work_type: "warehouse_adjust" as IoBatch["work_type"],
+      sub_type: "warehouse_adjust_out" as IoBatch["sub_type"],
+      bundles: [makeBundle({ lines: [outboundLine] })],
+    });
+
+    expect(getHistoryOperationLabel({ transaction_type: "ADJUST" }, inbound)).toBe("수량 조정");
+    expect(getBatchFlowEndpoints(inbound)).toEqual({ from: "수량 조정", to: "창고", mixed: false });
+    expect(getBatchFlowEndpoints(outbound)).toEqual({ from: "창고", to: "수량 조정", mixed: false });
+    expect(getHistoryLineSignedQuantity(inboundLine, inbound).sign).toBe("+");
+    expect(getHistoryLineSignedQuantity(outboundLine, outbound).sign).toBe("-");
+  });
+
   it("receive_supplier: none→warehouse → 외부→창고, mixed=false", () => {
     const line = makeLine({ from_bucket: "none", to_bucket: "warehouse" });
     const bundle = makeBundle({ lines: [line] });
@@ -756,6 +785,10 @@ describe("classifyHistoryScope", () => {
 
   it("ADJUST (no batch) → ambiguous", () => {
     expect(classifyHistoryScope({ transaction_type: "ADJUST" })).toBe("ambiguous");
+  });
+
+  it("창고 ADJUST (no batch) → warehouse_involved", () => {
+    expect(classifyHistoryScope({ transaction_type: "ADJUST", department: "창고" })).toBe("warehouse_involved");
   });
 
   it("batch 있고 warehouse bucket → warehouse_involved", () => {

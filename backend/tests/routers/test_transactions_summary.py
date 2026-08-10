@@ -425,6 +425,30 @@ def test_summary_search_filter_applies(client, db_session, make_item):
     assert body["adjust_count"] == 0
 
 
+def test_summary_counts_warehouse_adjust_as_warehouse(client, db_session, make_item):
+    item = make_item(name="창고보정품", warehouse_qty=Decimal("0"))
+    _seed_batch_log(
+        db_session,
+        item,
+        TransactionTypeEnum.ADJUST,
+        Decimal("1"),
+        sub_type="warehouse_adjust_in",
+        log_department="창고",
+    )
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions/summary")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "total": 1,
+        "warehouse_count": 1,
+        "dept_count": 0,
+        "adjust_count": 1,
+        "department_counts": {"창고": 1},
+    }
+
+
 def test_summary_search_ignores_spaces_and_separators(client, db_session, make_item):
     matching = make_item(name="Summary- Item/01", warehouse_qty=Decimal("0"))
     other = make_item(name="Other summary item", warehouse_qty=Decimal("0"))

@@ -30,12 +30,24 @@ from app.services import stock_math
 from app.services.approval_rules import APPROVAL_SUB_TYPES, MANUAL_LINE_ORIGINS  # noqa: F401
 
 
-WORK_TYPES = {"receive", "warehouse_io", "process", "defect", "internal_use"}
+WORK_TYPES = {
+    "receive",
+    "warehouse_io",
+    "warehouse_adjust",
+    "process",
+    "defect",
+    "internal_use",
+}
 INTERNAL_USE_WORK_TYPE = "internal_use"
 INTERNAL_USE_SUB_TYPE = "internal_use_out"
 INTERNAL_USE_DEPARTMENTS = frozenset(
     {DepartmentEnum.AS.value, DepartmentEnum.RESEARCH.value}
 )
+WAREHOUSE_ADJUST_WORK_TYPE = "warehouse_adjust"
+WAREHOUSE_ADJUST_SUB_TYPES = frozenset(
+    {"warehouse_adjust_in", "warehouse_adjust_out"}
+)
+WAREHOUSE_MANAGER_ROLES = frozenset({"primary", "deputy"})
 
 
 def validate_internal_use_operation(
@@ -82,6 +94,63 @@ def validate_internal_use_requester(
         "deputy",
     }:
         raise PermissionError("AS·연구 직원 또는 창고 정/부 담당자만 사내 사용 반출이 가능합니다.")
+
+
+def _is_warehouse_adjust(work_type: str, sub_type: str) -> bool:
+    return (
+        work_type == WAREHOUSE_ADJUST_WORK_TYPE
+        or sub_type in WAREHOUSE_ADJUST_SUB_TYPES
+    )
+
+
+def validate_warehouse_adjust_requester(
+    requester: Employee,
+    *,
+    work_type: str,
+    sub_type: str,
+) -> None:
+    """창고 정·부 담당자만 창고 수량보정 경로를 사용할 수 있다."""
+    if not _is_warehouse_adjust(work_type, sub_type):
+        return
+    if work_type != WAREHOUSE_ADJUST_WORK_TYPE or sub_type not in WAREHOUSE_ADJUST_SUB_TYPES:
+        raise ValueError("창고 수량보정 작업 유형과 세부 유형 조합이 올바르지 않습니다.")
+    warehouse_role = (requester.warehouse_role or "none").lower()
+    if warehouse_role not in WAREHOUSE_MANAGER_ROLES:
+        raise PermissionError("창고 정·부 담당자만 창고 수량보정을 할 수 있습니다.")
+
+
+def validate_warehouse_adjust_operation(
+    *,
+    work_type: str,
+    sub_type: str,
+    from_department: Optional[str],
+    to_department: Optional[str],
+    lines: Iterable[object] = (),
+) -> None:
+    """창고 보정은 부서 없이 단품 창고 증감 라인으로만 처리한다."""
+    if not _is_warehouse_adjust(work_type, sub_type):
+        return
+    if work_type != WAREHOUSE_ADJUST_WORK_TYPE or sub_type not in WAREHOUSE_ADJUST_SUB_TYPES:
+        raise ValueError("창고 수량보정 작업 유형과 세부 유형 조합이 올바르지 않습니다.")
+    if from_department is not None or to_department is not None:
+        raise ValueError("창고 수량보정에는 부서를 지정할 수 없습니다.")
+
+    expected = (
+        ("adjust", "none", None, "warehouse", None, "direct")
+        if sub_type == "warehouse_adjust_in"
+        else ("adjust", "warehouse", None, "none", None, "direct")
+    )
+    for line in lines:
+        actual = (
+            getattr(line, "direction"),
+            getattr(line, "from_bucket"),
+            getattr(line, "from_department"),
+            getattr(line, "to_bucket"),
+            getattr(line, "to_department"),
+            getattr(line, "origin"),
+        )
+        if actual != expected:
+            raise ValueError("창고 수량보정 라인 구성이 올바르지 않습니다.")
 
 
 def _d(value) -> Decimal:
@@ -253,6 +322,10 @@ def _route_for_sub_type(
     if sub_type == "adjust_out":
         dept = _default_production_dept(item, to_department or from_department)
         return ("adjust", "production", dept, "none", None)
+    if sub_type == "warehouse_adjust_in":
+        return ("adjust", "none", None, "warehouse", None)
+    if sub_type == "warehouse_adjust_out":
+        return ("adjust", "warehouse", None, "none", None)
     if sub_type == "defect_quarantine":
         # 사용자가 Step 2 에서 선택한 부서가 from_department 로 전달됨.
         # "창고" 면 창고 자체 재고를 격리(WAREHOUSE→DEFECTIVE), 그 외 부서면 그 부서 PRODUCTION→DEFECTIVE.
@@ -273,8 +346,13 @@ MANUAL_SOURCE_KIND = "manual"
 
 def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> None:
     """낱개 증가는 생산이 아닌 수량보정으로만 기록되도록 강제한다."""
-    if sub_type == "produce" and MANUAL_SOURCE_KIND in source_kinds:
+    kinds = tuple(source_kinds)
+    if sub_type == "produce" and MANUAL_SOURCE_KIND in kinds:
         raise ValueError("낱개 품목 입고는 생산이 아니라 수량보정 입고로 처리하세요.")
+    if sub_type in WAREHOUSE_ADJUST_SUB_TYPES and any(
+        source_kind != "direct_item" for source_kind in kinds
+    ):
+        raise ValueError("창고 수량보정은 단품 품목만 처리할 수 있습니다.")
 
 
 # BOM 전개 대상 세부 작업 — 결과/부품을 함께 펼친다.
@@ -554,6 +632,12 @@ def preview(
     validate_internal_use_operation(
         work_type=work_type,
         sub_type=sub_type,
+        to_department=to_department,
+    )
+    validate_warehouse_adjust_operation(
+        work_type=work_type,
+        sub_type=sub_type,
+        from_department=from_department,
         to_department=to_department,
     )
     if work_type not in WORK_TYPES:

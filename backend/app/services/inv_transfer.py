@@ -264,8 +264,16 @@ def receive_to_item_department(db: Session, item: Item, qty: Decimal) -> tuple[I
     inv = receive_confirmed(db, item.item_id, qty, bucket="production", dept=dept)
     return inv, qty_before, dept
 
-def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[Inventory, Decimal]:
+def consume_warehouse(
+    db: Session,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    *,
+    respect_pending: bool = False,
+) -> tuple[Inventory, Decimal]:
     """창고에서 qty 만큼 차감 (BACKFLUSH / 비예약 창고 출고용). 원자적 조건부 UPDATE.
+
+    ``respect_pending`` 이면 예약 수량을 제외한 창고 가용 재고 안에서만 차감한다.
 
     Returns:
         (inventory, qty_before) — qty_before 는 차감 전 Inventory.quantity (총량).
@@ -276,10 +284,14 @@ def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[In
     get_or_create_inventory(db, item_id)
     db.flush()
 
+    available_expr = Inventory.warehouse_qty
+    if respect_pending:
+        available_expr = available_expr - func.coalesce(Inventory.pending_quantity, 0)
+
     result = db.execute(
         sa_update(Inventory)
         .where(Inventory.item_id == item_id)
-        .where(Inventory.warehouse_qty >= qty)
+        .where(available_expr >= qty)
         .values(warehouse_qty=Inventory.warehouse_qty - qty)
         .execution_options(synchronize_session=False)
     )
@@ -288,6 +300,11 @@ def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[In
     if result.rowcount == 0:
         inv_check = inventory_repository.get(db, item_id)
         wh = inv_check.warehouse_qty if inv_check else Decimal("0")
+        pending = inv_check.pending_quantity if inv_check else Decimal("0")
+        if respect_pending:
+            raise ValueError(
+                f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 차감 요청 {qty})."
+            )
         raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
 
     db.expire_all()

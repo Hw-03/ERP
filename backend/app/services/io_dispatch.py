@@ -37,6 +37,8 @@ from app.services.io_preview import (
     validate_operation_sources,
     validate_internal_use_operation,
     validate_internal_use_requester,
+    validate_warehouse_adjust_operation,
+    validate_warehouse_adjust_requester,
 )
 from app.services.io_persist import (
     _batch_to_payload,
@@ -370,7 +372,19 @@ def _apply_defective(db: Session, line: IoLine, qty: Decimal) -> tuple[Transacti
 
 
 def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
-    if line.to_bucket == _BUCKET_PRODUCTION and line.from_bucket == _BUCKET_NONE:
+    if line.to_bucket == _BUCKET_WAREHOUSE and line.from_bucket == _BUCKET_NONE:
+        inventory_svc.receive_confirmed(
+            db,
+            line.item_id,
+            qty,
+            bucket=_BUCKET_WAREHOUSE,
+            dept=None,
+        )
+        quantity_change = qty
+    elif line.from_bucket == _BUCKET_WAREHOUSE and line.to_bucket == _BUCKET_NONE:
+        inventory_svc.consume_warehouse(db, line.item_id, qty, respect_pending=True)
+        quantity_change = -qty
+    elif line.to_bucket == _BUCKET_PRODUCTION and line.from_bucket == _BUCKET_NONE:
         inventory_svc.receive_confirmed(
             db,
             line.item_id,
@@ -408,6 +422,10 @@ def _dept_for_line(line: IoLine, tx_type: TransactionTypeEnum) -> str | None:
         return _val(line.from_department)
     if tx_type == TransactionTypeEnum.TRANSFER_DEPT:
         return _val(line.from_department)
+    if tx_type == TransactionTypeEnum.ADJUST and (
+        line.from_bucket == _BUCKET_WAREHOUSE or line.to_bucket == _BUCKET_WAREHOUSE
+    ):
+        return "창고"
     return None
 
 
@@ -415,7 +433,10 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     qty = _d(line.quantity)
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     before = _d(inv.quantity)
-    wh_before = _d(inv.warehouse_qty) if line.direction == "move" else None
+    tracks_warehouse = (
+        line.from_bucket == _BUCKET_WAREHOUSE or line.to_bucket == _BUCKET_WAREHOUSE
+    )
+    wh_before = _d(inv.warehouse_qty) if tracks_warehouse else None
     # 취소 역재생용 — mutation 전 재고 셀 스냅샷.
     cells_before = inv_effect.snapshot_cells(db, line.item_id)
 
@@ -435,7 +456,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     after = _d(inv.quantity)
-    wh_after = _d(inv.warehouse_qty) if line.direction == "move" else None
+    wh_after = _d(inv.warehouse_qty) if tracks_warehouse else None
     _log_immediate(
         db,
         batch=batch,
@@ -475,6 +496,18 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     validate_internal_use_operation(
         work_type=batch.work_type,
         sub_type=batch.sub_type,
+        to_department=batch.to_department,
+        lines=(line for bundle in batch.bundles for line in bundle.lines),
+    )
+    validate_warehouse_adjust_requester(
+        requester,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+    )
+    validate_warehouse_adjust_operation(
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        from_department=batch.from_department,
         to_department=batch.to_department,
         lines=(line for bundle in batch.bundles for line in bundle.lines),
     )

@@ -31,6 +31,8 @@ import {
   deptIoDisplayLabel,
   allowsMixedBundles,
   getItemActionMode,
+  ioDepartmentPayload,
+  singleItemSourceKind,
   lineTagLabel,
   isExitWorkType,
   targetDepartmentOf,
@@ -86,7 +88,14 @@ function makeBundle(overrides: Partial<IoBundle> & { lines?: IoLine[] } = {}): I
   };
 }
 
-const ALL_WORK_TYPES: IoWorkType[] = ["receive", "warehouse_io", "process", "defect", "internal_use"];
+const ALL_WORK_TYPES: IoWorkType[] = [
+  "receive",
+  "warehouse_io",
+  "warehouse_adjust",
+  "process",
+  "defect",
+  "internal_use",
+];
 const ALL_SUB_TYPES: IoSubType[] = [
   "receive_supplier",
   "warehouse_to_dept",
@@ -96,6 +105,8 @@ const ALL_SUB_TYPES: IoSubType[] = [
   "dept_transfer",
   "adjust_in",
   "adjust_out",
+  "warehouse_adjust_in",
+  "warehouse_adjust_out",
   "defect_quarantine",
   "supplier_return",
   "internal_use_out",
@@ -111,6 +122,7 @@ describe("ioWorkType 상수", () => {
       ["warehouse_io", "창고 입출고", "창고와 부서 간 재고를 이동합니다."],
       ["process", "부서 입출고", "부서 작업에 맞춰 재고를 처리합니다."],
       ["internal_use", "AS·연구 사용출고", "창고 재고를 AS·연구 용도로 반출합니다."],
+      ["warehouse_adjust", "수량보정 입출고", "창고 재고 수량을 즉시 보정합니다."],
     ]);
   });
 
@@ -121,6 +133,7 @@ describe("ioWorkType 상수", () => {
     expect(flat).toEqual({
       receive: ["receive_supplier"],
       warehouse_io: ["warehouse_to_dept", "dept_to_warehouse"],
+      warehouse_adjust: ["warehouse_adjust_in", "warehouse_adjust_out"],
       process: ["produce", "disassemble", "adjust_in", "adjust_out"],
       defect: ["defect_quarantine", "defect_restore", "defect_process", "supplier_return"],
       internal_use: ["internal_use_out"],
@@ -135,6 +148,8 @@ describe("ioWorkType 상수", () => {
       ["receive_supplier", "원자재 입고", "선택 품목을 창고 재고로 증가"],
       ["warehouse_to_dept", "창고 → 부서", "BOM 1단계 하위 품목 자동 포함"],
       ["dept_to_warehouse", "부서 → 창고", "반납할 하위 품목만 체크"],
+      ["warehouse_adjust_in", "보정 입고", "창고 재고 수량 즉시 증가"],
+      ["warehouse_adjust_out", "보정 출고", "창고 재고 수량 즉시 감소"],
       ["produce", "생산", "하위 자재 출고 + 결과 품목 입고"],
       ["disassemble", "분해", "상위 품목 출고 + 회수 품목 입고"],
       ["adjust_in", "수량보정 입고", "선택 품목 수량 증가"],
@@ -151,6 +166,7 @@ describe("ioWorkType 상수", () => {
     expect(DEFAULT_SUB_TYPE).toEqual({
       receive: "receive_supplier",
       warehouse_io: "warehouse_to_dept",
+      warehouse_adjust: "warehouse_adjust_in",
       process: "produce",
       defect: "defect_quarantine",
       internal_use: "internal_use_out",
@@ -166,6 +182,14 @@ describe("ioWorkType 상수", () => {
 // canSeeWorkType
 // ──────────────────────────────────────────────────────────────────
 describe("canSeeWorkType", () => {
+  it("warehouse_adjust: primary/deputy 만 true", () => {
+    const workType = "warehouse_adjust" as IoWorkType;
+    expect(canSeeWorkType(workType, { warehouse_role: "primary" })).toBe(true);
+    expect(canSeeWorkType(workType, { warehouse_role: "deputy" })).toBe(true);
+    expect(canSeeWorkType(workType, { warehouse_role: "none" })).toBe(false);
+    expect(canSeeWorkType(workType, null)).toBe(false);
+  });
+
   it("receive: primary/deputy 만 true", () => {
     expect(canSeeWorkType("receive", { warehouse_role: "primary" })).toBe(true);
     expect(canSeeWorkType("receive", { warehouse_role: "deputy" })).toBe(true);
@@ -207,6 +231,8 @@ describe("subTypeLabel", () => {
       dept_transfer: "dept_transfer", // IO_SUB_TYPES 에 없음 → 그대로 반환
       adjust_in: "수량보정 입고",
       adjust_out: "출고",
+      warehouse_adjust_in: "보정 입고",
+      warehouse_adjust_out: "보정 출고",
       defect_quarantine: "새 불량",
       supplier_return: "원자재 반품",
       internal_use_out: "AS·연구 사용출고",
@@ -229,6 +255,8 @@ describe("requiresDepartments", () => {
       dept_transfer: true,
       adjust_in: true,
       adjust_out: true,
+      warehouse_adjust_in: false,
+      warehouse_adjust_out: false,
       defect_quarantine: true,
       supplier_return: true,
       internal_use_out: true,
@@ -251,6 +279,8 @@ describe("requiresApproval", () => {
       dept_transfer: false,
       adjust_in: false,
       adjust_out: false,
+      warehouse_adjust_in: false,
+      warehouse_adjust_out: false,
       defect_quarantine: false,
       supplier_return: false,
       internal_use_out: true,
@@ -339,6 +369,8 @@ describe("isBomForced", () => {
       dept_transfer: false,
       adjust_in: false,
       adjust_out: false,
+      warehouse_adjust_in: false,
+      warehouse_adjust_out: false,
       defect_quarantine: false,
       supplier_return: false,
       internal_use_out: false,
@@ -373,6 +405,8 @@ describe("deptIoDirectionOf", () => {
       dept_transfer: null,
       adjust_in: "in",
       adjust_out: "out",
+      warehouse_adjust_in: "in",
+      warehouse_adjust_out: "out",
       defect_quarantine: null,
       supplier_return: null,
       internal_use_out: null,
@@ -395,6 +429,8 @@ describe("pickerDirectionLabel", () => {
       dept_transfer: "출고",
       adjust_in: "입고",
       adjust_out: "출고",
+      warehouse_adjust_in: "입고",
+      warehouse_adjust_out: "출고",
       defect_quarantine: "출고",
       supplier_return: "출고",
       internal_use_out: "사용출고",
@@ -417,6 +453,8 @@ describe("deptIoDisplayLabel", () => {
       dept_transfer: null,
       adjust_in: "입고 · 낱개",
       adjust_out: "출고 · 낱개",
+      warehouse_adjust_in: null,
+      warehouse_adjust_out: null,
       defect_quarantine: null,
       supplier_return: null,
       internal_use_out: null,
@@ -428,6 +466,20 @@ describe("deptIoDisplayLabel", () => {
 // getItemActionMode
 // ──────────────────────────────────────────────────────────────────
 describe("getItemActionMode", () => {
+  it("창고 수량보정은 단품 직접 선택으로 미리보기한다", () => {
+    const inbound = "warehouse_adjust_in" as IoSubType;
+    const outbound = "warehouse_adjust_out" as IoSubType;
+    expect(getItemActionMode(inbound)).toBe("single_only");
+    expect(getItemActionMode(outbound)).toBe("single_only");
+    expect(singleItemSourceKind(inbound)).toBe("direct_item");
+    expect(singleItemSourceKind(outbound)).toBe("direct_item");
+    expect(singleItemSourceKind("adjust_in")).toBe("manual");
+    expect(ioDepartmentPayload(inbound, "조립", "출하")).toEqual({
+      fromDepartment: null,
+      toDepartment: null,
+    });
+  });
+
   it("subType별 모드 고정", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, getItemActionMode(s)]));
     expect(map).toEqual({
@@ -439,6 +491,8 @@ describe("getItemActionMode", () => {
       dept_transfer: "single_only",
       adjust_in: "single_only",
       adjust_out: "single_only",
+      warehouse_adjust_in: "single_only",
+      warehouse_adjust_out: "single_only",
       defect_quarantine: "single_only",
       supplier_return: "single_only",
       internal_use_out: "single_only",
@@ -461,6 +515,8 @@ describe("allowsMixedBundles", () => {
       dept_transfer: false,
       adjust_in: false,
       adjust_out: false,
+      warehouse_adjust_in: false,
+      warehouse_adjust_out: false,
       defect_quarantine: false,
       supplier_return: false,
       internal_use_out: false,
@@ -520,6 +576,7 @@ describe("isExitWorkType", () => {
     expect(map).toEqual({
       receive: false,
       warehouse_io: false,
+      warehouse_adjust: false,
       process: false,
       defect: true,
       internal_use: true,
@@ -638,6 +695,20 @@ describe("useIoWorkState setWorkType", () => {
 // useIoWorkState — canAdvance[2] (process 방향 게이트)
 // ──────────────────────────────────────────────────────────────────
 describe("useIoWorkState canAdvance[2] process 게이트", () => {
+  it("창고 수량보정도 입고·출고 방향을 선택해야 진행한다", () => {
+    const { result } = renderHook(() => useIoWorkState());
+    act(() => result.current.setWorkType("warehouse_adjust" as IoWorkType));
+    expect(result.current.deptIoDirection).toBeNull();
+    expect(result.current.canAdvance[2]).toBe(false);
+
+    act(() => result.current.setDeptIoDirection("in"));
+    expect(result.current.subType).toBe("warehouse_adjust_in");
+    expect(result.current.canAdvance[2]).toBe(true);
+
+    act(() => result.current.setDeptIoDirection("out"));
+    expect(result.current.subType).toBe("warehouse_adjust_out");
+  });
+
   it("process + 방향 미선택 → canAdvance[2]=false", () => {
     const { result } = renderHook(() => useIoWorkState());
     act(() => result.current.setWorkType("process"));
@@ -826,6 +897,8 @@ describe("[추출 골든] targetDepartmentOf — Step3 대상 부서", () => {
       dept_transfer: "도착",
       adjust_in: "도착",
       adjust_out: "도착",
+      warehouse_adjust_in: null,
+      warehouse_adjust_out: null,
       defect_quarantine: "출발",
       supplier_return: "출발",
       internal_use_out: "도착",
@@ -855,6 +928,8 @@ describe("[추출 골든] deptVisibility", () => {
       dept_transfer: { from: true, to: true },
       adjust_in: { from: false, to: true },
       adjust_out: { from: false, to: true },
+      warehouse_adjust_in: { from: false, to: false },
+      warehouse_adjust_out: { from: false, to: false },
       defect_quarantine: { from: true, to: false },
       supplier_return: { from: true, to: false },
       internal_use_out: { from: false, to: true },

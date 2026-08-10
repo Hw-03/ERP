@@ -374,5 +374,10 @@ function persistWarehouseDraftUrl(batchId: string, step: IoStep): void {
 }
 
 function defaultDraftStep(draft: IoBatch): IoStep {
-  return draft.sub_type === "adjust_in" || draft.sub_type === "adjust_out" ? 3 : 4;
+  return draft.sub_type === "adjust_in"
+    || draft.sub_type === "adjust_out"
+    || draft.sub_type === "warehouse_adjust_in"
+    || draft.sub_type === "warehouse_adjust_out"
+    ? 3
+    : 4;
 }

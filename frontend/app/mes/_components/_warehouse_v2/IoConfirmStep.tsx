@@ -13,7 +13,12 @@ import {
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
-import { deptIoDisplayLabel, subTypeLabel, type ApprovalKind } from "./ioWorkType";
+import {
+  deptIoDisplayLabel,
+  isWarehouseAdjustSubType,
+  subTypeLabel,
+  type ApprovalKind,
+} from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal, type ConfirmTone } from "@/lib/ui/ConfirmModal";
 
@@ -71,6 +76,7 @@ function directionAccent(subType: IoSubType): string {
     subType === "internal_use_out" ||
     subType === "disassemble" ||
     subType === "adjust_out"
+    || subType === "warehouse_adjust_out"
   ) {
     return LEGACY_COLORS.red;
   }
@@ -105,6 +111,12 @@ function confirmCopy(
   if (subType === "dept_to_warehouse") {
     return { title: `창고 반입을 ${verb}`, tone: "normal", confirmLabel };
   }
+  if (subType === "warehouse_adjust_in") {
+    return { title: `창고 보정 입고를 ${verb}`, tone: "normal", confirmLabel };
+  }
+  if (subType === "warehouse_adjust_out") {
+    return { title: `창고 보정 출고를 ${verb}`, tone: "danger", confirmLabel };
+  }
   if (subType === "produce" || subType === "adjust_in") {
     return { title: `부서 입고를 ${verb}`, tone: "normal", confirmLabel };
   }
@@ -125,8 +137,8 @@ function classifySection(line: IoLine): SectionKind | null {
   if (line.direction === "defective") return "out";
   if (line.direction === "move") return "move";
   if (line.direction === "adjust") {
-    if (line.to_bucket === "production") return "in";
-    if (line.from_bucket === "production") return "out";
+    if (line.to_bucket === "production" || line.to_bucket === "warehouse") return "in";
+    if (line.from_bucket === "production" || line.from_bucket === "warehouse") return "out";
   }
   return null;
 }
@@ -172,7 +184,7 @@ export function IoConfirmStep({
   const visibleIncludedLines = includedLines.filter(
     (line) => !bomParentLineIds.has(line.line_id),
   );
-  const headerSummary = subType === "internal_use_out"
+  const headerSummary = subType === "internal_use_out" || isWarehouseAdjustSubType(subType)
     ? `${headerLabel} · 반영 ${visibleIncludedLines.length}건`
     : `${headerLabel} · BOM · 반영 ${visibleIncludedLines.length}건`;
   const displayBundles = bundles.filter((b) =>

@@ -7,9 +7,18 @@ from decimal import Decimal
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
+from app.routers.daily_work_reports import _operation_for
 
 
 WORK_DATE = "2026-07-27"
+
+
+def test_daily_activity_classifies_warehouse_adjust_as_warehouse():
+    log = TransactionLog(transaction_type=TransactionTypeEnum.ADJUST)
+
+    for sub_type in ("warehouse_adjust_in", "warehouse_adjust_out"):
+        batch = IoBatch(work_type="warehouse_adjust", sub_type=sub_type)
+        assert _operation_for(log, batch) == ("warehouse", "창고")
 
 
 def _employee(

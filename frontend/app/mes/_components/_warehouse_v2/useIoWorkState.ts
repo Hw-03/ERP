@@ -22,7 +22,7 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   const [notes, setNotes] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
   const [step, setStep] = useState<IoStep>(1);
-  // process workType 한정: 방향(입고/출고) 선택. null = 미선택 → Step 2 advance 차단.
+  // process/warehouse_adjust 방향(입고/출고) 선택. null = 미선택 → Step 2 advance 차단.
   const [deptIoDirection, setDeptIoDirectionBase] = useState<DeptIoDirection | null>(null);
 
   function setWorkType(next: IoWorkType) {
@@ -34,11 +34,19 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     setStep(1);
   }
 
-  // process workType 방향 설정 — bundle 비우고 sub_type 기본값 재설정
+  // 방향 설정 — 작업 유형에 맞는 sub_type으로 바꾸고 기존 bundle을 비운다.
   function setDeptIoDirection(dir: DeptIoDirection) {
     setDeptIoDirectionBase(dir);
     setBundles([]);
-    setSubType(dir === "in" ? "produce" : "disassemble");
+    setSubType(
+      workType === "warehouse_adjust"
+        ? dir === "in"
+          ? "warehouse_adjust_in"
+          : "warehouse_adjust_out"
+        : dir === "in"
+          ? "produce"
+          : "disassemble",
+    );
   }
 
   // draft 복원 전용 — bundle 보존, raw set
@@ -60,7 +68,7 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
     return {
       1: true,
-      2: workType === "process"
+      2: workType === "process" || workType === "warehouse_adjust"
         ? deptIoDirection != null
         : workType === "internal_use"
           ? toDepartment === "AS" || toDepartment === "연구"

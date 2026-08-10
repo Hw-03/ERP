@@ -124,6 +124,9 @@ describe("historyPresentation", () => {
   it("uses menu-level labels in the list while retaining the detailed movement elsewhere", () => {
     expect(getHistoryListOperationLabel(makeLog({ transaction_type: "ADJUST" }))).toBe("부서 입출고");
     expect(getHistoryListOperationLabel(
+      makeLog({ transaction_type: "ADJUST", department: "창고" }),
+    )).toBe("수량 조정");
+    expect(getHistoryListOperationLabel(
       makeLog({ transaction_type: "DISASSEMBLE", reference_no: "defect-disassemble:1" }),
     )).toBe("불량");
     expect(getHistoryListOperationLabel(

@@ -38,6 +38,7 @@ import {
   allowsMixedBundles,
   deptIoSubType,
   getItemActionMode,
+  singleItemSourceKind,
   type DeptIoDirection,
   type ItemActionMode,
 } from "./ioWorkType";
@@ -354,6 +355,7 @@ export function IoTargetPicker({
             clearFilters={clearFilters}
             mode={actionMode}
             workType={workType}
+            subType={subType}
             deptIoDirection={deptIoDirection}
             bundleSubType={bundleSubType}
             bomParents={bomParents}
@@ -411,6 +413,7 @@ function ItemTable({
   clearFilters,
   mode,
   workType,
+  subType,
   deptIoDirection,
   bundleSubType,
   bomParents,
@@ -428,6 +431,7 @@ function ItemTable({
   clearFilters: () => void;
   mode: ItemActionMode;
   workType: IoWorkType;
+  subType: IoSubType;
   deptIoDirection: DeptIoDirection | null;
   bundleSubType: IoSubType | null;
   bomParents: Set<string>;
@@ -514,7 +518,7 @@ function ItemTable({
             const wQty = Number(item.warehouse_qty) || 0;
             const isHighlight = highlightItemId === item.item_id;
             const rowClickEnabled = mode === "single_only" && !busy;
-            const addSingleItem = () => onAdd(item, "manual");
+            const addSingleItem = () => onAdd(item, singleItemSourceKind(subType));
             return (
               <HighlightableRow
                 key={item.item_id}

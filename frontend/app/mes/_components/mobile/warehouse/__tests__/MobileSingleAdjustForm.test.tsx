@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { IoBundle, IoLine, Item } from "@/lib/api";
+import type { IoBundle, IoLine, IoSubType, Item } from "@/lib/api";
 import { MobileSingleAdjustForm } from "../MobileSingleAdjustForm";
 
 function makeItem(overrides: Partial<Item> = {}): Item {
@@ -72,11 +72,13 @@ function makeBundle(): IoBundle {
 
 function Harness({
   bundles = [],
+  subType = "adjust_out",
   onAddItem = vi.fn(),
   onSaveDraft = vi.fn(),
   onReview = vi.fn(),
 }: {
   bundles?: IoBundle[];
+  subType?: IoSubType;
   onAddItem?: (item: Item) => void;
   onSaveDraft?: () => void;
   onReview?: () => void;
@@ -85,7 +87,7 @@ function Harness({
 
   return (
     <MobileSingleAdjustForm
-      subType="adjust_out"
+      subType={subType}
       items={[makeItem()]}
       bundles={bundles}
       search={search}
@@ -105,6 +107,22 @@ function Harness({
 }
 
 describe("MobileSingleAdjustForm", () => {
+  it("창고 보정 출고는 창고 가용 수량과 즉시 반영 안내를 사용한다", () => {
+    render(
+      <Harness
+        subType={"warehouse_adjust_out" as IoSubType}
+        bundles={[makeBundle()]}
+      />,
+    );
+
+    expect(screen.getByText("보정 출고 품목")).toBeInTheDocument();
+    expect(
+      screen.getByText("CTR-001 · 현재 창고 10 · 가용 10 · 보정 -1 · 예정 9"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("창고 재고에 즉시 반영됩니다.")).toBeInTheDocument();
+    expect(screen.queryByText(/부서 결재/)).not.toBeInTheDocument();
+  });
+
   it("clears search, collapses results, and refocuses the input after adding an item", async () => {
     const onAddItem = vi.fn();
     render(<Harness onAddItem={onAddItem} />);
