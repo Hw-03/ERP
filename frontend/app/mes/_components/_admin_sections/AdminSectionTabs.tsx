@@ -97,7 +97,7 @@ export function AdminSectionTabs({ section, onSelect }: AdminSectionTabsProps) {
                         : "transparent",
                       borderColor: active
                         ? `color-mix(in srgb, ${tone} 40%, transparent)`
-                        : "transparent",
+                        : LEGACY_COLORS.border,
                       color: active ? tone : LEGACY_COLORS.muted2,
                     }}
                   >

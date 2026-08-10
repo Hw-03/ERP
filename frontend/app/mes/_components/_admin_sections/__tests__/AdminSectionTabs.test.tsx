@@ -44,7 +44,7 @@ describe("AdminSectionTabs", () => {
     });
   });
 
-  it("shows an accent outline only on the active section tab", () => {
+  it("keeps a border on every section tab and accents the active one", () => {
     render(<AdminSectionTabs section="models" onSelect={vi.fn()} />);
 
     const activeTab = screen.getByRole("button", { name: "\uBAA8\uB378 \uAD00\uB9AC" });
@@ -52,7 +52,7 @@ describe("AdminSectionTabs", () => {
 
     expect(activeTab).toHaveClass("border");
     expect(activeTab).toHaveStyle({ borderColor: "color-mix(in srgb, var(--c-blue) 40%, transparent)" });
-    expect(inactiveTab).toHaveStyle({ borderColor: "transparent" });
+    expect(inactiveTab).toHaveStyle({ borderColor: "var(--c-border)" });
   });
 
   it("separates every group after the first with a left divider", () => {
