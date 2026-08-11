@@ -47,6 +47,7 @@ const baseProps = {
   search: "",
   onSearchChange: vi.fn(),
   onAddItem: vi.fn(),
+  onRemoveBundles: vi.fn(),
   onAdvance: vi.fn(),
 };
 

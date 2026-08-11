@@ -56,6 +56,7 @@ interface Props {
   search: string;
   onSearchChange: (value: string) => void;
   onAddItem: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
+  onRemoveBundles: (bundleIds: string[]) => void;
   onAdvance: () => void;
   busy?: boolean;
   /**
@@ -68,6 +69,37 @@ interface Props {
 }
 
 const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
+
+/** BOM/낱개 버튼의 선택·비활성 색 우선순위를 두 렌더 분기에서 동일하게 유지한다. */
+function actionButtonStyle(
+  isSelected: boolean,
+  isDisabled: boolean,
+  isPrimary: boolean,
+): React.CSSProperties {
+  return {
+    background: isSelected
+      ? LEGACY_COLORS.green
+      : isDisabled
+        ? LEGACY_COLORS.s2
+        : isPrimary
+          ? LEGACY_COLORS.blue
+          : LEGACY_COLORS.s2,
+    borderColor: isSelected
+      ? LEGACY_COLORS.green
+      : isDisabled
+        ? LEGACY_COLORS.border
+        : isPrimary
+          ? LEGACY_COLORS.blue
+          : LEGACY_COLORS.border,
+    color: isSelected
+      ? LEGACY_COLORS.white
+      : isDisabled
+        ? LEGACY_COLORS.muted2
+        : isPrimary
+          ? LEGACY_COLORS.white
+          : LEGACY_COLORS.text,
+  };
+}
 
 export function IoTargetPicker({
   workType,
@@ -82,6 +114,7 @@ export function IoTargetPicker({
   search,
   onSearchChange,
   onAddItem,
+  onRemoveBundles,
   onAdvance,
   busy,
   highlightItemId,
@@ -350,6 +383,7 @@ export function IoTargetPicker({
             displayLimit={displayLimit}
             onShowMore={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
             onAdd={onAddItem}
+            onRemove={onRemoveBundles}
             busy={busy}
             hasActiveFilter={hasActiveFilter}
             clearFilters={clearFilters}
@@ -359,6 +393,7 @@ export function IoTargetPicker({
             deptIoDirection={deptIoDirection}
             bundleSubType={bundleSubType}
             bomParents={bomParents}
+            bundles={bundles}
             hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
             hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
             allowMix={allowsMixedBundles(subType)}
@@ -408,6 +443,7 @@ function ItemTable({
   displayLimit,
   onShowMore,
   onAdd,
+  onRemove,
   busy,
   hasActiveFilter,
   clearFilters,
@@ -417,6 +453,7 @@ function ItemTable({
   deptIoDirection,
   bundleSubType,
   bomParents,
+  bundles,
   hasBomBundle,
   hasSingleBundle,
   allowMix,
@@ -426,6 +463,7 @@ function ItemTable({
   displayLimit: number;
   onShowMore: () => void;
   onAdd: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
+  onRemove: (bundleIds: string[]) => void;
   busy?: boolean;
   hasActiveFilter: boolean;
   clearFilters: () => void;
@@ -435,6 +473,7 @@ function ItemTable({
   deptIoDirection: DeptIoDirection | null;
   bundleSubType: IoSubType | null;
   bomParents: Set<string>;
+  bundles: IoBundle[];
   hasBomBundle: boolean;
   hasSingleBundle: boolean;
   allowMix: boolean;
@@ -517,13 +556,27 @@ function ItemTable({
             const noDeptStock = prodByDept.size === 0;
             const wQty = Number(item.warehouse_qty) || 0;
             const isHighlight = highlightItemId === item.item_id;
+            const selectedBundles = bundles.filter((bundle) => bundle.source_item_id === item.item_id);
+            const isSelected = selectedBundles.length > 0;
+            const isBomSelected = selectedBundles.some((bundle) => bundle.source_kind === "bom_parent");
+            const isSingleSelected = selectedBundles.some((bundle) => bundle.source_kind !== "bom_parent");
             const rowClickEnabled = mode === "single_only" && !busy;
-            const addSingleItem = () => onAdd(item, singleItemSourceKind(subType));
+            const bomBundleIds = selectedBundles
+              .filter((bundle) => bundle.source_kind === "bom_parent")
+              .map((bundle) => bundle.bundle_id);
+            const singleBundleIds = selectedBundles
+              .filter((bundle) => bundle.source_kind !== "bom_parent")
+              .map((bundle) => bundle.bundle_id);
+            const toggleSingleItem = () => {
+              if (isSingleSelected) onRemove(singleBundleIds);
+              else onAdd(item, singleItemSourceKind(subType));
+            };
             return (
               <HighlightableRow
                 key={item.item_id}
                 isHighlight={isHighlight}
-                onClick={rowClickEnabled ? addSingleItem : undefined}
+                isSelected={isSelected}
+                onClick={rowClickEnabled ? toggleSingleItem : undefined}
               >
                 <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                   {/* 모바일(<lg): 사양·괄호·구형/신형까지 보이도록 2줄. 데스크톱(lg:≥1024): 기존 한 줄 truncate 보존. */}
@@ -599,19 +652,15 @@ function ItemTable({
                           <Tooltip content={bomTitle}>
                             <button
                               type="button"
+                              aria-pressed={isBomSelected}
                               disabled={bomDisabled}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                onAdd(item, "direct_item", bomTarget!);
+                                if (isBomSelected) onRemove(bomBundleIds);
+                                else onAdd(item, "direct_item", bomTarget!);
                               }}
-                              className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
-                              style={{
-                                background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
-                                color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
-                                borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
-                                borderWidth: 1,
-                                borderStyle: "solid",
-                              }}
+                              className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
+                              style={actionButtonStyle(isBomSelected, bomDisabled, true)}
                             >
                               BOM
                             </button>
@@ -619,17 +668,15 @@ function ItemTable({
                           <Tooltip content={singleTitle}>
                             <button
                               type="button"
+                              aria-pressed={isSingleSelected}
                               disabled={singleDisabled}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                onAdd(item, "manual", singleTarget!);
+                                if (isSingleSelected) onRemove(singleBundleIds);
+                                else onAdd(item, "manual", singleTarget!);
                               }}
-                              className="rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
-                              style={{
-                                background: LEGACY_COLORS.s2,
-                                borderColor: LEGACY_COLORS.border,
-                                color: singleDisabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
-                              }}
+                              className="inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
+                              style={actionButtonStyle(isSingleSelected, singleDisabled, false)}
                             >
                               낱개
                             </button>
@@ -657,16 +704,14 @@ function ItemTable({
                           <Tooltip content={bomTitle}>
                             <button
                               type="button"
+                              aria-pressed={isBomSelected}
                               disabled={bomDisabled}
-                              onClick={() => onAdd(item)}
-                              className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
-                              style={{
-                                background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
-                                color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
-                                borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
-                                borderWidth: 1,
-                                borderStyle: "solid",
+                              onClick={() => {
+                                if (isBomSelected) onRemove(bomBundleIds);
+                                else onAdd(item);
                               }}
+                              className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
+                              style={actionButtonStyle(isBomSelected, bomDisabled, true)}
                             >
                               BOM
                             </button>
@@ -674,14 +719,14 @@ function ItemTable({
                           <Tooltip content={singleTitle}>
                             <button
                               type="button"
+                              aria-pressed={isSingleSelected}
                               disabled={singleDisabled}
-                              onClick={() => onAdd(item, "manual")}
-                              className="rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
-                              style={{
-                                background: LEGACY_COLORS.s2,
-                                borderColor: LEGACY_COLORS.border,
-                                color: singleDisabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                              onClick={() => {
+                                if (isSingleSelected) onRemove(singleBundleIds);
+                                else onAdd(item, "manual");
                               }}
+                              className="inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
+                              style={actionButtonStyle(isSingleSelected, singleDisabled, false)}
                             >
                               낱개
                             </button>
@@ -691,16 +736,17 @@ function ItemTable({
                     })() : (
                       <button
                         type="button"
+                        aria-pressed={isSingleSelected}
                         disabled={busy}
                         onClick={(event) => {
                           event.stopPropagation();
-                          addSingleItem();
+                          toggleSingleItem();
                         }}
                         className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
-                        style={{ background: LEGACY_COLORS.blueSolid }}
+                        style={{ background: isSingleSelected ? LEGACY_COLORS.green : LEGACY_COLORS.blueSolid }}
                         title="선택 — 선택 품목만 처리"
                       >
-                        <Plus className="h-3 w-3" />
+                        {!isSingleSelected && <Plus aria-hidden="true" className="h-3 w-3" />}
                         선택
                       </button>
                     )}
@@ -851,10 +897,12 @@ function EditOrderTable({
 // 자동 카트 추가는 하지 않고 사용자가 직접 BOM/낱개를 선택하게 한다.
 function HighlightableRow({
   isHighlight,
+  isSelected,
   onClick,
   children,
 }: {
   isHighlight: boolean;
+  isSelected: boolean;
   onClick?: () => void;
   children: React.ReactNode;
 }) {
@@ -883,7 +931,9 @@ function HighlightableRow({
     <tr
       ref={rowRef}
       onClick={onClick}
+      data-selected={isSelected}
       className={`transition-colors duration-150 hover:bg-[var(--c-s4)]${onClick ? " cursor-pointer" : ""}${flash ? " animate-row-flash" : ""}`}
+      style={{ background: isSelected ? LEGACY_COLORS.successBg : undefined }}
     >
       {children}
     </tr>

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { Item } from "../types";
+import type { IoBundle, Item } from "../types";
 import type { IoSubType, IoWorkType } from "@/lib/api";
 import { IoTargetPicker } from "../IoTargetPicker";
 
@@ -48,10 +48,78 @@ const baseProps = {
   search: "",
   onSearchChange: vi.fn(),
   onAddItem: vi.fn(),
+  onRemoveBundles: vi.fn(),
   onAdvance: vi.fn(),
 };
 
+function makeBundle(sourceKind: IoBundle["source_kind"]): IoBundle {
+  return {
+    bundle_id: `bundle-${sourceKind}`,
+    source_kind: sourceKind,
+    title: "Clickable Item",
+    source_item_id: "item-1",
+    source_mes_code: "3-TR-0001",
+    quantity: 1,
+    expanded_level: 0,
+    lines: [],
+  };
+}
+
 describe("IoTargetPicker row click", () => {
+  it.each([
+    ["BOM", "bom_parent"],
+    ["낱개", "manual"],
+  ] as const)("toggles off the selected %s bundle instead of adding its quantity", (label, sourceKind) => {
+    const onAddItem = vi.fn();
+    const onRemoveBundles = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="warehouse_io"
+        subType="warehouse_to_dept"
+        bomParents={new Set(["item-1"])}
+        bundles={[makeBundle(sourceKind)]}
+        onAddItem={onAddItem}
+        onRemoveBundles={onRemoveBundles}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const selectedButton = within(row).getByRole("button", { name: label });
+
+    expect(row).toHaveAttribute("data-selected", "true");
+    expect(row).toHaveStyle({ background: "var(--c-success-bg)" });
+    expect(selectedButton).toHaveStyle({ background: "var(--c-green)" });
+    expect(selectedButton).toHaveAttribute("aria-pressed", "true");
+    expect(selectedButton).not.toHaveTextContent("✓");
+    fireEvent.click(selectedButton);
+    expect(onRemoveBundles).toHaveBeenCalledWith([`bundle-${sourceKind}`]);
+    expect(onAddItem).not.toHaveBeenCalled();
+  });
+
+  it("toggles off a selected single-only item instead of adding its quantity", () => {
+    const onAddItem = vi.fn();
+    const onRemoveBundles = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        bundles={[makeBundle("manual")]}
+        onAddItem={onAddItem}
+        onRemoveBundles={onRemoveBundles}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const selectedButton = within(row).getByRole("button", { name: "선택" });
+
+    expect(row).toHaveAttribute("data-selected", "true");
+    expect(selectedButton).toHaveAttribute("aria-pressed", "true");
+    expect(selectedButton).not.toHaveTextContent("✓");
+    fireEvent.click(selectedButton);
+    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-manual"]);
+    expect(onAddItem).not.toHaveBeenCalled();
+  });
+
   it("adds warehouse adjustment items as direct items without BOM or manual approval origin", () => {
     const onAddItem = vi.fn();
     render(

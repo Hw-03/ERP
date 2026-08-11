@@ -227,16 +227,15 @@ export function MobileIoComposeWizard({
         state.fromDepartment,
         state.toDepartment,
       );
-      // 이미 같은 품목이 카트에 있으면 수량 합산, 없으면 append.
+      // 선택 단계에서는 수량을 늘리지 않고 같은 품목의 미리보기만 교체한다.
       const existingIdx = state.bundles.findIndex((b) => b.source_item_id === item.item_id);
-      const prevQty = existingIdx !== -1 ? state.bundles[existingIdx].quantity : 0;
       const response = await previewTarget({
         employeeId,
         workType: state.workType,
         subType: effectiveSubType,
         fromDepartment: departments.fromDepartment,
         toDepartment: departments.toDepartment,
-        target: { source_kind: sourceKind, item_id: item.item_id, quantity: prevQty + 1 },
+        target: { source_kind: sourceKind, item_id: item.item_id, quantity: 1 },
       });
       const newBundles = response.bundles;
       if (existingIdx !== -1) {
@@ -505,7 +504,7 @@ export function MobileIoComposeWizard({
       : step === 3
       ? `${pickerDirectionLabel(state.subType)} 품목 선택`
       : step === 4
-      ? "품목 확인"
+      ? "수량 조정"
       : "최종 확인";
 
   return (
@@ -635,6 +634,9 @@ export function MobileIoComposeWizard({
                 highlightItemId={highlightItemId}
                 onAddItem={(item, sourceKind, subTypeOverride) =>
                   addItem(item, sourceKind ?? "direct_item", subTypeOverride)
+                }
+                onRemoveBundles={(bundleIds) =>
+                  state.setBundles((prev) => prev.filter((bundle) => !bundleIds.includes(bundle.bundle_id)))
                 }
                 onAdvance={() => {
                   if (state.bundles.length > 0) state.goTo(4);

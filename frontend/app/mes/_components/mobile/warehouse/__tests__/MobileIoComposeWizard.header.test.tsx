@@ -12,12 +12,18 @@ const wizardState = vi.hoisted(() => ({
   notes: "",
   hasShortage: false,
   hasInvalidQuantity: false,
+  canAdvance: { 4: false },
+  setBundles: vi.fn(),
   setNotes: vi.fn(),
+  goTo: vi.fn(),
   goPrev: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
-  api: { getAllBOM: vi.fn(() => new Promise(() => {})) },
+  api: {
+    getAllBOM: vi.fn(() => new Promise(() => {})),
+    getItems: vi.fn(() => Promise.resolve([])),
+  },
 }));
 
 vi.mock("../../../_warehouse_v2/useIoWorkState", () => ({
@@ -41,6 +47,27 @@ vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
 }));
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("4단계를 수량 조정으로 안내한다", () => {
+    const originalStep = wizardState.step;
+    wizardState.step = 4;
+    try {
+      render(
+        <MobileIoComposeWizard
+          globalSearch=""
+          operator={null}
+          items={[]}
+          setItems={vi.fn()}
+          onStatusChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("수량 조정")).toBeInTheDocument();
+      expect(screen.queryByText("품목 확인")).not.toBeInTheDocument();
+    } finally {
+      wizardState.step = originalStep;
+    }
+  });
+
   it("keeps 24px of content padding on the work-type step for the common tab-bar gap", () => {
     const originalStep = wizardState.step;
     wizardState.step = 1;

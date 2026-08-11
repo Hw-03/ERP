@@ -250,6 +250,8 @@ describe("IoComposeView navigation chrome", () => {
     });
     const navItems = screen.getAllByTestId("io-step-nav-item");
     expect(navItems).toHaveLength(5);
+    expect(within(screen.getByTestId("io-step-nav")).getByText("수량 조정")).toBeInTheDocument();
+    expect(within(screen.getByTestId("io-step-nav")).queryByText("품목 확인")).not.toBeInTheDocument();
     expect(navItems[0]).toHaveClass("done");
     expect(navItems[1]).toHaveClass("a");
     expect(navItems.slice(2).every((item) => item.classList.contains("locked"))).toBe(true);
