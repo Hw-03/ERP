@@ -31,6 +31,7 @@ import {
   type ShippingHistoryParams,
   type ShippingHistoryStatus,
   type ShippingRequest,
+  type ShippingRequestRevisionChange,
   type ShippingRequestStatus,
 } from "@/lib/api";
 import { useShippingRequestsQuery, useShippingRevisionsQuery } from "@/lib/queries/useShippingQuery";
@@ -1868,8 +1869,8 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
     `생성 ${formatDate(request.created_at)}`,
   ].filter(Boolean).join(" · ");
   return (
-    <div className={SHIPPING_FLEX_COL_CLASS}>
-      <Panel dataTestId="shipping-request-detail" className={SHIPPING_FLEX_COL_CLASS}>
+    <div className="min-w-0">
+      <Panel dataTestId="shipping-request-detail" className="flex min-w-0 flex-col">
         <div data-testid="shipping-request-detail-header" className={SHIPPING_TOP_ROW_CLASS}>
           <div className={SHIPPING_ROW_CLASS}>
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -1897,8 +1898,6 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
           </div>
         </div>
 
-        {request.notes && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
-
         <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <InvoiceNumberEditor request={request} onSaved={onInvoiceSaved} />
           <RevisionHistory request={request} />
@@ -1906,15 +1905,18 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
 
         {request.status === "PREPARED" && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(request.serial_numbers)} /></div>}
 
-        <div className="mt-3 min-h-0 flex-1"><LineSummary request={request} /></div>
+        <div className="mt-3"><LineSummary request={request} contentSized /></div>
 
-        <div data-testid="shipping-detail-actions" className="mt-3 flex flex-wrap justify-end gap-2 rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {canSend && <ActionButton icon={Send} label={pending === "send" ? "요청 중" : "출하 요청"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
-          {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
-          {canDelete && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
-          {canPrepareComplete && <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onPrepareComplete(request)} disabled={pending !== null || !request.invoice_number?.trim()} dataTestId="shipping-prepare-from-detail" />}
-          {canCancelPrepared && <ActionButton icon={Truck} label={pending === "pickup" ? "처리 중" : "픽업 완료"} tone={LEGACY_COLORS.purple} onClick={() => onPickup(request)} disabled={pending !== null} dataTestId="shipping-pickup-from-detail" />}
-          {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
+        <div data-testid="shipping-detail-actions" className={`mt-3 flex flex-col gap-3 rounded-[14px] border p-3 ${request.notes ? "md:flex-row md:items-center md:justify-between" : "items-end"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          {request.notes && <div data-testid="shipping-detail-request-memo" className="min-w-0 flex-1"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
+          <div data-testid="shipping-detail-actions-buttons" className="flex shrink-0 flex-wrap justify-end gap-2">
+            {canSend && <ActionButton icon={Send} label={pending === "send" ? "요청 중" : "출하 요청"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
+            {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
+            {canDelete && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
+            {canPrepareComplete && <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onPrepareComplete(request)} disabled={pending !== null || !request.invoice_number?.trim()} dataTestId="shipping-prepare-from-detail" />}
+            {canCancelPrepared && <ActionButton icon={Truck} label={pending === "pickup" ? "처리 중" : "픽업 완료"} tone={LEGACY_COLORS.purple} onClick={() => onPickup(request)} disabled={pending !== null} dataTestId="shipping-pickup-from-detail" />}
+            {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
+          </div>
         </div>
       </Panel>
     </div>
@@ -2009,35 +2011,153 @@ function revisionSummary(changes: Array<{ field: string }>): string {
   return labels.length > 0 ? `${labels.join(" · ")} 수정` : "출하 요청 수정";
 }
 
-function revisionValue(value: unknown, request: ShippingRequest, isBomChange = false): string {
+type RevisionSnapshotLine = {
+  parentStage: string | null;
+  itemId: string | null;
+  itemName: string | null;
+  mesCode: string | null;
+  quantity: number | null;
+  unit: string;
+  included: boolean | undefined;
+};
+
+type RevisionArrayLineChange = {
+  key: string;
+  before: RevisionSnapshotLine | null;
+  after: RevisionSnapshotLine | null;
+};
+
+function revisionSnapshotLines(value: unknown): RevisionSnapshotLine[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const line = raw as Record<string, unknown>;
+    const rawItemId = line.child_item_id ?? line.item_id;
+    return [{
+      parentStage: typeof line.parent_stage === "string" ? line.parent_stage : null,
+      itemId: typeof rawItemId === "string" ? rawItemId : null,
+      itemName: typeof line.item_name === "string" && line.item_name.trim() ? line.item_name.trim() : null,
+      mesCode: typeof line.mes_code === "string" && line.mes_code.trim() ? line.mes_code.trim() : null,
+      quantity: typeof line.quantity === "number" ? line.quantity : null,
+      unit: typeof line.unit === "string" && line.unit ? line.unit : "EA",
+      included: typeof line.included === "boolean" ? line.included : undefined,
+    }];
+  });
+}
+
+function revisionSnapshotKey(line: RevisionSnapshotLine, index: number): string {
+  return `${line.parentStage ?? "COMPANION"}:${line.itemId ?? index}`;
+}
+
+function revisionArrayChanges(change: ShippingRequestRevisionChange): RevisionArrayLineChange[] {
+  const before = revisionSnapshotLines(change.before);
+  const after = revisionSnapshotLines(change.after);
+  const beforeByKey = new Map(before.map((line, index) => [revisionSnapshotKey(line, index), line]));
+  const afterByKey = new Map(after.map((line, index) => [revisionSnapshotKey(line, index), line]));
+  const keys = Array.from(beforeByKey.keys());
+  afterByKey.forEach((_line, key) => {
+    if (!beforeByKey.has(key)) keys.push(key);
+  });
+  return keys.flatMap((key) => {
+    const previous = beforeByKey.get(key) ?? null;
+    const next = afterByKey.get(key) ?? null;
+    const changed = !previous || !next
+      || previous.quantity !== next.quantity
+      || previous.included !== next.included
+      || previous.parentStage !== next.parentStage
+      || previous.itemName !== next.itemName
+      || previous.mesCode !== next.mesCode
+      || previous.unit !== next.unit;
+    return changed ? [{ key, before: previous, after: next }] : [];
+  });
+}
+
+function revisionSnapshotWithCurrent(snapshot: RevisionSnapshotLine, request: ShippingRequest): RevisionSnapshotLine {
+  const currentLine = snapshot.itemId
+    ? request.bom_lines.find((line) => line.child_item_id === snapshot.itemId)
+      ?? request.companion_lines.find((line) => line.item_id === snapshot.itemId)
+    : undefined;
+  return {
+    ...snapshot,
+    itemName: snapshot.itemName ?? currentLine?.item_name ?? snapshot.itemId ?? "품목 없음",
+    mesCode: snapshot.mesCode ?? currentLine?.mes_code ?? null,
+  };
+}
+
+function revisionChangeLabel(change: RevisionArrayLineChange): { label: string; tone: string } {
+  if (!change.before) return { label: "추가", tone: LEGACY_COLORS.green };
+  if (!change.after) return { label: "제외", tone: LEGACY_COLORS.red };
+  if (change.before.included !== change.after.included) {
+    return change.after.included === false
+      ? { label: "제외", tone: LEGACY_COLORS.red }
+      : { label: "포함", tone: LEGACY_COLORS.green };
+  }
+  if (change.before.quantity !== change.after.quantity) return { label: "수량 변경", tone: LEGACY_COLORS.yellow };
+  return { label: "구성 변경", tone: LEGACY_COLORS.blue };
+}
+
+function RevisionSnapshotInfo({ label, snapshot, request }: { label: string; snapshot: RevisionSnapshotLine; request: ShippingRequest }) {
+  const resolved = revisionSnapshotWithCurrent(snapshot, request);
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+      <span className="shrink-0 font-black" style={{ color: LEGACY_COLORS.text }}>{label}</span>
+      <span className="min-w-0 flex-1 truncate" style={{ color: LEGACY_COLORS.text }}>{resolved.itemName}</span>
+      <span className="min-w-0 truncate">{resolved.mesCode ?? "코드 없음"}</span>
+      <span className="shrink-0 tabular-nums">{resolved.quantity === null ? "수량 없음" : formatBomQuantity(resolved.quantity, resolved.unit)}</span>
+    </div>
+  );
+}
+
+function RevisionArrayChangeCard({ change, request }: { change: RevisionArrayLineChange; request: ShippingRequest }) {
+  const state = revisionChangeLabel(change);
+  const title = revisionSnapshotWithCurrent(change.after ?? change.before!, request).itemName;
+  return (
+    <div className="rounded-[10px] border px-2 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: tint(state.tone, 38) }}>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
+        <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(state.tone, 14), color: state.tone }}>{state.label}</span>
+      </div>
+      <div className="mt-1 grid gap-1">
+        {change.before && <RevisionSnapshotInfo label="변경 전" snapshot={change.before} request={request} />}
+        {change.after && <RevisionSnapshotInfo label="변경 후" snapshot={change.after} request={request} />}
+      </div>
+    </div>
+  );
+}
+
+function RevisionArrayChange({ change, request }: { change: ShippingRequestRevisionChange; request: ShippingRequest }) {
+  const changes = revisionArrayChanges(change);
+  const groups = change.field === "bom_lines"
+    ? [
+      { id: "pa", title: "PA 구성품", lines: changes.filter((line) => (line.after ?? line.before)?.parentStage === "PA") },
+      { id: "pf", title: "PF 구성품", lines: changes.filter((line) => (line.after ?? line.before)?.parentStage === "PF") },
+      { id: "other", title: "기타 구성품", lines: changes.filter((line) => !["PA", "PF"].includes((line.after ?? line.before)?.parentStage ?? "")) },
+    ].filter((group) => group.lines.length > 0)
+    : [{ id: "companion", title: "카톤·동반 출하품", lines: changes }];
+  return (
+    <section data-testid={`shipping-revision-array-change-${change.field}`} className="rounded-[10px] border p-2" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-2 text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{REVISION_FIELD_LABELS[change.field]}</div>
+      {changes.length === 0 ? (
+        <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>구성 순서가 변경되었습니다.</div>
+      ) : (
+        <div className={`grid gap-2 ${change.field === "bom_lines" ? "xl:grid-cols-2" : ""}`}>
+          {groups.map((group) => (
+            <section key={group.id} data-testid={`shipping-revision-array-group-${change.field}-${group.id}`} className="rounded-[10px] border p-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+              <div className="mb-1.5 text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{group.title}</div>
+              <div className="grid gap-2">
+                {group.lines.map((line) => <RevisionArrayChangeCard key={line.key} change={line} request={request} />)}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function revisionValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "없음";
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "없음";
-    return value.map((raw) => {
-      if (!raw || typeof raw !== "object") return String(raw);
-      const line = raw as Record<string, unknown>;
-      const itemId = String(line.child_item_id ?? line.item_id ?? "");
-      const currentLine = request.bom_lines.find((item) => item.child_item_id === itemId)
-        ?? request.companion_lines.find((item) => item.item_id === itemId);
-      const hasSnapshotName = Object.prototype.hasOwnProperty.call(line, "item_name");
-      const hasSnapshotCode = Object.prototype.hasOwnProperty.call(line, "mes_code");
-      const snapshotName = typeof line.item_name === "string" && line.item_name.trim() ? line.item_name.trim() : null;
-      const snapshotCode = typeof line.mes_code === "string" && line.mes_code.trim() ? line.mes_code.trim() : null;
-      const itemName = hasSnapshotName ? snapshotName : currentLine?.item_name ?? null;
-      const mesCode = hasSnapshotCode ? snapshotCode : currentLine?.mes_code ?? null;
-      const itemLabel = itemName ? `${itemName}${mesCode ? ` (${mesCode})` : ""}` : itemId || "품목";
-      const stage = typeof line.parent_stage === "string" ? `${line.parent_stage} · ` : "";
-      const unit = typeof line.unit === "string" ? line.unit : undefined;
-      const quantity = line.quantity === undefined
-        ? ""
-        : isBomChange
-          ? ` ${formatBomQuantity(Number(line.quantity), unit)}`
-          : ` × ${line.quantity}${unit ? ` ${unit}` : ""}`;
-      const inclusion = line.included === false ? " · 제외" : "";
-      return `${stage}${itemLabel}${quantity}${inclusion}`;
-    }).join(", ");
-  }
   return JSON.stringify(value);
 }
 
@@ -2090,10 +2210,14 @@ function RevisionHistory({ request }: { request: ShippingRequest }) {
                 {expanded && (
                   <div className="grid gap-1 border-t px-3 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
                     {revision.changes.map((change, index) => (
-                      <div key={`${change.field}-${index}`} className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
-                        <span className="font-black" style={{ color: LEGACY_COLORS.muted2 }}>{REVISION_FIELD_LABELS[change.field] ?? change.field}</span>
-                        <span>{` · ${revisionValue(change.before, request, change.field === "bom_lines")} → ${revisionValue(change.after, request, change.field === "bom_lines")}`}</span>
-                      </div>
+                      change.field === "bom_lines" || change.field === "companion_lines" ? (
+                        <RevisionArrayChange key={`${change.field}-${index}`} change={change} request={request} />
+                      ) : (
+                        <div key={`${change.field}-${index}`} className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+                          <span className="font-black" style={{ color: LEGACY_COLORS.muted2 }}>{REVISION_FIELD_LABELS[change.field] ?? change.field}</span>
+                          <span>{` · ${revisionValue(change.before)} → ${revisionValue(change.after)}`}</span>
+                        </div>
+                      )
                     ))}
                   </div>
                 )}
@@ -3138,6 +3262,7 @@ function CompanionPrepList({
 }
 
 function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, onPickupCancel, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; onSelect: (req: ShippingRequest) => void; onPickupCancel: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
+  const hasPickedUpSerialNumbers = selected?.status === "PICKED_UP" && Boolean(selected.serial_numbers?.trim());
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[420px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
       {showList && (
@@ -3159,24 +3284,29 @@ function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, 
           <EmptyState title="선택된 이력 없음" body={emptyBody ?? "왼쪽에서 완료 이력을 선택하세요."} />
         ) : (
           <div className="grid gap-4">
-            <div className={SHIPPING_TOP_ROW_CLASS}>
+            <div data-testid="shipping-history-detail-header" className={hasPickedUpSerialNumbers ? "grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)_auto] xl:items-center" : "flex flex-wrap items-center justify-between gap-3"}>
               <PanelTitle
                 icon={PackageCheck}
                 title={selected.final_pf_item_name ?? selected.base_pf_item_name}
                 subtitle={`${selected.status === "CANCELLED" ? "요청 취소" : "출하 완료"} ${formatDate(selected.status === "CANCELLED" ? selected.cancelled_at ?? null : selected.picked_up_at)}`}
               />
-              <StatusBadge status={selected.status} />
+              {hasPickedUpSerialNumbers && (
+                <div data-testid="shipping-history-serial-summary" className="min-w-0 rounded-[14px] border px-3 py-2" style={{ background: tint(LEGACY_COLORS.cyan, 10), borderColor: tint(LEGACY_COLORS.cyan, 45) }}>
+                  <div className="text-xs font-black" style={{ color: LEGACY_COLORS.cyan }}>{SERIAL_NUMBERS_LABEL}</div>
+                  <div className="sn-b truncate text-sm font-bold" title={selected.serial_numbers ?? undefined} style={{ color: LEGACY_COLORS.text }}>{serialNumberText(selected.serial_numbers)}</div>
+                </div>
+              )}
+              <div data-testid="shipping-history-detail-actions" className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <StatusBadge status={selected.status} />
+                {selected.status === "PICKED_UP" && (
+                  <ActionButton icon={RotateCcw} label="픽업 완료 취소" tone={LEGACY_COLORS.yellow} onClick={() => onPickupCancel(selected)} dataTestId="shipping-pickup-cancel-from-history" />
+                )}
+              </div>
             </div>
             <div className="grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
               <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
               <RevisionHistory request={selected} />
             </div>
-            {selected.status === "PICKED_UP" && (
-              <div className="flex justify-end rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                <ActionButton icon={RotateCcw} label="픽업 완료 취소" tone={LEGACY_COLORS.yellow} onClick={() => onPickupCancel(selected)} dataTestId="shipping-pickup-cancel-from-history" />
-              </div>
-            )}
-            {selected.status === "PICKED_UP" && <Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(selected.serial_numbers)} />}
             <div className="grid gap-3 md:grid-cols-3">
               <Metric label="최종 PA" value={selected.final_pa_item_name ?? "-"} />
               <Metric label="최종 PF" value={selected.final_pf_item_name ?? "-"} />
@@ -3488,7 +3618,7 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
 }
 type SummaryDisplayLine = { key: string; title: string; code: string; quantity: string; tone?: string };
 
-function LineSummary({ request }: { request: ShippingRequest }) {
+function LineSummary({ request, contentSized = false }: { request: ShippingRequest; contentSized?: boolean }) {
   const paLines = request.bom_lines.filter((line) => line.parent_stage === "PA" && line.included);
   const pfLines = request.bom_lines.filter((line) => line.parent_stage === "PF" && line.included);
   const formatLine = (line: ShippingRequest["bom_lines"][number]): SummaryDisplayLine => {
@@ -3506,19 +3636,19 @@ function LineSummary({ request }: { request: ShippingRequest }) {
     quantity: `${line.quantity}${line.unit ? " " + line.unit : ""}`,
   }));
   return (
-    <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
-      <SummaryList title="PA 구성품" lines={paLines.map(formatLine)} />
-      <SummaryList title="PF 구성품" lines={pfLines.map(formatLine)} />
-      <CompanionSummary lines={companionLines} />
+    <div data-testid="shipping-line-summary" className={`grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px] ${contentSized ? "" : "h-full min-h-0"}`}>
+      <SummaryList title="PA 구성품" lines={paLines.map(formatLine)} contentSized={contentSized} dataTestId="shipping-summary-list-pa" />
+      <SummaryList title="PF 구성품" lines={pfLines.map(formatLine)} contentSized={contentSized} dataTestId="shipping-summary-list-pf" />
+      <CompanionSummary lines={companionLines} contentSized={contentSized} />
     </div>
   );
 }
 
-function SummaryList({ title, lines, empty = "등록 없음" }: { title: string; lines: SummaryDisplayLine[]; empty?: string }) {
+function SummaryList({ title, lines, empty = "등록 없음", contentSized = false, dataTestId }: { title: string; lines: SummaryDisplayLine[]; empty?: string; contentSized?: boolean; dataTestId: string }) {
   return (
-    <div className={SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+    <div className={contentSized ? "flex min-w-0 flex-col rounded-[14px] border p-3" : SHIPPING_PANEL_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="mb-2 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
-      <div className={SHIPPING_SCROLL_LIST_CLASS}>
+      <div data-testid={dataTestId} className={contentSized ? "grid content-start gap-2" : SHIPPING_SCROLL_LIST_CLASS}>
         {lines.length === 0 ? (
           <div className={SHIPPING_EMPTY_BOX_CLASS} style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{empty}</div>
         ) : (
@@ -3552,8 +3682,8 @@ function SummaryCode({ code, testId, className }: { code: string; testId: string
   );
 }
 
-function CompanionSummary({ lines }: { lines: SummaryDisplayLine[] }) {
-  return <SummaryList title="카톤·동반 출하품" lines={lines} empty="픽업 전 입력 없음" />;
+function CompanionSummary({ lines, contentSized = false }: { lines: SummaryDisplayLine[]; contentSized?: boolean }) {
+  return <SummaryList title="카톤·동반 출하품" lines={lines} empty="픽업 전 입력 없음" contentSized={contentSized} dataTestId="shipping-summary-list-companion" />;
 }
 
 function ShippingActionConfirmModal({

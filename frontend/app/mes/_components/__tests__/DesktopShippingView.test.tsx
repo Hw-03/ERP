@@ -2062,7 +2062,7 @@ describe("DesktopShippingView", () => {
     }));
   });
 
-  it("shows product serial numbers in prepared and picked-up details, with a legacy fallback", async () => {
+  it("shows product serial numbers in prepared details and omits an empty history serial card", async () => {
     const prepared = request({ request_id: "prepared-sn", status: "PREPARED", serial_numbers: "SN-A\nSN-B" });
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-sn";
     vi.mocked(api.getShippingRequests).mockResolvedValue([prepared]);
@@ -2079,7 +2079,28 @@ describe("DesktopShippingView", () => {
     vi.mocked(api.getShippingRequest).mockResolvedValue(picked);
     render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    expect(await screen.findByText("미입력")).toBeInTheDocument();
+    const historyDetail = await screen.findByTestId("shipping-history-detail");
+    expect(within(historyDetail).queryByTestId("shipping-history-serial-summary")).not.toBeInTheDocument();
+    expect(within(historyDetail).getByTestId("shipping-pickup-cancel-from-history")).toBeInTheDocument();
+  });
+
+  it("omits the pickup-only serial card and cancel action for cancelled history", async () => {
+    const cancelled = request({
+      request_id: "cancelled-history-layout",
+      status: "CANCELLED",
+      serial_numbers: "SN-CANCELLED",
+      cancelled_at: "2026-07-27T02:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=cancelled-history-layout&shippingHistoryStatus=CANCELLED";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([cancelled]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [cancelled], next_cursor: null, has_more: false });
+    vi.mocked(api.getShippingRequest).mockResolvedValue(cancelled);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const historyDetail = await screen.findByTestId("shipping-history-detail");
+    expect(within(historyDetail).queryByTestId("shipping-history-serial-summary")).not.toBeInTheDocument();
+    expect(within(historyDetail).queryByTestId("shipping-pickup-cancel-from-history")).not.toBeInTheDocument();
   });
 
   it("shows a preparation failure inside the confirmation modal", async () => {
@@ -3092,11 +3113,138 @@ describe("DesktopShippingView", () => {
     const bomRevision = within(revisionHistory).getByRole("button", { name: /BOM 구성 수정/ });
     expect(bomRevision).not.toHaveTextContent("bom_lines");
     fireEvent.click(bomRevision);
-    expect(within(revisionHistory).getByText(/PA · 당시 AF \(AF-OLD\) 1EA/)).toBeInTheDocument();
-    expect(within(revisionHistory).getByText(/PF · 삭제된 과거 품목 \(OLD-777\) 3EA/)).toBeInTheDocument();
-    expect(within(revisionHistory).getByText(/PA · AF Main \(AF-001\) 2EA/)).toBeInTheDocument();
-    expect(within(revisionHistory).getByText(/PF · unknown-uuid 4EA/)).toBeInTheDocument();
+    const bomChange = within(revisionHistory).getByTestId("shipping-revision-array-change-bom_lines");
+    const paGroup = within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pa");
+    expect(paGroup).toHaveTextContent("당시 AF");
+    expect(paGroup).toHaveTextContent("AF-OLD");
+    expect(paGroup).toHaveTextContent("1EA");
+    expect(paGroup).toHaveTextContent("AF Main");
+    expect(paGroup).toHaveTextContent("AF-001");
+    expect(paGroup).toHaveTextContent("2EA");
+    const pfGroup = within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pf");
+    expect(pfGroup).toHaveTextContent("삭제된 과거 품목");
+    expect(pfGroup).toHaveTextContent("OLD-777");
+    expect(pfGroup).toHaveTextContent("unknown-uuid");
+    expect(pfGroup).toHaveTextContent("4EA");
     expect(within(revisionHistory).queryByText(/deleted-uuid/)).not.toBeInTheDocument();
+  });
+
+  it("expands request-detail summaries and keeps its memo beside the actions", async () => {
+    const detailRequest = request({
+      request_id: "content-sized-detail",
+      notes: "핸들 체결 뒤 스티커 부착",
+      companion_lines: [{
+        line_id: "detail-companion-1",
+        item_id: "carton-1",
+        item_name: "Carton Box",
+        mes_code: "R-BOX",
+        process_type_code: "R",
+        quantity: 2,
+        unit: "EA",
+      }],
+    });
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=content-sized-detail";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([detailRequest]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-request-detail");
+    const lineSummary = screen.getByTestId("shipping-line-summary");
+    expect(lineSummary).not.toHaveClass("h-full", "min-h-0");
+    expect(screen.getByTestId("shipping-summary-list-pa")).not.toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("shipping-summary-list-pf")).not.toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("shipping-summary-list-companion")).not.toHaveClass("overflow-y-auto");
+    expect(within(detail).getAllByText("핸들 체결 뒤 스티커 부착")).toHaveLength(1);
+
+    const actions = screen.getByTestId("shipping-detail-actions");
+    expect(within(actions).getByTestId("shipping-detail-request-memo")).toHaveTextContent("핸들 체결 뒤 스티커 부착");
+    expect(within(actions).getByTestId("shipping-detail-actions-buttons")).toHaveTextContent("수정");
+    expect(within(actions).getByTestId("shipping-detail-actions-buttons")).toHaveTextContent("요청 취소");
+    expect(within(actions).getByTestId("shipping-detail-actions-buttons")).toHaveTextContent("준비 완료");
+  });
+
+  it("renders BOM and companion revisions as grouped item change cards", async () => {
+    const detailRequest = request({ request_id: "grouped-revisions" });
+    const revisions = [{
+      revision_id: "revision-bom-and-companion",
+      request_id: detailRequest.request_id,
+      edited_by_employee_id: "employee-1",
+      edited_by_name: "홍길동",
+      summary: "구성품 수정",
+      affects_preparation: true,
+      changes: [
+        {
+          field: "bom_lines",
+          before: [
+            { parent_stage: "PA", child_item_id: "af-1", item_name: "기존 AF", mes_code: "AF-OLD", quantity: 1, unit: "EA", included: true },
+            { parent_stage: "PF", child_item_id: "deleted-pf", item_name: "삭제된 PF", mes_code: "PF-OLD", quantity: 3, unit: "EA", included: true },
+          ],
+          after: [
+            { parent_stage: "PA", child_item_id: "af-1", quantity: 2, unit: "EA", included: true },
+            { parent_stage: "PF", child_item_id: "added-pf", item_name: "추가 PF", mes_code: "PF-NEW", quantity: 1, unit: "EA", included: true },
+          ],
+        },
+        {
+          field: "companion_lines",
+          before: [{ item_id: "carton-1", item_name: "기존 카톤", mes_code: "R-OLD", quantity: 1, unit: "EA" }],
+          after: [
+            { item_id: "carton-1", quantity: 2, unit: "EA" },
+            { item_id: "added-companion", item_name: "추가 동반품", mes_code: "R-NEW", quantity: 4, unit: "EA" },
+          ],
+        },
+      ],
+      created_at: "2026-08-12T01:00:00Z",
+    }];
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=grouped-revisions";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([detailRequest]);
+    vi.mocked(api.getShippingRevisions).mockResolvedValue(revisions);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /BOM 구성 · 동반 출하품 수정/ }));
+    const revisionHistory = screen.getByTestId("shipping-revision-history");
+    const bomChange = within(revisionHistory).getByTestId("shipping-revision-array-change-bom_lines");
+    expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pa")).toHaveTextContent("PA 구성품");
+    expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pa")).toHaveTextContent("기존 AF");
+    expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pa")).toHaveTextContent("수량 변경");
+    expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pf")).toHaveTextContent("삭제된 PF");
+    expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pf")).toHaveTextContent("제외");
+    expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pf")).toHaveTextContent("추가 PF");
+    expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pf")).toHaveTextContent("추가");
+
+    const companionChange = within(revisionHistory).getByTestId("shipping-revision-array-change-companion_lines");
+    expect(companionChange).toHaveTextContent("카톤·동반 출하품");
+    expect(companionChange).toHaveTextContent("기존 카톤");
+    expect(companionChange).toHaveTextContent("수량 변경");
+    expect(companionChange).toHaveTextContent("추가 동반품");
+    expect(companionChange).toHaveTextContent("추가");
+    expect(within(revisionHistory).queryByText(/기존 AF \(AF-OLD\) 1EA, 삭제된 PF/)).not.toBeInTheDocument();
+  });
+
+  it("keeps picked-up serial numbers and pickup cancellation in the history header", async () => {
+    const historyRequest = request({
+      request_id: "history-header-layout",
+      status: "PICKED_UP",
+      final_pf_item_name: "완료 PF",
+      picked_up_at: "2026-08-12T01:00:00Z",
+      serial_numbers: "34M25H0490 ~ 34M25H0493 (4개)",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=history-header-layout&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([historyRequest]);
+    vi.mocked(api.getShippingRequest).mockResolvedValue(historyRequest);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [historyRequest], next_cursor: null, has_more: false });
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-history-detail");
+    const header = within(detail).getByTestId("shipping-history-detail-header");
+    expect(within(header).getByTestId("shipping-history-serial-summary")).toHaveTextContent("34M25H0490 ~ 34M25H0493 (4개)");
+    const actions = within(header).getByTestId("shipping-history-detail-actions");
+    expect(actions).toHaveClass("items-center");
+    expect(within(actions).getByText("픽업 완료")).toBeInTheDocument();
+    expect(within(actions).getByTestId("shipping-pickup-cancel-from-history")).toBeInTheDocument();
+    expect(within(detail).getAllByText("34M25H0490 ~ 34M25H0493 (4개)")).toHaveLength(1);
+    expect(within(detail).getAllByTestId("shipping-pickup-cancel-from-history")).toHaveLength(1);
   });
 
   it.each([
