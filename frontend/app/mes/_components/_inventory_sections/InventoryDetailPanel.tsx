@@ -53,6 +53,7 @@ export function InventoryDetailPanel({
   }, [item.item_id]);
   const pendingQty = Number(item.pending_quantity) || 0;
   const availableQty = Number(item.available_quantity) || 0;
+  const defectiveQty = Number(item.defective_total) || 0;
   const minStockRaw = item.min_stock == null ? 0 : Number(item.min_stock);
   const availableState = getStockState(availableQty, minStockRaw > 0 ? minStockRaw : null);
 
@@ -149,7 +150,7 @@ export function InventoryDetailPanel({
           수량 현황
         </div>
         <div className="grid gap-3 text-base">
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid ${defectiveQty > 0 ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
             <div
               className="rounded-[18px] border px-4 py-3"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
@@ -180,6 +181,22 @@ export function InventoryDetailPanel({
                 {formatQty(pendingQty)}
               </div>
             </div>
+            {defectiveQty > 0 && (
+              <div
+                className="rounded-[18px] border px-4 py-3"
+                style={{
+                  background: LEGACY_COLORS.s1,
+                  borderColor: mix(LEGACY_COLORS.red, 40),
+                }}
+              >
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  불량 재고
+                </div>
+                <div className="mt-1 text-xl font-black" style={{ color: LEGACY_COLORS.red }}>
+                  {formatQty(defectiveQty)}
+                </div>
+              </div>
+            )}
           </div>
           {item.supplier && (
             <div

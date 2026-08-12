@@ -35,6 +35,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   const minStock = getMinStock(item);
   const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
   const qty = safeQty(item);
+  const pendingQty = Number(item.pending_quantity) || 0;
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 
   const DEFECT_RED = "#ef4444";
@@ -79,6 +80,9 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   const stockChips: { key: string; label: string; quantity: number; color: string }[] = [];
   if (wh > 0) {
     stockChips.push({ key: "warehouse", label: "창고", quantity: wh, color: "#3dd4a0" });
+  }
+  if (pendingQty > 0) {
+    stockChips.push({ key: "pending", label: "예약", quantity: pendingQty, color: LEGACY_COLORS.yellow });
   }
   for (const [dept, quantity] of Array.from(prodQtyByDept)) {
     stockChips.push({ key: `dept-${dept}`, label: dept, quantity, color: getDeptColor(dept) });

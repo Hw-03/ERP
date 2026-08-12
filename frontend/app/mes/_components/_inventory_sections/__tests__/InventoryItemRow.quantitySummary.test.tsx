@@ -55,6 +55,52 @@ describe("InventoryItemRow quantity summary", () => {
     expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
   });
 
+  it("shows a positive pending reservation between warehouse and department chips without changing stock totals or gauge", () => {
+    render(
+      <table>
+        <tbody>
+          <InventoryItemRow
+            item={makeItem({ pending_quantity: 3 } as Partial<Item>)}
+            selected={false}
+            onSelect={() => {}}
+          />
+        </tbody>
+      </table>,
+    );
+
+    const summary = screen.getByTestId("inventory-dept-stock-summary");
+    const warehouseChip = within(summary).getByText("창고 5");
+    const pendingChip = within(summary).getByText("예약 3");
+    const departmentChip = within(summary).getByText("조립 8");
+    const defectiveChip = within(summary).getByText("불량 2");
+    expect(warehouseChip.compareDocumentPosition(pendingChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pendingChip.compareDocumentPosition(departmentChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(departmentChip.compareDocumentPosition(defectiveChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("15");
+    expect(defectiveChip).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
+  });
+
+  it("hides a zero pending reservation while keeping total, defective, and gauge displays", () => {
+    render(
+      <table>
+        <tbody>
+          <InventoryItemRow
+            item={makeItem({ pending_quantity: 0 } as Partial<Item>)}
+            selected={false}
+            onSelect={() => {}}
+          />
+        </tbody>
+      </table>,
+    );
+
+    const summary = screen.getByTestId("inventory-dept-stock-summary");
+    expect(within(summary).queryByText(/예약/)).toBeNull();
+    expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("15");
+    expect(within(summary).getByText("불량 2")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
+  });
+
   it("hides the defective stock chip when defective quantity is zero", () => {
     render(
       <table>

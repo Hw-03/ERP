@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type BOMTreeNode, type Item, type StockRequestReservationLine } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatQty } from "@/lib/mes/format";
 import { DesktopRightPanel } from "../../DesktopRightPanel";
 import { SlidePanel } from "../../common/SlidePanel";
 import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
@@ -171,6 +172,40 @@ describe("InventoryDetailPanel desktop quick actions", () => {
       borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
     });
     expect(within(pendingCard!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.yellow });
+  });
+
+  it("renders defective stock after available and pending quantities with red emphasis", () => {
+    render(
+      <InventoryDetailPanel
+        item={{ ...makeItem(), available_quantity: 10, pending_quantity: 5, defective_total: 3.5 } as Item}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    const availableLabel = screen.getByText("사용 가능 재고");
+    const pendingLabel = screen.getByText("승인 대기 수량");
+    const defectiveLabel = screen.getByText("불량 재고");
+    const defectiveCard = defectiveLabel.parentElement;
+
+    expect(availableLabel.compareDocumentPosition(pendingLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pendingLabel.compareDocumentPosition(defectiveLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(defectiveLabel.parentElement?.parentElement).toHaveClass("grid-cols-3");
+    expect(defectiveCard).toHaveStyle({
+      borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+    });
+    expect(within(defectiveCard!).getByText(formatQty(3.5))).toHaveStyle({ color: LEGACY_COLORS.red });
+  });
+
+  it("does not render defective stock or expand the quantity grid when its total is zero", () => {
+    render(
+      <InventoryDetailPanel
+        item={{ ...makeItem(), defective_total: 0 } as Item}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText("불량 재고")).not.toBeInTheDocument();
+    expect(screen.getByText("사용 가능 재고").parentElement?.parentElement).toHaveClass("grid-cols-2");
   });
 
   it("portals desktop quick actions into the fixed right-panel footer", () => {

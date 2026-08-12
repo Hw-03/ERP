@@ -22,13 +22,14 @@ vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => ({ employee_id: "emp-1", assigned_model_slots: [] }),
 }));
 
-function makeItem(): Item {
+function makeItem({ warehouseQty = 0, pendingQty = 0 }: { warehouseQty?: number; pendingQty?: number } = {}): Item {
   return {
     item_id: "item-1",
     item_name: "Clickable Item",
     mes_code: "3-TR-0001",
     quantity: 0,
-    warehouse_qty: 0,
+    warehouse_qty: warehouseQty,
+    pending_quantity: pendingQty,
     min_stock: null,
     locations: [],
     model_slots: [],
@@ -66,6 +67,73 @@ function makeBundle(sourceKind: IoBundle["source_kind"]): IoBundle {
 }
 
 describe("IoTargetPicker row click", () => {
+  it.each([
+    "warehouse_to_dept",
+    "internal_use_out",
+    "warehouse_adjust_out",
+  ] as const)("shows warehouse availability and reservations for %s", (subType) => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType={subType === "warehouse_adjust_out" ? "warehouse_adjust" : "warehouse_io"}
+        subType={subType}
+        items={[makeItem({ warehouseQty: 10, pendingQty: 12 })]}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const warehouseCell = within(row).getAllByRole("cell")[2];
+
+    expect(warehouseCell).toHaveTextContent("출고 가능 0");
+    expect(warehouseCell).toHaveTextContent("창고 10 · 예약 12");
+  });
+
+  it("subtracts a reservation from a positive warehouse quantity", () => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="warehouse_io"
+        subType="warehouse_to_dept"
+        items={[makeItem({ warehouseQty: 10, pendingQty: 3 })]}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const warehouseCell = within(row).getAllByRole("cell")[2];
+
+    expect(warehouseCell).toHaveTextContent("출고 가능 7");
+    expect(warehouseCell).toHaveTextContent("창고 10 · 예약 3");
+  });
+
+  it("keeps the warehouse cell as a single quantity when pending quantity is zero", () => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="warehouse_io"
+        subType="warehouse_to_dept"
+        items={[makeItem({ warehouseQty: 10, pendingQty: 0 })]}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const warehouseCell = within(row).getAllByRole("cell")[2];
+
+    expect(warehouseCell).toHaveTextContent("10");
+    expect(warehouseCell).not.toHaveTextContent("출고 가능");
+    expect(warehouseCell).not.toHaveTextContent("예약");
+  });
+
+  it("keeps the warehouse cell as a single quantity for supplier receipts", () => {
+    render(<IoTargetPicker {...baseProps} items={[makeItem({ warehouseQty: 10, pendingQty: 3 })]} />);
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const warehouseCell = within(row).getAllByRole("cell")[2];
+
+    expect(warehouseCell).toHaveTextContent("10");
+    expect(warehouseCell).not.toHaveTextContent("출고 가능");
+    expect(warehouseCell).not.toHaveTextContent("예약");
+  });
+
   it.each([
     ["BOM", "bom_parent"],
     ["낱개", "manual"],

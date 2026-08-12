@@ -486,11 +486,11 @@ function ItemTable({
     <>
       <table className="w-full border-collapse text-sm">
         {/* 모바일(<lg): 숨긴 3열(품목코드/창고/부서)을 0폭으로 접고 품목명열이 남는 폭 흡수 → 액션이 행 우측 끝.
-            데스크톱(lg:≥1024): 원래 5열 비율 복원(회귀 0). */}
+            데스크톱(lg:≥1024): 출고 가능·예약 2줄 표시를 위해 창고열 폭을 확보한 5열 비율. */}
         <colgroup>
-          <col className="w-full lg:w-[58%]" />
+          <col className="w-full lg:w-[51%]" />
           <col className="w-0 lg:w-[14%]" />
-          <col className="w-0 lg:w-[7%]" />
+          <col className="w-0 lg:w-[14%]" />
           <col className="w-0 lg:w-[8%]" />
           <col className="w-auto lg:w-[13%]" />
         </colgroup>
@@ -555,6 +555,13 @@ function ItemTable({
             const hasOthers = Array.from(prodByDept.keys()).some((d) => d !== impliedDeptName);
             const noDeptStock = prodByDept.size === 0;
             const wQty = Number(item.warehouse_qty) || 0;
+            const pendingQty = Number(item.pending_quantity) || 0;
+            const warehouseAvailableQty = Math.max(0, wQty - pendingQty);
+            const showsWarehouseAvailability =
+              pendingQty > 0 &&
+              (subType === "warehouse_to_dept" ||
+                subType === "internal_use_out" ||
+                subType === "warehouse_adjust_out");
             const isHighlight = highlightItemId === item.item_id;
             const selectedBundles = bundles.filter((bundle) => bundle.source_item_id === item.item_id);
             const isSelected = selectedBundles.length > 0;
@@ -596,13 +603,36 @@ function ItemTable({
                   </span>
                 </td>
                 <td
-                  className="hidden px-3 py-2 text-center text-base font-black tabular-nums lg:table-cell"
+                  className="hidden px-3 py-2 text-center lg:table-cell"
                   style={{
                     color: wQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                     borderBottom: `1px solid ${LEGACY_COLORS.border}`,
                   }}
                 >
-                  {formatQty(wQty)}
+                  {showsWarehouseAvailability ? (
+                    <div className="flex flex-col items-center leading-tight">
+                      <span
+                        className="whitespace-nowrap text-[11px] font-semibold"
+                        style={{ color: LEGACY_COLORS.muted2 }}
+                      >
+                        출고 가능{" "}
+                        <strong
+                          className="text-sm font-black tabular-nums"
+                          style={{ color: warehouseAvailableQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}
+                        >
+                          {formatQty(warehouseAvailableQty)}
+                        </strong>
+                      </span>
+                      <span
+                        className="mt-0.5 whitespace-nowrap text-[10px] font-medium tabular-nums"
+                        style={{ color: LEGACY_COLORS.muted2 }}
+                      >
+                        창고 {formatQty(wQty)} · 예약 {formatQty(pendingQty)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-base font-black tabular-nums">{formatQty(wQty)}</span>
+                  )}
                 </td>
                 <td
                   className="hidden px-3 py-2 text-center lg:table-cell"
