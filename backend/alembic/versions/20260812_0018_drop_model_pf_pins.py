@@ -13,7 +13,15 @@ down_revision: Union[str, None] = "20260812_0017"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-EMPLOYEE_AUTO_DEPLOY_POLICY = {"kind": "schema-only"}
+EMPLOYEE_AUTO_DEPLOY_POLICY = {
+    "kind": "data-change",
+    "allowed_tables": ["model_pf_pins"],
+    "validator_sql": (
+        "SELECT COUNT(*) FROM sqlite_master "
+        "WHERE type = 'table' AND name = 'model_pf_pins'"
+    ),
+    "validator_expected": 0,
+}
 
 
 def upgrade() -> None:

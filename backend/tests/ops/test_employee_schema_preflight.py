@@ -109,6 +109,26 @@ def test_data_change_policy_allows_only_declared_table_and_validator(tmp_path: P
     module.assert_policy_validators(database, (policy,))
 
 
+def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path) -> None:
+    module = _load_preflight_module()
+    database = tmp_path / "employee.db"
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE model_pf_pins (model_symbol TEXT PRIMARY KEY)")
+        connection.execute("INSERT INTO model_pf_pins VALUES ('DX-7020')")
+
+    policy = module._policy_from_migration(
+        MIGRATIONS / "20260812_0018_drop_model_pf_pins.py"
+    )
+    before = module.snapshot_existing_rows(database)
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE model_pf_pins")
+
+    assert policy.kind == "data-change"
+    assert policy.allowed_tables == frozenset({"model_pf_pins"})
+    module.assert_existing_rows_unchanged(database, before, policy.allowed_tables)
+    module.assert_policy_validators(database, (policy,))
+
+
 @pytest.mark.parametrize(
     "filename",
     [
