@@ -62,7 +62,7 @@ from app.models.stock_request import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
-from app.models.system import DataRevision, ModelPfPin, SystemSetting
+from app.models.system import DataRevision, SystemSetting
 from app.models.transaction import (
     TransactionEditLog,
     TransactionLog,
@@ -140,7 +140,6 @@ __all__ = [
     # system / audit
     "SystemSetting",
     "DataRevision",
-    "ModelPfPin",
     "AdminAuditLog",
     # warehouse map
     "WarehouseAngle",

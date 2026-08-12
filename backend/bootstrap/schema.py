@@ -690,6 +690,14 @@ def _is_pre_assembly_checklist_schema(
     )
 
 
+def _has_only_obsolete_manual_pf_pin_table(
+    differences: tuple[str, ...],
+) -> bool:
+    """Allow an unversioned pre-migration database to reach its removal migration."""
+    marker = "Alembic metadata diff: ('remove_table', Table('model_pf_pins'"
+    return bool(differences) and all(difference.startswith(marker) for difference in differences)
+
+
 def inspect_schema(connection: Connection) -> SchemaInspection:
     """Classify a database without changing schema or data."""
     head, known_revisions = _revision_contract(connection)
@@ -753,7 +761,10 @@ def inspect_schema(connection: Connection) -> SchemaInspection:
 
     differences = schema_differences(connection)
     if differences:
-        if _is_pre_assembly_checklist_schema(tables, differences):
+        if (
+            _is_pre_assembly_checklist_schema(tables, differences)
+            or _has_only_obsolete_manual_pf_pin_table(differences)
+        ):
             validate_unversioned_data(connection)
             return SchemaInspection(
                 SchemaState.UNVERSIONED_CURRENT,

@@ -18,44 +18,6 @@ export function useProductionCapacityQuery() {
   });
 }
 
-export function usePfPinsQuery() {
-  return useQuery({
-    queryKey: queryKeys.production.pfPins(),
-    queryFn: () => productionApi.getPfPins(),
-  });
-}
-
-export function useSetPfPinMutation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ modelSymbol, pfItemId }: { modelSymbol: string; pfItemId: string }) =>
-      productionApi.setPfPin(modelSymbol, pfItemId),
-    onSuccess: (_, { modelSymbol, pfItemId }) => {
-      qc.setQueryData<Record<string, string>>(
-        queryKeys.production.pfPins(),
-        (old) => ({ ...(old ?? {}), [modelSymbol]: pfItemId }),
-      );
-    },
-  });
-}
-
-export function useClearPfPinMutation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (modelSymbol: string) => productionApi.clearPfPin(modelSymbol),
-    onSuccess: (_, modelSymbol) => {
-      qc.setQueryData<Record<string, string>>(
-        queryKeys.production.pfPins(),
-        (old) => {
-          const next = { ...(old ?? {}) };
-          delete next[modelSymbol];
-          return next;
-        },
-      );
-    },
-  });
-}
-
 export function useProductionReceiptMutation() {
   const qc = useQueryClient();
   return useMutation({

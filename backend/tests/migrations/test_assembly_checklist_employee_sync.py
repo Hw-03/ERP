@@ -25,6 +25,7 @@ MIGRATION_PATH = (
 PREFLIGHT_SCRIPT = ROOT / "scripts" / "ops" / "employee_schema_preflight.py"
 PREVIOUS_REVISION = "20260807_0016"
 MIGRATION_REVISION = "20260812_0017"
+HEAD_REVISION = "20260812_0018"
 EXPECTED_COUNTS = (4, 6, 50)
 EXPECTED_SHA256 = "02ecc3fc0549e0ac60e035b14d87533bdfa58fe651daf302570a202fc58d96ba"
 
@@ -140,7 +141,7 @@ def test_migration_replaces_only_checklist_tables_with_development_snapshot(
     assert counts == EXPECTED_COUNTS
     assert digest == EXPECTED_SHA256
     assert sentinel == ("preserve-me",)
-    assert revision == (MIGRATION_REVISION,)
+    assert revision == (HEAD_REVISION,)
     assert policy.kind == "data-change"
     assert policy.allowed_tables == frozenset(SNAPSHOT_COLUMNS)
 
@@ -164,4 +165,4 @@ def test_migration_skips_snapshot_when_target_models_are_missing(
         revision = db.execute("SELECT version_num FROM alembic_version").fetchone()
 
     assert checklist_count == (0,)
-    assert revision == (MIGRATION_REVISION,)
+    assert revision == (HEAD_REVISION,)

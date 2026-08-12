@@ -457,12 +457,6 @@ _MIGRATION_DDL: list[str] = [
     )""",
     "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_audits_zone_id ON warehouse_special_zone_audits(zone_id)",
     "CREATE INDEX IF NOT EXISTS ix_warehouse_special_zone_audits_actor_employee_id ON warehouse_special_zone_audits(actor_employee_id)",
-    # 2026-06-22: 모델별 기준 PF 지정 — 대시보드 칩 기준 수치 고정
-    """CREATE TABLE IF NOT EXISTS model_pf_pins (
-        model_symbol TEXT PRIMARY KEY,
-        pf_item_id   CHAR(36) NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
-        updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )""",
 ]
 
 

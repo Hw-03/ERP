@@ -166,6 +166,8 @@ export interface ProductionCapacityAfBlock {
   summary: ProductionCapacityAfSummary;
   items: ProductionCapacityAfItem[];
   pf_variants: ProductionCapacityPfVariant[];
+  /** 모델별 PF 후보 중 자동 기준으로 선택된 하나의 출하 사양. */
+  auto_representatives: ProductionCapacityPfVariant[];
 }
 
 export interface ProductionCapacity {

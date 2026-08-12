@@ -4,7 +4,11 @@
  * 백엔드 `af.items`(AF 1종 단위)를 화면용으로 model_symbol 단위로 묶는다.
  * 패널(모델별 칩)과 상세 모달(모델 그룹 헤더 합계)이 공유한다.
  */
-import type { ProductionCapacityAfBlock, ProductionCapacityAfItem } from "@/lib/api/types/production";
+import type {
+  ProductionCapacityAfBlock,
+  ProductionCapacityAfItem,
+  ProductionCapacityPfVariant,
+} from "@/lib/api/types/production";
 import { getModelLabel } from "@/lib/mes/model-labels";
 
 export interface ModelCapacityGroup {
@@ -64,21 +68,13 @@ export function groupAfByModel(
 }
 
 /**
- * 핀이 지정된 PF 의 3수량을 반환. 핀 없거나 variant 못 찾으면 null.
- * 3수량 모두 pf_variant 에서 직접 읽는다.
+ * 백엔드가 모델별로 자동 선정한 PF 를 반환한다.
  */
-export function getPinnedPfNumbers(
+export function getAutoRepresentative(
   modelKey: string,
-  pfPins: Record<string, string>,
   af: ProductionCapacityAfBlock,
-): { ship_ready: number; fast_production: number; total_production: number } | null {
-  const pinId = pfPins[modelKey];
-  if (!pinId) return null;
-  const variant = af.pf_variants.find((v) => v.pf_item_id === pinId);
-  if (!variant) return null;
-  return {
-    ship_ready: variant.ship_ready,
-    fast_production: variant.fast_production,
-    total_production: variant.total_production,
-  };
+): ProductionCapacityPfVariant | null {
+  return (af.auto_representatives ?? []).find(
+    (variant) => (variant.model_symbol ?? "").trim() === modelKey,
+  ) ?? null;
 }

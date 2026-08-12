@@ -48,6 +48,36 @@ ReverseBom = Dict[uuid.UUID, List[Tuple[uuid.UUID, Decimal]]]
 FigById = Dict[uuid.UUID, "stock_math.StockFigures"]
 
 
+def select_auto_representatives(variants: List[dict]) -> List[dict]:
+    """모델별 PF 후보 중 자동 기준으로 표시할 하나를 결정한다.
+
+    세 생산 가능 수량의 합계는 기준을 고르는 점수일 뿐, 반환 수량을 합산하지는
+    않는다. 동점은 총생산, 빠른 생산, 출하 대기, PF 코드, 품목 ID 순으로 푼다.
+    """
+    candidates_by_model: Dict[str, List[dict]] = {}
+    for variant in variants:
+        model_symbol = str(variant.get("model_symbol") or "").strip()
+        candidates_by_model.setdefault(model_symbol, []).append(variant)
+
+    def ranking_key(variant: dict) -> tuple[int, int, int, int, str, str]:
+        ship_ready = int(variant["ship_ready"])
+        fast_production = int(variant["fast_production"])
+        total_production = int(variant["total_production"])
+        return (
+            -(ship_ready + fast_production + total_production),
+            -total_production,
+            -fast_production,
+            -ship_ready,
+            str(variant.get("pf_code") or ""),
+            str(variant["pf_item_id"]),
+        )
+
+    return [
+        min(candidates, key=ranking_key)
+        for _model_symbol, candidates in sorted(candidates_by_model.items())
+    ]
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 공용 헬퍼
 # ─────────────────────────────────────────────────────────────────────────────
@@ -539,6 +569,7 @@ def compute_af_capacity(
             "summary": {"ship_ready": 0, "fast_production": 0, "total_production": 0},
             "items": [],
             "pf_variants": [],
+            "auto_representatives": [],
         }
 
     af_id_set = {it.item_id for it in af_items}
@@ -641,6 +672,7 @@ def compute_af_capacity(
         "summary": summary,
         "items": af_rows,
         "pf_variants": variant_rows,
+        "auto_representatives": select_auto_representatives(variant_rows),
     }
 
 

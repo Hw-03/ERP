@@ -220,6 +220,7 @@ def test_capacity_response_has_legacy_and_af_block(
     }
     assert isinstance(data["af"]["items"], list)
     assert isinstance(data["af"]["pf_variants"], list)
+    assert isinstance(data["af"]["auto_representatives"], list)
 
 
 def test_capacity_af_block_fast_production_via_api(client, db_session, make_item, make_bom):
@@ -243,6 +244,7 @@ def test_capacity_af_block_fast_production_via_api(client, db_session, make_item
     assert variants[0]["pf_item_id"] == str(pf.item_id)
     assert variants[0]["ship_ready"] == 0  # PF 재고 없음
     assert variants[0]["fast_production"] == 5  # AF 재고 = 빠른 생산
+    assert [row["pf_item_id"] for row in af_block["auto_representatives"]] == [str(pf.item_id)]
 
 
 def test_capacity_multi_path_bottleneck(client, db_session, make_item, make_bom):

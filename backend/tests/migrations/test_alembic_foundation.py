@@ -4,8 +4,6 @@ import io
 import logging
 import os
 import sqlite3
-import uuid
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -17,8 +15,7 @@ from alembic.migration import MigrationContext
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.schema import CreateTable
 
-from app import models
-from app.models import Base, Item, ModelPfPin
+from app.models import Base, Item
 from migration_type_compare import compare_migration_type
 
 
@@ -58,6 +55,19 @@ def test_alembic_upgrade_keeps_application_logger_enabled(tmp_path, caplog):
         logger.setLevel(previous_level)
 
 
+def test_head_schema_removes_manual_pf_pin_table(tmp_path):
+    """자동 기준 전환 뒤 최신 스키마에는 수동 PF 지정 테이블이 없다."""
+    db_path = tmp_path / "without-pf-pins.db"
+    url = f"sqlite:///{db_path.as_posix()}"
+    command.upgrade(_config(url), "head")
+
+    engine = sa.create_engine(url)
+    try:
+        assert "model_pf_pins" not in sa.inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+
+
 def test_item_code_parts_are_not_nullable_and_use_portable_computed_sql():
     table = Item.__table__
 
@@ -78,94 +88,6 @@ def test_item_code_parts_are_not_nullable_and_use_portable_computed_sql():
     assert "cast" in postgresql_ddl
 
 
-def test_model_pf_pins_is_part_of_orm_metadata():
-    model_pf_pin = getattr(models, "ModelPfPin", None)
-    assert model_pf_pin is not None
-    table = Base.metadata.tables["model_pf_pins"]
-
-    assert model_pf_pin.__table__ is table
-    assert list(table.primary_key.columns.keys()) == ["model_symbol"]
-    assert table.c.pf_item_id.nullable is False
-    assert table.c.updated_at.nullable is False
-    assert table.c.updated_at.server_default is not None
-
-    fk = next(iter(table.c.pf_item_id.foreign_keys))
-    assert fk.target_fullname == "items.item_id"
-    assert fk.ondelete == "CASCADE"
-
-
-def test_model_pf_pins_sqlite_legacy_types_preserve_uuid_and_datetime_processors(
-    tmp_path,
-):
-    db_path = tmp_path / "model-pf-types.db"
-    url = f"sqlite:///{db_path.as_posix()}"
-    command.upgrade(_config(url), "head")
-    engine = sa.create_engine(url)
-    item_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
-    explicit_time = datetime(2026, 7, 15, 12, 30, 45)
-    try:
-        inspector = sa.inspect(engine)
-        columns = {
-            column["name"]: column for column in inspector.get_columns("model_pf_pins")
-        }
-        assert isinstance(columns["model_symbol"]["type"], sa.Text)
-        assert isinstance(columns["pf_item_id"]["type"], sa.CHAR)
-        assert columns["pf_item_id"]["type"].length == 36
-        assert isinstance(columns["updated_at"]["type"], sa.Text)
-
-        with engine.begin() as connection:
-            connection.execute(
-                sa.text(
-                    "INSERT INTO process_types "
-                    "(code, prefix, suffix, stage_order) VALUES ('TR', 'T', 'R', 1)"
-                )
-            )
-            connection.execute(
-                sa.text(
-                    "INSERT INTO items "
-                    "(item_id, item_name, unit, model_symbol, process_type_code, serial_no) "
-                    "VALUES (:item_id, 'pin-target', 'EA', '9', 'TR', 1)"
-                ),
-                {"item_id": item_id.hex},
-            )
-
-        with sa.orm.Session(engine) as session:
-            session.add(
-                ModelPfPin(
-                    model_symbol="9",
-                    pf_item_id=item_id,
-                    updated_at=explicit_time,
-                )
-            )
-            session.commit()
-            pin = session.get(ModelPfPin, "9")
-            assert pin is not None
-            assert pin.pf_item_id == item_id
-            assert pin.updated_at == explicit_time
-
-        with engine.begin() as connection:
-            assert connection.scalar(
-                sa.text(
-                    "SELECT pf_item_id FROM model_pf_pins WHERE model_symbol='9'"
-                )
-            ) == item_id.hex
-            connection.execute(
-                sa.text(
-                    "INSERT INTO model_pf_pins (model_symbol, pf_item_id) "
-                    "VALUES ('9-default', :item_id)"
-                ),
-                {"item_id": item_id.hex},
-            )
-
-        with sa.orm.Session(engine) as session:
-            default_pin = session.get(ModelPfPin, "9-default")
-            assert default_pin is not None
-            assert default_pin.pf_item_id == item_id
-            assert isinstance(default_pin.updated_at, datetime)
-    finally:
-        engine.dispose()
-
-
 def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path):
     db_path = tmp_path / "empty.db"
     url = f"sqlite:///{db_path.as_posix()}"
@@ -184,7 +106,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260812_0017"
+            ) == "20260812_0018"
             shipping_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("shipping_requests")
@@ -409,7 +331,7 @@ def test_postgresql_offline_upgrade_compiles_without_sqlite_functions():
 
     sql = output.getvalue().lower()
     assert "create table items" in sql
-    assert "create table model_pf_pins" in sql
+    assert "drop table model_pf_pins" in sql
     assert "ck_items_serial_no_positive" not in sql
     assert "printf" not in sql
     assert "pragma" not in sql

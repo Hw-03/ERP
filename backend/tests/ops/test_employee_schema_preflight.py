@@ -122,6 +122,7 @@ def test_data_change_policy_allows_only_declared_table_and_validator(tmp_path: P
         "20260807_0015_backfill_shipping_finalization_choice.py",
         "20260807_0016_repair_shipping_bom_candidate_schema.py",
         "20260812_0017_sync_assembly_checklist_content.py",
+        "20260812_0018_drop_model_pf_pins.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

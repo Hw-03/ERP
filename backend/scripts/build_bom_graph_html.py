@@ -1,7 +1,7 @@
-"""모델별 대표 PF 5개의 BOM 가계도를 인터랙티브 그래프 HTML 한 개로 생성한다 (읽기 전용).
+"""모델별 자동 기준 PF의 BOM 가계도를 인터랙티브 그래프 HTML 한 개로 생성한다 (읽기 전용).
 
 - DB를 직접 읽으므로 서버 불필요. SELECT만, commit 없음.
-- 대표 PF는 화면(capacity)과 동일하게 get_production_capacity 의 representative_items 사용.
+- 대표 PF는 화면(capacity)과 동일한 AF 자동 기준 출하품을 사용.
 - D3 v7 을 HTML 에 인라인 → 인터넷 없이 열린다(완전 self-contained).
 - 레이아웃: 공정 단계(stage_order)를 세로 레벨로 고정한 layered 피라미드.
   같은 단계(완제품/조립/원자재 등)는 같은 가로 띠에 정렬되어 위→아래로 층층이 내려간다.
@@ -21,9 +21,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import text
-
 from app.database import SessionLocal
+from app.services.production_capacity import compute_capacity
 from scripts.bom_graph_data import (
     build_graph_tree,
     build_limited_bom_cache,
@@ -68,10 +67,8 @@ def main():
 
     db = SessionLocal()
     try:
-        pins = db.execute(
-            text("SELECT model_symbol, pf_item_id FROM model_pf_pins ORDER BY CAST(model_symbol AS INTEGER)")
-        ).fetchall()
-        root_ids = [uuid.UUID(str(pf_id)) for _ms, pf_id in pins]
+        representatives = compute_capacity(db)["af"]["auto_representatives"]
+        root_ids = [uuid.UUID(str(row["pf_item_id"])) for row in representatives]
         bom_cache = build_limited_bom_cache(db, root_ids, max_depth=MAX_DEPTH)
         maps = load_item_maps(db, collect_item_ids(root_ids, bom_cache))
         model_labels = load_model_labels(db)
@@ -79,14 +76,15 @@ def main():
 
         models = []
         summary = []
-        for ms, pf_id in pins:
-            root_id = uuid.UUID(str(pf_id))
+        for representative in representatives:
+            model_symbol = str(representative.get("model_symbol") or "")
+            root_id = uuid.UUID(str(representative["pf_item_id"]))
             item = maps.items.get(root_id)
             if not item:
                 continue
             tree = build_graph_tree(root_id, bom_cache, maps, max_depth=MAX_DEPTH)
-            label = model_labels.get(str(ms)) or (item.item_name or "").split("_")[0]
-            models.append({"key": str(ms), "label": label, "code": item.mes_code, "tree": tree})
+            label = model_labels.get(model_symbol) or (item.item_name or "").split("_")[0]
+            models.append({"key": model_symbol, "label": label, "code": item.mes_code, "tree": tree})
             summary.append(f"{label} ({item.mes_code}): {count_nodes(tree)} 노드")
     finally:
         db.close()

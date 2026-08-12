@@ -8,15 +8,9 @@ import type {
   ProductionCapacityAfItem,
   ProductionCapacityPfVariant,
 } from "@/lib/api/types/production";
-import { groupAfByModel, getPinnedPfNumbers } from "@/lib/mes/capacity";
+import { getAutoRepresentative, groupAfByModel } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-import {
-  usePfPinsQuery,
-  useSetPfPinMutation,
-  useClearPfPinMutation,
-} from "@/lib/queries/useProductionQuery";
-import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 
 const DESKTOP_CAPACITY_GRID =
@@ -141,11 +135,6 @@ function isIncomplete(it: ProductionCapacityAfItem): boolean {
 }
 
 function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
-  const { data: pfPins = {} } = usePfPinsQuery();
-  const setPfPin = useSetPfPinMutation();
-  const clearPfPin = useClearPfPinMutation();
-  const isPinLoading = setPfPin.isPending || clearPfPin.isPending;
-
   const items = af.items;
   const unregisteredBomCount = items.filter((item) => item.bom_status === "incomplete").length;
 
@@ -162,8 +151,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
       else next.add(id);
       return next;
     });
-
-  const [unpinTarget, setUnpinTarget] = useState<string | null>(null);
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const toggleGroup = (key: string) =>
@@ -225,11 +212,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           </div>
         )}
         {grouped.map((group) => {
-          const pinnedPfId = pfPins[group.key];
-          const pinnedVariant = pinnedPfId
-            ? af.pf_variants.find((v) => v.pf_item_id === pinnedPfId)
-            : null;
-          const pinnedNumbers = getPinnedPfNumbers(group.key, pfPins, af);
+          const autoRepresentative = getAutoRepresentative(group.key, af);
           const groupCollapsed = !expandedGroups.has(group.key);
           return (
           <div key={group.key} className="border-t first:border-t-0" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -253,47 +236,35 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                 </span>
             </button>
 
-            {pinnedVariant ? (
+            {autoRepresentative ? (
               <div className="border-t px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-                <div className="text-[10px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  기준 출하 완제품
+                <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  자동 기준 출하 완제품
                 </div>
                 <div className="mt-0.5 flex items-start gap-2">
                   <span className="min-w-0 flex-1 break-words text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
-                    {pinnedVariant.pf_name || pinnedVariant.pf_code}
+                    {autoRepresentative.pf_name || autoRepresentative.pf_code}
                   </span>
-                  <button
-                    type="button"
-                    disabled={isPinLoading}
-                    onClick={() => setUnpinTarget(group.key)}
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
-                    style={{
-                      background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
-                      color: LEGACY_COLORS.red,
-                    }}
-                    aria-label="기준 PF 해제"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                  <Badge color={LEGACY_COLORS.cyan}>자동 기준</Badge>
                 </div>
               </div>
             ) : (
               <div className="border-t px-4 py-2 text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                기준 출하 완제품 미지정
+                자동 기준 출하 완제품 없음
               </div>
             )}
 
             <div className="grid grid-cols-3 divide-x border-t" style={{ borderColor: LEGACY_COLORS.border }}>
-              {pinnedNumbers ? (
+              {autoRepresentative ? (
                 <>
                   <div className="px-1.5 py-2">
-                    <QtyLabelCell label="출하 대기" value={pinnedNumbers.ship_ready} color={LEGACY_COLORS.cyan} />
+                    <QtyLabelCell label="출하 대기" value={autoRepresentative.ship_ready} color={LEGACY_COLORS.cyan} />
                   </div>
                   <div className="px-1.5 py-2">
-                    <QtyLabelCell label="빠른 생산" value={pinnedNumbers.fast_production} color={LEGACY_COLORS.blue} />
+                    <QtyLabelCell label="빠른 생산" value={autoRepresentative.fast_production} color={LEGACY_COLORS.blue} />
                   </div>
                   <div className="px-1.5 py-2">
-                    <QtyLabelCell label="총생산" value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
+                    <QtyLabelCell label="총생산" value={autoRepresentative.total_production} color={LEGACY_COLORS.purple} />
                   </div>
                 </>
               ) : (
@@ -363,11 +334,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       <PfVariants
                         variants={variants}
                         hasPfPath={it.has_pf_path}
-                        pinnedPfId={pinnedPfId}
-                        modelSymbol={group.key}
-                        onPin={(pfItemId) => setPfPin.mutate({ modelSymbol: group.key, pfItemId })}
-                        onUnpin={() => clearPfPin.mutate(group.key)}
-                        isPinLoading={isPinLoading}
+                        autoRepresentative={autoRepresentative}
                       />
                     </div>
                   )}
@@ -379,23 +346,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         })}
       </div>
 
-      <ConfirmModal
-        open={unpinTarget !== null}
-        title="기준 PF 해제"
-        tone="caution"
-        confirmLabel="해제"
-        onClose={() => setUnpinTarget(null)}
-        onConfirm={() => {
-          if (unpinTarget) clearPfPin.mutate(unpinTarget);
-          setUnpinTarget(null);
-        }}
-        busy={isPinLoading}
-      >
-        <p className="mb-2 text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-          기준 PF 지정을 해제하시겠습니까?
-        </p>
-      </ConfirmModal>
-
       {/* 데스크톱 테이블 레이아웃 (≥ 640px) */}
       <div className="hidden sm:block rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
         <div
@@ -405,7 +355,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           <span />
           <span>조립 완제품</span>
           <span>모델 수</span>
-          <span>기준 모델</span>
+          <span>자동 기준 출하품</span>
           <span className="text-right">출하 대기</span>
           <span className="text-right">빠른 생산</span>
           <span className="text-right">총생산</span>
@@ -418,11 +368,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         )}
 
         {grouped.map((group) => {
-          const pinnedPfId = pfPins[group.key];
-          const pinnedVariant = pinnedPfId
-            ? af.pf_variants.find((v) => v.pf_item_id === pinnedPfId)
-            : null;
-          const pinnedNumbers = getPinnedPfNumbers(group.key, pfPins, af);
+          const autoRepresentative = getAutoRepresentative(group.key, af);
           const groupCollapsed = !expandedGroups.has(group.key);
           return (
           <div key={group.key}>
@@ -448,7 +394,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                 {group.items.length}종
               </span>
               <div className="min-w-0">
-                {pinnedVariant ? (
+                {autoRepresentative ? (
                   <span
                     className="inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-sm font-bold"
                     style={{
@@ -456,20 +402,8 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       color: LEGACY_COLORS.cyan,
                     }}
                   >
-                    <span className="truncate">{pinnedVariant.pf_name || pinnedVariant.pf_code}</span>
-                    <button
-                      type="button"
-                      disabled={isPinLoading}
-                      onClick={(e) => { e.stopPropagation(); setUnpinTarget(group.key); }}
-                      className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
-                      style={{
-                        background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
-                        color: LEGACY_COLORS.red,
-                      }}
-                      aria-label="기준 PF 해제"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+                    <span className="truncate">{autoRepresentative.pf_name || autoRepresentative.pf_code}</span>
+                    <span>자동 기준</span>
                   </span>
                 ) : (
                   <span
@@ -479,15 +413,15 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       color: LEGACY_COLORS.muted2,
                     }}
                   >
-                    출고처 미지정
+                    출하 경로 없음
                   </span>
                 )}
               </div>
-              {pinnedNumbers ? (
+              {autoRepresentative ? (
                 <>
-                  <QtyCell value={pinnedNumbers.ship_ready} color={LEGACY_COLORS.cyan} />
-                  <QtyCell value={pinnedNumbers.fast_production} color={LEGACY_COLORS.blue} />
-                  <QtyCell value={pinnedNumbers.total_production} color={LEGACY_COLORS.purple} />
+                  <QtyCell value={autoRepresentative.ship_ready} color={LEGACY_COLORS.cyan} />
+                  <QtyCell value={autoRepresentative.fast_production} color={LEGACY_COLORS.blue} />
+                  <QtyCell value={autoRepresentative.total_production} color={LEGACY_COLORS.purple} />
                 </>
                 ) : (
                 <>
@@ -548,11 +482,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                       <PfVariants
                         variants={variants}
                         hasPfPath={it.has_pf_path}
-                        pinnedPfId={pinnedPfId}
-                        modelSymbol={group.key}
-                        onPin={(pfItemId) => setPfPin.mutate({ modelSymbol: group.key, pfItemId })}
-                        onUnpin={() => clearPfPin.mutate(group.key)}
-                        isPinLoading={isPinLoading}
+                        autoRepresentative={autoRepresentative}
                       />
                     </div>
                   )}
@@ -615,19 +545,11 @@ function Badge({ color, children }: { color: string; children: ReactNode }) {
 function PfVariants({
   variants,
   hasPfPath,
-  pinnedPfId,
-  modelSymbol: _modelSymbol,
-  onPin,
-  onUnpin,
-  isPinLoading,
+  autoRepresentative,
 }: {
   variants: ProductionCapacityPfVariant[];
   hasPfPath: boolean;
-  pinnedPfId?: string;
-  modelSymbol?: string;
-  onPin?: (pfItemId: string) => void;
-  onUnpin?: () => void;
-  isPinLoading?: boolean;
+  autoRepresentative?: ProductionCapacityPfVariant | null;
 }) {
   if (variants.length === 0) {
     return (
@@ -645,18 +567,20 @@ function PfVariants({
       </div>
       {variants.map((v) => {
         const ok = v.ship_ready > 0 || v.fast_production > 0;
-        const isPinned = pinnedPfId === v.pf_item_id;
+        const isAutoRepresentative =
+          autoRepresentative?.pf_item_id === v.pf_item_id &&
+          autoRepresentative.af_item_id === v.af_item_id;
         return (
           <div
             key={v.pf_item_id}
-            className={`grid grid-cols-[minmax(0,1fr)_72px_72px_72px_64px_28px] ${DESKTOP_PF_GRID} items-center gap-2 rounded-[8px] px-2 py-1.5 sm:gap-0 sm:px-0`}
+            className={`grid grid-cols-[minmax(0,1fr)_72px_72px_72px] ${DESKTOP_PF_GRID} items-center gap-2 rounded-[8px] px-2 py-1.5 sm:gap-0 sm:px-0`}
             style={{
-              background: isPinned
+              background: isAutoRepresentative
                 ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 10%, transparent)`
                 : ok
                   ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 6%, transparent)`
                   : `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
-              outline: isPinned ? `1.5px solid color-mix(in srgb, ${LEGACY_COLORS.cyan} 40%, transparent)` : undefined,
+              outline: isAutoRepresentative ? `1.5px solid color-mix(in srgb, ${LEGACY_COLORS.cyan} 40%, transparent)` : undefined,
             }}
           >
             <div className="min-w-0 sm:col-span-4">
@@ -677,29 +601,16 @@ function PfVariants({
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  {isPinned ? (
-                    <button
-                      type="button"
-                      disabled={isPinLoading}
-                      onClick={onUnpin}
+                  {isAutoRepresentative && (
+                    <span
                       className="rounded-full px-1.5 py-0.5 text-sm font-bold"
                       style={{
                         background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 18%, transparent)`,
                         color: LEGACY_COLORS.cyan,
                       }}
                     >
-                      기준
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isPinLoading}
-                      onClick={() => onPin?.(v.pf_item_id)}
-                      className="rounded-full px-1.5 py-0.5 text-sm font-semibold"
-                      style={{ color: LEGACY_COLORS.muted2 }}
-                    >
-                      지정
-                    </button>
+                      자동 기준
+                    </span>
                   )}
                   <span className="flex" aria-label={ok ? "생산 가능" : "생산 제한"}>
                     {ok ? (

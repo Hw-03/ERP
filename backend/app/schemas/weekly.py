@@ -230,6 +230,13 @@ class CapacityAfBlock(BaseModel):
     summary: CapacityAfSummary
     items: List[CapacityAfItem] = Field(default_factory=list)
     pf_variants: List[CapacityPfVariant] = Field(default_factory=list)
+    auto_representatives: List[CapacityPfVariant] = Field(
+        default_factory=list,
+        description=(
+            "모델별 PF 후보 중 출하 대기+빠른 생산+총생산 합계가 가장 큰 자동 기준 PF. "
+            "동점은 총생산, 빠른 생산, 출하 대기, PF 코드, 품목 ID 순으로 결정."
+        ),
+    )
 
 
 class CapacityResponse(BaseModel):

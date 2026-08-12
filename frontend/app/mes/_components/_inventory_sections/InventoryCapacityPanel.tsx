@@ -10,11 +10,10 @@ import type {
   ProductionCapacityAfBlock,
   ProductionCapacityAfStatus,
 } from "@/lib/api/types/production";
-import { groupAfByModel, getPinnedPfNumbers, type ModelCapacityGroup } from "@/lib/mes/capacity";
+import { getAutoRepresentative, groupAfByModel, type ModelCapacityGroup } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { getModelLabel } from "@/lib/mes/model-labels";
-import { usePfPinsQuery } from "@/lib/queries/useProductionQuery";
 
 function resolveStatus(data: ProductionCapacity): ProductionCapacityStatus {
   if (data.status) return data.status;
@@ -123,7 +122,6 @@ function AfPanel({
   interactive: boolean;
   onClick?: () => void;
 }) {
-  const { data: pfPins = {} } = usePfPinsQuery();
   const accent = afAccent(af.status);
   const showStats =
     af.status === "producible" ||
@@ -166,29 +164,34 @@ function AfPanel({
             </thead>
             <tbody>
               {groups.map((g) => {
-                const pinned = getPinnedPfNumbers(g.key, pfPins, af);
+                const autoRepresentative = getAutoRepresentative(g.key, af);
                 return (
                   <tr key={g.key}>
                     <td className="max-w-0 py-0.5 pr-2 text-left font-bold" style={{ color: LEGACY_COLORS.text }}>
                       <div className="truncate">{g.label}</div>
+                      {!autoRepresentative && (
+                        <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                          출하 경로 없음
+                        </div>
+                      )}
                     </td>
                     <td
                       className="py-0.5 font-black"
-                      style={{ color: pinned && pinned.ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
+                      style={{ color: autoRepresentative && autoRepresentative.ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
                     >
-                      {pinned ? formatQty(pinned.ship_ready) : "—"}
+                      {autoRepresentative ? formatQty(autoRepresentative.ship_ready) : "—"}
                     </td>
                     <td
                       className="py-0.5 font-black"
-                      style={{ color: pinned && pinned.fast_production > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+                      style={{ color: autoRepresentative && autoRepresentative.fast_production > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
                     >
-                      {pinned ? formatQty(pinned.fast_production) : "—"}
+                      {autoRepresentative ? formatQty(autoRepresentative.fast_production) : "—"}
                     </td>
                     <td
                       className="py-0.5 font-bold"
-                      style={{ color: pinned && pinned.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
+                      style={{ color: autoRepresentative && autoRepresentative.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
                     >
-                      {pinned ? formatQty(pinned.total_production) : "—"}
+                      {autoRepresentative ? formatQty(autoRepresentative.total_production) : "—"}
                     </td>
                   </tr>
                 );
@@ -213,7 +216,7 @@ function AfPanel({
         <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 sm:flex">
           <ModelLegend />
           {groups.map((g) => (
-            <ModelChip key={g.key} group={g} pinned={getPinnedPfNumbers(g.key, pfPins, af)} />
+            <ModelChip key={g.key} group={g} autoRepresentative={getAutoRepresentative(g.key, af)} />
           ))}
         </div>
       ) : (
@@ -264,27 +267,35 @@ function ModelLegend() {
 // 모델별 칩: 모델명 + 출하/조립/총생산 3수량(색 구분).
 function ModelChip({
   group,
-  pinned,
+  autoRepresentative,
 }: {
   group: ModelCapacityGroup;
-  pinned: { ship_ready: number; fast_production: number; total_production: number } | null;
+  autoRepresentative: { ship_ready: number; fast_production: number; total_production: number } | null;
 }) {
   return (
     <span className="inline-flex shrink-0 items-baseline gap-1 text-sm">
       <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
         {group.label}
       </span>
-      <span className="font-black" style={{ color: pinned ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>
-        {pinned ? formatQty(pinned.ship_ready) : "—"}
-      </span>
-      <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-      <span className="font-black" style={{ color: pinned ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>
-        {pinned ? formatQty(pinned.fast_production) : "—"}
-      </span>
-      <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-      <span className="font-bold" style={{ color: pinned ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}>
-        {pinned ? formatQty(pinned.total_production) : "—"}
-      </span>
+      {autoRepresentative ? (
+        <>
+          <span className="font-black" style={{ color: LEGACY_COLORS.cyan }}>
+            {formatQty(autoRepresentative.ship_ready)}
+          </span>
+          <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+          <span className="font-black" style={{ color: LEGACY_COLORS.blue }}>
+            {formatQty(autoRepresentative.fast_production)}
+          </span>
+          <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+          <span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>
+            {formatQty(autoRepresentative.total_production)}
+          </span>
+        </>
+      ) : (
+        <span className="font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+          출하 경로 없음
+        </span>
+      )}
     </span>
   );
 }

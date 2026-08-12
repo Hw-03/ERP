@@ -112,7 +112,6 @@ export const queryKeys = {
   production: {
     all: ["production"] as const,
     capacity: () => ["production", "capacity"] as const,
-    pfPins: () => ["production", "pfPins"] as const,
     transactions: (params?: object) =>
       ["production", "transactions", params ?? {}] as const,
     transactionEdits: (logId: string) =>

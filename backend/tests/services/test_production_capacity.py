@@ -35,6 +35,123 @@ def _item_label(item: Item) -> str:
     return f"{item.item_name} ({item.mes_code})"
 
 
+def test_auto_representatives_choose_largest_sum_then_stable_tie_breaker():
+    """모델별 자동 기준은 세 수량 합계와 확정된 동점 규칙으로 하나만 고른다."""
+    from app.services import production_capacity
+
+    select = getattr(production_capacity, "select_auto_representatives", None)
+    assert select is not None
+
+    representatives = select(
+        [
+            {
+                "model_symbol": "3",
+                "pf_item_id": "pf-low",
+                "pf_code": "3-PF-0001",
+                "ship_ready": 9,
+                "fast_production": 0,
+                "total_production": 1,
+            },
+            {
+                "model_symbol": "3",
+                "pf_item_id": "pf-best",
+                "pf_code": "3-PF-0002",
+                "ship_ready": 0,
+                "fast_production": 8,
+                "total_production": 8,
+            },
+            {
+                "model_symbol": "4",
+                "pf_item_id": "pf-code-later",
+                "pf_code": "4-PF-0009",
+                "ship_ready": 1,
+                "fast_production": 2,
+                "total_production": 3,
+            },
+            {
+                "model_symbol": "4",
+                "pf_item_id": "pf-code-first",
+                "pf_code": "4-PF-0002",
+                "ship_ready": 1,
+                "fast_production": 2,
+                "total_production": 3,
+            },
+        ]
+    )
+
+    assert [row["pf_item_id"] for row in representatives] == ["pf-best", "pf-code-first"]
+
+
+def test_auto_representatives_apply_all_tie_breakers():
+    """동점은 총생산, 빠른 생산, PF 코드, 품목 ID 순으로 확정한다."""
+    from app.services.production_capacity import select_auto_representatives
+
+    representatives = select_auto_representatives(
+        [
+            # 합계 동점이면 총생산이 큰 후보.
+            {"model_symbol": "3", "pf_item_id": "total-low", "pf_code": "3-PF-0001", "ship_ready": 0, "fast_production": 3, "total_production": 7},
+            {"model_symbol": "3", "pf_item_id": "total-high", "pf_code": "3-PF-0002", "ship_ready": 0, "fast_production": 2, "total_production": 8},
+            # 합계·총생산 동점이면 빠른 생산이 큰 후보.
+            {"model_symbol": "4", "pf_item_id": "fast-low", "pf_code": "4-PF-0001", "ship_ready": 2, "fast_production": 3, "total_production": 5},
+            {"model_symbol": "4", "pf_item_id": "fast-high", "pf_code": "4-PF-0002", "ship_ready": 1, "fast_production": 4, "total_production": 5},
+            # 네 수량 키가 모두 같으면 PF 코드, 이어서 품목 ID 오름차순.
+            {"model_symbol": "5", "pf_item_id": "id-z", "pf_code": "5-PF-0002", "ship_ready": 1, "fast_production": 2, "total_production": 3},
+            {"model_symbol": "5", "pf_item_id": "id-b", "pf_code": "5-PF-0001", "ship_ready": 1, "fast_production": 2, "total_production": 3},
+            {"model_symbol": "6", "pf_item_id": "id-z", "pf_code": "6-PF-0001", "ship_ready": 1, "fast_production": 2, "total_production": 3},
+            {"model_symbol": "6", "pf_item_id": "id-a", "pf_code": "6-PF-0001", "ship_ready": 1, "fast_production": 2, "total_production": 3},
+        ]
+    )
+
+    assert [row["pf_item_id"] for row in representatives] == [
+        "total-high",
+        "fast-high",
+        "id-b",
+        "id-a",
+    ]
+
+
+def test_af_capacity_exposes_zero_quantity_pf_as_auto_representative(
+    db_session, make_item, make_bom
+):
+    """PF 경로가 있으면 수량이 모두 0이어도 모델 자동 기준으로 반환한다."""
+    af_with_pf = make_item(
+        name="자동 기준 대상 AF",
+        process_type_code="AF",
+        model_symbol="3",
+        serial_no=1,
+    )
+    zero_pf = make_item(
+        name="자동 기준 대상 PF",
+        process_type_code="PF",
+        model_symbol="3",
+        serial_no=2,
+    )
+    af_without_pf = make_item(
+        name="출하 경로 없는 AF",
+        process_type_code="AF",
+        model_symbol="4",
+        serial_no=1,
+    )
+    make_bom(zero_pf.item_id, af_with_pf.item_id, Decimal("1"))
+    db_session.commit()
+
+    result = compute_capacity(db_session)
+    representatives = result["af"].get("auto_representatives")
+
+    assert representatives == [
+        {
+            **next(
+                variant
+                for variant in result["af"]["pf_variants"]
+                if variant["pf_item_id"] == str(zero_pf.item_id)
+            ),
+        }
+    ]
+    assert representatives[0]["model_symbol"] == "3"
+    assert all(representatives[0][key] == 0 for key in ("ship_ready", "fast_production", "total_production"))
+    assert all(row["model_symbol"] != af_without_pf.model_symbol for row in representatives)
+
+
 def test_af_without_children_included_as_incomplete(
     db_session, make_item, make_bom
 ):

@@ -1,12 +1,8 @@
 import { render, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ProductionCapacity } from "@/lib/api/types/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { capacityStatusBadge, InventoryCapacityPanel } from "../InventoryCapacityPanel";
-
-vi.mock("@/lib/queries/useProductionQuery", () => ({
-  usePfPinsQuery: () => ({ data: { DX3000: "pf-dx3000" } }),
-}));
 
 const capacityData = {
   immediate: 0,
@@ -33,6 +29,19 @@ const capacityData = {
       },
     ],
     pf_variants: [
+      {
+        pf_item_id: "pf-dx3000",
+        pf_code: "3-PF-0002",
+        pf_name: "DX3000_65kV, 1.7mA_USA_Vector",
+        model_symbol: "DX3000",
+        af_item_id: "af-dx3000",
+        ship_ready: 410,
+        fast_production: 86,
+        total_production: 598,
+        bom_status: "complete",
+      },
+    ],
+    auto_representatives: [
       {
         pf_item_id: "pf-dx3000",
         pf_code: "3-PF-0002",
@@ -100,6 +109,20 @@ describe("InventoryCapacityPanel 모바일 표", () => {
       "총생산",
     ]);
     expect(within(mobileTable).getByText("DX3000 조립 완제품")).toBeInTheDocument();
+  });
+
+  it("출하 경로가 없는 모델은 요약에서 상태를 명시한다", () => {
+    const noPfCapacity = {
+      ...capacityData,
+      af: {
+        ...capacityData.af,
+        auto_representatives: [],
+      },
+    } satisfies ProductionCapacity;
+
+    const { container } = render(<InventoryCapacityPanel capacityData={noPfCapacity} />);
+
+    expect(container).toHaveTextContent("출하 경로 없음");
   });
 
   it("renders AF and legacy model chips without leading dot separators", () => {

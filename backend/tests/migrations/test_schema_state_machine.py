@@ -32,7 +32,7 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260812_0017"
+HEAD_REVISION = "20260812_0018"
 
 
 def test_schema_state_exposes_explicit_legacy_onboarding_state():
@@ -179,7 +179,6 @@ def _create_independent_legacy_items_database(path: Path) -> None:
 
     with sqlite3.connect(path) as db:
         db.execute("PRAGMA foreign_keys=OFF")
-        db.execute("DROP TABLE model_pf_pins")
         db.execute("DROP TABLE items")
         db.execute(
             """
@@ -296,6 +295,9 @@ def test_independent_legacy_items_schema_is_backed_up_then_stamped(
             "SELECT warehouse_qty FROM inventory WHERE item_id=?",
             ("11111111111111111111111111111111",),
         ).fetchone() == (3,)
+        assert db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='model_pf_pins'"
+        ).fetchone() is None
 
 
 def test_empty_database_upgrades_to_head_and_is_idempotent(tmp_path: Path):
