@@ -256,6 +256,14 @@
     background-image: none;
   }
 
+  .desktop-work-hub-card:hover {
+    filter: brightness(0.94);
+  }
+
+  :root[data-theme="dark"] .desktop-work-hub-card:hover {
+    filter: brightness(1.15);
+  }
+
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
