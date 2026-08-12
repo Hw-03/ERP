@@ -174,6 +174,17 @@ describe("InventoryDetailPanel desktop quick actions", () => {
     expect(within(pendingCard!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.yellow });
   });
 
+  it("shows the combined warehouse and department approval pending quantity", () => {
+    render(
+      <InventoryDetailPanel
+        item={{ ...makeItem(), available_quantity: 10, pending_quantity: 3, department_pending_quantity: 2 } as Item}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    expect(within(screen.getByText("승인 대기 수량").parentElement!).getByText("5")).toBeInTheDocument();
+  });
+
   it("renders defective stock after available and pending quantities with red emphasis", () => {
     render(
       <InventoryDetailPanel
@@ -225,6 +236,32 @@ describe("InventoryDetailPanel desktop quick actions", () => {
 });
 
 describe("InventoryDetailPanel realtime reservations", () => {
+  it("shows each reservation's actual warehouse, production, and defective source", async () => {
+    vi.spyOn(api, "getItemReservations").mockResolvedValue([
+      {
+        ...makeReservation("dept-source", "부서 요청"),
+        from_bucket: "production",
+        from_department: "조립",
+      },
+      {
+        ...makeReservation("defect-source", "불량 요청"),
+        from_bucket: "defective",
+        from_department: "고압",
+      },
+      makeReservation("warehouse-source", "창고 요청"),
+    ]);
+    render(
+      <InventoryDetailPanel
+        item={{ ...makeItem(), pending_quantity: 0, department_pending_quantity: 5 } as Item}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    expect(await screen.findByText(/조립 생산 →/)).toBeInTheDocument();
+    expect(screen.getByText(/고압 불량 →/)).toBeInTheDocument();
+    expect(screen.getByText(/창고 →/)).toBeInTheDocument();
+  });
+
   it("refreshes unchanged pending quantity on a revision without closing the open quick action", async () => {
     vi.spyOn(api, "getItemReservations")
       .mockResolvedValueOnce([makeReservation("old", "기존 요청자")])

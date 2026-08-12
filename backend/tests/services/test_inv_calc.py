@@ -64,11 +64,18 @@ def test_defective_total_sums_only_defective(make_item, make_location, db_sessio
 
 def test_available_excludes_defective_and_pending(make_item, make_location, db_session):
     item = make_item(warehouse_qty=D("10"), pending=D("2"))
-    make_location(item.item_id, status=LocationStatusEnum.PRODUCTION, quantity=D("5"))
-    make_location(item.item_id, status=LocationStatusEnum.DEFECTIVE, quantity=D("100"))
+    production = make_location(
+        item.item_id, status=LocationStatusEnum.PRODUCTION, quantity=D("5")
+    )
+    production.pending_quantity = D("3")
+    defective = make_location(
+        item.item_id, status=LocationStatusEnum.DEFECTIVE, quantity=D("100")
+    )
+    defective.pending_quantity = D("90")
+    db_session.flush()
     inv = item.inventory
-    # available = warehouse + production - pending = 10 + 5 - 2 = 13 (불량 제외)
-    assert inv_calc.available(inv, db=db_session) == D("13")
+    # available = (warehouse - wh pending) + (production - production pending).
+    assert inv_calc.available(inv, db=db_session) == D("10")
 
 
 def test_available_warehouse_only_without_db(make_item, db_session):

@@ -153,6 +153,21 @@ def _prod_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
     return loc.quantity if loc else D("0")
 
 
+def _loc_pending(
+    db_session, item_id, dept=ASSEMBLY, status=LocationStatusEnum.PRODUCTION
+) -> Decimal:
+    loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == dept,
+            InventoryLocation.status == status,
+        )
+        .first()
+    )
+    return loc.pending_quantity if loc else D("0")
+
+
 def _defective_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
     loc = (
         db_session.query(InventoryLocation)
@@ -471,6 +486,41 @@ def test_submit_immediate_completes_and_orders_out_first(make_item, make_locatio
     assert db_session.query(TransactionLog).count() == 2
 
 
+def test_submit_immediate_prelocks_sorted_unique_inventories_before_mutation(
+    make_item, db_session, monkeypatch
+):
+    first = make_item(name="immediate-lock-first", warehouse_qty=D("0"))
+    second = make_item(name="immediate-lock-second", warehouse_qty=D("0"))
+    requester = _make_employee(db_session)
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="receive_supplier",
+        work_type="receive",
+        lines=[
+            {"item_id": second.item_id, "direction": "in", "from_bucket": "none",
+             "to_bucket": "warehouse", "quantity": D("1")},
+            {"item_id": first.item_id, "direction": "in", "from_bucket": "none",
+             "to_bucket": "warehouse", "quantity": D("1")},
+        ],
+    )
+    events = []
+
+    def lock_inventories(_db, item_ids):
+        events.append(("lock", item_ids))
+        return {item_id: object() for item_id in item_ids}
+
+    def apply_line(*_args, **kwargs):
+        events.append(("apply", kwargs["line"].item_id))
+
+    monkeypatch.setattr(svc.inventory_svc, "lock_inventories", lock_inventories)
+    monkeypatch.setattr(svc, "_apply_line", apply_line)
+
+    svc._submit_immediate(db_session, requester=requester, batch=batch)
+
+    assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
+
+
 def test_submit_immediate_skips_excluded_lines(make_item, db_session):
     """included=False 라인은 반영되지 않는다."""
     keep = make_item(name="포함", warehouse_qty=D("0"))
@@ -530,6 +580,51 @@ def test_submit_immediate_shortage_raises_and_no_change(make_item, db_session):
         svc._submit_immediate(db_session, requester=requester, batch=batch)
     assert _warehouse_qty(db_session, item.item_id) == D("2")
     assert db_session.query(TransactionLog).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("bucket", "status"),
+    [
+        ("production", LocationStatusEnum.PRODUCTION),
+        ("defective", LocationStatusEnum.DEFECTIVE),
+    ],
+)
+def test_validate_location_source_uses_quantity_minus_pending(
+    make_item, make_location, db_session, bucket, status
+):
+    item = make_item(name=f"{bucket}-validation-pending")
+    location = make_location(
+        item.item_id,
+        department=ASSEMBLY,
+        status=status,
+        quantity=D("10"),
+    )
+    location.pending_quantity = D("3")
+    requester = _make_employee(db_session, code=f"VAL-{bucket}")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="dept_to_warehouse",
+        work_type="warehouse_io",
+        from_department=ASSEMBLY.value,
+        lines=[
+            {
+                "item_id": item.item_id,
+                "direction": "move",
+                "from_bucket": bucket,
+                "from_department": ASSEMBLY.value,
+                "to_bucket": "warehouse",
+                "quantity": D("8"),
+            }
+        ],
+    )
+    line = _single_line(batch)
+
+    with pytest.raises(ValueError, match="가능 7 / 요청 8"):
+        svc._validate_included_lines(db_session, [line])
+
+    line.quantity = D("7")
+    svc._validate_included_lines(db_session, [line])
 
 
 def test_submit_immediate_empty_included_raises(make_item, db_session):
@@ -634,6 +729,155 @@ def test_submit_dept_only_self_approval_executes_immediately(
     assert log.transaction_type == TransactionTypeEnum.ADJUST
 
 
+def test_submit_dept_only_warehouse_primary_self_approval_executes_immediately(
+    make_item, make_location, db_session
+):
+    item = make_item(name="창고 담당 부서 자가승인")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(
+        db_session,
+        code="DEPT-WH-SELF",
+        warehouse_role="primary",
+    )
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="adjust_out",
+        lines=[
+            {
+                "item_id": item.item_id,
+                "direction": "adjust",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "adjust_out",
+            }
+        ],
+    )
+
+    svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
+
+    request = db_session.query(StockRequest).one()
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.department_approved_by_employee_id == requester.employee_id
+    assert _loc_pending(db_session, item.item_id) == D("0")
+    assert _prod_qty(db_session, item.item_id) == D("3")
+
+
+def test_submit_dept_only_admin_without_role_waits_for_approval(
+    make_item, make_location, db_session
+):
+    item = make_item(name="admin 부서 결재 대기")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(
+        db_session,
+        code="DEPT-ADMIN-WAIT",
+        level=EmployeeLevelEnum.ADMIN,
+    )
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="adjust_out",
+        lines=[
+            {
+                "item_id": item.item_id,
+                "direction": "adjust",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "adjust_out",
+            }
+        ],
+    )
+
+    svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
+
+    request = db_session.query(StockRequest).one()
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.department_approved_by_employee_id is None
+    assert _loc_pending(db_session, item.item_id) == D("2")
+    assert _prod_qty(db_session, item.item_id) == D("5")
+
+
+def test_submit_dept_only_self_approval_prelocks_sorted_inventories(
+    make_item, make_location, db_session, monkeypatch
+):
+    first = make_item(name="self-lock-first")
+    second = make_item(name="self-lock-second")
+    make_location(first.item_id, department=ASSEMBLY, quantity=D("0"))
+    make_location(second.item_id, department=ASSEMBLY, quantity=D("0"))
+    requester = _make_employee(
+        db_session,
+        code="SELF-LOCK",
+        department_role="primary",
+    )
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="adjust_in",
+        lines=[
+            {"item_id": second.item_id, "direction": "adjust",
+             "from_bucket": "none", "to_bucket": "production",
+             "to_department": ASSEMBLY, "quantity": D("1"), "origin": "adjust_in"},
+            {"item_id": first.item_id, "direction": "adjust",
+             "from_bucket": "none", "to_bucket": "production",
+             "to_department": ASSEMBLY, "quantity": D("1"), "origin": "adjust_in"},
+        ],
+    )
+    events = []
+    real_lock = svc.inventory_svc.lock_inventories
+
+    def lock_inventories(db, item_ids):
+        events.append(("lock", item_ids))
+        return real_lock(db, item_ids)
+
+    real_apply = svc._apply_line
+
+    def apply_line(*args, **kwargs):
+        events.append(("apply", kwargs["line"].item_id))
+        return real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(svc.inventory_svc, "lock_inventories", lock_inventories)
+    monkeypatch.setattr(svc, "_apply_line", apply_line)
+
+    svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
+
+    assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
+
+
+def test_submit_dept_out_self_approval_skips_reservation(
+    make_item, make_location, db_session
+):
+    item = make_item(name="self-approved-out")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, department_role="primary")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="adjust_out",
+        lines=[
+            {
+                "item_id": item.item_id,
+                "direction": "adjust",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "adjust_out",
+            }
+        ],
+    )
+
+    svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
+
+    request = db_session.query(StockRequest).one()
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert _loc_pending(db_session, item.item_id) == D("0")
+    assert _prod_qty(db_session, item.item_id) == D("3")
+
+
 def test_submit_dept_only_without_authority_waits(make_item, make_location, db_session):
     """일반 직원 → 부서 결재 대기. 실재고 미반영, batch 미완료, 로그 없음."""
     item = make_item(name="결재대기")
@@ -651,10 +895,88 @@ def test_submit_dept_only_without_authority_waits(make_item, make_location, db_s
 
     request = db_session.query(StockRequest).one()
     assert request.department_approved_by_employee_id is None
-    assert request.status != StockRequestStatusEnum.COMPLETED
+    assert request.status == StockRequestStatusEnum.SUBMITTED
     assert batch.status != "completed"
     assert _prod_qty(db_session, item.item_id) == D("0")
     assert db_session.query(TransactionLog).count() == 0
+
+
+def test_submit_dept_only_outgoing_reserves_department_location(
+    make_item, make_location, db_session
+):
+    item = make_item(name="department-reservation")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("6"))
+    requester = _make_employee(db_session, department_role="none")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="adjust_out",
+        lines=[
+            {
+                "item_id": item.item_id,
+                "direction": "adjust",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY,
+                "to_bucket": "none",
+                "quantity": D("4"),
+                "origin": "adjust_out",
+            }
+        ],
+    )
+
+    svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
+
+    request = db_session.query(StockRequest).one()
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert {line.status for line in request.lines} == {StockRequestStatusEnum.RESERVED}
+    assert _loc_pending(db_session, item.item_id) == D("4")
+    assert _prod_qty(db_session, item.item_id) == D("6")
+
+
+def test_submit_dept_out_then_approve_releases_and_consumes(
+    make_item, make_location, db_session
+):
+    from app.services import sr_approval
+
+    item = make_item(name="department-approved-adjustment")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("6"))
+    requester = _make_employee(db_session, department_role="none")
+    approver = _make_employee(
+        db_session,
+        code="DISP-DEPT-APP",
+        department_role="primary",
+    )
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="adjust_out",
+        lines=[
+            {
+                "item_id": item.item_id,
+                "direction": "adjust",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY,
+                "to_bucket": "none",
+                "quantity": D("4"),
+                "origin": "adjust_out",
+            }
+        ],
+    )
+    svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
+    request = db_session.query(StockRequest).one()
+
+    sr_approval.approve_request_department(
+        db_session,
+        request,
+        approver=approver,
+        pin="0000",
+    )
+    db_session.flush()
+
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert batch.status == "completed"
+    assert _loc_pending(db_session, item.item_id) == D("0")
+    assert _prod_qty(db_session, item.item_id) == D("2")
 
 
 # ──────────────────── execute_batch_after_dept_approval ────────────────────
@@ -712,9 +1034,13 @@ def test_mixed_process_manual_waits_for_department_approval_then_applies_all_lin
     assert result["stock_request_id"] == request.request_id
     assert request.requires_department_approval is True
     assert request.requires_warehouse_approval is False
+    assert request.status == StockRequestStatusEnum.RESERVED
     assert len(request.lines) == 3
     assert batch.status != "completed"
     assert _prod_qty(db_session, component.item_id) == D("10")
+    assert _loc_pending(db_session, component.item_id) == D("2")
+    assert _loc_pending(db_session, result_item.item_id) == D("0")
+    assert _loc_pending(db_session, manual_item.item_id) == D("0")
     assert _prod_qty(db_session, result_item.item_id) == D("0")
     assert _prod_qty(db_session, manual_item.item_id) == D("0")
     assert db_session.query(TransactionLog).count() == 0

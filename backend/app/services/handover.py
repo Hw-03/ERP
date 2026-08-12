@@ -192,6 +192,8 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
     from_dept = DepartmentEnum(doc.from_department)
     to_dept = DepartmentEnum(doc.to_department)
 
+    item_ids = sorted({line.item_id for line in doc.lines})
+    inventory_svc.ensure_and_lock_inventories(db, item_ids)
     for line in doc.lines:
         qty = Decimal(line.quantity)
         inv = inventory_svc.get_or_create_inventory(db, line.item_id)

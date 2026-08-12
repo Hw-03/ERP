@@ -1,10 +1,10 @@
 ﻿"""StockRequest 서비스 — 작업자 결재 요청 흐름.
 
 원칙:
-- 창고 재고가 움직이는 모든 작업(`from_bucket=='warehouse'` 또는 `to_bucket=='warehouse'`)은
-  창고 담당자(`warehouse_role in ('primary','deputy')`)의 승인 후에만 실재고 반영.
-- 점유는 `Inventory.pending_quantity` 컬럼으로 관리하고, origin 구분은
-  `StockRequestLine` 조회로 한다 (별도 컬럼 추가하지 않음).
+- 승인 대기 출고는 source별로 점유한다. 창고는 `Inventory.pending_quantity`,
+  생산/불량 위치는 `InventoryLocation.pending_quantity`를 사용하고 입고 전용은 점유하지 않는다.
+- 비자가승인 출고 요청은 `reserved`, 입고 전용 요청은 `submitted`로 대기하며,
+  자가승인 요청은 점유 없이 즉시 실행한다.
 - 승인은 한 트랜잭션 내에서 release + 실재고 이동 + TransactionLog 기록을 모두 수행한다.
   성공하면 `completed`, 검증 실패하면 `failed_approval` 로 저장하고 pending 을 안전하게 원복.
 - 승인 불필요 작업(`production ↔ production`)은 즉시 실행되고 `completed` 상태로 기록.
@@ -38,6 +38,7 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services import inventory as inventory_svc
+from app.services.dept_hierarchy import can_approve_department
 from app.repositories import item_repository
 
 # ---------------------------------------------------------------------------
@@ -258,9 +259,9 @@ def create_manual_adjustment_request(
 
     - request_type = MANUAL_ADJUSTMENT (bucket/dept 검증 생략)
     - requires_warehouse_approval=False, requires_department_approval=True
-    - reserve / 즉시실행 모두 하지 않음. 부서 결재 통과 후 io.py 가 실재고 반영.
-    - 자가승인 가능: 요청자가 부서 정/부 또는 admin 이면 즉시 dept_approved 기록 + 라우터가 io.py 호출
-      (단 이 함수는 dept_approved 만 마크하고 batch 실행은 호출자가 처리)
+    - 비자가승인 출고 라인은 source별로 점유하고 RESERVED, 입고 전용은 SUBMITTED로 대기.
+    - 자가승인 가능: `can_approve_department`가 허용하는 부서 정/부 또는 창고 정/부면
+      점유 없이 dept_approved를 기록하고 호출자가 즉시 실재고를 반영한다.
     """
     if not lines_input:
         raise ValueError("요청 라인이 비어 있습니다.")
@@ -286,12 +287,20 @@ def create_manual_adjustment_request(
     )
     # 자가승인: 요청자가 부서 결재 권한자라면 dept_approved 즉시 기록.
     # 실제 batch 실행은 호출자(io.py)가 status 보고 진행.
-    dept_role = (getattr(requester, "department_role", None) or "none").lower()
-    level = getattr(getattr(requester, "level", None), "value", requester.level)
-    if dept_role in ("primary", "deputy") or level == "admin":
+    if can_approve_department(requester, request.requester_department):
         request.department_approved_by_employee_id = requester.employee_id
         request.department_approved_by_name = requester.name
         request.department_approved_at = now
+        return request
+
+    from app.services import sr_reservation
+
+    if sr_reservation.aggregate_reservations(request.lines):
+        sr_reservation.reserve_lines(db, request.lines, employee=requester)
+        request.status = StockRequestStatusEnum.RESERVED
+        request.reserved_at = now
+        for line in request.lines:
+            line.status = StockRequestStatusEnum.RESERVED
     return request
 
 
@@ -301,13 +310,21 @@ def create_manual_adjustment_request(
 
 
 def list_active_reservations(db: Session, item_id: uuid.UUID) -> list[StockRequestLine]:
-    """품목별 RESERVED 상태 라인 목록 (창고 점유 라인만)."""
+    """품목별 RESERVED 상태의 모든 출고 source 라인 목록."""
     return (
         db.query(StockRequestLine)
+        .join(StockRequest, StockRequestLine.request_id == StockRequest.request_id)
         .filter(
             StockRequestLine.item_id == item_id,
             StockRequestLine.status == StockRequestStatusEnum.RESERVED,
-            StockRequestLine.from_bucket == RequestBucketEnum.WAREHOUSE,
+            StockRequest.status == StockRequestStatusEnum.RESERVED,
+            StockRequestLine.from_bucket.in_(
+                (
+                    RequestBucketEnum.WAREHOUSE,
+                    RequestBucketEnum.PRODUCTION,
+                    RequestBucketEnum.DEFECTIVE,
+                )
+            ),
         )
         .all()
     )

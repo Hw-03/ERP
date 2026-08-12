@@ -79,6 +79,9 @@ def _to_item_with_inventory(
                 department=row.department,
                 status=row.status,
                 quantity=row.quantity or _D("0"),
+                pending_quantity=row.pending_quantity or _D("0"),
+                available_quantity=(row.quantity or _D("0"))
+                - (row.pending_quantity or _D("0")),
             )
             for row in loc_rows
         ]
@@ -116,6 +119,7 @@ def _to_item_with_inventory(
         production_total=fig.production_total,
         defective_total=fig.defective_total,
         pending_quantity=fig.pending,
+        department_pending_quantity=fig.department_pending,
         available_quantity=fig.available,
         last_reserver_name=inventory.last_reserver_name if inventory else None,
         location=inventory.location if inventory else None,
@@ -310,6 +314,9 @@ def list_items(
                 department=row.department,
                 status=row.status,
                 quantity=row.quantity or _D("0"),
+                pending_quantity=row.pending_quantity or _D("0"),
+                available_quantity=(row.quantity or _D("0"))
+                - (row.pending_quantity or _D("0")),
             )
         )
 

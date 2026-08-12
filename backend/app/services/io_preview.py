@@ -206,7 +206,11 @@ def _bucket_available(
             )
             .first()
         )
-        return _d(loc.quantity) if loc else Decimal("0")
+        return (
+            _d(loc.quantity) - _d(loc.pending_quantity)
+            if loc
+            else Decimal("0")
+        )
     if bucket == "defective" and department:
         loc = (
             db.query(InventoryLocation)
@@ -217,7 +221,11 @@ def _bucket_available(
             )
             .first()
         )
-        return _d(loc.quantity) if loc else Decimal("0")
+        return (
+            _d(loc.quantity) - _d(loc.pending_quantity)
+            if loc
+            else Decimal("0")
+        )
     return Decimal("0")
 
 

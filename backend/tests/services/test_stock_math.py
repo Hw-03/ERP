@@ -7,6 +7,8 @@ from decimal import Decimal
 import pytest
 
 from app.models import DepartmentEnum, LocationStatusEnum
+from app.models import Inventory
+from app.routers.inventory._shared import to_response
 from app.services.stock_math import (
     StockFigures,
     bulk_compute,
@@ -64,6 +66,35 @@ def test_compute_for_with_locations(make_item, make_location, db_session):
     assert figs.available == D("9")  # wh + prod - pending(0)
 
 
+def test_compute_for_subtracts_only_production_location_pending(
+    make_item, make_location, db_session
+):
+    item = make_item(warehouse_qty=D("10"), pending=D("2"))
+    production = make_location(
+        item.item_id,
+        status=LocationStatusEnum.PRODUCTION,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=D("7"),
+    )
+    production.pending_quantity = D("3")
+    defective = make_location(
+        item.item_id,
+        status=LocationStatusEnum.DEFECTIVE,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=D("5"),
+    )
+    defective.pending_quantity = D("4")
+    db_session.flush()
+
+    figs = compute_for(db_session, item.item_id)
+
+    assert figs.pending == D("2")
+    assert figs.department_pending == D("7")
+    assert figs.production_pending == D("3")
+    assert figs.available == D("12")  # (10 - 2) + (7 - 3)
+    assert figs.total == D("22")
+
+
 def test_warehouse_available_excludes_production(make_item, make_location, db_session):
     """backflush 검사용 warehouse_available 은 production 위치 무시."""
     item = make_item(warehouse_qty=D("5"), pending=D("1"))
@@ -100,6 +131,51 @@ def test_bulk_compute_multiple_items(make_item, make_location, db_session):
     assert result[b.item_id].production_total == D("3")
     assert result[b.item_id].available == D("7")  # 5 + 3 - 1
     assert result[c.item_id].total == D("0")
+
+
+def test_bulk_compute_aggregates_location_pending(make_item, make_location, db_session):
+    item = make_item(warehouse_qty=D("2"))
+    production = make_location(item.item_id, quantity=D("4"))
+    production.pending_quantity = D("1")
+    defective = make_location(
+        item.item_id,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("3"),
+    )
+    defective.pending_quantity = D("2")
+    db_session.flush()
+
+    figures = bulk_compute(db_session, [item.item_id])[item.item_id]
+
+    assert figures.department_pending == D("3")
+    assert figures.available == D("5")
+
+
+def test_inventory_response_exposes_department_and_location_pending(
+    make_item, make_location, db_session
+):
+    item = make_item(warehouse_qty=D("6"), pending=D("1"))
+    production = make_location(item.item_id, quantity=D("5"))
+    production.pending_quantity = D("2")
+    defective = make_location(
+        item.item_id,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("3"),
+    )
+    defective.pending_quantity = D("1")
+    db_session.flush()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+
+    response = to_response(db_session, inv)
+
+    assert response.pending_quantity == 1
+    assert response.department_pending_quantity == 3
+    assert response.available_quantity == 8
+    by_status = {location.status: location for location in response.locations}
+    assert by_status[LocationStatusEnum.PRODUCTION].pending_quantity == 2
+    assert by_status[LocationStatusEnum.PRODUCTION].available_quantity == 3
+    assert by_status[LocationStatusEnum.DEFECTIVE].pending_quantity == 1
+    assert by_status[LocationStatusEnum.DEFECTIVE].available_quantity == 2
 
 
 def test_bulk_compute_unknown_id_zero_filled(make_item, db_session):

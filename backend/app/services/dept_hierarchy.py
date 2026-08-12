@@ -32,7 +32,7 @@ def can_approve_department(actor, target_dept: str | None) -> bool:
     룰 (2026-05-27 그릴 합의):
       1. 부서 정/부 (`department_role`): "창고" 외 모든 부서 결재 가능
       2. 창고 정/부 (`warehouse_role`): 모든 부서 결재 (창고 포함)
-      3. 시스템 admin (`level=admin`): 모든 부서 결재
+      3. `level=admin`만으로는 결재 권한이 생기지 않음
 
     한 명이 위 권한 중 하나라도 있으면 True.
     """

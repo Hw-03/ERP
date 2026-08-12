@@ -228,7 +228,7 @@ def _apply_adjustment(
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지
     if not _is_sqlite:
         all_item_ids = sorted({ln.item_id for ln in lines})
-        inventory_svc.lock_inventories(db, all_item_ids)
+        inventory_svc.ensure_and_lock_inventories(db, all_item_ids)
 
     sub_str = sub_type.value
     ordered = (
@@ -363,6 +363,25 @@ def _split_rework_quantities(decision: dict, qty: Decimal) -> tuple[Decimal, Dec
     return normal_qty, defective_qty, scrap_qty
 
 
+def rework_inventory_item_ids(
+    parent_item_id: uuid.UUID,
+    child_decisions: list[dict],
+) -> list[uuid.UUID]:
+    """Return every parent/branch/leaf item in deterministic lock order."""
+    item_ids = {parent_item_id}
+
+    def collect(decision: dict) -> None:
+        item_ids.add(uuid.UUID(str(decision["item_id"])))
+        children = decision.get("children")
+        if children:
+            for child in children:
+                collect(child)
+
+    for decision in child_decisions:
+        collect(decision)
+    return sorted(item_ids)
+
+
 def _submit_rework_disassemble(
     db: Session,
     parent_item_id: uuid.UUID,
@@ -388,6 +407,11 @@ def _submit_rework_disassemble(
             parent_qty,
             child_decisions,
         )
+
+    inventory_svc.ensure_and_lock_inventories(
+        db,
+        rework_inventory_item_ids(parent_item_id, child_decisions),
+    )
 
     batch_id = uuid.uuid4()
     batch_ref = f"defect-disassemble:{batch_id}"

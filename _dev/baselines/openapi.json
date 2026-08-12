@@ -3239,9 +3239,19 @@
       "InventoryLocationResponse": {
         "description": "부서×상태(생산/불량) 단위 재고 분포.",
         "properties": {
+          "available_quantity": {
+            "default": 0,
+            "title": "Available Quantity",
+            "type": "integer"
+          },
           "department": {
             "title": "Department",
             "type": "string"
+          },
+          "pending_quantity": {
+            "default": 0,
+            "title": "Pending Quantity",
+            "type": "integer"
           },
           "quantity": {
             "title": "Quantity",
@@ -3269,6 +3279,11 @@
           "defective_total": {
             "default": 0,
             "title": "Defective Total",
+            "type": "integer"
+          },
+          "department_pending_quantity": {
+            "default": 0,
+            "title": "Department Pending Quantity",
             "type": "integer"
           },
           "inventory_id": {
@@ -4677,6 +4692,11 @@
             ],
             "title": "Department"
           },
+          "department_pending_quantity": {
+            "default": 0,
+            "title": "Department Pending Quantity",
+            "type": "integer"
+          },
           "has_bom": {
             "default": false,
             "title": "Has Bom",
@@ -5933,6 +5953,17 @@
           },
           "from_bucket": {
             "$ref": "#/components/schemas/RequestBucketEnum"
+          },
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
           },
           "line_id": {
             "format": "uuid",

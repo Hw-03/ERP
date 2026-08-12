@@ -81,6 +81,22 @@ describe("InventoryItemRow quantity summary", () => {
     expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
   });
 
+  it("shows the combined warehouse and department approval pending quantity in the reservation chip", () => {
+    render(
+      <table>
+        <tbody>
+          <InventoryItemRow
+            item={makeItem({ pending_quantity: 3, department_pending_quantity: 2 } as Partial<Item>)}
+            selected={false}
+            onSelect={() => {}}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(within(screen.getByTestId("inventory-dept-stock-summary")).getByText("예약 5")).toBeInTheDocument();
+  });
+
   it("hides a zero pending reservation while keeping total, defective, and gauge displays", () => {
     render(
       <table>

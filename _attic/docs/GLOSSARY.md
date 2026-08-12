@@ -43,10 +43,11 @@
 | 창고 재고 | `warehouse_qty` | `Inventory.warehouse_qty`. 창고 부서가 보유한 분량. |
 | 생산 합계 | `production_total` | 부서별 `InventoryLocation` 의 `PRODUCTION` 상태 합계. |
 | 불량 합계 | `defective_total` | 부서별 `InventoryLocation` 의 `DEFECTIVE` 상태 합계. |
-| 보류 | `pending` | `Inventory.pending_quantity`. OUT 큐에서 예약 중. |
+| 창고 보류 | `pending` | `Inventory.pending_quantity`. 창고 OUT 큐에서 예약 중. |
+| 부서 보류 | `department_pending` | 생산·불량 `InventoryLocation.pending_quantity` 합계. 부서 OUT 큐에서 예약 중. |
 | 총재고 | `total` | `warehouse + production + defective` (= `Inventory.quantity` 와 같아야 함). |
-| 가용 | `available` | `warehouse + production - pending`. UI 가 보여주는 사용 가능량. |
-| 창고 가용 | `warehouse_available` | `warehouse - pending`. **BOM backflush·창고 출고 검사용**. |
+| 가용 | `available` | `(warehouse - 창고 pending) + (production - 생산 위치 pending)`. UI가 보여주는 사용 가능량. 불량은 제외. |
+| 창고 가용 | `warehouse_available` | `warehouse - 창고 pending`. **BOM backflush·창고 출고 검사용**. |
 
 ## BOM
 

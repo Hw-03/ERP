@@ -68,6 +68,7 @@ def _load_and_merge_requirements(
 def _preload_components(
     db: Session,
     merged: Dict[uuid.UUID, Decimal],
+    produced_item_id: uuid.UUID,
 ) -> Tuple[Dict[uuid.UUID, Item], Dict[uuid.UUID, Inventory]]:
     """부품 Item / Inventory 를 bulk 로드.
 
@@ -76,7 +77,10 @@ def _preload_components(
     """
     comp_ids = list(merged.keys())
     items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
-    invs_map = inventory_svc.lock_inventories(db, comp_ids)
+    invs_map = inventory_svc.ensure_and_lock_inventories(
+        db,
+        sorted({*comp_ids, produced_item_id}),
+    )
     return items_map, invs_map
 
 
@@ -208,7 +212,7 @@ def _execute_production_receipt(
       - ValueError            : ?? ?? ?? ??? ?? ?? ?? (? 422)
     """
     merged = _load_and_merge_requirements(db, payload, produced_item)
-    items_map, invs_map = _preload_components(db, merged)
+    items_map, invs_map = _preload_components(db, merged, produced_item.item_id)
     _assert_no_shortage(db, merged, items_map, invs_map)
 
     transaction_ids: List[uuid.UUID] = []

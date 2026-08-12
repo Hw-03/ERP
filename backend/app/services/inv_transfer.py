@@ -131,7 +131,11 @@ def transfer_to_warehouse(
         .where(InventoryLocation.item_id == item_id)
         .where(InventoryLocation.department == dept)
         .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
-        .where(InventoryLocation.quantity >= qty)
+        .where(
+            InventoryLocation.quantity
+            - func.coalesce(InventoryLocation.pending_quantity, 0)
+            >= qty
+        )
         .values(quantity=InventoryLocation.quantity - qty)
         .execution_options(synchronize_session=False)
     )
@@ -181,7 +185,11 @@ def transfer_between_departments(
         .where(InventoryLocation.item_id == item_id)
         .where(InventoryLocation.department == from_dept)
         .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
-        .where(InventoryLocation.quantity >= qty)
+        .where(
+            InventoryLocation.quantity
+            - func.coalesce(InventoryLocation.pending_quantity, 0)
+            >= qty
+        )
         .values(quantity=InventoryLocation.quantity - qty)
         .execution_options(synchronize_session=False)
     )
@@ -268,12 +276,8 @@ def consume_warehouse(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
-    *,
-    respect_pending: bool = False,
 ) -> tuple[Inventory, Decimal]:
-    """창고에서 qty 만큼 차감 (BACKFLUSH / 비예약 창고 출고용). 원자적 조건부 UPDATE.
-
-    ``respect_pending`` 이면 예약 수량을 제외한 창고 가용 재고 안에서만 차감한다.
+    """창고 가용 재고에서 qty 만큼 차감하는 원자적 조건부 UPDATE.
 
     Returns:
         (inventory, qty_before) — qty_before 는 차감 전 Inventory.quantity (총량).
@@ -284,9 +288,10 @@ def consume_warehouse(
     get_or_create_inventory(db, item_id)
     db.flush()
 
-    available_expr = Inventory.warehouse_qty
-    if respect_pending:
-        available_expr = available_expr - func.coalesce(Inventory.pending_quantity, 0)
+    available_expr = Inventory.warehouse_qty - func.coalesce(
+        Inventory.pending_quantity,
+        0,
+    )
 
     result = db.execute(
         sa_update(Inventory)
@@ -301,11 +306,9 @@ def consume_warehouse(
         inv_check = inventory_repository.get(db, item_id)
         wh = inv_check.warehouse_qty if inv_check else Decimal("0")
         pending = inv_check.pending_quantity if inv_check else Decimal("0")
-        if respect_pending:
-            raise ValueError(
-                f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 차감 요청 {qty})."
-            )
-        raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
+        raise ValueError(
+            f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 차감 요청 {qty})."
+        )
 
     db.expire_all()
     inv = inventory_repository.get(db, item_id)
@@ -332,7 +335,11 @@ def consume_from_department(
         .where(InventoryLocation.item_id == item_id)
         .where(InventoryLocation.department == dept)
         .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
-        .where(InventoryLocation.quantity >= qty)
+        .where(
+            InventoryLocation.quantity
+            - func.coalesce(InventoryLocation.pending_quantity, 0)
+            >= qty
+        )
         .values(quantity=InventoryLocation.quantity - qty)
         .execution_options(synchronize_session=False)
     )

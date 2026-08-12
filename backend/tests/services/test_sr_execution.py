@@ -151,6 +151,19 @@ def _prod_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
     return loc.quantity if loc else D("0")
 
 
+def _loc_pending(db_session, item_id, dept=ASSEMBLY) -> Decimal:
+    loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == dept.value,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    return loc.pending_quantity if loc else D("0")
+
+
 def _defective_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
     loc = (
         db_session.query(InventoryLocation)
@@ -626,8 +639,8 @@ def test_execute_line_raw_ship_insufficient_raises(db_session, make_item):
         svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
 
 
-def test_execute_line_approval_releases_pending(db_session, make_item):
-    """is_approval=True + from_bucket=WAREHOUSE → pending release 후 실재고 이동."""
+def test_release_then_execute_line_approval_consumes_stock(db_session, make_item):
+    """Final approval releases the request once before line execution."""
     item = make_item(name="APR", warehouse_qty=D("10"), pending=D("3"))
     emp = _make_employee(db_session)
     req = _make_request(db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT)
@@ -636,7 +649,9 @@ def test_execute_line_approval_releases_pending(db_session, make_item):
         from_bucket=RequestBucketEnum.WAREHOUSE, to_bucket=RequestBucketEnum.PRODUCTION,
         to_department=ASSEMBLY.value,
     )
+    req.status = StockRequestStatusEnum.RESERVED
 
+    svc.release_reservation(db_session, req)
     svc._execute_line(db_session, req, line, approver=emp, is_approval=True)
     db_session.flush()
 
@@ -738,6 +753,84 @@ def test_finalize_warehouse_deputy_self_approves(db_session, make_item):
     assert _wh_qty(db_session, item.item_id) == D("3")
 
 
+def test_finalize_warehouse_primary_self_approves_dual_request(db_session, make_item):
+    item = make_item(name="dual-self-approval", warehouse_qty=D("5"))
+    requester = _make_employee(
+        db_session,
+        code="DUAL-WH-SELF",
+        warehouse_role="primary",
+    )
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        requires_warehouse_approval=True,
+        requires_department_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("2"),
+        from_bucket=RequestBucketEnum.WAREHOUSE,
+        to_bucket=RequestBucketEnum.PRODUCTION,
+        to_department=ASSEMBLY.value,
+    )
+
+    svc._finalize_submission(
+        db_session,
+        request=request,
+        requester=requester,
+        now=datetime.utcnow(),
+    )
+    db_session.flush()
+
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.approved_by_employee_id == requester.employee_id
+    assert request.department_approved_by_employee_id == requester.employee_id
+    assert _wh_qty(db_session, item.item_id) == D("3")
+
+
+def test_finalize_admin_does_not_self_approve_department_part(db_session, make_item):
+    item = make_item(name="dual-admin-department-rule", warehouse_qty=D("5"))
+    requester = _make_employee(
+        db_session,
+        code="DUAL-ADMIN",
+        level=EmployeeLevelEnum.ADMIN,
+    )
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        requires_warehouse_approval=True,
+        requires_department_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("2"),
+        from_bucket=RequestBucketEnum.WAREHOUSE,
+        to_bucket=RequestBucketEnum.PRODUCTION,
+        to_department=ASSEMBLY.value,
+    )
+
+    svc._finalize_submission(
+        db_session,
+        request=request,
+        requester=requester,
+        now=datetime.utcnow(),
+    )
+    db_session.flush()
+
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.department_approved_by_employee_id is None
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+    assert inventory.pending_quantity == D("2")
+
+
 def test_finalize_non_warehouse_requester_reserves(db_session, make_item):
     """warehouse_role=none 일반 직원의 wh_to_dept → RESERVED + pending 생성, 로그 없음."""
     item = make_item(name="FIN3", warehouse_qty=D("5"))
@@ -762,6 +855,63 @@ def test_finalize_non_warehouse_requester_reserves(db_session, make_item):
     assert inv.warehouse_qty == D("5")  # 미차감
     assert len(_logs(db_session, item.item_id)) == 0  # 승인 전 로그 없음
     assert all(li.status == StockRequestStatusEnum.RESERVED for li in req.lines)
+
+
+def test_finalize_dept_to_warehouse_reserves_production_source(
+    db_session, make_item, make_location
+):
+    item = make_item(name="department-source")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, warehouse_role="none")
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("4"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+        from_department=ASSEMBLY.value,
+    )
+
+    svc._finalize_submission(
+        db_session, request=request, requester=requester, now=datetime.utcnow()
+    )
+    db_session.flush()
+
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert _loc_pending(db_session, item.item_id) == D("4")
+
+
+def test_finalize_inbound_only_approval_stays_submitted(db_session, make_item):
+    item = make_item(name="inbound-only")
+    requester = _make_employee(db_session, warehouse_role="none")
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.RAW_RECEIVE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("4"),
+        from_bucket=RequestBucketEnum.NONE,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+    )
+
+    svc._finalize_submission(
+        db_session, request=request, requester=requester, now=datetime.utcnow()
+    )
+
+    assert request.status == StockRequestStatusEnum.SUBMITTED
+    assert all(line.status == StockRequestStatusEnum.SUBMITTED for line in request.lines)
 
 
 def test_finalize_no_approval_required_completes(db_session, make_item, make_location):
@@ -859,3 +1009,145 @@ def test_release_reservation_noop_when_not_reserved(db_session, make_item):
 
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.pending_quantity == D("4")  # 불변
+
+
+def test_release_reservation_locks_sorted_unique_inventories_before_source_release(
+    db_session, make_item, monkeypatch
+):
+    from app.services import sr_reservation
+
+    first = make_item(name="release-lock-first", warehouse_qty=D("10"))
+    second = make_item(name="release-lock-second", warehouse_qty=D("10"))
+    emp = _make_employee(db_session, code="REL-LOCK")
+    req = _make_request(
+        db_session,
+        emp,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+    )
+    req.status = StockRequestStatusEnum.RESERVED
+    for item in (second, first, second):
+        _add_line(
+            db_session,
+            req,
+            item,
+            quantity=D("1"),
+            from_bucket=RequestBucketEnum.WAREHOUSE,
+            to_bucket=RequestBucketEnum.PRODUCTION,
+            to_department=ASSEMBLY.value,
+        )
+
+    events = []
+
+    def lock_inventories(_db, item_ids):
+        events.append(("lock", item_ids))
+        return {item_id: object() for item_id in item_ids}
+
+    def release_lines(_db, _lines, **_kwargs):
+        events.append(("release", None))
+
+    monkeypatch.setattr(svc, "_is_sqlite", False)
+    monkeypatch.setattr(svc.inventory_svc, "lock_inventories", lock_inventories)
+    monkeypatch.setattr(sr_reservation, "release_lines", release_lines)
+
+    svc.release_reservation(db_session, req)
+
+    assert events == [
+        ("lock", sorted({first.item_id, second.item_id})),
+        ("release", None),
+    ]
+
+
+@pytest.mark.parametrize("operation", ["release", "execute"])
+def test_rework_first_prelock_includes_recursive_child_tree(
+    db_session, make_item, monkeypatch, operation
+):
+    from app.services import sr_reservation
+
+    parent = make_item(name=f"rework-{operation}-parent")
+    branch = make_item(name=f"rework-{operation}-branch")
+    normal = make_item(name=f"rework-{operation}-normal")
+    defective = make_item(name=f"rework-{operation}-defective")
+    scrap = make_item(name=f"rework-{operation}-scrap")
+    employee = _make_employee(db_session, code=f"RW-{operation.upper()}")
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.REWORK_NORMAL,
+        requires_warehouse_approval=False,
+        notes=json.dumps(
+            {
+                "child_decisions": [
+                    {
+                        "item_id": str(branch.item_id),
+                        "qty": "1",
+                        "children": [
+                            {
+                                "item_id": str(normal.item_id),
+                                "qty": "1",
+                                "normal_qty": "1",
+                                "defective_qty": "0",
+                                "scrap_qty": "0",
+                            },
+                            {
+                                "item_id": str(defective.item_id),
+                                "qty": "1",
+                                "normal_qty": "0",
+                                "defective_qty": "1",
+                                "scrap_qty": "0",
+                            },
+                            {
+                                "item_id": str(scrap.item_id),
+                                "qty": "1",
+                                "normal_qty": "0",
+                                "defective_qty": "0",
+                                "scrap_qty": "1",
+                            },
+                        ],
+                    }
+                ]
+            }
+        ),
+    )
+    request.status = StockRequestStatusEnum.RESERVED
+    line = _add_line(
+        db_session,
+        request,
+        parent,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+    expected_ids = sorted(
+        {parent.item_id, branch.item_id, normal.item_id, defective.item_id, scrap.item_id}
+    )
+    events = []
+
+    monkeypatch.setattr(svc, "_is_sqlite", False)
+    monkeypatch.setattr(
+        svc.inventory_svc,
+        "ensure_and_lock_inventories",
+        lambda _db, item_ids: events.append(("lock", item_ids)) or {},
+    )
+    if operation == "release":
+        monkeypatch.setattr(
+            sr_reservation,
+            "release_lines",
+            lambda *_args, **_kwargs: events.append(("release", None)),
+        )
+        svc.release_reservation(db_session, request)
+    else:
+        monkeypatch.setattr(
+            svc,
+            "_execute_line",
+            lambda *_args, **_kwargs: events.append(("execute", line.item_id)),
+        )
+        svc._execute_all_lines(
+            db_session,
+            request,
+            [line],
+            operator_name=employee.name,
+            approver=employee,
+        )
+
+    assert events[0] == ("lock", expected_ids)

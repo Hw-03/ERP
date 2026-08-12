@@ -47,14 +47,25 @@ def defective_total(db: Session, item_id: uuid.UUID) -> Decimal:
 
 
 def available(inv: Inventory, *, db: Optional[Session] = None) -> Decimal:
-    """Available = warehouse_qty + production_total − pending. 불량 제외.
+    """Available = (warehouse_qty - warehouse pending) + (production - location pending). 불량 제외.
 
     db가 주어지면 production_total을 실시간 계산. 없으면 warehouse만 (예약 검사용 안전 기준).
     """
     pending = inv.pending_quantity or Decimal("0")
     wh = inv.warehouse_qty or Decimal("0")
     prod = production_total(db, inv.item_id) if db is not None else Decimal("0")
-    return wh + prod - pending
+    prod_pending = Decimal("0")
+    if db is not None:
+        value = (
+            db.query(func.coalesce(func.sum(InventoryLocation.pending_quantity), 0))
+            .filter(
+                InventoryLocation.item_id == inv.item_id,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            )
+            .scalar()
+        )
+        prod_pending = Decimal(str(value or 0))
+    return wh - pending + prod - prod_pending
 
 
 def _sync_total(db: Session, inv: Inventory) -> None:

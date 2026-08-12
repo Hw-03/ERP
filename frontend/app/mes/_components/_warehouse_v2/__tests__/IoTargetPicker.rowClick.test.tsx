@@ -22,7 +22,7 @@ vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => ({ employee_id: "emp-1", assigned_model_slots: [] }),
 }));
 
-function makeItem({ warehouseQty = 0, pendingQty = 0 }: { warehouseQty?: number; pendingQty?: number } = {}): Item {
+function makeItem({ warehouseQty = 0, pendingQty = 0, locations = [] }: { warehouseQty?: number; pendingQty?: number; locations?: unknown[] } = {}): Item {
   return {
     item_id: "item-1",
     item_name: "Clickable Item",
@@ -31,7 +31,7 @@ function makeItem({ warehouseQty = 0, pendingQty = 0 }: { warehouseQty?: number;
     warehouse_qty: warehouseQty,
     pending_quantity: pendingQty,
     min_stock: null,
-    locations: [],
+    locations,
     model_slots: [],
     deleted_at: null,
   } as unknown as Item;
@@ -105,6 +105,77 @@ describe("IoTargetPicker row click", () => {
     expect(warehouseCell).toHaveTextContent("창고 10 · 예약 3");
   });
 
+  it("subtracts only the selected department production reservation and exposes it in the mobile row", () => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="process"
+        subType="adjust_out"
+        deptIoDirection="out"
+        targetDepartment="조립"
+        items={[makeItem({
+          locations: [
+            { department: "조립", status: "PRODUCTION", quantity: 10, pending_quantity: 3, available_quantity: 7 },
+            { department: "고압", status: "PRODUCTION", quantity: 20, pending_quantity: 19, available_quantity: 1 },
+          ],
+        })]}
+      />,
+    );
+
+    expect(screen.getByTestId("picker-mobile-source-available-item-1")).toHaveTextContent("출고 가능 7");
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("출고 가능 7");
+    expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("실재고 10 · 예약 3");
+  });
+
+  it("uses warehouse availability when defect quarantine starts from the warehouse", () => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="defect"
+        subType="defect_quarantine"
+        targetDepartment="창고"
+        items={[makeItem({
+          warehouseQty: 10,
+          pendingQty: 3,
+          locations: [
+            { department: "조립", status: "PRODUCTION", quantity: 20, pending_quantity: 19, available_quantity: 1 },
+          ],
+        })]}
+      />,
+    );
+
+    expect(screen.getByTestId("picker-mobile-source-available-item-1")).toHaveTextContent("출고 가능 7");
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    expect(within(row).getAllByRole("cell")[2]).toHaveTextContent("출고 가능 7");
+    expect(within(row).getAllByRole("cell")[2]).toHaveTextContent("창고 10 · 예약 3");
+    expect(within(row).getAllByRole("cell")[3]).not.toHaveTextContent("출고 가능 0");
+  });
+
+  it("keeps using the selected production location when defect quarantine starts from a department", () => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="defect"
+        subType="defect_quarantine"
+        targetDepartment="조립"
+        items={[makeItem({
+          warehouseQty: 10,
+          pendingQty: 3,
+          locations: [
+            { department: "조립", status: "PRODUCTION", quantity: 9, pending_quantity: 2, available_quantity: 7 },
+          ],
+        })]}
+      />,
+    );
+
+    expect(screen.getByTestId("picker-mobile-source-available-item-1")).toHaveTextContent("출고 가능 7");
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    expect(within(row).getAllByRole("cell")[2]).not.toHaveTextContent("출고 가능 7");
+    expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("출고 가능 7");
+    expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("실재고 9 · 예약 2");
+  });
+
   it("keeps the warehouse cell as a single quantity when pending quantity is zero", () => {
     render(
       <IoTargetPicker
@@ -121,6 +192,25 @@ describe("IoTargetPicker row click", () => {
     expect(warehouseCell).toHaveTextContent("10");
     expect(warehouseCell).not.toHaveTextContent("출고 가능");
     expect(warehouseCell).not.toHaveTextContent("예약");
+  });
+
+  it.each([
+    "warehouse_to_dept",
+    "internal_use_out",
+    "warehouse_adjust_out",
+  ] as const)("shows mobile warehouse availability even without a reservation for %s", (subType) => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType={subType === "warehouse_adjust_out" ? "warehouse_adjust" : "warehouse_io"}
+        subType={subType}
+        items={[makeItem({ warehouseQty: 10, pendingQty: 0 })]}
+      />,
+    );
+
+    const availability = screen.getByTestId("picker-mobile-source-available-item-1");
+    expect(availability).toHaveTextContent("출고 가능 10");
+    expect(availability).not.toHaveTextContent("예약");
   });
 
   it("keeps the warehouse cell as a single quantity for supplier receipts", () => {

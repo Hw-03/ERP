@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
 
 const DEFECT_RED = "#ef4444";
 
@@ -28,6 +29,8 @@ export function InventoryDetailLocations({
   const depts = Array.from(
     new Set(locations.map((l) => l.department))
   );
+  const warehousePendingQty = warehousePending(item);
+  const warehouseAvailableQty = warehouseAvailable(item);
 
   return (
     <section
@@ -45,14 +48,21 @@ export function InventoryDetailLocations({
           >
             <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.muted2 }} />
             <span className="flex-1 text-base font-semibold">창고</span>
-            <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
-              {formatQty(item.warehouse_qty)}
-            </span>
+            {warehousePendingQty > 0 ? (
+              <div className="flex flex-col items-end leading-tight">
+                <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>출고 가능 {formatQty(warehouseAvailableQty)}</span>
+                <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>실재고 {formatQty(item.warehouse_qty)} · 예약 {formatQty(warehousePendingQty)}</span>
+              </div>
+            ) : (
+              <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                {formatQty(item.warehouse_qty)}
+              </span>
+            )}
           </div>
         )}
         {depts.map((dept) => {
-          const prod = locations.find((l) => l.department === dept && l.status === "PRODUCTION");
-          const defective = locations.find((l) => l.department === dept && l.status === "DEFECTIVE");
+          const prod = findInventoryLocation(item, dept, "PRODUCTION");
+          const defective = findInventoryLocation(item, dept, "DEFECTIVE");
           return (
             <div key={dept}>
               {prod && (
@@ -62,9 +72,16 @@ export function InventoryDetailLocations({
                 >
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getDeptColor(dept) }} />
                   <span className="flex-1 text-base font-semibold">{dept}</span>
-                  <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
-                    {formatQty(prod.quantity)}
-                  </span>
+                  {locationPending(prod) > 0 ? (
+                    <div className="flex flex-col items-end leading-tight">
+                      <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>출고 가능 {formatQty(locationAvailable(prod))}</span>
+                      <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>실재고 {formatQty(prod.quantity)} · 예약 {formatQty(locationPending(prod))}</span>
+                    </div>
+                  ) : (
+                    <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                      {formatQty(prod.quantity)}
+                    </span>
+                  )}
                 </div>
               )}
               {defective && (
@@ -79,9 +96,16 @@ export function InventoryDetailLocations({
                   <span className="flex-1 text-base font-semibold" style={{ color: DEFECT_RED }}>
                     {dept} [불량]
                   </span>
-                  <span className="text-base font-bold" style={{ color: DEFECT_RED }}>
-                    {formatQty(defective.quantity)}
-                  </span>
+                  {locationPending(defective) > 0 ? (
+                    <div className="flex flex-col items-end leading-tight">
+                      <span className="text-base font-bold" style={{ color: DEFECT_RED }}>출고 가능 {formatQty(locationAvailable(defective))}</span>
+                      <span className="text-xs" style={{ color: DEFECT_RED }}>실재고 {formatQty(defective.quantity)} · 예약 {formatQty(locationPending(defective))}</span>
+                    </div>
+                  ) : (
+                    <span className="text-base font-bold" style={{ color: DEFECT_RED }}>
+                      {formatQty(defective.quantity)}
+                    </span>
+                  )}
                 </button>
               )}
             </div>

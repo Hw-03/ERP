@@ -53,6 +53,8 @@ export interface InventoryLocationRow {
   department: Department;
   status: LocationStatus;
   quantity: number;
+  pending_quantity?: number;
+  available_quantity?: number;
 }
 
 export interface ProcessTypeSummary {

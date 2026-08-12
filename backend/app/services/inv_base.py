@@ -91,7 +91,8 @@ def _lock_location(
     dept: DepartmentEnum,
     status: LocationStatusEnum,
 ) -> InventoryLocation:
-    """쓰기 경로용 — PostgreSQL: FOR UPDATE 행 잠금. SQLite: 일반 SELECT."""
+    """쓰기 경로용 — 부모 Inventory 다음 위치 행을 잠근다."""
+    _lock_inventory(db, item_id)
     q = db.query(InventoryLocation).filter(
         InventoryLocation.item_id == item_id,
         InventoryLocation.department == dept,

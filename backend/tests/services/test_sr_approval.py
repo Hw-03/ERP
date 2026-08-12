@@ -99,6 +99,30 @@ def _make_reserved_request(db_session, requester, item, *, qty: Decimal = D("3")
     return req
 
 
+def _make_location_reserved_request(
+    db_session, requester, item, *, qty: Decimal = D("3")
+):
+    from app.models import RequestBucketEnum
+
+    return sr_svc.create_request(
+        db_session,
+        requester=requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        lines_input=[
+            LineInput(
+                item_id=item.item_id,
+                quantity=qty,
+                from_bucket=RequestBucketEnum.PRODUCTION,
+                from_department=ASSEMBLY,
+                to_bucket=RequestBucketEnum.WAREHOUSE,
+                to_department=None,
+            )
+        ],
+        reference_no=None,
+        notes=None,
+    )
+
+
 def _inv(db_session, item_id) -> Inventory:
     return db_session.query(Inventory).filter(Inventory.item_id == item_id).first()
 
@@ -145,6 +169,34 @@ def test_approve_transitions_reserved_to_completed_and_moves_stock(
     assert inv.warehouse_qty == D("7")        # 10 - 3
     assert inv.pending_quantity == D("0")     # 점유 해제
     assert _prod_qty(db_session, item.item_id) == D("3")  # 부서 생산 입고
+
+
+def test_legacy_submitted_department_request_can_be_approved_without_reservation(
+    db_session, make_item, make_location
+):
+    from app.services import sr_reservation
+
+    item = make_item(name="legacy-department-source")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="LEGACY-REQ")
+    approver = _make_employee(
+        db_session, code="LEGACY-APP", warehouse_role="primary"
+    )
+    request = _make_location_reserved_request(db_session, requester, item, qty=D("3"))
+    sr_reservation.release_lines(db_session, request.lines)
+    request.status = StockRequestStatusEnum.SUBMITTED
+    for line in request.lines:
+        line.status = StockRequestStatusEnum.SUBMITTED
+    db_session.flush()
+
+    svc.approve_request(db_session, request, approver=approver, pin="0000")
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert location.quantity == D("2")
+    assert location.pending_quantity == D("0")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("3")
 
 
 def test_approve_completed_request_is_idempotent(db_session, make_item):
@@ -325,6 +377,58 @@ def test_department_approve_completes_after_warehouse(db_session, make_item):
     assert _prod_qty(db_session, item.item_id) == D("3")
 
 
+def test_department_approve_releases_location_reservation_before_execution(
+    db_session, make_item, make_location
+):
+    from app.models import RequestBucketEnum
+
+    item = make_item(name="department-approved-source")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="DREQ-SOURCE")
+    approver = _make_employee(
+        db_session,
+        code="DAPP-SOURCE",
+        department_role="primary",
+    )
+    request = sr_svc.create_request(
+        db_session,
+        requester=requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        lines_input=[
+            LineInput(
+                item_id=item.item_id,
+                quantity=D("3"),
+                from_bucket=RequestBucketEnum.PRODUCTION,
+                from_department=ASSEMBLY,
+                to_bucket=RequestBucketEnum.WAREHOUSE,
+                to_department=None,
+            )
+        ],
+        reference_no=None,
+        notes=None,
+    )
+    request.requires_warehouse_approval = False
+    request.requires_department_approval = True
+    db_session.flush()
+    db_session.refresh(location)
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert location.pending_quantity == D("3")
+
+    svc.approve_request_department(
+        db_session,
+        request,
+        approver=approver,
+        pin="0000",
+    )
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert location.quantity == D("2")
+    assert location.pending_quantity == D("0")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("3")
+
+
 def test_department_approve_rejects_unauthorized(db_session, make_item):
     """부서 결재 권한 없는 직원(role 전무) → PermissionError."""
     item = make_item(name="DUAL3", warehouse_qty=D("10"))
@@ -379,6 +483,344 @@ def test_department_reject_releases_pending(db_session, make_item):
     inv = _inv(db_session, item.item_id)
     assert inv.pending_quantity == D("0")
     assert inv.warehouse_qty == D("10")
+
+
+def test_department_reject_releases_location_pending(
+    db_session, make_item, make_location
+):
+    item = make_item(name="department-reject")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="DLOC-REQ")
+    approver = _make_employee(
+        db_session, code="DLOC-APP", department_role="primary"
+    )
+    request = _make_location_reserved_request(db_session, requester, item)
+    request.requires_department_approval = True
+    db_session.flush()
+
+    svc.reject_request_department(
+        db_session,
+        request,
+        approver=approver,
+        pin="0000",
+        reason="department reject",
+    )
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert request.status == StockRequestStatusEnum.REJECTED
+    assert location.pending_quantity == D("0")
+    assert location.quantity == D("5")
+
+
+def test_failed_approval_releases_location_pending(
+    db_session, make_item, make_location
+):
+    item = make_item(name="department-failed")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="DFAL-REQ")
+    approver = _make_employee(db_session, code="DFAL-APP", warehouse_role="primary")
+    request = _make_location_reserved_request(db_session, requester, item)
+    db_session.flush()
+
+    svc.mark_failed_approval(
+        db_session,
+        request,
+        approver=approver,
+        reason="execution failed",
+    )
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert request.status == StockRequestStatusEnum.FAILED_APPROVAL
+    assert all(
+        line.status == StockRequestStatusEnum.FAILED_APPROVAL
+        for line in request.lines
+    )
+    assert location.pending_quantity == D("0")
+
+
+def test_failed_legacy_submitted_request_does_not_release_another_reservation(
+    db_session, make_item, make_location
+):
+    from app.services import sr_reservation
+
+    item = make_item(name="legacy-failure-shared-source")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    owner = _make_employee(db_session, code="FLEG-OWNER")
+    legacy_requester = _make_employee(db_session, code="FLEG-OLD")
+    approver = _make_employee(
+        db_session, code="FLEG-APP", warehouse_role="primary"
+    )
+    owner_request = _make_location_reserved_request(
+        db_session, owner, item, qty=D("2")
+    )
+    legacy = _make_location_reserved_request(
+        db_session, legacy_requester, item, qty=D("1")
+    )
+    sr_reservation.release_lines(db_session, legacy.lines)
+    legacy.status = StockRequestStatusEnum.SUBMITTED
+    for line in legacy.lines:
+        line.status = StockRequestStatusEnum.SUBMITTED
+    db_session.flush()
+    db_session.refresh(location)
+    assert owner_request.status == StockRequestStatusEnum.RESERVED
+    assert location.pending_quantity == D("2")
+
+    svc.mark_failed_approval(
+        db_session,
+        legacy,
+        approver=approver,
+        reason="legacy execution failed",
+    )
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert legacy.status == StockRequestStatusEnum.FAILED_APPROVAL
+    assert location.pending_quantity == D("2")
+
+
+def test_active_reservations_excludes_stale_reserved_line_under_failed_parent(
+    db_session, make_item, make_location
+):
+    item = make_item(name="failed-parent-reservation")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="FAR-REQ")
+    request = _make_location_reserved_request(
+        db_session, requester, item, qty=D("2")
+    )
+    request.status = StockRequestStatusEnum.FAILED_APPROVAL
+    db_session.flush()
+
+    assert request.lines[0].status == StockRequestStatusEnum.RESERVED
+    assert sr_svc.list_active_reservations(db_session, item.item_id) == []
+
+
+def test_requester_cancel_releases_location_pending(
+    db_session, make_item, make_location
+):
+    item = make_item(name="department-cancel")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="DCANCEL-REQ")
+    request = _make_location_reserved_request(db_session, requester, item)
+    db_session.flush()
+
+    svc.cancel_request(
+        db_session,
+        request,
+        requester=requester,
+        pin="0000",
+    )
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert request.status == StockRequestStatusEnum.CANCELLED
+    assert location.pending_quantity == D("0")
+    assert location.quantity == D("5")
+
+
+def test_cancel_open_releases_location_and_tolerates_legacy_submitted(
+    db_session, make_item, make_location, monkeypatch
+):
+    item = make_item(name="department-cleanup")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="DCLEAN-REQ")
+    legacy = _make_location_reserved_request(db_session, requester, item, qty=D("1"))
+    # Simulate a pre-deployment request whose status was submitted without a reservation.
+    from app.services import sr_reservation
+
+    sr_reservation.release_lines(db_session, legacy.lines)
+    legacy.status = StockRequestStatusEnum.SUBMITTED
+    for line in legacy.lines:
+        line.status = StockRequestStatusEnum.SUBMITTED
+    # Legacy row must be visited first; otherwise the old best-effort release bug is hidden.
+    reserved = _make_location_reserved_request(db_session, requester, item, qty=D("2"))
+    db_session.flush()
+    db_session.refresh(location)
+    assert location.pending_quantity == D("2")
+
+    released_statuses = []
+    real_release = svc._release_pending_best_effort
+
+    def track_release(db, request):
+        released_statuses.append(request.status)
+        real_release(db, request)
+
+    monkeypatch.setattr(svc, "_release_pending_best_effort", track_release)
+
+    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert count == 2
+    assert reserved.status == StockRequestStatusEnum.CANCELLED
+    assert legacy.status == StockRequestStatusEnum.CANCELLED
+    assert released_statuses == [StockRequestStatusEnum.RESERVED]
+    assert location.pending_quantity == D("0")
+
+
+def test_cancel_ghost_reserved_request_preserves_other_request_pending(
+    db_session, make_item, make_location
+):
+    item = make_item(name="ghost-reservation-cancel")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("10"))
+    requester = _make_employee(db_session, code="GHOST-CANCEL")
+    ghost = _make_location_reserved_request(
+        db_session,
+        requester,
+        item,
+        qty=D("2"),
+    )
+    from app.services import sr_reservation
+
+    sr_reservation.release_lines(db_session, ghost.lines)
+    owner = _make_location_reserved_request(
+        db_session,
+        requester,
+        item,
+        qty=D("3"),
+    )
+    db_session.flush()
+    db_session.refresh(location)
+    assert location.pending_quantity == D("3")
+
+    svc.cancel_request(
+        db_session,
+        ghost,
+        requester=requester,
+        pin="0000",
+    )
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert ghost.status == StockRequestStatusEnum.CANCELLED
+    assert owner.status == StockRequestStatusEnum.RESERVED
+    assert location.pending_quantity == D("3")
+
+
+def test_cancel_ghost_warehouse_request_preserves_other_request_pending(
+    db_session, make_item
+):
+    item = make_item(name="ghost-warehouse-cancel", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="GHOST-WH-CANCEL")
+    ghost = _make_reserved_request(db_session, requester, item, qty=D("2"))
+    from app.services import sr_reservation
+
+    sr_reservation.release_lines(db_session, ghost.lines)
+    owner = _make_reserved_request(db_session, requester, item, qty=D("3"))
+    db_session.flush()
+    inventory = _inv(db_session, item.item_id)
+    assert inventory.pending_quantity == D("3")
+
+    svc.cancel_request(
+        db_session,
+        ghost,
+        requester=requester,
+        pin="0000",
+    )
+    db_session.flush()
+    db_session.refresh(inventory)
+
+    assert ghost.status == StockRequestStatusEnum.CANCELLED
+    assert owner.status == StockRequestStatusEnum.RESERVED
+    assert inventory.pending_quantity == D("3")
+
+
+def test_cancel_open_reconciles_ghost_reserved_request_without_leak(
+    db_session, make_item, make_location
+):
+    item = make_item(name="ghost-reservation-cleanup")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("10"))
+    requester = _make_employee(db_session, code="GHOST-CLEANUP")
+    ghost = _make_location_reserved_request(
+        db_session,
+        requester,
+        item,
+        qty=D("2"),
+    )
+    from app.services import sr_reservation
+
+    sr_reservation.release_lines(db_session, ghost.lines)
+    owner = _make_location_reserved_request(
+        db_session,
+        requester,
+        item,
+        qty=D("3"),
+    )
+    db_session.flush()
+
+    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
+    db_session.flush()
+    db_session.refresh(location)
+
+    assert count == 2
+    assert ghost.status == StockRequestStatusEnum.CANCELLED
+    assert owner.status == StockRequestStatusEnum.CANCELLED
+    assert location.pending_quantity == D("0")
+
+
+def test_cancel_open_prelocks_all_request_items_in_global_order(
+    db_session, make_item, make_location, monkeypatch
+):
+    from app.services import inventory as inventory_svc
+
+    first = make_item(name="cleanup-global-lock-first")
+    second = make_item(name="cleanup-global-lock-second")
+    make_location(first.item_id, department=ASSEMBLY, quantity=D("5"))
+    make_location(second.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="CLEANUP-GLOBAL-LOCK")
+    _make_location_reserved_request(db_session, requester, second, qty=D("1"))
+    _make_location_reserved_request(db_session, requester, first, qty=D("1"))
+    events = []
+
+    monkeypatch.setattr(
+        inventory_svc,
+        "ensure_and_lock_inventories",
+        lambda _db, item_ids: events.append(("lock", item_ids)) or {},
+    )
+    monkeypatch.setattr(
+        svc,
+        "_release_pending_best_effort",
+        lambda _db, request: events.append(("release", request.request_id)),
+    )
+
+    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
+
+    assert count == 2
+    assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
+
+
+def test_cancel_open_locks_requests_before_inventories(
+    db_session, make_item, make_location, monkeypatch
+):
+    from sqlalchemy.orm import Query
+    from app.services import inventory as inventory_svc
+
+    item = make_item(name="cleanup-request-first-lock")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="CLEANUP-REQUEST-LOCK")
+    _make_location_reserved_request(db_session, requester, item, qty=D("1"))
+    events = []
+    real_with_for_update = Query.with_for_update
+
+    def with_for_update(query, *args, **kwargs):
+        events.append(("request_lock", None))
+        return real_with_for_update(query, *args, **kwargs)
+
+    monkeypatch.setattr(Query, "with_for_update", with_for_update)
+    monkeypatch.setattr(
+        inventory_svc,
+        "ensure_and_lock_inventories",
+        lambda _db, item_ids: events.append(("inventory_lock", item_ids)) or {},
+    )
+    monkeypatch.setattr(svc, "_release_pending_best_effort", lambda *_args: None)
+
+    svc.cancel_open_stock_requests(db_session, reason="cleanup")
+
+    assert events[:2] == [
+        ("request_lock", None),
+        ("inventory_lock", [item.item_id]),
+    ]
 
 
 def test_department_reject_rejects_unauthorized(db_session, make_item):

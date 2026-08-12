@@ -88,6 +88,7 @@ class ReservationLineResponse(BaseModel):
     requester_department: str
     quantity: int
     from_bucket: RequestBucketEnum
+    from_department: Optional[str] = None
     to_bucket: RequestBucketEnum
     to_department: Optional[str] = None
     created_at: UtcDatetime

@@ -63,6 +63,9 @@ def list_locations(db: Session, item_id: uuid.UUID) -> List[InventoryLocationRes
             department=row.department,
             status=row.status,
             quantity=row.quantity or Decimal("0"),
+            pending_quantity=row.pending_quantity or Decimal("0"),
+            available_quantity=(row.quantity or Decimal("0"))
+            - (row.pending_quantity or Decimal("0")),
         )
         for row in rows
     ]
@@ -81,6 +84,7 @@ def _build_response(
         production_total=fig.production_total,
         defective_total=fig.defective_total,
         pending_quantity=fig.pending,
+        department_pending_quantity=fig.department_pending,
         available_quantity=fig.available,
         last_reserver_name=inv.last_reserver_name,
         location=inv.location,
@@ -117,6 +121,9 @@ def to_response_bulk(
                 department=row.department,
                 status=row.status,
                 quantity=row.quantity or Decimal("0"),
+                pending_quantity=row.pending_quantity or Decimal("0"),
+                available_quantity=(row.quantity or Decimal("0"))
+                - (row.pending_quantity or Decimal("0")),
             )
         )
 

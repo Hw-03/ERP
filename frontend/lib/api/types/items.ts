@@ -16,6 +16,7 @@ export interface Item {
   production_total: number;
   defective_total: number;
   pending_quantity: number;
+  department_pending_quantity?: number;
   available_quantity: number;
   last_reserver_name: string | null;
   location: string | null;

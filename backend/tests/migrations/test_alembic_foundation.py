@@ -12,10 +12,11 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.schema import CreateTable
 
-from app.models import Base, Item
+from app.models import Base, InventoryLocation, Item
 from migration_type_compare import compare_migration_type
 
 
@@ -106,7 +107,19 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260812_0018"
+            ) == "20260812_0019"
+            location_columns = {
+                column["name"]: column
+                for column in inspector.get_columns("inventory_locations")
+            }
+            assert location_columns["pending_quantity"]["nullable"] is False
+            assert str(location_columns["pending_quantity"]["default"]) in {"0", "'0'"}
+            check_names = {
+                constraint["name"]
+                for constraint in inspector.get_check_constraints("inventory_locations")
+            }
+            assert "ck_invloc_pending_nonneg" in check_names
+            assert "ck_invloc_pending_le_quantity" in check_names
             shipping_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("shipping_requests")
@@ -316,6 +329,113 @@ def test_baseline_schema_has_no_semantic_metadata_diff(tmp_path):
                 },
             )
             assert compare_metadata(context, Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_inventory_location_model_tracks_reserved_quantity():
+    table = InventoryLocation.__table__
+
+    assert table.c.pending_quantity.nullable is False
+    assert table.c.pending_quantity.default.arg == 0
+    assert {
+        constraint.name for constraint in table.constraints
+    }.issuperset({"ck_invloc_pending_nonneg", "ck_invloc_pending_le_quantity"})
+
+
+def test_inventory_location_pending_migration_backfills_and_enforces_constraints(
+    tmp_path,
+):
+    path = tmp_path / "location-pending.db"
+    url = f"sqlite:///{path.as_posix()}"
+    command.upgrade(_config(url), "20260812_0018")
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "INSERT INTO items "
+            "(item_id, item_name, unit, model_symbol, process_type_code, serial_no) "
+            "VALUES ('item-1', 'item', 'EA', '9', 'TR', 1)"
+        )
+        db.execute(
+            "INSERT INTO inventory_locations "
+            "(location_id, item_id, department, status, quantity) "
+            "VALUES ('loc-1', 'item-1', 'assembly', 'PRODUCTION', 5)"
+        )
+        db.commit()
+
+    command.upgrade(_config(url), "head")
+
+    with sqlite3.connect(path) as db:
+        assert db.execute(
+            "SELECT pending_quantity FROM inventory_locations WHERE location_id='loc-1'"
+        ).fetchone() == (0,)
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute(
+                "UPDATE inventory_locations SET pending_quantity=-1 WHERE location_id='loc-1'"
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute(
+                "UPDATE inventory_locations SET pending_quantity=6 WHERE location_id='loc-1'"
+            )
+
+
+@pytest.mark.parametrize(
+    "existing_constraint",
+    [
+        None,
+        "ck_invloc_pending_nonneg",
+        "ck_invloc_pending_le_quantity",
+    ],
+)
+def test_inventory_location_pending_migration_repairs_partial_schema(
+    tmp_path, existing_constraint
+):
+    path = tmp_path / f"location-pending-partial-{existing_constraint or 'none'}.db"
+    url = f"sqlite:///{path.as_posix()}"
+    command.upgrade(_config(url), "20260812_0018")
+    engine = sa.create_engine(url)
+    try:
+        with engine.begin() as connection:
+            migration_context = MigrationContext.configure(connection)
+            operations = Operations(migration_context)
+            with operations.batch_alter_table("inventory_locations") as batch_op:
+                batch_op.add_column(
+                    sa.Column(
+                        "pending_quantity",
+                        sa.Integer(),
+                        nullable=False,
+                        server_default="0",
+                    )
+                )
+                if existing_constraint:
+                    batch_op.create_check_constraint(
+                        existing_constraint,
+                        (
+                            "pending_quantity >= 0"
+                            if existing_constraint == "ck_invloc_pending_nonneg"
+                            else "quantity >= pending_quantity"
+                        ),
+                    )
+    finally:
+        engine.dispose()
+
+    command.upgrade(_config(url), "head")
+
+    engine = sa.create_engine(url)
+    try:
+        inspector = sa.inspect(engine)
+        assert "pending_quantity" in {
+            column["name"]
+            for column in inspector.get_columns("inventory_locations")
+        }
+        assert {
+            constraint["name"]
+            for constraint in inspector.get_check_constraints("inventory_locations")
+        }.issuperset(
+            {
+                "ck_invloc_pending_nonneg",
+                "ck_invloc_pending_le_quantity",
+            }
+        )
     finally:
         engine.dispose()
 

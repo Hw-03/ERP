@@ -17,6 +17,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.database import _is_sqlite
 from app.models import (
     Inventory,
     InventoryLocation,
@@ -106,15 +107,24 @@ def apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | N
     창고는 Inventory.warehouse_qty, location 은 (dept,status) 행을 ORM 속성으로 갱신한다.
     호출 측에서 이후 _sync_total 로 Inventory.quantity 를 재동기화해야 한다.
     """
+    inventory_query = db.query(Inventory).filter(Inventory.item_id == item_id)
+    if not _is_sqlite:
+        inventory_query = inventory_query.with_for_update()
+    inv = inventory_query.first()
+    if inv is None:
+        raise ValueError("재고 레코드를 찾을 수 없습니다.")
+
     for cell in effect or []:
         reverse_delta = -int(cell["delta"])
         if cell.get("scope") == "warehouse":
-            inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
-            if inv is None:
-                raise ValueError("재고 레코드를 찾을 수 없습니다.")
             new_val = int(inv.warehouse_qty or 0) + reverse_delta
             if new_val < 0:
                 raise ValueError(f"취소 후 창고 재고가 음수({new_val})가 됩니다.")
+            pending = int(inv.pending_quantity or 0)
+            if new_val < pending:
+                raise ValueError(
+                    f"취소 후 창고 재고({new_val})가 예약 수량({pending})보다 작아집니다."
+                )
             inv.warehouse_qty = new_val
         elif cell.get("scope") == "warehouse_box":  # 박스별 수량 원복(R6)
             box_id = cell["box_id"]
@@ -135,15 +145,17 @@ def apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | N
         else:  # location
             dept = cell["department"]
             status = LocationStatusEnum(cell["status"])
-            loc = (
+            location_query = (
                 db.query(InventoryLocation)
                 .filter(
                     InventoryLocation.item_id == item_id,
                     InventoryLocation.department == dept,
                     InventoryLocation.status == status,
                 )
-                .first()
             )
+            if not _is_sqlite:
+                location_query = location_query.with_for_update()
+            loc = location_query.first()
             if loc is None:
                 loc = InventoryLocation(
                     item_id=item_id,
@@ -157,5 +169,11 @@ def apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | N
             if new_val < 0:
                 raise ValueError(
                     f"취소 후 {dept} {status.value} 재고가 음수({new_val})가 됩니다."
+                )
+            pending = int(loc.pending_quantity or 0)
+            if new_val < pending:
+                raise ValueError(
+                    f"취소 후 {dept} {status.value} 재고({new_val})가 "
+                    f"예약 수량({pending})보다 작아집니다."
                 )
             loc.quantity = new_val

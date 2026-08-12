@@ -970,6 +970,64 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     assert db_session.query(IoBatch).count() == 1
 
 
+def test_io_draft_recomputes_department_shortage_with_pending(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Draft production pending")
+    location = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="IO-DRAFT-PEND")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "dept_to_warehouse",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "8",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    assert preview.json()["bundles"][0]["lines"][0]["shortage"] == 0
+
+    saved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "dept_to_warehouse",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert saved.status_code == 200, saved.json()
+
+    location.pending_quantity = Decimal("3")
+    db_session.commit()
+    fetched = client.get(
+        "/api/io/draft",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "dept_to_warehouse",
+        },
+    )
+
+    assert fetched.status_code == 200, fetched.json()
+    assert fetched.json()["bundles"][0]["lines"][0]["shortage"] == 1
+
+
 def test_io_submit_idempotent_with_client_request_id(client, db_session, make_item):
     """같은 client_request_id로 두 번 submit 시 같은 batch 멱등 반환, 재고 한 번만 차감."""
     item = make_item(name="Idem Raw", warehouse_qty=Decimal("0"))

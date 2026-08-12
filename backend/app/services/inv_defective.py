@@ -94,9 +94,17 @@ def mark_defective(
         raise ValueError(f"알 수 없는 source: {kind} (warehouse 또는 production)")
 
     get_or_create_inventory(db, item_id)
-    _lock_location(db, item_id, target_dept, LocationStatusEnum.DEFECTIVE)
+    locations = [(target_dept, LocationStatusEnum.DEFECTIVE)]
     if kind == "production":
-        _lock_location(db, item_id, source_dept, LocationStatusEnum.PRODUCTION)
+        locations.append((source_dept, LocationStatusEnum.PRODUCTION))
+    for department, status in sorted(
+        locations,
+        key=lambda location: (
+            location[0].value if hasattr(location[0], "value") else str(location[0]),
+            location[1].value,
+        ),
+    ):
+        _lock_location(db, item_id, department, status)
     db.flush()
 
     if kind == "warehouse":
@@ -123,7 +131,11 @@ def mark_defective(
             .where(InventoryLocation.item_id == item_id)
             .where(InventoryLocation.department == source_dept)
             .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
-            .where(InventoryLocation.quantity >= qty)
+            .where(
+                InventoryLocation.quantity
+                - func.coalesce(InventoryLocation.pending_quantity, 0)
+                >= qty
+            )
             .values(quantity=InventoryLocation.quantity - qty)
             .execution_options(synchronize_session=False)
         )
@@ -173,7 +185,11 @@ def return_to_supplier(
         .where(InventoryLocation.item_id == item_id)
         .where(InventoryLocation.department == from_dept)
         .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
-        .where(InventoryLocation.quantity >= qty)
+        .where(
+            InventoryLocation.quantity
+            - func.coalesce(InventoryLocation.pending_quantity, 0)
+            >= qty
+        )
         .values(quantity=InventoryLocation.quantity - qty)
         .execution_options(synchronize_session=False)
     )
@@ -217,7 +233,11 @@ def unmark_defective(
         .where(InventoryLocation.item_id == item_id)
         .where(InventoryLocation.department == dept)
         .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
-        .where(InventoryLocation.quantity >= qty)
+        .where(
+            InventoryLocation.quantity
+            - func.coalesce(InventoryLocation.pending_quantity, 0)
+            >= qty
+        )
         .values(quantity=InventoryLocation.quantity - qty, defective_at=None)
         .execution_options(synchronize_session=False)
     )
@@ -261,7 +281,11 @@ def scrap_defective(
         .where(InventoryLocation.item_id == item_id)
         .where(InventoryLocation.department == dept)
         .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
-        .where(InventoryLocation.quantity >= qty)
+        .where(
+            InventoryLocation.quantity
+            - func.coalesce(InventoryLocation.pending_quantity, 0)
+            >= qty
+        )
         .values(quantity=InventoryLocation.quantity - qty)
         .execution_options(synchronize_session=False)
     )
@@ -339,7 +363,11 @@ def _consume_normal_source(
             .where(InventoryLocation.item_id == item_id)
             .where(InventoryLocation.department == dept_or_warehouse)
             .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
-            .where(InventoryLocation.quantity >= qty)
+            .where(
+                InventoryLocation.quantity
+                - func.coalesce(InventoryLocation.pending_quantity, 0)
+                >= qty
+            )
             .values(quantity=InventoryLocation.quantity - qty)
             .execution_options(synchronize_session=False)
         )

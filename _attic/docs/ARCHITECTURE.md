@@ -88,7 +88,8 @@ ERP/
 
 ```
 total = warehouse_qty + production_total + defective_total
-available = total - pending_quantity   # 예약 차감 후 가용 재고
+available = (warehouse_qty - warehouse_pending)
+          + (production_total - production_pending)  # defective 제외
 ```
 
 | bucket | 의미 |
@@ -96,9 +97,10 @@ available = total - pending_quantity   # 예약 차감 후 가용 재고
 | warehouse_qty | 자재창고 보관량 |
 | production_total | 생산부서별 보관량 합계 (`InventoryLocation` 의 status=PRODUCTION) |
 | defective_total | 불량 격리 보관량 합계 (status=DEFECTIVE) |
-| pending_quantity | 큐 OUT으로 예약된 양 (소비 전) |
+| warehouse_pending | 창고 OUT 예약량 (`Inventory.pending_quantity`) |
+| production_pending | 생산 위치 OUT 예약량 합계 (`InventoryLocation.pending_quantity`) |
 
-`InventoryLocation` 은 (item, department, status) 단위 보관량 기록이다.
+`InventoryLocation` 은 (item, department, status) 단위 보관량과 위치별 예약량 기록이다.
 
 ### 주요 엔드포인트
 

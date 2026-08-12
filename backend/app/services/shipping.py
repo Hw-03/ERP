@@ -1352,6 +1352,14 @@ def _execute_component_change_core(
     produced_by = requester_name or "구성품 변경"
     source_label = source_pa.process_type_code or "품목"
     target_label = target_pa.process_type_code or "품목"
+    item_ids = sorted(
+        {
+            source_pa.item_id,
+            target_pa.item_id,
+            *(line["item_id"] for line in preview["lines"]),
+        }
+    )
+    inventory_svc.ensure_and_lock_inventories(db, item_ids)
 
     logs.append(_backflush_component_location(
         db,
@@ -1545,6 +1553,11 @@ def _consume_pickup_allocations(
 ) -> None:
     """Deduct reserved pickup items, with a direct-deduction fallback for legacy requests."""
     allocations = _active_allocations_for_request(db, req)
+    item_ids = {final_pf.item_id, *(allocation.item_id for allocation in allocations)}
+    if not allocations:
+        item_ids.update(line.item_id for line in req.companion_lines)
+    sorted_item_ids = sorted(item_ids)
+    inventory_svc.ensure_and_lock_inventories(db, sorted_item_ids)
     if not allocations:
         _ship_from_item_location(db, req, final_pf, request_qty, f"출하 픽업: {final_pf.item_name} x {request_qty}")
         for line in req.companion_lines:
@@ -1632,6 +1645,10 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
         .all()
     )
     legacy_logs = [log for log in logs if log.operation_batch_id is None]
+    inventory_svc.lock_inventories(
+        db,
+        sorted({log.item_id for log in legacy_logs}),
+    )
     for log in legacy_logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)
         inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
@@ -1709,6 +1726,10 @@ def pickup_cancel(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     if not pickup_logs:
         raise ShippingError("취소할 픽업 완료 재고 이력이 없습니다.")
 
+    inventory_svc.lock_inventories(
+        db,
+        sorted({log.item_id for log in pickup_logs}),
+    )
     now = datetime.utcnow()
     for log in pickup_logs:
         inv_effect.apply_effect_reverse(db, log.item_id, log.inventory_effect)

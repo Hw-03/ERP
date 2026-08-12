@@ -686,6 +686,7 @@ def test_pickup_cancel_restores_inventory_allocations_and_prepared_state(
     make_item,
     make_bom,
     make_location,
+    monkeypatch,
 ) -> None:
     request_id, _final_pa_id, final_pf_id, companion_id = _make_prepared_request(
         db_session,
@@ -701,8 +702,29 @@ def test_pickup_cancel_restores_inventory_allocations_and_prepared_state(
     prepared_companion_qty = _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING)
 
     shipping_actions_svc.pickup_complete(db_session, request_id)
+    pickup_item_ids = sorted(
+        {
+            log.item_id
+            for log in db_session.query(TransactionLog)
+            .filter_by(shipping_request_id=request_id, shipping_phase="PICKUP")
+            .all()
+        }
+    )
+    lock_calls = []
+    real_lock = shipping_svc.inventory_svc.lock_inventories
+
+    def lock_inventories(db, item_ids):
+        lock_calls.append(item_ids)
+        return real_lock(db, item_ids)
+
+    monkeypatch.setattr(
+        shipping_svc.inventory_svc,
+        "lock_inventories",
+        lock_inventories,
+    )
     cancelled = shipping_actions_svc.pickup_cancel(db_session, request_id)
 
+    assert lock_calls == [pickup_item_ids]
     assert cancelled.status == ShippingRequestStatusEnum.PREPARED
     assert cancelled.picked_up_at is None
     assert cancelled.serial_numbers == "SN-001"

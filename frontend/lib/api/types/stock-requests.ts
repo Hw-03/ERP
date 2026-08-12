@@ -127,6 +127,7 @@ export interface StockRequestReservationLine {
   requester_department: Department;
   quantity: number;
   from_bucket: RequestBucket;
+  from_department?: Department | null;
   to_bucket: RequestBucket;
   to_department: Department | null;
   created_at: string;

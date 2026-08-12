@@ -7,7 +7,7 @@ import { api, type Item, type StockRequestReservationLine } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
-import { getStockState } from "@/lib/mes/inventory";
+import { getStockState, totalApprovalPending } from "@/lib/mes/inventory";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useDeptColorLookup } from "../DepartmentsContext";
@@ -20,6 +20,16 @@ import type { IoEntryIntent } from "../_warehouse_v2/types";
 
 const mix = (color: string, amount: number, base = "transparent") =>
   `color-mix(in srgb, ${color} ${amount}%, ${base})`;
+
+function reservationSourceLabel(reservation: StockRequestReservationLine): string {
+  if (reservation.from_bucket === "production") {
+    return `${reservation.from_department ? normalizeDepartment(reservation.from_department) : "부서"} 생산`;
+  }
+  if (reservation.from_bucket === "defective") {
+    return `${reservation.from_department ? normalizeDepartment(reservation.from_department) : "부서"} 불량`;
+  }
+  return "창고";
+}
 
 type Props = {
   item: Item;
@@ -51,7 +61,7 @@ export function InventoryDetailPanel({
     setMobileBomOpen(false);
     setIoMenu(null);
   }, [item.item_id]);
-  const pendingQty = Number(item.pending_quantity) || 0;
+  const pendingQty = totalApprovalPending(item);
   const availableQty = Number(item.available_quantity) || 0;
   const defectiveQty = Number(item.defective_total) || 0;
   const minStockRaw = item.min_stock == null ? 0 : Number(item.min_stock);
@@ -233,7 +243,7 @@ export function InventoryDetailPanel({
                   · {normalizeDepartment(r.requester_department)}
                 </span>
                 <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  창고 → {r.to_department ? normalizeDepartment(r.to_department) : "외부"}
+                  {reservationSourceLabel(r)} → {r.to_department ? normalizeDepartment(r.to_department) : "외부"}
                 </span>
                 <span className="ml-auto font-bold">{formatQty(r.quantity)} 개</span>
               </div>

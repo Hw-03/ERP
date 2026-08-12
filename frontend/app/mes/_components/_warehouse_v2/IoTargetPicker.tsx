@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
 import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
 import { useCurrentOperator } from "../login/useCurrentOperator";
@@ -99,6 +100,20 @@ function actionButtonStyle(
           ? LEGACY_COLORS.white
           : LEGACY_COLORS.text,
   };
+}
+
+function outboundLocationStatus(
+  subType: IoSubType,
+  targetDepartment?: string | null,
+): "PRODUCTION" | "DEFECTIVE" | null {
+  if (subType === "defect_quarantine" && targetDepartment === "창고") return null;
+  if (["dept_to_warehouse", "disassemble", "adjust_out", "defect_quarantine"].includes(subType)) {
+    return "PRODUCTION";
+  }
+  if (["defect_restore", "defect_process", "supplier_return"].includes(subType)) {
+    return "DEFECTIVE";
+  }
+  return null;
 }
 
 export function IoTargetPicker({
@@ -390,6 +405,7 @@ export function IoTargetPicker({
             mode={actionMode}
             workType={workType}
             subType={subType}
+            targetDepartment={targetDepartment}
             deptIoDirection={deptIoDirection}
             bundleSubType={bundleSubType}
             bomParents={bomParents}
@@ -450,6 +466,7 @@ function ItemTable({
   mode,
   workType,
   subType,
+  targetDepartment,
   deptIoDirection,
   bundleSubType,
   bomParents,
@@ -470,6 +487,7 @@ function ItemTable({
   mode: ItemActionMode;
   workType: IoWorkType;
   subType: IoSubType;
+  targetDepartment?: string | null;
   deptIoDirection: DeptIoDirection | null;
   bundleSubType: IoSubType | null;
   bomParents: Set<string>;
@@ -555,13 +573,21 @@ function ItemTable({
             const hasOthers = Array.from(prodByDept.keys()).some((d) => d !== impliedDeptName);
             const noDeptStock = prodByDept.size === 0;
             const wQty = Number(item.warehouse_qty) || 0;
-            const pendingQty = Number(item.pending_quantity) || 0;
-            const warehouseAvailableQty = Math.max(0, wQty - pendingQty);
-            const showsWarehouseAvailability =
-              pendingQty > 0 &&
-              (subType === "warehouse_to_dept" ||
-                subType === "internal_use_out" ||
-                subType === "warehouse_adjust_out");
+            const pendingQty = warehousePending(item);
+            const warehouseAvailableQty = warehouseAvailable(item);
+            const isWarehouseOutbound =
+              subType === "warehouse_to_dept" ||
+              subType === "internal_use_out" ||
+              subType === "warehouse_adjust_out" ||
+              (subType === "defect_quarantine" && targetDepartment === "창고");
+            const showsWarehouseAvailability = pendingQty > 0 && isWarehouseOutbound;
+            const sourceStatus = outboundLocationStatus(subType, targetDepartment);
+            const sourceLocation = sourceStatus
+              ? findInventoryLocation(item, targetDepartment, sourceStatus)
+              : undefined;
+            const sourcePendingQty = locationPending(sourceLocation);
+            const sourceAvailableQty = locationAvailable(sourceLocation);
+            const showsDepartmentAvailability = sourceStatus != null && targetDepartment != null;
             const isHighlight = highlightItemId === item.item_id;
             const selectedBundles = bundles.filter((bundle) => bundle.source_item_id === item.item_id);
             const isSelected = selectedBundles.length > 0;
@@ -593,6 +619,15 @@ function ItemTable({
                   >
                     {item.item_name}
                   </div>
+                  {(isWarehouseOutbound || showsDepartmentAvailability) && (
+                    <div
+                      data-testid={`picker-mobile-source-available-${item.item_id}`}
+                      className="mt-1 text-xs font-bold lg:hidden"
+                      style={{ color: LEGACY_COLORS.muted2 }}
+                    >
+                      출고 가능 {formatQty(isWarehouseOutbound ? warehouseAvailableQty : sourceAvailableQty)}
+                    </div>
+                  )}
                 </td>
                 <td
                   className="hidden px-3 py-2 text-center lg:table-cell"
@@ -638,7 +673,18 @@ function ItemTable({
                   className="hidden px-3 py-2 text-center lg:table-cell"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
-                  {noDeptStock ? (
+                  {showsDepartmentAvailability ? (
+                    <div className="flex flex-col items-center leading-tight">
+                      <span className="whitespace-nowrap text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                        출고 가능 <strong className="text-sm font-black tabular-nums" style={{ color: sourceAvailableQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>{formatQty(sourceAvailableQty)}</strong>
+                      </span>
+                      {sourcePendingQty > 0 && (
+                        <span className="mt-0.5 whitespace-nowrap text-[10px] font-medium tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+                          실재고 {formatQty(sourceLocation?.quantity ?? 0)} · 예약 {formatQty(sourcePendingQty)}
+                        </span>
+                      )}
+                    </div>
+                  ) : noDeptStock ? (
                     <span className="text-base font-black" style={{ color: LEGACY_COLORS.muted2 }}>
                       -
                     </span>

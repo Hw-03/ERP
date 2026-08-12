@@ -271,6 +271,7 @@ def list_item_reservations(
                 requester_department=req.requester_department,
                 quantity=line.quantity,
                 from_bucket=line.from_bucket,
+                from_department=line.from_department,
                 to_bucket=line.to_bucket,
                 to_department=line.to_department,
                 created_at=line.created_at,

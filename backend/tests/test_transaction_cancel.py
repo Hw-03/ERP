@@ -325,6 +325,52 @@ def test_cancel_internal_use_batch_restores_all_items(
     assert _cells(db_session, second.item_id) == (9, 9, {})
 
 
+def test_cancel_batch_prelocks_sorted_unique_inventories_before_reversal(
+    db_session, make_item, monkeypatch
+):
+    first = make_item(name="cancel-lock-first", warehouse_qty=Decimal("1"))
+    second = make_item(name="cancel-lock-second", warehouse_qty=Decimal("1"))
+    actor = _make_employee(db_session, code="CANCEL-LOCK")
+    logs = [
+        TransactionLog(
+            item_id=item_id,
+            reference_no="defect-disassemble:lock-order",
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=Decimal("1"),
+            quantity_before=Decimal("0"),
+            quantity_after=Decimal("1"),
+            produced_by=actor.name,
+            producer_employee_id=actor.employee_id,
+            inventory_effect=[{"scope": "warehouse", "delta": 1}],
+        )
+        for item_id in (second.item_id, first.item_id)
+    ]
+    db_session.add_all(logs)
+    db_session.flush()
+    events = []
+
+    monkeypatch.setattr(
+        transaction_actions.inventory_svc,
+        "lock_inventories",
+        lambda _db, item_ids: events.append(("lock", item_ids)) or {},
+    )
+    monkeypatch.setattr(
+        transaction_actions,
+        "_cancel_one_log",
+        lambda _db, log: events.append(("reverse", log.item_id)),
+    )
+
+    transaction_actions.cancel_transaction(
+        db_session,
+        log=logs[0],
+        canceller=actor,
+        reason="lock order",
+        request=None,
+    )
+
+    assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
+
+
 def test_cancel_batch_rolls_back_first_reversal_when_second_reversal_fails(
     client, db_session, make_item, monkeypatch
 ):
@@ -439,6 +485,210 @@ def test_effect_helper_roundtrip(db_session, make_item):
     ).first()
     assert int(inv.warehouse_qty) == 40
     assert int(loc.quantity) == 0
+
+
+def test_effect_reverse_blocks_location_pending_invasion(
+    db_session, make_item, make_location
+):
+    from app.services import inv_effect
+
+    item = make_item(name="location-effect-pending")
+    location = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    location.pending_quantity = Decimal("4")
+    db_session.flush()
+
+    with pytest.raises(ValueError, match="예약"):
+        inv_effect.apply_effect_reverse(
+            db_session,
+            item.item_id,
+            [
+                {
+                    "scope": "location",
+                    "department": DepartmentEnum.ASSEMBLY.value,
+                    "status": LocationStatusEnum.PRODUCTION.value,
+                    "delta": 2,
+                }
+            ],
+        )
+
+    db_session.refresh(location)
+    assert location.quantity == Decimal("5")
+    assert location.pending_quantity == Decimal("4")
+
+
+def test_effect_reverse_locks_inventory_before_location_for_location_only_effect(
+    db_session, make_item, make_location, monkeypatch
+):
+    from sqlalchemy.orm import Query
+
+    from app.services import inv_effect
+
+    item = make_item(name="effect-lock-order")
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    events = []
+    real_with_for_update = Query.with_for_update
+
+    def track_with_for_update(query, *args, **kwargs):
+        entity = query.column_descriptions[0].get("entity")
+        if entity in (Inventory, InventoryLocation):
+            events.append(entity)
+        return real_with_for_update(query, *args, **kwargs)
+
+    monkeypatch.setattr(inv_effect, "_is_sqlite", False)
+    monkeypatch.setattr(Query, "with_for_update", track_with_for_update)
+
+    inv_effect.apply_effect_reverse(
+        db_session,
+        item.item_id,
+        [
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.PRODUCTION.value,
+                "delta": -1,
+            }
+        ],
+    )
+
+    assert events == [Inventory, InventoryLocation]
+
+
+def test_effect_reverse_location_only_keeps_missing_inventory_error(
+    db_session, make_item
+):
+    from app.services import inv_effect
+
+    item = make_item(name="effect-missing-inventory")
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+    db_session.delete(inventory)
+    db_session.flush()
+
+    with pytest.raises(ValueError, match="재고 레코드를 찾을 수 없습니다"):
+        inv_effect.apply_effect_reverse(
+            db_session,
+            item.item_id,
+            [
+                {
+                    "scope": "location",
+                    "department": DepartmentEnum.ASSEMBLY.value,
+                    "status": LocationStatusEnum.PRODUCTION.value,
+                    "delta": -1,
+                }
+            ],
+        )
+
+
+def test_effect_reverse_allows_location_pending_boundary(
+    db_session, make_item, make_location
+):
+    from app.services import inv_effect
+
+    item = make_item(name="location-effect-boundary")
+    location = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    location.pending_quantity = Decimal("4")
+    db_session.flush()
+
+    inv_effect.apply_effect_reverse(
+        db_session,
+        item.item_id,
+        [
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.PRODUCTION.value,
+                "delta": 1,
+            }
+        ],
+    )
+    db_session.flush()
+
+    assert location.quantity == Decimal("4")
+    assert location.pending_quantity == Decimal("4")
+
+
+def test_effect_reverse_blocks_warehouse_pending_invasion(db_session, make_item):
+    from app.services import inv_effect
+
+    item = make_item(
+        name="warehouse-effect-pending",
+        warehouse_qty=Decimal("5"),
+        pending=Decimal("4"),
+    )
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+
+    with pytest.raises(ValueError, match="예약"):
+        inv_effect.apply_effect_reverse(
+            db_session,
+            item.item_id,
+            [{"scope": "warehouse", "delta": 2}],
+        )
+
+    db_session.refresh(inventory)
+    assert inventory.warehouse_qty == Decimal("5")
+    assert inventory.pending_quantity == Decimal("4")
+
+
+def test_cancel_maps_location_pending_invasion_to_business_error(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="cancel-location-pending")
+    location = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    location.pending_quantity = Decimal("4")
+    actor = _make_employee(db_session, code="CANCEL-PENDING")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("2"),
+        quantity_before=Decimal("3"),
+        quantity_after=Decimal("5"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        inventory_effect=[
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.PRODUCTION.value,
+                "delta": 2,
+            }
+        ],
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    response = _cancel(client, log.log_id, code=actor.employee_code)
+
+    assert response.status_code == 422, response.text
+    assert "예약" in response.json()["detail"]["message"]
+    db_session.expire_all()
+    location = db_session.query(InventoryLocation).filter(
+        InventoryLocation.location_id == location.location_id
+    ).one()
+    assert location.quantity == Decimal("5")
+    assert location.pending_quantity == Decimal("4")
+    refreshed_log = db_session.query(TransactionLog).filter(
+        TransactionLog.log_id == log.log_id
+    ).one()
+    assert refreshed_log.cancelled is False
 
 
 def test_cancel_io_v2_receive_restores(client, db_session, make_item):

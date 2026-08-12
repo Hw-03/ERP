@@ -21,9 +21,9 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services.dept_hierarchy import can_approve_department
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
-    line_requires_pending,
 )
 
 
@@ -36,15 +36,15 @@ def release_reservation(db: Session, request: StockRequest) -> None:
     """RESERVED 상태 라인의 pending 원복. 이미 release 된 라인은 건너뜀."""
     if request.status != StockRequestStatusEnum.RESERVED:
         return
-    pending_lines = [
-        line for line in request.lines if line_requires_pending(line.from_bucket, line.to_bucket)
-    ]
-    agg: dict[uuid.UUID, Decimal] = {}
-    for line in pending_lines:
-        agg[line.item_id] = agg.get(line.item_id, Decimal("0")) + (line.quantity or Decimal("0"))
-    for item_id, qty in agg.items():
-        if qty > 0:
-            inventory_svc.release(db, item_id, qty)
+    from app.services import sr_reservation
+
+    lines = list(request.lines)
+    if not _is_sqlite:
+        inventory_svc.ensure_and_lock_inventories(
+            db,
+            _request_inventory_item_ids(request, lines),
+        )
+    sr_reservation.release_lines(db, lines, request_id=request.request_id)
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +239,32 @@ def _child_decisions_from_notes(request) -> list[dict]:
     return child_decisions
 
 
+def _request_inventory_item_ids(
+    request: StockRequest,
+    lines: Iterable[StockRequestLine],
+) -> list[uuid.UUID]:
+    """Collect every item that the request may mutate before its first lock."""
+    lines = list(lines)
+    item_ids = {line.item_id for line in lines}
+    if request.request_type not in {
+        StockRequestTypeEnum.REWORK_NORMAL,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    }:
+        return sorted(item_ids)
+
+    try:
+        child_decisions = _child_decisions_from_notes(request)
+        from app.services.dept_adjustment import rework_inventory_item_ids
+
+        for line in lines:
+            item_ids.update(rework_inventory_item_ids(line.item_id, child_decisions))
+    except (KeyError, TypeError, ValueError):
+        # Invalid decisions will fail before child mutation in the rework service.
+        # Parent-only locking still allows rejection/cancellation to release safely.
+        pass
+    return sorted(item_ids)
+
+
 def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Decimal:
     from app.services.dept_adjustment import submit_defective_disassemble
 
@@ -316,17 +342,14 @@ def _execute_line(
 ) -> None:
     """단일 라인의 재고 이동 + TransactionLog 생성.
 
-    is_approval=True 면 RESERVED 라인의 pending 을 release 한 뒤 실재고를 움직인다.
-    is_approval=False 는 즉시 실행(승인 불필요) 경로.
+    RESERVED pending 해제는 승인 상위 경로가 먼저 처리한다.
+    이 함수는 승인 실행과 즉시 실행 모두에서 재고 이동과 로그만 담당한다.
     """
     qty = line.quantity or Decimal("0")
     item_id = line.item_id
     rt = request.request_type
 
-    # pending 점유 해제 (있다면)
-    if is_approval and line_requires_pending(line.from_bucket, line.to_bucket):
-        inventory_svc.release(db, item_id, qty)
-
+    # 이동 전 수량과 위치 셀을 기록한다.
     inv = inventory_svc.get_or_create_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
     warehouse_qty_before = inv.warehouse_qty or Decimal("0")
@@ -400,8 +423,8 @@ def _execute_all_lines(
     lines = list(lines)
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
     if not _is_sqlite:
-        all_item_ids = sorted({line.item_id for line in lines})
-        inventory_svc.lock_inventories(db, all_item_ids)
+        all_item_ids = _request_inventory_item_ids(request, lines)
+        inventory_svc.ensure_and_lock_inventories(db, all_item_ids)
     for line in lines:
         _execute_line(db, request, line, approver=approver, is_approval=is_approval)
 
@@ -428,9 +451,12 @@ def _finalize_submission(
     """
     lines = list(request.lines)
     requester_role = (requester.warehouse_role or "none").lower()
-    requester_dept_role = (getattr(requester, "department_role", None) or "none").lower()
     requester_level = getattr(getattr(requester, "level", None), "value", requester.level)
     is_admin = requester_level == "admin"
+    can_self_approve_department = can_approve_department(
+        requester,
+        request.requester_department,
+    )
 
     warehouse_ok = (
         (not request.requires_warehouse_approval)
@@ -439,8 +465,7 @@ def _finalize_submission(
     )
     dept_ok = (
         (not request.requires_department_approval)
-        or is_admin
-        or requester_dept_role in ("primary", "deputy")
+        or can_self_approve_department
     )
     if warehouse_ok and dept_ok:
         _execute_all_lines(
@@ -451,9 +476,11 @@ def _finalize_submission(
         # 결재 자체가 불필요한 타입(불량 전체 등 requires_*=False)은 approved_by = null 유지 —
         # 같은 사람이 요청자·승인자로 동시에 표시되는 혼란 방지.
         requester_self_approved = (
-            (request.requires_warehouse_approval and requester_role in ("primary", "deputy"))
-            or (request.requires_department_approval and requester_dept_role in ("primary", "deputy"))
-            or is_admin
+            request.requires_warehouse_approval
+            and (requester_role in ("primary", "deputy") or is_admin)
+        ) or (
+            request.requires_department_approval
+            and can_self_approve_department
         )
         if requester_self_approved:
             request.approved_by_employee_id = requester.employee_id
@@ -468,17 +495,10 @@ def _finalize_submission(
             line.status = StockRequestStatusEnum.COMPLETED
         return request
 
-    pending_lines = [
-        li for li in lines if line_requires_pending(li.from_bucket, li.to_bucket)
-    ]
-    if pending_lines:
-        agg: dict[uuid.UUID, Decimal] = {}
-        for li in pending_lines:
-            agg[li.item_id] = agg.get(li.item_id, Decimal("0")) + (
-                li.quantity or Decimal("0")
-            )
-        for item_id, qty in agg.items():
-            inventory_svc.reserve(db, item_id, qty, employee=requester)
+    from app.services import sr_reservation
+
+    if sr_reservation.aggregate_reservations(lines):
+        sr_reservation.reserve_lines(db, lines, employee=requester)
         request.status = StockRequestStatusEnum.RESERVED
         request.reserved_at = now
         for line in lines:

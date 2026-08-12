@@ -140,6 +140,64 @@ def test_handover_create_and_receive_moves_stock(client, db_session, make_item):
     assert logs[0].transfer_qty == Decimal("3")
 
 
+def test_handover_receive_prelocks_sorted_unique_inventories(
+    client, db_session, make_item, monkeypatch
+):
+    first = make_item(name="handover-lock-first", warehouse_qty=Decimal("0"))
+    second = make_item(name="handover-lock-second", warehouse_qty=Decimal("0"))
+    _seed_production(db_session, first.item_id, DepartmentEnum.TUBE.value, Decimal("2"))
+    _seed_production(db_session, second.item_id, DepartmentEnum.TUBE.value, Decimal("2"))
+    author = _make_employee(db_session, code="HANDOVER-LOCK-AUTHOR")
+    receiver = _make_employee(
+        db_session,
+        code="HANDOVER-LOCK-RECEIVER",
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        department_role="primary",
+    )
+    db_session.commit()
+    response = client.post(
+        "/api/handovers",
+        json={
+            "author_employee_id": str(author.employee_id),
+            "to_department": DepartmentEnum.HIGH_VOLTAGE.value,
+            "title": "lock order",
+            "process_content": "lock order",
+            "product_name": "lock order",
+            "analysis_text": "lock order",
+            "lines": [
+                {"item_id": str(second.item_id), "quantity": 1},
+                {"item_id": str(first.item_id), "quantity": 1},
+            ],
+        },
+    )
+    assert response.status_code == 201, response.text
+    doc = db_session.query(HandoverDoc).filter(
+        HandoverDoc.handover_id == response.json()["handover_id"]
+    ).one()
+    events = []
+
+    def lock_inventories(_db, item_ids):
+        events.append(("lock", item_ids))
+        return {item_id: object() for item_id in item_ids}
+
+    real_transfer = handover_svc.inventory_svc.transfer_between_departments
+
+    def transfer(*args, **kwargs):
+        events.append(("transfer", args[1]))
+        return real_transfer(*args, **kwargs)
+
+    monkeypatch.setattr(
+        handover_svc.inventory_svc, "lock_inventories", lock_inventories
+    )
+    monkeypatch.setattr(
+        handover_svc.inventory_svc, "transfer_between_departments", transfer
+    )
+
+    handover_svc.receive_handover(db_session, doc, actor=receiver, pin="0000")
+
+    assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
+
+
 def test_handover_receive_rolls_back_inventory_when_ledger_capture_fails(
     client, db_session, make_item, monkeypatch
 ):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import Optional
 
 from fastapi import Request
@@ -21,8 +20,11 @@ from app.services import inventory as inventory_svc
 from app.services.dept_hierarchy import can_approve_department
 from app.services.io_persist import ensure_stock_request_batch_is_mutable, sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
-from app.services.sr_execution import _execute_all_lines, release_reservation
-from app.services.sr_validation import line_requires_pending
+from app.services.sr_execution import (
+    _execute_all_lines,
+    _request_inventory_item_ids,
+    release_reservation,
+)
 
 # 주의: io_dispatch.execute_batch_after_dept_approval 만 함수 내부 지연 import 한다.
 # 정적 import 하면 순환 고리가 닫힌다:
@@ -79,6 +81,7 @@ def approve_request(
         return request
 
     try:
+        release_reservation(db, request)
         _execute_all_lines(
             db,
             request,
@@ -114,8 +117,7 @@ def approve_request_department(
 ) -> StockRequest:
     """부서 결재 승인.
 
-    - actor: department_role in {primary, deputy} 또는 admin
-    - actor.department == request.requester_department (다른 부서 결재 불가)
+    - actor: `can_approve_department`가 허용하는 부서 정/부 또는 창고 정/부
     - MANUAL_ADJUSTMENT 단독: 승인 즉시 io_dispatch.execute_batch_after_dept_approval 호출
     - 듀얼(창고+부서): 양쪽 모두 충족 시 _execute_all_lines, 아니면 status 유지
     """
@@ -123,9 +125,9 @@ def approve_request_department(
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
     # 결재 권한 (그릴 합의 — docs/defect-handling-redesign.md):
-    #   - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하) 결재
+    #   - 부서 정/부: 창고 외 부서 결재
     #   - 창고 정/부: 모든 부서 결재
-    #   - admin: 모든 부서 결재
+    #   - admin level 단독: 결재 권한 없음
     # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
     if not can_approve_department(approver, request.requester_department):
         raise PermissionError(
@@ -160,12 +162,13 @@ def approve_request_department(
     # stock_requests 는 다시 sr_approval 을 re-export → 정적 import 시 순환 ImportError.
     from app.services.io_dispatch import execute_batch_after_dept_approval
 
-    if request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT:
-        # io_dispatch 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
-        execute_batch_after_dept_approval(db, request=request, approver=approver)
-    else:
-        # 듀얼 승인 케이스 — _execute_all_lines.
-        try:
+    try:
+        release_reservation(db, request)
+        if request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT:
+            # io_dispatch 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
+            execute_batch_after_dept_approval(db, request=request, approver=approver)
+        else:
+            # 듀얼 승인 케이스 — _execute_all_lines.
             _execute_all_lines(
                 db,
                 request,
@@ -174,8 +177,8 @@ def approve_request_department(
                 approver=approver,
                 is_approval=True,
             )
-        except ValueError as exc:
-            raise FailedApprovalError(str(exc))
+    except ValueError as exc:
+        raise FailedApprovalError(str(exc))
 
     request.status = StockRequestStatusEnum.COMPLETED
     request.completed_at = now
@@ -192,17 +195,13 @@ def _release_pending_best_effort(db: Session, request: StockRequest) -> None:
     pending이 이미 0이거나 부족하면 ValueError를 무시하고 넘어간다(no-op).
     재고 리셋 후 고아가 된 요청을 안전하게 정리할 때 사용.
     """
-    pending_lines = [
-        line for line in request.lines if line_requires_pending(line.from_bucket, line.to_bucket)
-    ]
-    agg: dict[uuid.UUID, Decimal] = {}
-    for line in pending_lines:
-        agg[line.item_id] = agg.get(line.item_id, Decimal("0")) + (line.quantity or Decimal("0"))
-    for item_id, qty in agg.items():
-        try:
-            inventory_svc.release(db, item_id, qty)
-        except ValueError:
-            pass  # 이미 release 됐거나 pending=0 — 무시.
+    from app.services import sr_reservation
+
+    sr_reservation.release_lines_best_effort(
+        db,
+        request.lines,
+        request_id=request.request_id,
+    )
 
 
 def mark_failed_approval(
@@ -212,12 +211,13 @@ def mark_failed_approval(
     approver: Employee,
     reason: str,
 ) -> StockRequest:
-    """승인 실패 처리: pending 원복 + status=failed_approval 기록.
+    """승인 실패 처리: RESERVED pending 원복 + 요청/라인 실패 기록.
 
-    원래 트랜잭션이 rollback 된 직후 별도 트랜잭션에서 호출. release 는 다시 시도한다.
-    이미 release 된 상태이거나 pending 이 부족하면 release() 가 ValueError → 무시.
+    원래 트랜잭션이 rollback 된 직후 별도 트랜잭션에서 호출한다. rollback 후에도
+    RESERVED인 요청만 해제를 재시도하고, 예약이 없던 legacy SUBMITTED는 건너뛴다.
     """
-    _release_pending_best_effort(db, request)
+    if request.status == StockRequestStatusEnum.RESERVED:
+        _release_pending_best_effort(db, request)
 
     now = datetime.utcnow()
     request.status = StockRequestStatusEnum.FAILED_APPROVAL
@@ -225,6 +225,8 @@ def mark_failed_approval(
     request.rejected_by_name = approver.name
     request.rejected_at = now
     request.rejected_reason = f"승인 실패: {reason}"
+    for line in request.lines:
+        line.status = StockRequestStatusEnum.FAILED_APPROVAL
     sync_batch_from_stock_request(db, request)
     return request
 
@@ -299,7 +301,7 @@ def reject_request_department(
     if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
         raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
 
-    # warehouse-reserved 라인 점유 원복 (MANUAL_ADJUSTMENT 는 점유 없음 — release_reservation 가 no-op).
+    # source-aware RESERVED 라인의 창고/부서 위치 점유를 원복한다.
     release_reservation(db, request)
 
     now = datetime.utcnow()
@@ -361,7 +363,8 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
     권한·PIN 검증 없는 시스템 정리 전용. 재고 리셋/재적재 직전에 호출해
     inventory.pending 과 stock_requests 상태 불일치를 예방한다.
 
-    pending은 남은 만큼만 best-effort 해제(pending=0이어도 안전).
+    RESERVED 요청의 pending만 남은 만큼 best-effort 해제한다. 예약이 없던 legacy
+    SUBMITTED 요청은 상태와 라인만 취소한다.
 
     **commit은 호출측 책임 — 이 함수는 flush만 한다.** flush 이후 commit 전에 예외가 나면
     CANCELLED 상태와 pending release 가 부분 반영된 채 남을 수 있으므로, 호출측은 반드시
@@ -375,19 +378,32 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
     open_requests = (
         db.query(StockRequest)
         .filter(StockRequest.status.in_(open_statuses))
+        .order_by(StockRequest.request_id)
+        .with_for_update()
         .all()
     )
     for req in open_requests:
         ensure_stock_request_batch_is_mutable(db, req)
 
+    all_item_ids: set[uuid.UUID] = set()
+    for req in open_requests:
+        if req.status == StockRequestStatusEnum.RESERVED:
+            all_item_ids.update(
+                _request_inventory_item_ids(req, list(req.lines))
+            )
+    if all_item_ids:
+        inventory_svc.ensure_and_lock_inventories(db, sorted(all_item_ids))
+
     now = datetime.utcnow()
     for req in open_requests:
-        _release_pending_best_effort(db, req)
+        if req.status == StockRequestStatusEnum.RESERVED:
+            _release_pending_best_effort(db, req)
         req.status = StockRequestStatusEnum.CANCELLED
         req.cancelled_at = now
         for line in req.lines:
             line.status = StockRequestStatusEnum.CANCELLED
         sync_batch_from_stock_request(db, req)
-    if open_requests:
+        # SessionLocal은 autoflush=False다. 다음 요청의 reconciliation이 방금 취소한
+        # 요청을 활성 예약으로 다시 보호하지 않도록 요청별 전이를 먼저 반영한다.
         db.flush()
     return len(open_requests)

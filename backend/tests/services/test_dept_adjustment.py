@@ -55,6 +55,65 @@ def _tx_types(db_session) -> list[str]:
     return [r.transaction_type.value for r in db_session.query(TransactionLog).all()]
 
 
+def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutation(
+    make_item, make_location, db_session, monkeypatch
+):
+    parent = make_item(name="rework-lock-parent", process_type_code="AF")
+    branch = make_item(name="rework-lock-branch", process_type_code="AR")
+    normal = make_item(name="rework-lock-normal", process_type_code="TR")
+    defective = make_item(name="rework-lock-defective", process_type_code="HR")
+    scrap = make_item(name="rework-lock-scrap", process_type_code="VR")
+    make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
+    parent_inventory = inv_svc.get_or_create_inventory(db_session, parent.item_id)
+    parent_inventory.quantity = D("1")
+    decisions = [
+        {
+            "item_id": str(branch.item_id),
+            "qty": "1",
+            "children": [
+                {"item_id": str(normal.item_id), "qty": "1", "normal_qty": "1"},
+                {"item_id": str(defective.item_id), "qty": "1", "defective_qty": "1"},
+                {"item_id": str(scrap.item_id), "qty": "1", "scrap_qty": "1"},
+            ],
+        }
+    ]
+    expected_ids = sorted(
+        {parent.item_id, branch.item_id, normal.item_id, defective.item_id, scrap.item_id}
+    )
+    events = []
+    real_lock = svc.inventory_svc.ensure_and_lock_inventories
+    real_scrap = svc.inventory_svc.scrap_normal
+
+    def ensure_and_lock(db, item_ids):
+        events.append(("lock", item_ids))
+        return real_lock(db, item_ids)
+
+    def scrap_normal(*args, **kwargs):
+        events.append(("parent", args[1]))
+        return real_scrap(*args, **kwargs)
+
+    monkeypatch.setattr(
+        svc.inventory_svc,
+        "ensure_and_lock_inventories",
+        ensure_and_lock,
+    )
+    monkeypatch.setattr(svc.inventory_svc, "scrap_normal", scrap_normal)
+
+    svc.submit_normal_disassemble(
+        db_session,
+        parent.item_id,
+        D("1"),
+        "production",
+        ASSEMBLY,
+        decisions,
+        reason_category="test",
+        reason_memo="lock order",
+        actor="tester",
+    )
+
+    assert events[0] == ("lock", expected_ids)
+
+
 # ──────────────────────────── 템플릿 빌더 ────────────────────────────
 
 def test_production_template_basic(make_item, make_bom, db_session):

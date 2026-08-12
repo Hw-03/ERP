@@ -73,6 +73,103 @@ def _defective_loc(db, item_id, dept=ASSEMBLY) -> InventoryLocation:
     )
 
 
+def test_defective_flows_do_not_consume_reserved_location_stock(
+    make_item, make_location, db_session
+):
+    reason = ReasonContext(category="test")
+    cases = (
+        (
+            LocationStatusEnum.PRODUCTION,
+            lambda item_id: svc.mark_defective(
+                db_session,
+                item_id,
+                D("3"),
+                DefectSource(
+                    kind="production",
+                    source_dept=ASSEMBLY,
+                    target_dept=TUBE,
+                ),
+            ),
+        ),
+        (
+            LocationStatusEnum.DEFECTIVE,
+            lambda item_id: svc.return_to_supplier(
+                db_session, item_id, D("3"), ASSEMBLY
+            ),
+        ),
+        (
+            LocationStatusEnum.DEFECTIVE,
+            lambda item_id: svc.unmark_defective(
+                db_session, item_id, D("3"), ASSEMBLY, reason
+            ),
+        ),
+        (
+            LocationStatusEnum.DEFECTIVE,
+            lambda item_id: svc.scrap_defective(
+                db_session, item_id, D("3"), ASSEMBLY, reason
+            ),
+        ),
+        (
+            LocationStatusEnum.PRODUCTION,
+            lambda item_id: svc.scrap_normal(
+                db_session,
+                item_id,
+                D("3"),
+                NormalSource(kind="production", dept_or_warehouse=ASSEMBLY),
+                reason,
+            ),
+        ),
+    )
+
+    for index, (status, operation) in enumerate(cases, start=1):
+        item = make_item(name=f"reserved-defective-{index}")
+        location = make_location(
+            item.item_id,
+            department=ASSEMBLY,
+            status=status,
+            quantity=D("5"),
+        )
+        location.pending_quantity = D("3")
+        db_session.flush()
+
+        with pytest.raises(ValueError):
+            operation(item.item_id)
+
+        db_session.expire_all()
+        assert _loc_qty(db_session, item.item_id, status, ASSEMBLY) == D("5")
+
+
+def test_mark_defective_locks_locations_in_deterministic_order(
+    make_item, make_location, db_session, monkeypatch
+):
+    item = make_item(name="deterministic-defect-location-locks")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    events = []
+    real_lock_location = svc._lock_location
+
+    def track_lock_location(db, item_id, department, status):
+        events.append((department, status))
+        return real_lock_location(db, item_id, department, status)
+
+    monkeypatch.setattr(svc, "_lock_location", track_lock_location)
+
+    svc.mark_defective(
+        db_session,
+        item.item_id,
+        D("1"),
+        DefectSource(
+            kind="production",
+            source_dept=ASSEMBLY,
+            target_dept=TUBE,
+        ),
+    )
+
+    assert events == [
+        (ASSEMBLY, LocationStatusEnum.PRODUCTION),
+        (TUBE, LocationStatusEnum.DEFECTIVE),
+    ]
+
+
 # ──────────────────────────── mark_defective ────────────────────────────
 
 def test_mark_defective_from_warehouse_total_invariant(make_item, db_session):

@@ -116,6 +116,9 @@ def get_item_locations(item_id: uuid.UUID, db: Session = Depends(get_db)):
             department=row.department,
             status=row.status,
             quantity=row.quantity or Decimal("0"),
+            pending_quantity=row.pending_quantity or Decimal("0"),
+            available_quantity=(row.quantity or Decimal("0"))
+            - (row.pending_quantity or Decimal("0")),
         )
         for row in rows
     ]

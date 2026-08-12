@@ -63,12 +63,12 @@ def line_requires_approval(from_bucket: RequestBucketEnum, to_bucket: RequestBuc
 
 
 def line_requires_pending(from_bucket: RequestBucketEnum, to_bucket: RequestBucketEnum) -> bool:
-    """창고 재고를 선점해야 하는 라인은 from_bucket=='warehouse' 인 경우.
-
-    창고 입고(to=warehouse)는 점유 불필요. 부서→창고는 부서 production 점유가 필요하나
-    1차 구현에서는 부서 점유를 생략하고 승인 시점 재검증으로 갈음한다.
-    """
-    return from_bucket == RequestBucketEnum.WAREHOUSE
+    """출고 원천이 있는 라인은 해당 source 버킷을 예약한다."""
+    return from_bucket in {
+        RequestBucketEnum.WAREHOUSE,
+        RequestBucketEnum.PRODUCTION,
+        RequestBucketEnum.DEFECTIVE,
+    }
 
 
 def request_requires_approval(lines: Sequence[StockRequestLine]) -> bool:

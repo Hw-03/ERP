@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.models import DepartmentEnum, LocationStatusEnum
 from app.services import io_preview as iop
 
 D = Decimal
@@ -164,6 +165,59 @@ def test_preview_manual_skips_bom_expansion(db_session, make_item, make_bom):
     assert bundle["source_kind"] == "manual"
     assert len(bundle["lines"]) == 1
     assert bundle["lines"][0]["origin"] == "manual"
+
+
+@pytest.mark.parametrize(
+    ("bucket", "status"),
+    [
+        ("production", LocationStatusEnum.PRODUCTION),
+        ("defective", LocationStatusEnum.DEFECTIVE),
+    ],
+)
+def test_bucket_available_excludes_location_pending(
+    db_session, make_item, make_location, bucket, status
+):
+    item = make_item(name=f"{bucket}-available")
+    location = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=status,
+        quantity=D("10"),
+    )
+    location.pending_quantity = D("3")
+    db_session.flush()
+
+    available = iop._bucket_available(
+        db_session,
+        item_id=item.item_id,
+        bucket=bucket,
+        department=DepartmentEnum.ASSEMBLY.value,
+    )
+
+    assert available == D("7")
+
+
+def test_preview_department_source_shortage_excludes_pending(
+    db_session, make_item, make_location
+):
+    item = make_item(name="production-preview-pending")
+    location = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=D("10"),
+    )
+    location.pending_quantity = D("3")
+    db_session.flush()
+
+    out = iop.preview(
+        db_session,
+        work_type="warehouse_io",
+        sub_type="dept_to_warehouse",
+        targets=[_target(item.item_id, "8")],
+        from_department=DepartmentEnum.ASSEMBLY.value,
+    )
+
+    assert out["bundles"][0]["lines"][0]["shortage"] == D("1")
 
 
 def test_preview_process_manual_requires_adjustment_instead_of_produce(db_session, make_item, make_bom):

@@ -35,6 +35,8 @@ class InventoryLocationResponse(BaseModel):
     department: str
     status: LocationStatusEnum
     quantity: int
+    pending_quantity: int = 0
+    available_quantity: int = 0
 
 
 class InventoryResponse(BaseModel):
@@ -47,7 +49,8 @@ class InventoryResponse(BaseModel):
     production_total: int = 0
     defective_total: int = 0
     pending_quantity: int = 0
-    available_quantity: int = 0     # warehouse + production - pending (defective 제외)
+    department_pending_quantity: int = 0
+    available_quantity: int = 0     # (warehouse - 창고 예약) + (production - 생산 예약), defective 제외
     last_reserver_name: Optional[str] = None
     location: Optional[str]
     updated_at: UtcDatetime

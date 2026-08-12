@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { getStockState } from "@/lib/mes/inventory";
+import { getStockState, totalApprovalPending } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
@@ -35,7 +35,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   const minStock = getMinStock(item);
   const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
   const qty = safeQty(item);
-  const pendingQty = Number(item.pending_quantity) || 0;
+  const pendingQty = totalApprovalPending(item);
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 
   const DEFECT_RED = "#ef4444";

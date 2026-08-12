@@ -230,6 +230,10 @@ def cancel_transaction(
         if not batch_logs:
             batch_logs = [log]
 
+        inventory_svc.lock_inventories(
+            db,
+            sorted({batch_log.item_id for batch_log in batch_logs}),
+        )
         now = datetime.utcnow()
         for batch_log in batch_logs:
             inventory = inventory_repository.get(db, batch_log.item_id)

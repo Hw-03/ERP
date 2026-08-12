@@ -17,8 +17,10 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.orm import Query
 
 from app.models import DepartmentEnum, Inventory, InventoryLocation, LocationStatusEnum
+from app.services import inv_base
 from app.services import inv_transfer as svc
 
 D = Decimal
@@ -46,6 +48,54 @@ def _loc_qty(db_session, item_id, dept, status=LocationStatusEnum.PRODUCTION) ->
         .first()
     )
     return loc.quantity if loc else D("0")
+
+
+def test_location_decrements_do_not_consume_reserved_production_stock(
+    make_item, make_location, db_session
+):
+    operations = (
+        lambda item_id: svc.transfer_to_warehouse(db_session, item_id, D("3"), ASSEMBLY),
+        lambda item_id: svc.transfer_between_departments(
+            db_session, item_id, D("3"), ASSEMBLY, TUBE
+        ),
+        lambda item_id: svc.consume_from_department(
+            db_session, item_id, D("3"), ASSEMBLY
+        ),
+    )
+
+    for index, operation in enumerate(operations, start=1):
+        item = make_item(name=f"reserved-transfer-{index}")
+        location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+        location.pending_quantity = D("3")
+        db_session.flush()
+
+        with pytest.raises(ValueError):
+            operation(item.item_id)
+
+        db_session.expire_all()
+        assert _loc_qty(db_session, item.item_id, ASSEMBLY) == D("5")
+
+
+def test_location_write_locks_parent_inventory_before_location(
+    make_item, make_location, db_session, monkeypatch
+):
+    item = make_item(name="lock-order-location-write")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    events = []
+    real_with_for_update = Query.with_for_update
+
+    def track_with_for_update(query, *args, **kwargs):
+        entity = query.column_descriptions[0].get("entity")
+        if entity in (Inventory, InventoryLocation):
+            events.append(entity)
+        return real_with_for_update(query, *args, **kwargs)
+
+    monkeypatch.setattr(inv_base, "_is_sqlite", False)
+    monkeypatch.setattr(Query, "with_for_update", track_with_for_update)
+
+    svc.consume_from_department(db_session, item.item_id, D("1"), ASSEMBLY)
+
+    assert events[:2] == [Inventory, InventoryLocation]
 
 
 def _production_total(db_session, item_id) -> Decimal:
@@ -259,11 +309,25 @@ def test_consume_warehouse_basic(make_item, db_session):
 
 def test_consume_warehouse_insufficient_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("3"))
-    with pytest.raises(ValueError, match="창고 재고 부족"):
+    with pytest.raises(ValueError, match="창고 가용 재고 부족"):
         svc.consume_warehouse(db_session, item.item_id, D("5"))
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("3")
+
+
+def test_consume_warehouse_preserves_other_request_pending(make_item, db_session):
+    item = make_item(name="pending-protected", warehouse_qty=D("10"))
+    inv = _inv(db_session, item.item_id)
+    inv.pending_quantity = D("8")
+    db_session.flush()
+
+    with pytest.raises(ValueError):
+        svc.consume_warehouse(db_session, item.item_id, D("3"))
+
+    db_session.refresh(inv)
+    assert inv.warehouse_qty == D("10")
+    assert inv.pending_quantity == D("8")
 
 
 def test_consume_warehouse_zero_qty_raises(make_item, db_session):

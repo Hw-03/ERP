@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import event
@@ -45,6 +46,64 @@ def _location_qty(db_session, item, dept):
         InventoryLocation.status == LocationStatusEnum.PRODUCTION,
     ).first()
     return int(loc.quantity or 0) if loc else 0
+
+
+def test_pickup_consumption_prelocks_sorted_unique_inventories(
+    db_session, monkeypatch
+):
+    request_id = uuid.uuid4()
+    first = SimpleNamespace(item_id=uuid.UUID(int=1), item_name="first")
+    second = SimpleNamespace(item_id=uuid.UUID(int=2), item_name="second")
+    final_pf = SimpleNamespace(item_id=uuid.UUID(int=3), item_name="final")
+    request = SimpleNamespace(request_id=request_id, companion_lines=[])
+    allocations = [
+        SimpleNamespace(
+            item=second,
+            item_id=second.item_id,
+            quantity=1,
+            reference_no="companion-second",
+            status="RESERVED",
+            consumed_at=None,
+        ),
+        SimpleNamespace(
+            item=first,
+            item_id=first.item_id,
+            quantity=1,
+            reference_no="companion-first",
+            status="RESERVED",
+            consumed_at=None,
+        ),
+    ]
+    events = []
+
+    monkeypatch.setattr(
+        shipping_svc,
+        "_active_allocations_for_request",
+        lambda *_args: allocations,
+    )
+    monkeypatch.setattr(
+        shipping_svc.inventory_svc,
+        "get_or_create_inventory",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        shipping_svc.inventory_svc,
+        "lock_inventories",
+        lambda _db, item_ids: events.append(("lock", item_ids))
+        or {item_id: object() for item_id in item_ids},
+    )
+    monkeypatch.setattr(
+        shipping_svc,
+        "_ship_from_item_location",
+        lambda _db, _req, item, _qty, _notes: events.append(("ship", item.item_id)),
+    )
+
+    shipping_svc._consume_pickup_allocations(db_session, request, final_pf, 1)
+
+    assert events[0] == (
+        "lock",
+        sorted({first.item_id, second.item_id, final_pf.item_id}),
+    )
 
 
 def _effect_scopes(log):
@@ -739,7 +798,45 @@ def test_independent_component_change_rejects_invalid_pairs_and_shortages(
     with pytest.raises(shipping_svc.ShippingError):
         shipping_svc.execute_component_change_independent(db_session, source_pa.item_id, target_pa.item_id, 1)
 
-def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(db_session, make_item, make_bom, make_location):
+
+def test_component_change_prelocks_all_mutated_items_in_sorted_order(
+    db_session, make_item, make_bom, make_location, monkeypatch
+):
+    common = make_item(name="component-lock-common", process_type_code="AF")
+    added = make_item(name="component-lock-added", process_type_code="PR")
+    source_pa = make_item(name="component-lock-source", process_type_code="PA")
+    target_pa = make_item(name="component-lock-target", process_type_code="PA")
+    make_bom(source_pa.item_id, common.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, common.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, added.item_id, Decimal("1"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(added.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    events = []
+    real_lock = shipping_svc.inventory_svc.lock_inventories
+
+    def lock_inventories(db, item_ids):
+        events.append(item_ids)
+        return real_lock(db, item_ids)
+
+    monkeypatch.setattr(
+        shipping_svc.inventory_svc,
+        "lock_inventories",
+        lock_inventories,
+    )
+
+    shipping_svc.execute_component_change_independent(
+        db_session,
+        source_pa.item_id,
+        target_pa.item_id,
+        1,
+        memo="lock order",
+    )
+
+    assert events[0] == sorted({source_pa.item_id, target_pa.item_id, added.item_id})
+
+def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
+    db_session, make_item, make_bom, make_location, monkeypatch
+):
     af = make_item(name="AF body", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     base_pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -773,7 +870,31 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(db_sessio
     assert _location_qty(db_session, base_pf, DepartmentEnum.SHIPPING) == 1
     assert _active_allocation_qty(db_session, req.request_id, carton) == 1
 
+    legacy_item_ids = sorted(
+        {
+            log.item_id
+            for log in db_session.query(TransactionLog)
+            .filter_by(shipping_request_id=req.request_id, shipping_phase="PREPARE")
+            .all()
+            if log.operation_batch_id is None
+        }
+    )
+    lock_calls = []
+    real_lock = shipping_svc.inventory_svc.lock_inventories
+
+    def lock_inventories(db, item_ids):
+        lock_calls.append(item_ids)
+        return real_lock(db, item_ids)
+
+    monkeypatch.setattr(
+        shipping_svc.inventory_svc,
+        "lock_inventories",
+        lock_inventories,
+    )
+
     shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
+
+    assert lock_calls == [legacy_item_ids]
 
     actor = _shipping_actor(db_session)
     with pytest.raises(shipping_svc.ShippingError, match="인보이스"):

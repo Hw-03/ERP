@@ -406,7 +406,7 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
     assert request.rejected_by_employee_id == approver.employee_id
     assert request.rejected_reason and request.rejected_reason.startswith("승인 실패:")
     assert all(
-        line.status == StockRequestStatusEnum.RESERVED
+        line.status == StockRequestStatusEnum.FAILED_APPROVAL
         for line in request.lines
     )
     assert inventory.warehouse_qty == Decimal("10")

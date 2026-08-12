@@ -47,7 +47,7 @@ class Inventory(Base):
     quantity = Column(IntQuantity, nullable=False, default=0)
     # 창고 보관량. 가용 재고 계산에 포함.
     warehouse_qty = Column(IntQuantity, nullable=False, default=0)
-    # 큐 배치 예약분 (warehouse_qty 대비). Available = warehouse + production_total − pending.
+    # 창고 출고 예약분 (warehouse_qty 대비). 생산/불량 위치 예약은 InventoryLocation에 저장.
     pending_quantity = Column(IntQuantity, nullable=False, default=0)
     last_reserver_employee_id = Column(
         UUIDString,
@@ -98,6 +98,12 @@ class InventoryLocation(Base):
         index=True,
     )
     quantity = Column(IntQuantity, nullable=False, default=0)
+    pending_quantity = Column(
+        IntQuantity,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
     updated_at = Column(
         DateTime,
         nullable=False,
@@ -110,6 +116,11 @@ class InventoryLocation(Base):
     __table_args__ = (
         # 5.5-A: 음수 위치 재고 방지. 서비스 레이어에서 막지만 DB-level 안전망.
         CheckConstraint("quantity >= 0", name="ck_invloc_quantity_nonneg"),
+        CheckConstraint("pending_quantity >= 0", name="ck_invloc_pending_nonneg"),
+        CheckConstraint(
+            "quantity >= pending_quantity",
+            name="ck_invloc_pending_le_quantity",
+        ),
         UniqueConstraint("item_id", "department", "status", name="uq_invloc_item_dept_status"),
         Index("ix_invloc_item", "item_id"),
         Index("ix_invloc_dept", "department"),

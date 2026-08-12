@@ -158,6 +158,12 @@ def _has_manual_line(lines: Iterable[IoLine]) -> bool:
     return any((getattr(line, "origin", None) or "") in MANUAL_LINE_ORIGINS for line in lines)
 
 
+def _prelock_line_inventories(db: Session, lines: Sequence[IoLine]) -> None:
+    """다품목 실행 전에 부모 Inventory를 전역 순서로 잠근다."""
+    item_ids = sorted({line.item_id for line in lines})
+    inventory_svc.ensure_and_lock_inventories(db, item_ids)
+
+
 def _submit_approval(
     db: Session, *, requester: Employee, batch: IoBatch, force_dept_approval: bool = False
 ) -> None:
@@ -222,6 +228,7 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
 
     # 자가승인 경로 — create_manual_adjustment_request 가 dept_approved 를 이미 마크했으면 즉시 실행.
     if request.department_approved_by_employee_id is not None:
+        _prelock_line_inventories(db, lines)
         for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
             _apply_line(db, batch=batch, line=line, requester=requester)
         now = datetime.utcnow()
@@ -260,6 +267,7 @@ def execute_batch_after_dept_approval(
 
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
+    _prelock_line_inventories(db, lines)
     # 부서 결재로 권한 검증이 이미 완료된 시점이므로 ship 권한 재검증 생략.
     for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
         _apply_line(db, batch=batch, line=line, requester=approver)
@@ -382,7 +390,7 @@ def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionT
         )
         quantity_change = qty
     elif line.from_bucket == _BUCKET_WAREHOUSE and line.to_bucket == _BUCKET_NONE:
-        inventory_svc.consume_warehouse(db, line.item_id, qty, respect_pending=True)
+        inventory_svc.consume_warehouse(db, line.item_id, qty)
         quantity_change = -qty
     elif line.to_bucket == _BUCKET_PRODUCTION and line.from_bucket == _BUCKET_NONE:
         inventory_svc.receive_confirmed(
@@ -477,6 +485,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
 def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> None:
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
+    _prelock_line_inventories(db, lines)
     for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
         _apply_line(db, batch=batch, line=line, requester=requester)
     now = datetime.utcnow()

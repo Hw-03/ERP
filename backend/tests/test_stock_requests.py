@@ -812,6 +812,50 @@ def test_reservations_endpoint_lists_active_pending_lines(db_session, client, ma
     assert Decimal(rows[0]["quantity"]) == Decimal("4")
 
 
+def test_reservations_endpoint_lists_department_source_and_from_department(
+    db_session, client, make_item, make_location
+):
+    item = make_item(name="department reservation")
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("6"),
+    )
+    requester = _make_employee(db_session, code="DRES1", name="department requester")
+    db_session.commit()
+
+    created = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="dept_to_warehouse",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": 4,
+                "from_bucket": "production",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "warehouse",
+            }
+        ],
+    )
+    assert created["status_code"] == 201
+
+    response = client.get(
+        f"/api/stock-requests/reservations?item_id={item.item_id}"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            **response.json()[0],
+            "from_bucket": "production",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "quantity": 4,
+        }
+    ]
+
+
 # ---------------------------------------------------------------------------
 # request_type ↔ bucket 조합 강제 검증 (1차 보완)
 # ---------------------------------------------------------------------------

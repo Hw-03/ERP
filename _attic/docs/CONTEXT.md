@@ -72,7 +72,12 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 - `warehouse_to_dept`, `dept_to_warehouse`, `internal_use_out` 흐름은 즉시 반영되지 않고 `StockRequest`
   로 변환되어 결재 큐에 들어간다.
 - 결재자는 (a) 생산부장 (b) 창고장 둘 중 적절한 쪽.
-- 결재 완료 → 실제 재고 변경 + `TransactionLog` 기록.
+- 비자기승인 요청은 출고 원천별로 재고를 예약한다. 창고 출고는 `Inventory.pending_quantity`,
+  부서 생산·불량 출고는 해당 `InventoryLocation.pending_quantity`를 사용하며, 입고 전용 요청은
+  예약 없이 `SUBMITTED` 상태로 대기한다.
+- 최종 결재는 같은 트랜잭션에서 요청의 모든 source 예약을 한 번 해제한 뒤 실제 재고 변경과
+  `TransactionLog` 기록을 수행한다. 반려·취소·승인 실패도 같은 source 예약을 해제한다.
+- 요청자가 필요한 결재 권한을 모두 가진 자기승인 요청은 예약을 만들지 않고 즉시 실행한다.
 
 ## 모바일
 

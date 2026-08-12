@@ -49,23 +49,7 @@ import {
   shortageLines,
 } from "../../_warehouse_v2/pullFromWarehouse";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-
-/**
- * IoComposeView 의 로컬 헬퍼 복제. utils 로 추출하지 않은 이유:
- * 헬퍼가 4줄짜리 데이터 접근이고 두 컴포넌트만의 사용처라, 공용 모듈을 만드는 비용
- * (위치·이름·테스트 1곳 증가)이 복제 1개 유지 비용보다 크다. 더 손이 가면 그때 추출.
- */
-function locationQuantity(
-  item: Item,
-  department: string | null | undefined,
-  status: "PRODUCTION" | "DEFECTIVE",
-) {
-  if (!department) return 0;
-  return (
-    item.locations.find((loc) => loc.department === department && loc.status === status)
-      ?.quantity ?? 0
-  );
-}
+import { ioLineAvailable } from "@/lib/mes/inventory";
 
 const STEP_META: { key: string; label: string }[] = [
   { key: "1", label: "작업 유형" },
@@ -296,26 +280,7 @@ export function MobileIoComposeWizard({
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
     if (!item) return null;
-    const warehouseAvail = () => {
-      const wh = Number(item.warehouse_qty) || 0;
-      const pending = Number(item.pending_quantity) || 0;
-      return Math.max(0, wh - pending);
-    };
-    if (line.from_bucket === "warehouse") return warehouseAvail();
-    if (line.from_bucket === "production") {
-      return Number(locationQuantity(item, line.from_department, "PRODUCTION")) || 0;
-    }
-    if (line.from_bucket === "defective") {
-      return Number(locationQuantity(item, line.from_department, "DEFECTIVE")) || 0;
-    }
-    if (line.to_bucket === "warehouse") return warehouseAvail();
-    if (line.to_bucket === "production") {
-      return Number(locationQuantity(item, line.to_department, "PRODUCTION")) || 0;
-    }
-    if (line.to_bucket === "defective") {
-      return Number(locationQuantity(item, line.to_department, "DEFECTIVE")) || 0;
-    }
-    return null;
+    return ioLineAvailable(item, line);
   }
 
   // 부서/세부작업 변경 시 임시저장 슬롯을 끊어 새 슬롯으로 시작한다.

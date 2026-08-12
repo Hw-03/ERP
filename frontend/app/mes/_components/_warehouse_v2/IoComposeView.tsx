@@ -30,11 +30,7 @@ import type { IoComposeViewProps } from "./types";
 import { ItemConversionWorkView } from "./ItemConversionView";
 import { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "../common/StatusTargetNotice";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-
-function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
-  if (!department) return 0;
-  return item.locations.find((loc) => loc.department === department && loc.status === status)?.quantity ?? 0;
-}
+import { ioLineAvailable } from "@/lib/mes/inventory";
 
 function workTypeLabel(workType: IoWorkType) {
   return IO_WORK_TYPES.find((row) => row.id === workType)?.label ?? workType;
@@ -423,22 +419,7 @@ export function IoComposeView({
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
     if (!item) return null;
-    // 백엔드 Decimal 직렬화가 문자열로 내려와 산술이 string concat 으로 깨지는 것 방지 — Number 강제 변환.
-    const warehouseAvail = () => {
-      const wh = Number(item.warehouse_qty) || 0;
-      const pending = Number(item.pending_quantity) || 0;
-      return Math.max(0, wh - pending);
-    };
-    if (line.from_bucket === "warehouse") return warehouseAvail();
-    if (line.from_bucket === "production") {
-      return Number(locationQuantity(item, line.from_department, "PRODUCTION")) || 0;
-    }
-    // 입고 (from_bucket="none"): to_bucket 의 목적지 현재 재고
-    if (line.to_bucket === "warehouse") return warehouseAvail();
-    if (line.to_bucket === "production") {
-      return Number(locationQuantity(item, line.to_department, "PRODUCTION")) || 0;
-    }
-    return null;
+    return ioLineAvailable(item, line);
   }
 
   // 새 작업 시작(작업유형/세부작업/부서 변경) — 진행 중 임시저장 슬롯과의 연결을 끊는다.
