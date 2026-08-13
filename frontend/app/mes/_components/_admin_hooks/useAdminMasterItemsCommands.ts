@@ -59,7 +59,7 @@ export function useAdminMasterItemsCommands({
       return;
     }
     const allLocs = addForm.initial_locations ?? [];
-    if (!allLocs.some((row) => row.department && Number(row.quantity) > 0)) {
+    if (!allLocs.some((row) => row.department && row.quantity.trim() !== "")) {
       onError("초기 재고 위치와 수량을 입력하세요.");
       return;
     }
@@ -77,7 +77,7 @@ export function useAdminMasterItemsCommands({
         legacy_item_type: addForm.legacy_item_type || undefined,
         supplier: addForm.supplier || undefined,
         min_stock: addForm.min_stock === "" ? undefined : Number(addForm.min_stock),
-        initial_quantity: totalQty > 0 ? totalQty : undefined,
+        initial_quantity: totalQty,
         initial_locations: builtLocs.length > 0 ? builtLocs : undefined,
       });
       setSelectedItem(created);

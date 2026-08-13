@@ -99,6 +99,36 @@ describe("useAdminMasterItemsCommands", () => {
     expect(result.current.addMode).toBe(false);
   });
 
+  it("submits zero initial quantity when a warehouse location is selected", async () => {
+    createMutateAsync.mockResolvedValue({
+      item_id: "zero-stock",
+      item_name: "Zero stock item",
+      mes_code: "N-000",
+    });
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "Zero stock item",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "0" }],
+      }));
+    });
+
+    await act(async () => {
+      result.current.add();
+    });
+
+    expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      initial_quantity: 0,
+      initial_locations: undefined,
+    }));
+    expect(args.onError).not.toHaveBeenCalled();
+  });
+
   it("add는 mutation layer가 invalidation을 소유하므로 command에서 중복 무효화하지 않는다", async () => {
     createMutateAsync.mockResolvedValue({
       item_id: "101",

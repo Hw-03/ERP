@@ -4267,7 +4267,7 @@
           },
           "initial_quantity": {
             "description": "초기 재고 수량",
-            "exclusiveMinimum": 0.0,
+            "minimum": 0.0,
             "title": "Initial Quantity",
             "type": "integer"
           },

@@ -64,6 +64,17 @@ def test_create_no_locations_all_warehouse(client, seed_symbol):
     assert body["locations"] == []
 
 
+def test_create_zero_initial_quantity_allows_item_creation(client, seed_symbol):
+    """초기 재고가 0인 품목도 창고 재고 0으로 등록한다."""
+    res = _create_item(client, name="Zero initial stock", initial_quantity=0)
+    assert res.status_code == 201, res.text
+
+    body = _get_item(client, res.json()["item_id"]).json()
+    assert body["quantity"] == 0
+    assert body["warehouse_qty"] == 0
+    assert body["locations"] == []
+
+
 def test_create_item_allows_optional_material_classification_and_minimum_stock(client, seed_symbol):
     missing_material_type = _create_item(client, name="자재분류 없음", legacy_item_type=None)
     assert missing_material_type.status_code == 201, missing_material_type.text
