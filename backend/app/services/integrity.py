@@ -157,7 +157,7 @@ def repair_inventory_totals(db: Session, *, dry_run: bool = True) -> RepairRepor
             repaired += 1
 
     if not dry_run and repaired:
-        db.commit()
+        db.flush()
 
     return RepairReport(
         checked=len(inventories),

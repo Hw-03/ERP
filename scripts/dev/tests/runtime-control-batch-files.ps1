@@ -77,32 +77,19 @@ Assert-ContentMatch $StartBat 'watch\.bat' "start.bat must mention watch.bat for
 Assert-ContentNotMatch $StartBat 'start\s+"[^"]*"\s+"%~dp0watch\.bat"|Start-Process\s+.*watch\.bat' "start.bat must not open the monitor automatically."
 Assert-ContentMatch $StartBat 'stop\.bat' "start.bat must mention stop.bat for full shutdown."
 Assert-ContentMatch $StartBat 'ensure-schema-ready\.ps1' "start.bat must delegate schema readiness to the shared helper."
-Assert-ContentMatch $StartBat '-Mode\s+Start' "start.bat must invoke the interactive schema-start mode."
+Assert-ContentMatch $StartBat '-Mode\s+Start' "start.bat must invoke the read-only schema-start mode."
 Assert-ContentNotMatch $StartBat '(?m)^\s*py\s+bootstrap_db\.py[^\r\n]*--(schema|migrate|all)' "start.bat must not embed direct database mutation commands."
-Assert-ContentMatch $StartBat '(?s)ensure-schema-ready\.ps1.*?-Mode\s+Start.*?if\s+errorlevel\s+1.*?exit\s+/b\s+1.*?start-backend\.ps1' "start.bat must abort before servers start when schema preparation fails."
+Assert-ContentMatch $StartBat '(?s)ensure-schema-ready\.ps1.*?-Mode\s+Start.*?SCHEMA_EXIT.*?exit\s+/b\s+%SCHEMA_EXIT%.*?start-backend\.ps1' "start.bat must propagate schema readiness failures before server startup."
 
 Assert-ContentMatch $EnsureSchemaReadyScript 'ValidateSet\("Start",\s*"Report"\)' "schema helper must expose Start and Report modes."
-Assert-ContentMatch $EnsureSchemaReadyScript 'Invoke-BackendBootstrap\s+-Command\s+"--check"' "schema helper must check readiness before any migration."
-Assert-ContentMatch $EnsureSchemaReadyScript 'Read-Host' "schema helper must require interactive confirmation before migration."
-Assert-ContentMatch $EnsureSchemaReadyScript 'stop-servers\.ps1' "schema helper must stop active services before migrating."
-Assert-ContentMatch $EnsureSchemaReadyScript '\$BackupTool.*--label.*startup-schema-migration' "schema helper must create a labeled verified backup."
-Assert-ContentMatch $EnsureSchemaReadyScript 'BACKUP_PATH=' "schema helper must retain the exact backup path."
-Assert-ContentMatch $EnsureSchemaReadyScript 'Invoke-BackendBootstrap\s+-Command\s+"--migrate"' "schema helper must use Alembic migration without seeding."
-Assert-ContentMatch $EnsureSchemaReadyScript '_verify_backup\.py' "schema helper must run SQLite integrity verification."
-Assert-ContentMatch $EnsureSchemaReadyScript 'check_inventory_integrity\.py' "schema helper must run inventory integrity verification."
-Assert-ContentMatch $EnsureSchemaReadyScript '\$RestoreTool.*--sqlite.*--target.*--check' "schema helper must print an exact manual restore command."
-Assert-ContentNotMatch $EnsureSchemaReadyScript '&\s+.*restore_db\.py' "schema helper must never auto-restore the database."
-$schemaHelperContent = Get-Content -Raw $EnsureSchemaReadyScript
-$stopStage = $schemaHelperContent.IndexOf('$stopResult =')
-$backupStage = $schemaHelperContent.IndexOf('$backupResult =')
-$migrateStage = $schemaHelperContent.IndexOf('$migrateResult =')
-$postCheckStage = $schemaHelperContent.IndexOf('$postCheck =')
-$schemaVerifyStage = $schemaHelperContent.IndexOf('$schemaVerifyResult =')
-$inventoryVerifyStage = $schemaHelperContent.IndexOf('$inventoryVerifyResult =')
-if ($stopStage -lt 0 -or $backupStage -lt 0 -or $migrateStage -lt 0 -or $postCheckStage -lt 0 -or $schemaVerifyStage -lt 0 -or $inventoryVerifyStage -lt 0 -or
-    -not ($stopStage -lt $backupStage -and $backupStage -lt $migrateStage -and $migrateStage -lt $postCheckStage -and $postCheckStage -lt $schemaVerifyStage -and $schemaVerifyStage -lt $inventoryVerifyStage)) {
-    throw "schema helper must stop, back up, migrate, and verify in order."
+Assert-ContentMatch $EnsureSchemaReadyScript 'bootstrap_db\.py.*--check' "schema helper must invoke bootstrap --check."
+foreach ($forbiddenSchemaHelperPattern in @('--migrate', 'stop-servers\.ps1', 'backup_db\.py', 'restore_db\.py', '_verify_backup\.py', 'check_inventory_integrity\.py', 'Read-Host', 'mes\.db')) {
+    Assert-ContentNotMatch $EnsureSchemaReadyScript $forbiddenSchemaHelperPattern "schema helper must remain a read-only DATABASE_URL adapter: $forbiddenSchemaHelperPattern"
 }
+Assert-ContentMatch $EnsureSchemaReadyScript 'ready=True' "schema helper must require the machine-readable ready marker."
+Assert-ContentMatch $EnsureSchemaReadyScript 'ready=False' "schema helper must distinguish a machine-readable not-ready result."
+Assert-ContentMatch $EnsureSchemaReadyScript 'exit\s+2' "schema helper must return 2 for NOT_READY."
+Assert-ContentMatch $EnsureSchemaReadyScript 'exit\s+3' "schema helper must return 3 for CHECK_ERROR."
 
 Assert-ContentMatch $WatchBat 'open-watch\.ps1' "watch.bat must open the split monitoring launcher."
 Assert-ContentNotMatch $WatchBat 'start-(backend|frontend)|stop-(backend|frontend)|stop-servers|taskkill|Stop-Process' "watch.bat must not start or stop servers."
@@ -111,8 +98,12 @@ Assert-ContentMatch $StopBat 'stop-servers\.ps1' "stop.bat must call stop-server
 Assert-ContentMatch $StatusBat 'status-servers\.ps1' "status.bat must call status-servers.ps1."
 Assert-ContentMatch $StatusScript 'ensure-schema-ready\.ps1' "status must report shared schema readiness."
 Assert-ContentMatch $StatusScript '-Mode\s+Report' "status must use read-only schema report mode."
+Assert-ContentMatch $StatusScript 'status-database.*NOT_READY' "status must label NOT_READY distinctly."
+Assert-ContentMatch $StatusScript 'status-database.*CHECK_ERROR' "status must label CHECK_ERROR distinctly."
 Assert-ContentMatch $WatchServiceScript 'ensure-schema-ready\.ps1' "backend monitor must report shared schema readiness once."
 Assert-ContentMatch $WatchServiceScript '-Mode\s+Report' "backend monitor must use read-only schema report mode."
+Assert-ContentMatch $WatchServiceScript 'watch-database.*NOT_READY' "watch must label NOT_READY distinctly."
+Assert-ContentMatch $WatchServiceScript 'watch-database.*CHECK_ERROR' "watch must label CHECK_ERROR distinctly."
 Assert-ContentMatch $StopServersScript 'stop-backend\.ps1' "stop-servers.ps1 must stop the backend."
 Assert-ContentMatch $StopServersScript 'stop-frontend\.ps1' "stop-servers.ps1 must stop the frontend."
 

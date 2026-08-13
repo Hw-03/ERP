@@ -103,7 +103,7 @@ export async function clickNextStep(page: Page): Promise<void> {
 /** 품목 선택 단계에서 담긴 품목을 수량 확인 단계로 넘긴다. */
 export async function advanceToQuantityStep(page: Page): Promise<void> {
   await page
-    .getByRole("button", { name: /수량 조정/ })
+    .getByRole("button", { name: /수량 조정/, disabled: false })
     .filter({ visible: true })
     .first()
     .click({ noWaitAfter: true });

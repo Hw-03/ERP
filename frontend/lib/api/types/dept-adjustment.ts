@@ -2,6 +2,7 @@ import type { Department } from "./shared";
 
 export type DeptAdjSubType = "production" | "disassembly" | "correction";
 export type AdjDirection = "in" | "out" | "defective" | "scrap";
+export type AdjSubmitDirection = Exclude<AdjDirection, "scrap">;
 
 export interface AdjLineTemplate {
   item_id: string;
@@ -24,7 +25,7 @@ export interface BomTemplateResponse {
 
 export interface AdjLineInput {
   item_id: string;
-  direction: AdjDirection;
+  direction: AdjSubmitDirection;
   quantity: number;
   department: Department;
   reason?: string | null;

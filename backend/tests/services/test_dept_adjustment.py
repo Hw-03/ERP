@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import text
 
 from app.models import (
     DepartmentEnum,
@@ -218,6 +220,149 @@ def test_submit_production(make_item, make_location, db_session):
     assert {
         log.department for log in db_session.query(TransactionLog).all()
     } == {ASSEMBLY.value}
+    assert {log.log_id for log in db_session.query(TransactionLog).all()} == set(log_ids)
+
+
+@pytest.mark.parametrize(
+    ("direction", "quantity"),
+    [("scrap", D("1")), ("unknown", D("1")), ("in", D("0"))],
+)
+def test_submit_validates_all_lines_before_transaction(
+    direction, quantity, make_item, db_session, monkeypatch
+):
+    item = make_item(name=f"invalid-{direction}")
+    entered_transaction = False
+
+    @contextmanager
+    def transaction_probe(_db):
+        nonlocal entered_transaction
+        entered_transaction = True
+        yield
+
+    monkeypatch.setattr(svc, "transactional", transaction_probe)
+
+    with pytest.raises(ValueError, match="direction|수량"):
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            [
+                svc.AdjLine(
+                    item_id=item.item_id,
+                    direction=direction,
+                    quantity=quantity,
+                    department=ASSEMBLY,
+                )
+            ],
+        )
+
+    assert entered_transaction is False
+
+
+def test_submit_mixed_valid_and_invalid_lines_has_no_sql_side_effects(
+    make_item, make_location, db_session
+):
+    item = make_item(name="mixed-invalid")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("10"))
+    db_session.commit()
+    params = {"item_id": item.item_id.hex}
+    before = (
+        db_session.execute(
+            text("SELECT quantity FROM inventory_locations WHERE item_id = :item_id"),
+            params,
+        ).scalar_one(),
+        db_session.execute(text("SELECT COUNT(*) FROM transaction_logs")).scalar_one(),
+    )
+
+    error = None
+    try:
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            [
+                svc.AdjLine(
+                    item_id=item.item_id,
+                    direction="out",
+                    quantity=D("3"),
+                    department=ASSEMBLY,
+                ),
+                svc.AdjLine(
+                    item_id=item.item_id,
+                    direction="unknown",
+                    quantity=D("1"),
+                    department=ASSEMBLY,
+                ),
+            ],
+        )
+    except ValueError as exc:
+        error = exc
+
+    db_session.expire_all()
+    after = (
+        db_session.execute(
+            text("SELECT quantity FROM inventory_locations WHERE item_id = :item_id"),
+            params,
+        ).scalar_one(),
+        db_session.execute(text("SELECT COUNT(*) FROM transaction_logs")).scalar_one(),
+    )
+    assert after == before == (10, 0)
+    assert error is not None
+
+
+def test_submit_rolls_back_when_created_log_count_mismatches_lines(
+    make_item, make_location, db_session, monkeypatch
+):
+    item = make_item(name="log-count-mismatch")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("10"))
+    db_session.commit()
+    real_apply = svc._apply_adjustment
+
+    def omit_last_line(db, sub_type, lines, **kwargs):
+        return real_apply(db, sub_type, lines[:-1], **kwargs)
+
+    monkeypatch.setattr(svc, "_apply_adjustment", omit_last_line)
+    params = {"item_id": item.item_id.hex}
+    before = (
+        db_session.execute(
+            text("SELECT quantity FROM inventory_locations WHERE item_id = :item_id"),
+            params,
+        ).scalar_one(),
+        db_session.execute(text("SELECT COUNT(*) FROM transaction_logs")).scalar_one(),
+    )
+
+    error = None
+    try:
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            [
+                svc.AdjLine(
+                    item_id=item.item_id,
+                    direction="out",
+                    quantity=D("2"),
+                    department=ASSEMBLY,
+                ),
+                svc.AdjLine(
+                    item_id=item.item_id,
+                    direction="out",
+                    quantity=D("1"),
+                    department=ASSEMBLY,
+                ),
+            ],
+        )
+    except RuntimeError as exc:
+        error = exc
+
+    db_session.expire_all()
+    after = (
+        db_session.execute(
+            text("SELECT quantity FROM inventory_locations WHERE item_id = :item_id"),
+            params,
+        ).scalar_one(),
+        db_session.execute(text("SELECT COUNT(*) FROM transaction_logs")).scalar_one(),
+    )
+    assert after == before == (10, 0)
+    assert error is not None
+    assert "로그 수" in str(error)
 
 
 def test_submit_rolls_back_inventory_when_ledger_capture_fails(

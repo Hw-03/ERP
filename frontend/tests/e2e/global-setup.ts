@@ -195,6 +195,7 @@ export default async function globalSetup() {
       env: { ...process.env, DATABASE_URL },
       stdio: "ignore",
       detached: true,
+      windowsHide: true,
     },
   );
   backend.unref();

@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import event, text
 
 from app.models import LocationStatusEnum
 from app.services.integrity import check_inventory_consistency, repair_inventory_totals
@@ -97,6 +98,63 @@ def test_repair_actually_fixes(make_item, db_session):
     assert inv2.quantity == D("5")
 
 
+def test_repair_flushes_without_committing_and_can_be_rolled_back(
+    make_item, make_location, db_session
+):
+    """실제 복구는 flush까지만 하고 호출자 transaction에 남긴다."""
+    from app.models import Inventory
+
+    item = make_item(warehouse_qty=D("5"))
+    make_location(item.item_id, status=LocationStatusEnum.PRODUCTION, quantity=D("3"))
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inv.quantity = D("12")
+    db_session.commit()
+
+    flushes: list[bool] = []
+    event.listen(db_session, "after_flush", lambda *_args: flushes.append(True))
+
+    report = repair_inventory_totals(db_session, dry_run=False)
+
+    assert report.checked == 1
+    assert report.mismatched == 1
+    assert report.repaired == 1
+    assert flushes == [True]
+    assert db_session.execute(text("SELECT quantity FROM inventory")).scalar_one() == 8
+
+    db_session.rollback()
+    assert db_session.execute(text("SELECT quantity FROM inventory")).scalar_one() == 12
+
+
+def test_repair_dry_run_has_no_flush_or_commit(make_item, db_session):
+    """dry-run은 mismatch를 보고해도 write/flush/commit을 전혀 만들지 않는다."""
+    from app.models import Inventory
+
+    item = make_item(warehouse_qty=D("5"))
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inv.quantity = D("9")
+    db_session.commit()
+
+    boundaries = {"flush": 0, "commit": 0}
+    event.listen(
+        db_session,
+        "after_flush",
+        lambda *_args: boundaries.__setitem__("flush", boundaries["flush"] + 1),
+    )
+    event.listen(
+        db_session,
+        "after_commit",
+        lambda *_args: boundaries.__setitem__("commit", boundaries["commit"] + 1),
+    )
+
+    report = repair_inventory_totals(db_session, dry_run=True)
+
+    assert report.checked == 1
+    assert report.mismatched == 1
+    assert report.repaired == 0
+    assert boundaries == {"flush": 0, "commit": 0}
+    assert db_session.execute(text("SELECT quantity FROM inventory")).scalar_one() == 9
+
+
 def test_repair_samples_capped_at_20(make_item, db_session):
     """미스매치 25건 → samples 는 20건만."""
     from app.models import Inventory
@@ -107,7 +165,10 @@ def test_repair_samples_capped_at_20(make_item, db_session):
     db_session.flush()
 
     report = repair_inventory_totals(db_session, dry_run=True)
+    assert report.checked == 25
     assert report.mismatched == 25
+    assert report.repaired == 0
+    assert report.dry_run is True
     assert len(report.samples) == 20
 
 

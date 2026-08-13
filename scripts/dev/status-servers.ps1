@@ -134,6 +134,10 @@ Show-ServiceStatus `
 
 Write-Host "[database]"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SchemaReadinessScript -Mode Report
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[database] 상태 확인 스크립트를 실행하지 못했습니다."
+$schemaExit = $LASTEXITCODE
+switch ($schemaExit) {
+    0 { Write-Host "[status-database] READY" }
+    2 { Write-Host "[status-database] NOT_READY" }
+    3 { Write-Host "[status-database] CHECK_ERROR" }
+    default { Write-Host "[status-database] CHECK_ERROR (unexpected exit $schemaExit)" }
 }

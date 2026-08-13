@@ -70,7 +70,7 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
         .getByRole("button", { name: "선택", exact: true }),
     );
     await expect(
-      page.getByRole("button", { name: /수량 조정/ }).filter({ visible: true }).first(),
+      page.getByRole("button", { name: /수량 조정/, disabled: false }).filter({ visible: true }).first(),
     ).toBeEnabled();
     await advanceToQuantityStep(page);
 

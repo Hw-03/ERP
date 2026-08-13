@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+from sqlalchemy import text
+
 from app.models import DepartmentEnum, Employee, EmployeeLevelEnum, LocationStatusEnum
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
@@ -188,6 +191,52 @@ def test_submit_correction_api(client, db_session, make_item, make_location):
     assert resp.status_code == 201
     assert resp.json()["processed_count"] == 1
     assert _prod_qty(db_session, item.item_id) == D("7")
+
+
+@pytest.mark.parametrize("sub_type", ["production", "disassembly", "correction"])
+def test_submit_rejects_scrap_without_inventory_or_log_mutation(
+    sub_type, client, db_session, make_item, make_location
+):
+    item = make_item(name=f"scrap-{sub_type}")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("10"))
+    operator = _make_operator(db_session, code=f"SC{sub_type[0].upper()}1")
+    db_session.commit()
+
+    params = {"item_id": item.item_id.hex}
+    before = (
+        db_session.execute(
+            text("SELECT quantity FROM inventory_locations WHERE item_id = :item_id"),
+            params,
+        ).scalar_one(),
+        db_session.execute(text("SELECT COUNT(*) FROM transaction_logs")).scalar_one(),
+    )
+
+    resp = client.post(
+        "/api/dept-adjustment/submit",
+        json={
+            "sub_type": sub_type,
+            "operator_employee_code": operator.employee_code,
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "direction": "scrap",
+                    "quantity": 2,
+                    "department": ASSEMBLY.value,
+                }
+            ],
+        },
+    )
+
+    db_session.expire_all()
+    after = (
+        db_session.execute(
+            text("SELECT quantity FROM inventory_locations WHERE item_id = :item_id"),
+            params,
+        ).scalar_one(),
+        db_session.execute(text("SELECT COUNT(*) FROM transaction_logs")).scalar_one(),
+    )
+    assert resp.status_code == 422
+    assert after == before == (10, 0)
 
 
 

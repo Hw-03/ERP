@@ -98,14 +98,14 @@ if exist "requirements.txt" (
 )
 popd
 
-rem ====== Interactive DB readiness and migration workflow ======
-rem The helper runs read-only checks first and changes the DB only after explicit Y confirmation.
+rem ====== Read-only DB readiness gate ======
 echo [MES] Checking DB schema readiness...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\ensure-schema-ready.ps1" -Mode Start
-if errorlevel 1 (
-    echo [MES] ERROR: database schema preparation was cancelled or failed. Server startup aborted.
+set "SCHEMA_EXIT=%ERRORLEVEL%"
+if not "%SCHEMA_EXIT%"=="0" (
+    echo [MES] ERROR: database schema readiness check blocked server startup ^(exit %SCHEMA_EXIT%^).
     pause
-    exit /b 1
+    exit /b %SCHEMA_EXIT%
 )
 
 rem ====== Resolve dev/employee server profile (ports, URL) ======

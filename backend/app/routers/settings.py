@@ -45,14 +45,16 @@ ADMIN_PIN_KEY = "admin_pin"
 DEFAULT_ADMIN_PIN = "0000"
 
 
-def ensure_admin_pin(db: Session) -> SystemSetting:
+def ensure_admin_pin(db: Session, *, commit_if_created: bool = True) -> SystemSetting:
+    """관리자 PIN 설정을 반환하고, 호출자가 원하면 생성 commit을 위임한다."""
     setting = db.query(SystemSetting).filter(SystemSetting.setting_key == ADMIN_PIN_KEY).first()
     if setting:
         return setting
 
     setting = SystemSetting(setting_key=ADMIN_PIN_KEY, setting_value=hash_pin(DEFAULT_ADMIN_PIN))
     db.add(setting)
-    commit_and_refresh(db, setting)
+    if commit_if_created:
+        commit_and_refresh(db, setting)
     return setting
 
 
@@ -60,18 +62,24 @@ def _is_hashed(value: str) -> bool:
     return len(value) == 64 and all(c in "0123456789abcdef" for c in value)
 
 
-def _matches_admin_pin(db: Session, setting: SystemSetting, input_pin: str) -> bool:
-    """PIN 비교. 평문 발견 시 자동 해시화(lazy migration)."""
+def _matches_admin_pin(
+    db: Session,
+    setting: SystemSetting,
+    input_pin: str,
+    *,
+    migrate_plaintext: bool = True,
+    commit_migration: bool = True,
+) -> bool:
+    """PIN을 비교하고 요청 경계가 허용할 때만 평문을 lazy migration한다."""
     stored = setting.setting_value
     if _is_hashed(stored):
         return stored == hash_pin(input_pin)
-    # 평문 → 비교 후 일치하면 즉시 해시화
-    if stored == input_pin:
+    if stored == input_pin and migrate_plaintext:
         setting.setting_value = hash_pin(input_pin)
         setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
-        commit_only(db)
-        return True
-    return False
+        if commit_migration:
+            commit_only(db)
+    return stored == input_pin
 
 
 @router.post("/verify-pin", response_model=MessageResponse)
@@ -107,10 +115,22 @@ def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Sessi
     return MessageResponse(message="관리자 비밀번호를 변경했습니다.")
 
 
-def require_admin(db: Session, pin: str) -> None:
+def require_admin(
+    db: Session,
+    pin: str,
+    *,
+    migrate_plaintext: bool = True,
+    commit_lazy_changes: bool = True,
+) -> None:
     """관리자 PIN 검증. 일치하지 않으면 403."""
-    setting = ensure_admin_pin(db)
-    if not _matches_admin_pin(db, setting, pin):
+    setting = ensure_admin_pin(db, commit_if_created=commit_lazy_changes)
+    if not _matches_admin_pin(
+        db,
+        setting,
+        pin,
+        migrate_plaintext=migrate_plaintext,
+        commit_migration=commit_lazy_changes,
+    ):
         raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
 
 
@@ -171,7 +191,12 @@ def repair_inventory_integrity(
 
     `dry_run=True` (기본) 로 먼저 확인 후 실제 적용 시 false 로 호출.
     """
-    _require_admin(db, payload.pin)
+    _require_admin(
+        db,
+        payload.pin,
+        migrate_plaintext=not payload.dry_run,
+        commit_lazy_changes=False,
+    )
     report = integrity_svc.repair_inventory_totals(db, dry_run=payload.dry_run)
     if not payload.dry_run:
         audit.record(
@@ -180,7 +205,8 @@ def repair_inventory_integrity(
             action="settings.integrity_repair",
             target_type="settings",
             target_id="inventory",
-            payload_summary=f"repaired {getattr(report, 'fixed_count', '?')} rows",
+            payload_summary=f"repaired {report.repaired} rows",
         )
+        db.flush()
         commit_only(db)
     return report.to_dict()

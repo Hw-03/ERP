@@ -13,6 +13,7 @@ Set-StrictMode -Version Latest
 $RepoRoot = git rev-parse --show-toplevel
 $FrontendRoot = Join-Path $RepoRoot "frontend"
 $BackendRoot = Join-Path $RepoRoot "backend"
+$VerifyE2EScript = Join-Path $RepoRoot "scripts\dev\verify_e2e.ps1"
 
 function Invoke-Check {
     param(
@@ -283,7 +284,9 @@ if mismatch_count != 0:
 
 if ($IncludeE2E) {
     # 전용 DB(mes_e2e.db)·전용 백엔드(8021)·전용 프론트(3100) — globalSetup/teardown 자동.
-    Invoke-Check "Playwright E2E (전용 DB)" $FrontendRoot { npx playwright test }
+    Invoke-Check "Playwright E2E (전용 DB)" $RepoRoot {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $VerifyE2EScript
+    }
 }
 
 # 풀 게이트가 돈 경우에만 working tree status 노출 (부분 모드에선 노이즈).

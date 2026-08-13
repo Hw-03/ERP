@@ -4,10 +4,12 @@
 
 # DEXCOWIN MES 전수 코드 품질·재고 신뢰도 감사 및 개선 계획
 
-- 감사 기준일: 2026-08-13 KST
-- 감사 SHA: `71d6a34faf27ef736fe7dc64a5084ff2a7f46893`
-- 실행 위치: `C:\ERP\.worktrees\full-code-quality-audit`
-- Git 상태: detached HEAD, 브랜치·커밋·푸시 없음
+- 원 감사 기준일·SHA: 2026-08-13 KST, `71d6a34faf27ef736fe7dc64a5084ff2a7f46893`
+- 첫 개선 체크포인트 기준 SHA: `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`
+- 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-improvement`
+- Git 상태: detached HEAD의 미커밋 working diff, 브랜치·커밋·푸시 없음
+- 실행 진척: 체크포인트 1 완료, 후속 체크포인트 2~7의 6개 구간 대기
+- 잔여 작업: 미완료 `IC` 24개(미착수 23개 + 부분 완료 `IC-20`)와 최종 closeout `DOC-01`, `AT-01`, `AT-02`
 - 최종 판정: **조건부 사용 가능**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
@@ -24,7 +26,7 @@
 1. 프런트의 입출고 쓰기 요청은 15초 후 화면에서 실패로 끝나도 서버 요청을 중단하지 않는다. 작업자가 다시 누르면 새 멱등 키가 발급되어 첫 요청의 지연 성공과 재시도가 모두 반영될 수 있다. `frontend/lib/api-core.ts:210-234`, `frontend/app/mes/_components/_warehouse_v2/useIoSubmit.ts:20-47`
 2. 출하 예약은 일반 재고 예약 필드와 별도인 `ShippingAllocation`에만 기록된다. 출하 외 소비 경로가 이 예약을 공통으로 차감하지 않으며, 출하 상태 전이에 request/allocation 행 잠금과 명령 멱등 키가 없다. `backend/app/services/shipping.py:858-899,1485-1536,1670-1769`, `backend/app/models/shipping.py:184-206`
 3. 일반 거래취소는 재고 효과만 역재생하고 출하 요청·allocation·IO batch·StockRequest 같은 업무 상태를 함께 되돌리지 않는다. 픽업 로그를 일반 취소하면 재고는 복원되지만 출하는 `PICKED_UP`, allocation은 `CONSUMED`로 남을 수 있다. `backend/app/services/transaction_actions.py:182-257`, `backend/app/services/inv_effect.py:35-104`
-4. 부서조정 API는 `direction="scrap"`을 허용하지만 서비스가 그 라인을 처리 목록에 넣지 않아 성공 응답과 `processed_count=0`으로 끝날 수 있다. 폐기했다고 생각한 수량이 남는 무음 실패다. `backend/app/routers/dept_adjustment.py:63-68,159-193`, `backend/app/services/dept_adjustment.py:33,198-207,233-250`
+4. 원 감사에서 부서조정 `direction="scrap"`의 무음 성공을 재현했으나, 첫 체크포인트 `IC-02`에서 request enum·service·frontend submit type을 함께 좁혀 모든 subtype을 422로 차단했다. 폐기는 전용 재작업 `scrap_qty` 흐름만 사용한다.
 5. 운영 무결성 검사는 부서 예약, 출하 allocation, 창고 박스·특수구역 수량을 검사하지 않고, 누락·0 효과 거래를 경고만 한 뒤 성공 종료할 수 있다. 즉 “검사 통과”가 모든 재고 표현의 일치를 보증하지 않는다. `scripts/ops/check_inventory_integrity.py:62-332,349-409`
 6. 재고 초기화 도구는 출하 요청·allocation을 지우지 않는다. 기존 `PREPARED` 출하가 새 기준 재고에서 나중에 픽업되면 초기화 후 재고가 다시 차감될 수 있다. `scripts/ops/inventory_cutover.py:290-326`, `backend/app/services/shipping.py:1692-1704`
 
@@ -33,7 +35,7 @@
 - 입출고가 타임아웃되면 즉시 같은 작업을 새로 제출하지 말고 거래 이력과 재고를 먼저 확인한다.
 - 출하 준비 완료 후 픽업 전에는 예약 품목을 생산·부서조정·불량 처리로 소비하지 않는다.
 - 출하·생산·분해처럼 여러 로그가 한 업무를 이루는 거래는 일반 거래취소 화면으로 임의 취소하지 않는다.
-- `/dept-adjustment`의 `scrap` 입력은 개선 전까지 폐기 수단으로 사용하지 않는다.
+- 일반 `/dept-adjustment`에는 `scrap` 입력이 더 이상 허용되지 않는다. 폐기는 정상/불량 재작업의 전용 폐기 흐름만 사용한다.
 - inventory cutover는 출하 미결 건을 별도로 닫고 검증하기 전에는 실행하지 않는다.
 - 일일 마감 때 창고·부서 정상·불량·출하 allocation·박스·특수구역을 함께 대조한다. 현행 readiness 성공만으로 대체하지 않는다.
 
@@ -64,8 +66,8 @@
 | 생산·BOM backflush | `PARTIAL` | 구성품 감소·완제품 증가·로그 효과·SQLite 1승자 | 복합 로그 일반 취소, PostgreSQL 잠금 증거 부족 |
 | 분해·재작업 | `PARTIAL` | 부모 감소와 자식 정상/불량/폐기 분기 | 빈 효과 폐기 로그와 복합 취소 계약 |
 | 불량 격리·해제 | `PARTIAL` | 정상/불량 버킷 이동과 총량 보존, 중복 격리 방지 | actor 검증, 승인 표시와 실제 즉시 완료 drift |
-| 불량 폐기·반품 | `PARTIAL` | 독립 defect/StockRequest 정상 경로 수량 감소 | 부서조정 `scrap` 표면은 별도 `FAILED` |
-| 부서조정 `scrap` | `FAILED` | 없음 | 허용된 입력이 조용히 무시됨 |
+| 불량 폐기·반품 | `PARTIAL` | 독립 defect/StockRequest 정상 경로 수량 감소와 전용 재작업 폐기 | actor·경합·복합 취소 계약은 계속 보강 필요 |
+| 일반 부서조정 `scrap` | `VERIFIED` | `IC-02`에서 모든 subtype 422, service 직접 호출 fail-closed, 실패 전후 raw SQL 재고·로그 불변 | 폐기 기능은 이 표면이 아니라 전용 재작업 흐름만 사용 |
 | 순차 출하 준비·픽업·취소 | `PARTIAL` | 단일 호출에서 allocation·재고·로그의 정상 전이 | 행 잠금·멱등·공통 예약 부족 |
 | 출하와 일반 거래취소 결합 | `FAILED` | 없음 | 재고만 복원되고 출하 상태/allocation은 남을 수 있음 |
 | 거래 수량보정·일반 취소 | `FAILED` | 창고 RECEIVE 정정의 순차 primitive와 단일 effect 취소만 제한적으로 동작 | 부서 출하 SHIP도 창고 bucket을 정정하는 wrong-bucket 결함, 복합 업무 상태 분리 |
@@ -78,16 +80,18 @@
 
 첫 구현 Wave는 구조 미관이 아니라 수량이 틀어질 수 있는 경로를 닫는다.
 
-1. 첫 국소 change로 부서조정 `scrap` 무음 성공을 막고, 무결성 복구·감사 로그를 한 commit으로 묶는다(`IC-02`, `IC-05`).
-2. 동시에 서버가 발급·검증하는 직원 세션과 공통 actor 경계를 설계·구현한다(`IC-01`). 이후 mutation API 카드는 이 경계 뒤에 배포한다.
-3. 출하/복합 거래를 일반 correction/cancel이 깨뜨리지 못하게 업무 수명주기 명령으로 제한한다(`IC-03`).
-4. inventory cutover의 history·역취소 정책을 확정하고 reset 뒤 과거 출하가 재고를 증감하지 못하게 한다(`IC-04`).
-5. 그 다음 창고 위치 정책 preflight와 예약·멱등성·잠금을 진행한다(`IC-06` 이후 Wave 2).
+1. 첫 체크포인트에서 서버 시작 DB 보호 경계를 read-only로 되돌렸다(`IC-27` 완료).
+2. 부서조정 `scrap` 무음 성공을 막고 무결성 복구·감사 로그를 한 transaction으로 묶었다(`IC-02`, `IC-05` 완료).
+3. 체크포인트 2에서 필수 PostgreSQL·E2E·type gate를 먼저 완성하고, 재고를 다시 바꿀 수 있는 기존 출하가 있으면 cutover를 fail-closed한다(`IC-20`, `IC-04`).
+4. 체크포인트 3에서 session 발급 자격을 먼저 결정한 뒤 서버 검증 직원 session과 공통 actor 경계를 단독 구현한다(`IC-01`). 이후 mutation API 카드는 이 경계 뒤에 배포한다.
+5. 일반 correction/cancel 안전 차단과 멱등성·조건부 전이를 거쳐 `박스+특수구역+미배치=창고`, 예약·출하 상태기계, blocking integrity 순으로 진행한다(`IC-03`, `IC-06`~`IC-10`, `IC-17`~`IC-19`).
+
+후속 실행의 단일 순서와 각 정지 조건은 8.9절의 체크포인트 2~7을 따른다. 한 체크포인트가 통합·검증·리뷰를 모두 통과하기 전에는 다음 체크포인트를 시작하지 않는다.
 
 ---
 ## 2. 감사 SHA·범위·방법·제약
 
-### 2.1 실행 계약
+### 2.1 원 감사 실행 계약 (`71d6a34`)
 
 - 모든 코드 읽기, 격리 DB, 서버, 브라우저, 문서 쓰기는 detached 워크트리에서 수행했다.
 - 감사 중 `main`이 이동하더라도 최초 SHA를 유지했다.
@@ -96,6 +100,8 @@
 - tracked 산출물은 이 문서 하나다. 원본 로그·스크린샷·격리 DB·기계 원장은 `_attic/runtime/code-quality-audit/20260813-073216/` 아래 ignored 파일로 보존했다.
 - 브랜치 생성, 커밋, 푸시는 수행하지 않았다.
 - weekly report 화면, 모바일 하단 탭, desktop shipping 5단계 카드 크기의 동결 범위는 읽고 분류했으나 수정 후보에서 제외했다.
+
+첫 개선 체크포인트는 별도 detached 워크트리와 기준 SHA `8be64743`에서 제품·테스트·운영 helper를 미커밋 working diff로 수정했다. 따라서 위 “제품 코드·공개 API·제품 타입 무수정”과 “tracked 산출물 문서 하나”는 원 감사 단계에만 해당한다. 체크포인트의 의도적 공개 계약 변화는 일반 부서조정 request에서 처리하지 않던 `scrap` enum을 제거한 한 건이며, DB schema·migration과 response schema는 바꾸지 않았다.
 
 ### 2.2 직원 환경 비접촉과 사전 해시 조회 기록
 
@@ -113,6 +119,8 @@ evidence status는 `READ_HASH_ONLY_BEFORE_PROHIBITION_UPDATE`로 기록했다.
 
 동적 harness에서 해당 경로를 제거한 뒤 감사 runtime 전체에서 `ERP-dev` 문자열이 남지 않았음을 확인했다. 이 예외 때문에 “직원 환경을 한 번도 읽지 않았다”라고 주장하지 않는다.
 
+첫 개선 체크포인트에서는 시작부터 직원 환경의 파일·해시·검색·DB·process·port를 모두 금지했고 접근은 0이었다. 아래 사전 해시 사건은 원 감사 단계의 역사 기록이며 이번 체크포인트에서 반복되지 않았다.
+
 ### 2.3 고정 환경
 
 | 항목 | 값 |
@@ -122,6 +130,8 @@ evidence status는 `READ_HASH_ONLY_BEFORE_PROHIBITION_UPDATE`로 기록했다.
 | Python | `3.12.0` |
 | Node.js | `v24.15.0` |
 | npm | `11.12.1` |
+
+첫 개선 체크포인트는 SHA `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`, Alembic `20260812_0019`, Python `3.12.0`을 유지했다. E2E 정본은 CI와 같은 Node `v20.20.2`이며, `verify_e2e.ps1`은 다른 major에서 Playwright 시작 전에 fail-closed하도록 보강했다.
 | frontend lock SHA-256 | `356998dc19dcaee6489a31f68c0f445aad7e5e1868997fcf6d841797bae9d970` |
 | 격리 backend/frontend | `127.0.0.1:8022` / `127.0.0.1:3101` |
 | PostgreSQL | 환경 부재로 `NOT_VERIFIED` |
@@ -302,14 +312,14 @@ SQLite 동시성 테스트는 파일 DB, WAL, `NullPool`, `BEGIN IMMEDIATE`로 �
 
 ### 4.5 불량 격리·해제·폐기·반품
 
-**판정: 독립 격리/해제/폐기/반품은 `PARTIAL`, 부서조정 `scrap`은 `FAILED`.**
+**원 감사 판정: 독립 격리/해제/폐기/반품은 `PARTIAL`, 부서조정 `scrap`은 `FAILED`. 첫 체크포인트에서 후자는 `IC-02`로 422 차단해 `VERIFIED`로 갱신했다.**
 
 창고 또는 정상 부서재고를 불량 버킷으로 옮길 때 총량은 보존되고, 해제는 같은 부서 정상 버킷으로 되돌린다. 폐기·공급사 반품은 불량 또는 정상 source를 줄이고 총재고도 줄인다. semantic duplicate 격리와 SQLite 동시성, ledger 실패 rollback 테스트가 있다.
 
 두 가지 계약 drift가 있다.
 
 - `approval_rules`는 defect quarantine을 승인 대상으로 표시하지만 StockRequest 생성은 defect type의 양 승인 플래그를 false로 강제해 즉시 완료한다. 화면/규칙과 실행 상태가 다르다. `backend/app/services/approval_rules.py:21-24`, `backend/app/services/stock_requests.py:207-224`
-- 부서조정 schema의 `scrap`은 서비스가 처리하지 않는다. 작업자는 성공으로 오해할 수 있으므로 이 표면은 `FAILED`다.
+- 원 감사 당시 부서조정 schema의 `scrap`은 서비스가 처리하지 않아 이 표면을 `FAILED`로 판정했다. 현재는 request schema와 service가 모든 subtype의 일반 부서조정 `scrap`을 transaction 전에 거부한다.
 
 ### 4.6 출하
 
@@ -433,7 +443,7 @@ PICKED_UP → pickup cancel → PREPARED
 | 35 | `/dept-adjustment/submit`, production | 활성 사번, PIN/승인 없음 | out `P-q,T-q`; defective `P-q,F+q,T0`; in `P+q,T+q` | BACKFLUSH/MARK_DEFECTIVE/PRODUCE+effect | `dept_adjustment.py:211-315`; SQLite 동시성만 |
 | 36 | 같은 API, disassembly | 동일 | 부모 out; 자식 normal/defective in | DISASSEMBLE/RECEIVE/MARK_DEFECTIVE+effect | `dept_adjustment.py:198-289`; service tests |
 | 37 | 같은 API, correction | 동일 | `P∓q,T∓q`; defective 이동은 T0 | ADJUST 또는 MARK_DEFECTIVE+effect | `test_dept_adjustment.py:278-298` |
-| 38 | 같은 API, `direction=scrap` | schema 허용, 승인 없음 | **어떤 셀도 바뀌지 않음**, HTTP 201/success/processed 0 | log/effect 없음 | `routers/dept_adjustment.py:63-68`; `services/dept_adjustment.py:33,198-207,233-250`; in-memory HTTP 재현 `FAILED` |
+| 38 | 같은 API, `direction=scrap` | **원 감사:** schema 허용, 승인 없음. **현재:** request validation 422 | 원 감사에서는 어떤 셀도 바뀌지 않은 채 HTTP 201/success/processed 0. 현재는 mutation 전 거부 | 현재 log/effect 없음·재고 불변 | 원 감사 in-memory HTTP `FAILED`; `IC-02` 이후 router/service RED→GREEN과 raw SQL 불변으로 `VERIFIED` |
 | 39 | `/production/receipt` | `producer_employee_code` optional; 누락 시 익명 귀속, 승인/PIN 없음 | 각 구성품 `P[home]-q,T-q`; 결과품 `P[to]+q,T+q` | BACKFLUSH/PRODUCE+effect; 전체 rollback | `schemas/item.py:162-164`, `inventory/_tx_helper.py:14-29`, `production_receipt.py:47-190`; SQLite 1승자 |
 | 40 | `/handovers/{id}/receive` | 수령부서 직원+PIN | `P[from]-q,P[to]+q,T0`; SUBMITTED→RECEIVED | TRANSFER_DEPT+effect; 재호출 no-op | `handover.py:181-232`; `test_handover.py:104-358`; PG 이중 수령 공백 |
 | 41 | `/defects/quarantine`, warehouse | 직원 존재 확인, active/PIN/role 없음 | `W-q,F[to]+q,T0` | MARK_DEFECTIVE+effect | `routers/defects.py:293-331`; semantic duplicate tests; actor 공백 |
@@ -509,6 +519,8 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `PLAUSIBLE_NOT_REPRODUCED` | 위험 경로는 있으나 필요한 경합·지연·dialect 실행을 못함 |
 | `POLICY_DECISION` | 코드 변경 전 제품 규칙을 정해야 함 |
 | `TEST_DEFECT` | 제품 결함이 아니라 검증 자체가 현재 계약을 따라가지 못함 |
+| `RESOLVED_CHECKPOINT_1` | 첫 품질 개선 체크포인트에서 실패 테스트와 회귀 검증을 거쳐 해소됨. 표의 원인·재현 근거는 역사 추적을 위해 유지 |
+| `MITIGATED_CHECKPOINT_1` | 첫 체크포인트의 정본 실행 경로는 안전해졌지만 보조 진입점·운영 정책 등 후속 범위가 남음 |
 
 우선순위는 `P0 데이터 손상·보안`, `P1 재고·업무 신뢰`, `P2 운영·테스트·유지보수`, `P3 위생`이다. P0/P1이라도 `PLAUSIBLE_NOT_REPRODUCED`이면 구현 전에 재현 테스트를 먼저 쓴다.
 
@@ -518,8 +530,8 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 |---|---|---|---|---|
 | `CQ-001` | P0 | `CONFIRMED` | 클라이언트가 피해 직원의 ID/header를 함께 보내 타 직원으로 위장하거나, 일부 경로는 익명/비활성 actor로 재고·출하 상태를 바꿔 감사 귀속을 오염시킬 수 있음 | mutation마다 클라이언트 body/header 직원 ID를 신뢰하고 서버가 발급·검증한 직원 귀속 session/token이 없음. `frontend/lib/api-core.ts:148`, `useCurrentOperator.ts:54,109-110`, StockRequest `routers/stock_requests.py:52-89`, defect `routers/defects.py:293-307,364-370`, production `routers/production.py:40-59`, shipping pickup `routers/shipping.py:576-579` |
 | `CQ-002` | P0 | `CONFIRMED` | 출하 픽업이나 생산의 로그 하나를 일반 취소하면 물리 재고와 업무 상태가 갈라질 수 있음 | 일반 취소가 shipping phase/request/allocation과 생산 관련 로그를 묶지 않고 effect만 역재생. `transaction_actions.py:201-247`, `production_receipt.py:116-196`, `shipping.py:953-988,1633-1768` |
-| `CQ-003` | P1 | `REPRODUCED` | 폐기 성공으로 오해했지만 수량·로그가 그대로 남음 | router schema는 `scrap` 허용, service의 타입·정렬·tx map은 in/out/defective만 처리. in-memory HTTP에서 201, `success=true`, `processed_count=0`, 생산/총재고 10→10, log 0→0 재현. `routers/dept_adjustment.py:63-68,159-193`, `services/dept_adjustment.py:33,198-207,233-250` |
-| `CQ-004` | P1 | `CONFIRMED` | 무결성 보정은 반영됐지만 audit가 없거나 보정 건수가 `?`로 남을 수 있음 | service 내부 commit 후 router가 audit와 두 번째 commit; `fixed_count` 오타. `services/integrity.py:57-71,121-160`, `routers/settings.py:164-185` |
+| `CQ-003` | P1 | `RESOLVED_CHECKPOINT_1` | 폐기 성공으로 오해했지만 수량·로그가 그대로 남았음 | 원인은 router schema가 `scrap`을 허용하지만 service가 처리하지 않은 계약 분리였다. 첫 체크포인트에서 모든 subtype의 일반 부서조정 `scrap`과 service 직접 unknown direction을 transaction 전에 거부하고, accepted line과 log 수가 다르면 전체 rollback하도록 수정했다. 전용 재작업 `scrap_qty`는 유지했다. RED 3 router + 5 service, GREEN 관련 34개와 독립 SQL 무변경 증거는 12.9절에 보존한다. |
+| `CQ-004` | P1 | `RESOLVED_CHECKPOINT_1` | 무결성 보정과 audit가 분리되거나 보정 건수가 `?`로 남을 수 있었음 | 원인은 service 내부 commit, router의 두 번째 commit, `fixed_count` 오타였다. 첫 체크포인트에서 service를 flush-only로 바꾸고 router가 PIN lazy change→repair→audit flush→한 commit을 소유하며 `report.repaired`를 기록하도록 수정했다. dry-run은 legacy·missing PIN도 지속하지 않고 audit/flush/commit 실패 rollback은 독립 SQL로 증명했다. |
 | `CQ-005` | P1 | `CONFIRMED` | 같은 key로 품목/수량을 바꾼 요청이 409가 아니라 이전 성공처럼 돌아와 새 작업이 조용히 버려질 수 있음 | IO/StockRequest key unique만 있고 payload fingerprint 비교 없이 기존 record 반환. `models/io_batch.py:58`, `routers/io.py:257-267`, `services/io_draft.py:165-185`, `models/stock_request.py:78-80`, `routers/stock_requests.py:90-100` |
 | `CQ-006` | P1 | `CONFIRMED` | 출하 준비로 잡아둔 품목을 생산·IO·일반 출고가 먼저 소비하여 픽업이 실패할 수 있음 | 출하 allocation은 별도 계층이고 다른 소비 primitive가 조회하지 않음. `shipping.py:858-899`, `io_dispatch.py:340-350,391-394`, `sr_execution.py:84-87,146-161`, `production_receipt.py:133-135` |
 | `CQ-007` | P1 | `CONFIRMED` | 창고 지도상 특수구역 수량이 출고 후 남거나, 중복 box row의 취소가 일부 행만 복원할 수 있음 | physical placement는 box+zone을 합치지만 출고/effect는 box만 처리. duplicate item insert 허용, effect는 box_id key와 `.first()` 사용. `warehouse_map.py:84-91,183-225,358-386`, `inv_effect.py:35-69,129-144`, `routers/warehouse_map/boxes.py:150-162,200-204` |
@@ -528,6 +540,9 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `CQ-011` | P1 | `CONFIRMED` | 출하 화면에 진입만 해도 미저장 경고가 뜨며 실제 수정 여부를 구분하지 못함 | `requestWork/prepWork/historyWork` view 이름으로 dirty를 정함. `DesktopShippingView.tsx:428-431` |
 | `CQ-012` | P1 | `CONFIRMED` | readiness 성공인데도 부서 예약·출하 allocation·box/zone 불일치가 남을 수 있음 | integrity hard-fail 범위가 warehouse pending/total/orphan 중심이며 location pending·allocation·map을 조회하지 않고 missing/zero effect는 WARN-only. `check_inventory_integrity.py:62-332,368-395`, `operational_readiness.py:90-104` |
 | `CQ-024` | P1 | `CONFIRMED` | 공정부서 출하의 수량을 정정하면 원래 출하 location이 아니라 창고 재고가 변해 위치별 수량이 틀어짐 | SHIP을 correctable로 허용하지만 correction은 항상 `new_warehouse`와 `adjust_warehouse`를 사용하고, shipping pickup은 department location을 소비. `routers/inventory/transactions.py:77-83,898-982`, `transaction_actions.py:122-150`, `shipping.py:1670-1688` |
+| `CQ-025` | P1 | `CONFIRMED` | 재고 KPI 숫자와 카드를 눌러 보이는 목록의 모집단이 달라 작업자가 “전체 품목” 수량을 잘못 이해할 수 있음 | KPI 숫자는 MES 코드의 `-PA-`/`-PF-` 품목을 제외하지만 summary와 카드 클릭 목록은 계속 포함하고 `ALL` 설명은 “전체 품목”이다. `useDesktopInventoryDerivations.tsx:21-24,47-76,89-99`, `_inventory_sections/inventoryFilter.ts:34-40`, `_hooks/__tests__/useDesktopInventoryDerivations.test.tsx:40-84` |
+| `CQ-027` | P0 | `RESOLVED_CHECKPOINT_1` | 기본 `backend/mes.db`와 실제 `DATABASE_URL` 대상이 갈려 잘못된 DB를 보호·검증할 수 있었음 | 첫 체크포인트에서 helper를 `bootstrap_db.py --check`의 machine-readable 결과만 해석하는 read-only adapter로 축소했다. helper는 DB path를 해석·열지 않고 backup/migration/restore도 수행하지 않는다. alternate SQLite URL과 sentinel DB의 SHA·mtime 불변을 Start/Report 실패 matrix에서 검증했다. |
+| `CQ-028` | P1 | `RESOLVED_CHECKPOINT_1` | 평상시 서버 시작이 DB migration을 수행하고 직원용 일반 시작이 전용 preflight를 우회할 수 있었음 | `start.bat`은 read-only readiness 결과가 0이 아니면 해당 exit code로 서버 시작 전에 중단한다. development는 명시적 `bootstrap_db.py --all`, employee profile은 승인된 sync/deploy 절차만 안내하며 helper의 mutation command는 0이다. |
 
 `CQ-007`의 “zone이 출고 source가 아니다”라는 구조는 확정이지만, 실제 어떤 zone부터 소비해야 하는지는 제품 정책이다. 중복 row 취소의 구체적 오복원은 동적 재현 후 수정을 확정한다.
 
@@ -542,6 +557,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `RV-005` | P1 | `PLAUSIBLE_NOT_REPRODUCED` | 창고 지도 move/restack이 전체 이전 snapshot으로 optimistic rollback하며 in-flight 재드롭 차단이 없음. `DesktopWarehouseMapView.tsx:338-450`, `WarehouseStages.tsx:621-664` | deferred 두 요청을 역순 성공/실패시켜 오래된 rollback이 최신 성공을 덮는지 hook/component test |
 | `RV-006` | P1 | `PLAUSIBLE_NOT_REPRODUCED` | 출하 BOM 자동/수동 match가 같은 state를 generation/abort 없이 갱신. `DesktopShippingView.tsx:1236-1252,1471-1498` | 두 payload의 응답 순서를 역전해 최신 fingerprint만 반영되는지 테스트. frozen인 것은 step 5 카드 크기뿐이며 hook/상태 계약 개선은 크기·layout을 건드리지 않음 |
 | `RV-007` | P1 | `POLICY_DECISION` | IO preview는 defect quarantine을 승인 대상으로 표시하지만 호환 StockRequest는 approval flag를 false로 강제해 즉시 완료한다. canonical `/api/defects/quarantine`는 명시적 즉시 경로와 semantic idempotency를 가짐. `io_preview.py:337-344,677-681`, `io_dispatch.py:167-198`, `stock_requests.py:207-224`, `routers/defects.py:293-342` | IO도 즉시 처리가 맞는지 승인 대기가 맞는지 결정하고 preview→submit E2E로 응답 상태와 수량을 고정 |
+| `RV-008` | P1 | `RESOLVED_CHECKPOINT_1` | 기존에는 두 schema 준비 실행이 같은 outdated check 뒤 stop/backup/migrate로 진입할 가능성이 있었음 | `IC-27`이 일반 start/report 경로의 write·stop·backup·migration을 모두 제거해 이 경로의 경합 자체가 사라졌다. 향후 명시적 prepare 도구를 새로 만들 경우에는 별도 target mutex와 두 process barrier 증명이 다시 필요하다. |
 
 “ShippingAllocation에 unique constraint가 없다”는 사실만으로 결함을 확정하지 않는다. final PF와 여러 companion을 별도 row로 저장하는 구조에서 어떤 business key가 유일해야 하는지 먼저 정의해야 한다. 필요한 것은 막연한 `(request_id,item_id)` unique가 아니라 active allocation identity와 상태 전이의 명시적 계약이다.
 
@@ -551,7 +567,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 |---|---|---|---|
 | `CQ-013` | `CONFIRMED` | backup verifier가 고정 20개 테이블만 검사하고 Alembic head/전체 schema를 증명하지 않는다. restore 기본은 inventory check도 선택 사항이다. | `scripts/ops/_verify_backup.py:28-93`, `scripts/ops/restore_db.py:221-248` |
 | `CQ-014` | `CONFIRMED` | readiness가 SQLite main DB mtime으로 backup freshness를 판단해 WAL에만 있는 후속 쓰기를 놓칠 수 있다. DB가 없을 때 eager check가 traceback하거나 일반 SQLite URL의 integrity subprocess가 빈 DB 파일을 만들 가능성도 있다. | `operational_readiness.py:49-92,114-128`, `backend/app/database.py:48-55` |
-| `CQ-015` | `TEST_DEFECT` | baseline E2E 8건이 실제 제품 실패가 아니라 disabled step-nav와 enabled CTA 중 첫 버튼을 고르는 stale helper로 실패한다. CI E2E도 non-blocking이다. | baseline DOM/screenshot, `.github/workflows/ci.yml:109-144` |
+| `CQ-015` | `RESOLVED_CHECKPOINT_1` | baseline E2E 실패의 stale selector와 자가승인 기대 drift를 Gate 0에서 고쳤고, 사용자가 닫을 수 있던 visible 전용 backend 콘솔도 숨김 실행으로 보강했다. CI E2E non-blocking은 `IC-20`, 보조 E2E 진입점의 Node 20 계약은 `CQ-030`으로 남는다. | RED 단일 0/1, focused 1/1·3/3, 무계측 Node 20 정본 전체 14/14, 숨김 backend 적용 후 전체 14/14. 12.9절 evidence |
 | `CQ-016` | `CONFIRMED` | backend CI는 Python 3.11 단일 버전과 pytest/compile/OpenAPI 중심이며 Ruff/mypy/필수 PostgreSQL job이 없다. | `.github/workflows/ci.yml:14-53` |
 | `CQ-017` | `CONFIRMED` | frontend `tsc`는 tests/e2e를 제외하고 coverage는 선택된 module whitelist만 측정한다. 전체 75%처럼 읽으면 안 된다. | `frontend/tsconfig.json:30-46`, `frontend/vitest.config.mts:11-54` |
 | `CQ-018` | `CONFIRMED` | 수동 DTO에 `package_out`이 빠지고 defect `mes_code` nullability가 backend와 다르다. | `frontend/lib/api/types/stock-requests.ts:18-36`, `frontend/lib/api/types/defects.ts:6-16`, `backend/app/routers/defects.py:48-58` |
@@ -560,6 +576,9 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `CQ-021` | `CONFIRMED` | production deploy를 주장하는 orphan `scripts/prod/deploy.ps1`이 pull exit, backup, migration, post-verify, health/restart를 보장하지 않는다. | `scripts/prod/deploy.ps1:1-20`; repo consumer 0 |
 | `CQ-022` | `CONFIRMED` | active 운영/온보딩 문서에 깨진 상대 링크, PostgreSQL 필수 서술과 현 SQLite 운영 충돌, `/legacy` URL drift가 있다. | `_attic/docs/operations/DAILY_OPERATION_CHECKLIST.md:37-45,129-135`, `_attic/ONBOARDING.md:41-54` |
 | `CQ-023` | `CONFIRMED` | 현재 dependency audit에 20건이 보고됐고 production Next와 dev tooling 취약점을 분리해 올려야 한다. | `frontend/package.json:19-40`, 감사 `npm audit --json` evidence |
+| `CQ-026` | `CONFIRMED` | handoff는 이미 열린 결과에서 다른 작성자로 바꿀 때만 animation을 요구하지만 구현·테스트는 첫 작성자 선택에도 적용한다. | `_attic/handoff/2026-07-24-shipping-sales-followup-todo.md:262-275`, `_daily_report/DailyWorkReportScreen.tsx:278-298`, 관련 test `:155-166` |
+| `CQ-029` | `RESOLVED_CHECKPOINT_1` | schema readiness는 `0=READY`, `2=NOT_READY`, `3=CHECK_ERROR`로 분리되고 status/watch가 이를 다른 label로 표시한다. | Start/Report × ready/not-ready/check-error/malformed/missing·wrong path/launch-error behavior matrix와 상시 Windows pytest wrapper |
+| `CQ-030` | `MITIGATED_CHECKPOINT_1` | 로컬 E2E가 Node 20을 강제하지 않아 Node 24 PATH에서 Next worker 조기 종료와 연결 거부 연쇄 실패가 발생할 수 있었음 | Gate 0에서 Node 24 실패와 무계측 Node 20 14/14를 비교한 뒤 정본 `verify_e2e.ps1`과 `verify_local -IncludeE2E`가 Node major 20을 Playwright 전에 강제하도록 보강했다. Windows behavior test가 Node 20에서는 npx 호출, Node 24에서는 호출 0과 fail-closed, full gate의 wrapper 위임을 검증한다. `npm run test:e2e` 같은 보조 진입점과 `.nvmrc`·`engines.node` 설치 안내는 `IC-20` 후속 범위다. |
 
 ### 6.5 보존해야 할 현재 강점
 
@@ -593,16 +612,16 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 |---|---|---|---|
 | `QP-001` 결과 불명·semantic idempotency | **미해결** | frontend timeout은 abort/key 보존이 없고 IO/StockRequest는 fingerprint가 없다. defect의 semantic 409 패턴만 참고 자산이다. `api-core.ts:210-235`, `useIoSubmit.ts:20-44`, `io.py:257-267` | `IC-09` |
 | `QP-002` 행위자 위조 차단 | **미해결** | 공통 VerifiedActor 없이 body/header ID, 일부 익명/비활성 actor mutation이 남는다. | `IC-01` |
-| `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock은 강화됐지만 운영 DB 결정, 필수 PostgreSQL concurrency gate는 닫히지 않았다. `database.py:22-63`, `tests/concurrency/conftest.py:36-68` | `IC-08`, `IC-18`, `IC-20` |
+| `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock이 있고 `IC-27`로 startup check의 DB identity 분리는 해소됐다. 다만 운영 DB 결정과 필수 PostgreSQL concurrency gate는 닫히지 않았다. `database.py:22-63`, `tests/concurrency/conftest.py:36-68` | `IC-08`, `IC-18`, `IC-20`; `IC-27` 완료 |
 | `QP-004` 승인 정책 단일 진실 | **부분 해결** | 입출고 subtype 상수와 drift test는 생겼지만 role/self/admin/list/count/button 판정은 같은 policy를 쓰지 않는다. `approval_rules.py:1-29`, `sr_execution.py:453-483` | `IC-24`; IO defect 표시/실행은 별도 `RV-007` 결정 |
 | `QP-005` 불량 idempotency·actor | **부분 해결** | same-key/different-payload semantic matcher와 중복 race는 해결. actor 검증은 공통 경계가 없어 미해결. `defects.py:135-167,293-342`, `test_defect_flow.py:323-472` | `IC-01` |
 | `QP-006` 출하 원자 상태 전이 | **미해결** | action transaction은 생겼지만 request/allocation 상태 직렬화, command receipt, 공통 예약은 없다. | `IC-07`, `IC-08` |
 | `QP-007` 거래 정정·취소 수명주기 | **미해결** | 서비스 위임은 개선됐지만 복합 생산/출하의 업무 상태를 일반 effect 취소가 함께 되돌리지 않고 SHIP correction wrong-bucket도 있다. | `IC-03`, `IC-10` |
-| `QP-008` integrity repair 단일 commit | **미해결** | service 내부 commit과 router audit 두 번째 commit, `fixed_count` 오타가 그대로다. | `IC-05` |
+| `QP-008` integrity repair 단일 commit | **해결** | `IC-05`에서 service 내부 commit을 제거하고 router가 repair→audit flush→한 commit을 소유한다. audit summary는 `report.repaired`를 사용하며 audit/flush/commit 실패가 재고·audit를 함께 rollback함을 독립 SQL로 증명했다. | `IC-05` 완료 |
 | `QP-009` soft-deleted 품목 계약 | **미해결** | repository/IO lookup이 deleted item을 반환하고 delete가 open command를 확인하지 않는다. | `IC-11` |
 | `QP-010` 부서 dirty/save Promise | **미해결** | parent dirty false 고정과 void save가 남는다. | `IC-12` |
 | `QP-011` 출하 BOM race·dirty 의미 | **미해결** | dirty는 view 기반으로 확정 drift, BOM match는 generation/abort 없이 경쟁 가능하다. step 5 frozen layout을 건드리지 않고 hook/baseline만 고친다. | `IC-13` |
-| `QP-012` 필수 E2E gate | **미해결** | CI E2E가 `continue-on-error: true`, 현 baseline helper도 8건 stale selector 실패다. `.github/workflows/ci.yml:109-144` | `IC-20` |
+| `QP-012` 필수 E2E gate | **미해결** | Gate 0에서 stale selector와 자가승인 기대 drift를 고치고 visible 전용 backend 콘솔을 숨김 실행으로 보강해 로컬 Node 20 정본 14/14를 복구했다. 그러나 CI E2E가 여전히 `continue-on-error: true`라 회귀를 차단하지 못한다. `.github/workflows/ci.yml:109-144` | `IC-20` |
 | `QP-013A` 공통 식별 경계 | **미해결** | VerifiedActor, mutation rate/identity boundary가 없다. PIN rate limiter는 일부 employee 경로뿐이다. | `IC-01` |
 | `QP-013B` PIN 보안 이행 | **대체** | 현재 SHA256/default PIN은 식별용이라는 정책이 유지된다. 인증 수단으로 격상할지는 별도 제품·운영 결정이며 이번 재고 카드에 몰아넣지 않는다. `pin_auth.py:1-29` | 결정 시 독립 security plan |
 | `QP-014` backend 품질 gate | **부분 해결** | pytest/compile/OpenAPI는 있으나 Ruff/mypy/Python matrix/필수 PG job은 없다. | `IC-20` |
@@ -612,7 +631,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `QP-018` shipping frontend module 심화 | **근거 부족** | 대형 조정 component는 남지만 구조 분해 자체보다 QP-006/011과 pagination이 선행이다. 선행 seam을 닫은 뒤 다시 측정한다. | `IC-13`, `IC-16`, `IC-24` 후 재평가 |
 | `QP-019` desktop/mobile IO 공통화 | **해결** | 두 shell이 실제로 `useIoSubmit` 등 공용 hook을 사용해 ADR-0003과 일치한다. 추가 통합을 위한 중복 결함 근거가 없다. | 변경 없음 |
 | `QP-020` OpenAPI↔frontend type | **미해결** | OpenAPI drift gate는 있으나 frontend는 수동 DTO이며 `package_out`/nullable drift가 확인됐다. | `IC-21` |
-| `QP-021` health·오류·shipping 조회 | **부분 해결** | live DB ping과 history pagination은 있으나 true liveness/readiness 분리, active list pagination, mobile load-more가 부족하다. | `IC-16`, `IC-19` |
+| `QP-021` health·오류·shipping 조회 | **부분 해결** | live DB ping과 history pagination이 있고 `IC-27`로 schema report exit 의미는 분리됐다. true liveness/readiness 분리, active list pagination, mobile load-more는 부족하다. | `IC-16`, `IC-19`; `IC-27` 완료 |
 | `QP-022` bundle·responsive shell·문서 | **부분 해결** | build/bundle gate는 통과. client width shell swap/static import와 문서 drift는 남는다. responsive shell은 `IC-24`에서 실제 bundle/render 측정 후 변경 여부를 결정하고 문서는 `DOC-01`로 고친다. | `IC-24`, `DOC-01` |
 | `QP-023` 측정형 위생 | **부분 해결** | BOM cache와 query-zero test는 개선됨. SWR/useResource 미사용, hook suppression, BOM bytes, dependency는 측정 후 처리한다. | `IC-22`, `IC-24`, `AT-01` |
 
@@ -620,9 +639,9 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 | 상태 | 수 |
 |---|---:|
-| 해결 | 1 |
+| 해결 | 2 |
 | 부분 해결 | 9 |
-| 미해결 | 12 |
+| 미해결 | 11 |
 | 대체 | 1 |
 | 근거 부족 | 1 |
 
@@ -646,12 +665,24 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 ### 8.2 Wave 1 — 실제 재고 불일치·부분 commit·잘못된 취소
 
+#### `IC-27` 서버 시작의 read-only DB 경계
+
+- **체크포인트 상태:** `완료`. behavior RED/GREEN, Windows pytest 상시 편입, 실제 schema check 30초 timeout과 hang→exit 3까지 완료했다. 제품 API·schema 변화는 없다.
+- **작업자 영향:** 평상시 서버 시작이 어떤 DB도 변경하지 않으며, ready 표시는 실제 `DATABASE_URL` 대상의 read-only 검사 결과만 의미한다.
+- **근거/근본 원인:** 최신 delta의 `CQ-027`~`CQ-029`. PowerShell helper는 고정 `backend/mes.db`를 보호하지만 Python check/migrate는 `DATABASE_URL`을 사용했고 start/report/prepare 의미와 exit code가 섞였다.
+- **수정 경계:** `ensure-schema-ready.ps1`의 `Start`와 `Report`를 모두 `bootstrap_db.py --check`만 실행하는 read-only adapter로 축소한다. stop, backup, migration, restore, 사후 mutation 검사를 제거한다. `start.bat`은 nonzero에서 서버를 시작하지 않고 development에는 명시적 `bootstrap_db.py --all`, employee에는 승인된 동기화·배포 절차를 안내한다. status/watch는 exit 의미를 그대로 표시한다.
+- **API/type/schema:** 제품 API와 제품 DB schema 변화 없음. helper 종료 계약은 `0=READY`, `2=NOT_READY`, `3=CHECK_ERROR`로 고정한다. `bootstrap_db.py --check`의 machine-readable output으로 not-ready와 실행 오류를 구분하되 helper가 별도 DB path를 추측하지 않는다.
+- **실패·복구 정책:** target을 해석하지 못하거나 check process를 시작할 수 없거나 30초 안에 끝나지 않으면 exit 3, 정상 check 결과가 구버전/불일치면 exit 2다. 두 경우 모두 server start와 DB write는 0이다. 일반 start는 backup·migration·자동 restore를 절대 수행하지 않는다.
+- **테스트:** alternate SQLite `DATABASE_URL`과 sentinel `backend/mes.db`, ready/not-ready/check error/hang, missing/wrong path, start의 migration 호출 0, status/watch의 distinct exit 표시, helper source의 write command 부재를 임시 root·가짜 command로 검증한다. 직원 경로·DB·프로세스·포트에는 접근하지 않는다.
+- **합격 조건:** (1) start 경로 DB write 0, (2) helper의 stop/backup/migrate/restore 호출 0, (3) check가 참조하는 DB identity는 `DATABASE_URL` 하나, (4) READY/NOT_READY/CHECK_ERROR가 exit로 구분, (5) non-ready/error 뒤 server process 0, (6) 제품 API/schema 변화 0.
+- **의존성/롤백:** 최신 delta에서 발견된 P0 보호 경계이므로 다른 카드보다 먼저 배포한다. rollback도 read-only check를 유지하며 interactive migration으로 돌아가지 않는다. 명시적 prepare/deploy 안전성은 `IC-17`·`IC-18`에서 별도 완성한다.
+
 #### `IC-01` 서버 검증 직원 세션과 VerifiedActor mutation 경계
 
 - **작업자 영향:** 누가 수량을 바꿨는지 믿을 수 없으면 수량이 맞아도 원장과 책임 추적을 믿을 수 없다.
 - **근거/근본 원인:** `CQ-001`. router마다 body UUID, 사번 header, 이름 문자열, 무입력을 다르게 신뢰한다.
-- **수정 경계:** 로그인 성공 시 backend가 직원 귀속 session을 발급하고 HttpOnly/SameSite cookie 또는 서명 bearer를 검증한다. `backend/app/dependencies/verified_actor.py`는 이 서버 검증 identity에서 actor를 만들며 StockRequest, IO, defect, production, shipping, dept-adjustment mutation router가 동일 actor object만 service에 전달한다. `_actor.py`는 request context adapter로 축소하고 frontend `sessionStorage` 값은 표시 편의일 뿐 권한 source로 쓰지 않는다.
-- **API/type/schema:** 기존 header/body 직원 값은 호환 표시/요청 대상 값으로만 받고 verified session actor와 다르면 403이다. active 직원, endpoint별 부서/role을 서버에서 검증한다. session table 또는 서명 key/만료/revocation 저장 방식은 보안 설계에서 결정하되 단순 “header와 body가 같다”를 인증으로 간주하지 않는다. 기존 audit UUID/code는 유지한다.
+- **수정 경계:** 로그인 성공 시 backend가 무작위 opaque token의 SHA-256만 DB session table에 저장하고, 브라우저에는 HttpOnly·SameSite=Lax session cookie를 발급한다. 절대 만료는 12시간이며 로그아웃, PIN 변경·초기화, 직원 비활성화·삭제, backend `boot_id` 변경에서 즉시 폐기한다. `backend/app/dependencies/verified_actor.py`는 이 서버 검증 identity에서 actor를 만들며 StockRequest, IO, defect, production, shipping, dept-adjustment mutation router가 동일 actor object만 service에 전달한다. `_actor.py`는 request context adapter로 축소하고 frontend `sessionStorage` 값은 표시 편의일 뿐 권한 source로 쓰지 않는다.
+- **API/type/schema:** `POST /api/operator-session/login`, `GET /api/operator-session`, `DELETE /api/operator-session`을 추가하고 기존 PIN 확인 endpoint는 한 release 동안 같은 cookie를 발급하는 호환 alias로 둔다. 기존 header/body 직원 값은 표시/요청 대상 값으로만 받고 verified session actor와 다르면 403이다. active 직원, endpoint별 부서/role을 서버에서 검증한다. 기존 audit UUID/code는 유지한다.
 - **실패·취소·경합 정책:** actor 검증 실패는 mutation 전에 401/403으로 끝나며 재고·요청·로그·event가 0이어야 한다. actor는 transaction 중간에 다시 body 값으로 교체할 수 없다.
 - **테스트:** 정상 session, 무서명/변조/만료/revoked session, sessionStorage/header/body만 피해자 값으로 맞춘 위장, 비활성 actor, 다른 body/header, 타 부서 actor matrix. 픽업·생산·불량의 실제 delta와 audit actor까지 확인한다.
 - **합격 조건:** 공통 dependency를 우회하는 활성 재고 mutation router가 0이고, 피해자 ID/header만 아는 client가 피해자로 mutation할 수 없으며 모든 mismatch가 mutation 0을 증명한다.
@@ -659,15 +690,15 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-02` 부서조정 `scrap` 무음 성공 제거
 
+- **체크포인트 상태:** `완료`. 일반 부서조정 `scrap`은 모든 subtype에서 422이고 service 직접 호출도 transaction 전에 fail-closed한다. 요청 enum·frontend submit type·OpenAPI baseline을 함께 좁혔고 관련 backend 34개와 frontend typecheck, 명세·품질 review를 통과했다.
 - **작업자 영향:** 폐기 완료 메시지를 믿었는데 수량이 남는 직접 오류를 제거한다.
-- **근거/근본 원인:** `CQ-003` 동적 재현. Pydantic 허용값과 service `AdjDirection`, 처리 순서, transaction type map이 다르다.
-- **수정 경계:** `routers/dept_adjustment.py`, `services/dept_adjustment.py`, desktop/mobile 해당 payload producer와 테스트.
-- **업무 결정:** `disassembly`의 scrap은 “부모 분해 후 회수되지 않은 이론 자식”으로만 허용하고 물리 자식 입고 없이 명시적 audit log를 남긴다. `production`과 `correction`의 단독 scrap은 기존 정상재고를 폐기하는 별도 명령과 혼동되므로 422로 거부하고 정상재고 폐기 API를 안내한다. 이 규칙이 현업 의도와 다르면 구현 전에 카드만 보류하고 무음 성공은 즉시 422로 차단한다.
-- **API/type/schema:** enum은 subtype별 discriminated validation으로 좁힌다. DB schema 변경 없음. response의 `processed_count=0`이 입력 line>0일 때 성공할 수 없게 한다.
-- **실패·취소 정책:** invalid combination은 transaction 진입 전 422; disassembly scrap informational log의 취소 정책은 부모 업무 batch와 함께만 취소 가능해야 한다.
-- **테스트:** 이번 재현을 정식 router regression으로 이전하고 production/correction 422, disassembly mixed normal/defective/scrap, 후반 실패 rollback, 일반 취소 차단을 검증한다.
-- **합격 조건:** 어떤 accepted line도 처리/명시적 informational outcome 없이 사라지지 않으며, success count와 입력 decision count의 계약이 문서화된다.
-- **의존성/롤백:** 독립 국소 수정이며 `IC-01`과 병렬 개발 가능하다. validation 강화만 먼저 배포 가능하고, 새 scrap 처리에서 문제 시 accepted 범위를 다시 422로 좁히되 무음 성공으로는 돌아가지 않는다.
+- **근거/근본 원인:** 원 감사의 `CQ-003` 호출 경로에서 Pydantic은 `scrap`을 받지만 service 처리 순서·transaction type map은 이를 처리하지 않아 입력 line이 성공 응답 안에서 사라졌다. 현재는 아래 수정 경계로 해소됐다.
+- **수정 경계:** 첫 배포에서는 `/api/dept-adjustment/submit`의 `scrap`을 모든 subtype에서 422로 차단한다. router validation뿐 아니라 service 직접 호출도 알 수 없는 direction을 transaction 전에 거부한다. accepted line 수와 생성된 거래 수가 다르면 성공할 수 없게 하고, frontend 부서조정 submit 타입에서만 `scrap`을 제거한다. 재작업 화면의 `scrap_qty` 결정 타입과 `REWORK_NORMAL`·`DEFECT_DISASSEMBLE` 전용 흐름은 유지한다.
+- **API/type/schema:** 기존 부서조정 request의 허용 enum만 좁아진다. response와 DB schema 변화 없음. 일반 부서조정 요청만으로 이론 자식·업무 batch·취소 귀속을 증명할 수 없으므로 informational scrap log는 이번 카드에서 추가하지 않는다.
+- **실패·취소 정책:** `scrap` 또는 알 수 없는 direction은 transaction 진입 전 422이며 재고·요청·로그가 0이어야 한다. 처리된 거래 수가 accepted line 수와 다르면 전체 rollback한다.
+- **테스트:** router/service 각각의 scrap 거부, service의 알 수 없는 direction, 혼합 line에서 transaction 전 거부와 부분 로그 0, 정상 in/out/defective의 정확한 processed count를 검증한다.
+- **합격 조건:** 부서조정의 어떤 accepted line도 처리 없이 사라지지 않고, `scrap`은 모든 subtype에서 422이며 전용 재작업 `scrap_qty` 경로에는 delta가 없다.
+- **의존성/롤백:** 독립 국소 수정이며 `IC-01`과 병렬 개발 가능하다. rollback도 `scrap`을 무음 허용하지 않고 fail-closed 422를 유지한다.
 
 #### `IC-03` 업무 수명주기와 일반 거래취소 분리
 
@@ -685,7 +716,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 - **작업자 영향:** 새 기준 재고를 올린 직후 과거 출하가 다시 차감하는 위험을 제거한다.
 - **근거/근본 원인:** `RV-002`. cutover의 삭제 집합과 shipping lifecycle의 소유권이 분리되어 있다.
 - **수정 경계:** `scripts/ops/inventory_cutover.py`, cutover runbook, 관련 ops tests. 제품 runtime shipping service는 cutover용 우회 로직을 넣지 않는다.
-- **업무 결정:** 기본 정책은 shipping history를 유지하는 `--keep-history`를 허용하지 않고, 어떤 ShippingRequest/Allocation도 새 baseline 이후 물리 재고를 증감할 전용 pickup/pickup-cancel 경로가 남지 않을 때만 apply한다. 승계가 필요하면 nonterminal뿐 아니라 `PICKED_UP/CONSUMED`의 역취소 가능성까지 포함한 모든 lifecycle을 내보내 별도 migration plan으로 승인한다. 자동 삭제는 기본값으로 두지 않는다.
+- **업무 결정:** shipping history를 유지하는 `--keep-history`는 허용하지 않는다. 상태×allocation 조합상 향후 pickup·cancel 등으로 재고를 다시 증감할 수 있는 `ShippingRequest` 또는 `ShippingAllocation`이 하나라도 존재하면 cutover를 0 mutation으로 fail-closed한다. 단순히 terminal row가 존재한다는 이유만으로 영구 차단하지 않고, 각 조합의 미래 허용 command와 inventory delta 가능성을 선언적 표로 판정한다. 승계가 필요하면 nonterminal뿐 아니라 `PICKED_UP/CONSUMED`의 역취소 가능성까지 포함한 모든 lifecycle을 내보내 별도 migration plan으로 승인한다. 자동 삭제·자동 승계는 기본값으로 두지 않는다.
 - **API/type/schema:** CLI preflight와 evidence report만 변경, schema 없음. 결과에 request/status/allocation 합과 차단 이유를 남긴다.
 - **실패·취소 정책:** preflight 실패는 어떠한 테이블도 변경하지 않는다. apply 중 실패는 기존 single transaction rollback과 backup 복구 경로를 유지한다.
 - **테스트:** REQUESTED/PREPARING/PREPARED/PICKED_UP/CANCELLED별 cutover, active/released/consumed allocation, `--keep-history` 거부, cutover→pickup과 cutover→pickup-cancel 차단, dry-run/apply, 후반 failure rollback.
@@ -694,12 +725,13 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-05` 무결성 복구·audit 단일 transaction
 
+- **체크포인트 상태:** `완료`. service flush-only, router 단일 commit, 정확한 repaired count, dry-run 0 write와 네 실패 지점 rollback을 검증했다. legacy 평문 PIN migration과 누락 PIN 생성도 dry-run에서는 지속하지 않고 실제 repair의 같은 최종 commit에 포함한다.
 - **작업자 영향:** 재고 보정이 있으면 반드시 정확한 감사 흔적이 함께 남는다.
 - **근거/근본 원인:** `CQ-004`. service commit과 router audit commit이 분리되고 field 이름이 틀렸다.
 - **수정 경계:** `services/integrity.py`는 mutation 후 `flush`와 `RepairReport`만 반환하고, `routers/settings.py` action boundary가 repair→audit→한 commit을 소유한다.
 - **API/type/schema:** response field는 기존 `repaired` 유지, schema 없음. audit summary도 `report.repaired` 사용.
-- **실패·취소 정책:** audit insert, event, final commit 어느 단계가 실패해도 repair가 rollback된다. dry-run은 write/audit 0이다.
-- **테스트:** audit add/flush/commit fault injection, 정확한 repaired count, no mismatch, 20개 sample cap, retry.
+- **실패·취소 정책:** inventory flush, audit record/flush, final commit 어느 단계가 실패해도 repair·PIN lazy change·audit가 함께 rollback된다. dry-run은 PIN 생성·migration을 포함해 write/audit/commit 0이다.
+- **테스트:** inventory flush, audit record/flush, final commit fault injection, 정확한 repaired count, no mismatch, 20개 sample cap, legacy 평문·누락 PIN의 dry-run 0 commit과 실제 repair 1 commit.
 - **합격 조건:** service 내부 commit 0, 실패 주입 후 quantity/audit 모두 before와 같고 정상 시 둘 다 한 commit으로 존재.
 - **의존성/롤백:** 독립 국소 수정이며 `IC-01`과 병렬 개발 가능하다. transaction owner 변경은 schema가 없어 코드 revert 가능하고, 잘못 남은 과거 `?` audit은 변경하지 않고 새 기록부터 정확히 쓴다.
 
@@ -708,12 +740,12 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 - **작업자 영향:** 지도상 재고와 창고 총재고가 출고·취소 뒤 달라지는 위험을 줄인다.
 - **근거/근본 원인:** `CQ-007`. reconcile source와 outbound/effect source가 다르고 중복 row identity가 불명확하다.
 - **수정 경계:** 1차 change는 read-only duplicate/placement report와 정책 ADR만 작성한다. 정책 승인 뒤에만 `warehouse_map` service, `inv_effect`, box/zone schemas/routers, integrity checks를 수정한다.
-- **업무 결정:** W가 회계 source이고 B/Z가 배치 표현인지, B/Z 합이 곧 W인 강한 source인지 선택한다. 추천은 tracking 활성 품목에서 `B+Z=W`를 강제하고 출고 source priority를 명시하는 것이다. zone-only 재고 처리와 입고 시 배치 미지정 상태도 함께 정한다.
+- **업무 결정:** `W`는 회계 총량이고, tracking 활성 품목의 물리 배치 원장은 `B + Z + U = W`를 항상 만족해야 한다. `B`는 box, `Z`는 special zone, `U`는 명시적인 미배치 bucket이다. 위치가 정해지지 않은 입고를 숨은 차이로 남기지 않고 `U`에 기록하며, 출고 command는 작업자가 실제 source를 고르거나 사전에 확정된 결정적 priority를 사용해야 한다.
 - **API/type/schema:** 동일 container 내 `(container_id,item_id)` unique 또는 명시적 line identity가 필요하면 migration과 duplicate merge report를 먼저 만든다. 임의 merge 금지.
 - **실패·취소 정책:** consume/cancel effect는 실제 변경한 box/zone row 모두를 stable row ID로 기록한다. 부분 복원 금지.
 - **테스트:** preflight가 mutation 0인지 먼저 검증한 뒤, 승인된 정책에 대해 box+zone 혼합, zone-only, 동일 item 중복 row, consume/cancel, 부족, 동시 restack/outbound, legacy duplicate를 검증한다.
-- **합격 조건:** tracking 활성 행에서 W, B+Z, effect delta가 항상 일치하고 integrity가 불일치를 blocking fail로 잡는다.
-- **의존성/롤백:** 업무 owner의 W/B/Z source-of-truth 승인이 선행이다. migration 전 duplicate report를 보존하고 new identity column은 additive로 시작한다. 정책 배포 실패 시 outbound를 fail-closed로 전환한다.
+- **합격 조건:** tracking 활성 행에서 `W`, `B+Z+U`, effect delta가 항상 일치하고 integrity가 불일치를 blocking fail로 잡는다.
+- **의존성/롤백:** 위 `W/B/Z/U` 정책은 승인 완료 상태다. 구현 전 duplicate report를 보존하고 new identity column은 additive로 시작한다. 정책 배포 실패 시 outbound를 fail-closed로 전환한다.
 
 ### 8.3 Wave 2 — 예약·멱등성·잠금·원자 상태 전이
 
@@ -831,6 +863,17 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 - **합격 조건:** active endpoint가 무제한 전체 목록을 반환하지 않고, desktop/mobile이 같은 정렬·중복 제거 계약을 사용한다.
 - **의존성/롤백:** backend query plan과 frontend adapter를 같은 change에서 검증한다. 호환 endpoint/response adapter를 한 release 유지한다.
 
+#### `IC-25` 재고 KPI 모집단을 작업자에게 명시
+
+- **작업자 영향:** KPI 카드 숫자와 카드를 눌러 나온 목록 행 수가 다른 이유를 화면에서 즉시 이해하게 한다.
+- **근거/근본 원인:** `CQ-025`. 숫자는 PA·PF를 제외하지만 summary와 목록 filter는 PA·PF를 포함하고 현재 설명은 이를 구분하지 않는다.
+- **수정 경계:** `useDesktopInventoryDerivations.tsx`의 `ALL` hint를 `PA·PF 제외 품목`으로 바꾸고 공용 KPI panel에 `KPI 숫자는 PA·PF 중간품목을 제외하며, 좁힌 목록에는 PA·PF가 표시될 수 있음`을 상시 표시한다. PA/PF 판별, 네 숫자, `matchesKpi`, `onSummaryChange`, 생산 가능수량 계산은 바꾸지 않는다.
+- **API/type/schema:** 없음. desktop/mobile이 같은 hook과 panel 계약을 소비한다.
+- **실패·갱신 정책:** loading·filter 변경 중에도 모집단 설명을 숨기지 않는다. 검색·부서·공정 filter와 카드 클릭 결과는 현행을 유지한다.
+- **테스트:** hook characterization에서 숫자 제외와 목록 포함을 유지하며 새 hint를 검증하고, KPI panel 및 desktop/mobile smoke에서 네 숫자와 설명 문구가 함께 보이는지 확인한다.
+- **합격 조건:** 네 숫자를 전체 목록 행 수로 오인하게 만드는 `전체 품목` 문구 0, PC·모바일 설명 누락 0, 기존 숫자·목록·callback delta 0.
+- **의존성/롤백:** 물리 재고 카드와 독립된 Wave 3 표시 계약이다. 안내 문구와 hint만 되돌릴 수 있으며 API·DB 계산에는 영향이 없다.
+
 ### 8.5 Wave 4 — 원장·무결성·운영 readiness
 
 #### `IC-17` 재고 integrity를 모든 표현 계층의 blocking gate로 확장
@@ -870,13 +913,14 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-20` 필수 E2E·test type·PostgreSQL gate 복구
 
+- **체크포인트 상태:** `부분 완료`. stale selector·자가승인 기대를 바로잡고 전용 backend를 숨김 실행해 Node 20에서 14/14를 복구했으며, `verify_e2e.ps1`은 다른 Node major에서 Playwright 전에 fail-closed한다. CI blocking, version file/`engines.node`, test typecheck와 PostgreSQL job은 후속 범위다.
 - **작업자 영향:** 실제로 깨진 재고/승인/화면 흐름이 CI에서 초록으로 통과하지 못하게 한다.
-- **근거/근본 원인:** `CQ-015`~`CQ-017`.
-- **수정 경계:** baseline helper를 role/name/visible+enabled 계약으로 고치고 핵심 smoke E2E는 blocking job으로 분리한다. 별도 test tsconfig로 unit/e2e typecheck, backend Ruff/mypy 단계적 baseline, PostgreSQL concurrency job을 추가한다.
+- **근거/근본 원인:** 체크포인트에서 해결한 `CQ-015`, `CQ-030`과 남은 `CQ-016`, `CQ-017`.
+- **수정 경계:** 완료된 selector/runtime guard를 유지하고 핵심 smoke E2E는 blocking job으로 분리한다. Node 20 버전 파일과 `engines.node`로 설치 단계도 맞춘다. 별도 test tsconfig로 unit/e2e typecheck, backend Ruff/mypy 단계적 baseline, PostgreSQL concurrency job을 추가한다.
 - **API/type/schema:** 없음. CI artifact naming과 required check 설정 변경.
 - **실패 정책:** flaky 격리는 quarantine 목록·owner·만료일이 있는 경우만 허용하고 핵심 재고 smoke는 `continue-on-error` 금지.
-- **테스트:** 현 14 E2E, inventory/approval/shipping smoke, test source typecheck, PG race matrix.
-- **합격 조건:** baseline E2E 14/14, 필수 job non-optional, tests/e2e type error가 CI를 실패시킴.
+- **테스트:** Node 20에서 현 14 E2E, 지원하지 않는 Node major의 명시적 fail-fast, inventory/approval/shipping smoke, test source typecheck, PG race matrix.
+- **합격 조건:** baseline E2E 14/14, 전용 backend 콘솔 노출 0, 로컬·CI Node major drift 0, 지원하지 않는 runtime에서 Next worker cascade 전 명시적 오류, 필수 job non-optional, tests/e2e type error가 CI를 실패시킴.
 - **의존성/롤백:** `IC-08`·`IC-10` 완료 선언에 필요한 선행 infrastructure다. 신규 broad lint는 기존 debt를 baseline file로 단계 적용하되 핵심 E2E/PG safety job은 optional로 되돌리지 않는다.
 
 #### `IC-21` OpenAPI 기반 frontend DTO 연결
@@ -925,13 +969,24 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 ### 8.7 Wave 6 — 문서 정합성과 `_attic` 물리 이전
 
+#### `IC-26` 일일보고 작성자 전환 animation 계약 정합화
+
+- **작업자 영향:** 첫 작성자 조회는 즉시 열리고 이미 보고 있던 작성자에서 다른 작성자로 이동할 때만 전환 맥락을 제공한다.
+- **근거/근본 원인:** `CQ-026`. handoff의 확정 동작과 구현·테스트가 서로 다르다.
+- **수정 경계:** 작성자 클릭 직전 선택값이 존재하고 새 ID와 다를 때만 결과 animation을 한 번 활성화한다. 첫 선택, 같은 작성자 재선택, 내 일보↔전체 일보, 날짜 변경, 거래 상세 toggle에는 적용하지 않는다. query, read-only 권한, save/dirty guard는 유지한다.
+- **API/type/schema:** 없음.
+- **실패·이동 정책:** loading/error/empty 결과에서도 같은 전환 판정을 사용하고 `prefers-reduced-motion` 계약을 유지한다.
+- **테스트:** 첫 작성자 선택에는 class 0, 두 번째 다른 작성자에는 1회, 같은 작성자·탭·날짜·상세 toggle에는 0을 검증한다.
+- **합격 조건:** 서로 다른 작성자 간 전환만 animation 1회이며 조회·권한·저장·dirty 동작 delta 0.
+- **의존성/롤백:** 데이터 카드와 독립된 Wave 6 UX 정합화다. 단일 화면 상태와 관련 테스트만 되돌린다.
+
 #### `DOC-01` live 문서 정합화
 
 - **작업자 영향:** 잘못된 URL·DB·검증 명령으로 운영자가 안전하지 않은 경로를 실행하는 일을 막는다.
-- **근거/수정 경계:** `CQ-022`. daily checklist의 깨진 script 링크·DB 서술, onboarding의 `/legacy`와 5-gate drift, glossary broken link, stale architecture 표지를 live code에 맞춘다.
+- **근거/수정 경계:** `CQ-022`. daily checklist의 깨진 script 링크·DB 서술, onboarding의 `/legacy`와 5-gate drift, glossary broken link, stale architecture 표지를 live code에 맞춘다. 활성 handoff의 직원 서버 과거 관찰에는 `[HISTORICAL — 재확인 금지]`를 붙이고, 실행 지시는 detached 감사·개선 워크트리의 전용 DB와 전용 port만 가리키게 한다. 직원 환경의 파일·DB·프로세스·port는 읽기·조회·연결·비교도 금지한다고 명시한다.
 - **API/schema·실패 정책:** 제품 API/schema 변화 없음. 존재하지 않는 명령을 추측해 쓰지 않고 실행 불가능한 항목은 명시적으로 deprecated/역사 자료로 표기한다.
 - **테스트:** 모든 상대 링크 존재, 명령 dry parse, `/mes` 실제 route, `verify_local` 현 gate와 문서 표 대조.
-- **합격 조건:** live 문서의 깨진 내부 링크 0. 과거 감사·regression 문서는 역사 자료로 보존하고 내용을 현행처럼 재작성하지 않는다.
+- **합격 조건:** live 문서의 깨진 내부 링크 0, 실행 지시 문맥의 직원 서버 접근 0. 과거 감사·regression·직원 서버 관찰은 재실행 금지 표지와 함께 역사 자료로 보존하고 내용을 현행처럼 재작성하지 않는다.
 - **의존성/롤백:** 관련 행동 카드가 확정된 뒤 문구를 갱신한다. 문서 diff만 revert 가능.
 
 #### `AT-01` consumer 0 파일의 실제 `_attic` 이전
@@ -1005,6 +1060,189 @@ flowchart LR
 - box/special zone 중 어느 계층이 회계 source인지 합의되지 않았을 때
 - PIN을 단순 식별이 아니라 인증 수단으로 바꾸려 할 때
 - 운영 DB가 SQLite인지 PostgreSQL인지 결정과 배포 환경이 다를 때
+
+### 8.9 첫 체크포인트 이후 실행 로드맵
+
+> **추천 모델: GPT-5.6 Sol** - 인증, 재고 원장, 동시성, 운영 복구가 서로의 선행조건인 고위험 계획입니다.
+>
+> **추천 추론 수준: 매우 높음** - 각 체크포인트에서 물리 재고·예약·업무 상태·원장·화면을 함께 검증해야 합니다.
+>
+> **추천 실행 형태: 부모 통합 + 경계가 겹치지 않는 카드별 하위 에이전트** - 구현 파일 소유권을 분리하고 최종 통합·검증·상태 갱신은 부모가 맡습니다.
+
+**남은 실행 GOAL:** DB-backed 12시간 작업자 세션과 추적 재고 불변식을 기반으로 남은 24개 IC 카드를 의존 순서대로 구현해 권한 위장, 잘못된 취소, 중복 반영, 예약 선점, 운영 false-green을 제거한다.
+
+#### 8.9.1 카드 수와 체크포인트 수
+
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`을 완료했다. `IC-20`은 Node 20 정본·E2E selector·숨김 backend lifecycle까지만 완료되어 부분 완료다. 따라서 **남은 IC는 24개**이며, 다음 **6개 체크포인트**로 닫는다. `DOC-01`, `AT-01`, `AT-02`는 IC 24개에 포함하지 않고 마지막 closeout으로 수행한다.
+
+| 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
+|---|---|---|---:|
+| 체크포인트 1 | `완료` | `IC-02`, `IC-05`, `IC-27`; `IC-20` 일부 | 24 |
+| 체크포인트 2 | `대기` | `IC-04`, `IC-20` | 22 |
+| 체크포인트 3 | `대기` | `IC-01` | 21 |
+| 체크포인트 4 | `대기` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 안전 차단까지만 | 18 |
+| 체크포인트 5 | `대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 11 |
+| 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 4 |
+| 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 0 |
+
+체크포인트를 합치지 않는다. 특히 2는 후속 동시성 증거와 cutover kill-switch, 3은 actor trust root, 4는 일반 command의 안전 차단·멱등·경합, 5는 물리 원장부터 운영 readiness까지의 엄격한 직렬 chain이다. 6과 7도 화면 행동과 계약·정리 작업을 분리해 행동 변경과 물리 이동을 같은 diff에 섞지 않는다.
+
+#### 8.9.2 모든 후속 체크포인트의 실행 계약
+
+각 체크포인트는 다음 계약을 반복한다.
+
+1. **이전 체크포인트 통합 승인:** 현재 detached working diff를 자동 commit·push·merge하지 않는다. 사용자가 이전 체크포인트의 통합을 명시적으로 승인한 뒤 최신 `main`의 정확한 SHA를 새 기준으로 고정한다.
+2. **분리 워크트리:** 움직이는 branch 이름이 아니라 고정 SHA에서 detached 개선 워크트리를 만들거나 현재 워크트리를 명시적으로 재생성한다. 브랜치·commit·push는 별도 사용자 지시 없이는 0이다.
+3. **delta 감사:** 이전 감사 SHA와 새 기준 SHA 사이의 모든 변경 경로를 manifest로 만들고, 해당 체크포인트 카드의 전제·API·migration·테스트가 아직 유효한지 먼저 판정한다.
+4. **Goal:** 실행 승인 직후 해당 체크포인트에 적힌 `GOAL` 문구 그대로 Codex Goal을 만들고 토큰 예산은 두지 않는다.
+5. **TDD와 독립 오라클:** RED→최소 구현→GREEN 순서를 지키고 재고 카드는 기대 delta, 독립 SQL delta, `inventory_effect` delta를 대조한다. PostgreSQL 경합 카드는 실제 두 connection barrier 없이는 `VERIFIED`로 올리지 않는다.
+6. **파일 소유권:** 같은 충돌군의 카드를 두 구현 에이전트에게 동시에 맡기지 않는다. 충돌군은 인증/mutation router, 출하·취소, 예약 primitive, 창고 위치/integrity, 부서 관리 frontend, 출하 frontend, CI·generated type이다.
+7. **검증:** 카드별 focused gate와 리뷰를 먼저 통과시킨 뒤 체크포인트 끝에 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`를 한 번 실행한다. 마지막 변경이 docs-only면 전체 gate를 반복하지 않고 docs gate와 `git diff --check`만 다시 실행한다.
+8. **안전 경계:** `C:\ERP-dev`는 파일·해시·검색·DB·process·port까지 접근 0이다. worktree `backend/mes.db`도 테스트 fixture로 사용하지 않고 temp SQLite와 ephemeral PostgreSQL만 사용한다.
+9. **동결 경계:** 주간보고, 모바일 하단 tab 디자인, 출하 step 5 카드 높이·grid·overflow는 변경 0이어야 한다.
+10. **정지:** 명세 리뷰와 코드 품질 리뷰의 Critical/Important를 모두 해소하고 문서의 카드 상태·증거·남은 위험을 갱신한 뒤 즉시 멈춘다. 다음 체크포인트를 자동으로 시작하지 않는다.
+
+각 run의 원본 로그·SQL snapshot·브라우저 evidence·리뷰 결과는 `_attic/runtime/code-quality-improvement/<run_id>/`에만 저장한다. tracked 산출물은 해당 체크포인트 구현과 이 단일 정본 문서의 상태 갱신뿐이다.
+
+#### 8.9.3 체크포인트 2 — 필수 검증 기반과 cutover kill-switch `[GPT-5.6 Sol] [순차]`
+
+**GOAL:** 후속 동시성 카드를 증명할 Node·E2E·type·PostgreSQL 필수 gate를 완성하고, 향후 재고를 바꿀 수 있는 기존 출하가 있는 cutover를 mutation 전에 차단한다.
+
+- [ ] **`IC-20` 완료:** 체크포인트 1의 selector·Node 20·숨김 backend 보강을 유지하고, Node version file·`engines.node`, test/e2e typecheck, blocking 핵심 E2E, 필수 PostgreSQL two-connection job, 단계적 Ruff/mypy baseline을 닫는다.
+- [ ] **필수 job 증명:** CI required-check 설정과 local wrapper가 같은 Node·test·PostgreSQL 계약을 사용하고, `continue-on-error`로 핵심 재고 smoke를 우회할 수 없게 한다.
+- [ ] **`IC-04` 상태표:** 각 shipping request status×allocation status에서 앞으로 허용되는 pickup/cancel과 가능한 inventory delta를 선언적 표로 고정한다. 단순 terminal row 존재와 실제 미래 delta 가능성을 구분한다.
+- [ ] **`IC-04` kill-switch:** 미래 delta 가능 lifecycle이 하나라도 있으면 cutover dry-run/apply 모두 0 mutation으로 실패하고 상태별 evidence를 남긴다. 자동 삭제·자동 승계·실제 cutover 실행은 하지 않는다.
+
+`IC-20`을 먼저 완료하고 그 gate 위에서 `IC-04`를 구현한다. 이 순서를 바꾸면 후속 PostgreSQL 경합 카드의 합격 증거를 만들 수 없고 cutover 안전 회귀도 CI가 차단하지 못한다.
+
+**비범위:** 직원 환경 배포·동기화, 실제 inventory cutover 실행, shipping lifecycle 승계, 제품 재고 mutation service 변경. cutover가 실행 가능한지에 대한 최종 readiness는 체크포인트 5의 `IC-17`~`IC-19`까지 끝난 뒤에만 판단한다.
+
+**실행 전 정지 gate:** CI required-check를 바꿀 권한이 없거나 운영 DB dialect와 PostgreSQL 검증 계약이 다르거나 상태×allocation별 미래 delta 판정이 합의되지 않으면 구현·완료 선언을 중단한다.
+
+**필수 검증:** Node 20 blocking E2E 14/14, unsupported Node의 npx 호출 0, test/e2e type error failure, 실제 PostgreSQL 두 connection smoke, REQUESTED/PREPARING/PREPARED/PICKED_UP/CANCELLED와 RESERVED/CONSUMED/RELEASED 조합의 cutover matrix, 후반 failure rollback. Matrix의 기대 결과는 세 부류로 고정한다. `FUTURE_DELTA` 또는 `INCONSISTENT` 조합은 apply 실패·0 mutation, `TERMINAL_SAFE` 조합은 apply 허용·기준재고 반영 후 과거 request의 미래 delta 0, dry-run은 모든 조합에서 mutation 0이다.
+
+**완료·정지 조건:** 핵심 safety job optional 0, PostgreSQL 경합 harness가 CI에서 실제 실행, 미래 재고 delta 가능 출하가 있는 cutover mutation 0. `IC-20`과 `IC-04`를 완료하고 멈춘다.
+
+#### 8.9.4 체크포인트 3 — 신뢰 가능한 작업자 actor `[GPT-5.6 Sol] [순차]`
+
+**GOAL:** 세션 발급 자격을 명시적으로 결정하고 DB-backed 12시간 서버 세션을 모든 재고 mutation의 단일 VerifiedActor 경계로 만든다.
+
+- [ ] **인증 bootstrap 결정:** 서버 session을 누구에게 발급할지, 기존 직원 PIN이 단순 식별에서 인증 credential로 격상되는지, 격상한다면 hash·rate limit·lockout·초기 PIN 이행을 어떻게 할지 별도 ADR과 사용자 승인으로 고정한다.
+- [ ] **`IC-01` session core:** 무작위 opaque token의 hash만 DB에 저장하고 HttpOnly·SameSite=Lax cookie, 12시간 절대 만료, logout·credential 변경·직원 비활성화/삭제·`boot_id` 변경 revoke를 적용한다.
+- [ ] **mutation surface manifest:** FastAPI의 모든 POST/PUT/PATCH/DELETE와 실제 service consumer를 manifest로 만들고 `inventory`, IO, StockRequest, defect, production, shipping, dept-adjustment, transaction correction/cancel, handover receive, warehouse-map, settings/admin repair 등 재고·업무 상태 변경 표면을 분류한다. actor가 필요 없는 표면은 서버 검증 근거와 의도적 예외 이유를 명시한다.
+- [ ] **`VerifiedActor` 전환:** 위 manifest의 활성 재고·업무 mutation은 공통 dependency가 만든 actor만 service에 전달한다. header/body/sessionStorage 값은 권한 source가 아니다.
+- [ ] **호환 경계:** 기존 PIN 확인 alias가 무검증 actor나 무자격 session을 발급하지 않게 하고, session actor와 body/header 대상 직원이 다르면 mutation 전에 401/403으로 끝낸다.
+
+이 체크포인트는 단독 실행한다. 인증과 mutation router를 여러 구현 에이전트가 동시에 고치면 호환 alias·cookie·actor audit 경계가 갈라질 수 있으므로 characterization 조사만 병렬화하고 production diff는 한 owner가 순차 소유한다.
+
+**확정된 것과 미결정인 것:** DB-backed opaque server session과 12시간 절대 만료는 확정됐다. 하지만 현재 문서의 “PIN은 식별 수단” 정책과 session 발급 credential은 아직 양립 방법이 정해지지 않았다. 이 모순을 해결하기 전에는 코드를 쓰지 않는다.
+
+**비범위:** 부서별 권한 matrix 재설계, responsive login UI 개편, 직원 환경 배포. credential 정책이 PIN 보안 격상을 요구하면 `QP-013B`를 대체 상태에서 다시 열고 이 체크포인트 범위·테스트를 사용자에게 재승인받는다.
+
+**필수 검증:** session migration upgrade/forward recovery, 정상 발급, 변조·만료·revoke·restart, 비활성 actor, 다른 body/header, 피해자 식별값 위장, mutation surface manifest 양방향 차집합 0, transaction/handover/warehouse-map/settings를 포함한 우회 scan, 실제 pickup·production·defect·correction·handover의 SQL delta와 audit actor, frontend login/logout/reload E2E.
+
+**완료·정지 조건:** session 발급 credential 모순 0, 공통 dependency 우회 mutation router 0, actor 불일치·무자격 session의 inventory/request/log/event 0. `IC-01`만 완료하고 멈춘다.
+
+#### 8.9.5 체크포인트 4 — 일반 취소 차단·멱등·조건부 command `[GPT-5.6 Sol] [부분 병렬]`
+
+**GOAL:** workflow 귀속 거래의 잘못된 일반 취소를 먼저 fail-closed하고, IO·StockRequest 재시도와 handover·correction·cancel 경합에서 중복 재고 반영을 제거한다.
+
+- [ ] **`IC-03-A` 안전 차단·신규 batch identity:** shipping, production receipt, IO batch, StockRequest, defect disassembly 귀속 log의 일반 correction/cancel과 SHIP의 wrong-bucket correction을 machine-readable reason·409로 막는다. 새 production receipt의 BACKFLUSH/PRODUCE 관련 log에는 하나의 불변 `operation_batch_id`를 저장하는 additive migration을 적용한다. legacy 귀속은 reference 문자열로 추측하거나 자동 backfill하지 않고 증명되지 않으면 409를 유지한다.
+- [ ] **`IC-09` 완료:** frontend 결과 불명 상태는 같은 key+fingerprint를 보존하고 backend IO/StockRequest는 same key/same payload만 기존 결과를 반환하며 different payload는 409로 거부한다. fingerprint actor는 `IC-01`의 `VerifiedActor`만 사용한다.
+- [ ] **`IC-10` 완료:** handover, correction, cancel은 owning row를 조건부로 선점하고 stale absolute correction을 lock 안에서 다시 계산한다. PostgreSQL 두 connection에서 winner 하나를 증명한다.
+- [ ] **`IC-11` 완료:** command/preview는 active item만, history/audit는 deleted item도 조회하며 open IO/StockRequest/shipping/BOM 참조가 있으면 delete 409를 반환한다.
+
+`IC-03-A`를 먼저 배포 가능한 안전막으로 만든다. 이후 `IC-09`와 `IC-10`은 파일 소유권이 분리될 때 병렬 가능하고 `IC-11`은 IO lookup 충돌을 피하도록 마지막에 통합한다. 전용 shipping allocation 예약과 box/zone 물리 원장은 이 체크포인트에서 바꾸지 않는다.
+
+두 번의 **내부 hard stop**을 둔다. 먼저 `IC-03-A`의 migration·409 공개 계약·legacy 무추정 matrix가 focused GREEN과 명세·품질 리뷰를 통과하면 멈추고 rollback evidence를 승인받는다. 그 승인 후 `IC-09+IC-10`의 PostgreSQL 멱등·경합 증거를 만들고 다시 멈춘다. 두 번째 승인 뒤에만 `IC-11`을 통합하고 체크포인트 전체 gate를 한 번 실행한다.
+
+**실행 전 결정 gate:** correction을 원본 거래당 한 번만 허용할지 명시적 revision/version으로 여러 번 허용할지 migration 전에 승인받는다. legacy log를 자동 귀속·backfill해야만 기능이 성립한다면 안전한 증거가 없으므로 정지한다.
+
+**필수 검증:** linked log correction/cancel 409와 재고·업무 상태 불변, `operation_batch_id` migration upgrade·forward recovery와 새 production receipt의 동일 batch identity, legacy reference backfill 0, response loss·late success·same/different fingerprint, two-connection handover×2/correction×2/cancel×2/correction-vs-cancel, rollback 후 재시도, concurrent delete-vs-submit과 history 보존.
+
+**완료·정지 조건:** 업무 귀속 log의 effect-only 일반 취소 0, 결과 불명 재시도의 물리 반영 최대 1회, handover/correction/cancel winner 1·loser orphan 0, deleted item 신규 command 0. `IC-09`, `IC-10`, `IC-11`은 완료하고 `IC-03`은 안전 차단이 완료된 `부분 완료`로 기록한 뒤 멈춘다.
+
+#### 8.9.6 체크포인트 5 — 물리 위치·출하 예약·운영 진실 `[GPT-5.6 Sol] [엄격 순차]`
+
+**GOAL:** 창고 물리 원장, 공통 availability, shipping 상태기계, 전용 workflow 취소, blocking integrity, backup, health를 하나의 검증 사슬로 완성한다.
+
+- [ ] **`IC-06` read-only preflight:** tracking 품목의 `W`, box `B`, special zone `Z`, unplaced `U`, duplicate·orphan을 mutation 없이 보고하고 input snapshot과 report hash를 고정한다. runtime·schema·재고 mutation은 이 change에서 0이다.
+- [ ] **`IC-06` 승인 후 완료:** preflight 결과와 outbound source·duplicate 처리 ADR을 사용자가 승인한 뒤에만 `B+Z+U=W`와 stable row effect identity를 적용한다.
+- [ ] **`IC-07` + `IC-08` 같은 release:** 모든 소비 primitive가 stock pending과 active shipping allocation을 함께 보는 공통 availability를 사용하고, shipping prepare/pickup/cancel은 request lock·deterministic inventory lock·expected-state·command receipt를 같은 release에서 적용한다.
+- [ ] **`IC-03-B` 완료:** shipping pickup, production receipt, IO batch, StockRequest, defect disassembly의 전용 workflow cancel이 effects, allocation/pending, request/batch status, event를 한 transaction으로 되돌리고 history router는 `CancelPolicy` 결과만 소비한다.
+- [ ] **`IC-17` 완료:** location pending, StockRequest, ShippingAllocation, box/zone/unplaced, orphan, effect cutoff를 안정된 check ID/severity로 검사하고 blocking mismatch는 exit 1로 만든다.
+- [ ] **`IC-18` 완료:** backup artifact가 snapshot metadata·Alembic head·전체 schema·WAL 시점을 증명하고 restore는 verify와 post-check를 기본값으로 한다.
+- [ ] **`IC-19` 완료:** live는 process, ready는 DB/schema/dependency, detailed/integrity는 업무 불변식이라는 단일 의미로 나누고 운영 consumer를 함께 전환한다.
+
+순서는 `IC-06 read-only preflight`→사용자 승인→`IC-06 runtime`→`IC-07+IC-08`→`IC-03-B`→`IC-17`→`IC-18`→`IC-19`다. `IC-07` availability만 먼저 배포하면 race에서 초과예약될 수 있으므로 `IC-08`의 request/allocation lock·receipt와 같은 release checkpoint에서 함께 닫는다. 각 카드는 별도 change/evidence를 가질 수 있지만 이 순서를 건너뛰지 않는다.
+
+이 큰 사슬에는 세 번의 **내부 hard stop**을 둔다. 첫째, `IC-06` read-only preflight의 mutation 0·snapshot/report hash를 검증한 즉시 멈추고 사용자에게 ADR과 runtime 적용을 승인받는다. 둘째, 승인된 `IC-06` runtime과 `IC-07+IC-08`의 PostgreSQL reservation/shipping race가 통과하면 명세·품질 리뷰를 받고 멈춘다. 셋째, 승인 후 `IC-03-B`의 모든 workflow cancel matrix와 재고 3자 대조를 통과하면 다시 리뷰·정지한다. 그 승인 후에만 `IC-17→IC-18→IC-19` 운영 사슬을 진행한다. 각 구간은 독립 rollback evidence를 가진다.
+
+**비범위:** 화면 미관, 실제 cutover 실행, 자동 duplicate merge, 직원 환경 readiness. 체크포인트 2의 `IC-04`는 kill-switch일 뿐이며 이 체크포인트 전체가 끝나기 전에는 cutover 실행 가능 판정을 내리지 않는다.
+
+**실행 전 결정 gate:** outbound 물리 source를 작업자가 선택할지 결정적 priority를 사용할지, duplicate row 처리, legacy effect cutoff, invariant mismatch를 ready 503으로 볼지 별도 operational block으로 둘지를 승인받는다. PostgreSQL two-connection 또는 backup/restore 검증 dialect를 확보하지 못하면 완료 처리하지 않는다.
+
+**필수 검증:** box+zone+unplaced consume/cancel, 동시 restack/outbound, prepare→생산/부서조정/불량 교차 소비, prepare×2/pickup×2/prepare-cancel/pickup-cancel, shipping pickup·production receipt·IO batch·StockRequest·defect disassembly 각각의 정상/중복/부분 실패/다음 업무 소비 후 cancel, invariant별 broken DB, WAL-only write freshness, missing schema/head/FK, staged restore failure, live/ready/detailed matrix. 재고 행은 expected/SQL/effect 3자 대조, 경합은 PostgreSQL winner 1·loser orphan 0을 증명한다.
+
+**완료·정지 조건:** `B+Z+U=W`, 예약 선점 0, shipping 경합 winner 1, 업무 cancel 부분 상태 0, integrity false-green 0, backup valid가 복구 가능 snapshot을 의미하고 health endpoint별 의미가 하나다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`를 완료하고 멈춘다.
+
+#### 8.9.7 체크포인트 6 — 화면 freshness와 작업자 표시 `[GPT-5.6 Sol] [영역별 병렬]`
+
+**GOAL:** frontend의 저장·dirty·비동기 응답·cache·pagination·KPI 의미를 backend 정본과 맞춰 작업자가 보는 상태가 실제 서버 상태와 어긋나지 않게 한다.
+
+- [ ] **`IC-12`→`IC-14` 완료:** 실제 department form의 dirty와 Promise save를 먼저 고친 뒤 React Query를 부서 server state의 단일 정본으로 만들고 Context는 lookup adapter로 축소한다.
+- [ ] **`IC-13`→`IC-16` 완료:** shipping BOM match generation과 실제 payload dirty를 먼저 고친 뒤 active/history pagination·bulk loading·desktop/mobile load-more를 적용한다.
+- [ ] **`IC-15` 완료:** warehouse map mutation을 operation ID/generation과 query invalidation으로 직렬화해 오래된 rollback이 최신 성공을 덮지 못하게 한다. 이는 체크포인트 5의 위치 원장 계약을 소비한다.
+- [ ] **`IC-25` 완료:** KPI 숫자의 PA·PF 제외 모집단과 목록 포함 가능성을 desktop/mobile에 항상 명시한다.
+- [ ] **`IC-26` 완료:** 첫 일보 작성자 선택은 animation 0, 서로 다른 작성자 전환만 1회가 되도록 handoff와 live 구현을 맞춘다.
+
+`IC-12`, `IC-13`, `IC-15`, `IC-25`, `IC-26`은 실제 파일 소유권이 다를 때 병렬 가능하다. `IC-14`는 `IC-12` 뒤, `IC-16`은 `IC-13`과 체크포인트 5의 shipping API/state contract 뒤에 둔다. 출하 frontend의 `IC-13`과 `IC-16`은 한 owner가 순차 수행한다.
+
+각 카드/의존 묶음 뒤 **내부 hard stop**을 둔다. `IC-12→14`, `IC-13→16`, `IC-15`, `IC-25`, `IC-26`은 각각 focused GREEN·화면 계약 리뷰·rollback evidence를 남긴 뒤에만 통합한다. 체크포인트 말미에만 full gate를 한 번 실행한다.
+
+**비범위·동결 정지 gate:** backend 재고 정책 변경, responsive shell 구조 변경, 출하 step 5 카드 높이·grid·column·overflow, 모바일 하단 tab, 주간보고 파일은 범위 밖이다. frozen diff가 하나라도 생기면 즉시 멈춘다.
+
+**필수 검증:** save failure·중복 save·navigation guard, department mutation 뒤 desktop/mobile/admin 동시 갱신, deferred BOM 역순·abort·payload revert, pagination 동일 timestamp·event invalidation·N+1 count, optimistic A/B 역순 성공·실패와 cache remount, desktop/mobile KPI 설명, 일보 첫/다른/같은 작성자·탭·날짜 animation matrix. 대표 재고 화면은 UI·API·독립 SQL을 대조하고 frozen 범위 characterization/screenshot을 보존한다.
+
+**완료·정지 조건:** persistence 전 이동 0, stale state 적용 0, UI=server=query cache, active endpoint 무제한 list 0, KPI 모집단 설명 누락 0, 일보 animation drift 0, frozen UI 변경 0. `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26`을 완료하고 멈춘다.
+
+#### 8.9.8 체크포인트 7 — type·dependency·접근성·locality·closeout `[GPT-5.6 Sol] [엄격 순차]`
+
+**GOAL:** 안정된 제품 행동 위에서 OpenAPI type, dependency, 접근성, 정책 locality를 각각 독립적으로 강화하고 live 문서와 `_attic` 물리 경계를 최종 정리한다.
+
+- [ ] **`IC-21` 완료:** OpenAPI generated raw type과 업무 adapter를 분리하고 nullable·unknown enum·request serialization drift가 같은 change에서 CI에 잡히게 한다.
+- [ ] **`IC-22` 완료:** Next runtime, Vitest/coverage, ESLint/PostCSS를 세 개의 독립 change로 올리고 각각 `npm audit` 도달 범위·rollback·full gate evidence를 남긴다. `--force` 자동 적용은 금지한다.
+- [ ] **`IC-23` 완료:** 핵심 IO·shipping·defect·department 경로의 공용 error/focus/a11y contract를 blocking test로 만든다.
+- [ ] **`IC-24` 완료:** approval role/self/admin/list/count/button와 앞 카드에서 두 번째 consumer가 확인된 policy만 공통 module로 모은다. 행동 변경과 광역 파일 이동은 섞지 않는다.
+- [ ] **`DOC-01` 완료:** live 운영·온보딩·handoff의 URL, DB, gate, 링크를 현행 코드와 맞추고 역사 관찰에는 재실행 금지 표지를 붙인다.
+- [ ] **`AT-01` 완료:** 각 source의 consumer 0을 다시 확인한 뒤 `git mv`, import/path/doc 갱신, old path 0, import/parser/dry-run을 같은 change에서 끝낸다.
+- [ ] **`AT-02` 완료:** 실제 consumer가 없는 byte-identical frontend 자산만 hash report와 함께 제거하고 item 이미지·원본 data·regression evidence는 보존한다.
+- [ ] **최종 재감사:** `QP-001`~`QP-023`, `CQ`, `RV`, `IC` 상태를 재집계하고 재고 작업 70행 matrix와 작업자 결론을 현재 SHA에서 다시 판정한다.
+
+순서는 `IC-21`→`IC-22`의 세 단계→`IC-23`→`IC-24`→`DOC-01`→`AT-01`→`AT-02`→최종 재감사다. 각 화살표는 **내부 hard stop**이다. 앞 change의 focused/full gate, 명세·품질 리뷰, rollback evidence를 승인한 뒤 다음 change로 넘어간다. `_attic`은 삭제 장소가 아니라 역사·one-off 보존 위치이며 외부 보관 확인 없는 `_attic/data` 삭제는 금지한다.
+
+**비범위:** 새 업무 행동, item 이미지 자동 삭제, 근거 없는 responsive shell 변경, 대규모 refactor. responsive shell은 bundle·state reset 측정이 실제 문제를 증명할 때만 별도 승인 change로 수행한다.
+
+**실행 전 결정 gate:** `RV-007`의 IO defect quarantine이 즉시 완료인지 승인 대기인지 확정하지 못하면 approval locality 정리를 중단한다. 새 consumer가 생겼거나 historical 원본/rollback hash가 불명확한 파일·asset은 이동·삭제하지 않는다.
+
+**필수 검증:** generated type diff 0, dependency 단계별 audit·lint·type·unit·coverage·build·bundle·E2E, keyboard/axe/focus return, approval 순수 matrix+router/UI integration, import cycle/query count, live docs 링크·명령 dry parse, old-path 양방향 검색 0, Git rename/hash, asset manifest·login screenshot, 전체 manifest 차집합 0.
+
+**완료·정지 조건:** 미완료 IC 0, OpenAPI/type drift 0, production critical 취약점 0 또는 승인된 vendor 예외, 핵심 a11y gate blocking, 공통 정책 write owner 하나, live 문서 broken link 0, 실행 지시의 직원 환경 접근 0, 이동 대상 old path 0, 보존 대상 손실 0. 최종 재고 신뢰도 판정과 남은 `NOT_VERIFIED`만 보고하고 전체 품질 개선 Goal을 종료한다.
+
+#### 8.9.9 체크포인트 간 의존 관계
+
+```mermaid
+flowchart LR
+  C1["체크포인트 1 완료: IC-02·05·27"] --> C2["2: 필수 gate·cutover kill-switch"]
+  C2 --> C3["3: VerifiedActor"]
+  C3 --> C4["4: 취소 차단·멱등·조건부 command"]
+  C4 --> C5["5: 위치·예약·integrity·운영 진실"]
+  C5 --> C6["6: 화면 freshness"]
+  C5 --> C7["7: type·dependency·closeout"]
+  C6 --> C7
+```
+
+다음 실행 시작점은 체크포인트 2다. 단, 현재 체크포인트 1 detached diff를 먼저 사용자가 검토·통합하고, 그 결과의 최신 `main` SHA에서 새 detached 워크트리를 준비한 뒤에만 시작한다.
 
 ---
 ## 9. 테스트·운영 검증 보강안
@@ -1373,7 +1611,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode fu
 | production | 10→10 |
 | total | 10→10 |
 | transaction log | 0→0 |
-| 판정 | 무음 no-op 재현, `CQ-003` `REPRODUCED` |
+| 판정 | 감사 시점에는 무음 no-op을 재현해 `CQ-003` `REPRODUCED`; 첫 체크포인트 `IC-02`에서 `RESOLVED_CHECKPOINT_1` |
 
 ### 12.4 명시적 `NOT_VERIFIED`
 
@@ -1429,13 +1667,77 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode fu
 - [x] docs gate·`git diff --check`·tracked 변경 1개 최종 확인
 
 
-### 12.8 최종 실행 시작점
+### 12.8 첫 체크포인트 실행 시작점과 완료 기록
 
-사용자가 이 문서를 승인하면 `Wave 1 / IC-01~IC-06`을 한꺼번에 구현하지 않는다. 첫 change는 다음 두 카드로 제한한다.
+이 절은 체크포인트 1을 시작할 때 확정했던 범위의 역사 기록이다. 최신 `main` delta를 먼저 감사하고 Gate 0에서 Playwright 14개 기준선 신뢰를 복구한 뒤 다음 세 카드만 구현했다.
 
-1. `IC-02` 부서조정 scrap 무음 성공 차단/정상 계약
-2. `IC-05` integrity repair와 audit 단일 transaction
+1. `IC-27` 서버 시작의 read-only DB 경계
+2. `IC-02` 부서조정 scrap 무음 성공 차단/정상 계약
+3. `IC-05` integrity repair와 audit 단일 transaction
 
-둘은 각각 명확한 failing evidence가 있고 변경 경계가 작아 `IC-01`의 서버 session 보안 설계와 병렬로 먼저 배포할 수 있다. 그러나 그 다음 mutation API 카드의 배포는 `IC-01` 완료 뒤로 고정한다. 이후 `IC-03` 업무 수명주기 correction/cancel 차단을 진행하고, cutover 정책 결정을 받아 `IC-04`를 진행한다. 각 change는 별도 테스트·검증 evidence를 남긴 뒤 다음 카드로 넘어간다.
+세 카드는 failing evidence, 카드별 명세·코드 품질 review, 통합 gate를 거쳐 완료됐고 `IC-01` 이후 Wave는 시작하지 않았다. **현재의 다음 실행 시작점과 단일 순서는 8.9절 체크포인트 2~7이며**, 체크포인트 2는 후속 카드가 의존할 Node·E2E·type·PostgreSQL 필수 gate인 `IC-20`을 먼저 닫고, 그 위에서 미래 재고 delta가 가능한 출하만 차단하는 `IC-04` cutover kill-switch를 구현한다.
+
+### 12.9 최신 `main` delta 감사와 첫 체크포인트 (`71d6a34..8be64743`)
+
+- **기준:** 역사적 전수 감사 SHA `71d6a34`의 증거·판정은 보존하고, 최신 개선 기준 SHA `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`를 별도 delta로 감사한다.
+- **범위:** 전체 변경 22경로 중 runtime/migration 9/9, frontend·test·handoff 12/12, 이 감사 문서 1/1을 검토해 양방향 차집합 0으로 닫는다.
+
+| 변경 경로 | delta 판정 |
+|---|---|
+| `_attic/docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md` | 역사적 전수 감사 산출물. 최신 SHA·finding·결정·첫 체크포인트 증거를 이 절에 추가하되 원 감사 증거를 덮어쓰지 않음 |
+| `_attic/handoff/2026-07-24-shipping-sales-followup-todo.md` | KPI 모집단 정책 근거와 일보 animation drift 확인. 직원 서버 재확인 지시는 `DOC-01` 정리 대상 |
+| `backend/alembic/versions/20260812_0018_drop_model_pf_pins.py` | data-change/allowed table/완료 validator/fail-closed downgrade는 positive delta. isolated preflight E2E는 미검증 |
+| `backend/tests/ops/test_employee_schema_preflight.py` | migration 정책 단위 근거는 강화됐으나 실제 preflight 전체 경로 대신 직접 table 제거를 사용 |
+| `backend/tests/ops/test_employee_sync_safety.py` | helper 배포·start delegation의 문자열 계약만 검증하고 DB target·exit·실제 동작은 미검증 |
+| `frontend/app/mes/_components/CapacityDetailModal.tsx` | desktop 중복 badge만 제거하고 mobile badge와 생산가능수량 계산은 유지. 신규 재고 mutation finding 없음 |
+| `frontend/app/mes/_components/DesktopShippingView.tsx` | detail/revision/hub 표시 delta만 존재. `CQ-011`, `RV-006` 미해결이고 출하 5단계 동결 계약은 불변 |
+| `frontend/app/mes/_components/__tests__/CapacityDetailModal.mobile.test.tsx` | mobile badge 보존 characterization |
+| `frontend/app/mes/_components/__tests__/CapacityDetailModal.test.tsx` | desktop 열·badge delta와 수량/병목 불변 검증 |
+| `frontend/app/mes/_components/__tests__/DesktopShippingView.test.tsx` | detail·revision·hub와 동결 step 5 검증. 기존 비동기 `act(...)` warning 때문에 전체 E2E 근거로는 사용하지 않음 |
+| `frontend/app/mes/_components/_daily_report/DailyWorkReportEditor.tsx` | read-only card 높이·내부 scroll만 변경. 저장·재고 계약 delta 없음 |
+| `frontend/app/mes/_components/_daily_report/DailyWorkReportScreen.tsx` | 전체 일보 layout delta와 첫 작성자부터 animation이 붙는 `CQ-026` 확인 |
+| `frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportEditor.test.tsx` | read-only 내부 scroll characterization |
+| `frontend/app/mes/_components/_daily_report/__tests__/DailyWorkReportScreen.test.tsx` | 첫 선택 animation을 현행으로 고정해 handoff 정책 drift를 재확인 |
+| `frontend/app/mes/_components/_hooks/__tests__/useDesktopInventoryDerivations.test.tsx` | KPI 숫자는 PA·PF 제외, callback/list는 포함하는 이중 모집단을 직접 고정해 `CQ-025` 확정 |
+| `frontend/app/mes/_components/_hooks/useDesktopInventoryDerivations.tsx` | desktop/mobile 공용 KPI의 숫자·목록 모집단 불일치와 오해 가능한 `전체 품목` 문구 확인 |
+| `scripts/dev/ensure-schema-ready.ps1` | 고정 `mes.db` 보호와 `DATABASE_URL` check/migrate 분리, start mutation, Report false-green의 핵심 근거 |
+| `scripts/dev/status-servers.ps1` | Report nonzero만 오류로 처리해 기존 exit 0 false-green을 소비 |
+| `scripts/dev/sync-to-employee.ps1` | helper가 직원 runtime 배포 대상임을 정적으로만 확인. 실행·직원 환경 접근 없음 |
+| `scripts/dev/tests/runtime-control-batch-files.ps1` | 호출 순서·문자열 gate는 있으나 target·exit·실제 read-only behavior 증거 없음 |
+| `scripts/dev/watch-service.ps1` | backend watcher가 Report false-green을 소비 |
+| `start.bat` | 일반 서버 시작 전에 interactive migration을 허용해 read-only start 계약과 충돌 |
+
+- **신규 판정:** delta에서 `CQ-025/IC-25`, `CQ-026/IC-26`, `CQ-027`~`CQ-029/IC-27`, 검증 가설 `RV-008`을 추가했다. 이 중 `CQ-027`~`CQ-029`와 `RV-008`은 첫 체크포인트의 `IC-27`로 해소했고, `CQ-011`, `RV-006`, `IC-13`은 미해결/불변이다.
+- **positive delta:** migration `20260812_0018`은 `model_pf_pins` 제거를 data-change로 분류하고 allowed table·완료 validator·fail-closed downgrade를 명시했다. 다만 실제 isolated preflight 전체 실행 증거는 아직 없다.
+- **동결 판정:** `DesktopShippingView.tsx`의 출하 작성 5단계 `BOM·동반 출하품` 및 `변경된 구성품`의 높이·grid·column·overflow 계약은 delta가 없고 기존 characterization test 범위도 유지된다.
+- **사용자 결정:** 작업자 인증은 DB-backed 12시간 서버 session, 추적 재고는 `박스 + 특수구역 + 명시적 미배치 = 창고 총량`, cutover는 재고를 다시 변경할 수 있는 기존 출하가 있으면 fail-closed로 고정한다.
+- **직원 환경:** 이 delta 감사와 체크포인트에서는 직원 환경 파일·DB·process·port 접근을 모두 금지한다. 관련 handoff 실행 지시는 `DOC-01`에서 전용 detached 워크트리 절차로 교체한다.
+
+#### Gate 0 — E2E 기준선 신뢰 복구
+
+| 단계 | 결과 | 증거·판정 |
+|---|---|---|
+| RED | 단일 approval spec 0/1, exit 1 | visible한 disabled step-nav를 먼저 선택해 timeout. `gate0-red-io-approval-cycle.log` |
+| 최소 수정 | test-only 3파일 | 공용 helper와 창고 보정 assertion은 `disabled:false`로 enabled CTA를 선택한다. 원자재 입고 test는 현 자가승인 즉시 반영 message·이름·주석에 맞췄다. 제품·layout·config·package/lock delta 0 |
+| focused GREEN | 단일 1/1, 관련 3/3 | `gate0-green-io-approval-cycle.log`, `gate0-green-targeted-remaining.log` |
+| Node 24 조사 | full run에서 Next listener 조기 소실 재현 | listener worker가 먼저 사라지고 Next CLI가 이를 session stop `exit 0`으로 가리는 경로까지 확인했다. Node 24에서의 worker 종료 발신자는 미확정이며, 진단 wrapper/preloader/config 변경은 전부 제거했다. 이 문제는 아래의 사용자 종료와 별개다. |
+| 정본 GREEN | Node 20.20.2, 원본 `verify_e2e.ps1`, 14/14, exit 0, 72.408초 | PATH만 Node 20으로 고정하고 `NODE_OPTIONS`·preload·wrapper·추가 listener/file hook 없이 실행. `gate0-node20-clean-preflight.txt`, `gate0-node20-clean-full14.log`, `gate0-node20-clean-metadata.txt` |
+| 환경 계약 고정 | 정본 gate에서 Node 20 외 fail-closed | `verify_e2e.ps1`이 major 20을 Playwright 전에 검사하고 `verify_local -IncludeE2E`도 이 wrapper를 사용한다. RED에서 Node 24가 npx를 호출하고 성공했으며, GREEN에서 Node 20은 npx 호출·Node 24는 호출 0/명시 오류와 full gate 위임을 Windows pytest로 검증했다. `gate0-node20-guard-red-confirmed.log`, `gate0-node20-guard-green-final.log` |
+| 전용 backend 창 종료 재현·보강 | visible detached 콘솔을 사용자가 닫아 8021 소실 | `global-setup.ts`의 Windows detached uvicorn에 `windowsHide: true`를 추가했다. 같은 Node 20 정본 E2E를 다시 실행해 14/14, exit 0, 72.3초를 확인했다. `final3-verify-local-full.log`, `final4-e2e-hidden-backend.log` |
+| 안전 가드 | DB·lockfile 불변, 8021/3100 listener 0 | `backend/mes.db` SHA-256 `6977FE...A391A`, lockfile SHA-256 `356998...D970` 전후 동일. E2E DB·PID·seed 파일 0. 최종 명세·품질 review Critical/Important 0 |
+
+Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoint에도 같은 major를 fail-closed로 고정했다. Node 24에서 별도로 관찰된 Next worker 종료 발신자는 확정하지 못했으므로 Node 24 지원을 주장하지 않는다. 최종 통합 E2E의 8021 소실은 visible한 전용 backend 콘솔을 사용자가 닫은 사건으로 확정했고, 숨김 실행 후 14/14로 재검증했다. `npm run test:e2e` 같은 보조 진입점, Node version 파일·package engine·CI blocking 정책은 `IC-20`의 후속 범위다.
+
+#### 첫 구현 묶음 결과
+
+| 카드 | RED | 구현·GREEN | 독립 검증·review | 상태 |
+|---|---|---|---|---|
+| `IC-27` | 기존 adapter가 ready marker를 `READY`로 보고하지 못했고, 기존 process harness는 `TimeoutSeconds=0`을 무시해 1.174초 뒤 정상 반환 | Start/Report를 read-only `--check` adapter로 축소하고 exit `0/2/3`과 실제 check 30초 timeout을 고정. PowerShell behavior PASS, Windows pytest wrapper 포함 관련 pytest 21 passed, runtime static PASS | alternate SQLite·sentinel SHA/mtime 불변, 실패 matrix별 check 정확히 1회·launch 0, hang process tree 정리와 exit 3. 최종 명세·품질 review Critical/Important 0 | `완료` |
+| `IC-02` | router `scrap` 3 subtype가 201·processed 0으로 성공했고 service validation/atomicity 5개 실패 | router/service가 scrap·unknown·nonpositive를 transaction 전에 거부하고 accepted line/log count 불일치를 rollback. 관련 backend 34 passed, frontend typecheck 통과 | 애플리케이션 계산을 재사용하지 않은 raw SQL로 실패 전후 inventory location·log가 같음을 확인. 카드 명세·품질 review Critical/Important 0 | `완료` |
+| `IC-05` | service rollback, 정상 atomic commit, audit record/flush/final commit fault 등 기존 5개와 legacy 평문 PIN 경계 2개가 실패 | service는 flush만 하고 router가 PIN lazy change→repair→audit flush→한 commit. dry-run은 PIN 생성·migration도 지속하지 않는다. integrity service/router 34개와 PIN 회귀를 합친 52개 통과 | file SQLite의 별도 raw SQL connection으로 정상 `repaired 2 rows`, dry-run 0 row, inventory/audit flush·record·commit 실패 원상복구, legacy·missing PIN의 0/1 commit과 실패 rollback을 확인. 최종 명세·품질 review Critical/Important 0 | `완료` |
+
+증거 정본은 ignored 디렉터리 `_attic/runtime/code-quality-improvement/20260813-115532-checkpoint1/`의 `ic27/`, `ic02/`, `ic05/`와 Gate 0 로그에 보존한다. 작업 파일은 `IC-27` 8개, `IC-02` 6개(요청 enum·frontend submit type·OpenAPI baseline 포함), `IC-05` 4개, Gate 0 7개(test-only 보정 3, Node runtime guard·정본 위임 2, Windows 회귀 test 1, 전용 backend 숨김 실행 1), 감사 문서 1개로 전체 26개다. DB migration·response schema·frozen UI는 변경하지 않았고, 공개 API 변화는 일반 부서조정 request에서 처리하지 않던 `scrap`을 제거한 의도적 축소 하나뿐이다.
+
+최종 통합 검증은 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`로 수행했다. backend pytest, OpenAPI drift, frontend strict lint·typecheck, Vitest 232파일/1,861테스트와 coverage threshold(전체 statement 92.5%), production build, bundle 2,381,157 bytes/한도 2,381,316.096 bytes, DB read-only consistency는 통과했다. E2E는 사용자가 visible 전용 backend 콘솔을 닫은 외부 중단으로 2/14 뒤 실패했으며, 원인 제거 1줄만 반영한 뒤 영향받는 정본 E2E를 재실행해 14/14를 통과했다. 변경 범위가 전용 E2E 프로세스 표시 방식뿐이므로 이미 통과한 비영향 gate는 반복하지 않았다. 종료 시 `mes.db`·lockfile 해시 불변, E2E 임시 DB/PID/seed 0, 8021·3100 listener 0을 확인했다.
 
 ---

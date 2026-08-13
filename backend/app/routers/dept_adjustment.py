@@ -62,7 +62,7 @@ class ExpandComponentRequest(BaseModel):
 
 class AdjLineInput(BaseModel):
     item_id: uuid.UUID
-    direction: Literal["in", "out", "defective", "scrap"]
+    direction: Literal["in", "out", "defective"]
     quantity: Decimal = Field(..., gt=0)
     department: str
     reason: Optional[str] = None

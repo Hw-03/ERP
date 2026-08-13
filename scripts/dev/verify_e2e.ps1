@@ -10,6 +10,11 @@ Set-StrictMode -Version Latest
 $RepoRoot = git rev-parse --show-toplevel
 $FrontendRoot = Join-Path $RepoRoot "frontend"
 
+$nodeVersion = (& node --version 2>$null)
+if ($LASTEXITCODE -ne 0 -or $nodeVersion -notmatch '^v20\.') {
+    throw "Playwright E2E requires Node.js 20 (current: $nodeVersion)."
+}
+
 Write-Host "==> Playwright E2E (전용 DB mes_e2e.db · 실 mes.db 미접촉)"
 Push-Location $FrontendRoot
 try {

@@ -14,6 +14,7 @@ SYNC_SCRIPT = ROOT / "scripts" / "dev" / "sync-to-employee.ps1"
 AUTO_SYNC_SCRIPT = ROOT / "scripts" / "dev" / "auto-sync-to-employee.ps1"
 CHECKED_COMMAND = ROOT / "scripts" / "dev" / "checked-command.ps1"
 START_BAT = ROOT / "start.bat"
+SCHEMA_HELPER = ROOT / "scripts" / "dev" / "ensure-schema-ready.ps1"
 RUNTIME_SCRIPTS = (
     "resolve-server-profile.ps1",
     "ensure-schema-ready.ps1",
@@ -478,8 +479,9 @@ def test_automatic_sync_uses_dry_run_and_never_blocks_on_source_git_state() -> N
     assert "| Out-Host" in script
 
 
-def test_start_bat_delegates_interactive_schema_preparation_before_servers() -> None:
+def test_start_bat_delegates_read_only_schema_check_before_servers() -> None:
     script = START_BAT.read_text(encoding="utf-8-sig")
+    helper = SCHEMA_HELPER.read_text(encoding="utf-8-sig")
     command_lines = [line.strip() for line in script.splitlines() if line.strip().lower().startswith("py ")]
 
     assert "ensure-schema-ready.ps1" in script
@@ -489,9 +491,25 @@ def test_start_bat_delegates_interactive_schema_preparation_before_servers() -> 
         for line in command_lines
         for option in ("--all", "--schema", "--migrate")
     )
-    preparation = script.index("ensure-schema-ready.ps1")
-    failure = script.index("if errorlevel 1", preparation)
-    abort = script.index("exit /b 1", failure)
+    readiness = script.index("ensure-schema-ready.ps1")
+    failure = script.index("SCHEMA_EXIT", readiness)
+    abort = script.index("exit /b %SCHEMA_EXIT%", failure)
     failure_block = script[failure:abort]
-    assert "schema preparation" in failure_block.lower()
+    assert "schema readiness" in failure_block.lower()
     assert script.index("start-backend.ps1") > abort
+
+    assert "bootstrap_db.py" in helper
+    assert '"--check"' in helper
+    assert "ready=True" in helper
+    assert "ready=False" in helper
+    for forbidden in (
+        "--migrate",
+        "stop-servers.ps1",
+        "backup_db.py",
+        "restore_db.py",
+        "_verify_backup.py",
+        "check_inventory_integrity.py",
+        "Read-Host",
+        "mes.db",
+    ):
+        assert forbidden not in helper

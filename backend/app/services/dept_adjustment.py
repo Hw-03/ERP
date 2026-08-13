@@ -134,7 +134,8 @@ def build_disassembly_template(
     """분해/회수용 초기 라인 세트 반환.
 
     분해 대상품: direction="out".
-    BOM 직계 구성품: direction="in" (사용자가 in/defective/scrap으로 변경 가능).
+    BOM 직계 구성품: direction="in" (일반 부서조정에서는 in/defective로 변경 가능).
+    폐기는 별도 재작업의 scrap_qty 흐름에서 처리한다.
     """
     item = item_repository.get(db, item_id)
     if item is None:
@@ -206,6 +207,20 @@ _TRANSACTION_TYPE_MAP: dict[tuple[AdjDirection, str], TransactionTypeEnum] = {
     ("defective", "disassembly"): TransactionTypeEnum.MARK_DEFECTIVE,
     ("defective", "correction"):  TransactionTypeEnum.MARK_DEFECTIVE,
 }
+
+_VALID_ADJUSTMENT_DIRECTIONS = frozenset({"in", "out", "defective"})
+
+
+def _validate_adjustment_lines(lines: list[AdjLine]) -> None:
+    """트랜잭션 진입 전에 모든 제출 라인의 처리 가능 여부를 확인한다."""
+    if not lines:
+        raise ValueError("처리할 라인이 없습니다.")
+
+    for index, line in enumerate(lines, start=1):
+        if line.direction not in _VALID_ADJUSTMENT_DIRECTIONS:
+            raise ValueError(f"지원하지 않는 direction입니다 ({index}번째 라인): {line.direction}")
+        if line.quantity <= 0:
+            raise ValueError(f"수량은 0보다 커야 합니다 ({index}번째 라인).")
 
 
 def _apply_adjustment(
@@ -302,8 +317,9 @@ def submit_adjustment(
     notes: Optional[str] = None,
 ) -> list[uuid.UUID]:
     """부서 재고 조정과 원장을 하나의 업무 트랜잭션으로 확정한다."""
+    _validate_adjustment_lines(lines)
     with transactional(db):
-        return _apply_adjustment(
+        log_ids = _apply_adjustment(
             db,
             sub_type,
             lines,
@@ -312,6 +328,11 @@ def submit_adjustment(
             reference_no=reference_no,
             notes=notes,
         )
+        if len(log_ids) != len(lines):
+            raise RuntimeError(
+                f"부서 재고 조정 로그 수 불일치: 라인 {len(lines)}건, 로그 {len(log_ids)}건"
+            )
+        return log_ids
 
 
 # ---------------------------------------------------------------------------

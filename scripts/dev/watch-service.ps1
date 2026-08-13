@@ -141,8 +141,12 @@ $FrontendErrorPatterns = @(
 if ($Service -eq "backend") {
     Write-Host "===== Database readiness ====="
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SchemaReadinessScript -Mode Report
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[schema] 상태 확인 스크립트를 실행하지 못했습니다."
+    $schemaExit = $LASTEXITCODE
+    switch ($schemaExit) {
+        0 { Write-Host "[watch-database] READY" }
+        2 { Write-Host "[watch-database] NOT_READY" }
+        3 { Write-Host "[watch-database] CHECK_ERROR" }
+        default { Write-Host "[watch-database] CHECK_ERROR (unexpected exit $schemaExit)" }
     }
     Write-Host ""
     Watch-LogFiles "Backend logs" @($BackendOut, $BackendErr, $BackendEvents) @()
