@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { ProductionCapacity } from "@/lib/api/types/production";
 import { CapacityDetailModal } from "../CapacityDetailModal";
@@ -92,5 +92,15 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
 
     expect(mobile.getByText("자동 기준 출하 완제품 없음")).toBeInTheDocument();
     expect(mobile.getAllByText("—")).toHaveLength(3);
+  });
+
+  it("펼친 PF 상세에서는 자동 기준 배지를 유지한다", () => {
+    const { mobileList } = renderModal();
+    const mobile = within(mobileList);
+
+    fireEvent.click(mobile.getByRole("button", { name: /DX3000.*1종/ }));
+    fireEvent.click(mobile.getAllByRole("button", { name: /DX3000 조립 완제품/ })[1]);
+
+    expect(mobile.getAllByText("자동 기준")).toHaveLength(2);
   });
 });

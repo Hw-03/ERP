@@ -156,8 +156,8 @@ describe("CapacityDetailModal", () => {
     expect(header).toHaveClass("grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]");
     expect(header).toHaveTextContent(/조립 완제품\s*모델 수\s*자동 기준 출하품\s*출하 대기\s*빠른 생산\s*총생산/);
     expect(groupRow).toHaveClass("grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]");
-    expect(groupRow).toHaveTextContent(/2종\s*DX3000 수출형\s*자동 기준\s*10\s*20\s*30/);
-    expect(within(groupRow!).getByText("자동 기준")).toBeInTheDocument();
+    expect(groupRow).toHaveTextContent(/2종\s*DX3000 수출형\s*10\s*20\s*30/);
+    expect(within(groupRow!).queryByText("자동 기준")).not.toBeInTheDocument();
     expect(within(groupRow!).queryByRole("button", { name: "기준 PF 해제" })).not.toBeInTheDocument();
   });
 
@@ -226,7 +226,7 @@ describe("CapacityDetailModal", () => {
     expect(within(desktopTable!).queryByText("출하 완제품 · 병목")).not.toBeInTheDocument();
   });
 
-  it("PF 행은 수량, 자동 기준 상태, 빠른 생산 병목 정보를 유지한다", () => {
+  it("PF 행은 수량과 빠른 생산 병목 정보를 유지하되 자동 기준 배지는 표시하지 않는다", () => {
     const { container } = render(<CapacityDetailModal capacityData={capacityData} onClose={vi.fn()} />);
     const desktopTable = container.querySelector(".hidden.sm\\:block");
     const groupRow = within(desktopTable!).getByText("2종").closest(".grid");
@@ -242,7 +242,7 @@ describe("CapacityDetailModal", () => {
     expect(within(pfRow!).getByText("10")).toBeInTheDocument();
     expect(within(pfRow!).getByText("20")).toBeInTheDocument();
     expect(within(pfRow!).getByText("30")).toBeInTheDocument();
-    expect(within(pfRow!).getByText("자동 기준")).toBeInTheDocument();
+    expect(within(pfRow!).queryByText("자동 기준")).not.toBeInTheDocument();
     expect(within(pfRow!).queryByRole("button", { name: "지정" })).not.toBeInTheDocument();
     expect(pfRow).toHaveClass("sm:grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]");
     expect(pfRow).toHaveClass("sm:gap-0", "sm:px-0");

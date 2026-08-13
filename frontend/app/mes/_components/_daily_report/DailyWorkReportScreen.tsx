@@ -240,7 +240,7 @@ export function DailyWorkReportScreen({
 
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
-      <div className={`scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:pb-0 ${editable && !isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
+      <div className={`scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
         {!onTopbarControlsChange && <header className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-h-11 items-center gap-3">
@@ -295,7 +295,7 @@ export function DailyWorkReportScreen({
         )}
 
         {targetEmployeeId ? (
-          <div className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${editable ? "" : "lg:overflow-y-auto lg:pr-1"}`}>
+          <div key={tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
             {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." />}
             {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : activityQuery.data ? <DailyWorkActivity activity={activityQuery.data} onDetailOpenChange={setIsActivityDetailOpen} /> : <PanelPlaceholder>MES 거래를 불러오는 중입니다.</PanelPlaceholder>}
             <DailyWorkReportEditor
@@ -312,7 +312,7 @@ export function DailyWorkReportScreen({
                 setSaveError(null);
               }}
               saveRef={editorSaveRef}
-              fillAvailableHeight={editable && !isActivityDetailOpen}
+              fillAvailableHeight={!isActivityDetailOpen}
             />
           </div>
         ) : tab === "all" ? <PanelPlaceholder>작성한 직원을 선택하세요.</PanelPlaceholder> : null}

@@ -128,7 +128,7 @@ export function DailyWorkReportEditor({
 
   if (!editable) {
     return (
-      <section className="rounded-[20px] border p-4 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <section className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
             <PencilLine className="h-5 w-5" />
@@ -137,7 +137,7 @@ export function DailyWorkReportEditor({
             <h2 className="text-lg font-black">작업 내역</h2>
           </div>
         </div>
-        <p className="mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7 lg:max-h-72 lg:overflow-y-auto lg:pr-1" style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <p className={`mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1" : ""}`} style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {initialContent || "작성된 일보가 없습니다."}
         </p>
       </section>

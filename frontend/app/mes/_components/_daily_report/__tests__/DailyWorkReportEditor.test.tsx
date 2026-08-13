@@ -198,8 +198,11 @@ describe("DailyWorkReportEditor", () => {
 
   it("읽기 전용 장문은 데스크톱 카드 내부에서만 스크롤한다", () => {
     const content = "긴 작업 내역 ".repeat(500);
-    render(<DailyWorkReportEditor initialContent={content} editable={false} saving={false} saveError={null} onSave={vi.fn().mockResolvedValue("2026-08-04T02:30:00Z")} />);
+    render(<DailyWorkReportEditor initialContent={content} editable={false} saving={false} saveError={null} onSave={vi.fn().mockResolvedValue("2026-08-04T02:30:00Z")} fillAvailableHeight />);
 
-    expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent === content)).toHaveClass("lg:max-h-72", "lg:overflow-y-auto");
+    const readonlyContent = screen.getByText((_, element) => element?.tagName === "P" && element.textContent === content);
+    expect(readonlyContent).toHaveClass("lg:min-h-0", "lg:flex-1", "lg:overflow-y-auto");
+    expect(readonlyContent).not.toHaveClass("lg:max-h-72");
+    expect(readonlyContent.closest("section")).toHaveClass("lg:flex", "lg:min-h-0", "lg:flex-1", "lg:flex-col");
   });
 });

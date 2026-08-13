@@ -335,6 +335,7 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         variants={variants}
                         hasPfPath={it.has_pf_path}
                         autoRepresentative={autoRepresentative}
+                        showAutoRepresentativeBadge
                       />
                     </div>
                   )}
@@ -403,7 +404,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                     }}
                   >
                     <span className="truncate">{autoRepresentative.pf_name || autoRepresentative.pf_code}</span>
-                    <span>자동 기준</span>
                   </span>
                 ) : (
                   <span
@@ -546,10 +546,12 @@ function PfVariants({
   variants,
   hasPfPath,
   autoRepresentative,
+  showAutoRepresentativeBadge = false,
 }: {
   variants: ProductionCapacityPfVariant[];
   hasPfPath: boolean;
   autoRepresentative?: ProductionCapacityPfVariant | null;
+  showAutoRepresentativeBadge?: boolean;
 }) {
   if (variants.length === 0) {
     return (
@@ -601,12 +603,12 @@ function PfVariants({
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  {isAutoRepresentative && (
+                  {showAutoRepresentativeBadge && isAutoRepresentative && (
                     <span
                       className="rounded-full px-1.5 py-0.5 text-sm font-bold"
                       style={{
-                        background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 18%, transparent)`,
                         color: LEGACY_COLORS.cyan,
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 15%, transparent)`,
                       }}
                     >
                       자동 기준

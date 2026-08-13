@@ -124,8 +124,9 @@ describe("DailyWorkReportScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "다른 작성자 조립" }));
 
     const readonlyContent = screen.getByText((_, element) => element?.tagName === "P" && element.textContent === content);
-    expect(readonlyContent).toHaveClass("lg:max-h-72", "lg:overflow-y-auto");
-    expect(readonlyContent.closest("section")).not.toHaveClass("lg:flex-1");
+    expect(readonlyContent).toHaveClass("lg:min-h-0", "lg:flex-1", "lg:overflow-y-auto");
+    expect(readonlyContent).not.toHaveClass("lg:max-h-72");
+    expect(readonlyContent.closest("section")).toHaveClass("lg:flex", "lg:min-h-0", "lg:flex-1", "lg:flex-col");
   });
 
   it("전체 일보의 큰 읽기 전용 카드 묶음은 데스크톱 내부 스크롤 영역에서 접근한다", () => {
@@ -144,10 +145,23 @@ describe("DailyWorkReportScreen", () => {
     const readonlyContent = screen.getByText((_, element) => element?.tagName === "P" && element.textContent === content);
     const targetWrapper = readonlyContent.closest("section")?.parentElement;
     const outer = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header")?.parentElement?.parentElement;
-    expect(targetWrapper).toHaveClass("lg:min-h-0", "lg:flex-1", "lg:overflow-y-auto");
-    expect(readonlyContent.closest("section")).not.toHaveClass("lg:flex-1");
+    expect(targetWrapper).toHaveClass("lg:min-h-0", "lg:flex-1");
+    expect(targetWrapper).not.toHaveClass("lg:overflow-y-auto");
+    expect(readonlyContent.closest("section")).toHaveClass("lg:flex-1");
     expect(outer).toHaveClass("lg:overflow-hidden");
     expect(outer).not.toHaveClass("lg:overflow-y-auto");
+  });
+
+  it("animates the result area only after selecting an all-report author", () => {
+    queryState.reports = [{ employee_id: "employee-2", employee_name: "Other", department: "Test" }];
+
+    render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "Mine", department: "Test" } as never} />);
+    fireEvent.click(screen.getAllByRole("tab")[1]);
+
+    expect(screen.queryByTestId("daily-work-report-result")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Other Test" }));
+
+    expect(screen.getByTestId("daily-work-report-result")).toHaveClass("animate-view-fade");
   });
 
   it("전체 일보의 읽기 전용 MES 상세는 일보 본문 스크롤로 확인한다", () => {

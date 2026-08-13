@@ -58,6 +58,7 @@ function isShippingViewMode(value: string | null): value is ViewMode {
 }
 type RequestWizardStep = 1 | 2 | 3 | 4 | 5;
 type RequestWizardNavigation = "push" | "replace";
+type ViewNavigationOptions = { animateFromHub?: boolean };
 type PendingUrlSearch = { from: string; to: string };
 type RequestWizardPushEntry = {
   fromSearch: string;
@@ -313,6 +314,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     requestWizardForwardStackRef.current = [];
   }
   const [view, setView] = useState<ViewMode>("hub");
+  const [hubEntryAnimationView, setHubEntryAnimationView] = useState<ViewMode | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [pfItems, setPfItems] = useState<Item[]>([]);
   const queryClient = useQueryClient();
@@ -461,6 +463,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     requestId?: string | null,
     historyStatusOverride?: ShippingHistoryStatus,
     requestStepOverride?: RequestWizardStep,
+    options?: ViewNavigationOptions,
   ) {
     if (nextView !== "requestWork") {
       clearRequestWizardHistory();
@@ -468,6 +471,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     const url = buildShippingUrl(nextView, requestId, historyStatusOverride, requestStepOverride);
     const toSearch = url.startsWith("?") ? url.slice(1) : url;
     pendingUrlSearchRef.current = { from: searchParams.toString(), to: toSearch };
+    setHubEntryAnimationView(options?.animateFromHub ? nextView : null);
     setView(nextView);
     router.push(url, { scroll: false });
   }
@@ -881,6 +885,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         pendingUrlSearchRef.current = null;
         clearRequestWizardHistory();
       }
+    }
+    if (!settledPendingNavigation) {
+      setHubEntryAnimationView(null);
     }
     if (!settledPendingNavigation && currentSearch !== lastUrlSearchRef.current) {
       const lastPushedEntry = requestWizardPushStackRef.current.at(-1);
@@ -1516,7 +1523,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }, [basePfId, draftLines, itemById, matchResult]);
 
   function openSection(next: SectionTab) {
-    navigateView(next === "request" ? "requestList" : "historyList");
+    navigateView(next === "request" ? "requestList" : "historyList", undefined, undefined, undefined, { animateFromHub: true });
   }
 
   function renderActiveView() {
@@ -1530,7 +1537,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     }
 
     if (view === "requestList") {
-      return (
+      const entry = (
         <RequestListEntry
           requests={activeRequests}
           onBack={() => navigateView("hub")}
@@ -1538,6 +1545,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           onOpen={(req) => loadRequestIntoDraft(req, "requestDetail")}
         />
       );
+      return hubEntryAnimationView === "requestList"
+        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade">{entry}</div>
+        : entry;
     }
 
     if (view === "requestDetail") {
@@ -1657,7 +1667,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     }
 
     if (view === "historyList") {
-      return (
+      const entry = (
         <HistoryListEntry
           rows={historyRows}
           status={historyStatus}
@@ -1682,6 +1692,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           }}
         />
       );
+      return hubEntryAnimationView === "historyList"
+        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade">{entry}</div>
+        : entry;
     }
 
     return (
@@ -1872,11 +1885,12 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
     <div className="min-w-0">
       <Panel dataTestId="shipping-request-detail" className="flex min-w-0 flex-col">
         <div data-testid="shipping-request-detail-header" className={SHIPPING_TOP_ROW_CLASS}>
-          <div className={SHIPPING_ROW_CLASS}>
+          <div className={`${SHIPPING_ROW_CLASS} flex-1 flex-wrap`}>
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               <ArrowLeft className="h-4 w-4" />
             </button>
             <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
+            <InvoiceNumberEditor request={request} onSaved={onInvoiceSaved} />
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {canCancelPrepared && (
@@ -1898,12 +1912,9 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
           </div>
         </div>
 
-        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <InvoiceNumberEditor request={request} onSaved={onInvoiceSaved} />
-          <RevisionHistory request={request} />
-        </div>
-
         {request.status === "PREPARED" && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(request.serial_numbers)} /></div>}
+
+        <div className="mt-3"><RevisionHistory request={request} /></div>
 
         <div className="mt-3"><LineSummary request={request} contentSized /></div>
 
@@ -1957,29 +1968,28 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
     || request.events.some((event) => event.event_type === "PREPARED");
   const cannotClearExisting = Boolean(request.invoice_number) && !value.trim() && hasPreparationHistory;
   return (
-    <section data-testid="shipping-invoice-editor" className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: request.invoice_number ? LEGACY_COLORS.border : tint(LEGACY_COLORS.yellow, 42) }}>
-      <Field label="인보이스 번호">
-        <div className="flex min-w-0 gap-2">
-          <input
-            aria-label="인보이스 번호"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            className={`${SHIPPING_TEXT_INPUT_CLASS} min-w-0 flex-1`}
-            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            placeholder="인보이스 번호 입력"
-          />
-          <button
-            type="button"
-            aria-label="인보이스 번호 저장"
-            onClick={() => void saveInvoice()}
-            disabled={saving || unchanged || cannotClearExisting}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[12px] border px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
-            style={{ background: tint(LEGACY_COLORS.blue, 14), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}
-          >
-            {saving ? "저장 중" : "저장"}
-          </button>
-        </div>
-      </Field>
+    <section data-testid="shipping-invoice-editor" className="min-w-[280px] flex-1" aria-label="인보이스 번호 편집">
+      <div className="mb-1 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>인보이스 번호</div>
+      <div className="flex min-w-0 gap-2">
+        <input
+          aria-label="인보이스 번호"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          className={`${SHIPPING_TEXT_INPUT_CLASS} min-w-0 flex-1`}
+          style={{ background: LEGACY_COLORS.bg, borderColor: request.invoice_number ? LEGACY_COLORS.border : tint(LEGACY_COLORS.yellow, 42), color: LEGACY_COLORS.text }}
+          placeholder="인보이스 번호 입력"
+        />
+        <button
+          type="button"
+          aria-label="인보이스 번호 저장"
+          onClick={() => void saveInvoice()}
+          disabled={saving || unchanged || cannotClearExisting}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[12px] border px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
+          style={{ background: tint(LEGACY_COLORS.blue, 14), borderColor: tint(LEGACY_COLORS.blue, 40), color: LEGACY_COLORS.blue }}
+        >
+          {saving ? "저장 중" : "저장"}
+        </button>
+      </div>
       {cannotClearExisting ? (
         <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
           준비 완료 이력이 있어 기존 인보이스 번호를 비울 수 없습니다.
@@ -2108,9 +2118,9 @@ function RevisionSnapshotInfo({ label, snapshot, request }: { label: string; sna
   );
 }
 
-function RevisionArrayChangeCard({ change, request }: { change: RevisionArrayLineChange; request: ShippingRequest }) {
+function RevisionArrayChangeCard({ change, snapshot, side, request }: { change: RevisionArrayLineChange; snapshot: RevisionSnapshotLine; side: "before" | "after"; request: ShippingRequest }) {
   const state = revisionChangeLabel(change);
-  const title = revisionSnapshotWithCurrent(change.after ?? change.before!, request).itemName;
+  const title = revisionSnapshotWithCurrent(snapshot, request).itemName;
   return (
     <div className="rounded-[10px] border px-2 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: tint(state.tone, 38) }}>
       <div className="flex min-w-0 items-center justify-between gap-2">
@@ -2118,8 +2128,7 @@ function RevisionArrayChangeCard({ change, request }: { change: RevisionArrayLin
         <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(state.tone, 14), color: state.tone }}>{state.label}</span>
       </div>
       <div className="mt-1 grid gap-1">
-        {change.before && <RevisionSnapshotInfo label="변경 전" snapshot={change.before} request={request} />}
-        {change.after && <RevisionSnapshotInfo label="변경 후" snapshot={change.after} request={request} />}
+        <RevisionSnapshotInfo label={side === "before" ? "변경 전" : "변경 후"} snapshot={snapshot} request={request} />
       </div>
     </div>
   );
@@ -2144,8 +2153,19 @@ function RevisionArrayChange({ change, request }: { change: ShippingRequestRevis
           {groups.map((group) => (
             <section key={group.id} data-testid={`shipping-revision-array-group-${change.field}-${group.id}`} className="rounded-[10px] border p-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
               <div className="mb-1.5 text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{group.title}</div>
-              <div className="grid gap-2">
-                {group.lines.map((line) => <RevisionArrayChangeCard key={line.key} change={line} request={request} />)}
+              <div className="grid gap-2 md:grid-cols-2">
+                {group.lines.some((line) => line.before) && (
+                  <section data-testid={`shipping-revision-array-before-${change.field}-${group.id}`} className="grid content-start gap-2">
+                    <div className="text-xs font-black" style={{ color: LEGACY_COLORS.red }}>제외 · 변경 전</div>
+                    {group.lines.flatMap((line) => line.before ? [<RevisionArrayChangeCard key={`${line.key}-before`} change={line} snapshot={line.before} side="before" request={request} />] : [])}
+                  </section>
+                )}
+                {group.lines.some((line) => line.after) && (
+                  <section data-testid={`shipping-revision-array-after-${change.field}-${group.id}`} className="grid content-start gap-2">
+                    <div className="text-xs font-black" style={{ color: LEGACY_COLORS.green }}>추가 · 변경 후</div>
+                    {group.lines.flatMap((line) => line.after ? [<RevisionArrayChangeCard key={`${line.key}-after`} change={line} snapshot={line.after} side="after" request={request} />] : [])}
+                  </section>
+                )}
               </div>
             </section>
           ))}
@@ -2184,7 +2204,7 @@ function RevisionHistory({ request }: { request: ShippingRequest }) {
       ) : revisions.length === 0 ? (
         <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기록된 수정 이력이 없습니다.</div>
       ) : (
-        <div className="mt-2 grid max-h-[240px] gap-2 overflow-y-auto pr-1">
+        <div className="mt-2 grid gap-2">
           {revisions.map((revision) => {
             const expanded = openRevisionIds.includes(revision.revision_id);
             const summary = revisionSummary(revision.changes);

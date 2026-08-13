@@ -3163,6 +3163,31 @@ describe("DesktopShippingView", () => {
     expect(within(actions).getByTestId("shipping-detail-actions-buttons")).toHaveTextContent("준비 완료");
   });
 
+  it("places invoice and prepared serial numbers above the full-width revision history", async () => {
+    const detailRequest = request({
+      request_id: "prepared-detail-layout",
+      status: "PREPARED",
+      invoice_number: "INV-READY",
+      serial_numbers: "32M26H0146 ~ 32M26H0155",
+      prepared_at: "2026-08-12T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-detail-layout";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([detailRequest]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-request-detail");
+    const header = within(detail).getByTestId("shipping-request-detail-header");
+    const invoice = within(detail).getByTestId("shipping-invoice-editor");
+    const serialNumbers = within(detail).getByText("완제품 SN").closest("div.mt-3");
+    const revisionHistory = within(detail).getByTestId("shipping-revision-history");
+
+    expect(header).toContainElement(invoice);
+    expect(serialNumbers?.compareDocumentPosition(revisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(revisionHistory.parentElement).toHaveClass("mt-3");
+    expect(revisionHistory).not.toHaveClass("max-h-[240px]", "overflow-y-auto");
+  });
+
   it("renders BOM and companion revisions as grouped item change cards", async () => {
     const detailRequest = request({ request_id: "grouped-revisions" });
     const revisions = [{
@@ -3219,6 +3244,72 @@ describe("DesktopShippingView", () => {
     expect(companionChange).toHaveTextContent("추가 동반품");
     expect(companionChange).toHaveTextContent("추가");
     expect(within(revisionHistory).queryByText(/기존 AF \(AF-OLD\) 1EA, 삭제된 PF/)).not.toBeInTheDocument();
+  });
+
+  it("splits each revision group into before and after columns without empty counterpart cards", async () => {
+    const detailRequest = request({ request_id: "two-column-revisions" });
+    const revisions = [{
+      revision_id: "revision-two-columns",
+      request_id: detailRequest.request_id,
+      edited_by_employee_id: "employee-1",
+      edited_by_name: "홍길동",
+      summary: "구성품 수정",
+      affects_preparation: true,
+      changes: [{
+        field: "companion_lines",
+        before: [
+          { item_id: "carton-1", item_name: "수량 변경 카톤", mes_code: "R-OLD", quantity: 1, unit: "EA" },
+          { item_id: "removed-carton", item_name: "제외 카톤", mes_code: "R-REMOVE", quantity: 1, unit: "EA" },
+        ],
+        after: [
+          { item_id: "carton-1", item_name: "수량 변경 카톤", mes_code: "R-OLD", quantity: 2, unit: "EA" },
+          { item_id: "added-carton", item_name: "추가 카톤", mes_code: "R-ADD", quantity: 1, unit: "EA" },
+        ],
+      }],
+      created_at: "2026-08-12T01:00:00Z",
+    }];
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=two-column-revisions";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([detailRequest]);
+    vi.mocked(api.getShippingRevisions).mockResolvedValue(revisions);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /동반 출하품 수정/ }));
+    const group = within(screen.getByTestId("shipping-revision-array-change-companion_lines"))
+      .getByTestId("shipping-revision-array-group-companion_lines-companion");
+    const before = within(group).getByTestId("shipping-revision-array-before-companion_lines-companion");
+    const after = within(group).getByTestId("shipping-revision-array-after-companion_lines-companion");
+
+    expect(before).toHaveTextContent("수량 변경 카톤");
+    expect(before).toHaveTextContent("제외 카톤");
+    expect(after).toHaveTextContent("수량 변경 카톤");
+    expect(after).toHaveTextContent("추가 카톤");
+    expect(before).not.toHaveTextContent("추가 카톤");
+    expect(after).not.toHaveTextContent("제외 카톤");
+  });
+
+  it("animates only a hub-card entry and not a request-list URL restore", async () => {
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    const animatedEntry = await screen.findByTestId("shipping-hub-entry-animation");
+    expect(animatedEntry).toHaveClass("animate-view-fade");
+
+    navigationMock.search = "tab=shipping&shippingView=requestList";
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+
+    navigationMock.search = "tab=shipping&shippingView=requestList";
+    const direct = render(<DesktopShippingView onStatusChange={() => {}} />);
+    await within(direct.container).findByTestId("shipping-request-list-panel");
+    expect(direct.container.querySelector("[data-testid='shipping-hub-entry-animation']")).toBeNull();
+
+    navigationMock.search = "tab=shipping";
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await waitFor(() => expect(container.querySelector("[data-shipping-hub-card='request']")).toBeTruthy());
+    navigationMock.search = "tab=shipping&shippingView=requestList";
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await within(container).findByTestId("shipping-request-list-panel");
+    expect(container.querySelector("[data-testid='shipping-hub-entry-animation']")).toBeNull();
   });
 
   it("keeps picked-up serial numbers and pickup cancellation in the history header", async () => {
