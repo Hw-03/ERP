@@ -98,19 +98,15 @@ if exist "requirements.txt" (
 )
 popd
 
-rem ====== Read-only DB readiness guard ======
-rem Server startup must never create, migrate, stamp, or otherwise change the DB.
-pushd "%~dp0backend"
-echo [MES] Checking DB schema readiness ^(read-only^)...
-py bootstrap_db.py --check
+rem ====== Interactive DB readiness and migration workflow ======
+rem The helper runs read-only checks first and changes the DB only after explicit Y confirmation.
+echo [MES] Checking DB schema readiness...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\ensure-schema-ready.ps1" -Mode Start
 if errorlevel 1 (
-    echo [MES] ERROR: DB schema is not ready. Server startup aborted.
-    echo [MES] Prepare explicitly: cd backend ^&^& py bootstrap_db.py --all
-    popd
+    echo [MES] ERROR: database schema preparation was cancelled or failed. Server startup aborted.
     pause
     exit /b 1
 )
-popd
 
 rem ====== Resolve dev/employee server profile (ports, URL) ======
 for /f "usebackq tokens=1,2 delims==" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=& '%~dp0scripts\dev\resolve-server-profile.ps1'; 'PROFILE='+$p.Name; 'FRONTEND_PORT='+$p.FrontendPort; 'BACKEND_PORT='+$p.BackendPort; 'BACKEND_URL='+$p.BackendInternalUrl"`) do set "%%A=%%B"

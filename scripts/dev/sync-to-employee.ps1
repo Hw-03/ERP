@@ -266,6 +266,7 @@ $EmpDevScriptDir = Join-Path $EmpRoot "scripts\dev"
 New-Item -ItemType Directory -Force -Path $EmpDevScriptDir | Out-Null
 $runtimeScripts = @(
     "resolve-server-profile.ps1",
+    "ensure-schema-ready.ps1",
     "checked-command.ps1",
     "runtime-paths.ps1",
     "runtime-control.ps1",

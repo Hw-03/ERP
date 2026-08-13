@@ -7,6 +7,7 @@ $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
 . (Join-Path $PSScriptRoot "runtime-control.ps1")
 $BackendLogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\backend"
 $FrontendLogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\frontend"
+$SchemaReadinessScript = Join-Path $PSScriptRoot "ensure-schema-ready.ps1"
 
 function Test-HttpReady {
     param([string] $Url)
@@ -130,3 +131,9 @@ Show-ServiceStatus `
     -StatePath (Join-Path $FrontendLogDir "frontend-runtime.json") `
     -EventPath (Join-Path $FrontendLogDir "frontend-runtime-events.jsonl") `
     -HealthUrl "http://127.0.0.1:$($Profile.FrontendPort)/mes"
+
+Write-Host "[database]"
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SchemaReadinessScript -Mode Report
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[database] 상태 확인 스크립트를 실행하지 못했습니다."
+}

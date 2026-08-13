@@ -19,6 +19,7 @@ $FrontendOut = Join-Path $FrontendLogDir "frontend-dev.out.log"
 $FrontendErr = Join-Path $FrontendLogDir "frontend-dev.err.log"
 $BackendEvents = Join-Path $BackendLogDir "backend-runtime-events.jsonl"
 $FrontendEvents = Join-Path $FrontendLogDir "frontend-runtime-events.jsonl"
+$SchemaReadinessScript = Join-Path $PSScriptRoot "ensure-schema-ready.ps1"
 
 $ServiceTitle = if ($Service -eq "backend") { "Backend" } else { "Frontend" }
 try {
@@ -138,6 +139,12 @@ $FrontendErrorPatterns = @(
 )
 
 if ($Service -eq "backend") {
+    Write-Host "===== Database readiness ====="
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SchemaReadinessScript -Mode Report
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[schema] 상태 확인 스크립트를 실행하지 못했습니다."
+    }
+    Write-Host ""
     Watch-LogFiles "Backend logs" @($BackendOut, $BackendErr, $BackendEvents) @()
 }
 else {

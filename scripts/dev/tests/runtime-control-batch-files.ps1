@@ -13,6 +13,7 @@ $SupervisorScript = Join-Path $RepoRoot "scripts\dev\service_supervisor.py"
 $RuntimeControlScript = Join-Path $RepoRoot "scripts\dev\runtime-control.ps1"
 $RuntimePathsScript = Join-Path $RepoRoot "scripts\dev\runtime-paths.ps1"
 $CheckedCommandScript = Join-Path $RepoRoot "scripts\dev\checked-command.ps1"
+$EnsureSchemaReadyScript = Join-Path $RepoRoot "scripts\dev\ensure-schema-ready.ps1"
 $StatusScript = Join-Path $RepoRoot "scripts\dev\status-servers.ps1"
 $StopServersScript = Join-Path $RepoRoot "scripts\dev\stop-servers.ps1"
 $StartFrontendScript = Join-Path $RepoRoot "scripts\dev\start-frontend.ps1"
@@ -63,6 +64,7 @@ Assert-FileExists $WatchServiceScript
 Assert-FileExists $SupervisorScript
 Assert-FileExists $RuntimeControlScript
 Assert-FileExists $RuntimePathsScript
+Assert-FileExists $EnsureSchemaReadyScript
 Assert-FileExists $StatusScript
 Assert-FileExists $StopServersScript
 Assert-FileExists $BackupBat
@@ -74,15 +76,43 @@ Assert-ContentMatch $StartBat 'start-frontend\.ps1' "start.bat must call start-f
 Assert-ContentMatch $StartBat 'watch\.bat' "start.bat must mention watch.bat for manual monitoring."
 Assert-ContentNotMatch $StartBat 'start\s+"[^"]*"\s+"%~dp0watch\.bat"|Start-Process\s+.*watch\.bat' "start.bat must not open the monitor automatically."
 Assert-ContentMatch $StartBat 'stop\.bat' "start.bat must mention stop.bat for full shutdown."
-Assert-ContentMatch $StartBat '(?m)^\s*py\s+bootstrap_db\.py\s+--check\s*$' "start.bat must run the read-only Alembic head guard."
-Assert-ContentNotMatch $StartBat '(?m)^\s*py\s+bootstrap_db\.py[^\r\n]*--(schema|migrate|all)' "start.bat must never mutate the database during server startup."
-Assert-ContentMatch $StartBat '(?s)py\s+bootstrap_db\.py\s+--check.*?if\s+errorlevel\s+1.*?py\s+bootstrap_db\.py\s+--all.*?exit\s+/b\s+1' "start.bat must abort a failed read-only guard and print explicit bootstrap guidance."
+Assert-ContentMatch $StartBat 'ensure-schema-ready\.ps1' "start.bat must delegate schema readiness to the shared helper."
+Assert-ContentMatch $StartBat '-Mode\s+Start' "start.bat must invoke the interactive schema-start mode."
+Assert-ContentNotMatch $StartBat '(?m)^\s*py\s+bootstrap_db\.py[^\r\n]*--(schema|migrate|all)' "start.bat must not embed direct database mutation commands."
+Assert-ContentMatch $StartBat '(?s)ensure-schema-ready\.ps1.*?-Mode\s+Start.*?if\s+errorlevel\s+1.*?exit\s+/b\s+1.*?start-backend\.ps1' "start.bat must abort before servers start when schema preparation fails."
+
+Assert-ContentMatch $EnsureSchemaReadyScript 'ValidateSet\("Start",\s*"Report"\)' "schema helper must expose Start and Report modes."
+Assert-ContentMatch $EnsureSchemaReadyScript 'Invoke-BackendBootstrap\s+-Command\s+"--check"' "schema helper must check readiness before any migration."
+Assert-ContentMatch $EnsureSchemaReadyScript 'Read-Host' "schema helper must require interactive confirmation before migration."
+Assert-ContentMatch $EnsureSchemaReadyScript 'stop-servers\.ps1' "schema helper must stop active services before migrating."
+Assert-ContentMatch $EnsureSchemaReadyScript '\$BackupTool.*--label.*startup-schema-migration' "schema helper must create a labeled verified backup."
+Assert-ContentMatch $EnsureSchemaReadyScript 'BACKUP_PATH=' "schema helper must retain the exact backup path."
+Assert-ContentMatch $EnsureSchemaReadyScript 'Invoke-BackendBootstrap\s+-Command\s+"--migrate"' "schema helper must use Alembic migration without seeding."
+Assert-ContentMatch $EnsureSchemaReadyScript '_verify_backup\.py' "schema helper must run SQLite integrity verification."
+Assert-ContentMatch $EnsureSchemaReadyScript 'check_inventory_integrity\.py' "schema helper must run inventory integrity verification."
+Assert-ContentMatch $EnsureSchemaReadyScript '\$RestoreTool.*--sqlite.*--target.*--check' "schema helper must print an exact manual restore command."
+Assert-ContentNotMatch $EnsureSchemaReadyScript '&\s+.*restore_db\.py' "schema helper must never auto-restore the database."
+$schemaHelperContent = Get-Content -Raw $EnsureSchemaReadyScript
+$stopStage = $schemaHelperContent.IndexOf('$stopResult =')
+$backupStage = $schemaHelperContent.IndexOf('$backupResult =')
+$migrateStage = $schemaHelperContent.IndexOf('$migrateResult =')
+$postCheckStage = $schemaHelperContent.IndexOf('$postCheck =')
+$schemaVerifyStage = $schemaHelperContent.IndexOf('$schemaVerifyResult =')
+$inventoryVerifyStage = $schemaHelperContent.IndexOf('$inventoryVerifyResult =')
+if ($stopStage -lt 0 -or $backupStage -lt 0 -or $migrateStage -lt 0 -or $postCheckStage -lt 0 -or $schemaVerifyStage -lt 0 -or $inventoryVerifyStage -lt 0 -or
+    -not ($stopStage -lt $backupStage -and $backupStage -lt $migrateStage -and $migrateStage -lt $postCheckStage -and $postCheckStage -lt $schemaVerifyStage -and $schemaVerifyStage -lt $inventoryVerifyStage)) {
+    throw "schema helper must stop, back up, migrate, and verify in order."
+}
 
 Assert-ContentMatch $WatchBat 'open-watch\.ps1' "watch.bat must open the split monitoring launcher."
 Assert-ContentNotMatch $WatchBat 'start-(backend|frontend)|stop-(backend|frontend)|stop-servers|taskkill|Stop-Process' "watch.bat must not start or stop servers."
 
 Assert-ContentMatch $StopBat 'stop-servers\.ps1' "stop.bat must call stop-servers.ps1."
 Assert-ContentMatch $StatusBat 'status-servers\.ps1' "status.bat must call status-servers.ps1."
+Assert-ContentMatch $StatusScript 'ensure-schema-ready\.ps1' "status must report shared schema readiness."
+Assert-ContentMatch $StatusScript '-Mode\s+Report' "status must use read-only schema report mode."
+Assert-ContentMatch $WatchServiceScript 'ensure-schema-ready\.ps1' "backend monitor must report shared schema readiness once."
+Assert-ContentMatch $WatchServiceScript '-Mode\s+Report' "backend monitor must use read-only schema report mode."
 Assert-ContentMatch $StopServersScript 'stop-backend\.ps1' "stop-servers.ps1 must stop the backend."
 Assert-ContentMatch $StopServersScript 'stop-frontend\.ps1' "stop-servers.ps1 must stop the frontend."
 
@@ -120,6 +150,7 @@ Assert-ContentMatch $SyncToEmployeeScript 'open-watch\.ps1' "sync-to-employee.ps
 Assert-ContentMatch $SyncToEmployeeScript 'watch-service\.ps1' "sync-to-employee.ps1 must copy watch-service.ps1 to the employee server."
 Assert-ContentMatch $SyncToEmployeeScript 'runtime-paths\.ps1' "sync-to-employee.ps1 must copy the shared runtime path resolver."
 Assert-ContentMatch $SyncToEmployeeScript 'checked-command\.ps1' "sync-to-employee.ps1 must use and copy the checked external-command helper."
+Assert-ContentMatch $SyncToEmployeeScript 'ensure-schema-ready\.ps1' "sync-to-employee.ps1 must copy the shared schema readiness helper."
 Assert-ContentMatch $CheckedCommandScript 'Invoke-CheckedExternalCommand' "checked-command.ps1 must expose checked external command execution."
 
 Assert-ContentMatch $RuntimePathsScript 'MES_RUNTIME_ROOT' "runtime-paths.ps1 must support the single runtime root override."

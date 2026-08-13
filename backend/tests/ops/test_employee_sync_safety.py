@@ -16,6 +16,7 @@ CHECKED_COMMAND = ROOT / "scripts" / "dev" / "checked-command.ps1"
 START_BAT = ROOT / "start.bat"
 RUNTIME_SCRIPTS = (
     "resolve-server-profile.ps1",
+    "ensure-schema-ready.ps1",
     "runtime-paths.ps1",
     "runtime-control.ps1",
     "service_supervisor.py",
@@ -477,19 +478,20 @@ def test_automatic_sync_uses_dry_run_and_never_blocks_on_source_git_state() -> N
     assert "| Out-Host" in script
 
 
-def test_start_bat_checks_schema_read_only_before_starting_servers() -> None:
+def test_start_bat_delegates_interactive_schema_preparation_before_servers() -> None:
     script = START_BAT.read_text(encoding="utf-8-sig")
     command_lines = [line.strip() for line in script.splitlines() if line.strip().lower().startswith("py ")]
 
-    assert "py bootstrap_db.py --check" in command_lines
+    assert "ensure-schema-ready.ps1" in script
+    assert "-Mode Start" in script
     assert not any(
         option in line
         for line in command_lines
         for option in ("--all", "--schema", "--migrate")
     )
-    check = script.index("py bootstrap_db.py --check")
-    failure = script.index("if errorlevel 1", check)
+    preparation = script.index("ensure-schema-ready.ps1")
+    failure = script.index("if errorlevel 1", preparation)
     abort = script.index("exit /b 1", failure)
     failure_block = script[failure:abort]
-    assert "py bootstrap_db.py --all" in failure_block
+    assert "schema preparation" in failure_block.lower()
     assert script.index("start-backend.ps1") > abort
