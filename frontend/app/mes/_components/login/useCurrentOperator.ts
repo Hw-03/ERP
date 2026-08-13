@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { sendClientEvent } from "@/lib/client-events";
+import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-context";
 import { getClientEventSource } from "@/lib/operator-log-context";
 import { normalizeSidebarMode, type SidebarMode } from "@/lib/sidebar-mode";
 
@@ -108,6 +109,7 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
   clearLegacyPersistentOperator();
   window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
   if (bootId) window.sessionStorage.setItem(BOOT_KEY, bootId);
+  startAuditSession();
   sendClientEvent({ event: "ui_login", source: getClientEventSource() });
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
@@ -127,6 +129,7 @@ export function updateCurrentOperatorPreferences(patch: {
 export function clearCurrentOperator(): void {
   if (typeof window === "undefined") return;
   sendClientEvent({ event: "ui_logout", source: getClientEventSource() });
+  clearAuditSession();
   window.sessionStorage.removeItem(OPERATOR_KEY);
   window.sessionStorage.removeItem(BOOT_KEY);
   window.sessionStorage.removeItem(LOGIN_NOTIFICATION_POPUP_PENDING_KEY);

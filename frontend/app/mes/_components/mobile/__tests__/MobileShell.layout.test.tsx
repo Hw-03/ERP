@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
 
+const setAuditScreen = vi.hoisted(() => vi.fn());
+
 const state = vi.hoisted(() => ({
   notifications: {
     items: [] as AppNotification[],
@@ -36,6 +38,10 @@ vi.mock("@/lib/queries/useNotificationsQuery", () => ({
 
 vi.mock("@/lib/client-events", () => ({
   sendClientEvent: vi.fn(),
+}));
+
+vi.mock("@/lib/activity-audit-context", () => ({
+  setAuditScreen,
 }));
 
 vi.mock("@/lib/queries/realtime", () => ({
@@ -113,6 +119,7 @@ describe("MobileShell layout", () => {
     state.operator.hidden_sidebar_tabs = [];
     state.revision = null;
     vi.mocked(sendClientEvent).mockClear();
+    setAuditScreen.mockClear();
   });
 
   it("does not render the old mobile top header controls", () => {
@@ -189,9 +196,12 @@ describe("MobileShell layout", () => {
       from: "dashboard",
       to: "warehouse",
       path: "/mes",
+      screen_key: "mobile.warehouse",
+      screen_label: "입출고",
       source: "mobile",
     });
     expect(sendClientEvent).toHaveBeenCalledTimes(1);
+    expect(setAuditScreen).toHaveBeenLastCalledWith({ key: "mobile.warehouse", label: "입출고" });
   });
 
   it("refreshes capacity on a realtime revision without leaving the active tab", async () => {

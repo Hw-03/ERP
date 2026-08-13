@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+
+const audit = vi.hoisted(() => ({ sendClientEvent: vi.fn() }));
+
+vi.mock("@/lib/client-events", () => audit);
+
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 describe("ConfirmModal", () => {
@@ -141,5 +146,24 @@ describe("ConfirmModal", () => {
     const ta = screen.getByTestId("ta");
     fireEvent.keyDown(ta, { key: "Enter" });
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+  it("records a cancellation audit event", () => {
+    render(
+      <ConfirmModal
+        open
+        title="submit"
+        onClose={() => {}}
+        onConfirm={() => {}}
+        auditAction={{ key: "io.submit", label: "io submit" }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(audit.sendClientEvent).toHaveBeenCalledWith({
+      event: "ui_action_cancel",
+      action_key: "io.submit",
+      action_label: "io submit",
+    });
   });
 });

@@ -33,6 +33,7 @@ import { STALE_TIME } from "@/lib/queries/client";
 import { queryKeys } from "@/lib/queries/keys";
 import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { sendClientEvent } from "@/lib/client-events";
+import { setAuditScreen } from "@/lib/activity-audit-context";
 import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation, useFlushDirtyEntries } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
@@ -120,6 +121,11 @@ function DesktopMesShellInner({
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
 
   useEffect(() => {
+    const meta = TAB_META[activeTab];
+    setAuditScreen({ key: `desktop.${activeTab}`, label: meta.title });
+  }, [activeTab]);
+
+  useEffect(() => {
     onBeforeViewportSwitchChange?.(flushDirtyEntries);
     return () => onBeforeViewportSwitchChange?.(null);
   }, [flushDirtyEntries, onBeforeViewportSwitchChange]);
@@ -157,6 +163,8 @@ function DesktopMesShellInner({
           from: activeTab,
           to: tab,
           path: "/mes",
+          screen_key: `desktop.${tab}`,
+          screen_label: TAB_META[tab].title,
           source: "desktop",
         });
       }

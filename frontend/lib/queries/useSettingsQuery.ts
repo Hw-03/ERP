@@ -20,6 +20,14 @@ export function useAuditCsvListQuery() {
   });
 }
 
+/** 월별 작업 감사 파일 목록 조회 */
+export function useActivityAuditListQuery() {
+  return useQuery({
+    queryKey: queryKeys.settings.activityAuditList(),
+    queryFn: () => adminApi.listActivityAuditFiles(),
+  });
+}
+
 /** PIN 검증 (mutation — side-effect 없음, 로컬 state 갱신용) */
 export function useVerifyPinMutation() {
   return useMutation({

@@ -30,6 +30,7 @@ import { getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { sendClientEvent } from "@/lib/client-events";
+import { setAuditScreen } from "@/lib/activity-audit-context";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { useNotificationsQuery } from "@/lib/queries/useNotificationsQuery";
@@ -158,6 +159,11 @@ export function MobileShell({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
 
+  useEffect(() => {
+    const meta = TAB_META[activeTab];
+    setAuditScreen({ key: `mobile.${activeTab}`, label: meta.label });
+  }, [activeTab]);
+
   // URL ?tab= / ?defect_dept= 으로 초기 상태 동기화.
   // useSearchParams 의 Suspense 요구를 피하려 클라이언트 마운트 시 1회만 읽는다.
   useEffect(() => {
@@ -207,6 +213,8 @@ export function MobileShell({
         from: activeTab,
         to: target,
         path: "/mes",
+        screen_key: `mobile.${target}`,
+        screen_label: TAB_META[target].label,
         source: "mobile",
       });
     }

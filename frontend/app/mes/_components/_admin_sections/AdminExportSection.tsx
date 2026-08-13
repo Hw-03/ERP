@@ -8,12 +8,14 @@ import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { FilterChip } from "../common/FilterChip";
+import { AdminActivityAuditControls } from "./AdminActivityAuditControls";
 import { AdminAuditCsvControls } from "./AdminAuditCsvControls";
 
 type RangePreset = "today" | "7d" | "30d" | "90d";
 type DataScope = "all" | "items" | "transactions" | "employees" | "bom";
 type ExportFormat = "csv" | "xlsx";
 type ExportMode = "general" | "audit";
+type AuditKind = "inventory" | "activity";
 type ExportFeedback = { kind: "success" | "error"; message: string };
 
 const EXPORT_PAGE_SIZE = 2000;
@@ -169,6 +171,7 @@ export function AdminExportSection() {
   const [preset, setPreset] = useState<RangePreset>("30d");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [mode, setMode] = useState<ExportMode>("general");
+  const [auditKind, setAuditKind] = useState<AuditKind>("inventory");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<ExportFeedback | null>(null);
   const [f704Year, setF704Year] = useState(() => new Date().getFullYear());
@@ -479,7 +482,25 @@ export function AdminExportSection() {
             </div>
           ) : (
             <div className="mt-4 flex min-h-0 flex-1 flex-col">
-              <AdminAuditCsvControls />
+              <div role="group" aria-label="원본 로그 종류" className="flex shrink-0 flex-wrap gap-1.5">
+                <FilterChip
+                  active={auditKind === "inventory"}
+                  label="재고 거래 원본"
+                  onClick={() => setAuditKind("inventory")}
+                  size="sm"
+                  className="min-h-11"
+                />
+                <FilterChip
+                  active={auditKind === "activity"}
+                  label="작업 감사 로그"
+                  onClick={() => setAuditKind("activity")}
+                  size="sm"
+                  className="min-h-11"
+                />
+              </div>
+              <div className="mt-3 flex min-h-0 flex-1 flex-col">
+                {auditKind === "inventory" ? <AdminAuditCsvControls /> : <AdminActivityAuditControls />}
+              </div>
             </div>
           )}
         </ExportSurface>

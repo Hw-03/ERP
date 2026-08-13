@@ -14,6 +14,7 @@ import {
   ApiError,
 } from "../api-core";
 import { adminApi } from "../api/admin";
+import { setAuditScreen } from "../activity-audit-context";
 
 // Helpers --------------------------------------------------------
 
@@ -131,6 +132,7 @@ describe("fetcher / write helpers", () => {
     globalThis.fetch = originalFetch;
     window.localStorage.clear();
     window.sessionStorage.clear();
+    setAuditScreen(null);
     registerAdminPinProvider(() => null);
     vi.useRealTimers();
   });
@@ -175,6 +177,25 @@ describe("fetcher / write helpers", () => {
     expect(JSON.parse(init.body as string)).toEqual({ name: "X" });
   });
 
+  it("attaches the audit session, terminal, screen, and source to write requests", async () => {
+    setAuditScreen({ key: "warehouse.io.produce.step5", label: "production submit" });
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await postJson("/api/items", { name: "X" });
+
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers).toMatchObject({
+      "X-MES-Audit-Screen": "warehouse.io.produce.step5",
+      "X-MES-Audit-Screen-Label": encodeURIComponent("production submit"),
+      "X-MES-Audit-Source": "desktop",
+    });
+    expect(headers["X-MES-Audit-Session"]).toMatch(/^[a-f0-9-]+$/);
+    expect(headers["X-MES-Terminal-Id"]).toMatch(/^[a-f0-9-]+$/);
+  });
+
   it("putJson uses PUT method", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ ok: true, body: {} })),
@@ -204,7 +225,7 @@ describe("fetcher / write helpers", () => {
     await expect(postJson("/api/items", {})).rejects.toThrow("유효성 실패");
   });
 
-  it("postJson without body skips Content-Type header", async () => {
+  it("postJson without body skips Content-Type while keeping audit headers", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
     );
@@ -213,7 +234,9 @@ describe("fetcher / write helpers", () => {
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("POST");
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBeUndefined();
+    expect(headers["X-MES-Audit-Session"]).toMatch(/^[a-f0-9-]+$/);
   });
 
   it("fetcher attaches the current operator code as a log-only header", async () => {
@@ -267,6 +290,49 @@ describe("fetcher / write helpers", () => {
     ) as unknown as typeof fetch;
 
     await expect(adminApi.downloadAuditFile("2026-05", "xlsx")).resolves.toBe(blob);
+  });
+
+  it("adminApi.updateCurrentAuditTerminal sends the current browser terminal", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({
+        ok: true,
+        body: { terminal_id: "9ea597dc-35ef-4bc0-8a31-4649cff9b5ae", name: "출하 PC-1" },
+      })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await adminApi.updateCurrentAuditTerminal({
+      terminal_id: "9ea597dc-35ef-4bc0-8a31-4649cff9b5ae",
+      name: "출하 PC-1",
+    });
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/admin/activity-audit/terminals/current");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({
+      terminal_id: "9ea597dc-35ef-4bc0-8a31-4649cff9b5ae",
+      name: "출하 PC-1",
+    });
+  });
+
+  it("adminApi.listActivityAuditFiles requests the work audit file list", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ ok: true, body: [] })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await adminApi.listActivityAuditFiles();
+
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/admin/activity-audit/files");
+  });
+
+  it("adminApi.downloadActivityAuditFile returns the selected monthly workbook", async () => {
+    const blob = new Blob(["activity audit"]);
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, statusText: "OK", blob: () => Promise.resolve(blob) }),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(adminApi.downloadActivityAuditFile("2026-08", "xlsx")).resolves.toBe(blob);
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/admin/activity-audit/2026-08.xlsx");
   });
 
   it("adminApi.downloadF704Ledger requests the selected annual F704-02 workbook", async () => {

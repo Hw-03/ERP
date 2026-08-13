@@ -5,6 +5,7 @@ W9-B: 단일 `models.py` (705줄) → 도메인별 패키지로 분리. 모든 �
 """
 
 from app.models.audit import AdminAuditLog
+from app.models.activity_audit import ActivityAuditLog, AuditTerminal
 from app.models.base import (
     Base,
     BoolAsString,
@@ -141,6 +142,8 @@ __all__ = [
     "SystemSetting",
     "DataRevision",
     "AdminAuditLog",
+    "ActivityAuditLog",
+    "AuditTerminal",
     # warehouse map
     "WarehouseAngle",
     "WarehouseBox",

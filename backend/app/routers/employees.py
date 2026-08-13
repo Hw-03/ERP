@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 import uuid
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,7 @@ from app.schemas import (
 from app.dependencies.admin import require_admin_pin
 from app.routers.settings import require_admin
 from app.services import rate_limit
+from app.services.audit_actor_session import set_audit_actor_cookie
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, validate_pin, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
@@ -491,6 +492,7 @@ def verify_employee_pin(
     employee_id: uuid.UUID,
     payload: PinVerifyRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.
@@ -519,6 +521,7 @@ def verify_employee_pin(
 
     rate_limit.record_success(rl_key)
     set_actor(request, employee)
+    set_audit_actor_cookie(response, employee.employee_code)
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 

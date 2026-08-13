@@ -3,6 +3,8 @@
  */
 
 import { ApiError, parseError, toApiUrl } from "../api-core";
+import { getAuditRequestHeaders } from "../activity-audit-context";
+import { readCurrentEmployeeCodeForLog } from "../operator-log-context";
 import type { NotificationListResponse, NotificationMarkReadPayload } from "./types";
 
 
@@ -13,10 +15,15 @@ async function requestWithActor<T>(
 ): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("X-Actor-Employee-Id", employeeId);
+  const employeeCode = readCurrentEmployeeCodeForLog();
+  if (employeeCode) headers.set("X-MES-Employee-Code", employeeCode);
+  for (const [name, value] of Object.entries(getAuditRequestHeaders())) {
+    headers.set(name, value);
+  }
   if (init.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(url, { ...init, headers });
+  const res = await fetch(url, { ...init, headers, credentials: "include" });
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

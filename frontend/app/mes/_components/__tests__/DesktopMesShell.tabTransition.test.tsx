@@ -6,6 +6,8 @@ import { DesktopMesShell } from "../DesktopMesShell";
 import type { DesktopTabId } from "../tabAccess";
 import { sendClientEvent } from "@/lib/client-events";
 
+const setAuditScreen = vi.hoisted(() => vi.fn());
+
 const routerPush = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const queryClientMock = vi.hoisted(() => ({
@@ -20,6 +22,10 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("@/lib/client-events", () => ({
   sendClientEvent: vi.fn(),
+}));
+
+vi.mock("@/lib/activity-audit-context", () => ({
+  setAuditScreen,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -150,6 +156,7 @@ describe("DesktopMesShell tab transition", () => {
     shippingViewProps.mockClear();
     adminViewMounts.mockClear();
     vi.mocked(sendClientEvent).mockClear();
+    setAuditScreen.mockClear();
   });
 
   afterEach(() => {
@@ -178,8 +185,11 @@ describe("DesktopMesShell tab transition", () => {
       from: "history",
       to: "weekly",
       path: "/mes",
+      screen_key: "desktop.weekly",
+      screen_label: "주간보고",
       source: "desktop",
     });
+    expect(setAuditScreen).toHaveBeenLastCalledWith({ key: "desktop.weekly", label: "주간보고" });
   });
 
   it("prefetches the default history page before the first history tab visit", () => {

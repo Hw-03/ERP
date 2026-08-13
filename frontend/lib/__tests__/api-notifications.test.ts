@@ -15,6 +15,8 @@ function makeResponse(body: unknown, ok = true, status?: number): Response {
 const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 function headersOf(init: RequestInit): Headers {
@@ -39,6 +41,10 @@ describe("notificationsApi.listNotifications", () => {
 
 describe("notificationsApi.markNotificationsRead", () => {
   it("POST /api/notifications/mark-read forwards payload with actor header", async () => {
+    window.sessionStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({ employee_code: "E22" }),
+    );
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ items: [], unread_count: 0 })),
     );
@@ -53,7 +59,10 @@ describe("notificationsApi.markNotificationsRead", () => {
     expect(url).toContain("/api/notifications/mark-read");
     expect(init.method).toBe("POST");
     expect(headersOf(init).get("X-Actor-Employee-Id")).toBe("e-1");
+    expect(headersOf(init).get("X-MES-Employee-Code")).toBe("E22");
     expect(headersOf(init).get("Content-Type")).toBe("application/json");
+    expect(headersOf(init).get("X-MES-Audit-Session")).toMatch(/^[a-f0-9-]+$/);
+    expect(headersOf(init).get("X-MES-Terminal-Id")).toMatch(/^[a-f0-9-]+$/);
     const body = JSON.parse(init.body as string);
     expect(body.recipient_employee_id).toBe("e-1");
     expect(body.notification_ids).toEqual(["n-1"]);

@@ -1,6 +1,34 @@
 {
   "components": {
     "schemas": {
+      "ActivityAuditFileResponse": {
+        "properties": {
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "file_name",
+          "row_count",
+          "size_bytes"
+        ],
+        "title": "ActivityAuditFileResponse",
+        "type": "object"
+      },
       "AdjLineInput": {
         "properties": {
           "bom_expected": {
@@ -517,6 +545,45 @@
           "row_count"
         ],
         "title": "AuditCsvFile",
+        "type": "object"
+      },
+      "AuditTerminalResponse": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "terminal_id": {
+            "title": "Terminal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terminal_id",
+          "name"
+        ],
+        "title": "AuditTerminalResponse",
+        "type": "object"
+      },
+      "AuditTerminalUpsert": {
+        "properties": {
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "terminal_id": {
+            "format": "uuid",
+            "title": "Terminal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terminal_id",
+          "name"
+        ],
+        "title": "AuditTerminalUpsert",
         "type": "object"
       },
       "BOMCreate": {
@@ -10779,6 +10846,295 @@
         "summary": "Root",
         "tags": [
           "System"
+        ]
+      }
+    },
+    "/api/admin/activity-audit/files": {
+      "get": {
+        "operationId": "list_activity_audit_files_api_admin_activity_audit_files_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityAuditFileResponse"
+                  },
+                  "title": "Response List Activity Audit Files Api Admin Activity Audit Files Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Activity Audit Files",
+        "tags": [
+          "Admin Audit"
+        ]
+      }
+    },
+    "/api/admin/activity-audit/terminals/current": {
+      "put": {
+        "description": "현재 클라이언트 UUID에 관리용 표시 이름을 등록한다.",
+        "operationId": "upsert_current_terminal_api_admin_activity_audit_terminals_current_put",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditTerminalUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditTerminalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Current Terminal",
+        "tags": [
+          "Admin Audit"
+        ]
+      }
+    },
+    "/api/admin/activity-audit/{month}.csv": {
+      "get": {
+        "operationId": "download_activity_audit_csv_api_admin_activity_audit__month__csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "title": "Month",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Activity Audit Csv",
+        "tags": [
+          "Admin Audit"
+        ]
+      }
+    },
+    "/api/admin/activity-audit/{month}.xlsx": {
+      "get": {
+        "operationId": "download_activity_audit_xlsx_api_admin_activity_audit__month__xlsx_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "title": "Month",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Activity Audit Xlsx",
+        "tags": [
+          "Admin Audit"
         ]
       }
     },

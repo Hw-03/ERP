@@ -19,6 +19,13 @@ export interface AuditCsvBackfillResult {
   months: string[];
 }
 
+export interface AuditTerminal {
+  terminal_id: string;
+  name: string;
+}
+
+export type ActivityAuditFile = AuditCsvFile;
+
 export const adminApi = {
   verifyAdminPin: (pin: string) =>
     postJson<{ message: string }>(toApiUrl("/api/settings/verify-pin"), { pin }),
@@ -31,6 +38,15 @@ export const adminApi = {
 
   downloadAuditFile: (month: string, format: "csv" | "xlsx"): Promise<Blob> =>
     fetchBlob(toApiUrl(`/api/admin/audit-csv/${month}.${format}`)),
+
+  updateCurrentAuditTerminal: (payload: AuditTerminal) =>
+    putJson<AuditTerminal>(toApiUrl("/api/admin/activity-audit/terminals/current"), payload),
+
+  listActivityAuditFiles: () =>
+    fetcher<ActivityAuditFile[]>(toApiUrl("/api/admin/activity-audit/files")),
+
+  downloadActivityAuditFile: (month: string, format: "csv" | "xlsx"): Promise<Blob> =>
+    fetchBlob(toApiUrl(`/api/admin/activity-audit/${month}.${format}`)),
 
   downloadF704Ledger: (year: number): Promise<Blob> =>
     fetchBlob(toApiUrl(`/api/admin/audit-ledger/f704-02.xlsx?year=${year}`)),

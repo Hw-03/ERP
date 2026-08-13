@@ -92,6 +92,7 @@ export const queryKeys = {
   settings: {
     all: ["settings"] as const,
     auditCsvList: () => ["settings", "auditCsvList"] as const,
+    activityAuditList: () => ["settings", "activityAuditList"] as const,
   },
   stockRequests: {
     all: ["stockRequests"] as const,

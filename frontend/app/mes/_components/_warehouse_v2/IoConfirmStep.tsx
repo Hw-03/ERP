@@ -310,6 +310,10 @@ export function IoConfirmStep({
         cancelLabel="취소"
         busy={submitting}
         busyLabel="처리 중..."
+        auditAction={{
+          key: `warehouse.io.${workType}.${subType}.submit`,
+          label: `${headerLabel} 제출`,
+        }}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);

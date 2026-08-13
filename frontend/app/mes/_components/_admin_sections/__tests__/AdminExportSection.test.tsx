@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
+  downloadActivityAuditFile: vi.fn(),
   downloadAuditFile: vi.fn(),
   downloadF704Ledger: vi.fn(),
   downloadF705ProductionLog: vi.fn(),
@@ -12,6 +13,8 @@ const state = vi.hoisted(() => ({
   getItemsExportUrl: vi.fn(),
   getTransactions: vi.fn(),
   getTransactionsExportUrl: vi.fn(),
+  updateCurrentAuditTerminal: vi.fn(),
+  useActivityAuditListQuery: vi.fn(),
   useAuditCsvListQuery: vi.fn(),
 }));
 
@@ -30,13 +33,16 @@ vi.mock("@/lib/api-core", () => ({ fetchBlob: state.fetchBlob }));
 
 vi.mock("@/lib/api/admin", () => ({
   adminApi: {
+    downloadActivityAuditFile: state.downloadActivityAuditFile,
     downloadAuditFile: state.downloadAuditFile,
     downloadF704Ledger: state.downloadF704Ledger,
     downloadF705ProductionLog: state.downloadF705ProductionLog,
+    updateCurrentAuditTerminal: state.updateCurrentAuditTerminal,
   },
 }));
 
 vi.mock("@/lib/queries/useSettingsQuery", () => ({
+  useActivityAuditListQuery: state.useActivityAuditListQuery,
   useAuditCsvListQuery: state.useAuditCsvListQuery,
 }));
 
@@ -71,6 +77,11 @@ describe("AdminExportSection", () => {
     state.fetchBlob.mockResolvedValue(new Blob(["xlsx"]));
     state.useAuditCsvListQuery.mockReturnValue({
       data: [{ month: "2026-05", file_name: "inout_2026-05.csv", row_count: 2, size_bytes: 128 }],
+      isLoading: false,
+      error: null,
+    });
+    state.useActivityAuditListQuery.mockReturnValue({
+      data: [{ month: "2026-08", file_name: "activity_audit_2026-08.csv", row_count: 4, size_bytes: 256 }],
       isLoading: false,
       error: null,
     });
@@ -133,9 +144,19 @@ describe("AdminExportSection", () => {
 
     fireEvent.click(within(modeGroup).getByRole("button", { name: "내부 원본 로그" }));
 
+    const auditKindGroup = within(dataExport).getByRole("group", { name: "원본 로그 종류" });
+    expect(within(auditKindGroup).getByRole("button", { name: "재고 거래 원본" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(auditKindGroup).getByRole("button", { name: "작업 감사 로그" })).toHaveAttribute("aria-pressed", "false");
     expect(within(dataExport).getByTestId("audit-csv-controls")).toBeInTheDocument();
     expect(within(dataExport).queryByTestId("export-control-panel")).not.toBeInTheDocument();
     expect(state.useAuditCsvListQuery).toHaveBeenCalledOnce();
+    expect(state.useActivityAuditListQuery).not.toHaveBeenCalled();
+
+    fireEvent.click(within(auditKindGroup).getByRole("button", { name: "작업 감사 로그" }));
+
+    expect(within(dataExport).getByTestId("activity-audit-controls")).toBeInTheDocument();
+    expect(within(dataExport).queryByTestId("audit-csv-controls")).not.toBeInTheDocument();
+    expect(state.useActivityAuditListQuery).toHaveBeenCalledOnce();
   });
 
   it("범위에 맞는 형식·기간·비활성 옵션만 표시하고 비지원 형식은 CSV로 되돌린다", () => {

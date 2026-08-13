@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
+import { sendClientEvent } from "@/lib/client-events";
 
 /**
  * ConfirmModal — `@/lib/ui/ConfirmModal` 정본.
@@ -35,6 +36,7 @@ interface Props {
   busyLabel?: string;
   confirmAccent?: string;
   confirmDisabled?: boolean;
+  auditAction?: { key: string; label: string };
 }
 
 export function ConfirmModal({
@@ -52,7 +54,20 @@ export function ConfirmModal({
   busyLabel = "처리 중...",
   confirmAccent,
   confirmDisabled = false,
+  auditAction,
 }: Props) {
+  const closeWithAudit = useCallback(() => {
+    if (!viewer) {
+      const action = auditAction ?? { key: "confirm.cancel", label: title };
+      sendClientEvent({
+        event: "ui_action_cancel",
+        action_key: action.key,
+        action_label: action.label,
+      });
+    }
+    onClose();
+  }, [auditAction, onClose, title, viewer]);
+
   // ESC 닫기 / Enter 확인 — busy 중에는 잠금
   useEffect(() => {
     if (!open) return;
@@ -63,7 +78,7 @@ export function ConfirmModal({
           e.preventDefault();
           e.stopImmediatePropagation();
         }
-        onClose();
+        closeWithAudit();
         return;
       }
       if (e.key === "Enter" && onConfirm) {
@@ -79,7 +94,7 @@ export function ConfirmModal({
     };
     window.addEventListener("keydown", handler, viewer);
     return () => window.removeEventListener("keydown", handler, viewer);
-  }, [open, busy, onClose, onConfirm, viewer]);
+  }, [open, busy, onConfirm, viewer, closeWithAudit]);
 
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -104,7 +119,7 @@ export function ConfirmModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      onClick={viewer ? onClose : undefined}
+      onClick={viewer ? closeWithAudit : undefined}
     >
       <div
         ref={panelRef}
@@ -144,7 +159,7 @@ export function ConfirmModal({
           <button
             ref={closeRef}
             type="button"
-            onClick={onClose}
+            onClick={closeWithAudit}
             disabled={busy}
             className="rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors hover:brightness-125 disabled:opacity-50"
             style={{

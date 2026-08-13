@@ -25,12 +25,14 @@ import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import {
+  IO_WORK_TYPES,
   approvalKind,
   ioDepartmentPayload,
   isExitWorkType,
   isSingleInlineSubType,
   pickerDirectionLabel,
   singleItemSourceKind,
+  subTypeLabel,
   targetDepartmentOf,
 } from "../../_warehouse_v2/ioWorkType";
 import {
@@ -50,6 +52,8 @@ import {
 } from "../../_warehouse_v2/pullFromWarehouse";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ioLineAvailable } from "@/lib/mes/inventory";
+import { setAuditScreen } from "@/lib/activity-audit-context";
+import { sendClientEvent } from "@/lib/client-events";
 
 const STEP_META: { key: string; label: string }[] = [
   { key: "1", label: "작업 유형" },
@@ -106,6 +110,7 @@ export function MobileIoComposeWizard({
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const previousAuditScreenRef = useRef<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
   // 마지막으로 복원을 발동시킨 '이어서 하기' nonce — 같은 draft 재선택 재발동 판정용.
   const restoredNonceRef = useRef<number | null>(null);
@@ -454,6 +459,32 @@ export function MobileIoComposeWizard({
 
   const step = state.step;
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
+
+  useEffect(() => {
+    const workTypeLabel = IO_WORK_TYPES.find((row) => row.id === state.workType)?.label ?? state.workType;
+    const nextScreen = {
+      key: `warehouse.io.${state.workType}.${state.subType}.step${step}`,
+      label: `입출고 · ${workTypeLabel} · ${subTypeLabel(state.subType)} · ${STEP_META[step - 1]?.label ?? step}`,
+    };
+    const previousScreen = previousAuditScreenRef.current ?? "mobile.warehouse";
+    setAuditScreen(nextScreen, { priority: "workflow" });
+    if (previousScreen !== nextScreen.key) {
+      sendClientEvent({
+        event: "ui_nav",
+        from: previousScreen,
+        to: nextScreen.key,
+        path: "/mes",
+        screen_key: nextScreen.key,
+        screen_label: nextScreen.label,
+        source: "mobile",
+      });
+      previousAuditScreenRef.current = nextScreen.key;
+    }
+  }, [state.subType, state.workType, step]);
+
+  useEffect(() => () => {
+    setAuditScreen({ key: "mobile.warehouse", label: "입출고" }, { force: true });
+  }, []);
 
   useEffect(() => {
     onStepChange?.(step);

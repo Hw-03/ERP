@@ -22,10 +22,12 @@ import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
-import { useIoWorkState, type IoStep } from "./useIoWorkState";
+import { IO_STEP_LABELS, useIoWorkState, type IoStep } from "./useIoWorkState";
 import { useIoUrlSync } from "./useIoUrlSync";
 import { useIoPreselect } from "./useIoPreselect";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { setAuditScreen } from "@/lib/activity-audit-context";
+import { sendClientEvent } from "@/lib/client-events";
 import type { IoComposeViewProps } from "./types";
 import { ItemConversionWorkView } from "./ItemConversionView";
 import { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "../common/StatusTargetNotice";
@@ -144,6 +146,7 @@ export function IoComposeView({
   const [itemConversionView, setItemConversionView] = useState<"compose" | "work">("compose");
   const [itemConversionHistoryStep, setItemConversionHistoryStep] = useState<ItemConversionHistoryStep>(1);
   const itemConversionViewRef = useRef(itemConversionView);
+  const previousAuditScreenRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
   const intentAppliedRef = useRef(false);
@@ -685,6 +688,31 @@ export function IoComposeView({
   const stepWrapperClass = (n: IoStep) => `flex min-h-0 flex-1 flex-col${step > n ? " pt-[9px]" : ""}`;
   const workTypeInfo = IO_WORK_TYPES.find((row) => row.id === state.workType);
   const currentWorkTitle = workTypeInfo?.label ?? workTypeLabel(state.workType);
+
+  useEffect(() => {
+    const nextScreen = {
+      key: `warehouse.io.${state.workType}.${state.subType}.step${step}`,
+      label: `입출고 · ${currentWorkTitle} · ${subTypeText} · ${IO_STEP_LABELS[step]}`,
+    };
+    const previousScreen = previousAuditScreenRef.current ?? "desktop.warehouse";
+    setAuditScreen(nextScreen, { priority: "workflow" });
+    if (previousScreen !== nextScreen.key) {
+      sendClientEvent({
+        event: "ui_nav",
+        from: previousScreen,
+        to: nextScreen.key,
+        path: "/mes",
+        screen_key: nextScreen.key,
+        screen_label: nextScreen.label,
+        source: "desktop",
+      });
+      previousAuditScreenRef.current = nextScreen.key;
+    }
+  }, [currentWorkTitle, state.subType, state.workType, step, subTypeText]);
+
+  useEffect(() => () => {
+    setAuditScreen({ key: "desktop.warehouse", label: "입출고" }, { force: true });
+  }, []);
 
   function stepTitle(stepId: IoStep) {
     if (stepId === 3) return `${pickerDirectionLabel(state.subType)} 품목 선택`;

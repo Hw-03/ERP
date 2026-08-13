@@ -36,6 +36,7 @@ from app.routers import (
     admin_audit,
     admin_audit_csv,
     admin_audit_ledger,
+    admin_activity_audit,
     admin_production_log,
     assembly_checklists,
     bom,
@@ -301,6 +302,7 @@ app.include_router(assembly_checklists.router, prefix="/api/assembly-checklists"
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_ledger.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(admin_activity_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_production_log.router, prefix="/api/admin", tags=["Admin Export"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])

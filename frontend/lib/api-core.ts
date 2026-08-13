@@ -11,6 +11,7 @@
  */
 
 import { readCurrentEmployeeCodeForLog } from "./operator-log-context";
+import { getAuditRequestHeaders } from "./activity-audit-context";
 
 const SERVER_API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}`
@@ -150,7 +151,11 @@ function logActorHeaders(): Record<string, string> {
 
 /** admin PIN + operator 자격증명을 합친 인증 헤더. 둘 다 있으면 둘 다 주입. */
 function authHeaders(): Record<string, string> {
-  return { ...adminPinHeaders(), ...operatorCredsHeaders(), ...logActorHeaders() };
+  return {
+    ...adminPinHeaders(),
+    ...operatorCredsHeaders(),
+    ...logActorHeaders(),
+  };
 }
 
 function rethrowGetRequestError(error: unknown, url: string): never {
@@ -169,7 +174,7 @@ export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> 
   let res: Response;
   try {
     const headers = authHeaders();
-    const init: RequestInit = { signal };
+    const init: RequestInit = { signal, credentials: "include" };
     if (Object.keys(headers).length > 0) init.headers = headers;
     res = await fetch(url, init);
   } catch (error) {
@@ -186,7 +191,7 @@ export async function fetchBlob(url: string, signal?: AbortSignal): Promise<Blob
   let res: Response;
   try {
     const headers = authHeaders();
-    const init: RequestInit = { signal };
+    const init: RequestInit = { signal, credentials: "include" };
     if (Object.keys(headers).length > 0) init.headers = headers;
     res = await fetch(url, init);
   } catch (error) {
@@ -212,8 +217,8 @@ async function writeJson<T>(
   method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown,
 ): Promise<T> {
-  const init: RequestInit = { method };
-  const pinHeaders = authHeaders();
+  const init: RequestInit = { method, credentials: "include" };
+  const pinHeaders = { ...authHeaders(), ...getAuditRequestHeaders() };
   if (body !== undefined) {
     init.headers = { "Content-Type": "application/json", ...pinHeaders };
     init.body = JSON.stringify(body);

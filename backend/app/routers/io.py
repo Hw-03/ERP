@@ -239,6 +239,11 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
     try:
         result = io_actions_svc.submit(db, payload)
         _batch = result.get("batch") or {}
+        http_request.state.activity_audit_related_id = str(_batch.get("batch_id") or "")[:120] or None
+        http_request.state.activity_audit_target_summary = (
+            f"{_batch.get('work_type') or ''} · {_batch.get('sub_type') or ''}".strip(" ·")
+            or None
+        )
         _evt_emit(
             "io_submit",
             request=http_request,
@@ -295,6 +300,11 @@ def submit_io_draft(
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     _batch = result.get("batch") or {}
+    http_request.state.activity_audit_related_id = str(_batch.get("batch_id") or "")[:120] or None
+    http_request.state.activity_audit_target_summary = (
+        f"{_batch.get('work_type') or ''} · {_batch.get('sub_type') or ''}".strip(" ·")
+        or None
+    )
     _evt_emit(
         "io_submit",
         request=http_request,

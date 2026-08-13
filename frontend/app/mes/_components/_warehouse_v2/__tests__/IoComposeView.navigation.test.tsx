@@ -6,6 +6,11 @@ import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
 
 const routerPush = vi.fn();
+const setAuditScreen = vi.hoisted(() => vi.fn());
+const sendClientEvent = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen }));
+vi.mock("@/lib/client-events", () => ({ sendClientEvent }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/mes",
@@ -131,9 +136,38 @@ beforeEach(() => {
   vi.mocked(api.getItemConversionPreview).mockResolvedValue(conversionResult);
   vi.mocked(api.executeItemConversion).mockResolvedValue(conversionResult);
   routerPush.mockClear();
+  setAuditScreen.mockClear();
+  sendClientEvent.mockClear();
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("records detailed warehouse workflow screen arrivals and step moves", async () => {
+    renderCompose();
+
+    expect(setAuditScreen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ key: "warehouse.io.receive.receive_supplier.step1" }),
+      { priority: "workflow" },
+    );
+    expect(sendClientEvent).toHaveBeenLastCalledWith(expect.objectContaining({
+      event: "ui_nav",
+      from: "desktop.warehouse",
+      to: "warehouse.io.receive.receive_supplier.step1",
+      screen_key: "warehouse.io.receive.receive_supplier.step1",
+      screen_label: expect.any(String),
+      source: "desktop",
+    }));
+
+    fireEvent.click(workTypeCards()[1]);
+
+    await waitFor(() => {
+      expect(sendClientEvent).toHaveBeenLastCalledWith(expect.objectContaining({
+        event: "ui_nav",
+        to: expect.stringContaining(".step2"),
+        source: "desktop",
+      }));
+    });
+  });
+
   it("ignores a legacy linked shipping request intent", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
