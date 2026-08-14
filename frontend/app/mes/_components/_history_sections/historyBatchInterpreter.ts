@@ -824,7 +824,11 @@ export function getHistoryMovementSummary(
     parts.push(_verbItemPart("증가", "success", included));
   } else if (sub === "warehouse_adjust_out") {
     parts.push(_verbItemPart("감소", "danger", included));
-  } else if (sub === "adjust_in" || sub === "adjust_out" || tx === "ADJUST") {
+  } else if (sub === "adjust_in") {
+    parts.push(_verbItemPart("증가", "success", included));
+  } else if (sub === "adjust_out") {
+    parts.push(_verbItemPart("감소", "danger", included));
+  } else if (tx === "ADJUST") {
     const inc: typeof included = [];
     const dec: typeof included = [];
     for (const l of included) {

@@ -692,8 +692,8 @@ describe("getHistoryMovementSummary", () => {
     expect(result.parts[0].tone).toBe("success");
   });
 
-  it("adjust_out + negative qty → '감소 N' danger", () => {
-    const line = makeLine({ quantity: -5 });
+  it("adjust_out + 양수 저장 수량 → '감소 N' danger", () => {
+    const line = makeLine({ quantity: 5 });
     const bundle = makeBundle({ lines: [line] });
     const batch = makeBatch({ sub_type: "adjust_out", bundles: [bundle] });
     const result = getHistoryMovementSummary({ transaction_type: "ADJUST" }, batch);
