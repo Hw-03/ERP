@@ -441,6 +441,8 @@ function Start-ProfileFrontendSupervisor {
         [Parameter(Mandatory = $true)][string] $StderrLog
     )
 
+    $frontendMode = if ($Profile.Name -eq "employee") { "start" } else { "dev" }
+
     return Start-ServiceSupervisor `
         -Profile $Profile `
         -Service "frontend" `
@@ -455,9 +457,26 @@ function Start-ProfileFrontendSupervisor {
         -Environment @{
             MES_RUNTIME_ROOT = $RuntimeRoot
             MES_SUPERVISED_FRONTEND = "1"
+            MES_FRONTEND_MODE = $frontendMode
             PORT = [string] $Profile.FrontendPort
             BACKEND_INTERNAL_URL = $Profile.BackendInternalUrl
         }
+}
+
+function Assert-ProfileFrontendBuildReady {
+    param(
+        [Parameter(Mandatory = $true)][object] $Profile,
+        [Parameter(Mandatory = $true)][string] $FrontendDir
+    )
+
+    if ($Profile.Name -ne "employee") {
+        return
+    }
+
+    $buildIdPath = Join-Path $FrontendDir ".next-prod\BUILD_ID"
+    if (-not (Test-Path -LiteralPath $buildIdPath -PathType Leaf)) {
+        throw "[start-frontend] Employee production build is missing: $buildIdPath. Run the approved sync/deploy command first."
+    }
 }
 
 function Invoke-ProfileFrontendStartup {
@@ -490,6 +509,8 @@ function Invoke-ProfileFrontendStartup {
     if (-not (Wait-RuntimeHttp200 -Url $backendHealthUrl)) {
         throw "[start-frontend] Backend is not live at $backendHealthUrl. Start the profile backend first."
     }
+
+    Assert-ProfileFrontendBuildReady -Profile $Profile -FrontendDir $FrontendDir
 
     $supervisorArgs = @{
         Profile = $Profile

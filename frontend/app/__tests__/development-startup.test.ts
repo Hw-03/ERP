@@ -7,6 +7,7 @@ const FRONTEND_ROOT = path.resolve(__dirname, "..", "..");
 const NEXT_CONFIG_PATH = path.join(FRONTEND_ROOT, "next.config.js");
 const START_FRONTEND_PATH = path.resolve(FRONTEND_ROOT, "..", "scripts", "dev", "start-frontend.ps1");
 const RUNTIME_CONTROL_PATH = path.resolve(FRONTEND_ROOT, "..", "scripts", "dev", "runtime-control.ps1");
+const DEV_DIAGNOSTICS_PATH = path.join(FRONTEND_ROOT, "scripts", "dev-diagnostics.js");
 
 function packageScripts() {
   return JSON.parse(readFileSync(path.join(FRONTEND_ROOT, "package.json"), "utf8")).scripts as Record<
@@ -49,6 +50,49 @@ describe("개발 서버 실행 경로", () => {
 
   it("dev:raw는 내부와 E2E에서 쓰는 직접 Next 실행 명령을 유지한다", () => {
     expect(packageScripts()["dev:raw"]).toBe("next dev --hostname 0.0.0.0");
+  });
+
+  it.each([
+    ["dev", "Usage: next dev"],
+    ["start", "Usage: next start"],
+  ])("supervised frontend mode %s selects the matching Next command", (runMode, expectedUsage) => {
+    const result = spawnSync(process.execPath, ["scripts/dev.js", "--help"], {
+      cwd: FRONTEND_ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        MES_SUPERVISED_FRONTEND: "1",
+        MES_FRONTEND_MODE: runMode,
+        PORT: runMode === "dev" ? "3001" : "3000",
+        BACKEND_INTERNAL_URL:
+          runMode === "dev" ? "http://localhost:8011" : "http://localhost:8010",
+      },
+    });
+
+    const stdout = result.stdout.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(result.status).toBe(0);
+    expect(stdout).toContain(expectedUsage);
+  });
+
+  it("records the selected frontend mode and Next command in exit dumps", () => {
+    const { buildExitDump } = require(DEV_DIAGNOSTICS_PATH);
+    const startTime = new Date("2026-08-14T00:00:00.000Z");
+    const endTime = new Date("2026-08-14T00:00:01.000Z");
+    const dump = buildExitDump({
+      reason: "child-exit",
+      code: 0,
+      signal: null,
+      childPid: 42,
+      startTime,
+      endTime,
+      port: "3000",
+      hostname: "0.0.0.0",
+      cwd: FRONTEND_ROOT,
+      runMode: "start",
+      nextCommand: "start",
+    });
+
+    expect(dump).toMatchObject({ runMode: "start", nextCommand: "start" });
   });
 
   it("감독 실행기는 dev.js를 직접 호출해 npm dev 재귀를 만들지 않는다", () => {

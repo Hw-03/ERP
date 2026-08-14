@@ -199,6 +199,7 @@ Assert-ContentMatch $RuntimeControlScript 'terminatedPids\s*=\s*@\(\$terminatedP
 Assert-ContentMatch $RuntimeControlScript '(?s)state\.status\s+-eq\s+"crash_loop".*?Recover-CrashLoopPortListeners.*?restart-reset' "crash-loop supervisors must recover an owned listener conflict before a restart reset."
 Assert-ContentMatch $RuntimeControlScript '(?s)port_conflict.*crash_loop' "runtime-control.ps1 must record crash-loop listener ownership conflicts."
 Assert-ContentMatch $RuntimeControlScript 'MES_SUPERVISED_FRONTEND\s*=\s*"1"' "runtime-control.ps1 must mark the supervised frontend child."
+Assert-ContentMatch $RuntimeControlScript '(?s)\$frontendMode\s*=\s*if.*?Profile\.Name.*?employee.*?start.*?dev.*?MES_FRONTEND_MODE\s*=\s*\$frontendMode' "runtime-control.ps1 must run only the employee frontend with next start."
 Assert-ContentMatch $RuntimeControlScript 'BACKEND_INTERNAL_URL' "runtime-control.ps1 must pass the profile backend URL to the frontend child."
 Assert-ContentMatch $RuntimeControlScript 'health/live' "runtime-control.ps1 must verify direct backend health before starting the frontend."
 Assert-ContentMatch $RuntimeControlScript 'backend_proxy_mismatch' "runtime-control.ps1 must record a backend proxy boot-id mismatch."
@@ -218,6 +219,8 @@ Assert-ContentMatch $StopBackendScript 'backend-runtime-control\.json' "stop-bac
 Assert-ContentMatch $StopFrontendScript 'frontend-runtime-control\.json' "stop-frontend.ps1 must write an intentional stop request."
 Assert-ContentMatch $SyncToEmployeeScript 'service_supervisor\.py' "sync-to-employee.ps1 must copy the supervisor."
 Assert-ContentMatch $SyncToEmployeeScript 'status-servers\.ps1' "sync-to-employee.ps1 must copy status reporting."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)\[sync-frontend\].*?robocopy.*?Invoke-EmployeeFrontendBuild.*?\[sync\] 백엔드.*?robocopy.*?\[migrate\]' "employee deployment must build the production frontend before backend sync and DB migration."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)\.next-prod.*?previous.*?npm\.cmd.*?run.*?build.*?Restart-EmployeeServices.*?exit\s+9' "employee deployment must restore the prior frontend build and services when production build fails."
 Assert-ContentMatch $StatusScript 'Test-SupervisorProcessOwned' "status-servers.ps1 must not report a reused supervisor PID as alive."
 Assert-ContentMatch $StatusScript 'Test-StoredRuntimeProcessOwned' "status-servers.ps1 must not report a reused child PID as alive."
 

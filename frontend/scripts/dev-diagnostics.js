@@ -75,6 +75,8 @@ function buildExitDump({
   port,
   hostname,
   cwd,
+  runMode = "dev",
+  nextCommand = "dev",
   receivedSignals = [],
   parentProcess = null,
   childProcess = null,
@@ -94,6 +96,8 @@ function buildExitDump({
     port,
     hostname,
     cwd,
+    runMode,
+    nextCommand,
     uptimeMs: Math.max(0, endTime.getTime() - startTime.getTime()),
     process: {
       pid: process.pid,

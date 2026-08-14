@@ -26,6 +26,13 @@ if (missingSupervisorEnvironment.length > 0) {
   process.exit(1);
 }
 
+const runMode = (process.env.MES_FRONTEND_MODE || "dev").trim().toLowerCase();
+if (!new Set(["dev", "start"]).has(runMode)) {
+  console.error(`[frontend] Unsupported MES_FRONTEND_MODE: ${runMode}`);
+  process.exit(1);
+}
+const nextCommand = runMode;
+
 const C = {
   reset: "\x1b[0m",
   bold: "\x1b[1m",
@@ -137,7 +144,8 @@ function banner() {
   const out = process.stdout;
   const url = lanIp ? `http://${lanIp}:${port}` : `http://localhost:${port}`;
   safeWrite("stdout", out, "\n");
-  safeWrite("stdout", out, `  ${C.magenta}${C.bold}DEXCOWIN MES${C.reset}  ${C.gray}dev server${C.reset}\n`);
+  const serverLabel = runMode === "start" ? "production server" : "dev server";
+  safeWrite("stdout", out, `  ${C.magenta}${C.bold}DEXCOWIN MES${C.reset}  ${C.gray}${serverLabel}${C.reset}\n`);
   safeWrite("stdout", out, `  ${C.gray}${"-".repeat(44)}${C.reset}\n`);
   safeWrite("stdout", out, `  ${C.dim}Network ${C.reset}  ${C.green}${url}${C.reset}\n`);
   safeWrite("stdout", out, `  ${C.dim}Root    ${C.reset}  ${C.cyan}${rootDir}${C.reset}\n`);
@@ -194,6 +202,8 @@ function writeExitDumpOnce(reason, details = {}) {
     hostname,
     cwd: rootDir,
     backendInternalUrl,
+    runMode,
+    nextCommand,
     receivedSignals,
     parentProcess: getProcessDetails(process.ppid),
     childProcess: getProcessDetails(child?.pid),
@@ -211,7 +221,9 @@ function forwardSignal(signal) {
 }
 
 banner();
-diagnostics.log("dev server wrapper started", {
+diagnostics.log("frontend server wrapper started", {
+  runMode,
+  nextCommand,
   port,
   hostname,
   cwd: rootDir,
@@ -223,14 +235,14 @@ const nextCli = path.join(__dirname, "..", "node_modules", "next", "dist", "bin"
 
 child = spawn(
   process.execPath,
-  [nextCli, "dev", "--hostname", hostname, "--port", port, ...process.argv.slice(2)],
+  [nextCli, nextCommand, "--hostname", hostname, "--port", port, ...process.argv.slice(2)],
   {
     cwd: rootDir,
     stdio: ["inherit", "pipe", "pipe"],
     env: { ...process.env, FORCE_COLOR: "1" },
   }
 );
-diagnostics.log("next dev child spawned", { childPid: child.pid });
+diagnostics.log("next child spawned", { childPid: child.pid, runMode, nextCommand });
 
 child.stdout.on("data", createLineFilter(process.stdout));
 child.stderr.on("data", createLineFilter(process.stderr));
@@ -240,13 +252,13 @@ process.stdin.on("close", () => diagnostics.log("wrapper stdin closed"));
 process.stdin.on("end", () => diagnostics.log("wrapper stdin ended"));
 
 child.on("error", (error) => {
-  diagnostics.log("next dev child error", { message: error.message });
+  diagnostics.log("next child error", { message: error.message, runMode, nextCommand });
   writeExitDumpOnce("child-error", { error });
   process.exit(1);
 });
 
 child.on("exit", (code, signal) => {
-  diagnostics.log("next dev child exited", { code, signal });
+  diagnostics.log("next child exited", { code, signal, runMode, nextCommand });
   writeExitDumpOnce("child-exit", { code, signal });
   process.exit(code ?? (signal ? 1 : 0));
 });

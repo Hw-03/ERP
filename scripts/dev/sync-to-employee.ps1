@@ -9,7 +9,8 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\dev\sync-to-employee.ps1 -AllowSchemaChange
 #
 # exit code: 0 성공 / 2 접속자 있음 / 3 스키마 검수 필요 / 4 동기화 실패 /
-#            5 마이그레이션 실패 / 6 헬스체크 실패 / 7 백업 실패 / 8 사후 검증 실패
+#            5 마이그레이션 실패 / 6 헬스체크 실패 / 7 백업 실패 / 8 사후 검증 실패 /
+#            9 프론트엔드 운영 빌드 실패
 
 param(
     [switch] $DryRun,
@@ -30,6 +31,7 @@ $EmpBackupDir = Join-Path $EmpRoot "_attic\runtime\backups\sqlite"
 $EmpLog = Join-Path $EmpRoot "_attic\runtime\logs\backend\mes.log"
 $EmpLegacyLog = Join-Path $EmpBackend "logs\mes.log"
 $EmpDb = Join-Path $EmpBackend "mes.db"
+$EmpPreviousFrontendBuild = Join-Path $EmpRuntimeRoot "frontend-build\previous.next-prod"
 
 . (Join-Path $DevRoot "scripts\dev\checked-command.ps1")
 
@@ -71,6 +73,57 @@ function Restart-EmployeeServices {
         Success = ($backendStart.Success -and $frontendStart.Success)
         Backend = $backendStart
         Frontend = $frontendStart
+    }
+}
+
+function Invoke-EmployeeFrontendBuild {
+    $activeBuild = Join-Path $EmpFrontend ".next-prod"
+    $previousBuildParent = Split-Path -Parent $EmpPreviousFrontendBuild
+    New-Item -ItemType Directory -Force -Path $previousBuildParent | Out-Null
+
+    if (Test-Path -LiteralPath $EmpPreviousFrontendBuild) {
+        if (Test-Path -LiteralPath $activeBuild) {
+            Remove-Item -LiteralPath $EmpPreviousFrontendBuild -Recurse -Force
+        }
+        else {
+            Move-Item -LiteralPath $EmpPreviousFrontendBuild -Destination $activeBuild
+        }
+    }
+    if (Test-Path -LiteralPath $activeBuild) {
+        Move-Item -LiteralPath $activeBuild -Destination $EmpPreviousFrontendBuild
+    }
+
+    $previousBackendUrl = $env:BACKEND_INTERNAL_URL
+    $previousTelemetry = $env:NEXT_TELEMETRY_DISABLED
+    try {
+        $env:BACKEND_INTERNAL_URL = "http://localhost:8010"
+        $env:NEXT_TELEMETRY_DISABLED = "1"
+        $result = Invoke-CheckedExternalCommand `
+            -FilePath "npm.cmd" `
+            -ArgumentList @("run", "build") `
+            -WorkingDirectory $EmpFrontend
+    }
+    finally {
+        $env:BACKEND_INTERNAL_URL = $previousBackendUrl
+        $env:NEXT_TELEMETRY_DISABLED = $previousTelemetry
+    }
+
+    $buildIdPath = Join-Path $activeBuild "BUILD_ID"
+    $success = ($result.Success -and (Test-Path -LiteralPath $buildIdPath -PathType Leaf))
+    if ($success) {
+        Remove-Item -LiteralPath $EmpPreviousFrontendBuild -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    else {
+        Remove-Item -LiteralPath $activeBuild -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $EmpPreviousFrontendBuild) {
+            Move-Item -LiteralPath $EmpPreviousFrontendBuild -Destination $activeBuild
+        }
+    }
+
+    return [pscustomobject]@{
+        Success = $success
+        Command = $result
+        BuildIdPath = $buildIdPath
     }
 }
 
@@ -261,6 +314,32 @@ Write-Host "[backup] 검증된 백업: $backupPath"
 # ---------------------------------------------------------------
 # 5) 코드 동기화
 # ---------------------------------------------------------------
+Write-Host "[sync-frontend] 프론트엔드 동기화 중..."
+robocopy "$DevRoot\frontend" $EmpFrontend /MIR `
+    /XD .next .next-prod node_modules _archive coverage test-results logs `
+    /XF .env.local `
+    /NJH /NDL /NP /NS /NC | Out-Null
+$frontendExit = $LASTEXITCODE
+if ($frontendExit -ge 8) {
+    Write-Host "[sync-frontend] 프론트엔드 robocopy 실패 (exit $frontendExit)"
+    $restartAfterFrontendSyncFailure = Restart-EmployeeServices
+    exit 4
+}
+Remove-Item (Join-Path $EmpFrontend ".next") -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Host "[build-frontend] 직원용 production 빌드 중..."
+$frontendBuild = Invoke-EmployeeFrontendBuild
+Write-CheckedCommandResult -Label "build-frontend" -Result $frontendBuild.Command
+if (-not $frontendBuild.Success) {
+    Write-Host "[build-frontend] 실패 - 이전 빌드를 복원하고 기존 서비스를 재기동합니다."
+    $restartAfterFrontendBuildFailure = Restart-EmployeeServices
+    if (-not $restartAfterFrontendBuildFailure.Success) {
+        Write-Host "[build-frontend] 기존 서비스 재기동도 실패했습니다."
+    }
+    exit 9
+}
+Write-Host "[build-frontend] 완료"
+
 Write-Host "[sync] 직원 실행·운영 스크립트 갱신 중..."
 $EmpDevScriptDir = Join-Path $EmpRoot "scripts\dev"
 New-Item -ItemType Directory -Force -Path $EmpDevScriptDir | Out-Null
@@ -309,18 +388,6 @@ if ($backendExit -ge 8) {
     Write-Host "[sync] 백엔드 robocopy 실패 (exit $backendExit)"
     exit 4
 }
-
-Write-Host "[sync] 프론트엔드 동기화 중..."
-robocopy "$DevRoot\frontend" $EmpFrontend /MIR `
-    /XD .next .next-prod node_modules _archive coverage test-results logs `
-    /XF .env.local `
-    /NJH /NDL /NP /NS /NC | Out-Null
-$frontendExit = $LASTEXITCODE
-if ($frontendExit -ge 8) {
-    Write-Host "[sync] 프론트엔드 robocopy 실패 (exit $frontendExit)"
-    exit 4
-}
-Remove-Item (Join-Path $EmpFrontend ".next") -Recurse -Force -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------
 # 6) DB 마이그레이션

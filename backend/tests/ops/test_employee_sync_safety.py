@@ -190,6 +190,19 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
             """
         ).lstrip(),
     )
+    _write(
+        fake_bin / "npm.cmd",
+        textwrap.dedent(
+            r"""
+            @echo off
+            >>"%SYNC_EVENT_LOG%" echo frontend-build
+            if not "%FAKE_FRONTEND_BUILD_EXIT%"=="0" exit /b %FAKE_FRONTEND_BUILD_EXIT%
+            if not exist ".next-prod" mkdir ".next-prod"
+            >".next-prod\BUILD_ID" echo fake-build
+            exit /b 0
+            """
+        ).lstrip(),
+    )
 
     sync_copy = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
     sync_copy = sync_copy.replace('$DevRoot = "C:\\ERP"', f'$DevRoot = "{dev_root.as_posix()}"')
@@ -210,6 +223,7 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
             "FAKE_START_BACKEND_EXIT": "0",
             "FAKE_START_FRONTEND_EXIT": "0",
             "FAKE_BACKUP_EXIT": "0",
+            "FAKE_FRONTEND_BUILD_EXIT": "0",
             "FAKE_MIGRATE_EXIT": "0",
             "FAKE_MIGRATE_OUTPUT": "failed=0",
             "FAKE_SCHEMA_CHECK_EXIT": "0",
@@ -284,6 +298,28 @@ def test_employee_sync_backup_failure_restarts_services_without_sync_or_migratio
     assert "migrate" not in events
 
 
+def test_employee_sync_frontend_build_failure_restores_services_before_backend_sync(tmp_path: Path) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_FRONTEND_BUILD_EXIT": "16"}
+    )
+
+    result = _run_sync(sync_path, environment)
+    events = _event_kinds(event_log)
+
+    assert result.returncode == 9, result.stdout + result.stderr
+    assert events == [
+        "robocopy-dryrun",
+        "stop-backend",
+        "stop-frontend",
+        "backup",
+        "robocopy-sync",
+        "frontend-build",
+        "start-backend",
+        "start-frontend",
+    ]
+    assert "migrate" not in events
+
+
 def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_recovery(tmp_path: Path) -> None:
     sync_path, environment, event_log = _prepare_sync_sandbox(
         tmp_path, {"FAKE_SCHEMA_VERIFY_EXIT": "13"}
@@ -300,6 +336,7 @@ def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_rec
         "stop-frontend",
         "backup",
         "robocopy-sync",
+        "frontend-build",
         "robocopy-sync",
         "robocopy-sync",
         "migrate",
@@ -326,6 +363,7 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
         "stop-frontend",
         "backup",
         "robocopy-sync",
+        "frontend-build",
         "robocopy-sync",
         "robocopy-sync",
         "migrate",
