@@ -2,7 +2,9 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from fastapi import Request
 from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -18,6 +20,8 @@ DATABASE_URL = os.getenv(
 )
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
+_sqlite_database = make_url(DATABASE_URL).database if _is_sqlite else None
+_is_file_sqlite = _is_sqlite and _sqlite_database not in (None, "", ":memory:")
 
 # 실서버 가드(WS2): 운영 환경에서 SQLite/DATABASE_URL 미설정이면 즉시 기동 거부.
 # SQLite 는 다중 사용자 동시성(락) 한계로 운영 불가 — '무성(silent) SQLite prod'
@@ -36,44 +40,76 @@ if _require_postgres and _is_sqlite:
         "(개발/테스트는 APP_ENV/REQUIRE_POSTGRES 를 비우면 SQLite 가 허용됩니다.)"
     )
 
-connect_args = {"check_same_thread": False} if _is_sqlite else {}
+def _create_database_engine(
+    database_url: str,
+    *,
+    sqlite_read_only: bool = False,
+) -> Engine:
+    """요청 역할에 맞는 engine을 만들고 SQLite 트랜잭션 경계를 고정한다."""
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args=connect_args,
-    **({"poolclass": NullPool} if _is_sqlite else {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}),
-)
+    is_sqlite = database_url.startswith("sqlite")
+    if sqlite_read_only and not is_sqlite:
+        raise ValueError("sqlite_read_only requires a SQLite database URL")
+    created_engine = create_engine(
+        database_url,
+        connect_args={"check_same_thread": False} if is_sqlite else {},
+        **(
+            {"poolclass": NullPool}
+            if is_sqlite
+            else {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}
+        ),
+    )
+    if not is_sqlite:
+        return created_engine
 
-
-if _is_sqlite:
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_conn, _):
+    @event.listens_for(created_engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, _connection_record) -> None:
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA busy_timeout=10000")
         cursor.execute("PRAGMA synchronous=NORMAL")
+        if sqlite_read_only:
+            cursor.execute("PRAGMA query_only=ON")
         cursor.close()
-        # pysqlite 자동 BEGIN 비활성화 → begin 이벤트에서 BEGIN IMMEDIATE 직접 발행
+        # pysqlite 자동 BEGIN 비활성화 → begin 이벤트에서 요청 역할별 BEGIN 직접 발행
         dbapi_conn.isolation_level = None
 
-    @event.listens_for(engine, "begin")
-    def set_begin_immediate(conn):
-        conn.exec_driver_sql("BEGIN IMMEDIATE")
+    @event.listens_for(created_engine, "begin")
+    def set_transaction_mode(connection) -> None:
+        connection.exec_driver_sql("BEGIN" if sqlite_read_only else "BEGIN IMMEDIATE")
+
+    return created_engine
+
+
+engine = _create_database_engine(DATABASE_URL)
+read_engine = (
+    _create_database_engine(DATABASE_URL, sqlite_read_only=True)
+    if _is_file_sqlite
+    else engine
+)
 
 
 from app._slow_query import install_slow_query_hook  # noqa: E402
 
 install_slow_query_hook(engine)
+if read_engine is not engine:
+    install_slow_query_hook(read_engine)
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+ReadSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=read_engine)
 
 Base = declarative_base()
 
 
-def get_db():
-    db = SessionLocal()
+def get_db(request: Request):
+    session_factory = (
+        ReadSessionLocal
+        if _is_file_sqlite and request.method in {"GET", "HEAD"}
+        else SessionLocal
+    )
+    db = session_factory()
     try:
         yield db
     except Exception:

@@ -21,6 +21,7 @@ from app.schemas.activity_audit import (
 )
 from app.services import activity_audit_export
 from app.services.export_helpers import csv_streaming_response
+from app.services.realtime import suppress_realtime_revision
 from app.utils.excel import apply_header, auto_width, make_xlsx_response
 
 
@@ -52,7 +53,8 @@ def upsert_current_terminal(
         db.add(terminal)
     else:
         terminal.name = payload.name
-    db.commit()
+    with suppress_realtime_revision(db):
+        db.commit()
     request.state.audit_terminal_id = terminal_id
     request.state.activity_audit_related_id = terminal_id
     request.state.activity_audit_target_summary = f"단말명: {terminal.name}"

@@ -5,7 +5,24 @@
 """
 from unittest.mock import MagicMock, patch
 
+from starlette.requests import Request
+
 from app import database
+
+
+def _request(method: str = "POST") -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": method,
+            "path": "/probe",
+            "headers": [],
+            "query_string": b"",
+            "server": ("testserver", 80),
+            "client": ("testclient", 123),
+            "scheme": "http",
+        }
+    )
 
 
 def test_get_db_rolls_back_and_closes_on_exception():
@@ -14,7 +31,7 @@ def test_get_db_rolls_back_and_closes_on_exception():
     order.attach_mock(fake.rollback, "rollback")
     order.attach_mock(fake.close, "close")
     with patch.object(database, "SessionLocal", return_value=fake):
-        gen = database.get_db()
+        gen = database.get_db(_request())
         assert next(gen) is fake
         try:
             gen.throw(RuntimeError("handler boom"))
@@ -29,7 +46,7 @@ def test_get_db_rolls_back_and_closes_on_exception():
 def test_get_db_no_rollback_on_normal_completion():
     fake = MagicMock()
     with patch.object(database, "SessionLocal", return_value=fake):
-        gen = database.get_db()
+        gen = database.get_db(_request())
         next(gen)
         try:
             next(gen)  # 정상 종료 → StopIteration

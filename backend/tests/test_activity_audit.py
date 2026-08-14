@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import csv
 import uuid
+from contextlib import contextmanager
 from datetime import datetime
 from io import BytesIO, StringIO
 from types import SimpleNamespace
 from urllib.parse import quote
 
+from sqlalchemy import event
 from openpyxl import load_workbook
 from fastapi import FastAPI
 from fastapi.responses import Response
@@ -43,6 +45,21 @@ def _add_employee(db_session, *, code: str = "E22", name: str = "홍길동") -> 
         )
     )
     db_session.commit()
+
+
+def _observe_realtime_commits(db_session):
+    from app.models import DataRevision
+    from app.services import realtime
+
+    db_session.add(DataRevision(id=1, revision=0))
+    db_session.commit()
+    event.listen(db_session, "before_commit", realtime._advance_revision_before_commit)
+
+
+def _stop_observing_realtime_commits(db_session):
+    from app.services import realtime
+
+    event.remove(db_session, "before_commit", realtime._advance_revision_before_commit)
 
 
 def test_client_event_persists_actor_and_terminal_snapshots(client, db_session):
@@ -97,6 +114,23 @@ def test_client_event_persists_actor_and_terminal_snapshots(client, db_session):
     assert row.outcome == "success"
     assert row.request_id == "req-client-1"
     assert row.related_id == "item-1"
+
+
+def test_client_event_persists_without_advancing_realtime_revision(client, db_session):
+    from app.models import ActivityAuditLog, DataRevision
+
+    _observe_realtime_commits(db_session)
+    try:
+        response = client.post(
+            "/api/client-events",
+            json={"event": "ui_nav", "source": "desktop", "to": "desktop.inventory"},
+        )
+    finally:
+        _stop_observing_realtime_commits(db_session)
+
+    assert response.status_code == 204
+    assert db_session.query(ActivityAuditLog).count() == 1
+    assert db_session.get(DataRevision, 1).revision == 0
 
 
 def test_client_events_ignore_forged_employee_headers_without_verified_login(client, db_session):
@@ -300,6 +334,67 @@ def test_terminal_upsert_requires_pin_and_records_current_name(client, db_sessio
     )
     assert len(successful) == 2
     assert successful[-1].terminal_name == "출하 PC 2"
+
+
+def test_terminal_upsert_does_not_advance_realtime_revision(client, db_session):
+    from app.models import AuditTerminal, DataRevision, SystemSetting
+    from app.services.pin_auth import hash_pin
+
+    db_session.add(SystemSetting(setting_key="admin_pin", setting_value=hash_pin("0000")))
+    db_session.commit()
+    _observe_realtime_commits(db_session)
+    terminal_id = str(uuid.uuid4())
+    try:
+        response = client.put(
+            "/api/admin/activity-audit/terminals/current",
+            headers=ADMIN_HEADERS,
+            json={"terminal_id": terminal_id, "name": "감사 전용 PC"},
+        )
+    finally:
+        _stop_observing_realtime_commits(db_session)
+
+    assert response.status_code == 200, response.text
+    assert db_session.get(AuditTerminal, terminal_id) is not None
+    assert db_session.get(DataRevision, 1).revision == 0
+
+
+def test_background_write_audit_does_not_advance_realtime_revision(
+    db_session,
+    monkeypatch,
+):
+    from app import _access_log
+    from app.models import ActivityAuditLog, DataRevision
+
+    _observe_realtime_commits(db_session)
+
+    @contextmanager
+    def _fixed_audit_session(_app):
+        yield db_session
+
+    monkeypatch.setattr(_access_log, "_audit_session", _fixed_audit_session)
+    entry = _access_log._WriteAuditEntry(
+        method="POST",
+        path="/api/items",
+        status=201,
+        source="desktop",
+        terminal_id=None,
+        session_id="audit-session",
+        screen_key="items",
+        screen_label="품목",
+        actor_employee_code=None,
+        request_id="audit-request",
+        action_key="http.post.items",
+        action_label="POST /api/items",
+        target_summary="/api/items",
+        related_id=None,
+    )
+    try:
+        _access_log._record_write_audit(object(), entry)
+    finally:
+        _stop_observing_realtime_commits(db_session)
+
+    assert db_session.query(ActivityAuditLog).count() == 1
+    assert db_session.get(DataRevision, 1).revision == 0
 
 
 def test_write_action_metadata_normalizes_path_ids():

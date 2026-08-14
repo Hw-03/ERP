@@ -32,6 +32,7 @@ from app._logging import get_logger
 from app.database import SessionLocal, get_db
 from app.services import activity_audit
 from app.services.audit_actor_session import get_verified_audit_actor_code
+from app.services.realtime import suppress_realtime_revision
 
 
 _log = get_logger()
@@ -185,7 +186,8 @@ def _record_write_audit(app, entry: _WriteAuditEntry) -> None:
                 actor_employee_code=entry.actor_employee_code,
                 request_id=entry.request_id,
             )
-            db.commit()
+            with suppress_realtime_revision(db):
+                db.commit()
     except Exception as exc:  # noqa: BLE001 - 감사 실패는 업무 응답을 바꾸면 안 된다.
         _log.warning(
             "evt=activity_audit_failed method=%s path=%s status=%d err=%s",

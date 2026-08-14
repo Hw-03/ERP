@@ -141,6 +141,105 @@ describe("RealtimeSyncProvider", () => {
     expect(invalidateSpy).toHaveBeenCalledTimes(11);
   });
 
+  it("250ms 창의 revision burst를 최신 context와 한 번의 무효화로 합친다", async () => {
+    vi.useFakeTimers();
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    render(<RevisionValue />, { wrapper: makeWrapper(client) });
+    const source = FakeEventSource.instances[0];
+
+    act(() => {
+      source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 7 }));
+      source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 8 }));
+      source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 9 }));
+    });
+
+    expect(screen.getByTestId("revision")).toHaveTextContent("null");
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(249));
+    expect(screen.getByTestId("revision")).toHaveTextContent("null");
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+
+    expect(screen.getByTestId("revision")).toHaveTextContent("9");
+    expect(invalidateSpy).toHaveBeenCalledTimes(11);
+  });
+
+  it("hidden 탭은 갱신을 보류하고 visible 복귀 때 최신 revision만 한 번 적용한다", async () => {
+    vi.useFakeTimers();
+    let visibility: DocumentVisibilityState = "hidden";
+    vi.spyOn(document, "visibilityState", "get").mockImplementation(() => visibility);
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    render(<RevisionValue />, { wrapper: makeWrapper(client) });
+    const source = FakeEventSource.instances[0];
+
+    act(() => {
+      source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 7 }));
+      source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 9 }));
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+    expect(screen.getByTestId("revision")).toHaveTextContent("null");
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    visibility = "visible";
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("revision")).toHaveTextContent("9");
+    expect(invalidateSpy).toHaveBeenCalledTimes(11);
+  });
+
+  it("무효화 진행 중에는 겹쳐 실행하지 않고 최신 revision을 다음 창에 적용한다", async () => {
+    vi.useFakeTimers();
+    const firstInvalidation = deferred<void>();
+    const client = makeClient();
+    const invalidateSpy = vi
+      .spyOn(client, "invalidateQueries")
+      .mockImplementation(() => firstInvalidation.promise);
+    render(<RevisionValue />, { wrapper: makeWrapper(client) });
+    const source = FakeEventSource.instances[0];
+
+    act(() => source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 7 })));
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+    expect(screen.getByTestId("revision")).toHaveTextContent("7");
+    expect(invalidateSpy).toHaveBeenCalledTimes(11);
+
+    act(() => {
+      source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 8 }));
+      source.emitRevision(JSON.stringify({ ...VALID_SNAPSHOT, revision: 9 }));
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(screen.getByTestId("revision")).toHaveTextContent("7");
+    expect(invalidateSpy).toHaveBeenCalledTimes(11);
+
+    await act(async () => {
+      firstInvalidation.resolve();
+      await firstInvalidation.promise;
+      await Promise.resolve();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+
+    expect(screen.getByTestId("revision")).toHaveTextContent("9");
+    expect(invalidateSpy).toHaveBeenCalledTimes(22);
+  });
+
+  it("unmount 시 대기 중인 revision flush timer도 정리한다", async () => {
+    vi.useFakeTimers();
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    const { unmount } = render(<RevisionValue />, { wrapper: makeWrapper(client) });
+    const source = FakeEventSource.instances[0];
+
+    act(() => source.emitRevision(JSON.stringify(VALID_SNAPSHOT)));
+    unmount();
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
   it("같은 revision 반복과 malformed payload를 무시한다", async () => {
     const client = makeClient();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries").mockResolvedValue();

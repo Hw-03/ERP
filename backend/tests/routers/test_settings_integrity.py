@@ -214,6 +214,39 @@ def test_integrity_inventory_post_uses_body_pin(client, make_item):
     assert body["samples"] == []
 
 
+@pytest.mark.parametrize("pin_state", ["legacy", "missing"])
+def test_integrity_inventory_get_authenticates_without_persisting_pin_changes(
+    integrity_request_db,
+    pin_state,
+):
+    request_client, engine, observer = integrity_request_db
+    with engine.begin() as connection:
+        if pin_state == "legacy":
+            connection.execute(
+                text(
+                    "UPDATE system_settings SET setting_value = '0000' "
+                    "WHERE setting_key = 'admin_pin'"
+                )
+            )
+        else:
+            connection.execute(
+                text("DELETE FROM system_settings WHERE setting_key = 'admin_pin'")
+            )
+
+    response = request_client.request(
+        "GET",
+        "/api/settings/integrity/inventory",
+        params={"pin": "0000", "limit": 50},
+    )
+
+    assert response.status_code == 200, response.text
+    if pin_state == "legacy":
+        assert _admin_pin_value(engine) == "0000"
+    else:
+        assert _admin_pin_count(engine) == 0
+    assert observer["commits"] == 0
+
+
 def test_integrity_inventory_post_rejects_wrong_pin(client):
     resp = client.post(
         "/api/settings/integrity/inventory",

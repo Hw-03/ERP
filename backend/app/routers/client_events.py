@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app._evt import emit
 from app.database import get_db
 from app.services import activity_audit
+from app.services.realtime import suppress_realtime_revision
 from app.services.audit_actor_session import clear_audit_actor_cookie
 
 router = APIRouter()
@@ -102,7 +103,8 @@ def client_event(
         target_summary=log_fields.get("target_summary"),
         related_id=log_fields.get("related_id"),
     )
-    db.commit()
+    with suppress_realtime_revision(db):
+        db.commit()
     if event == "ui_logout":
         clear_audit_actor_cookie(response)
     response.status_code = 204

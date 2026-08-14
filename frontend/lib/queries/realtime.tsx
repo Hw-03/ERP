@@ -7,6 +7,7 @@ import { queryKeys } from "./keys";
 const STREAM_URL = "/api/realtime/stream";
 const REVISION_URL = "/api/realtime/revision";
 const FALLBACK_INTERVAL_MS = 1_000;
+const REVISION_BATCH_WINDOW_MS = 250;
 
 const OPERATIONAL_QUERY_ROOTS = [
   queryKeys.items.all,
@@ -49,13 +50,65 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [revision, setRevision] = useState<number | null>(null);
   const currentRevision = useRef<number | null>(null);
+  const appliedRevision = useRef<number | null>(null);
 
   useEffect(() => {
     let disposed = false;
     let source: EventSource | null = null;
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let inFlightRevisionCheck: Promise<void> | null = null;
+    let inFlightInvalidation: Promise<void> | null = null;
+    let pendingRevision: number | null = null;
     let sseEpoch = 0;
+
+    function flushPendingRevision() {
+      if (
+        disposed ||
+        document.visibilityState === "hidden" ||
+        inFlightInvalidation ||
+        pendingRevision === null
+      ) {
+        return;
+      }
+      const nextRevision = pendingRevision;
+      pendingRevision = null;
+      if (nextRevision === appliedRevision.current) return;
+
+      appliedRevision.current = nextRevision;
+      setRevision(nextRevision);
+      const invalidation = invalidateOperationalQueries(queryClient);
+      inFlightInvalidation = invalidation;
+      const finishInvalidation = () => {
+        if (inFlightInvalidation === invalidation) inFlightInvalidation = null;
+        if (!disposed) scheduleRevisionFlush();
+      };
+      void invalidation.then(finishInvalidation, finishInvalidation);
+    }
+
+    function scheduleRevisionFlush() {
+      if (
+        disposed ||
+        document.visibilityState === "hidden" ||
+        inFlightInvalidation ||
+        pendingRevision === null ||
+        flushTimer !== null
+      ) {
+        return;
+      }
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flushPendingRevision();
+      }, REVISION_BATCH_WINDOW_MS);
+    }
+
+    function flushPendingRevisionImmediately() {
+      if (flushTimer !== null) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+      flushPendingRevision();
+    }
 
     const applySnapshot = (value: unknown, origin: "sse" | "get") => {
       const snapshot = parseRevisionSnapshot(value);
@@ -63,8 +116,8 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
       if (origin === "sse") sseEpoch += 1;
       if (snapshot.revision === currentRevision.current) return;
       currentRevision.current = snapshot.revision;
-      setRevision(snapshot.revision);
-      void invalidateOperationalQueries(queryClient);
+      pendingRevision = snapshot.revision;
+      scheduleRevisionFlush();
     };
 
     const checkRevision = (): Promise<void> => {
@@ -109,7 +162,13 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
     };
     const onOnline = () => void checkRevision();
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") void checkRevision();
+      if (document.visibilityState === "visible") {
+        flushPendingRevisionImmediately();
+        void checkRevision();
+      } else if (flushTimer !== null) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
     };
 
     window.addEventListener("online", onOnline);
@@ -127,6 +186,8 @@ export function RealtimeSyncProvider({ children }: { children: ReactNode }) {
     return () => {
       disposed = true;
       stopFallback();
+      if (flushTimer !== null) clearTimeout(flushTimer);
+      pendingRevision = null;
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (source) {

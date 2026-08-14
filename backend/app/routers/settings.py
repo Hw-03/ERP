@@ -134,6 +134,16 @@ def require_admin(
         raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
 
 
+def require_admin_readonly(db: Session, pin: str) -> None:
+    """DB 상태를 만들거나 변경하지 않고 관리자 PIN만 검증한다."""
+
+    setting = db.query(SystemSetting).filter(SystemSetting.setting_key == ADMIN_PIN_KEY).first()
+    stored = setting.setting_value if setting is not None else DEFAULT_ADMIN_PIN
+    matches = stored == hash_pin(pin) if _is_hashed(stored) else stored == pin
+    if not matches:
+        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
+
+
 # 내부 호환 alias
 _require_admin = require_admin
 
@@ -164,7 +174,7 @@ def check_inventory_integrity(
     effective_pin = (body.pin if body and body.pin else None) or pin
     if not effective_pin:
         raise http_error(400, ErrorCode.BAD_REQUEST, "관리자 PIN 이 필요합니다.")
-    _require_admin(db, effective_pin)
+    require_admin_readonly(db, effective_pin)
     return _inventory_integrity_payload(db, limit)
 
 

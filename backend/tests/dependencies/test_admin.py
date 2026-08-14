@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.admin import require_admin_pin
 from app.database import get_db
+from app.models import SystemSetting
+from app.services.pin_auth import hash_pin
 
 
 # ───── 테스트용 미니 앱 ─────────────────────────────────────────────────────
@@ -153,6 +155,42 @@ def test_get_endpoint_query_pin(protected_client):
     """GET 엔드포인트에서 query PIN 인증 → 200."""
     resp = protected_client.get("/protected?pin=0000")
     assert resp.status_code == 200, resp.text
+
+
+def test_get_endpoint_missing_setting_authenticates_without_creating_pin(
+    protected_client,
+    db_session,
+):
+    assert db_session.query(SystemSetting).filter_by(setting_key="admin_pin").count() == 0
+
+    resp = protected_client.get("/protected", headers={"X-Admin-Pin": "0000"})
+
+    assert resp.status_code == 200, resp.text
+    assert db_session.query(SystemSetting).filter_by(setting_key="admin_pin").count() == 0
+    assert not db_session.new
+
+
+def test_get_endpoint_legacy_plaintext_pin_authenticates_without_migration(
+    protected_client,
+    db_session,
+):
+    setting = SystemSetting(setting_key="admin_pin", setting_value="0000")
+    db_session.add(setting)
+    db_session.commit()
+
+    resp = protected_client.get("/protected", headers={"X-Admin-Pin": "0000"})
+
+    assert resp.status_code == 200, resp.text
+    db_session.refresh(setting)
+    assert setting.setting_value == "0000"
+
+
+def test_post_endpoint_keeps_lazy_pin_creation(protected_client, db_session):
+    resp = protected_client.post("/protected", headers={"X-Admin-Pin": "0000"})
+
+    assert resp.status_code == 200, resp.text
+    setting = db_session.query(SystemSetting).filter_by(setting_key="admin_pin").one()
+    assert setting.setting_value == hash_pin("0000")
 
 
 def test_get_endpoint_missing_pin_400(protected_client):

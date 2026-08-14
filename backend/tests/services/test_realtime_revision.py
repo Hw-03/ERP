@@ -160,6 +160,57 @@ def test_commit_without_business_changes_still_advances_revision(revision_store)
     assert _revision(engine) == 1
 
 
+def test_suppressed_commit_persists_rows_without_advancing_revision(
+    revision_store,
+) -> None:
+    engine, factory = revision_store
+    realtime.register_session_listeners(factory)
+
+    with factory() as session:
+        session.add(WorkRow(id=1, name="audit-only"))
+        with realtime.suppress_realtime_revision(session):
+            session.commit()
+
+    with engine.connect() as connection:
+        assert connection.scalar(sa.select(sa.func.count()).select_from(WorkRow)) == 1
+    assert _revision(engine) == 0
+
+
+def test_revision_suppression_is_scoped_to_the_wrapped_commit(revision_store) -> None:
+    engine, factory = revision_store
+    realtime.register_session_listeners(factory)
+
+    with factory() as session:
+        session.add(WorkRow(id=1, name="audit-only"))
+        with realtime.suppress_realtime_revision(session):
+            session.commit()
+        session.add(WorkRow(id=2, name="business"))
+        session.commit()
+
+    assert _revision(engine) == 1
+
+
+def test_revision_suppression_clears_after_failed_commit(revision_store) -> None:
+    engine, factory = revision_store
+    realtime.register_session_listeners(factory)
+
+    with factory() as session:
+        session.add_all(
+            [
+                WorkRow(id=1, name="duplicate"),
+                WorkRow(id=2, name="duplicate"),
+            ]
+        )
+        with pytest.raises(IntegrityError):
+            with realtime.suppress_realtime_revision(session):
+                session.commit()
+        session.rollback()
+        session.add(WorkRow(id=3, name="business"))
+        session.commit()
+
+    assert _revision(engine) == 1
+
+
 def test_explicit_rollback_does_not_advance_revision(revision_store) -> None:
     engine, factory = revision_store
     realtime.register_session_listeners(factory)

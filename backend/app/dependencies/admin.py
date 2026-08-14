@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.routers._errors import ErrorCode, http_error
-from app.routers.settings import require_admin
+from app.routers.settings import require_admin, require_admin_readonly
 
 
 async def extract_admin_pin(
@@ -51,10 +51,14 @@ async def extract_admin_pin(
 
 
 def require_admin_pin(
+    request: Request,
     pin_value: Annotated[str, Depends(extract_admin_pin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
     """모든 admin 엔드포인트 시그니처에 추가:
         _admin: Annotated[None, Depends(require_admin_pin)]
     """
-    require_admin(db, pin_value)
+    if request.method in {"GET", "HEAD"}:
+        require_admin_readonly(db, pin_value)
+    else:
+        require_admin(db, pin_value)

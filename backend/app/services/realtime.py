@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import AsyncIterator
+from typing import AsyncIterator, Iterator
 
 from sqlalchemy import event, func, update
 from sqlalchemy.engine import Engine
@@ -18,6 +18,8 @@ from app.models import DataRevision
 
 
 _log = logging.getLogger(__name__)
+_REVISION_SUPPRESSION_INFO_KEY = "mes_suppress_realtime_revision"
+_MISSING_INFO_VALUE = object()
 
 
 @dataclass(frozen=True)
@@ -32,9 +34,26 @@ class DataRevisionError(RuntimeError):
     """Raised when the singleton row cannot be advanced safely."""
 
 
+@contextmanager
+def suppress_realtime_revision(session: Session) -> Iterator[None]:
+    """한 commit 범위의 비업무 저장이 operational revision을 올리지 않게 한다."""
+
+    previous = session.info.get(_REVISION_SUPPRESSION_INFO_KEY, _MISSING_INFO_VALUE)
+    session.info[_REVISION_SUPPRESSION_INFO_KEY] = True
+    try:
+        yield
+    finally:
+        if previous is _MISSING_INFO_VALUE:
+            session.info.pop(_REVISION_SUPPRESSION_INFO_KEY, None)
+        else:
+            session.info[_REVISION_SUPPRESSION_INFO_KEY] = previous
+
+
 def _advance_revision_before_commit(session: Session) -> None:
     """Advance the singleton inside the transaction being committed."""
 
+    if session.info.get(_REVISION_SUPPRESSION_INFO_KEY):
+        return
     if session.in_nested_transaction():
         return
     session.flush()
