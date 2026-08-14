@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
+import { ApiConnectionError, ApiError } from "@/lib/api-core";
 import { productionApi } from "@/lib/api/production";
 import type { InventoryEffectRow } from "../historyInventoryEffect";
 import {
@@ -220,6 +221,67 @@ describe("HistoryCancelAction", () => {
     fireEvent.click(screen.getByRole("button", { name: "이 이력 1건 취소" }));
     expect(screen.getByLabelText("취소 사유")).toHaveValue("");
     expect(screen.getByLabelText("PIN")).toHaveValue("");
+  });
+
+  it("shows connection guidance and keeps the draft for a manual retry", async () => {
+    const onSubmit = vi.fn()
+      .mockRejectedValueOnce(new ApiConnectionError())
+      .mockResolvedValueOnce(undefined);
+    render(
+      <HistoryCancelAction
+        panelOpen
+        identity="log:connection-error"
+        scope="single"
+        effects={effects}
+        cancelled={false}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이 이력 1건 취소" }));
+    fireEvent.change(screen.getByLabelText("취소 사유"), { target: { value: "연결 재시도" } });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "취소 확정" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "서버와 연결할 수 없습니다. 취소 처리 여부를 확인한 뒤 다시 시도해 주세요.",
+      );
+      expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("취소 사유")).toHaveValue("연결 재시도");
+    expect(screen.getByLabelText("PIN")).toHaveValue("1234");
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(2);
+      expect(onSubmit).toHaveBeenLastCalledWith({ reason: "연결 재시도", pin: "1234" });
+    });
+  });
+
+  it("shows a server business error without replacing its Korean message", async () => {
+    const onSubmit = vi.fn().mockRejectedValue(
+      new ApiError("취소할 수 없는 이력입니다.", 422),
+    );
+    render(
+      <HistoryCancelAction
+        panelOpen
+        identity="log:business-error"
+        scope="single"
+        effects={effects}
+        cancelled={false}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이 이력 1건 취소" }));
+    fireEvent.change(screen.getByLabelText("취소 사유"), { target: { value: "업무 오류" } });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "취소 확정" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("취소할 수 없는 이력입니다.");
+    });
   });
 
   it("keeps the confirmation draft when refreshed data preserves the target identity", () => {

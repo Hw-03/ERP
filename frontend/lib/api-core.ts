@@ -55,6 +55,13 @@ export class ApiError extends Error {
   get isUnavailable(): boolean { return this.status === 503; }
 }
 
+/** 쓰기 요청의 연결 거절·시간 초과를 구분하는 오류 클래스. */
+export class ApiConnectionError extends Error {
+  constructor() {
+    super("연결 실패");
+  }
+}
+
 export function extractErrorMessage(detail: unknown, fallback = "처리 실패"): string {
   if (typeof detail === "string") return detail;
   // Pydantic 스키마 검증 실패는 detail 이 배열 — [{loc, msg, type, ...}]. 첫 항목의 msg 사용,
@@ -226,12 +233,11 @@ async function writeJson<T>(
     init.headers = pinHeaders;
   }
   const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error("요청 시간이 초과되었습니다. 네트워크 연결을 확인하고 다시 시도해 주세요.")),
-      15_000,
-    ),
+    setTimeout(reject, 15_000),
   );
-  const res = await Promise.race([fetch(url, init), timeout]);
+  const res = await Promise.race([fetch(url, init), timeout]).catch(() => {
+    throw new ApiConnectionError();
+  });
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
   if (res.status === 204) return undefined as T;
   const text = await res.text();

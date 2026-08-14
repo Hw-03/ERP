@@ -11,6 +11,7 @@ import {
   deleteJson,
   FALLBACK_SERVER_API_BASE,
   registerAdminPinProvider,
+  ApiConnectionError,
   ApiError,
 } from "../api-core";
 import { adminApi } from "../api/admin";
@@ -175,6 +176,35 @@ describe("fetcher / write helpers", () => {
     const headers = init.headers as Record<string, string>;
     expect(headers["Content-Type"]).toBe("application/json");
     expect(JSON.parse(init.body as string)).toEqual({ name: "X" });
+  });
+
+  it("postJson converts a network rejection into ApiConnectionError", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    ) as unknown as typeof fetch;
+
+    const error = await postJson("/api/items", { name: "X" }).catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(ApiConnectionError);
+    expect(error).toMatchObject({
+      message: "연결 실패",
+    });
+  });
+
+  it("postJson converts a timeout into ApiConnectionError", async () => {
+    globalThis.fetch = vi.fn(
+      () => new Promise<Response>(() => {}),
+    ) as unknown as typeof fetch;
+
+    const request = postJson("/api/items", { name: "X" });
+    const failure = request.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(15_000);
+    const error = await failure;
+
+    expect(error).toBeInstanceOf(ApiConnectionError);
+    expect(error).toMatchObject({
+      message: "연결 실패",
+    });
   });
 
   it("attaches the audit session, terminal, screen, and source to write requests", async () => {

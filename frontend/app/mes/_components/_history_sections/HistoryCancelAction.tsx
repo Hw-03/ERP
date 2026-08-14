@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { XCircle } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
+import { ApiConnectionError } from "@/lib/api-core";
 import { productionApi } from "@/lib/api/production";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -264,7 +265,13 @@ export function HistoryCancelAction({
       inFlightCancellationIdentities.delete(requestIdentity);
       if (lifecycleTokenRef.current !== token) return;
       setStep("error");
-      setError(err instanceof Error ? err.message : "취소 처리 중 오류가 발생했습니다.");
+      setError(
+        err instanceof ApiConnectionError
+          ? "서버와 연결할 수 없습니다. 취소 처리 여부를 확인한 뒤 다시 시도해 주세요."
+          : err instanceof Error
+            ? err.message
+            : "취소 처리 중 오류가 발생했습니다.",
+      );
     }
   }
 
@@ -366,7 +373,7 @@ export function HistoryCancelAction({
           className="min-h-11 flex-1 rounded-[12px] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
           style={{ background: LEGACY_COLORS.redSolid }}
         >
-          {step === "submitting" ? "처리 중…" : "취소 확정"}
+          {step === "submitting" ? "처리 중…" : step === "error" ? "다시 시도" : "취소 확정"}
         </button>
         <button
           type="button"
@@ -516,6 +523,8 @@ export function HistoryMobileCancelConfirmation({
         >
           {controller.step === "submitting"
             ? "처리 중…"
+            : controller.step === "error"
+              ? "다시 시도"
             : variant === "single"
               ? "범위 확인 후 취소"
               : "취소 확정"}

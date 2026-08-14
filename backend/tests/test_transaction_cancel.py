@@ -423,6 +423,137 @@ def test_cancel_defective_disassemble_with_scrap_child_restores_batch(
 
 
 @pytest.mark.parametrize(
+    "effect",
+    [
+        {"scope": "warehouse", "delta": 2},
+        {
+            "scope": "location",
+            "department": DepartmentEnum.ASSEMBLY.value,
+            "status": LocationStatusEnum.DEFECTIVE.value,
+            "delta": 2,
+        },
+        {"scope": "warehouse_box", "box_id": "box-1", "delta": -2},
+    ],
+)
+def test_normalize_effect_for_cancel_wraps_valid_single_effect_object(effect):
+    assert transaction_actions._normalize_effect_for_cancel(effect) == [effect]
+
+
+@pytest.mark.parametrize(
+    "effect",
+    [
+        {"scope": "location", "delta": 2},
+        {"scope": "warehouse_box", "delta": 2},
+        {"scope": "unknown", "delta": 2},
+        {"scope": "warehouse", "delta": 0},
+    ],
+)
+def test_normalize_effect_for_cancel_rejects_malformed_single_effect_object(effect):
+    with pytest.raises(ValueError, match="재고 효과 기록 형식"):
+        transaction_actions._normalize_effect_for_cancel(effect)
+
+
+def test_cancel_rejects_malformed_single_effect_without_mutating_stock(client, db_session, make_item):
+    item = make_item(name="malformed-single-effect", warehouse_qty=Decimal("50"))
+    actor = _make_employee(db_session, code="MALFORMED-EFFECT")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("50"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("50"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        inventory_effect={"scope": "location", "delta": 2},
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    response = _cancel(client, log.log_id, code=actor.employee_code)
+
+    assert response.status_code == 422, response.text
+    assert "재고 효과" in response.json()["detail"]["message"]
+    assert _cells(db_session, item.item_id)[:2] == (50, 50)
+    db_session.refresh(log)
+    assert log.cancelled is False
+
+
+def test_cancel_defective_disassemble_normalizes_single_effect_object(
+    client, db_session, make_item, make_location, make_bom
+):
+    from app.services.dept_adjustment import submit_defective_disassemble
+
+    parent = make_item(
+        name="cancel-rework-object-parent",
+        process_type_code="PA",
+        warehouse_qty=Decimal("0"),
+    )
+    child = make_item(
+        name="cancel-rework-object-child",
+        process_type_code="TR",
+        warehouse_qty=Decimal("0"),
+    )
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    make_location(
+        parent.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("2"),
+    )
+    parent_inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == parent.item_id
+    ).one()
+    parent_inventory.quantity = Decimal("2")
+    actor = _make_employee(db_session, code="REWORK-OBJECT")
+    db_session.commit()
+
+    result = submit_defective_disassemble(
+        db_session,
+        parent.item_id,
+        Decimal("2"),
+        DepartmentEnum.ASSEMBLY,
+        child_decisions=[
+            {
+                "item_id": child.item_id,
+                "qty": Decimal("2"),
+                "defective_qty": Decimal("1"),
+                "scrap_qty": Decimal("1"),
+            }
+        ],
+        reason_category="rework object regression",
+        reason_memo="single effect object",
+        actor=actor.name,
+        actor_employee_id=actor.employee_id,
+    )
+    db_session.commit()
+
+    defective_child = db_session.query(TransactionLog).filter(
+        TransactionLog.reference_no == result["batch_ref"],
+        TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
+        TransactionLog.notes == "[rework:defective_child]",
+    ).one()
+    assert isinstance(defective_child.inventory_effect, list)
+    defective_child.inventory_effect = defective_child.inventory_effect[0]
+    db_session.commit()
+
+    response = _cancel(
+        client,
+        result["parent_log_id"],
+        code=actor.employee_code,
+        reason="rework object cancel",
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    batch_logs = db_session.query(TransactionLog).filter(
+        TransactionLog.reference_no == result["batch_ref"]
+    ).all()
+    assert all(log.cancelled for log in batch_logs)
+    assert _cells(db_session, parent.item_id)[1] == 2
+    assert _cells(db_session, child.item_id)[1] == 0
+
+
+@pytest.mark.parametrize(
     ("transaction_type", "reference_no", "notes"),
     [
         pytest.param(
@@ -1109,6 +1240,9 @@ def test_cancel_legacy_defect_without_effect_returns_message(client, db_session,
     res = _cancel(client, log.log_id, code="WH2")
     assert res.status_code == 422, res.text
     assert "재고 효과" in res.json()["detail"]["message"]
+    assert _cells(db_session, item.item_id)[:2] == (100, 100)
+    db_session.refresh(log)
+    assert log.cancelled is False
 
 
 def test_cancel_legacy_mark_defective_with_inferred_quantity_is_blocked(client, db_session, make_item):

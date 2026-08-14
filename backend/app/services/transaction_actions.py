@@ -11,7 +11,14 @@ from typing import Any, Optional
 from fastapi import Request
 from sqlalchemy.orm import Session
 
-from app.models import Employee, Item, TransactionEditLog, TransactionLog, TransactionTypeEnum
+from app.models import (
+    Employee,
+    Item,
+    LocationStatusEnum,
+    TransactionEditLog,
+    TransactionLog,
+    TransactionTypeEnum,
+)
 from app.repositories import inventory_repository, item_repository
 from app.services import audit, inv_effect, inventory as inventory_svc
 from app.services._tx import transactional
@@ -179,6 +186,36 @@ def correct_transaction_quantity(
     return correction_log
 
 
+def _normalize_effect_for_cancel(effect: object) -> object:
+    """레거시 단일 효과 객체를 검증한 뒤 한 항목 목록으로 읽는다."""
+    if not isinstance(effect, dict):
+        return effect
+
+    try:
+        delta = int(effect.get("delta", 0))
+    except (TypeError, ValueError):
+        delta = 0
+    scope = effect.get("scope")
+    is_valid = delta != 0
+
+    if scope == "location":
+        department = effect.get("department")
+        status = effect.get("status")
+        try:
+            LocationStatusEnum(status)
+        except (TypeError, ValueError):
+            is_valid = False
+        is_valid = is_valid and isinstance(department, str) and bool(department.strip())
+    elif scope == "warehouse_box":
+        is_valid = is_valid and bool(effect.get("box_id"))
+    elif scope != "warehouse":
+        is_valid = False
+
+    if not is_valid:
+        raise ValueError("재고 효과 기록 형식이 올바르지 않아 자동 취소할 수 없습니다.")
+    return [effect]
+
+
 def _cancel_one_log(db: Session, log: TransactionLog) -> None:
     """기록된 재고 효과를 역재생한다."""
     effect = log.inventory_effect
@@ -192,6 +229,7 @@ def _cancel_one_log(db: Session, log: TransactionLog) -> None:
         return
     if effect is None:
         raise ValueError("재고 효과 기록이 없어 자동 취소할 수 없습니다.")
+    effect = _normalize_effect_for_cancel(effect)
     if not isinstance(effect, list) or not effect:
         raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
     try:
