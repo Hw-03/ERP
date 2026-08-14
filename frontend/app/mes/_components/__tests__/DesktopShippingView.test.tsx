@@ -347,7 +347,47 @@ describe("DesktopShippingView", () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector("[data-testid='shipping-root-panel']")).toBeInTheDocument());
-    expect(container.querySelector("[data-testid='shipping-root-panel']")).toHaveStyle({ boxShadow: "none" });
+    const root = container.querySelector("[data-testid='shipping-root-panel']");
+    expect(root).toHaveStyle({ boxShadow: "none" });
+    expect(root).toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    expect(root).not.toHaveAttribute("data-surface");
+  });
+
+  it("uses layout-only root and outer wrappers for an existing request detail", async () => {
+    const detailRequest = request({ request_id: "layout-only-detail", notes: "상세 작업 메모" });
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=layout-only-detail";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([detailRequest]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-request-detail");
+    const root = screen.getByTestId("shipping-root-panel");
+    expect(root).toHaveAttribute("data-surface", "layout-only");
+    expect(root).not.toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    expect(detail).toHaveAttribute("data-surface", "layout-only");
+    expect(detail).not.toHaveClass("rounded-[24px]", "border", "p-4");
+
+    const header = within(detail).getByTestId("shipping-request-detail-header");
+    const revisionHistory = within(detail).getByTestId("shipping-revision-history");
+    const lineSummary = within(detail).getByTestId("shipping-line-summary");
+    const actions = within(detail).getByTestId("shipping-detail-actions");
+    expect(header).toContainElement(within(detail).getByTestId("shipping-invoice-editor"));
+    expect(header.compareDocumentPosition(revisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(revisionHistory.compareDocumentPosition(lineSummary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(lineSummary.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(actions).toHaveClass("rounded-[14px]", "border", "p-3");
+  });
+
+  it("keeps the empty request-detail guidance panel inside the layout-only root", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=missing-detail";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByText("선택된 요청 없음")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-root-panel")).toHaveAttribute("data-surface", "layout-only");
+    const guidancePanel = screen.getByText("선택된 요청 없음").closest('[class~="rounded-[24px]"]');
+    expect(guidancePanel).toHaveClass("border", "p-4");
   });
 
   async function openHubCard(container: HTMLElement, id: "request" | "history") {
@@ -3263,6 +3303,10 @@ describe("DesktopShippingView", () => {
     fireEvent.click(await screen.findByRole("button", { name: /BOM 구성 · 동반 출하품 수정/ }));
     const revisionHistory = screen.getByTestId("shipping-revision-history");
     const bomChange = within(revisionHistory).getByTestId("shipping-revision-array-change-bom_lines");
+    const bomGroups = within(bomChange).getByTestId("shipping-revision-array-groups-bom_lines");
+    expect(bomGroups).not.toHaveClass("xl:grid-cols-2");
+    expect(within(bomGroups).getByTestId("shipping-revision-array-comparison-bom_lines-pa")).toHaveClass("md:grid-cols-2");
+    expect(within(bomGroups).getByTestId("shipping-revision-array-comparison-bom_lines-pf")).toHaveClass("md:grid-cols-2");
     expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pa")).toHaveTextContent("PA 구성품");
     expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pa")).toHaveTextContent("기존 AF");
     expect(within(bomChange).getByTestId("shipping-revision-array-group-bom_lines-pa")).toHaveTextContent("수량 변경");
@@ -3503,6 +3547,51 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByText("7월 · 1건", { selector: "summary" })).toBeInTheDocument();
     expect(await screen.findByText(/인보이스 번호 · INV-C/)).toBeInTheDocument();
     expect(screen.getByText(/요청 취소 07/)).toBeInTheDocument();
+  });
+
+  it("uses layout-only root, list, year, and month wrappers for history and search results", async () => {
+    const historyRequest = request({
+      request_id: "layout-only-history",
+      status: "PICKED_UP",
+      invoice_number: "INV-LAYOUT",
+      picked_up_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 6, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [historyRequest], next_cursor: null, has_more: false });
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const historyList = await screen.findByTestId("shipping-history-list");
+    const root = screen.getByTestId("shipping-root-panel");
+    const body = within(historyList).getByTestId("shipping-history-list-body");
+    const year = await within(historyList).findByTestId("shipping-history-year-2026");
+    const month = within(historyList).getByTestId("shipping-history-month-2026-6");
+    const requestRow = within(month).getByRole("button", { name: /Standard PF/ });
+
+    expect(root).toHaveAttribute("data-surface", "layout-only");
+    expect(root).not.toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    expect(historyList).toHaveAttribute("data-surface", "layout-only");
+    expect(historyList).not.toHaveClass("rounded-[24px]", "border", "p-4");
+    expect(body).toHaveAttribute("data-surface", "layout-only");
+    expect(body).not.toHaveClass("rounded-[18px]", "border", "p-3");
+    expect(year).toHaveAttribute("data-surface", "layout-only");
+    expect(year).not.toHaveClass("rounded-[14px]", "border");
+    expect(month).toHaveAttribute("data-surface", "layout-only");
+    expect(month).not.toHaveClass("rounded-[12px]", "border");
+    expect(requestRow).toHaveClass("rounded-[14px]", "border");
+
+    fireEvent.change(within(historyList).getByRole("searchbox", { name: "출하 이력 검색" }), { target: { value: "INV-LAYOUT" } });
+    fireEvent.click(within(historyList).getByRole("button", { name: "검색" }));
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledWith(expect.objectContaining({ q: "INV-LAYOUT" })));
+
+    const searchYear = within(historyList).getByTestId("shipping-history-year-2026");
+    const searchMonth = within(historyList).getByTestId("shipping-history-month-2026-6");
+    expect(searchYear).toHaveAttribute("data-surface", "layout-only");
+    expect(searchYear).not.toHaveClass("rounded-[14px]", "border");
+    expect(searchMonth).toHaveAttribute("data-surface", "layout-only");
+    expect(searchMonth).not.toHaveClass("rounded-[12px]", "border");
+    expect(within(searchMonth).getByRole("button", { name: /Standard PF/ })).toHaveClass("rounded-[14px]", "border");
   });
 
   it("uses semantic history colors, a balanced title, and controlled month disclosure", async () => {

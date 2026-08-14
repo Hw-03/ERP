@@ -1734,12 +1734,14 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     );
   }
 
+  const usesLayoutOnlyRoot = view === "requestDetail" || view === "historyList";
   return (
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       <div
         data-testid="shipping-root-panel"
-        className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-[28px] border px-4 py-4"
-        style={{
+        data-surface={usesLayoutOnlyRoot ? "layout-only" : undefined}
+        className={`scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto ${usesLayoutOnlyRoot ? "" : "rounded-[28px] border px-4 py-4"}`}
+        style={usesLayoutOnlyRoot ? undefined : {
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
           boxShadow: "none",
@@ -1904,7 +1906,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
   ].filter(Boolean).join(" · ");
   return (
     <div className="min-w-0">
-      <Panel dataTestId="shipping-request-detail" className="flex min-w-0 flex-col">
+      <div data-testid="shipping-request-detail" data-surface="layout-only" className="flex min-w-0 flex-col">
         <div data-testid="shipping-request-detail-header" className={SHIPPING_TOP_ROW_CLASS}>
           <div className={`${SHIPPING_ROW_CLASS} flex-1 flex-wrap`}>
             <button type="button" aria-label="요청 목록으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -1950,7 +1952,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
             {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
           </div>
         </div>
-      </Panel>
+      </div>
     </div>
   );
 }
@@ -2170,11 +2172,11 @@ function RevisionArrayChange({ change, request }: { change: ShippingRequestRevis
       {changes.length === 0 ? (
         <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>구성 순서가 변경되었습니다.</div>
       ) : (
-        <div className={`grid gap-2 ${change.field === "bom_lines" ? "xl:grid-cols-2" : ""}`}>
+        <div data-testid={`shipping-revision-array-groups-${change.field}`} className="grid gap-2">
           {groups.map((group) => (
             <section key={group.id} data-testid={`shipping-revision-array-group-${change.field}-${group.id}`} className="rounded-[10px] border p-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
               <div className="mb-1.5 text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{group.title}</div>
-              <div className="grid gap-2 md:grid-cols-2">
+              <div data-testid={`shipping-revision-array-comparison-${change.field}-${group.id}`} className="grid gap-2 md:grid-cols-2">
                 {group.lines.some((line) => line.before) && (
                   <section data-testid={`shipping-revision-array-before-${change.field}-${group.id}`} className="grid content-start gap-2">
                     <div className="text-xs font-black" style={{ color: LEGACY_COLORS.red }}>제외 · 변경 전</div>
@@ -2368,7 +2370,7 @@ function HistoryListEntry({
 
   return (
     <div className={SHIPPING_FLEX_COL_CLASS}>
-      <Panel dataTestId="shipping-history-list" className={SHIPPING_FLEX_COL_CLASS}>
+      <div data-testid="shipping-history-list" data-surface="layout-only" className={SHIPPING_FLEX_COL_CLASS}>
         <div className={SHIPPING_TOP_ROW_CLASS}>
           <div className="flex min-h-11 items-center gap-3">
             <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -2428,7 +2430,7 @@ function HistoryListEntry({
           </button>
         </form>
 
-        <div className={`${SHIPPING_MODAL_BODY_CLASS} overflow-y-auto`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div data-testid="shipping-history-list-body" data-surface="layout-only" className="mt-4 flex min-h-0 flex-1 overflow-y-auto">
           {error && rows.length > 0 && (
             <div className="mb-3">
               <LoadFailureCard
@@ -2449,11 +2451,11 @@ function HistoryListEntry({
             ) : (
               <div className="grid flex-1 content-start gap-2">
                 {Array.from(new Set(searchGroups.map((group) => group.year))).map((year, yearIndex) => (
-                  <details key={year} open={yearIndex === 0} className="rounded-[14px] border" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                  <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={yearIndex === 0} className="min-w-0">
                     <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{year}년</summary>
                     <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
                       {searchGroups.filter((group) => group.year === year).map((group) => (
-                        <details key={`${group.year}-${group.month}`} open className="rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                        <details key={`${group.year}-${group.month}`} data-testid={`shipping-history-month-${group.year}-${group.month}`} data-surface="layout-only" open className="min-w-0">
                           <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>{group.month}월 · {group.rows.length}건</summary>
                           {renderRows(group.rows)}
                         </details>
@@ -2468,7 +2470,7 @@ function HistoryListEntry({
           ) : (
             <div className="grid flex-1 content-start gap-2">
               {years.map((year) => (
-                <details key={year} open={year === selectedYear} className="rounded-[14px] border" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+                <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={year === selectedYear} className="min-w-0">
                   <summary
                     className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black"
                     style={{ color: LEGACY_COLORS.text }}
@@ -2483,7 +2485,7 @@ function HistoryListEntry({
                     {months.filter((row) => row.year === year).map((row) => {
                       const selected = selectedYear === row.year && selectedMonth === row.month;
                       return (
-                        <details key={`${row.year}-${row.month}`} open={selected} className="rounded-[12px] border" style={{ background: selected ? tint(LEGACY_COLORS.blue, 8) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.blue, 38) : LEGACY_COLORS.border }}>
+                        <details key={`${row.year}-${row.month}`} data-testid={`shipping-history-month-${row.year}-${row.month}`} data-surface="layout-only" open={selected} className="min-w-0">
                           <summary
                             className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black"
                             style={{ color: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
@@ -2509,7 +2511,7 @@ function HistoryListEntry({
             {loading ? "불러오는 중" : "더 보기"}
           </button>
         )}
-      </Panel>
+      </div>
     </div>
   );
 }

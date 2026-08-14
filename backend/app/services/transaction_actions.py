@@ -182,6 +182,14 @@ def correct_transaction_quantity(
 def _cancel_one_log(db: Session, log: TransactionLog) -> None:
     """기록된 재고 효과를 역재생한다."""
     effect = log.inventory_effect
+    if (
+        log.reference_no
+        and log.reference_no.startswith("defect-disassemble:")
+        and log.transaction_type == TransactionTypeEnum.DEFECT_SCRAP
+        and log.notes == "[rework:scrap_child]"
+        and effect == []
+    ):
+        return
     if effect is None:
         raise ValueError("재고 효과 기록이 없어 자동 취소할 수 없습니다.")
     if not isinstance(effect, list) or not effect:

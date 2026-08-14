@@ -11,7 +11,7 @@ import type { Operator } from "./login/useCurrentOperator";
 import { DefectKpiCards, type DefectKpiKind } from "./_defect_hub/DefectKpiCards";
 import { DefectHubEntry } from "./_defect_hub/DefectHubEntry";
 import type { DefectHubCardId } from "./_defect_hub/defectHubCards";
-import { DefectFilterBar, type DefectScope, type DefectSort } from "./_defect_hub/DefectFilterBar";
+import { DefectFilterBar, type DefectActorScope, type DefectScope, type DefectSort } from "./_defect_hub/DefectFilterBar";
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
@@ -98,6 +98,7 @@ function DefectViewInner({
   };
 
   const [scope, setScope] = useState<DefectScope>(initialScope);
+  const [actorScope, setActorScope] = useState<DefectActorScope>("all");
   const [sort, setSort] = useState<DefectSort>("newest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [view, setView] = useState<ViewMode>({ kind: "hub" });
@@ -146,17 +147,22 @@ function DefectViewInner({
     };
   }, [reloadNonce, realtimeRevision]);
 
-  // 부서/scope 범위만 적용 — KPI 집계와 목록이 공유하는 모집단
+  // 부서 범위와 격리 처리자 범위를 먼저 합성 — KPI 집계와 목록이 공유하는 모집단
   const scopedLocations = useMemo(() => {
+    let result = locations;
     if (scope === "my") {
       const targetDept = defectDeptFilter ?? operator.department;
-      return locations.filter((loc) => loc.department === targetDept);
+      result = result.filter((loc) => loc.department === targetDept);
+    } else if (scope === "production") {
+      result = result.filter((loc) => PRODUCTION_LINES.has(loc.department));
     }
-    if (scope === "production") {
-      return locations.filter((loc) => PRODUCTION_LINES.has(loc.department));
+    if (actorScope === "mine") {
+      result = result.filter(
+        (loc) => loc.quarantined_by_employee_id === operator.employee_id,
+      );
     }
-    return locations;
-  }, [locations, scope, defectDeptFilter, operator.department]);
+    return result;
+  }, [locations, scope, actorScope, defectDeptFilter, operator.department, operator.employee_id]);
 
   // KPI — 현재 부서 범위 기준으로 집계해 목록과 항상 일치 (서버 /kpi 대신 클라 계산)
   const kpi = useMemo<DefectKpi>(
@@ -191,12 +197,13 @@ function DefectViewInner({
   }, [scopedLocations, sort, kpiFilter]);
 
   // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
-  const scopeLabel =
+  const departmentScopeLabel =
     scope === "my"
       ? `${defectDeptFilter ?? operator.department} 부서`
       : scope === "production"
       ? "생산 전체"
       : "전체 부서";
+  const scopeLabel = `${departmentScopeLabel} · ${actorScope === "mine" ? "내가 격리" : "격리자 전체"}`;
 
   const employee = {
     employee_id: operator.employee_id,
@@ -334,9 +341,14 @@ function DefectViewInner({
 
             <DefectFilterBar
               scope={scope}
+              actorScope={actorScope}
               sort={sort}
               onScopeChange={(next) => {
                 setScope(next);
+                setKpiFilter(null);
+              }}
+              onActorScopeChange={(next) => {
+                setActorScope(next);
                 setKpiFilter(null);
               }}
               onSortChange={setSort}

@@ -38,8 +38,8 @@ describe("DesktopHistoryView scrollbar", () => {
     const scroller = container.querySelector(".overflow-y-auto");
     expect(scroller).toHaveClass("sg");
     expect(scroller).not.toHaveClass("scrollbar-hide");
-    expect(scroller).toHaveClass("rounded-[28px]", "desktop-flat-surface");
+    expect(scroller).not.toHaveClass("rounded-[28px]", "desktop-flat-surface");
     expect(scroller).not.toHaveClass("border");
-    expect(scroller).toHaveStyle({ background: "var(--c-s1)" });
+    expect(scroller).not.toHaveStyle({ background: "var(--c-s1)" });
   });
 });

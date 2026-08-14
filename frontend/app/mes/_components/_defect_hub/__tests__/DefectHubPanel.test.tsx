@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { DefectHubPanel } from "../DefectHubPanel";
-import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
+import type { DefectLocation } from "@/lib/api/types/defects";
 
 const realtime = vi.hoisted(() => ({ revision: null as number | null }));
 
@@ -12,7 +12,6 @@ vi.mock("@/lib/queries/realtime", () => ({
 // defectsApi 모킹
 vi.mock("@/lib/api/defects", () => ({
   defectsApi: {
-    getDefectKpi: vi.fn(),
     listDefects: vi.fn(),
   },
 }));
@@ -31,11 +30,6 @@ vi.mock("../../mobile/screens/MobileDefectCartFlow", () => ({
 }));
 
 import { defectsApi } from "@/lib/api/defects";
-
-const mockKpi: DefectKpi = {
-  quarantined: 17,
-  over_one_year: 3,
-};
 
 // 조립부 1개, 진공부 1개
 const mockLocations: DefectLocation[] = [
@@ -79,9 +73,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   realtime.revision = null;
-  vi.mocked(defectsApi.getDefectKpi).mockClear();
   vi.mocked(defectsApi.listDefects).mockClear();
-  vi.mocked(defectsApi.getDefectKpi).mockResolvedValue(mockKpi);
   vi.mocked(defectsApi.listDefects).mockResolvedValue(mockLocations);
 });
 
@@ -107,8 +99,8 @@ describe("DefectHubPanel", () => {
     openList();
 
     await waitFor(() => {
-      expect(screen.getByText("17")).toBeInTheDocument();
-      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
+      expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("0건");
     });
   });
 
@@ -211,16 +203,76 @@ describe("DefectHubPanel", () => {
     expect(panel).toBeInTheDocument();
     expect(panel).toHaveTextContent("7-TR-0001");
   });
+
+  it("combines department and quarantine actor for the list and KPI population", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
+      {
+        ...mockLocations[0],
+        item_id: "mine-assembly",
+        item_name: "내 조립 격리",
+        mes_code: "MINE-ASSEMBLY",
+        department: mockEmployee.department,
+        quarantined_by_employee_id: mockEmployee.employee_id,
+        defective_at: new Date(Date.now() - 100 * day).toISOString(),
+      },
+      {
+        ...mockLocations[0],
+        item_id: "mine-vacuum",
+        item_name: "내 진공 격리",
+        mes_code: "MINE-VACUUM",
+        department: "진공",
+        quarantined_by_employee_id: mockEmployee.employee_id,
+        defective_at: new Date(Date.now() - 400 * day).toISOString(),
+      },
+      {
+        ...mockLocations[0],
+        item_id: "other-assembly",
+        item_name: "다른 작업자 격리",
+        mes_code: "OTHER-ASSEMBLY",
+        department: mockEmployee.department,
+        quarantined_by_employee_id: "employee-2",
+      },
+      {
+        ...mockLocations[0],
+        item_id: "unknown-assembly",
+        item_name: "처리자 미상 격리",
+        mes_code: "UNKNOWN-ASSEMBLY",
+        department: mockEmployee.department,
+        quarantined_by_employee_id: null,
+      },
+    ]);
+    render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    openList();
+    expect(await screen.findByText("UNKNOWN-ASSEMBLY")).toBeInTheDocument();
+
+    const actorFilters = screen.getByText("격리자").parentElement!;
+    fireEvent.click(within(actorFilters).getByRole("button", { name: "내가 격리" }));
+
+    expect(screen.getByText("MINE-ASSEMBLY")).toBeInTheDocument();
+    expect(screen.queryByText("MINE-VACUUM")).not.toBeInTheDocument();
+    expect(screen.queryByText("OTHER-ASSEMBLY")).not.toBeInTheDocument();
+    expect(screen.queryByText("UNKNOWN-ASSEMBLY")).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("0건");
+
+    const departmentFilters = screen.getByText("부서").parentElement!;
+    fireEvent.click(within(departmentFilters).getByRole("button", { name: "전체" }));
+
+    expect(screen.getByText("MINE-ASSEMBLY")).toBeInTheDocument();
+    expect(screen.getByText("MINE-VACUUM")).toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("1건");
+  });
 });
 
 describe("DefectHubPanel realtime refresh", () => {
-  it("reloads KPI and locations on revision without leaving an in-progress cart", async () => {
+  it("reloads locations on revision without leaving an in-progress cart", async () => {
     const props = { currentEmployee: mockEmployee };
     const { rerender } = render(<DefectHubPanel {...props} />);
     fireEvent.click(screen.getAllByRole("button")[0]);
     expect(await screen.findByTestId("cart-flow")).toHaveTextContent("add");
     await waitFor(() => {
-      expect(defectsApi.getDefectKpi).toHaveBeenCalledTimes(1);
       expect(defectsApi.listDefects).toHaveBeenCalledTimes(1);
     });
 
@@ -228,7 +280,6 @@ describe("DefectHubPanel realtime refresh", () => {
     rerender(<DefectHubPanel {...props} />);
 
     await waitFor(() => {
-      expect(defectsApi.getDefectKpi).toHaveBeenCalledTimes(2);
       expect(defectsApi.listDefects).toHaveBeenCalledTimes(2);
     });
     expect(screen.getByTestId("cart-flow")).toHaveTextContent("add");
@@ -240,9 +291,7 @@ describe("DefectHubPanel realtime refresh", () => {
     fireEvent.click(screen.getByText("격리 목록"));
     expect(await screen.findByText("7-TR-0001")).toBeInTheDocument();
 
-    const pendingKpi = deferred<DefectKpi>();
     const pendingLocations = deferred<DefectLocation[]>();
-    vi.mocked(defectsApi.getDefectKpi).mockReturnValueOnce(pendingKpi.promise);
     vi.mocked(defectsApi.listDefects).mockReturnValueOnce(pendingLocations.promise);
     realtime.revision = 1;
     rerender(<DefectHubPanel {...props} />);
@@ -252,7 +301,6 @@ describe("DefectHubPanel realtime refresh", () => {
     expect(screen.queryByText(/로딩 중/)).not.toBeInTheDocument();
 
     await act(async () => {
-      pendingKpi.resolve(mockKpi);
       pendingLocations.resolve(mockLocations);
     });
   });

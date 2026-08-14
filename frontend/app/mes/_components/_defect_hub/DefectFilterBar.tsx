@@ -4,20 +4,25 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common/FilterChip";
 
 export type DefectScope = "my" | "production" | "all";
+export type DefectActorScope = "all" | "mine";
 export type DefectSort = "oldest" | "newest";
 
 interface Props {
   scope: DefectScope;
+  actorScope: DefectActorScope;
   sort: DefectSort;
   onScopeChange: (scope: DefectScope) => void;
+  onActorScopeChange: (scope: DefectActorScope) => void;
   onSortChange: (sort: DefectSort) => void;
   currentDept: string;
 }
 
 export function DefectFilterBar({
   scope,
+  actorScope,
   sort,
   onScopeChange,
+  onActorScopeChange,
   onSortChange,
   currentDept,
 }: Props) {
@@ -44,6 +49,28 @@ export function DefectFilterBar({
           label="전체"
           active={scope === "all"}
           onClick={() => onScopeChange("all")}
+          size="sm"
+        />
+      </div>
+
+      {/* 구분선 */}
+      <div className="h-5 w-px" style={{ background: LEGACY_COLORS.border }} />
+
+      {/* 격리 처리자 범위 칩 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          격리자
+        </span>
+        <FilterChip
+          label="전체"
+          active={actorScope === "all"}
+          onClick={() => onActorScopeChange("all")}
+          size="sm"
+        />
+        <FilterChip
+          label="내가 격리"
+          active={actorScope === "mine"}
+          onClick={() => onActorScopeChange("mine")}
           size="sm"
         />
       </div>

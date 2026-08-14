@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Operator } from "../login/useCurrentOperator";
 
@@ -163,5 +163,59 @@ describe("DesktopDefectView realtime refresh", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open list" }));
 
     expect((await screen.findByTestId("defect-list")).parentElement).toHaveClass("animate-view-fade");
+  });
+
+  it("combines department and quarantine actor before deriving KPI and list population", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    mocks.listDefects.mockResolvedValueOnce([
+      {
+        ...location,
+        item_id: "mine-assembly",
+        mes_code: "MINE-ASSEMBLY",
+        quarantined_by_employee_id: operator.employee_id,
+        defective_at: new Date(Date.now() - 100 * day).toISOString(),
+      },
+      {
+        ...location,
+        item_id: "mine-vacuum",
+        mes_code: "MINE-VACUUM",
+        department: "vacuum",
+        quarantined_by_employee_id: operator.employee_id,
+        defective_at: new Date(Date.now() - 400 * day).toISOString(),
+      },
+      {
+        ...location,
+        item_id: "other-assembly",
+        mes_code: "OTHER-ASSEMBLY",
+        quarantined_by_employee_id: "employee-2",
+      },
+      {
+        ...location,
+        item_id: "unknown-assembly",
+        mes_code: "UNKNOWN-ASSEMBLY",
+        quarantined_by_employee_id: null,
+      },
+    ]);
+    render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    expect(await screen.findByRole("button", { name: "Process UNKNOWN-ASSEMBLY" })).toBeInTheDocument();
+
+    const actorFilters = screen.getByText("격리자").parentElement!;
+    fireEvent.click(within(actorFilters).getByRole("button", { name: "내가 격리" }));
+
+    expect(screen.getByRole("button", { name: "Process MINE-ASSEMBLY" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Process MINE-VACUUM" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Process OTHER-ASSEMBLY" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Process UNKNOWN-ASSEMBLY" })).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("1건");
+
+    const departmentFilters = screen.getByText("부서").parentElement!;
+    fireEvent.click(within(departmentFilters).getByRole("button", { name: "내 부서" }));
+
+    expect(screen.getByRole("button", { name: "Process MINE-ASSEMBLY" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Process MINE-VACUUM" })).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("0건");
   });
 });

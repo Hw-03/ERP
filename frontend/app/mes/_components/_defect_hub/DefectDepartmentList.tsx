@@ -107,6 +107,7 @@ export function DefectDepartmentList({
                   const warn = isOverOneYear(loc.defective_at);
                   const reasonCategory = loc.reason_category?.trim();
                   const reasonMemo = loc.reason_memo?.trim();
+                  const quarantinedBy = loc.quarantined_by?.trim() || "처리자 미상";
                   return (
                     <div
                       key={`${loc.item_id}-${idx}`}
@@ -124,7 +125,7 @@ export function DefectDepartmentList({
                         </div>
                         <div className="flex items-center gap-3 text-xs" style={{ color: LEGACY_COLORS.muted }}>
                           <span>{formatQty(loc.quantity)}개</span>
-                          <span>격리 {formatDate(loc.defective_at)}</span>
+                          <span>격리 {formatDate(loc.defective_at)} · {quarantinedBy}</span>
                           {warn && (
                             <span
                               className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold"

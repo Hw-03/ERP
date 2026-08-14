@@ -54,6 +54,8 @@ class DefectLocationItem(BaseModel):
     defective_at: Optional[datetime]
     reason_category: Optional[str]
     reason_memo: Optional[str]
+    quarantined_by: Optional[str]
+    quarantined_by_employee_id: Optional[uuid.UUID]
     # BOM 자식 보유 여부. 프론트 격리 처리 액션에서 "재작업" 옵션 노출 조건.
     has_bom: bool = False
 
@@ -217,6 +219,7 @@ def list_defect_locations(
             .filter(
                 TransactionLog.item_id.in_(item_ids),
                 TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
+                TransactionLog.cancelled.is_(False),
             )
             .order_by(TransactionLog.created_at.desc())
             .all()
@@ -238,6 +241,10 @@ def list_defect_locations(
                 defective_at=loc.defective_at,
                 reason_category=last_log.reason_category if last_log else None,
                 reason_memo=last_log.reason_memo if last_log else None,
+                quarantined_by=last_log.produced_by if last_log else None,
+                quarantined_by_employee_id=(
+                    last_log.producer_employee_id if last_log else None
+                ),
                 has_bom=item.item_id in bom_items,
             )
         )

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -1054,13 +1055,109 @@ def test_locations_returns_defective_list(db_session, client, make_item):
     res = client.get("/api/defects/locations")
     assert res.status_code == 200, res.json()
     locs = res.json()
-    assert any(str(item.item_id) == loc["item_id"] for loc in locs)
+    item_location = next(loc for loc in locs if str(item.item_id) == loc["item_id"])
+    assert item_location["quarantined_by"] == actor.name
+    assert item_location["quarantined_by_employee_id"] == str(actor.employee_id)
 
     # 부서 필터
     res2 = client.get(f"/api/defects/locations?department={DepartmentEnum.ASSEMBLY.value}")
     assert res2.status_code == 200
     for loc in res2.json():
         assert loc["department"] == DepartmentEnum.ASSEMBLY.value
+
+
+def test_locations_uses_latest_quarantine_actor_and_keeps_unknown_actor_null(
+    db_session, client, make_item
+):
+    latest_item = make_item(name="LATEST-ACTOR", process_type_code="TR")
+    unknown_item = make_item(name="UNKNOWN-ACTOR", process_type_code="TR")
+    older_actor = _make_employee(db_session, code="ELOC-OLD", name="이전 처리자")
+    latest_actor = _make_employee(db_session, code="ELOC-NEW", name="최근 처리자")
+    _make_defective_location(
+        db_session, latest_item.item_id, DepartmentEnum.ASSEMBLY, Decimal("1")
+    )
+    _make_defective_location(
+        db_session, unknown_item.item_id, DepartmentEnum.ASSEMBLY, Decimal("1")
+    )
+    now = datetime.utcnow()
+    db_session.add_all(
+        [
+            TransactionLog(
+                item_id=latest_item.item_id,
+                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+                quantity_change=Decimal("0"),
+                department=DepartmentEnum.ASSEMBLY.value,
+                produced_by=older_actor.name,
+                producer_employee_id=older_actor.employee_id,
+                created_at=now - timedelta(days=1),
+            ),
+            TransactionLog(
+                item_id=latest_item.item_id,
+                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+                quantity_change=Decimal("0"),
+                department=DepartmentEnum.ASSEMBLY.value,
+                produced_by=latest_actor.name,
+                producer_employee_id=latest_actor.employee_id,
+                created_at=now,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get("/api/defects/locations")
+
+    assert response.status_code == 200, response.json()
+    by_item_id = {row["item_id"]: row for row in response.json()}
+    assert by_item_id[str(latest_item.item_id)]["quarantined_by"] == latest_actor.name
+    assert (
+        by_item_id[str(latest_item.item_id)]["quarantined_by_employee_id"]
+        == str(latest_actor.employee_id)
+    )
+    assert by_item_id[str(unknown_item.item_id)]["quarantined_by"] is None
+    assert by_item_id[str(unknown_item.item_id)]["quarantined_by_employee_id"] is None
+
+
+def test_locations_ignores_newer_cancelled_quarantine_actor(
+    db_session, client, make_item
+):
+    item = make_item(name="CANCELLED-ACTOR", process_type_code="TR")
+    active_actor = _make_employee(db_session, code="ELOC-ACTIVE", name="실제 처리자")
+    cancelled_actor = _make_employee(db_session, code="ELOC-CANCEL", name="취소 처리자")
+    _make_defective_location(
+        db_session, item.item_id, DepartmentEnum.ASSEMBLY, Decimal("1")
+    )
+    now = datetime.utcnow()
+    db_session.add_all(
+        [
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+                quantity_change=Decimal("0"),
+                department=DepartmentEnum.ASSEMBLY.value,
+                produced_by=active_actor.name,
+                producer_employee_id=active_actor.employee_id,
+                created_at=now - timedelta(days=1),
+            ),
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+                quantity_change=Decimal("0"),
+                department=DepartmentEnum.ASSEMBLY.value,
+                produced_by=cancelled_actor.name,
+                producer_employee_id=cancelled_actor.employee_id,
+                created_at=now,
+                cancelled=True,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get("/api/defects/locations")
+
+    assert response.status_code == 200, response.json()
+    location = next(row for row in response.json() if row["item_id"] == str(item.item_id))
+    assert location["quarantined_by"] == active_actor.name
+    assert location["quarantined_by_employee_id"] == str(active_actor.employee_id)
 
 
 # ---------------------------------------------------------------------------

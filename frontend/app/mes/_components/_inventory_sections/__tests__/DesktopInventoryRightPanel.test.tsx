@@ -7,6 +7,10 @@ vi.mock("../InventoryDetailPanel", () => ({
   InventoryDetailPanel: () => <div>상세 내용</div>,
 }));
 
+vi.mock("../InventoryRecentHistoryPanel", () => ({
+  InventoryRecentHistoryPanel: () => <div>최근 내역 패널</div>,
+}));
+
 import { DesktopInventoryRightPanel } from "../DesktopInventoryRightPanel";
 
 function makeItem(): Item {
@@ -27,6 +31,59 @@ function makeItem(): Item {
 }
 
 describe("DesktopInventoryRightPanel", () => {
+  it("기본 상세 정보를 보여주고 최근 내역 탭으로 전환한다", () => {
+    const item = makeItem();
+    render(
+      <DesktopInventoryRightPanel
+        selectedItem={item}
+        displayItem={item}
+        headerBadge={null}
+        onClose={() => {}}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    const detailTab = screen.getByRole("tab", { name: "상세 정보" });
+    const historyTab = screen.getByRole("tab", { name: "최근 내역" });
+    expect(screen.getByRole("tablist", { name: "재고 상세 보기" })).toBeInTheDocument();
+    expect(detailTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("상세 내용")).toBeInTheDocument();
+
+    fireEvent.click(historyTab);
+
+    expect(historyTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("최근 내역 패널")).toBeInTheDocument();
+    expect(screen.queryByText("상세 내용")).not.toBeInTheDocument();
+  });
+
+  it("다른 품목을 열면 상세 정보 탭으로 돌아간다", () => {
+    const firstItem = makeItem();
+    const nextItem = { ...makeItem(), item_id: "item-2", item_name: "다음 품목" };
+    const { rerender } = render(
+      <DesktopInventoryRightPanel
+        selectedItem={firstItem}
+        displayItem={firstItem}
+        headerBadge={null}
+        onClose={() => {}}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "최근 내역" }));
+    rerender(
+      <DesktopInventoryRightPanel
+        selectedItem={nextItem}
+        displayItem={nextItem}
+        headerBadge={null}
+        onClose={() => {}}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "상세 정보" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("상세 내용")).toBeInTheDocument();
+  });
+
   it("keeps modal dialog semantics while using one red card close button", () => {
     const onClose = vi.fn();
     const item = makeItem();

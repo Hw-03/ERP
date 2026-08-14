@@ -325,6 +325,162 @@ def test_cancel_internal_use_batch_restores_all_items(
     assert _cells(db_session, second.item_id) == (9, 9, {})
 
 
+def test_cancel_defective_disassemble_with_scrap_child_restores_batch(
+    client, db_session, make_item, make_location, make_bom
+):
+    from app.services.dept_adjustment import submit_defective_disassemble
+
+    parent = make_item(
+        name="cancel-rework-parent",
+        process_type_code="PA",
+        warehouse_qty=Decimal("0"),
+    )
+    child = make_item(
+        name="cancel-rework-child",
+        process_type_code="TR",
+        warehouse_qty=Decimal("0"),
+    )
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    make_location(
+        parent.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("3"),
+    )
+    parent_inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == parent.item_id
+    ).one()
+    parent_inventory.quantity = Decimal("3")
+    actor = _make_employee(db_session, code="REWORK-CANCEL")
+    db_session.commit()
+
+    result = submit_defective_disassemble(
+        db_session,
+        parent.item_id,
+        Decimal("3"),
+        DepartmentEnum.ASSEMBLY,
+        child_decisions=[
+            {
+                "item_id": child.item_id,
+                "qty": Decimal("3"),
+                "normal_qty": Decimal("1"),
+                "defective_qty": Decimal("1"),
+                "scrap_qty": Decimal("1"),
+            }
+        ],
+        reason_category="rework cancel regression",
+        reason_memo="split child",
+        actor=actor.name,
+        actor_employee_id=actor.employee_id,
+    )
+    db_session.commit()
+
+    batch_logs = db_session.query(TransactionLog).filter(
+        TransactionLog.reference_no == result["batch_ref"]
+    ).all()
+    scrap_logs = [
+        log
+        for log in batch_logs
+        if log.transaction_type == TransactionTypeEnum.DEFECT_SCRAP
+        and log.notes == "[rework:scrap_child]"
+    ]
+    assert len(batch_logs) == 4
+    assert len(scrap_logs) == 1
+    assert scrap_logs[0].inventory_effect == []
+    assert _cells(db_session, parent.item_id)[1] == 0
+    assert _cells(db_session, child.item_id)[1] == 2
+
+    response = _cancel(
+        client,
+        result["parent_log_id"],
+        code=actor.employee_code,
+        reason="rework batch cancel",
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    cancelled_logs = db_session.query(TransactionLog).filter(
+        TransactionLog.reference_no == result["batch_ref"]
+    ).all()
+    assert all(log.cancelled for log in cancelled_logs)
+    assert all(log.cancel_reason == "rework batch cancel" for log in cancelled_logs)
+    assert all(log.cancelled_by == actor.employee_id for log in cancelled_logs)
+    assert all(log.cancelled_at is not None for log in cancelled_logs)
+
+    parent_warehouse, parent_total, parent_locations = _cells(db_session, parent.item_id)
+    assert (parent_warehouse, parent_total) == (0, 3)
+    assert parent_locations.get(
+        (DepartmentEnum.ASSEMBLY.value, LocationStatusEnum.DEFECTIVE.value), 0
+    ) == 3
+    child_warehouse, child_total, child_locations = _cells(db_session, child.item_id)
+    assert (child_warehouse, child_total) == (0, 0)
+    assert child_locations.get(
+        (DepartmentEnum.TUBE.value, LocationStatusEnum.PRODUCTION.value), 0
+    ) == 0
+    assert child_locations.get(
+        (DepartmentEnum.TUBE.value, LocationStatusEnum.DEFECTIVE.value), 0
+    ) == 0
+
+
+@pytest.mark.parametrize(
+    ("transaction_type", "reference_no", "notes"),
+    [
+        pytest.param(
+            TransactionTypeEnum.DEFECT_SCRAP,
+            "defect-disassemble:near-miss-notes",
+            "[rework:scrap_child] extra",
+            id="notes-not-exact",
+        ),
+        pytest.param(
+            TransactionTypeEnum.DEFECT_SCRAP,
+            "other-disassemble:near-miss-reference",
+            "[rework:scrap_child]",
+            id="reference-prefix-not-exact",
+        ),
+        pytest.param(
+            TransactionTypeEnum.RECEIVE,
+            "defect-disassemble:near-miss-type",
+            "[rework:scrap_child]",
+            id="transaction-type-not-scrap",
+        ),
+    ],
+)
+def test_cancel_rejects_empty_effect_when_rework_scrap_signature_is_not_exact(
+    client,
+    db_session,
+    make_item,
+    transaction_type,
+    reference_no,
+    notes,
+):
+    item = make_item(name="cancel-rework-near-miss", warehouse_qty=Decimal("50"))
+    actor = _make_employee(db_session, code="REWORK-NEAR-MISS")
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=transaction_type,
+        quantity_change=Decimal("0"),
+        quantity_before=Decimal("50"),
+        quantity_after=Decimal("50"),
+        reference_no=reference_no,
+        notes=notes,
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        inventory_effect=[],
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    response = _cancel(client, log.log_id, code=actor.employee_code)
+
+    assert response.status_code == 422, response.text
+    db_session.expire_all()
+    assert _cells(db_session, item.item_id) == (50, 50, {})
+    refreshed_log = db_session.query(TransactionLog).filter(
+        TransactionLog.log_id == log.log_id
+    ).one()
+    assert refreshed_log.cancelled is False
+
+
 def test_cancel_batch_prelocks_sorted_unique_inventories_before_reversal(
     db_session, make_item, monkeypatch
 ):

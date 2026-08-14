@@ -70,9 +70,9 @@ describe("DesktopInventoryView scrollbar", () => {
     expect(scroller).not.toBeNull();
     expect(scroller).not.toHaveClass("scrollbar-hide");
     expect(scroller).toHaveClass("sg");
-    expect(scroller).toHaveClass("rounded-[28px]", "desktop-flat-surface");
+    expect(scroller).not.toHaveClass("rounded-[28px]", "desktop-flat-surface");
     expect(scroller).not.toHaveClass("border");
-    expect(scroller).toHaveStyle({ background: "var(--c-s1)" });
+    expect(scroller).not.toHaveStyle({ background: "var(--c-s1)" });
   });
 
   it("uses flat work surfaces instead of elevated dashboard cards", () => {

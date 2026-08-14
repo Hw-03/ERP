@@ -470,8 +470,7 @@ export function DesktopHistoryView() {
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       {/* ── 좌측: 스크롤 영역 ── */}
       <div
-      className="sg desktop-flat-surface min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px]"
-      style={{ background: "var(--c-s1)" }}
+      className="sg min-h-0 min-w-0 flex-1 overflow-y-auto"
       >
         <div className="flex flex-col gap-3 pb-6">
           <HistoryStatsBar

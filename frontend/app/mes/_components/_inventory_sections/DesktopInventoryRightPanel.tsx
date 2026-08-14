@@ -1,12 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Item } from "@/lib/api";
 import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
 import { InventoryDetailPanel } from "./InventoryDetailPanel";
+import { InventoryRecentHistoryPanel } from "./InventoryRecentHistoryPanel";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 
 const INVENTORY_DETAIL_TITLE_ID = "desktop-inventory-detail-title";
+const INVENTORY_DETAIL_TAB_ID = "desktop-inventory-detail-tab";
+const INVENTORY_HISTORY_TAB_ID = "desktop-inventory-history-tab";
+const INVENTORY_DETAIL_PANEL_ID = "desktop-inventory-detail-panel";
+const INVENTORY_HISTORY_PANEL_ID = "desktop-inventory-history-panel";
 
 /**
  * Round-13 (#9) 추출 — DesktopInventoryView 우측 슬라이딩 상세 패널.
@@ -34,6 +40,12 @@ export function DesktopInventoryRightPanel({
   canReceive,
   imageFilename,
 }: DesktopInventoryRightPanelProps) {
+  const [activeTab, setActiveTab] = useState<"detail" | "history">("detail");
+
+  useEffect(() => {
+    setActiveTab("detail");
+  }, [selectedItem?.item_id]);
+
   return (
     <SlidePanel
       open={!!selectedItem}
@@ -49,12 +61,60 @@ export function DesktopInventoryRightPanel({
           subtitleBadge={headerBadge}
           onClose={onClose}
         >
-          <InventoryDetailPanel
-            item={displayItem}
-            onGoToWarehouse={onGoToWarehouse}
-            canReceive={canReceive}
-            imageFilename={imageFilename}
-          />
+          <div className="px-1 pt-1">
+            <div
+              aria-label="재고 상세 보기"
+              className="flex gap-1 rounded-[12px] p-1"
+              role="tablist"
+              style={{ background: "color-mix(in srgb, var(--c-blue) 8%, transparent)" }}
+            >
+              <button
+                id={INVENTORY_DETAIL_TAB_ID}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "detail"}
+                aria-controls={INVENTORY_DETAIL_PANEL_ID}
+                onClick={() => setActiveTab("detail")}
+                className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                style={{
+                  background: activeTab === "detail" ? "var(--c-s1)" : "transparent",
+                  color: activeTab === "detail" ? "var(--c-text)" : "var(--c-muted2)",
+                }}
+              >
+                상세 정보
+              </button>
+              <button
+                id={INVENTORY_HISTORY_TAB_ID}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "history"}
+                aria-controls={INVENTORY_HISTORY_PANEL_ID}
+                onClick={() => setActiveTab("history")}
+                className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                style={{
+                  background: activeTab === "history" ? "var(--c-s1)" : "transparent",
+                  color: activeTab === "history" ? "var(--c-text)" : "var(--c-muted2)",
+                }}
+              >
+                최근 내역
+              </button>
+            </div>
+          </div>
+
+          {activeTab === "detail" ? (
+            <div id={INVENTORY_DETAIL_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_DETAIL_TAB_ID}>
+              <InventoryDetailPanel
+                item={displayItem}
+                onGoToWarehouse={onGoToWarehouse}
+                canReceive={canReceive}
+                imageFilename={imageFilename}
+              />
+            </div>
+          ) : selectedItem?.item_id === displayItem.item_id ? (
+            <div id={INVENTORY_HISTORY_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_HISTORY_TAB_ID}>
+              <InventoryRecentHistoryPanel key={selectedItem.item_id} item={selectedItem} />
+            </div>
+          ) : null}
         </DesktopRightPanel>
       )}
     </SlidePanel>

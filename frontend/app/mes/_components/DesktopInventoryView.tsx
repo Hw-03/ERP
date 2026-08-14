@@ -145,8 +145,7 @@ export function DesktopInventoryView({
       {/* ── 좌측: 스크롤 컨테이너 ── */}
       <div
         ref={scrollRef}
-        className="sg desktop-flat-surface min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px]"
-        style={{ background: "var(--c-s1)" }}
+        className="sg min-h-0 min-w-0 flex-1 overflow-y-auto"
       >
         <div className="flex flex-col gap-3 pb-6">
           {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}

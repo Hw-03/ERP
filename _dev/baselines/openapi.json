@@ -1766,6 +1766,29 @@
             "title": "Quantity",
             "type": "string"
           },
+          "quarantined_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quarantined By"
+          },
+          "quarantined_by_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quarantined By Employee Id"
+          },
           "reason_category": {
             "anyOf": [
               {
@@ -1797,7 +1820,9 @@
           "quantity",
           "defective_at",
           "reason_category",
-          "reason_memo"
+          "reason_memo",
+          "quarantined_by",
+          "quarantined_by_employee_id"
         ],
         "title": "DefectLocationItem",
         "type": "object"
