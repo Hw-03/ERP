@@ -447,6 +447,7 @@ export function BomWorkbench({
                   bomRows={bomRows}
                   items={items}
                   onAdd={handleAdd}
+                  isLocked={isCompleted}
                 />
               ) : (
                 <div
@@ -470,6 +471,7 @@ export function BomWorkbench({
                 onRequestDelete={(row, childName) =>
                   setDeleteRequest({ bomId: row.bom_id, childName })
                 }
+                isLocked={isCompleted}
               />
             </div>
           </>

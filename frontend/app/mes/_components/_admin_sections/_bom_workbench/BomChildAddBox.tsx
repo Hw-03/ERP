@@ -25,6 +25,7 @@ interface Props {
   bomRows: BOMEntry[];
   items: Item[];
   onAdd: (childId: string, childName: string, qty: number) => Promise<boolean>;
+  isLocked?: boolean;
 }
 
 const STAGE_FILTERS: { id: "ALL" | StageLetter; label: string }[] = [
@@ -34,7 +35,7 @@ const STAGE_FILTERS: { id: "ALL" | StageLetter; label: string }[] = [
   { id: "F", label: "공정완료" },
 ];
 
-export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
+export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false }: Props) {
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<DeptLetter | "">("");
   const [stageFilter, setStageFilter] = useState<"ALL" | StageLetter>("ALL");
@@ -57,6 +58,13 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
     }
   }, [expandedId]);
 
+  useEffect(() => {
+    if (isLocked) {
+      setExpandedId(null);
+      setQtyDraft("1");
+    }
+  }, [isLocked]);
+
   const candidates = useMemo(() => {
     return items
       .filter((i) => i.item_id !== parent.item_id)
@@ -74,6 +82,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
   }, [items, parent.item_id, search, deptFilter, stageFilter]);
 
   function openRow(id: string) {
+    if (isLocked) return;
     setExpandedId(id);
     setQtyDraft("1");
   }
@@ -84,6 +93,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
   }
 
   async function commit(child: Item) {
+    if (isLocked) return;
     const qty = parseFloat(qtyDraft);
     if (!Number.isFinite(qty) || qty <= 0) {
       qtyRef.current?.focus();
@@ -108,6 +118,11 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
         <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
           하위 품목 추가
         </div>
+        {isLocked && (
+          <span className="shrink-0 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+            완료 해제 후 수정 가능
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
         </div>
@@ -204,7 +219,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                 <BomTableItemRow
                   item={c}
                   gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
-                  disabled={already}
+                  disabled={already || isLocked}
                   onClick={() => (expanded ? closeRow() : openRow(c.item_id))}
                   background={expanded ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` : undefined}
                   trailing={already ? (

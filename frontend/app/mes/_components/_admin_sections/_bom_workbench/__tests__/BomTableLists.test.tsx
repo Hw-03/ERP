@@ -501,6 +501,45 @@ describe("BOM 편집 표형 목록", () => {
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 
+  it("완료 BOM에서는 추가·수량 수정·삭제 진입점을 비활성화한다", () => {
+    const onAdd = vi.fn();
+    const onSaveQty = vi.fn();
+    const onRequestDelete = vi.fn();
+    render(
+      <>
+        <BomChildAddBox
+          parent={item()}
+          bomRows={[]}
+          items={[item(), item({ item_id: "item-3", item_name: "추가할 항목", mes_code: "CHILD-003" })]}
+          onAdd={onAdd}
+          isLocked
+        />
+        <BomEditPanel
+          parent={item()}
+          bomRows={[bomRow]}
+          items={[item(), item({ item_id: "item-2", item_name: "등록된 항목", mes_code: "CHILD-001" })]}
+          onSaveQty={onSaveQty}
+          onRequestDelete={onRequestDelete}
+          isLocked
+        />
+      </>,
+    );
+
+    const addCandidate = screen.getByText("추가할 항목").closest("button")!;
+    expect(addCandidate).toBeDisabled();
+    fireEvent.click(addCandidate);
+    expect(onAdd).not.toHaveBeenCalled();
+
+    const quantityButton = screen.getByTitle("클릭하여 수량 수정");
+    const deleteButton = screen.getByTitle("삭제");
+    expect(quantityButton).toBeDisabled();
+    expect(deleteButton).toBeDisabled();
+    fireEvent.click(quantityButton);
+    fireEvent.click(deleteButton);
+    expect(onSaveQty).not.toHaveBeenCalled();
+    expect(onRequestDelete).not.toHaveBeenCalled();
+  });
+
   it("현재 구성의 수량 Enter 저장·Escape 취소와 삭제 요청을 유지한다", () => {
     const onSaveQty = vi.fn();
     const onRequestDelete = vi.fn();

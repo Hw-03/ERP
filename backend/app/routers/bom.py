@@ -21,6 +21,20 @@ from app.repositories import item_repository
 router = APIRouter()
 
 
+def _require_editable_bom_parent(db: Session, parent_item_id: uuid.UUID) -> Item:
+    """완료 상태가 아닌 BOM 부모 품목을 반환한다."""
+    parent = item_repository.get(db, parent_item_id)
+    if not parent:
+        raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
+    if parent.bom_completed_at is not None:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.CONFLICT,
+            "완료된 BOM은 완료 해제 후 수정할 수 있습니다.",
+        )
+    return parent
+
+
 @router.get("", response_model=List[BOMDetailResponse])
 def get_all_bom(db: Session = Depends(get_db)):
     """Return all BOM relationships with parent and child item names."""
@@ -70,9 +84,7 @@ def create_bom(
             "상위 품목과 하위 품목은 같을 수 없습니다.",
         )
 
-    parent = item_repository.get(db, payload.parent_item_id)
-    if not parent:
-        raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
+    parent = _require_editable_bom_parent(db, payload.parent_item_id)
 
     child = item_repository.get(db, payload.child_item_id)
     if not child:
@@ -143,6 +155,7 @@ def update_bom(
     bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
     if not bom_entry:
         raise http_error(404, ErrorCode.NOT_FOUND, "BOM 항목을 찾을 수 없습니다.")
+    _require_editable_bom_parent(db, bom_entry.parent_item_id)
 
     changed: list[str] = []
     if payload.quantity is not None and bom_entry.quantity != payload.quantity:
@@ -236,6 +249,7 @@ def delete_bom(
     bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
     if not bom_entry:
         raise http_error(404, ErrorCode.NOT_FOUND, "BOM 항목을 찾을 수 없습니다.")
+    _require_editable_bom_parent(db, bom_entry.parent_item_id)
 
     audit.record(
         db,

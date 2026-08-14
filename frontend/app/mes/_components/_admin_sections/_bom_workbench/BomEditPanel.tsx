@@ -20,6 +20,7 @@ interface Props {
   items: Item[];
   onSaveQty: (bomId: string, qty: number) => void | Promise<void>;
   onRequestDelete: (row: BOMEntry, childName: string) => void;
+  isLocked?: boolean;
 }
 
 export function BomEditPanel({
@@ -28,6 +29,7 @@ export function BomEditPanel({
   items,
   onSaveQty,
   onRequestDelete,
+  isLocked = false,
 }: Props) {
   if (!parent) {
     return (
@@ -75,6 +77,7 @@ export function BomEditPanel({
                 childItem={itemMap.get(r.child_item_id)}
                 onSaveQty={onSaveQty}
                 onRequestDelete={onRequestDelete}
+                isLocked={isLocked}
               />
             ))
           )}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
@@ -125,3 +126,61 @@ def test_bom_rejects_fractional_quantity(client, make_item):
         },
     )
     assert res.status_code == 422, res.text
+
+
+def test_bom_mutations_require_completion_to_be_cleared(client, db_session, make_item, make_bom):
+    parent = make_item(name="완료 잠금 부모", process_type_code="AF")
+    child = make_item(name="기존 자식", process_type_code="TR")
+    added_child = make_item(name="추가 자식", process_type_code="HR")
+    row = make_bom(parent.item_id, child.item_id, Decimal("1"))
+    parent.bom_completed_at = datetime.now(UTC).replace(tzinfo=None)
+    db_session.commit()
+
+    create = client.post(
+        "/api/bom",
+        headers=ADMIN_HEADERS,
+        json={
+            "parent_item_id": str(parent.item_id),
+            "child_item_id": str(added_child.item_id),
+            "quantity": "1",
+            "unit": "EA",
+        },
+    )
+    assert create.status_code == 409, create.text
+
+    update = client.patch(
+        f"/api/bom/{row.bom_id}",
+        headers=ADMIN_HEADERS,
+        json={"quantity": "2"},
+    )
+    assert update.status_code == 409, update.text
+
+    delete = client.delete(f"/api/bom/{row.bom_id}", headers=ADMIN_HEADERS)
+    assert delete.status_code == 409, delete.text
+
+    db_session.refresh(row)
+    assert row.quantity == Decimal("1")
+
+    unlocked = client.patch(
+        f"/api/items/{parent.item_id}/bom-completion",
+        headers=ADMIN_HEADERS,
+        json={"completed": False},
+    )
+    assert unlocked.status_code == 200, unlocked.text
+
+    assert client.patch(
+        f"/api/bom/{row.bom_id}",
+        headers=ADMIN_HEADERS,
+        json={"quantity": "2"},
+    ).status_code == 200
+    assert client.delete(f"/api/bom/{row.bom_id}", headers=ADMIN_HEADERS).status_code == 204
+    assert client.post(
+        "/api/bom",
+        headers=ADMIN_HEADERS,
+        json={
+            "parent_item_id": str(parent.item_id),
+            "child_item_id": str(added_child.item_id),
+            "quantity": "1",
+            "unit": "EA",
+        },
+    ).status_code == 201

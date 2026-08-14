@@ -29,9 +29,10 @@ interface Props {
   childItem: Item | undefined;
   onSaveQty: (bomId: string, qty: number) => void | Promise<void>;
   onRequestDelete: (row: BOMEntry, childName: string) => void;
+  isLocked?: boolean;
 }
 
-export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
+export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = false }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(row.quantity));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +44,18 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
     }
   }, [editing]);
 
+  useEffect(() => {
+    if (isLocked) {
+      setEditing(false);
+      setDraft(String(row.quantity));
+    }
+  }, [isLocked, row.quantity]);
+
   function commit() {
+    if (isLocked) {
+      cancel();
+      return;
+    }
     setEditing(false);
     const next = parseFloat(draft);
     if (!Number.isFinite(next) || next <= 0) {
@@ -120,9 +132,12 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
         ) : (
           <button
             type="button"
-            onClick={() => setEditing(true)}
+            disabled={isLocked}
+            onClick={() => {
+              if (!isLocked) setEditing(true);
+            }}
             {...actionTooltipProps}
-            className="h-[30px] rounded-md border px-3 py-1 text-sm font-semibold transition-colors hover:brightness-110"
+            className="h-[30px] rounded-md border px-3 py-1 text-sm font-semibold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.border,
@@ -137,9 +152,12 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
       <div className="flex justify-center">
         <button
           type="button"
-          onClick={() => onRequestDelete(row, childName)}
+          disabled={isLocked}
+          onClick={() => {
+            if (!isLocked) onRequestDelete(row, childName);
+          }}
           {...actionTooltipProps}
-          className="flex h-7 w-7 items-center justify-center rounded-md p-0 transition-colors hover:brightness-110"
+          className="flex h-7 w-7 items-center justify-center rounded-md p-0 transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             color: LEGACY_COLORS.red,
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
