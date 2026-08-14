@@ -495,16 +495,16 @@ describe("getItemActionMode", () => {
       warehouse_adjust_out: "single_only",
       defect_quarantine: "single_only",
       supplier_return: "single_only",
-      internal_use_out: "single_only",
+      internal_use_out: "bom_or_single",
     });
   });
 });
 
 // ──────────────────────────────────────────────────────────────────
-// allowsMixedBundles — 창고 입출고만 BOM·낱개 혼합 허용
+// allowsMixedBundles — 창고 입출고·사용출고만 BOM·낱개 혼합 허용
 // ──────────────────────────────────────────────────────────────────
 describe("allowsMixedBundles", () => {
-  it("창고 입출고 sub_type만 true", () => {
+  it("창고 입출고와 사용출고 sub_type만 true", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, allowsMixedBundles(s)]));
     expect(map).toEqual({
       receive_supplier: false,
@@ -519,7 +519,7 @@ describe("allowsMixedBundles", () => {
       warehouse_adjust_out: false,
       defect_quarantine: false,
       supplier_return: false,
-      internal_use_out: false,
+      internal_use_out: true,
     });
   });
 });
@@ -594,7 +594,7 @@ describe("internal_use_out 흐름", () => {
     expect(deptVisibility("internal_use_out")).toEqual({ from: false, to: true });
     expect(targetDepartmentOf("internal_use_out", "출발", "AS")).toBe("AS");
     expect(pickerDirectionLabel("internal_use_out")).toBe("사용출고");
-    expect(getItemActionMode("internal_use_out")).toBe("single_only");
+    expect(getItemActionMode("internal_use_out")).toBe("bom_or_single");
     expect(lineTagLabel(makeLine({ origin: "direct" }), "internal_use_out")).toEqual({
       text: "사용출고",
       tone: "red",

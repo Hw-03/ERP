@@ -64,6 +64,36 @@ def test_preview_internal_use_requires_warehouse_approval(db_session, make_item)
     assert result["requires_approval"] is True
 
 
+def test_preview_internal_use_expands_bom_parent(db_session, make_item, make_bom):
+    parent = make_item(name="사내 사용 BOM 부모", process_type_code="AF")
+    child = make_item(name="사내 사용 BOM 구성품", process_type_code="AR")
+    make_bom(parent.item_id, child.item_id, D("2"))
+    db_session.commit()
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[_target(parent.item_id, "3")],
+        to_department="AS",
+    )
+
+    bundle = result["bundles"][0]
+    assert bundle["source_kind"] == "bom_parent"
+    assert bundle["lines"] == [
+        {
+            **bundle["lines"][0],
+            "item_id": child.item_id,
+            "origin": "bom_auto",
+            "quantity": D("6"),
+            "direction": "out",
+            "from_bucket": "warehouse",
+            "to_bucket": "none",
+            "to_department": "AS",
+        }
+    ]
+
+
 def test_route_defect_quarantine_warehouse_source(make_item):
     route = iop._route_for_sub_type("defect_quarantine", item=make_item(),
                                     from_department="창고", to_department=None)

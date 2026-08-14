@@ -278,6 +278,71 @@ describe("IoTargetPicker row click", () => {
     expect(onAddItem).not.toHaveBeenCalled();
   });
 
+  it("replaces a selected internal-use single item with BOM", () => {
+    const onAddItem = vi.fn();
+    const onRemoveBundles = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="internal_use"
+        subType="internal_use_out"
+        bomParents={new Set(["item-1"])}
+        bundles={[makeBundle("manual")]}
+        onAddItem={onAddItem}
+        onRemoveBundles={onRemoveBundles}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const bomButton = within(row).getByRole("button", { name: "BOM" });
+
+    fireEvent.click(bomButton);
+
+    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-manual"]);
+    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }));
+  });
+
+  it("replaces a selected internal-use BOM with a single item", () => {
+    const onAddItem = vi.fn();
+    const onRemoveBundles = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="internal_use"
+        subType="internal_use_out"
+        bomParents={new Set(["item-1"])}
+        bundles={[makeBundle("bom_parent")]}
+        onAddItem={onAddItem}
+        onRemoveBundles={onRemoveBundles}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const bomButton = within(row).getByRole("button", { name: "BOM" });
+    const singleButton = within(row).getAllByRole("button").find((button) => button !== bomButton)!;
+
+    fireEvent.click(singleButton);
+
+    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-bom_parent"]);
+    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual");
+  });
+
+  it("keeps only the latest internal-use selection when both modes were already selected", () => {
+    const onRemoveBundles = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="internal_use"
+        subType="internal_use_out"
+        bomParents={new Set(["item-1"])}
+        bundles={[makeBundle("manual"), makeBundle("bom_parent")]}
+        onRemoveBundles={onRemoveBundles}
+      />,
+    );
+
+    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-manual"]);
+  });
+
   it("adds warehouse adjustment items as direct items without BOM or manual approval origin", () => {
     const onAddItem = vi.fn();
     render(

@@ -365,7 +365,7 @@ def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> No
 
 # BOM 전개 대상 세부 작업 — 결과/부품을 함께 펼친다.
 EXPAND_SUB_TYPES = frozenset(
-    {"warehouse_to_dept", "dept_to_warehouse", "dept_transfer", "produce", "disassemble"}
+    {"warehouse_to_dept", "dept_to_warehouse", "dept_transfer", "produce", "disassemble", "internal_use_out"}
 )
 # 회수되지 않은 부품 라인에 붙는 안내 문구.
 DISASSEMBLE_EXCLUSION_NOTE = "회수 안 됨"

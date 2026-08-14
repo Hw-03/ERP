@@ -149,7 +149,7 @@ export function approvalKind(
 }
 
 // BOM 강제 모드: 부서 입출고 BOM(produce/disassemble) 에서만 하위 라인 잠금 (체크/수량 편집 차단).
-// 창고 입출고(warehouse_to_dept/dept_to_warehouse) 는 묶음 선택 후 내부 자유 편집 허용.
+// 창고 입출고와 사용출고는 묶음 선택 후 내부 자유 편집을 허용한다.
 export function isBomForced(subType: IoSubType) {
   return subType === "produce" || subType === "disassemble";
 }
@@ -264,7 +264,8 @@ export function getItemActionMode(subType: IoSubType): ItemActionMode {
     subType === "warehouse_to_dept" ||
     subType === "dept_to_warehouse" ||
     subType === "produce" ||
-    subType === "disassemble"
+    subType === "disassemble" ||
+    subType === "internal_use_out"
   ) {
     return "bom_or_single";
   }
@@ -304,10 +305,10 @@ export function ioDepartmentPayload(
 }
 
 /** 한 묶음 카트 안에서 BOM 묶음과 낱개 묶음을 같이 가질 수 있는지.
- *  현재는 창고 입출고(warehouse_to_dept/dept_to_warehouse)만 true.
+ *  창고 입출고와 사용출고(internal_use_out)는 BOM·낱개 혼합 선택을 허용한다.
  *  produce/disassemble 은 BOM 강제(isBomForced) 흐름과 백엔드 분기가 달라 락 유지. */
 export function allowsMixedBundles(subType: IoSubType): boolean {
-  return subType === "warehouse_to_dept" || subType === "dept_to_warehouse";
+  return subType === "warehouse_to_dept" || subType === "dept_to_warehouse" || subType === "internal_use_out";
 }
 
 export type LineTagTone = "green" | "red" | "blue" | "purple" | "muted";

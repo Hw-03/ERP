@@ -454,6 +454,23 @@ export function IoTargetPicker({
   );
 }
 
+function internalUseConflictingBundleIds(bundles: IoBundle[]): string[] {
+  const latestModeByItem = new Map<string, "bom" | "single">();
+  for (const bundle of bundles) {
+    if (!bundle.source_item_id) continue;
+    latestModeByItem.set(bundle.source_item_id, bundle.source_kind === "bom_parent" ? "bom" : "single");
+  }
+
+  return bundles
+    .filter((bundle) => {
+      if (!bundle.source_item_id) return false;
+      const latestMode = latestModeByItem.get(bundle.source_item_id);
+      const mode = bundle.source_kind === "bom_parent" ? "bom" : "single";
+      return latestMode != null && mode !== latestMode;
+    })
+    .map((bundle) => bundle.bundle_id);
+}
+
 function ItemTable({
   items,
   displayLimit,
@@ -500,6 +517,16 @@ function ItemTable({
   const isProcess = workType === "process" && deptIoDirection != null;
   const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
   const singleTarget = isProcess ? deptIoSubType(deptIoDirection!, "single") : null;
+  const internalUseConflictBundleIds = useMemo(
+    () => (subType === "internal_use_out" ? internalUseConflictingBundleIds(bundles) : []),
+    [bundles, subType],
+  );
+
+  // 이전 동작으로 같은 품목의 BOM·낱개가 함께 담긴 초안은 마지막 선택만 남긴다.
+  useEffect(() => {
+    if (internalUseConflictBundleIds.length > 0) onRemove(internalUseConflictBundleIds);
+  }, [internalUseConflictBundleIds, onRemove]);
+
   return (
     <>
       <table className="w-full border-collapse text-sm">
@@ -510,7 +537,7 @@ function ItemTable({
           <col className="w-0 lg:w-[14%]" />
           <col className="w-0 lg:w-[14%]" />
           <col className="w-0 lg:w-[8%]" />
-          <col className="w-auto lg:w-[13%]" />
+          <col style={{ width: 128 }} />
         </colgroup>
         <thead className="sticky top-0 z-10">
           <tr
@@ -761,7 +788,9 @@ function ItemTable({
                       );
                     })() : mode === "bom_or_single" ? (() => {
                       const hasBom = bomParents.has(item.item_id);
-                      // 창고 입출고(allowMix)는 BOM·낱개 혼합 허용 — 새 결재 정책상 한 요청에서 같이 처리.
+                      const isInternalUse = subType === "internal_use_out";
+                      // 창고 입출고·사용출고(allowMix)는 서로 다른 품목의 BOM·낱개 혼합을 허용한다.
+                      // 사용출고는 같은 품목에서만 마지막 선택 방식으로 교체한다.
                       // 그 외(produce/disassemble)는 종전대로 한쪽만 활성 — BOM 강제와 흐름 분기가 달라 락 유지.
                       const bomLockedByMode = !allowMix && hasSingleBundle;
                       const singleLockedByMode = !allowMix && hasBomBundle;
@@ -783,8 +812,12 @@ function ItemTable({
                               aria-pressed={isBomSelected}
                               disabled={bomDisabled}
                               onClick={() => {
-                                if (isBomSelected) onRemove(bomBundleIds);
-                                else onAdd(item);
+                                if (isBomSelected) {
+                                  onRemove(isInternalUse && isSingleSelected ? singleBundleIds : bomBundleIds);
+                                } else {
+                                  if (isInternalUse && isSingleSelected) onRemove(singleBundleIds);
+                                  onAdd(item);
+                                }
                               }}
                               className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
                               style={actionButtonStyle(isBomSelected, bomDisabled, true)}
@@ -798,8 +831,12 @@ function ItemTable({
                               aria-pressed={isSingleSelected}
                               disabled={singleDisabled}
                               onClick={() => {
-                                if (isSingleSelected) onRemove(singleBundleIds);
-                                else onAdd(item, "manual");
+                                if (isSingleSelected) {
+                                  onRemove(isInternalUse && isBomSelected ? bomBundleIds : singleBundleIds);
+                                } else {
+                                  if (isInternalUse && isBomSelected) onRemove(bomBundleIds);
+                                  onAdd(item, "manual");
+                                }
                               }}
                               className="inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
                               style={actionButtonStyle(isSingleSelected, singleDisabled, false)}

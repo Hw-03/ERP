@@ -60,4 +60,11 @@ describe("IoTargetPicker responsive layout", () => {
     expect(table!.innerHTML).not.toContain("sm:");
     expect(table!.innerHTML).toContain("lg:");
   });
+
+  it("keeps the add action column wide enough for BOM and single-item actions", () => {
+    const { container } = render(<IoTargetPicker {...baseProps} />);
+    const columns = container.querySelectorAll("table col");
+
+    expect(columns[4]).toHaveStyle({ width: "128px" });
+  });
 });
