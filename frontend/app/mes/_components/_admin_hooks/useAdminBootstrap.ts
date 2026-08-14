@@ -85,7 +85,7 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
         if (requestId === allBomRequestId.current) setAllBomRows(rows);
       })
       .catch(() => {
-        if (requestId === allBomRequestId.current) setAllBomRows([]);
+        // Keep the last successful BOM snapshot when a realtime refresh fails.
       });
   }, []);
 

@@ -105,7 +105,10 @@ export function HistoryBatchDetailPanel({
       setState({ status: "available", batch: hit });
       return;
     }
-    setState({ status: "loading" });
+    const background = Boolean(hit);
+    if (!background) {
+      setState({ status: "loading" });
+    }
     let cancelled = false;
     const controller = new AbortController();
     void ioApi.getBatch(operationBatchId, { signal: controller.signal })
@@ -122,7 +125,9 @@ export function HistoryBatchDetailPanel({
       })
       .catch((err: unknown) => {
         if (cancelled || (err as Error)?.name === "AbortError") return;
-        setState({ status: "unavailable" });
+        if (!background) {
+          setState({ status: "unavailable" });
+        }
       });
     return () => {
       cancelled = true;

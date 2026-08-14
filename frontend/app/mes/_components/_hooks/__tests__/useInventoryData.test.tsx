@@ -7,7 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useInventoryData } from "../useInventoryData";
@@ -136,5 +136,27 @@ describe("useInventoryData", () => {
         client.getQueryData(queryKeys.items.list({ limit: 2000, search: undefined })),
       ).toEqual(updated),
     );
+  });
+
+  it("백그라운드 재조회가 실패해도 기존 재고와 전면 오류 상태를 유지한다", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(sampleItems))
+      .mockRejectedValueOnce(new Error("refresh failed"));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient();
+    const { result } = renderHook(
+      () => useInventoryData({ globalSearch: "", onStatusChange: vi.fn() }),
+      { wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadItems();
+    });
+
+    expect(result.current.items).toEqual(sampleItems);
+    expect(result.current.error).toBeNull();
+    await waitFor(() => expect(result.current.refreshError).toBeTruthy());
   });
 });

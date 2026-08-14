@@ -10,6 +10,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { queryKeys } from "@/lib/queries/keys";
 import { useShippingHistoryQuery, useShippingRequestsQuery } from "@/lib/queries/useShippingQuery";
 import { ExpandableItemName } from "../../_warehouse_v2/ExpandableItemName";
+import { LoadFailureCard } from "../../common/LoadFailureCard";
 
 type MobileShippingTab = "requests" | "prep" | "history";
 
@@ -119,11 +120,16 @@ export function MobileShippingScreen() {
     }
   }
 
-  const loading = requestsQuery.isLoading
-    || (requestsQuery.isPlaceholderData && requestsQuery.isFetching)
-    || (tab === "history" && (historyQuery.isLoading || (historyQuery.isPlaceholderData && historyQuery.isFetching)));
+  const activeQuery = tab === "history" ? historyQuery : requestsQuery;
+  const loading = activeQuery.isLoading;
   const queryError = tab === "history" ? historyQuery.error : requestsQuery.error;
   const error = queryError instanceof Error ? queryError.message : queryError ? "출하 데이터를 불러오지 못했습니다." : null;
+  const hasActiveData = activeQuery.data !== undefined;
+  const initialError = hasActiveData ? null : error;
+  const refreshError = hasActiveData ? error : null;
+  const retryRefresh = () => {
+    void activeQuery.refetch();
+  };
 
   return (
     <div className="mw0 scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
@@ -148,9 +154,17 @@ export function MobileShippingScreen() {
       </div>
 
       {loading && <InlineState title="로딩 중" body="출하 데이터를 불러오고 있습니다." />}
-      {error && <InlineState title="오류" body={error} tone={LEGACY_COLORS.red} />}
+      {initialError && <InlineState title="오류" body={initialError} tone={LEGACY_COLORS.red} />}
+      {refreshError && (
+        <LoadFailureCard
+          message={refreshError}
+          prefix="최신 출하 내역을 동기화하지 못했습니다"
+          retryLabel="다시 동기화"
+          onRetry={retryRefresh}
+        />
+      )}
 
-      {!loading && !error && tab === "requests" && (
+      {!loading && !initialError && tab === "requests" && (
         <div className="mw0 grid gap-2">
           {activeRequests.length === 0 ? (
             <InlineState title="요청 없음" body="PC에서 새 출하 요청을 만들 수 있습니다." />
@@ -160,7 +174,7 @@ export function MobileShippingScreen() {
         </div>
       )}
 
-      {!loading && !error && tab === "prep" && (
+      {!loading && !initialError && tab === "prep" && (
         <div className="mw0 grid gap-2">
           {prepRequests.length === 0 ? (
             <InlineState title="준비 중 없음" body="PC에서 요청을 준비 중으로 넘기면 표시됩니다." />
@@ -179,7 +193,7 @@ export function MobileShippingScreen() {
         </div>
       )}
 
-      {!loading && !error && tab === "history" && (
+      {!loading && !initialError && tab === "history" && (
         <div className="mw0 grid gap-2">
           {history.length === 0 ? (
             <InlineState title="이력 없음" body="픽업 완료된 출하가 아직 없습니다." />

@@ -32,6 +32,8 @@ export interface UseHistoryDataResult {
   loading: boolean;
   error: string | null;
   retry: () => void;
+  refreshError: string | null;
+  retryRefresh: () => void;
   loadingMore: boolean;
   loadMoreError: string | null;
   canLoadMore: boolean;
@@ -131,6 +133,9 @@ export function useHistoryData({
   const [error, setError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const retryQueryKeyRef = useRef<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshRetryNonce, setRefreshRetryNonce] = useState(0);
+  const refreshRetryQueryKeyRef = useRef<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
@@ -138,6 +143,7 @@ export function useHistoryData({
   const isFirstRunRef = useRef(true);
   const generationRef = useRef(0);
   const realtimeRevisionRef = useRef(realtimeRevision);
+  const hasSuccessfulLoadRef = useRef(initialCached !== undefined);
   const loadedPageCountRef = useRef(1);
   const loadedTailLogIdRef = useRef(initialCached?.at(-1)?.log_id ?? null);
 
@@ -149,9 +155,14 @@ export function useHistoryData({
     loadingRef.current = true;
     const isRetry = retryQueryKeyRef.current === queryKey;
     retryQueryKeyRef.current = null;
+    const isRefreshRetry = refreshRetryQueryKeyRef.current === queryKey;
+    refreshRetryQueryKeyRef.current = null;
     const queryChanged = queryKeyRef.current !== queryKey;
+    if (queryChanged) hasSuccessfulLoadRef.current = false;
     const revisionChanged = realtimeRevisionRef.current !== realtimeRevision;
-    const shouldRefreshLoadedDepth = revisionChanged && !queryChanged;
+    const shouldRefreshLoadedDepth = (revisionChanged || isRefreshRetry)
+      && !queryChanged
+      && hasSuccessfulLoadRef.current;
     const pagesToRefresh = shouldRefreshLoadedDepth ? loadedPageCountRef.current : 1;
     const refreshAnchorLogId = shouldRefreshLoadedDepth ? loadedTailLogIdRef.current : null;
     queryKeyRef.current = queryKey;
@@ -162,9 +173,12 @@ export function useHistoryData({
     // 첫 실행(마운트)이고 위 lazy init 에서 이미 캐시를 반영했다면 logs/loading
     // 을 다시 초기화하지 않는다 — 화면은 그대로 두고 아래에서 백그라운드
     // 재검증(staleTime 경과 시)만 한다.
-    const skipReset = isRetry || (isFirstRunRef.current && initialCached !== undefined);
+    const skipReset = isRetry
+      || shouldRefreshLoadedDepth
+      || (isFirstRunRef.current && initialCached !== undefined);
     isFirstRunRef.current = false;
     setError(null);
+    setRefreshError(null);
     loadingMoreRef.current = false;
     setLoadingMore(false);
     setLoadMoreError(null);
@@ -183,7 +197,7 @@ export function useHistoryData({
         const pageQueryKey = pageIndex === 0
           ? exactQueryKey
           : queryKeys.transactions.list(pageQueryParams);
-        if (revisionChanged) {
+        if (revisionChanged || isRefreshRetry) {
           await queryClient.cancelQueries({ queryKey: pageQueryKey, exact: true });
           await queryClient.invalidateQueries({ queryKey: pageQueryKey, exact: true, refetchType: "none" });
         }
@@ -208,22 +222,26 @@ export function useHistoryData({
         loadedPageCountRef.current = Math.max(1, pages.length);
         loadedTailLogIdRef.current = data.at(-1)?.log_id ?? null;
         realtimeRevisionRef.current = realtimeRevision;
+        hasSuccessfulLoadRef.current = true;
         setLogs(data);
         setLastBatchSize(lastPage.length);
         setError(null);
+        setRefreshError(null);
         setLoadMoreError(null);
         loadingRef.current = false;
         setLoading(false);
       })
       .catch((caught: unknown) => {
         if (generationRef.current !== generation || queryKeyRef.current !== myKey) return;
-        setError(historyLoadError(caught, "입출고 내역을 불러오지 못했습니다."));
+        const message = historyLoadError(caught, "입출고 내역을 불러오지 못했습니다.");
+        if (shouldRefreshLoadedDepth) setRefreshError(message);
+        else setError(message);
         loadingRef.current = false;
         setLoading(false);
       });
     // primitive 분해된 query string 으로 비교하므로 안전.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, queryClient, retryNonce, realtimeRevision]);
+  }, [queryKey, queryClient, retryNonce, refreshRetryNonce, realtimeRevision]);
 
   const retry = useCallback(() => {
     retryQueryKeyRef.current = queryKey;
@@ -231,6 +249,13 @@ export function useHistoryData({
     loadingRef.current = true;
     setLoading(true);
     setRetryNonce((value) => value + 1);
+  }, [queryKey]);
+
+  const retryRefresh = useCallback(() => {
+    refreshRetryQueryKeyRef.current = queryKey;
+    setRefreshError(null);
+    loadingRef.current = true;
+    setRefreshRetryNonce((value) => value + 1);
   }, [queryKey]);
 
   const loadMore = useCallback(async () => {
@@ -270,5 +295,17 @@ export function useHistoryData({
 
   const canLoadMore = !loading && getCanLoadMore({ loadedCount: logs.length, totalCount, lastBatchSize });
 
-  return { logs, setLogs, loading, error, retry, loadingMore, loadMoreError, canLoadMore, loadMore };
+  return {
+    logs,
+    setLogs,
+    loading,
+    error,
+    retry,
+    refreshError,
+    retryRefresh,
+    loadingMore,
+    loadMoreError,
+    canLoadMore,
+    loadMore,
+  };
 }

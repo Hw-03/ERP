@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
@@ -21,6 +21,7 @@ import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { tint } from "@/lib/mes/colorUtils";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { LoadFailureCard } from "../common/LoadFailureCard";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -51,6 +52,9 @@ export function DefectHubPanel({
   const [locations, setLocations] = useState<DefectLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
+  const requestGenerationRef = useRef(0);
 
   // defectDeptFilter prop 이 있으면 내 부서 필터로 초기 설정,
   // 없으면 생산 라인이면 "my", 아니면 "all"
@@ -85,31 +89,42 @@ export function DefectHubPanel({
 
   // 마운트 시 KPI + 목록 동시 로드 (처리 완료 후 reloadNonce 증가 시 재로드)
   useEffect(() => {
-    let cancelled = false;
+    const generation = ++requestGenerationRef.current;
+    const background = hasLoadedRef.current;
 
     async function load() {
-      setLoading(true);
-      setError(null);
+      if (background) {
+        setRefreshError(null);
+      } else {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const [kpiData, locData] = await Promise.all([
           defectsApi.getDefectKpi(),
           defectsApi.listDefects(),
         ]);
-        if (!cancelled) {
+        if (generation === requestGenerationRef.current) {
+          hasLoadedRef.current = true;
           setKpi(kpiData);
           setLocations(locData);
+          setRefreshError(null);
         }
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "불량 데이터 로드에 실패했습니다.");
+        if (generation === requestGenerationRef.current) {
+          const message = err instanceof Error ? err.message : "불량 데이터 로드에 실패했습니다.";
+          if (background) setRefreshError(message);
+          else setError(message);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (generation === requestGenerationRef.current && !background) setLoading(false);
       }
     }
 
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      if (generation === requestGenerationRef.current) requestGenerationRef.current += 1;
+    };
   }, [reloadNonce, realtimeRevision]);
 
   // scope/defectDeptFilter 에 따른 목록 필터
@@ -261,6 +276,14 @@ export function DefectHubPanel({
       )}
 
       {/* 목록 */}
+      {refreshError && (
+        <LoadFailureCard
+          prefix="최신 불량 격리 목록을 동기화하지 못했습니다"
+          message={refreshError}
+          retryLabel="다시 동기화"
+          onRetry={() => setReloadNonce((value) => value + 1)}
+        />
+      )}
       {loading ? (
         <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
           불량 데이터 로딩 중...

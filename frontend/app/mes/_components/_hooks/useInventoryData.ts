@@ -32,6 +32,7 @@ export interface UseInventoryDataResult {
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
   loading: boolean;
   error: string | null;
+  refreshError: string | null;
   loadItems: () => Promise<void>;
 }
 
@@ -75,5 +76,13 @@ export function useInventoryData(opts: UseInventoryDataOptions): UseInventoryDat
       : "재고 데이터를 불러오지 못했습니다."
     : null;
 
-  return { items, setItems, loading: query.isLoading, error, loadItems };
+  const refreshError = query.data !== undefined ? error : null;
+  return {
+    items,
+    setItems,
+    loading: query.isLoading,
+    error: query.data === undefined ? error : null,
+    refreshError,
+    loadItems,
+  };
 }

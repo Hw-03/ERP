@@ -12,6 +12,14 @@ const realtimeState = vi.hoisted(() => ({
   revision: 1 as number | null,
 }));
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 vi.mock("@/lib/queries/realtime", () => ({
   useRealtimeRevision: () => realtimeState.revision,
 }));
@@ -168,6 +176,29 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it("keeps loaded edit history visible while a realtime refresh is pending", async () => {
+    const existingEdit = { edit_id: "existing", original_log_id: "same-log", edited_by_employee_id: "e1", edited_by_name: "Existing editor", reason: "existing", before_payload: "{}", after_payload: "{}", correction_log_id: null, created_at: "2026-08-04T00:00:00Z" };
+    const refresh = deferred<TransactionEditLog[]>();
+    vi.mocked(api.getTransactionEdits)
+      .mockResolvedValueOnce([existingEdit])
+      .mockReturnValueOnce(refresh.promise);
+    const selected = makeLog({ log_id: "same-log", operation_batch_id: null, edit_count: undefined });
+    const { rerender } = render(
+      <HistoryDetailPanel panelOpen selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} variant="desktop" />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /\uC218\uC815 \uC774\uB825.*1/ }));
+    expect(screen.getByText("Existing editor")).toBeInTheDocument();
+
+    realtimeState.revision = 2;
+    rerender(
+      <HistoryDetailPanel panelOpen selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} variant="desktop" />,
+    );
+
+    await waitFor(() => expect(api.getTransactionEdits).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Existing editor")).toBeInTheDocument();
+    await act(async () => refresh.resolve([existingEdit]));
+  });
+
   it("re-fetches the selected log edits on a realtime revision and ignores the aborted response", async () => {
     let firstSignal: AbortSignal | undefined;
     let resolveFirst: (edits: TransactionEditLog[]) => void = () => {};

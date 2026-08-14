@@ -58,7 +58,7 @@ export function DesktopInventoryView({
       ),
     [],
   );
-  const { items, setItems, loading, error, loadItems } = useInventoryData({
+  const { items, setItems, loading, error, refreshError, loadItems } = useInventoryData({
     globalSearch,
     onStatusChange,
     onSelectedSync,
@@ -202,6 +202,7 @@ export function DesktopInventoryView({
             />
             <InventoryItemsTable
               error={error}
+              refreshError={refreshError}
               loading={loading}
               filteredItems={filteredItems}
               displayLimit={displayLimit}

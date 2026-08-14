@@ -87,6 +87,7 @@ export function DesktopHistoryView() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const calendarLoadedKeyRef = useRef<string | null>(null);
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
@@ -149,6 +150,8 @@ export function DesktopHistoryView() {
     loading,
     error: historyError,
     retry,
+    refreshError,
+    retryRefresh,
     loadingMore,
     loadMoreError,
     canLoadMore,
@@ -166,7 +169,9 @@ export function DesktopHistoryView() {
   useEffect(() => {
     if (!calendarOpen) return;
 
-    setCalendarLoading(true);
+    const calendarKey = `${calendarYear}-${calendarMonth}`;
+    const background = calendarLoadedKeyRef.current === calendarKey;
+    if (!background) setCalendarLoading(true);
     const firstDay = new Date(calendarYear, calendarMonth, 1);
     const lastDay = new Date(calendarYear, calendarMonth + 1, 0);
     const ymd = (d: Date) =>
@@ -186,21 +191,18 @@ export function DesktopHistoryView() {
       )
       .then((data) => {
         if (!active) return;
+        calendarLoadedKeyRef.current = calendarKey;
         setCalendarLogs(data);
-        setCalendarLoading(false);
+        if (!background) setCalendarLoading(false);
       })
       .catch((err) => {
-        if (active && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
+        if (active && !background && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
       });
     return () => {
       active = false;
       ctrl.abort();
     };
   }, [calendarOpen, calendarYear, calendarMonth, realtimeRevision]);
-
-  useEffect(() => {
-    if (realtimeRevision !== null) setBatchCache(new Map());
-  }, [realtimeRevision, setBatchCache]);
 
   function prevMonth() {
     if (calendarMonth === 0) {
@@ -557,6 +559,8 @@ export function DesktopHistoryView() {
             loading={loading}
             error={historyError}
             onRetry={retryHistoryResults}
+            refreshError={refreshError}
+            onRetryRefresh={retryRefresh}
             filteredLogs={logs}
             displayGroups={displayGroups}
             selection={selection}

@@ -65,7 +65,11 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const background = revisionChanged && batch?.batch_id === batchId;
+    if (!background) {
+      setBatch(null);
+      setLoading(true);
+    }
     let cancelled = false;
     const controller = new AbortController();
     void ioApi
@@ -77,10 +81,10 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
       })
       .catch((err: unknown) => {
         if (cancelled || (err as Error)?.name === "AbortError") return;
-        setBatch(null);
+        if (!background) setBatch(null);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !background) setLoading(false);
       });
     return () => {
       cancelled = true;

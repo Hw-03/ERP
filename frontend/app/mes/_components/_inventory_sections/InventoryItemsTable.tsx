@@ -14,6 +14,7 @@ const PAGE_SIZE = 100;
 
 type Props = {
   error: string | null;
+  refreshError?: string | null;
   loading: boolean;
   filteredItems: Item[];
   displayLimit: number;
@@ -30,6 +31,7 @@ type Props = {
 
 export function InventoryItemsTable({
   error,
+  refreshError,
   loading,
   filteredItems,
   displayLimit,
@@ -85,7 +87,16 @@ export function InventoryItemsTable({
   }
   if (filteredItems.length === 0) {
     return (
-      <EmptyState
+      <div className="space-y-3">
+        {refreshError && (
+          <LoadFailureCard
+            message={refreshError}
+            prefix="최신 재고 목록 동기화 실패"
+            retryLabel="다시 동기화"
+            onRetry={onRetry}
+          />
+        )}
+        <EmptyState
         variant={activeFilterCount > 0 || hasKpiFilter ? "filtered-out" : "no-search-result"}
         icon={<PackageSearch className="h-8 w-8" />}
         title="검색 결과가 없습니다."
@@ -95,11 +106,22 @@ export function InventoryItemsTable({
             ? { label: "필터 초기화", onClick: onResetAllFilters }
             : undefined
         }
-      />
+        />
+      </div>
     );
   }
   return (
     <>
+      {refreshError && (
+        <div className="mb-3">
+          <LoadFailureCard
+            message={refreshError}
+            prefix="최신 재고 목록 동기화 실패"
+            retryLabel="다시 동기화"
+            onRetry={onRetry}
+          />
+        </div>
+      )}
       <div className="overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead className="sticky top-0 z-10">

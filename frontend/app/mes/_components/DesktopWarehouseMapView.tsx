@@ -9,6 +9,7 @@ import { QuantityInput } from "./common/QuantityInput";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 import { SlidePanel } from "./common/SlidePanel";
 import { LoadingSkeleton } from "./common/LoadingSkeleton";
+import { LoadFailureCard } from "./common/LoadFailureCard";
 import {
   warehouseMapApi,
   type BoxSize,
@@ -1012,11 +1013,21 @@ export function DesktopWarehouseMapView({
 
         {/* Stage */}
         <div style={{ flex: 1, minWidth: 0, position: "relative", overflow: "hidden", minHeight: 0, display: "flex" }}>
+          {error && map && (
+            <div className="absolute left-4 right-4 top-4 z-30">
+              <LoadFailureCard
+                message={error}
+                prefix="지도 동기화 실패"
+                retryLabel="다시 동기화"
+                onRetry={() => void mapQuery.refetch()}
+              />
+            </div>
+          )}
           {loading ? (
             <div style={{ flex: 1, padding: 24 }}>
               <LoadingSkeleton variant="card" rows={6} />
             </div>
-          ) : error ? (
+          ) : error && !map ? (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: LEGACY_COLORS.red, fontSize: 14 }}>
               {error}
             </div>

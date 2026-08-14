@@ -24,22 +24,26 @@ import { MovementSummaryCell, buildGroups } from "../../_history_sections/histor
 export function MobileHistoryList({
   loading,
   error,
+  refreshError,
   filteredLogs,
   selectedKey,
   onSelectLog,
   onSelectBatch,
   onRetry,
+  onRetryRefresh,
   canLoadMore,
   loadingMore,
   onLoadMore,
 }: {
   loading: boolean;
   error: string | null;
+  refreshError?: string | null;
   filteredLogs: TransactionLog[];
   selectedKey: string | null;
   onSelectLog: (log: TransactionLog) => void;
   onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
   onRetry: () => void;
+  onRetryRefresh?: () => void;
   canLoadMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -63,7 +67,7 @@ export function MobileHistoryList({
       </div>
     );
   }
-  if (filteredLogs.length === 0) {
+  if (filteredLogs.length === 0 && !refreshError) {
     return (
       <div className="py-10">
         <EmptyState variant="no-data" />
@@ -75,6 +79,15 @@ export function MobileHistoryList({
 
   return (
     <div className="flex flex-col gap-2 pb-4">
+      {refreshError && (
+        <LoadFailureCard
+          message={refreshError}
+          onRetry={onRetryRefresh}
+          retryLabel="다시 동기화"
+          prefix="최신 입출고 내역을 동기화하지 못했습니다"
+        />
+      )}
+
       {groups.map((g) => {
         if (g.type === "solo") {
           const log = g.log;

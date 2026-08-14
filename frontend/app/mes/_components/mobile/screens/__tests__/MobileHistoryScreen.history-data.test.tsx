@@ -246,6 +246,35 @@ describe("MobileHistoryScreen history data states", () => {
     expect(testState.historyArgs.at(-1)).toMatchObject({ realtimeRevision: 2 });
   });
 
+  it("keeps the current KPI visible while the same-condition realtime refresh is pending", async () => {
+    const nextSummary = deferred<TransactionSummary>();
+    testState.getTransactionsSummary.mockImplementation((params: SummaryParams) => {
+      if (!isCurrentSummary(params)) return Promise.resolve(makeSummary(90));
+      return testState.realtimeRevision === 2 ? nextSummary.promise : Promise.resolve(makeSummary(37));
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <MobileHistoryScreen />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("history-kpi")).toHaveTextContent("37"));
+
+    testState.realtimeRevision = 2;
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MobileHistoryScreen />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(testState.getTransactionsSummary).toHaveBeenCalledTimes(4));
+
+    expect(screen.getByTestId("history-kpi")).toHaveTextContent("37");
+    expect(screen.getByTestId("history-kpi")).toHaveAttribute("data-loading", "no");
+
+    await act(async () => nextSummary.resolve(makeSummary(38)));
+    await waitFor(() => expect(screen.getByTestId("history-kpi")).toHaveTextContent("38"));
+  });
+
   it("wires the initial transaction error and retry action to the mobile list", async () => {
     const retry = vi.fn();
     testState.historyResult = {

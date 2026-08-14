@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoLine } from "@/lib/api/types/io";
@@ -97,6 +97,14 @@ function makeBatch(): IoBatch {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 function makeDuplicateManualBatch(): IoBatch {
   const batch = makeBatch();
   const makeBundle = (bundleId: string, lineId: string) => ({
@@ -168,7 +176,8 @@ describe("BomBatchDetail", () => {
     freshBatch.bundles[0].title = "Fresh BOM Bundle";
     freshBatch.bundles[0].lines[1].item_name = "Fresh BOM Child";
     const onCached = vi.fn();
-    vi.mocked(ioApi.getBatch).mockResolvedValue(freshBatch);
+    const refresh = deferred<IoBatch>();
+    vi.mocked(ioApi.getBatch).mockReturnValue(refresh.promise);
     const cache = new Map([[staleBatch.batch_id, staleBatch]]);
     const { rerender } = render(
       <table>
@@ -191,6 +200,11 @@ describe("BomBatchDetail", () => {
     );
 
     await waitFor(() => expect(ioApi.getBatch).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("Stale BOM Bundle")).toBeInTheDocument();
+    expect(screen.getByText("Stale BOM Child")).toBeInTheDocument();
+    expect(screen.queryByText("작업 묶음 상세 불러오는 중...")).not.toBeInTheDocument();
+
+    await act(async () => refresh.resolve(freshBatch));
     await waitFor(() => expect(screen.getByText("Fresh BOM Bundle")).toBeInTheDocument());
     expect(onCached).toHaveBeenCalledWith(staleBatch.batch_id, freshBatch);
     expect(screen.getByText("Fresh BOM Child")).toBeInTheDocument();

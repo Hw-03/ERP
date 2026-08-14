@@ -84,6 +84,8 @@ export function BomWorkbench({
   const [mode, setMode] = useState<Mode>("edit");
   const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
   const [whereUsedRows, setWhereUsedRows] = useState<BOMDetailEntry[]>([]);
+  const bomRowsParentRef = useRef<string | null>(null);
+  const whereUsedParentRef = useRef<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
@@ -161,14 +163,20 @@ export function BomWorkbench({
   // 선택된 부모의 직계 자식
   useEffect(() => {
     if (!parentId) {
+      bomRowsParentRef.current = null;
       setBomRows([]);
       return;
     }
+    if (bomRowsParentRef.current !== parentId) setBomRows([]);
     let alive = true;
     api
       .getBOM(parentId)
-      .then((rows) => alive && setBomRows(rows))
-      .catch(() => alive && setBomRows([]));
+      .then((rows) => {
+        if (!alive) return;
+        bomRowsParentRef.current = parentId;
+        setBomRows(rows);
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -177,14 +185,20 @@ export function BomWorkbench({
   // 선택된 품목의 역참조 (사용처 모드)
   useEffect(() => {
     if (!parentId) {
+      whereUsedParentRef.current = null;
       setWhereUsedRows([]);
       return;
     }
+    if (whereUsedParentRef.current !== parentId) setWhereUsedRows([]);
     let alive = true;
     api
       .getBOMWhereUsed(parentId)
-      .then((rows) => alive && setWhereUsedRows(rows))
-      .catch(() => alive && setWhereUsedRows([]));
+      .then((rows) => {
+        if (!alive) return;
+        whereUsedParentRef.current = parentId;
+        setWhereUsedRows(rows);
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };

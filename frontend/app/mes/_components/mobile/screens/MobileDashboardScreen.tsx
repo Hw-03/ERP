@@ -63,7 +63,7 @@ export function MobileDashboardScreen({
       ),
     [],
   );
-  const { items, loading, error, loadItems } = useInventoryData({
+  const { items, loading, error, refreshError, loadItems } = useInventoryData({
     globalSearch,
     onStatusChange,
     onSelectedSync,
@@ -305,6 +305,7 @@ export function MobileDashboardScreen({
           <section>
             <InventoryItemsTable
               error={error}
+              refreshError={refreshError}
               loading={loading || filterChanging}
               filteredItems={filteredItems}
               displayLimit={displayLimit}

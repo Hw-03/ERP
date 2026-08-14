@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronRight, Eye, ImageOff } from "lucide-react";
 import { api, type Item, type StockRequestReservationLine } from "@/lib/api";
@@ -50,6 +50,7 @@ export function InventoryDetailPanel({
   const revision = useRealtimeRevision();
   const getDeptColor = useDeptColorLookup();
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
+  const reservationsItemRef = useRef<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [bomModalOpen, setBomModalOpen] = useState(false);
   const [mobileBomOpen, setMobileBomOpen] = useState(false);
@@ -69,17 +70,24 @@ export function InventoryDetailPanel({
 
   useEffect(() => {
     let cancelled = false;
+    if (reservationsItemRef.current !== item.item_id) {
+      setReservations([]);
+    }
     if (pendingQty <= 0) {
+      reservationsItemRef.current = item.item_id;
       setReservations([]);
       return;
     }
     api
       .getItemReservations(item.item_id)
       .then((rows) => {
-        if (!cancelled) setReservations(rows);
+        if (!cancelled) {
+          reservationsItemRef.current = item.item_id;
+          setReservations(rows);
+        }
       })
       .catch(() => {
-        if (!cancelled) setReservations([]);
+        // Preserve the last successful reservation snapshot on refresh failure.
       });
     return () => {
       cancelled = true;

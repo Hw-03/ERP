@@ -122,6 +122,68 @@ describe("useHistoryData", () => {
     expect(result.current.logs).toEqual(refreshedPage);
   });
 
+  it("keeps visible rows while a same-query realtime refresh is pending", async () => {
+    const refreshRequest = deferred<Response>();
+    const initialRows = page2;
+    const refreshedPage = initialRows.map((log, index) => ({ ...log, log_id: `R${index}` }));
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(initialRows))
+      .mockReturnValueOnce(refreshRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient({ staleTime: 30_000 });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useHistoryData({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.logs).toEqual(initialRows);
+    expect(result.current.refreshError).toBeNull();
+
+    await act(async () => refreshRequest.resolve(makeResponse(refreshedPage)));
+    await waitFor(() => expect(result.current.logs).toEqual(refreshedPage));
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("keeps visible rows and retries a failed realtime refresh without showing the skeleton", async () => {
+    const retryRequest = deferred<Response>();
+    const initialRows = page2;
+    const refreshedPage = initialRows.map((log, index) => ({ ...log, log_id: `S${index}` }));
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(initialRows))
+      .mockResolvedValueOnce(makeResponse({ detail: "동기화 실패" }, false))
+      .mockReturnValueOnce(retryRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient({ staleTime: 30_000 });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useHistoryData({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(result.current.refreshError).toContain("동기화 실패"));
+    expect(result.current.error).toBeNull();
+    expect(result.current.logs).toEqual(initialRows);
+
+    act(() => result.current.retryRefresh());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.logs).toEqual(initialRows);
+    expect(result.current.refreshError).toBeNull();
+
+    await act(async () => retryRequest.resolve(makeResponse(refreshedPage)));
+    await waitFor(() => expect(result.current.logs).toEqual(refreshedPage));
+    expect(result.current.refreshError).toBeNull();
+  });
+
   it("revalidates every loaded page on a realtime revision", async () => {
     const insertedPage = page1.map((log, index) => ({ ...log, log_id: `N${index}` }));
     const refreshedPage1 = page1.map((log) => ({ ...log, item_name: "refreshed" }));
@@ -145,10 +207,11 @@ describe("useHistoryData", () => {
 
     rerender({ realtimeRevision: 2 });
 
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(fetchSpy).toHaveBeenCalledTimes(5);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(5));
     expect(String(fetchSpy.mock.calls[4][0])).toContain("skip=200");
-    expect(result.current.logs).toEqual([...insertedPage, ...refreshedPage1, ...refreshedPage2]);
+    await waitFor(() => {
+      expect(result.current.logs).toEqual([...insertedPage, ...refreshedPage1, ...refreshedPage2]);
+    });
   });
 
   it("keeps query generations distinct when field values contain the old delimiter", async () => {
@@ -295,6 +358,33 @@ describe("useHistoryData", () => {
     expect(result.current.canLoadMore).toBe(false);
 
     await act(async () => resolveChangedQuery(makeResponse(page2)));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+  });
+
+  it("uses foreground loading when a realtime revision follows a failed query change", async () => {
+    const revisionRequest = deferred<Response>();
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(page2))
+      .mockResolvedValueOnce(makeResponse({ detail: "필터 조회 실패" }, false))
+      .mockReturnValueOnce(revisionRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient();
+    const { result, rerender } = renderHook(
+      ({ department, realtimeRevision }) => useHistoryData({ ...baseArgs, department, realtimeRevision }),
+      { initialProps: { department: "", realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ department: "assembly", realtimeRevision: 1 });
+    await waitFor(() => expect(result.current.error).toContain("필터 조회 실패"));
+
+    rerender({ department: "assembly", realtimeRevision: 2 });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    expect(result.current.loading).toBe(true);
+    expect(result.current.refreshError).toBeNull();
+
+    await act(async () => revisionRequest.resolve(makeResponse(page2)));
     await waitFor(() => expect(result.current.loading).toBe(false));
   });
 

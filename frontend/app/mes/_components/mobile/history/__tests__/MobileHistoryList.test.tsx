@@ -156,4 +156,30 @@ describe("MobileHistoryList", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByText("Shipping item cached")).toBeInTheDocument();
   });
+
+  it("keeps existing cards visible and retries from a non-blocking refresh failure", () => {
+    const retryRefresh = vi.fn();
+
+    render(
+      <MobileHistoryList
+        loading={false}
+        error={null}
+        refreshError="동기화 실패"
+        filteredLogs={[log("cached", "PREPARE")]}
+        selectedKey={null}
+        onSelectLog={vi.fn()}
+        onSelectBatch={vi.fn()}
+        onRetry={vi.fn()}
+        onRetryRefresh={retryRefresh}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Shipping item cached")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("최신 입출고 내역을 동기화하지 못했습니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    expect(retryRefresh).toHaveBeenCalledOnce();
+  });
 });

@@ -59,6 +59,23 @@ function renderWithClient(ui: ReactElement) {
 }
 
 describe("DesktopWarehouseMapView fullscreen", () => {
+  it("keeps the current map visible when a background refresh fails and retries in place", async () => {
+    mapApiMock.getMap.mockReset().mockResolvedValueOnce(mapFixture).mockRejectedValue(new Error("refresh failed"));
+    const { client } = renderWithClient(<DesktopWarehouseMapView />);
+    expect(await screen.findByText("앵글 1")).toBeInTheDocument();
+
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ["warehouseMap", "map"] });
+    });
+
+    expect(screen.getByText("앵글 1")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+
+    mapApiMock.getMap.mockResolvedValue(mapFixture);
+    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+  });
+
   it("keeps search chrome in regular mode", async () => {
     mapApiMock.getMap.mockResolvedValueOnce(mapFixture);
 

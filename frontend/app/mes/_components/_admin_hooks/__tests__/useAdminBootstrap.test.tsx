@@ -102,4 +102,19 @@ describe("useAdminBootstrap realtime refresh", () => {
     });
     expect(result.current.items[0]?.item_name).toBe("Newest");
   });
+
+  it("keeps the last successful BOM snapshot when a realtime refresh fails", async () => {
+    const initialRows = [{ parent_item_id: "parent-1", child_item_id: "child-1" }];
+    mocks.getAllBOM.mockResolvedValueOnce(initialRows).mockRejectedValueOnce(new Error("refresh failed"));
+    const { result, rerender } = renderHook(
+      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError: vi.fn() }),
+    );
+    await waitFor(() => expect(result.current.allBomRows).toEqual(initialRows));
+
+    mocks.revision = 1;
+    rerender();
+    await waitFor(() => expect(mocks.getAllBOM).toHaveBeenCalledTimes(2));
+
+    expect(result.current.allBomRows).toEqual(initialRows);
+  });
 });

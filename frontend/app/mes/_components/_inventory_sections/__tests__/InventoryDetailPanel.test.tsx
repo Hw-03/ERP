@@ -430,6 +430,21 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(closeButton).toHaveFocus();
   });
 
+  it("keeps the previous reservation rows when a realtime refresh fails", async () => {
+    vi.spyOn(api, "getItemReservations")
+      .mockResolvedValueOnce([makeReservation("old", "기존 요청자")])
+      .mockRejectedValueOnce(new Error("refresh failed"));
+    const item = { ...makeItem(), pending_quantity: 5 } as Item;
+    const { rerender } = render(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
+    expect(await screen.findByText("기존 요청자")).toBeInTheDocument();
+
+    realtimeState.revision = 2;
+    rerender(<InventoryDetailPanel item={item} onGoToWarehouse={() => {}} />);
+    await waitFor(() => expect(api.getItemReservations).toHaveBeenCalledTimes(2));
+
+    expect(screen.getByText("기존 요청자")).toBeInTheDocument();
+  });
+
   it("renders modal BOM rows as one aligned grid without tree rails", async () => {
     const nestedTree: BOMTreeNode = {
       ...bomTree,

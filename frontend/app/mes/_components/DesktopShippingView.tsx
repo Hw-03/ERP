@@ -20,6 +20,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { LoadFailureCard } from "./common/LoadFailureCard";
 import {
   api,
   type Item,
@@ -373,6 +374,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyDetailError, setHistoryDetailError] = useState<string | null>(null);
+  const [historyDetailRetryNonce, setHistoryDetailRetryNonce] = useState(0);
   const historyLoadedStatusRef = useRef<ShippingHistoryStatus | null>(null);
   const historyRequestGenerationRef = useRef(0);
   const itemsRefreshRevisionRef = useRef<number | null>(realtimeRevision);
@@ -805,7 +807,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     // Rows/catalog changes must not abort an in-flight detail refresh. They are sampled when this
     // selected-id/view/revision lifecycle starts; loading completion still triggers the initial fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realtimeRevision, selectedHistoryId, shippingRequestsQuery.isLoading, view]);
+  }, [historyDetailRetryNonce, realtimeRevision, selectedHistoryId, shippingRequestsQuery.isLoading, view]);
   useEffect(() => {
     if (view !== "historyList" && view !== "historyWork") return;
     if (view === "historyWork") {
@@ -1678,6 +1680,15 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           appliedSearch={historyAppliedSearch}
           loading={historyLoading}
           error={historyError}
+          onRetry={() => {
+            if (historyAppliedSearch) {
+              void loadHistoryPage({ status: historyStatus, q: historyAppliedSearch });
+            } else if (historyYear !== null && historyMonth !== null) {
+              void loadHistoryPage({ status: historyStatus, year: historyYear, month: historyMonth });
+            } else {
+              void loadHistoryOverview(historyStatus);
+            }
+          }}
           hasMore={historyHasMore}
           onBack={() => navigateView("hub")}
           onStatus={selectHistoryStatus}
@@ -1700,7 +1711,17 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     return (
       <div className="grid gap-3">
         <ViewHeader title="출하 상세 이력" subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다." onBack={() => navigateView("historyList")} />
-        <HistorySection rows={historyRows} selected={selectedHistory} emptyBody={historyDetailError ?? undefined} onSelect={(req) => setSelectedHistoryId(req.request_id)} onPickupCancel={cancelPickup} onInvoiceSaved={handleInvoiceSaved} showList={false} />
+        <HistorySection
+          rows={historyRows}
+          selected={selectedHistory}
+          emptyBody={historyDetailError ?? undefined}
+          refreshError={selectedHistory ? historyDetailError : null}
+          onRetryRefresh={() => setHistoryDetailRetryNonce((nonce) => nonce + 1)}
+          onSelect={(req) => setSelectedHistoryId(req.request_id)}
+          onPickupCancel={cancelPickup}
+          onInvoiceSaved={handleInvoiceSaved}
+          showList={false}
+        />
       </div>
     );
   }
@@ -2288,6 +2309,7 @@ function HistoryListEntry({
   appliedSearch,
   loading,
   error,
+  onRetry,
   hasMore,
   onBack,
   onStatus,
@@ -2307,6 +2329,7 @@ function HistoryListEntry({
   appliedSearch: string;
   loading: boolean;
   error: string | null;
+  onRetry: () => void;
   hasMore: boolean;
   onBack: () => void;
   onStatus: (status: ShippingHistoryStatus) => void;
@@ -2406,7 +2429,17 @@ function HistoryListEntry({
         </form>
 
         <div className={`${SHIPPING_MODAL_BODY_CLASS} overflow-y-auto`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {error ? (
+          {error && rows.length > 0 && (
+            <div className="mb-3">
+              <LoadFailureCard
+                message={error}
+                prefix="최신 출하 이력을 동기화하지 못했습니다"
+                retryLabel="다시 동기화"
+                onRetry={onRetry}
+              />
+            </div>
+          )}
+          {error && rows.length === 0 ? (
             <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력을 불러오지 못했습니다" body={error} /></div>
           ) : loading && rows.length === 0 ? (
             <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력을 불러오는 중입니다" body="잠시만 기다려주세요." /></div>
@@ -3281,7 +3314,7 @@ function CompanionPrepList({
   );
 }
 
-function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, onPickupCancel, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; onSelect: (req: ShippingRequest) => void; onPickupCancel: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
+function HistorySection({ showList = true, rows, selected, emptyBody, refreshError, onRetryRefresh, onSelect, onPickupCancel, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; refreshError?: string | null; onRetryRefresh?: () => void; onSelect: (req: ShippingRequest) => void; onPickupCancel: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
   const hasPickedUpSerialNumbers = selected?.status === "PICKED_UP" && Boolean(selected.serial_numbers?.trim());
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[420px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
@@ -3304,6 +3337,14 @@ function HistorySection({ showList = true, rows, selected, emptyBody, onSelect, 
           <EmptyState title="선택된 이력 없음" body={emptyBody ?? "왼쪽에서 완료 이력을 선택하세요."} />
         ) : (
           <div className="grid gap-4">
+            {refreshError && (
+              <LoadFailureCard
+                message={refreshError}
+                prefix="최신 출하 상세를 동기화하지 못했습니다"
+                retryLabel="다시 동기화"
+                onRetry={onRetryRefresh}
+              />
+            )}
             <div data-testid="shipping-history-detail-header" className={hasPickedUpSerialNumbers ? "grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)_auto] xl:items-center" : "flex flex-wrap items-center justify-between gap-3"}>
               <PanelTitle
                 icon={PackageCheck}

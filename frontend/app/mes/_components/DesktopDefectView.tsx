@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
@@ -17,6 +17,7 @@ import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlo
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { LoadFailureCard } from "./common/LoadFailureCard";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -85,6 +86,9 @@ function DefectViewInner({
   const [locations, setLocations] = useState<DefectLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
+  const requestGenerationRef = useRef(0);
 
   const initialScope = (): DefectScope => {
     if (defectDeptFilter) return "my";
@@ -100,14 +104,21 @@ function DefectViewInner({
   const [reloadNonce, setReloadNonce] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const generation = ++requestGenerationRef.current;
+    const background = hasLoadedRef.current;
     async function load() {
-      setLoading(true);
-      setError(null);
+      if (background) {
+        setRefreshError(null);
+      } else {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const locData = await defectsApi.listDefects();
-        if (!cancelled) {
+        if (generation === requestGenerationRef.current) {
+          hasLoadedRef.current = true;
           setLocations(locData);
+          setRefreshError(null);
           setView((currentView) => {
             if (currentView.kind !== "process") return currentView;
             const freshLocation = locData.find(
@@ -120,16 +131,18 @@ function DefectViewInner({
           });
         }
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "불량 데이터 로드에 실패했습니다.");
+        if (generation === requestGenerationRef.current) {
+          const message = err instanceof Error ? err.message : "불량 데이터 로드에 실패했습니다.";
+          if (background) setRefreshError(message);
+          else setError(message);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (generation === requestGenerationRef.current && !background) setLoading(false);
       }
     }
     void load();
     return () => {
-      cancelled = true;
+      if (generation === requestGenerationRef.current) requestGenerationRef.current += 1;
     };
   }, [reloadNonce, realtimeRevision]);
 
@@ -329,6 +342,15 @@ function DefectViewInner({
               onSortChange={setSort}
               currentDept={operator.department}
             />
+
+            {refreshError && (
+              <LoadFailureCard
+                prefix="최신 불량 격리 목록을 동기화하지 못했습니다"
+                message={refreshError}
+                retryLabel="다시 동기화"
+                onRetry={() => setReloadNonce((value) => value + 1)}
+              />
+            )}
 
             {loading ? (
               <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>

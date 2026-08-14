@@ -26,6 +26,8 @@ type Props = {
   loading: boolean;
   error?: string | null;
   onRetry?: () => void;
+  refreshError?: string | null;
+  onRetryRefresh?: () => void;
   filteredLogs?: TransactionLog[];
   /** PC 그룹 API가 보장한 대표 행 경계. 제공되면 원본 로그를 다시 묶지 않는다. */
   displayGroups?: LogGroup[];
@@ -125,6 +127,8 @@ export function HistoryTable({
   loading,
   error,
   onRetry,
+  refreshError,
+  onRetryRefresh,
   filteredLogs = [],
   displayGroups,
   selection,
@@ -197,10 +201,12 @@ export function HistoryTable({
   const observerRef = useRef<IntersectionObserver | null>(null);
   const observedRowsRef = useRef<Set<HTMLTableRowElement>>(new Set());
   const batchCacheRef = useRef(batchCache);
+  const staleBatchIdsRef = useRef<Set<string>>(new Set());
   batchCacheRef.current = batchCache;
 
   if (previousCacheEpochRef.current !== cacheEpoch) {
     previousCacheEpochRef.current = cacheEpoch;
+    staleBatchIdsRef.current = new Set(batchCacheRef.current.keys());
     batchCacheEpochRef.current += 1;
   }
 
@@ -251,7 +257,7 @@ export function HistoryTable({
         .then((b) => {
           if (mountedRef.current && requestEpoch === batchCacheEpochRef.current) {
             setBatchCache((prev) => {
-              if (prev.has(next)) return prev;
+              if (prev.get(next) === b) return prev;
               const m = new Map(prev);
               m.set(next, b);
               return m;
@@ -272,8 +278,9 @@ export function HistoryTable({
   }, [setBatchCache]);
 
   const enqueueBatchFetch = useCallback((batchId: string) => {
-    if (batchCacheRef.current.has(batchId)) return;
+    if (batchCacheRef.current.has(batchId) && !staleBatchIdsRef.current.has(batchId)) return;
     if (pendingFetchesRef.current.has(batchId)) return;
+    staleBatchIdsRef.current.delete(batchId);
     pendingFetchesRef.current.add(batchId);
     fetchQueueRef.current.push(batchId);
     tryDrainQueue();
@@ -532,6 +539,17 @@ export function HistoryTable({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && !error && refreshError && (
+        <div className="mt-4">
+          <LoadFailureCard
+            message={refreshError}
+            onRetry={onRetryRefresh}
+            retryLabel="다시 동기화"
+            prefix="최신 입출고 내역을 동기화하지 못했습니다"
+          />
         </div>
       )}
 

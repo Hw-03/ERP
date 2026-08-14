@@ -104,6 +104,68 @@ describe("useDesktopHistoryGroups", () => {
     expect(result.current.groups).toEqual(refreshedPage.groups);
   });
 
+  it("keeps visible groups while a same-query realtime refresh is pending", async () => {
+    const refreshRequest = deferred<Response>();
+    const initialPage = { groups: [makeGroup(0)], next_cursor: null, has_more: false };
+    const refreshedPage = { groups: [makeGroup(1)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(initialPage))
+      .mockReturnValueOnce(refreshRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.groups).toEqual(initialPage.groups);
+    expect(result.current.refreshError).toBeNull();
+
+    await act(async () => refreshRequest.resolve(makeResponse(refreshedPage)));
+    await waitFor(() => expect(result.current.groups).toEqual(refreshedPage.groups));
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("keeps visible groups and retries a failed realtime refresh without showing the skeleton", async () => {
+    const retryRequest = deferred<Response>();
+    const initialPage = { groups: [makeGroup(0)], next_cursor: null, has_more: false };
+    const refreshedPage = { groups: [makeGroup(2)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(initialPage))
+      .mockResolvedValueOnce(makeResponse({ detail: "동기화 실패" }, false))
+      .mockReturnValueOnce(retryRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result, rerender } = renderHook(
+      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ realtimeRevision: 2 });
+
+    await waitFor(() => expect(result.current.refreshError).toContain("동기화 실패"));
+    expect(result.current.error).toBeNull();
+    expect(result.current.groups).toEqual(initialPage.groups);
+
+    act(() => result.current.retryRefresh());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.groups).toEqual(initialPage.groups);
+    expect(result.current.refreshError).toBeNull();
+
+    await act(async () => retryRequest.resolve(makeResponse(refreshedPage)));
+    await waitFor(() => expect(result.current.groups).toEqual(refreshedPage.groups));
+    expect(result.current.refreshError).toBeNull();
+  });
+
   it("revalidates every loaded cursor page on a realtime revision", async () => {
     const firstPage = {
       groups: Array.from({ length: 100 }, (_, index) => makeGroup(index)),
@@ -143,14 +205,15 @@ describe("useDesktopHistoryGroups", () => {
 
     rerender({ realtimeRevision: 2 });
 
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(fetchSpy).toHaveBeenCalledTimes(5);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(5));
     expect(String(fetchSpy.mock.calls[4][0])).toContain("cursor=fresh-cursor-200");
-    expect(result.current.groups).toEqual([
-      ...refreshedFirstPage.groups,
-      ...refreshedSecondPage.groups,
-      ...refreshedThirdPage.groups,
-    ]);
+    await waitFor(() => {
+      expect(result.current.groups).toEqual([
+        ...refreshedFirstPage.groups,
+        ...refreshedSecondPage.groups,
+        ...refreshedThirdPage.groups,
+      ]);
+    });
   });
 
   it("대표 행 100개를 받고 다음 요청에는 서버 커서를 전달해 완결된 묶음을 덧붙인다", async () => {
@@ -221,5 +284,33 @@ describe("useDesktopHistoryGroups", () => {
 
     await act(async () => oldRequest.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false })));
     expect(result.current.groups).toEqual([makeGroup(2)]);
+  });
+
+  it("uses foreground loading when a realtime revision follows a failed query change", async () => {
+    const revisionRequest = deferred<Response>();
+    const initialPage = { groups: [makeGroup(0)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(initialPage))
+      .mockResolvedValueOnce(makeResponse({ detail: "필터 조회 실패" }, false))
+      .mockReturnValueOnce(revisionRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result, rerender } = renderHook(
+      ({ department, realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, department, realtimeRevision }),
+      { initialProps: { department: "", realtimeRevision: 1 }, wrapper: makeWrapper(client) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ department: "조립", realtimeRevision: 1 });
+    await waitFor(() => expect(result.current.error).toContain("필터 조회 실패"));
+
+    rerender({ department: "조립", realtimeRevision: 2 });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    expect(result.current.loading).toBe(true);
+    expect(result.current.refreshError).toBeNull();
+
+    await act(async () => revisionRequest.resolve(makeResponse(initialPage)));
+    await waitFor(() => expect(result.current.loading).toBe(false));
   });
 });

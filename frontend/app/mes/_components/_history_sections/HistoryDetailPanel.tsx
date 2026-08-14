@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
@@ -64,6 +64,8 @@ export function HistoryDetailPanel({
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
   const [flow, setFlow] = useState<FlowState>({ status: "idle" });
+  const editsLoadedLogRef = useRef<string | null>(null);
+  const flowLoadedBatchRef = useRef<string | null>(null);
   const cancelScope = selected ? getHistoryCancelScope(selected) : "single";
   const canCancelAsBatch = cancelScope === "batch";
   const cancellationScope = useHistoryCancellationScopeLogs({
@@ -76,17 +78,22 @@ export function HistoryDetailPanel({
 
   useLayoutEffect(() => {
     if (!selected) {
+      editsLoadedLogRef.current = null;
       setEdits([]);
       setEditsLoaded(false);
       return;
     }
-    setEdits([]);
-    setEditsLoaded(false);
+    const background = editsLoadedLogRef.current === selected.log_id;
+    if (!background) {
+      setEdits([]);
+      setEditsLoaded(false);
+    }
     let cancelled = false;
     const controller = new AbortController();
     api.getTransactionEdits(selected.log_id, { signal: controller.signal })
       .then((data) => {
         if (cancelled) return;
+        editsLoadedLogRef.current = selected.log_id;
         setEdits(data);
         setEditsLoaded(true);
       })
@@ -104,24 +111,32 @@ export function HistoryDetailPanel({
 
   useLayoutEffect(() => {
     if (!selected) {
+      flowLoadedBatchRef.current = null;
       setFlow({ status: "idle" });
       return;
     }
     if (!selected.operation_batch_id) {
+      flowLoadedBatchRef.current = null;
       setFlow({ status: "unavailable" });
       return;
     }
-    setFlow({ status: "loading" });
+    const background = flowLoadedBatchRef.current === selected.operation_batch_id;
+    if (!background) {
+      setFlow({ status: "loading" });
+    }
     let cancelled = false;
     const controller = new AbortController();
     void ioApi.getBatch(selected.operation_batch_id, { signal: controller.signal })
       .then((b) => {
         if (cancelled) return;
+        flowLoadedBatchRef.current = selected.operation_batch_id;
         setFlow({ status: "available", batch: b });
       })
       .catch((err: unknown) => {
         if (cancelled || (err as Error)?.name === "AbortError") return;
-        setFlow({ status: "unavailable" });
+        if (!background) {
+          setFlow({ status: "unavailable" });
+        }
       });
     return () => {
       cancelled = true;

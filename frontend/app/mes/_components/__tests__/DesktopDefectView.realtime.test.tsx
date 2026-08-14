@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Operator } from "../login/useCurrentOperator";
 
@@ -69,6 +69,16 @@ const location = {
   has_bom: false,
 };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("DesktopDefectView realtime refresh", () => {
   beforeEach(() => {
     mocks.revision = null;
@@ -106,6 +116,43 @@ describe("DesktopDefectView realtime refresh", () => {
     rerender(<DesktopDefectView operator={operator} />);
     await waitFor(() => expect(screen.queryByTestId("process-location")).not.toBeInTheDocument());
     expect(screen.getByTestId("defect-list")).toBeInTheDocument();
+  });
+
+  it("keeps the loaded list visible while a realtime refresh is pending", async () => {
+    mocks.listDefects.mockResolvedValueOnce([location]);
+    const pendingRefresh = deferred<typeof location[]>();
+    const { rerender } = render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    expect(await screen.findByRole("button", { name: "Process D-001" })).toBeInTheDocument();
+
+    mocks.listDefects.mockReturnValueOnce(pendingRefresh.promise);
+    mocks.revision = 1;
+    rerender(<DesktopDefectView operator={operator} />);
+
+    await waitFor(() => expect(mocks.listDefects).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
+    expect(screen.queryByText(/로딩 중/)).not.toBeInTheDocument();
+
+    await act(async () => pendingRefresh.resolve([{ ...location, quantity: 2 }]));
+  });
+
+  it("keeps the loaded list visible after refresh failure and retries without a loading screen", async () => {
+    mocks.listDefects.mockResolvedValueOnce([location]);
+    const { rerender } = render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    expect(await screen.findByRole("button", { name: "Process D-001" })).toBeInTheDocument();
+
+    mocks.listDefects.mockRejectedValueOnce(new Error("refresh failed"));
+    mocks.revision = 1;
+    rerender(<DesktopDefectView operator={operator} />);
+
+    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
+
+    mocks.listDefects.mockResolvedValueOnce([{ ...location, quantity: 2 }]);
+    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
   });
 
   it("does not apply an inner transition to the initial hub but keeps it for internal views", async () => {

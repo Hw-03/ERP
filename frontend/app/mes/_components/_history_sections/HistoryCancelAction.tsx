@@ -92,13 +92,18 @@ export function useHistoryCancellationScopeLogs({
     status: requestKey ? "loading" : "ready",
     logs: requestKey ? [] : visibleLogs,
   });
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     if (!requestKey || !panelOpen) return;
 
     let active = true;
     const controller = new AbortController();
-    setState({ scopeKey, status: "loading", logs: [] });
+    const background = stateRef.current.scopeKey === scopeKey && stateRef.current.status === "ready";
+    if (!background) {
+      setState({ scopeKey, status: "loading", logs: [] });
+    }
     const params = operationBatchId
       ? { operationBatchId, limit: 2000, skip: 0 }
       : { referenceNo: referenceNo!, limit: 2000, skip: 0 };
@@ -107,14 +112,14 @@ export function useHistoryCancellationScopeLogs({
       .then((logs) => {
         if (!active) return;
         if (logs.length === 0) {
-          setState({ scopeKey, status: "error", logs: [] });
+          if (!background) setState({ scopeKey, status: "error", logs: [] });
           return;
         }
         setState({ scopeKey, status: "ready", logs });
       })
       .catch((err: unknown) => {
         if (!active || (err as Error)?.name === "AbortError") return;
-        setState({ scopeKey, status: "error", logs: [] });
+        if (!background) setState({ scopeKey, status: "error", logs: [] });
       });
 
     return () => {

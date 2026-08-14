@@ -79,6 +79,7 @@ export function MobileHistoryScreen() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const calendarLoadedKeyRef = useRef<string | null>(null);
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
@@ -92,6 +93,8 @@ export function MobileHistoryScreen() {
   const [summary, setSummary] = useState<TransactionSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const summaryKeyRef = useRef("");
+  const summaryConditionsRef = useRef("");
+  const summaryRef = useRef<TransactionSummary | null>(null);
 
   const historyData = useHistoryData({
     operations: opParam,
@@ -109,6 +112,8 @@ export function MobileHistoryScreen() {
     loading,
     error: historyError,
     retry,
+    refreshError,
+    retryRefresh,
     loadingMore,
     canLoadMore,
     loadMore,
@@ -120,7 +125,9 @@ export function MobileHistoryScreen() {
 
   useEffect(() => {
     if (!calendarOpen) return;
-    setCalendarLoading(true);
+    const calendarKey = `${calendarYear}-${calendarMonth}`;
+    const background = calendarLoadedKeyRef.current === calendarKey;
+    if (!background) setCalendarLoading(true);
     const firstDay = new Date(calendarYear, calendarMonth, 1);
     const lastDay = new Date(calendarYear, calendarMonth + 1, 0);
     const ymd = (d: Date) =>
@@ -136,11 +143,12 @@ export function MobileHistoryScreen() {
       )
       .then((data) => {
         if (!active) return;
+        calendarLoadedKeyRef.current = calendarKey;
         setCalendarLogs(data);
-        setCalendarLoading(false);
+        if (!background) setCalendarLoading(false);
       })
       .catch((err) => {
-        if (active && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
+        if (active && !background && (err as Error)?.name !== "AbortError") setCalendarLoading(false);
       });
     return () => {
       active = false;
@@ -205,18 +213,23 @@ export function MobileHistoryScreen() {
     const searchParam = debouncedSearch.trim() || undefined;
     const department = deptParam || undefined;
     const model = modelParam || undefined;
-    const myKey = JSON.stringify([
+    const conditionsKey = JSON.stringify([
       transactionTypes ?? null,
       dateFrom ?? null,
       dateTo ?? null,
       searchParam ?? null,
       department ?? null,
       model ?? null,
-      realtimeRevision ?? null,
     ]);
+    const myKey = JSON.stringify([conditionsKey, realtimeRevision ?? null]);
+    const background = summaryConditionsRef.current === conditionsKey && summaryRef.current !== null;
+    summaryConditionsRef.current = conditionsKey;
     summaryKeyRef.current = myKey;
-    setSummary(null);
-    setSummaryLoading(true);
+    if (!background) {
+      summaryRef.current = null;
+      setSummary(null);
+      setSummaryLoading(true);
+    }
     const ctrl = new AbortController();
     void productionApi
       .getTransactionsSummary(
@@ -225,14 +238,18 @@ export function MobileHistoryScreen() {
       )
       .then((s) => {
         if (summaryKeyRef.current !== myKey) return;
+        summaryRef.current = s;
         setSummary(s);
-        setSummaryLoading(false);
+        if (!background) setSummaryLoading(false);
       })
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (summaryKeyRef.current !== myKey) return;
-        setSummary(null);
-        setSummaryLoading(false);
+        if (!background) {
+          summaryRef.current = null;
+          setSummary(null);
+          setSummaryLoading(false);
+        }
       });
     return () => ctrl.abort();
   }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam, realtimeRevision]);
@@ -240,34 +257,42 @@ export function MobileHistoryScreen() {
   const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
   const [baselineLoading, setBaselineLoading] = useState(false);
   const baselineKeyRef = useRef("");
+  const baselineConditionsRef = useRef("");
+  const baselineSummaryRef = useRef<TransactionSummary | null>(null);
 
   useEffect(() => {
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
     const dateTo = selectedDay ?? undefined;
-    const myKey = JSON.stringify([dateFrom ?? null, dateTo ?? null, realtimeRevision ?? null]);
+    const conditionsKey = JSON.stringify([dateFrom ?? null, dateTo ?? null]);
+    const myKey = JSON.stringify([conditionsKey, realtimeRevision ?? null]);
+    const background = baselineConditionsRef.current === conditionsKey && baselineSummaryRef.current !== null;
+    baselineConditionsRef.current = conditionsKey;
     baselineKeyRef.current = myKey;
-    setBaselineSummary(null);
-    setBaselineLoading(true);
+    if (!background) {
+      baselineSummaryRef.current = null;
+      setBaselineSummary(null);
+      setBaselineLoading(true);
+    }
     const ctrl = new AbortController();
     void productionApi
       .getTransactionsSummary({ dateFrom, dateTo }, { signal: ctrl.signal })
       .then((s) => {
         if (baselineKeyRef.current !== myKey) return;
+        baselineSummaryRef.current = s;
         setBaselineSummary(s);
-        setBaselineLoading(false);
+        if (!background) setBaselineLoading(false);
       })
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (baselineKeyRef.current !== myKey) return;
-        setBaselineSummary(null);
-        setBaselineLoading(false);
+        if (!background) {
+          baselineSummaryRef.current = null;
+          setBaselineSummary(null);
+          setBaselineLoading(false);
+        }
       });
     return () => ctrl.abort();
   }, [dateFilter, selectedDay, realtimeRevision]);
-
-  useEffect(() => {
-    if (realtimeRevision !== null) setBatchCache(new Map());
-  }, [realtimeRevision]);
 
   useEffect(() => {
     const decision = advanceHistoryLoadReconcileState(loadReconcileRef.current, {
@@ -492,11 +517,13 @@ export function MobileHistoryScreen() {
           <MobileHistoryList
             loading={loading}
             error={historyError}
+            refreshError={refreshError}
             filteredLogs={logs}
             selectedKey={selectedKey}
             onSelectLog={handleSelectLog}
             onSelectBatch={handleSelectBatch}
             onRetry={() => void retry()}
+            onRetryRefresh={retryRefresh}
             canLoadMore={canLoadMore}
             loadingMore={loadingMore}
             onLoadMore={() => void loadMore()}

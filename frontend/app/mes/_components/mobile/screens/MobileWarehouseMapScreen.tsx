@@ -12,6 +12,7 @@ import { InlineSearch } from "../primitives";
 import { TYPO } from "../tokens";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { LoadFailureCard } from "../../common/LoadFailureCard";
 
 interface CellHit {
   angleId: number;
@@ -234,9 +235,19 @@ export function MobileWarehouseMapScreen({
       </div>
 
       {/* 본문 */}
+      {error && map && (
+        <div className="shrink-0 px-4 pt-3">
+          <LoadFailureCard
+            message={error}
+            prefix="창고 지도 동기화 실패"
+            retryLabel="다시 동기화"
+            onRetry={() => setReloadNonce((n) => n + 1)}
+          />
+        </div>
+      )}
       {loading && !map ? (
         <CenterNote>창고 지도를 불러오는 중…</CenterNote>
-      ) : error ? (
+      ) : error && !map ? (
         <CenterNote>
           {error}
           <button

@@ -15,6 +15,8 @@ export interface UseDesktopHistoryGroupsResult {
   loading: boolean;
   error: string | null;
   retry: () => void;
+  refreshError: string | null;
+  retryRefresh: () => void;
   loadingMore: boolean;
   loadMoreError: string | null;
   canLoadMore: boolean;
@@ -73,6 +75,8 @@ export function useDesktopHistoryGroups({
   const loadingRef = useRef(initialCached === undefined);
   const [error, setError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshRetryNonce, setRefreshRetryNonce] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
@@ -83,7 +87,9 @@ export function useDesktopHistoryGroups({
   const generationRef = useRef(0);
   const isFirstRunRef = useRef(true);
   const retryQueryIdentityRef = useRef<string | null>(null);
+  const refreshRetryQueryIdentityRef = useRef<string | null>(null);
   const realtimeRevisionRef = useRef(realtimeRevision);
+  const hasSuccessfulLoadRef = useRef(initialCached !== undefined);
   const loadedPageCountRef = useRef(1);
   const loadedTailGroupKeyRef = useRef(initialCached?.groups.at(-1)?.key ?? null);
 
@@ -93,16 +99,24 @@ export function useDesktopHistoryGroups({
     loadingRef.current = true;
     const isRetry = retryQueryIdentityRef.current === queryIdentity;
     retryQueryIdentityRef.current = null;
+    const isRefreshRetry = refreshRetryQueryIdentityRef.current === queryIdentity;
+    refreshRetryQueryIdentityRef.current = null;
     const queryChanged = queryIdentityRef.current !== queryIdentity;
+    if (queryChanged) hasSuccessfulLoadRef.current = false;
     const revisionChanged = realtimeRevisionRef.current !== realtimeRevision;
-    const shouldRefreshLoadedDepth = revisionChanged && !queryChanged;
+    const shouldRefreshLoadedDepth = (revisionChanged || isRefreshRetry)
+      && !queryChanged
+      && hasSuccessfulLoadRef.current;
     const pagesToRefresh = shouldRefreshLoadedDepth ? loadedPageCountRef.current : 1;
     const refreshAnchorGroupKey = shouldRefreshLoadedDepth ? loadedTailGroupKeyRef.current : null;
     queryIdentityRef.current = queryIdentity;
     const params = pageParams();
-    const skipReset = isRetry || (isFirstRunRef.current && initialCached !== undefined);
+    const skipReset = isRetry
+      || shouldRefreshLoadedDepth
+      || (isFirstRunRef.current && initialCached !== undefined);
     isFirstRunRef.current = false;
     setError(null);
+    setRefreshError(null);
     loadingMoreRef.current = false;
     setLoadingMore(false);
     setLoadMoreError(null);
@@ -119,7 +133,7 @@ export function useDesktopHistoryGroups({
       let nextParams = params;
       for (let pageIndex = 0; ; pageIndex += 1) {
         const pageQueryKey = queryKeys.transactions.displayGroups(nextParams);
-        if (revisionChanged) {
+        if (revisionChanged || isRefreshRetry) {
           await queryClient.cancelQueries({ queryKey: pageQueryKey, exact: true });
           await queryClient.invalidateQueries({ queryKey: pageQueryKey, exact: true, refetchType: "none" });
         }
@@ -145,20 +159,24 @@ export function useDesktopHistoryGroups({
       loadedPageCountRef.current = Math.max(1, pages.length);
       loadedTailGroupKeyRef.current = refreshedGroups.at(-1)?.key ?? null;
       realtimeRevisionRef.current = realtimeRevision;
+      hasSuccessfulLoadRef.current = true;
       setGroups(refreshedGroups);
       setHasMore(lastPage?.hasMore ?? false);
       setError(null);
+      setRefreshError(null);
       loadingRef.current = false;
       setLoading(false);
     }).catch((caught: unknown) => {
       if (generationRef.current !== generation || queryIdentityRef.current !== queryIdentity) return;
-      setError(historyLoadError(caught, "입출고 내역을 불러오지 못했습니다."));
+      const message = historyLoadError(caught, "입출고 내역을 불러오지 못했습니다.");
+      if (shouldRefreshLoadedDepth) setRefreshError(message);
+      else setError(message);
       loadingRef.current = false;
       setLoading(false);
     });
     // queryIdentity contains every primitive query condition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryIdentity, queryClient, retryNonce, realtimeRevision]);
+  }, [queryIdentity, queryClient, retryNonce, refreshRetryNonce, realtimeRevision]);
 
   const retry = useCallback(() => {
     retryQueryIdentityRef.current = queryIdentity;
@@ -166,6 +184,13 @@ export function useDesktopHistoryGroups({
     loadingRef.current = true;
     setLoading(true);
     setRetryNonce((value) => value + 1);
+  }, [queryIdentity]);
+
+  const retryRefresh = useCallback(() => {
+    refreshRetryQueryIdentityRef.current = queryIdentity;
+    setRefreshError(null);
+    loadingRef.current = true;
+    setRefreshRetryNonce((value) => value + 1);
   }, [queryIdentity]);
 
   const loadMore = useCallback(async () => {
@@ -209,6 +234,8 @@ export function useDesktopHistoryGroups({
     loading,
     error,
     retry,
+    refreshError,
+    retryRefresh,
     loadingMore,
     loadMoreError,
     canLoadMore: !loading && hasMore,

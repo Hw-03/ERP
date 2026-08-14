@@ -49,6 +49,33 @@ describe("HistoryTable hierarchy", () => {
     expect(container.querySelectorAll("[data-history-loading-row='true']")).toHaveLength(8);
   });
 
+  it("keeps existing rows visible and retries from a non-blocking refresh failure", () => {
+    const retryRefresh = vi.fn();
+    const current = makeLog({ item_name: "현재 내역" });
+
+    render(
+      <HistoryTable
+        loading={false}
+        refreshError="동기화 실패"
+        onRetryRefresh={retryRefresh}
+        displayGroups={[{ type: "solo", log: current }]}
+        selection={null}
+        onSelectLog={vi.fn()}
+        onSelectBatch={vi.fn()}
+        batchCache={new Map()}
+        setBatchCache={vi.fn()}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("현재 내역")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("최신 입출고 내역을 동기화하지 못했습니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    expect(retryRefresh).toHaveBeenCalledOnce();
+  });
+
   it("shows neutral placeholders instead of inferred operation details before batch metadata arrives", () => {
     const parent = makeLog({ operation_batch_id: "batch-1" });
 

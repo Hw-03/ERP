@@ -1261,6 +1261,40 @@ describe("DesktopShippingView", () => {
     });
   });
 
+  it("keeps shipping history rows visible after realtime failure and retries in place", async () => {
+    const initial = request({
+      request_id: "history-initial",
+      status: "PICKED_UP",
+      invoice_number: "INV-INITIAL",
+      picked_up_at: "2026-06-26T01:00:00Z",
+    });
+    const refreshed = request({
+      request_id: "history-fresh",
+      status: "PICKED_UP",
+      invoice_number: "INV-FRESH",
+      picked_up_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([]);
+    vi.mocked(api.getShippingHistory)
+      .mockResolvedValueOnce({ requests: [initial], next_cursor: null, has_more: false })
+      .mockRejectedValueOnce(new Error("refresh failed"))
+      .mockResolvedValueOnce({ requests: [refreshed], next_cursor: null, has_more: false });
+    realtimeMock.revision = null;
+    const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByText(/INV-INITIAL/)).toBeInTheDocument();
+
+    realtimeMock.revision = 2;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(screen.getByText(/INV-INITIAL/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    expect(await screen.findByText(/INV-FRESH/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+  });
+
   it("preserves a new request draft when browser Back returns from the request list", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestWork&shippingStep=1";
     const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DefectHubPanel } from "../DefectHubPanel";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
 
@@ -66,6 +66,16 @@ const mockEmployee = {
   name: "김건호",
   department: "조립",
 };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
 
 beforeEach(() => {
   realtime.revision = null;
@@ -222,6 +232,47 @@ describe("DefectHubPanel realtime refresh", () => {
       expect(defectsApi.listDefects).toHaveBeenCalledTimes(2);
     });
     expect(screen.getByTestId("cart-flow")).toHaveTextContent("add");
+  });
+
+  it("keeps the loaded quarantine list visible while a realtime refresh is pending", async () => {
+    const props = { currentEmployee: { ...mockEmployee, department: "기타" } };
+    const { rerender } = render(<DefectHubPanel {...props} />);
+    fireEvent.click(screen.getByText("격리 목록"));
+    expect(await screen.findByText("7-TR-0001")).toBeInTheDocument();
+
+    const pendingKpi = deferred<DefectKpi>();
+    const pendingLocations = deferred<DefectLocation[]>();
+    vi.mocked(defectsApi.getDefectKpi).mockReturnValueOnce(pendingKpi.promise);
+    vi.mocked(defectsApi.listDefects).mockReturnValueOnce(pendingLocations.promise);
+    realtime.revision = 1;
+    rerender(<DefectHubPanel {...props} />);
+
+    await waitFor(() => expect(defectsApi.listDefects).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+    expect(screen.queryByText(/로딩 중/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      pendingKpi.resolve(mockKpi);
+      pendingLocations.resolve(mockLocations);
+    });
+  });
+
+  it("keeps the loaded quarantine list after refresh failure and retries in place", async () => {
+    const props = { currentEmployee: { ...mockEmployee, department: "기타" } };
+    const { rerender } = render(<DefectHubPanel {...props} />);
+    fireEvent.click(screen.getByText("격리 목록"));
+    expect(await screen.findByText("7-TR-0001")).toBeInTheDocument();
+
+    vi.mocked(defectsApi.listDefects).mockRejectedValueOnce(new Error("refresh failed"));
+    realtime.revision = 1;
+    rerender(<DefectHubPanel {...props} />);
+
+    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+    expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
   });
 
   it("reconnects a process view to the fresh location and returns to the list when it disappears", async () => {
