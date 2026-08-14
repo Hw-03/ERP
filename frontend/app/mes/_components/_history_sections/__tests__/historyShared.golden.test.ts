@@ -974,11 +974,8 @@ describe("parseUtc", () => {
 // formatHistoryDate
 // ──────────────────────────────────────────────────────────────────
 describe("formatHistoryDate", () => {
-  it("MM/DD HH:mm 형식 반환", () => {
-    // UTC 2026-05-15T10:30:00Z → 로컬 시간 기준 포맷
-    const result = formatHistoryDate("2026-05-15T10:30:00Z");
-    // MM/DD HH:mm 형식 확인 (시간은 로컬 TZ에 따라 다름)
-    expect(result).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
+  it("KST MM/DD HH:mm 형식 반환", () => {
+    expect(formatHistoryDate("2026-05-15T15:30:00Z")).toBe("05/16 00:30");
   });
 });
 
@@ -986,9 +983,10 @@ describe("formatHistoryDate", () => {
 // formatHistoryDateTimeLong
 // ──────────────────────────────────────────────────────────────────
 describe("formatHistoryDateTimeLong", () => {
-  it("연 월 일 시 분 형식 반환", () => {
-    const result = formatHistoryDateTimeLong("2026-05-15T10:30:00Z");
-    expect(result).toMatch(/\d{4}년 \d+월 \d+일\s+\d{2}시 \d{2}분/);
+  it("KST 연 월 일 시 분 형식 반환", () => {
+    expect(formatHistoryDateTimeLong("2026-05-15T10:30:00Z")).toBe(
+      "2026년 5월 15일    19시 30분",
+    );
   });
 });
 
@@ -996,9 +994,8 @@ describe("formatHistoryDateTimeLong", () => {
 // toDateKey
 // ──────────────────────────────────────────────────────────────────
 describe("toDateKey", () => {
-  it("YYYY-MM-DD 형식 반환", () => {
-    const result = toDateKey("2026-05-15T10:30:00Z");
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  it("KST YYYY-MM-DD 형식 반환", () => {
+    expect(toDateKey("2026-05-15T15:30:00Z")).toBe("2026-05-16");
   });
 });
 
