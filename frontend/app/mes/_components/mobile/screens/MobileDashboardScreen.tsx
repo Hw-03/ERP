@@ -17,6 +17,7 @@ import { useDesktopInventoryDerivations } from "../../_hooks/useDesktopInventory
 import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
 import { useToggleSet } from "../../_hooks/useToggleSet";
 import {
+  DEFAULT_INVENTORY_FILTER_LOGIC,
   matchesInventoryCategoryFilters,
   matchesKpi,
   matchesSearch,
@@ -74,7 +75,7 @@ export function MobileDashboardScreen({
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>("OR");
+  const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>(DEFAULT_INVENTORY_FILTER_LOGIC);
   // 생산 가능 현황은 첫 화면 면적을 크게 차지하므로 기본 접힘 — 품목 목록을 위로 끌어올린다(리뷰 §4.2).
   const [capacityOpen, setCapacityOpen] = useState(false);
 
@@ -142,6 +143,7 @@ export function MobileDashboardScreen({
     displayItem,
     onSummaryChange,
   });
+  const hasNonDefaultFilterLogic = filterLogic !== DEFAULT_INVENTORY_FILTER_LOGIC;
 
   const resetAllFilters = useCallback(() => {
     setSelectedDepts([]);
@@ -149,7 +151,7 @@ export function MobileDashboardScreen({
     setSelectedProcessSteps([]);
     setLocalSearch("");
     setKpi("ALL");
-    setFilterLogic("OR");
+    setFilterLogic(DEFAULT_INVENTORY_FILTER_LOGIC);
   }, [setSelectedDepts, setSelectedModels, setSelectedProcessSteps]);
 
   const capacityBadge = capacityStatusBadge(capacityData);
@@ -286,6 +288,7 @@ export function MobileDashboardScreen({
             <div className="-mx-3 px-3 pb-2.5">
               <InventoryFilters
                 open={filtersOpen}
+                logic={filterLogic}
                 selectedDepts={selectedDepts}
                 selectedModels={selectedModels}
                 selectedProcessSteps={selectedProcessSteps}
@@ -297,7 +300,7 @@ export function MobileDashboardScreen({
                 onClearModels={() => setSelectedModels([])}
                 onClearProcessSteps={() => setSelectedProcessSteps([])}
                 onResetAll={resetAllFilters}
-                isAnyFilterActive={isFiltered}
+                isAnyFilterActive={isFiltered || hasNonDefaultFilterLogic}
               />
             </div>
           )}

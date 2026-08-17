@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DesktopInventoryView } from "../DesktopInventoryView";
@@ -31,7 +31,11 @@ vi.mock("../_hooks/useDesktopInventoryDerivations", () => ({
 }));
 
 vi.mock("../_inventory_sections/InventoryKpiPanel", () => ({
-  InventoryKpiPanel: () => <div data-testid="inventory-kpi-panel" />,
+  InventoryKpiPanel: ({ onChange }: { onChange: (key: "ALL") => void }) => (
+    <button type="button" onClick={() => onChange("ALL")}>
+      전체 초기화 KPI
+    </button>
+  ),
 }));
 
 vi.mock("../_inventory_sections/InventoryCapacityPanel", () => ({
@@ -39,7 +43,20 @@ vi.mock("../_inventory_sections/InventoryCapacityPanel", () => ({
 }));
 
 vi.mock("../_inventory_sections/InventoryFilterToggleButton", () => ({
-  InventoryFilterToggleButton: () => <button type="button">필터</button>,
+  InventoryFilterToggleButton: ({
+    logic,
+    onLogicChange,
+  }: {
+    logic: "AND" | "OR";
+    onLogicChange: (logic: "AND" | "OR") => void;
+  }) => (
+    <>
+      <output data-testid="filter-logic">{logic}</output>
+      <button type="button" onClick={() => onLogicChange("OR")}>
+        OR로 전환
+      </button>
+    </>
+  ),
 }));
 
 vi.mock("../_inventory_sections/InventoryFilterBar", () => ({
@@ -85,5 +102,23 @@ describe("DesktopInventoryView scrollbar", () => {
     );
 
     expect(container.querySelectorAll("section.desktop-flat-surface")).toHaveLength(2);
+  });
+
+  it("기본 AND에서 OR로 바꾼 뒤 전체 초기화하면 AND로 돌아간다", () => {
+    render(
+      <DesktopInventoryView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+        onGoToWarehouse={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("filter-logic")).toHaveTextContent("AND");
+
+    fireEvent.click(screen.getByRole("button", { name: "OR로 전환" }));
+    expect(screen.getByTestId("filter-logic")).toHaveTextContent("OR");
+
+    fireEvent.click(screen.getByRole("button", { name: "전체 초기화 KPI" }));
+    expect(screen.getByTestId("filter-logic")).toHaveTextContent("AND");
   });
 });

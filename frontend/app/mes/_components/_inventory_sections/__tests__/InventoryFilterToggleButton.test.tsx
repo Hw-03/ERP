@@ -3,20 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 import { InventoryFilterToggleButton } from "../InventoryFilterToggleButton";
 
 describe("InventoryFilterToggleButton", () => {
-  it("필터가 열렸을 때 OR 기본 토글을 표시하고 AND 선택을 전달한다", () => {
+  it("필터가 열렸을 때 전달된 AND 토글을 표시하고 OR 선택을 전달한다", () => {
     const onLogicChange = vi.fn();
 
     render(
       <InventoryFilterToggleButton
         filtersOpen
-        logic="OR"
+        logic="AND"
         onLogicChange={onLogicChange}
         onToggle={() => {}}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "OR" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "AND" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "AND" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "OR" })).toHaveAttribute("aria-pressed", "false");
 
     const filterButton = screen.getByRole("button", { name: "필터" });
     const andButton = screen.getByRole("button", { name: "AND" });
@@ -26,16 +26,16 @@ describe("InventoryFilterToggleButton", () => {
     expect(andButton).toHaveClass("h-full");
     expect(filterButton.compareDocumentPosition(andButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "AND" }));
+    fireEvent.click(screen.getByRole("button", { name: "OR" }));
 
-    expect(onLogicChange).toHaveBeenCalledWith("AND");
+    expect(onLogicChange).toHaveBeenCalledWith("OR");
   });
 
   it("필터가 닫혀 있으면 논리 토글을 표시하지 않는다", () => {
     const { rerender } = render(
       <InventoryFilterToggleButton
         filtersOpen={false}
-        logic="OR"
+        logic="AND"
         onLogicChange={() => {}}
         onToggle={() => {}}
       />,
@@ -51,7 +51,7 @@ describe("InventoryFilterToggleButton", () => {
     rerender(
       <InventoryFilterToggleButton
         filtersOpen
-        logic="OR"
+        logic="AND"
         onLogicChange={() => {}}
         onToggle={() => {}}
       />,

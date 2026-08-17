@@ -18,6 +18,7 @@ import { useToggleSet } from "./_hooks/useToggleSet";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import {
+  DEFAULT_INVENTORY_FILTER_LOGIC,
   matchesInventoryCategoryFilters,
   matchesKpi,
   matchesSearch,
@@ -69,7 +70,7 @@ export function DesktopInventoryView({
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>("OR");
+  const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>(DEFAULT_INVENTORY_FILTER_LOGIC);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSelectedItemRef = useRef<Item | null>(null);
@@ -85,6 +86,7 @@ export function DesktopInventoryView({
     useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
 
   const showUnclassified = selectedModels.includes("미분류");
+  const hasNonDefaultFilterLogic = filterLogic !== DEFAULT_INVENTORY_FILTER_LOGIC;
 
   const selectedSlots = useMemo(
     () => new Set(productModels.filter((m) => selectedModels.includes(m.model_name ?? "")).map((m) => m.slot)),
@@ -137,7 +139,7 @@ export function DesktopInventoryView({
     setSelectedProcessSteps([]);
     setLocalSearch("");
     setKpi("ALL");
-    setFilterLogic("OR");
+    setFilterLogic(DEFAULT_INVENTORY_FILTER_LOGIC);
   }
 
   return (
@@ -169,6 +171,7 @@ export function DesktopInventoryView({
             </div>
             <InventoryFilters
               open={filtersOpen}
+              logic={filterLogic}
               selectedDepts={selectedDepts}
               selectedModels={selectedModels}
               selectedProcessSteps={selectedProcessSteps}
@@ -185,7 +188,8 @@ export function DesktopInventoryView({
                 selectedModels.length > 0 ||
                 selectedProcessSteps.length > 0 ||
                 kpi !== "ALL" ||
-                localSearch.length > 0
+                localSearch.length > 0 ||
+                hasNonDefaultFilterLogic
               }
             />
           </section>

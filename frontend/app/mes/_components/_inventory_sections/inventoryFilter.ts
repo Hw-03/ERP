@@ -4,6 +4,7 @@ import { mesCodeDept } from "@/lib/mes/process";
 import type { KpiFilter } from "./InventoryKpiPanel";
 
 export type InventoryFilterLogic = "OR" | "AND";
+export const DEFAULT_INVENTORY_FILTER_LOGIC: InventoryFilterLogic = "AND";
 
 type InventoryCategoryFilters = {
   selectedDepts: string[];
@@ -40,24 +41,20 @@ export function matchesKpi(item: Item, kpi: KpiFilter): boolean {
   return true;
 }
 
-export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCategoryFilters): boolean {
-  const selectedDepartmentMatches = filters.selectedDepts.map((department) => {
-    const hasDepartmentStock =
-      department === "창고"
+function matchesDepartmentGroup(item: Item, selectedDepts: string[]): boolean | null {
+  if (selectedDepts.length === 0) return null;
+
+  return selectedDepts.some((department) =>
+    department === "창고"
       ? (item.warehouse_qty ?? 0) > 0
-      : item.locations.some(
-          (location) => location.department === department && (location.quantity ?? 0) > 0,
-        );
-    return filters.logic === "AND"
-      ? hasDepartmentStock
-      : hasDepartmentStock || item.department === department || mesCodeDept(item.mes_code) === department;
-  });
-  const departmentMatch =
-    filters.selectedDepts.length > 0
-      ? filters.logic === "AND"
-        ? selectedDepartmentMatches.every(Boolean)
-        : selectedDepartmentMatches.some(Boolean)
-      : null;
+      : item.department === department ||
+        mesCodeDept(item.mes_code) === department ||
+        item.locations.some((location) => location.department === department),
+  );
+}
+
+export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCategoryFilters): boolean {
+  const departmentMatch = matchesDepartmentGroup(item, filters.selectedDepts);
   const modelMatch =
     filters.selectedSlots.size > 0 || filters.showUnclassified
       ? (filters.selectedSlots.size > 0 && item.model_slots.some((slot) => filters.selectedSlots.has(slot))) ||

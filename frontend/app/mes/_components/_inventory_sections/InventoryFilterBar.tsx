@@ -4,6 +4,7 @@ import { Layers, RotateCcw, Search, Sparkles, TrendingUp } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
+import type { InventoryFilterLogic } from "./inventoryFilter";
 
 const DEPT_CHIPS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
@@ -16,6 +17,7 @@ const PROCESS_STEP_CHIPS: { value: "R" | "A" | "F" | "DEFECT"; label: string }[]
 
 type FiltersProps = {
   open: boolean;
+  logic: InventoryFilterLogic;
   selectedDepts: string[];
   selectedModels: string[];
   selectedProcessSteps: string[];
@@ -32,6 +34,7 @@ type FiltersProps = {
 
 export function InventoryFilters({
   open,
+  logic,
   selectedDepts,
   selectedModels,
   selectedProcessSteps,
@@ -48,6 +51,18 @@ export function InventoryFilters({
   if (!open) return null;
   return (
     <div id="inventory-filter-panel" className="mt-2.5 grid gap-2.5 xl:grid-cols-3">
+      <p
+        aria-live="polite"
+        className="xl:col-span-3 text-xs font-semibold"
+        style={{ color: LEGACY_COLORS.muted2 }}
+      >
+        <span>
+          {logic === "AND"
+            ? "선택한 부서·모델·공정을 모두 만족합니다."
+            : "선택한 부서·모델·공정 중 하나만 만족해도 됩니다."}
+        </span>{" "}
+        <span>같은 구분에서 여러 항목을 선택하면 하나만 일치해도 됩니다.</span>
+      </p>
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-bold">
           <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MobileDashboardScreen } from "../MobileDashboardScreen";
 
@@ -47,7 +47,11 @@ vi.mock("../../../_inventory_sections/InventoryCapacityPanel", () => ({
 }));
 
 vi.mock("../../../_inventory_sections/InventoryFilterBar", () => ({
-  InventoryFilters: () => null,
+  InventoryFilters: ({ onResetAll }: { onResetAll: () => void }) => (
+    <button type="button" onClick={onResetAll}>
+      전체 초기화
+    </button>
+  ),
 }));
 
 vi.mock("../../../_inventory_sections/InventoryItemsTable", () => ({
@@ -70,5 +74,24 @@ describe("MobileDashboardScreen", () => {
 
     expect(screen.getByTestId("kpi-panel")).toBeInTheDocument();
     expect(screen.queryByText("총 1건")).toBeNull();
+  });
+
+  it("기본 AND에서 OR로 바꾼 뒤 전체 초기화하면 AND로 돌아간다", () => {
+    render(
+      <MobileDashboardScreen
+        globalSearch=""
+        onStatusChange={() => {}}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "필터 열기" }));
+    expect(screen.getByRole("button", { name: "AND" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "OR" }));
+    expect(screen.getByRole("button", { name: "OR" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "전체 초기화" }));
+    expect(screen.getByRole("button", { name: "AND" })).toHaveAttribute("aria-pressed", "true");
   });
 });
