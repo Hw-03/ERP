@@ -98,6 +98,32 @@ def _preview_warehouse_adjust(
     )
 
 
+def _preview_department_single_adjustment(
+    client,
+    requester: Employee,
+    item,
+    *,
+    sub_type: str,
+    quantity: int = 1,
+):
+    return client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": sub_type,
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "manual",
+                    "item_id": str(item.item_id),
+                    "quantity": quantity,
+                }
+            ],
+        },
+    )
+
+
 def _internal_use_bundles(
     item,
     *,
@@ -1114,6 +1140,7 @@ def test_io_immediate_adjust_in_increases_production_quantity(
             "work_type": "process",
             "sub_type": "adjust_in",
             "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": "adjust in test",
             "bundles": preview.json()["bundles"],
         },
     )
@@ -1180,6 +1207,7 @@ def test_io_submit_merges_duplicate_manual_single_item_bundles(
             "work_type": "process",
             "sub_type": "adjust_in",
             "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": "duplicate merge",
             "bundles": [first_bundle, duplicate_bundle],
         },
     )
@@ -1235,6 +1263,7 @@ def test_io_draft_resave_and_submit_merges_duplicate_manual_single_item_bundles(
             "work_type": "process",
             "sub_type": "adjust_in",
             "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": "draft duplicate merge",
             "bundles": [first_bundle, duplicate_bundle],
         },
     )
@@ -1262,6 +1291,7 @@ def test_io_draft_resave_and_submit_merges_duplicate_manual_single_item_bundles(
             "sub_type": "adjust_in",
             "to_department": DepartmentEnum.ASSEMBLY.value,
             "batch_id": batch_id,
+            "notes": "draft duplicate merge",
             "bundles": fetched_bundles,
         },
     )
@@ -1384,6 +1414,7 @@ def test_io_immediate_adjust_out_decreases_production_quantity(
             "work_type": "process",
             "sub_type": "adjust_out",
             "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": "adjust out test",
             "bundles": preview.json()["bundles"],
         },
     )
@@ -1787,6 +1818,7 @@ def test_io_submit_adjust_out_blocks_on_shortage(
             "work_type": "process",
             "sub_type": "adjust_out",
             "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": "shortage validation",
             "bundles": preview.json()["bundles"],
         },
     )
@@ -2075,6 +2107,132 @@ def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_it
 # ---------------------------------------------------------------------------
 # 원자성 회귀 — io 제출 실패 시 부분 상태 없음
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("sub_type", ["adjust_in", "adjust_out"])
+@pytest.mark.parametrize("notes", [None, "", " \t "])
+def test_io_submit_requires_memo_for_department_single_adjustment(
+    client, db_session, make_item, make_location, sub_type, notes
+):
+    item = make_item(name=f"Memo required {sub_type}", warehouse_qty=Decimal("0"))
+    if sub_type == "adjust_out":
+        make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("3"))
+        db_session.flush()
+        db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one().quantity = Decimal("3")
+    requester = _make_employee(db_session, department_role="primary")
+    db_session.commit()
+
+    preview = _preview_department_single_adjustment(
+        client, requester, item, sub_type=sub_type
+    )
+    assert preview.status_code == 200, preview.text
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": sub_type,
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+        "bundles": preview.json()["bundles"],
+    }
+    if notes is not None:
+        payload["notes"] = notes
+
+    response = client.post("/api/io/submit", json=payload)
+
+    assert response.status_code == 422, response.json()
+    assert "메모" in str(response.json())
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(StockRequest).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+
+def test_io_submit_with_memo_keeps_department_approval_request_and_notes(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Memo approval request", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = _preview_department_single_adjustment(
+        client, requester, item, sub_type="adjust_in"
+    )
+    assert preview.status_code == 200, preview.text
+
+    response = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": "awaiting department approval",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+    assert response.json()["status"] == "submitted"
+    assert response.json()["requires_approval"] is True
+    batch = db_session.query(IoBatch).one()
+    request = db_session.query(StockRequest).one()
+    assert batch.notes == "awaiting department approval"
+    assert request.notes == "awaiting department approval"
+    assert request.status == StockRequestStatusEnum.SUBMITTED
+    assert request.department_approved_by_employee_id is None
+    assert db_session.query(TransactionLog).count() == 0
+
+
+def test_io_draft_submission_requires_memo_without_changing_draft(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Draft memo required", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("0"))
+    requester = _make_employee(db_session, department_role="primary")
+    db_session.commit()
+
+    preview = _preview_department_single_adjustment(
+        client, requester, item, sub_type="adjust_in"
+    )
+    assert preview.status_code == 200, preview.text
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": "adjust_in",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+        "bundles": preview.json()["bundles"],
+    }
+
+    drafted = client.put("/api/io/draft", json=payload)
+    assert drafted.status_code == 200, drafted.text
+    batch_id = drafted.json()["batch_id"]
+
+    rejected = client.post(
+        f"/api/io/draft/{batch_id}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert rejected.status_code == 422, rejected.json()
+    db_session.expire_all()
+    draft = db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one()
+    assert draft.status == "draft"
+    assert draft.submitted_at is None
+    assert db_session.query(StockRequest).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+    updated = client.put(
+        "/api/io/draft",
+        json={**payload, "batch_id": batch_id, "notes": "재고 실사 차이"},
+    )
+    assert updated.status_code == 200, updated.text
+    submitted = client.post(
+        f"/api/io/draft/{batch_id}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    db_session.expire_all()
+    assert db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one().notes == "재고 실사 차이"
+    assert db_session.query(TransactionLog).one().notes == "재고 실사 차이"
 
 
 def test_io_submit_rolls_back_fully_on_shortage(client, db_session, make_item, make_bom):

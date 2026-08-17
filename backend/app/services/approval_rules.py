@@ -27,3 +27,6 @@ APPROVAL_SUB_TYPES: frozenset[str] = WAREHOUSE_APPROVAL_SUB_TYPES | frozenset(
 # 낱개 라인 origin — 1라인이라도 포함되면 부서 결재 정/부 승인이 필요.
 # 프론트 IoLine.origin / ioWorkType.MANUAL_ORIGINS 와 동기화.
 MANUAL_LINE_ORIGINS: frozenset[str] = frozenset({"manual", "adjust_in", "adjust_out"})
+
+# 부서 입출고의 낱개 입고·출고는 부서 결재 요청 전에 메모를 반드시 남긴다.
+MEMO_REQUIRED_SUB_TYPES: frozenset[str] = frozenset({"adjust_in", "adjust_out"})

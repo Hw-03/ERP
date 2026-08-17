@@ -27,6 +27,7 @@ from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
+from app.services.approval_rules import MEMO_REQUIRED_SUB_TYPES
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     INTERNAL_USE_SUB_TYPE,
@@ -50,6 +51,16 @@ from app.services.io_persist import (
 
 def _included_lines(batch: IoBatch) -> list[IoLine]:
     return [line for bundle in batch.bundles for line in bundle.lines if line.included]
+
+
+def _validate_required_memo(*, work_type: str, sub_type: str, notes: str | None) -> None:
+    """부서 낱개 입출고 제출은 공백이 아닌 메모를 요구한다."""
+    if (
+        work_type == "process"
+        and sub_type in MEMO_REQUIRED_SUB_TYPES
+        and not (notes or "").strip()
+    ):
+        raise ValueError("낱개 부서 입출고는 메모를 입력해야 합니다.")
 
 
 def _fmt_qty(d: Decimal) -> str:
@@ -552,6 +563,11 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
 
 
 def submit(db: Session, payload) -> dict:
+    _validate_required_memo(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        notes=payload.notes,
+    )
     requester = _load_requester(db, payload.requester_employee_id)
     batch = _persist_batch(
         db,
@@ -578,6 +594,11 @@ def submit_existing_draft(
     if batch.status != "draft":
         raise ValueError("임시저장 상태가 아닙니다.")
     ensure_batch_is_mutable(batch)
+    _validate_required_memo(
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        notes=batch.notes,
+    )
     requester = _load_requester(db, requester_employee_id)
     batch.status = "submitted"
     batch.submitted_at = datetime.utcnow()

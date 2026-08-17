@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBundle, IoSubType, IoWorkType } from "@/lib/api";
@@ -64,7 +65,51 @@ function renderConfirmStep() {
   );
 }
 
+function DepartmentSingleAdjustHarness({ initialNotes = "" }: { initialNotes?: string }) {
+  const [notes, setNotes] = useState(initialNotes);
+  const adjustmentLine = {
+    ...parentLine,
+    direction: "adjust" as const,
+    from_bucket: "production" as const,
+    from_department: "조립",
+    to_bucket: "none" as const,
+    to_department: null,
+    origin: "manual",
+  };
+
+  return (
+    <IoConfirmStep
+      workType="process"
+      subType="adjust_out"
+      bundles={[{ ...bundle, source_kind: "direct_item", lines: [adjustmentLine] }]}
+      notes={notes}
+      hasShortage={false}
+      hasInvalidQuantity={false}
+      submitting={false}
+      saving={false}
+      approvalKind="department"
+      onNotesChange={setNotes}
+      onSubmit={() => {}}
+      onSaveDraft={vi.fn()}
+    />
+  );
+}
+
 describe("IoConfirmStep", () => {
+  it("requires a non-blank memo before submitting a department single adjustment", () => {
+    render(<DepartmentSingleAdjustHarness />);
+
+    expect(screen.getByText("메모 (필수)")).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveAttribute("aria-required", "true");
+    expect(screen.getByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "저장" })).toBeEnabled();
+
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "재고 실사 차이" } });
+
+    expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeEnabled();
+  });
+
   it("창고 보정 입고는 BOM 없이 즉시 반영 확인 문구를 사용한다", () => {
     const adjustmentLine = {
       ...parentLine,

@@ -9,6 +9,7 @@
 import re
 from pathlib import Path
 
+from app.services import approval_rules
 from app.services.approval_rules import (
     MANUAL_LINE_ORIGINS,
     WAREHOUSE_APPROVAL_SUB_TYPES,
@@ -38,6 +39,16 @@ def test_manual_origins_fe_be_parity():
     assert fe == set(MANUAL_LINE_ORIGINS), (
         f"낱개 라인 origin drift — FE {sorted(fe)} != BE {sorted(MANUAL_LINE_ORIGINS)}. "
         "approval_rules.MANUAL_LINE_ORIGINS 와 ioWorkType.MANUAL_ORIGINS 를 함께 갱신할 것."
+    )
+
+
+def test_memo_required_sub_types_fe_be_parity():
+    """FE memo-required subtype set matches the backend policy."""
+    fe = _strings_in(_match(r"MEMO_REQUIRED_SUB_TYPES\s*=\s*new Set\(\[(.*?)\]\)"))
+    be = set(getattr(approval_rules, "MEMO_REQUIRED_SUB_TYPES", ()))
+    assert fe == be, (
+        f"memo-required subtype drift: FE {sorted(fe)} != BE {sorted(be)}. "
+        "Update approval_rules.MEMO_REQUIRED_SUB_TYPES and ioWorkType.MEMO_REQUIRED_SUB_TYPES together."
     )
 
 

@@ -16,6 +16,7 @@ import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import {
   deptIoDisplayLabel,
   isWarehouseAdjustSubType,
+  requiresMemoForDepartmentSingleAdjustment,
   subTypeLabel,
   type ApprovalKind,
 } from "./ioWorkType";
@@ -190,10 +191,15 @@ export function IoConfirmStep({
   const displayBundles = bundles.filter((b) =>
     b.lines.some((l) => l.included && !bomParentLineIds.has(l.line_id)),
   );
+  const memoRequired = requiresMemoForDepartmentSingleAdjustment(workType, subType);
+  const memoMissing = memoRequired && !notes.trim();
 
   const submitDisabled =
-    submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
+    submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity || memoMissing;
   const saveDisabled = submitting || saving || bundles.length === 0;
+  const memoBlockerText = memoMissing
+    ? "메모를 입력해야 부서 결재 요청을 할 수 있습니다."
+    : null;
   const accent = directionAccent(subType);
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
@@ -253,12 +259,19 @@ export function IoConfirmStep({
 
       {/* 항목 7-4 — 메모를 액션 푸터 밖(스크롤 영역 바로 아래 정적 요소)으로 분리해 버튼 위에 끼지 않게 한다.
           버튼 행은 Step4(IoBundleCart) 와 동일한 sticky 푸터로 통일 → 두 단계 버튼의 화면상 위치(네비바와의 간격)가 일치. */}
-      <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
+      <Field
+        label={memoRequired ? "메모 (필수)" : "메모 (선택)"}
+        value={notes}
+        onChange={onNotesChange}
+        placeholder="작업 메모"
+        required={memoRequired}
+        invalid={memoMissing}
+      />
 
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
       <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-1 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
         {/* blocker */}
-        {blockerText && (
+        {(blockerText ?? memoBlockerText) && (
           <div
             className="rounded-[16px] border px-4 py-3 text-center text-sm font-bold"
             style={{
@@ -267,7 +280,7 @@ export function IoConfirmStep({
               color: LEGACY_COLORS.yellow,
             }}
           >
-            {blockerText}
+            {blockerText ?? memoBlockerText}
           </div>
         )}
 
@@ -537,11 +550,15 @@ function Field({
   value,
   onChange,
   placeholder,
+  required = false,
+  invalid = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  required?: boolean;
+  invalid?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-2">
@@ -552,6 +569,9 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        required={required}
+        aria-required={required}
+        aria-invalid={invalid || undefined}
         className="h-14 rounded-[16px] border px-4 text-base font-bold outline-none focus:border-[var(--c-blue)]"
         style={{
           background: LEGACY_COLORS.s2,
