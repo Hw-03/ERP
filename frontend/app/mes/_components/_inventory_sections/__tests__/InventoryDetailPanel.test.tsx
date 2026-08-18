@@ -445,7 +445,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(screen.getByText("기존 요청자")).toBeInTheDocument();
   });
 
-  it("renders modal BOM rows as one aligned grid without tree rails", async () => {
+  it("renders modal BOM rows as a five-column grid without a type cell or tree rails", async () => {
     const nestedTree: BOMTreeNode = {
       ...bomTree,
       children: [{
@@ -471,8 +471,9 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(screen.getByTestId("bom-modal-grid-header")).toHaveClass("bom-modal-grid", "sticky", "top-0");
     expect(row).toHaveClass("bom-modal-grid");
     expect(within(row).getByRole("button", { expanded: false })).toHaveClass("bom-modal-toggle");
-    expect(within(row).getByText("Packaging")).toBeInTheDocument();
-    expect(within(row).queryByText("조립")).not.toBeInTheDocument();
+    expect(screen.getByTestId("bom-modal-grid-header")).not.toHaveTextContent("유형");
+    expect(within(row).queryByText("Packaging")).not.toBeInTheDocument();
+    expect(within(row).getByTestId("bom-modal-code")).toHaveTextContent("46-AA-0081");
     expect(within(row).getByText("1.5EA")).toHaveClass("text-center");
     expect(within(row).getByText("10 EA")).toHaveClass("text-center");
     expect(screen.queryByTestId("bom-modal-rail")).not.toBeInTheDocument();
@@ -483,7 +484,33 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     const nestedName = await screen.findByText("nested-component");
     const nestedRow = nestedName.closest("[data-testid='bom-modal-row']")!;
     expect(nestedRow).toHaveAttribute("data-depth", "1");
-    expect(within(nestedRow).getByTestId("bom-modal-name-cell")).toHaveStyle({ paddingLeft: "32px" });
+    expect(within(nestedRow).getByTestId("bom-modal-name-cell")).toHaveStyle({ paddingLeft: "36px" });
+  });
+
+  it("강조 가능한 정형 코드만 분해하고 비정형 코드는 원문 단일 텍스트로 유지한다", async () => {
+    const codes = ["46-AA-0081", "46-AA-0081-extra", "46--0081", "46-AA"];
+    vi.spyOn(api, "getBOMTree").mockResolvedValue({
+      ...bomTree,
+      children: codes.map((mes_code, index) => ({
+        ...bomTree.children[0],
+        item_id: `component-${index}`,
+        item_name: `코드 ${index}`,
+        mes_code,
+      })),
+    });
+    render(<BomSubExpander itemId="item-1" open modal />);
+
+    await screen.findByText("코드 0");
+    const [canonicalCode, ...malformedCodes] = screen.getAllByTestId("bom-modal-code");
+    const stage = canonicalCode.querySelector("span[style*='--c-process-aa']");
+    expect(stage).toHaveTextContent("-AA");
+    expect(stage).toHaveStyle({ color: "var(--c-process-aa)" });
+    expect(stage).toHaveClass("font-black");
+
+    malformedCodes.forEach((code, index) => {
+      expect(code).toHaveTextContent(codes[index + 1]);
+      expect(code.childElementCount).toBe(0);
+    });
   });
 
   it("does not render stale BOM responses after item changes and a rapid reopen", async () => {
@@ -587,8 +614,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(row).toBeDefined();
     const rowContext = within(row!);
     expect(rowContext.getByText(longItemName)).toBeInTheDocument();
-    expect(rowContext.getByText("-")).toBeInTheDocument();
-    expect(rowContext.getByText("46-AA-0081")).toBeInTheDocument();
+    expect(rowContext.getByTestId("bom-modal-code")).toHaveTextContent("46-AA-0081");
     expect(rowContext.getByText("2EA")).toHaveClass("text-center");
     expect(rowContext.getByText("10 EA")).toHaveClass("text-center");
     expect(row).toHaveClass("bom-modal-grid");

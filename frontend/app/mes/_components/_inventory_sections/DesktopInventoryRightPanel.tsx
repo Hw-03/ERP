@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Item } from "@/lib/api";
 import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
@@ -13,6 +13,8 @@ const INVENTORY_DETAIL_TAB_ID = "desktop-inventory-detail-tab";
 const INVENTORY_HISTORY_TAB_ID = "desktop-inventory-history-tab";
 const INVENTORY_DETAIL_PANEL_ID = "desktop-inventory-detail-panel";
 const INVENTORY_HISTORY_PANEL_ID = "desktop-inventory-history-panel";
+const INVENTORY_TABS = ["detail", "history"] as const;
+type InventoryTab = (typeof INVENTORY_TABS)[number];
 
 /**
  * Round-13 (#9) 추출 — DesktopInventoryView 우측 슬라이딩 상세 패널.
@@ -40,7 +42,30 @@ export function DesktopInventoryRightPanel({
   canReceive,
   imageFilename,
 }: DesktopInventoryRightPanelProps) {
-  const [activeTab, setActiveTab] = useState<"detail" | "history">("detail");
+  const [activeTab, setActiveTab] = useState<InventoryTab>("detail");
+  const detailTabRef = useRef<HTMLButtonElement>(null);
+  const historyTabRef = useRef<HTMLButtonElement>(null);
+
+  function selectTab(nextTab: InventoryTab, moveFocus = false) {
+    setActiveTab(nextTab);
+    if (moveFocus) (nextTab === "detail" ? detailTabRef : historyTabRef).current?.focus();
+  }
+
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    const currentIndex = INVENTORY_TABS.indexOf(activeTab);
+    const nextTab = event.key === "ArrowRight"
+      ? INVENTORY_TABS[(currentIndex + 1) % INVENTORY_TABS.length]
+      : event.key === "ArrowLeft"
+        ? INVENTORY_TABS[(currentIndex - 1 + INVENTORY_TABS.length) % INVENTORY_TABS.length]
+        : event.key === "Home"
+          ? INVENTORY_TABS[0]
+          : event.key === "End"
+            ? INVENTORY_TABS[INVENTORY_TABS.length - 1]
+            : null;
+    if (!nextTab) return;
+    event.preventDefault();
+    selectTab(nextTab, true);
+  }
 
   useEffect(() => {
     setActiveTab("detail");
@@ -61,21 +86,24 @@ export function DesktopInventoryRightPanel({
           subtitleBadge={headerBadge}
           onClose={onClose}
           topContent={
-            <div className="px-1 pt-1">
+            <div className="pr-3">
               <div
                 aria-label="재고 상세 보기"
-                className="flex gap-1 rounded-[12px] p-1"
+                className="inline-flex w-fit gap-1 rounded-[12px] p-1"
                 role="tablist"
                 style={{ background: "color-mix(in srgb, var(--c-blue) 8%, transparent)" }}
               >
                 <button
+                  ref={detailTabRef}
                   id={INVENTORY_DETAIL_TAB_ID}
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "detail"}
                   aria-controls={INVENTORY_DETAIL_PANEL_ID}
-                  onClick={() => setActiveTab("detail")}
-                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  tabIndex={activeTab === "detail" ? 0 : -1}
+                  onClick={() => selectTab("detail")}
+                  onKeyDown={handleTabKeyDown}
+                  className="min-h-9 shrink-0 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
                   style={{
                     background: activeTab === "detail" ? "var(--c-s1)" : "transparent",
                     color: activeTab === "detail" ? "var(--c-text)" : "var(--c-muted2)",
@@ -84,13 +112,16 @@ export function DesktopInventoryRightPanel({
                   상세 정보
                 </button>
                 <button
+                  ref={historyTabRef}
                   id={INVENTORY_HISTORY_TAB_ID}
                   type="button"
                   role="tab"
                   aria-selected={activeTab === "history"}
                   aria-controls={INVENTORY_HISTORY_PANEL_ID}
-                  onClick={() => setActiveTab("history")}
-                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  tabIndex={activeTab === "history" ? 0 : -1}
+                  onClick={() => selectTab("history")}
+                  onKeyDown={handleTabKeyDown}
+                  className="min-h-9 shrink-0 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
                   style={{
                     background: activeTab === "history" ? "var(--c-s1)" : "transparent",
                     color: activeTab === "history" ? "var(--c-text)" : "var(--c-muted2)",

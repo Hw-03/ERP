@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ClipboardCheck } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import { PIN_LENGTH } from "@/lib/auth/constants";
-import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { LoadFailureCard, LoadingSkeleton } from "../common";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import { useWarehouseQueueQuery, useApproveStockRequestMutation, useRejectStockRequestMutation } from "@/lib/queries/useStockRequestsQuery";
 import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
+import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 
 interface Props {
   targetRequestId?: string | null;
@@ -98,11 +101,15 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
       {error && <LoadFailureCard message={error} onRetry={() => void refetch()} />}
       {!loading && items.length === 0 && !error && (
-        <EmptyState variant="no-data" compact title="승인 대기 중인 요청이 없습니다." />
+        <WarehouseEmptyWorkArea
+          icon={<ClipboardCheck style={{ color: LEGACY_COLORS.green }} />}
+          title="승인 대기 중인 요청이 없습니다."
+          description="새 요청이 도착하면 여기에서 승인할 수 있습니다."
+        />
       )}
       {prioritizeTargetRequest(items, targetRequestId).map((req) => (
         <WarehouseQueueRow

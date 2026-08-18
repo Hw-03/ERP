@@ -3401,6 +3401,7 @@ describe("DesktopShippingView", () => {
     const historyRequest = request({
       request_id: "history-header-layout",
       status: "PICKED_UP",
+      invoice_number: "INV-HISTORY",
       final_pf_item_name: "완료 PF",
       picked_up_at: "2026-08-12T01:00:00Z",
       serial_numbers: "34M25H0490 ~ 34M25H0493 (4개)",
@@ -3416,8 +3417,16 @@ describe("DesktopShippingView", () => {
     const viewHeader = screen.getByTestId("shipping-history-view-header");
     const headerRight = within(viewHeader).getByTestId("shipping-view-header-right");
     expect(headerRight).toHaveClass("min-w-[min(100%,620px)]", "basis-[620px]", "flex-1", "flex-wrap");
-    expect(within(viewHeader).getByTestId("shipping-history-serial-summary")).toHaveTextContent("34M25H0490 ~ 34M25H0493 (4개)");
-    expect(within(viewHeader).getByTestId("shipping-invoice-editor")).toBeInTheDocument();
+    const serialSummary = within(viewHeader).getByTestId("shipping-history-serial-summary");
+    expect(serialSummary).toHaveTextContent("34M25H0490 ~ 34M25H0493 (4개)");
+    expect(serialSummary).toHaveClass("min-h-[64px]", "min-w-[280px]", "basis-[280px]", "grow");
+    const invoiceEditor = within(viewHeader).getByTestId("shipping-invoice-editor");
+    expect(invoiceEditor).toHaveClass("min-w-[280px]", "basis-[280px]", "grow");
+    const invoiceShell = within(invoiceEditor).getByTestId("shipping-invoice-field-shell");
+    expect(invoiceShell).toHaveClass("min-h-[64px]", "rounded-[14px]", "border");
+    expect(invoiceShell).toContainElement(within(invoiceEditor).getByText("인보이스 번호"));
+    expect(invoiceShell).toContainElement(within(invoiceEditor).getByRole("textbox", { name: "인보이스 번호" }));
+    expect(invoiceShell).toContainElement(within(invoiceEditor).getByRole("button", { name: "인보이스 번호 저장" }));
     const header = within(detail).getByTestId("shipping-history-detail-header");
     const actions = within(header).getByTestId("shipping-history-detail-actions");
     expect(actions).toHaveClass("items-center");

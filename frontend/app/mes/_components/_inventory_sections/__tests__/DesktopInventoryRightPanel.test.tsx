@@ -53,6 +53,9 @@ describe("DesktopInventoryRightPanel", () => {
     expect(title.compareDocumentPosition(tabpanel) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(detailTab).toHaveAttribute("aria-selected", "true");
+    expect(tablist).toHaveClass("inline-flex", "w-fit");
+    expect(tablist.parentElement).toHaveClass("pr-3");
+    expect(tablist.parentElement).not.toHaveClass("pt-1");
     expect(screen.getByText("상세 내용")).toBeInTheDocument();
 
     fireEvent.click(historyTab);
@@ -88,6 +91,42 @@ describe("DesktopInventoryRightPanel", () => {
 
     expect(screen.getByRole("tab", { name: "상세 정보" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("상세 내용")).toBeInTheDocument();
+  });
+
+  it("선택 탭만 탭 순서에 두고 방향키와 Home/End로 선택과 포커스를 이동한다", () => {
+    const item = makeItem();
+    render(
+      <DesktopInventoryRightPanel
+        selectedItem={item}
+        displayItem={item}
+        headerBadge={null}
+        onClose={() => {}}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    const detailTab = screen.getByRole("tab", { name: "상세 정보" });
+    const historyTab = screen.getByRole("tab", { name: "최근 내역" });
+    expect(detailTab).toHaveAttribute("tabindex", "0");
+    expect(historyTab).toHaveAttribute("tabindex", "-1");
+
+    detailTab.focus();
+    fireEvent.keyDown(detailTab, { key: "ArrowRight" });
+    expect(historyTab).toHaveFocus();
+    expect(historyTab).toHaveAttribute("aria-selected", "true");
+    expect(historyTab).toHaveAttribute("tabindex", "0");
+    expect(detailTab).toHaveAttribute("tabindex", "-1");
+
+    fireEvent.keyDown(historyTab, { key: "Home" });
+    expect(detailTab).toHaveFocus();
+    expect(detailTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(detailTab, { key: "End" });
+    expect(historyTab).toHaveFocus();
+    fireEvent.keyDown(historyTab, { key: "ArrowRight" });
+    expect(detailTab).toHaveFocus();
+    fireEvent.keyDown(detailTab, { key: "ArrowLeft" });
+    expect(historyTab).toHaveFocus();
   });
 
   it("keeps modal dialog semantics while using one red card close button", () => {

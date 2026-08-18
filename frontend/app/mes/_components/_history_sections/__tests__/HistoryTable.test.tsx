@@ -53,6 +53,17 @@ describe("HistoryTable hierarchy", () => {
       "border",
     );
     expect(container.querySelectorAll("[data-history-loading-row='true']")).toHaveLength(8);
+    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("rounded-tl-[22px]");
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("rounded-tr-[22px]");
+    expect(screen.getByTestId("history-table-surface")).not.toHaveClass("overflow-y-auto");
+  });
+
+  it("keeps both sticky header corners aligned with the table surface", () => {
+    renderTable([{ type: "solo", log: makeLog() }]);
+
+    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "rounded-tl-[22px]");
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("sticky", "rounded-tr-[22px]");
+    expect(screen.getByTestId("history-table-surface")).not.toHaveClass("overflow-y-auto");
   });
 
   it("keeps existing rows visible and retries from a non-blocking refresh failure", () => {

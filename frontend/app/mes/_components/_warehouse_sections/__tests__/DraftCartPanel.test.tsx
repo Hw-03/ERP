@@ -28,6 +28,7 @@ describe("DraftCartPanel empty state", () => {
     );
 
     expect(screen.getByText("작업 중인 요청이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-empty-work-area")).toHaveClass("flex-1", "min-h-0");
     fireEvent.click(screen.getByRole("button", { name: "요청 작성" }));
     expect(onStartCompose).toHaveBeenCalledOnce();
   });

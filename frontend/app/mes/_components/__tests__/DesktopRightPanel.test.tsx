@@ -1,8 +1,20 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { DesktopRightPanel, DesktopRightPanelFooter } from "../DesktopRightPanel";
+import { createRef } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { DesktopPanelCloseButton, DesktopRightPanel, DesktopRightPanelFooter } from "../DesktopRightPanel";
 
 describe("DesktopRightPanel", () => {
+  it("forwards its button ref and uses the default panel-close label", () => {
+    const ref = createRef<HTMLButtonElement>();
+    const onClick = vi.fn();
+    render(<DesktopPanelCloseButton ref={ref} onClick={onClick} />);
+
+    const button = screen.getByRole("button", { name: "패널 닫기" });
+    expect(ref.current).toBe(button);
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   it("exposes a labelled title target while keeping the two-line clamp", () => {
     const title = "ADX6000s_80kV, 5mA_USA_Dexcowin Global 전체 품목명";
     render(

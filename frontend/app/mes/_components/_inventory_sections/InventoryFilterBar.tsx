@@ -174,9 +174,9 @@ export function InventoryTableStickyHeader({
 }: StickyHeaderProps) {
   return (
     <div
-      className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 rounded-t-[28px]"
+      className="sticky top-0 z-20 -mx-5 -mt-5 mb-0 rounded-t-[28px]"
       style={{
-        background: "inherit",
+        background: "var(--c-popup-bg)",
       }}
     >
       <div className="flex flex-wrap items-center gap-2.5 px-5 pb-3 pt-5">

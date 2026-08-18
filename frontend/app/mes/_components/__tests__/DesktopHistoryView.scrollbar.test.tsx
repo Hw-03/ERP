@@ -48,12 +48,11 @@ describe("DesktopHistoryView scrollbar", () => {
     expect(viewport).not.toHaveClass("border");
     expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
     expect(viewport).not.toHaveClass("overflow-y-auto");
-    expect(screen.queryByTestId("history-list-scroller")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("history-controls")).not.toBeInTheDocument();
     expect(screen.queryByTestId("history-list-card")).not.toBeInTheDocument();
-    expect(historyTable.parentElement).toHaveClass("flex", "flex-col", "gap-3");
+    expect(historyTable.parentElement).toHaveClass("flex", "flex-col", "gap-2");
     expect(screen.getByTestId("history-filter-bar")).toHaveAttribute("data-flat-surface", "true");
-    expect(scroller).not.toHaveClass("rounded-[28px]", "desktop-flat-surface");
-    expect(scroller).not.toHaveClass("border");
+    expect(scroller).not.toHaveClass("rounded-[28px]", "desktop-flat-surface", "border");
     expect(scroller).not.toHaveStyle({ background: "var(--c-s1)" });
   });
 });

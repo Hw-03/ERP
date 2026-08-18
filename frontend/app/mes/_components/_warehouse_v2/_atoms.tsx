@@ -93,8 +93,6 @@ export function WizardStepCard({
         style={{
           backgroundColor: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
-          boxShadow: "var(--c-card-shadow)",
-          backgroundImage: "var(--c-panel-glow)",
           ...animStyle,
         }}
       >

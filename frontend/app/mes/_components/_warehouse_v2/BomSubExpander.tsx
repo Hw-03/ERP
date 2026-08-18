@@ -8,7 +8,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { formatQty } from "@/lib/mes/format";
-import { mesCodeDeptBadge, processStageLabel, processTypeColor } from "@/lib/mes/process";
+import { mesCodeDeptBadge, processTypeColor } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 
@@ -278,20 +278,40 @@ function BomTreeItem({
   );
 }
 
+function ModalBomCode({ code }: { code: string | null }) {
+  if (!code) return <span data-testid="bom-modal-code">-</span>;
+  const parts = code.split("-");
+  const processIndex = parts.length === 3 && parts.every(Boolean) ? 1 : -1;
+
+  return (
+    <span data-testid="bom-modal-code" title={code} className="font-mono text-sm">
+      {processIndex === -1
+        ? code
+        : parts.map((part, index) => (
+          <span
+            key={`${part}-${index}`}
+            className={index === processIndex ? "font-black" : undefined}
+            style={index === processIndex ? { color: processTypeColor(part) } : undefined}
+          >
+            {index > 0 ? "-" : ""}{part}
+          </span>
+        ))}
+    </span>
+  );
+}
+
 function ModalBomTreeItem({ node, depth }: { node: BOMTreeNode; depth: number }) {
   const [open, setOpen] = useState(false);
   const hasKids = node.children.length > 0;
-  const processTypeCode = node.process_type_code;
 
   return (
     <>
       <li
         data-testid="bom-modal-row"
         data-depth={depth}
-        className="bom-modal-grid min-h-[52px] border-b text-sm"
+        className="bom-modal-grid min-h-[52px] border-b bg-[var(--c-s1)] text-sm transition-colors hover:bg-[var(--c-s2)]"
         style={{
           borderColor: LEGACY_COLORS.border,
-          background: LEGACY_COLORS.s1,
         }}
       >
         <div className="flex h-11 w-11 items-center justify-center">
@@ -316,32 +336,15 @@ function ModalBomTreeItem({ node, depth }: { node: BOMTreeNode; depth: number })
         <span
           data-testid="bom-modal-name-cell"
           className="min-w-0 break-words px-3 py-2 font-semibold leading-snug"
-          style={{ color: LEGACY_COLORS.text, paddingLeft: 12 + depth * 20 }}
+          style={{ color: LEGACY_COLORS.text, paddingLeft: 12 + depth * 24 }}
         >
           {node.item_name}
-        </span>
-        <span className="flex justify-center px-2">
-          {processTypeCode ? (
-            <span
-              className="rounded-full px-2 py-1 text-xs font-bold leading-none"
-              style={{
-                color: processTypeColor(processTypeCode),
-                background: `color-mix(in srgb, ${processTypeColor(processTypeCode)} 12%, transparent)`,
-              }}
-              title={processTypeCode}
-            >
-              {processStageLabel(processTypeCode)}
-            </span>
-          ) : (
-            <span style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-          )}
         </span>
         <span
           className="min-w-0 truncate px-3 font-mono text-sm"
           style={{ color: LEGACY_COLORS.muted2 }}
-          title={node.mes_code || undefined}
         >
-          {node.mes_code || "-"}
+          <ModalBomCode code={node.mes_code} />
         </span>
         <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
           {formatBomQuantity(node.required_quantity, node.unit)}
@@ -510,7 +513,6 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
             >
               <span aria-hidden />
               <span className="px-3">구성품명</span>
-              <span className="text-center">유형</span>
               <span className="px-3">품목코드</span>
               <span className="text-center">소요량</span>
               <span className="text-center">현재재고</span>

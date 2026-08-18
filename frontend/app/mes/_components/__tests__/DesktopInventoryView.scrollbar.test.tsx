@@ -73,7 +73,7 @@ vi.mock("../_inventory_sections/DesktopInventoryRightPanel", () => ({
 }));
 
 describe("DesktopInventoryView scrollbar", () => {
-  it("keeps the full dashboard workspace in one visible outer scrollbar", () => {
+  it("keeps the original sticky boundary while the outer content scrolls the full dashboard", () => {
     const { container } = render(
       <DesktopInventoryView
         globalSearch=""
@@ -93,12 +93,9 @@ describe("DesktopInventoryView scrollbar", () => {
     expect(viewport).not.toHaveClass("border");
     expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
     expect(viewport).not.toHaveClass("overflow-y-auto");
-    expect(screen.queryByTestId("inventory-list-scroller")).not.toBeInTheDocument();
     expect(listCard).toHaveClass("card", "desktop-flat-surface");
-    expect(listCard).not.toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-y-auto");
-    expect(scroller).not.toHaveClass("rounded-[28px]", "desktop-flat-surface");
-    expect(scroller).not.toHaveClass("border");
-    expect(scroller).not.toHaveStyle({ background: "var(--c-s1)" });
+    expect(listCard).not.toHaveClass("overflow-hidden", "overflow-y-auto");
+    expect(screen.queryByTestId("inventory-items-scroll-region")).not.toBeInTheDocument();
   });
 
   it("uses flat work surfaces instead of elevated dashboard cards", () => {

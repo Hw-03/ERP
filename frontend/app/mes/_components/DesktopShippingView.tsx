@@ -1719,7 +1719,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           right={selectedHistory && (
             <>
               {hasPickedUpSerialNumbers && (
-                <div data-testid="shipping-history-serial-summary" className="min-w-0 flex-1 rounded-[14px] border px-3 py-2" style={{ background: tint(LEGACY_COLORS.cyan, 10), borderColor: tint(LEGACY_COLORS.cyan, 45) }}>
+                <div data-testid="shipping-history-serial-summary" className="min-h-[64px] min-w-[280px] basis-[280px] grow rounded-[14px] border px-3 py-2" style={{ background: tint(LEGACY_COLORS.cyan, 10), borderColor: tint(LEGACY_COLORS.cyan, 45) }}>
                   <div className="text-xs font-black" style={{ color: LEGACY_COLORS.cyan }}>{SERIAL_NUMBERS_LABEL}</div>
                   <div className="sn-b truncate text-sm font-bold" title={selectedHistory.serial_numbers ?? undefined} style={{ color: LEGACY_COLORS.text }}>{serialNumberText(selectedHistory.serial_numbers)}</div>
                 </div>
@@ -2008,17 +2008,26 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
     || request.events.some((event) => event.event_type === "PREPARED");
   const cannotClearExisting = Boolean(request.invoice_number) && !value.trim() && hasPreparationHistory;
   return (
-    <section data-testid="shipping-invoice-editor" className="min-w-[280px] flex-1" aria-label="인보이스 번호 편집">
-      <div className="mb-1 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>인보이스 번호</div>
-      <div className="flex min-w-0 gap-2">
-        <input
-          aria-label="인보이스 번호"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          className={`${SHIPPING_TEXT_INPUT_CLASS} min-w-0 flex-1`}
-          style={{ background: LEGACY_COLORS.bg, borderColor: request.invoice_number ? LEGACY_COLORS.border : tint(LEGACY_COLORS.yellow, 42), color: LEGACY_COLORS.text }}
-          placeholder="인보이스 번호 입력"
-        />
+    <section data-testid="shipping-invoice-editor" className="min-w-[280px] basis-[280px] grow" aria-label="인보이스 번호 편집">
+      <div
+        data-testid="shipping-invoice-field-shell"
+        className="flex min-h-[64px] min-w-0 items-center gap-2 rounded-[14px] border px-3 py-2 transition-shadow focus-within:ring-2 focus-within:ring-[color:var(--c-blue)]"
+        style={{
+          background: LEGACY_COLORS.bg,
+          borderColor: request.invoice_number ? LEGACY_COLORS.border : tint(LEGACY_COLORS.yellow, 42),
+        }}
+      >
+        <label className="min-w-0 flex-1">
+          <span className="block text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>인보이스 번호</span>
+          <input
+            aria-label="인보이스 번호"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className="mt-0.5 h-7 w-full min-w-0 bg-transparent p-0 text-sm font-bold outline-none"
+            style={{ color: LEGACY_COLORS.text }}
+            placeholder="인보이스 번호 입력"
+          />
+        </label>
         <button
           type="button"
           aria-label="인보이스 번호 저장"

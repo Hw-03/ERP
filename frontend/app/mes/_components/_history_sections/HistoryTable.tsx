@@ -62,10 +62,28 @@ const COLUMNS: ColSpec[] = [
   { label: "담당자", width: "120px", align: "center" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
+const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-x-clip rounded-[24px] border";
+
+function historyTableHeaderClass(column: (typeof COLUMNS)[number], index: number): string {
+  const alignment = column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left";
+  return [
+    "sticky top-0 z-10 whitespace-nowrap border-b",
+    column.px ?? "px-4",
+    "py-3 text-xs font-bold",
+    index === 0 ? "rounded-tl-[22px]" : "",
+    index === COLUMNS.length - 1 ? "rounded-tr-[22px]" : "",
+    column.hidden ? "hidden sm:table-cell" : "",
+    alignment,
+  ].filter(Boolean).join(" ");
+}
 
 function HistoryTableSkeleton() {
   return (
-    <div className="min-w-0 overflow-x-clip rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+    <div
+      data-testid="history-table-surface"
+      className={HISTORY_TABLE_SURFACE_CLASS}
+      style={{ borderColor: LEGACY_COLORS.border }}
+    >
       <table
         aria-busy="true"
         aria-label="입출고 내역 불러오는 중"
@@ -73,15 +91,15 @@ function HistoryTableSkeleton() {
       >
         <thead>
           <tr style={{ background: LEGACY_COLORS.s2 }}>
-            {COLUMNS.map(({ label, width, minWidth, align, hidden, px }, index) => (
+            {COLUMNS.map((column, index) => (
               <th
-                key={label || `loading-spacer-${index}`}
-                scope={label ? "col" : undefined}
-                aria-hidden={label ? undefined : true}
-                className={`sticky top-0 z-10 whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"}`}
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
+                key={column.label || `loading-spacer-${index}`}
+                scope={column.label ? "col" : undefined}
+                aria-hidden={column.label ? undefined : true}
+                className={historyTableHeaderClass(column, index)}
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
               >
-                {label}
+                {column.label}
               </th>
             ))}
           </tr>
@@ -365,19 +383,23 @@ export function HistoryTable({
           description="조건에 맞는 거래가 없거나 아직 기록이 없습니다."
         />
       ) : (
-        <div className="min-w-0 overflow-x-clip rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div
+          data-testid="history-table-surface"
+          className={HISTORY_TABLE_SURFACE_CLASS}
+          style={{ borderColor: LEGACY_COLORS.border }}
+        >
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
             <thead>
               <tr style={{ background: LEGACY_COLORS.s2 }}>
-                {COLUMNS.map(({ label, width, minWidth, align, hidden, px }, index) => (
+                {COLUMNS.map((column, index) => (
                   <th
-                    key={label || `spacer-${index}`}
-                    scope={label ? "col" : undefined}
-                    aria-hidden={label ? undefined : true}
-                    className={`sticky top-0 z-10 whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left"}`}
-                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
+                    key={column.label || `spacer-${index}`}
+                    scope={column.label ? "col" : undefined}
+                    aria-hidden={column.label ? undefined : true}
+                    className={historyTableHeaderClass(column, index)}
+                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
-                    {label}
+                    {column.label}
                   </th>
                 ))}
               </tr>

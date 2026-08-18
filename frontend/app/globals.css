@@ -947,7 +947,7 @@
 
 .bom-modal-grid {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1.5fr) 96px minmax(120px, 1fr) 96px 112px;
+  grid-template-columns: 44px minmax(0, 1.5fr) minmax(120px, 1fr) 96px 112px;
   align-items: center;
 }
 

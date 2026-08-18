@@ -474,7 +474,7 @@ export function DesktopHistoryView() {
         className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[32px]"
       >
         <div data-testid="history-left-content" className="sg min-h-0 flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
           <HistoryStatsBar
             baseline={baselineSummary}
             currentCount={summary?.total ?? null}
@@ -556,7 +556,6 @@ export function DesktopHistoryView() {
             selectedDay={selectedDay}
             setSelectedDay={handleCalendarSelectedDay}
           />
-
           <HistoryTable
             loading={loading}
             error={historyError}

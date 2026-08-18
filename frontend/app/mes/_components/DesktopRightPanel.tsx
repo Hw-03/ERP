@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, forwardRef, useContext, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -8,6 +8,34 @@ import { TruncatedText } from "@/lib/ui/TruncatedText";
 
 const DesktopRightPanelBodyContext = createContext<HTMLDivElement | null>(null);
 const DesktopRightPanelFooterContext = createContext<HTMLDivElement | null>(null);
+
+type DesktopPanelCloseButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "onClick" | "type"> & {
+  onClick: () => void;
+  ariaLabel?: string;
+  iconClassName?: string;
+};
+
+export const DesktopPanelCloseButton = forwardRef<HTMLButtonElement, DesktopPanelCloseButtonProps>(
+  function DesktopPanelCloseButton(
+    {
+      ariaLabel = "패널 닫기",
+      className = "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110",
+      iconClassName = "h-4 w-4",
+      style = {
+        background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
+        color: LEGACY_COLORS.red,
+      },
+      ...props
+    },
+    ref,
+  ) {
+    return (
+      <button ref={ref} type="button" aria-label={ariaLabel} className={className} style={style} {...props}>
+        <X className={iconClassName} />
+      </button>
+    );
+  },
+);
 
 export function useDesktopRightPanelBody(): HTMLDivElement | null {
   return useContext(DesktopRightPanelBodyContext);
@@ -69,20 +97,7 @@ export function DesktopRightPanel({
                 ) : null}
               </div>
               {headerBadge ? <div className="shrink-0 pt-1">{headerBadge}</div> : null}
-              {onClose && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label="패널 닫기"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
-                  style={{
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
-                    color: LEGACY_COLORS.red,
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+              {onClose && <DesktopPanelCloseButton onClick={onClose} />}
             </div>
           </div>
           <div ref={setBody} data-testid="desktop-right-panel-body" className="sg min-h-0 flex-1 overflow-y-auto">{children}</div>

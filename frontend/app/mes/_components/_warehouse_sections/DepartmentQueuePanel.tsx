@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Building2 } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
-import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { LoadFailureCard, LoadingSkeleton } from "../common";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import {
   useApproveStockRequestDepartmentMutation,
@@ -10,6 +12,7 @@ import {
   useRejectStockRequestDepartmentMutation,
 } from "@/lib/queries/useStockRequestsQuery";
 import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
+import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 
 /**
  * 부서 결재 정/부 전용 결재함 (낱개 IO + 듀얼 결재 케이스).
@@ -122,11 +125,15 @@ export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChang
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
       {error && <LoadFailureCard message={error} onRetry={() => void refetch()} />}
       {!loading && items.length === 0 && !error && (
-        <EmptyState variant="no-data" compact title="부서 결재 대기 요청이 없습니다." />
+        <WarehouseEmptyWorkArea
+          icon={<Building2 style={{ color: LEGACY_COLORS.blue }} />}
+          title="부서 결재 대기 요청이 없습니다."
+          description="결재가 필요한 요청이 도착하면 여기에서 확인할 수 있습니다."
+        />
       )}
       {prioritizeTargetRequest(items, targetRequestId).map((req) => (
         <WarehouseQueueRow

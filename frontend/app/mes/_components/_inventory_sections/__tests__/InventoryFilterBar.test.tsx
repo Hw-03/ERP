@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { InventoryFilters } from "../InventoryFilterBar";
+import { InventoryFilters, InventoryTableStickyHeader } from "../InventoryFilterBar";
 
 const baseProps = {
   open: true,
@@ -19,6 +19,21 @@ const baseProps = {
 };
 
 describe("InventoryFilters", () => {
+  it("uses an opaque token surface and compact gap for the sticky table controls", () => {
+    render(
+      <InventoryTableStickyHeader
+        searchValue=""
+        onSearchChange={() => {}}
+        count={0}
+        isFiltered={false}
+      />,
+    );
+
+    const header = screen.getByText("자재 목록").closest(".sticky");
+    expect(header).toHaveStyle({ background: "var(--c-popup-bg)" });
+    expect(header).toHaveClass("mb-0");
+  });
+
   it("AND와 OR의 적용 범위 및 같은 분류 내부 OR 규칙을 안내한다", () => {
     const { rerender } = render(<InventoryFilters {...baseProps} logic="AND" />);
 

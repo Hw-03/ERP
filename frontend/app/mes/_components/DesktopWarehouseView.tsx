@@ -245,6 +245,7 @@ export function DesktopWarehouseView({
   }
 
   const isComposeSection = sectionTab === "compose";
+  const isWorkAreaSection = sectionTab === "cart" || sectionTab === "queue" || sectionTab === "dept-queue";
   const hideSectionTabs = isComposeSection && itemConversionFocused;
 
   return (
@@ -273,41 +274,46 @@ export function DesktopWarehouseView({
           />
         </div>
 
-        <WarehouseDraftPanelTabs
-          sectionTab={sectionTab}
-          canSeeQueue={canSeeQueue}
-          canSeeDeptQueue={canSeeDeptQueue}
-          operator={operator}
-          operatorEmployeeId={operator?.employee_id}
-          employeeId={employeeId}
-          refreshNonce={panelRefreshNonce}
-          globalSearch={globalSearch}
-          items={items}
-          setItems={setItems}
-          onContinueDraft={handleLegacyDraftContinue}
-          onContinueIoDraft={(draft) => {
-            setRestoreIoDraft(draft);
-            setRestoreNonce((n) => n + 1);
-            handleSectionTabChange("compose");
-            persistWarehouseDraftUrl(
-              draft.batch_id,
-              draft.sub_type === "adjust_in"
-                || draft.sub_type === "adjust_out"
-                || draft.sub_type === "warehouse_adjust_in"
-                || draft.sub_type === "warehouse_adjust_out"
-                ? 3
-                : 4,
-            );
-          }}
-          bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
-          onSubmitSuccess={onSubmitSuccess}
-          resetDraftTracking={() => {}}
-          onCartCountChange={(n) => {
-            setCartCount(n);
-            if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
-          }}
-          onStartCompose={() => handleSectionTabChange("compose")}
-        />
+        <div
+          data-testid={isWorkAreaSection ? "warehouse-section-work-area" : undefined}
+          className={isWorkAreaSection ? "flex min-h-0 flex-1 flex-col" : undefined}
+        >
+          <WarehouseDraftPanelTabs
+            sectionTab={sectionTab}
+            canSeeQueue={canSeeQueue}
+            canSeeDeptQueue={canSeeDeptQueue}
+            operator={operator}
+            operatorEmployeeId={operator?.employee_id}
+            employeeId={employeeId}
+            refreshNonce={panelRefreshNonce}
+            globalSearch={globalSearch}
+            items={items}
+            setItems={setItems}
+            onContinueDraft={handleLegacyDraftContinue}
+            onContinueIoDraft={(draft) => {
+              setRestoreIoDraft(draft);
+              setRestoreNonce((n) => n + 1);
+              handleSectionTabChange("compose");
+              persistWarehouseDraftUrl(
+                draft.batch_id,
+                draft.sub_type === "adjust_in"
+                  || draft.sub_type === "adjust_out"
+                  || draft.sub_type === "warehouse_adjust_in"
+                  || draft.sub_type === "warehouse_adjust_out"
+                  ? 3
+                  : 4,
+              );
+            }}
+            bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
+            onSubmitSuccess={onSubmitSuccess}
+            resetDraftTracking={() => {}}
+            onCartCountChange={(n) => {
+              setCartCount(n);
+              if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
+            }}
+            onStartCompose={() => handleSectionTabChange("compose")}
+          />
+        </div>
 
         {isComposeSection && (
           <div className="min-h-0 flex-1">

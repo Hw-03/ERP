@@ -122,16 +122,17 @@ export function InventoryItemsTable({
           />
         </div>
       )}
-      <div className="overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+      <div className={`${compact ? "overflow-x-auto " : ""}rounded-[24px] border`} style={{ borderColor: LEGACY_COLORS.border }}>
         <table className="min-w-full border-separate border-spacing-0 text-sm">
-          <thead className="sticky top-0 z-10">
-            <tr style={{ background: LEGACY_COLORS.s2 }}>
-              {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }) => (
+          <thead className={`sticky ${compact ? "top-0" : "top-[74px]"} z-10`}>
+            <tr>
+              {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }, columnIndex) => (
                 <th
                   key={label}
                   scope="col"
-                  className={`border-b px-4 py-2.5 text-sm font-bold${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
+                  className={`border-b px-4 py-2.5 text-sm font-bold${columnIndex === 0 ? " rounded-tl-[24px]" : ""}${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
                   style={{
+                    background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
                     color: LEGACY_COLORS.muted2,
                     width,
@@ -143,16 +144,16 @@ export function InventoryItemsTable({
               ))}
               <th
                 scope="col"
-                className={`border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "text-center" : "text-right sm:text-center"}`}
-                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
+                className={`border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "rounded-tr-[24px] text-center" : "text-right sm:text-center"}`}
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
               >
                 총재고
               </th>
               {!compact && (
                 <th
                   scope="col"
-                  className="hidden sm:table-cell border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center"
-                  style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
+                  className="hidden rounded-tr-[24px] border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center sm:table-cell"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
                 >
                   안전재고
                 </th>

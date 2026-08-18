@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
+import { DesktopPanelCloseButton } from "../DesktopRightPanel";
 import { BomSubExpander } from "../_warehouse_v2/BomSubExpander";
 
 type Props = {
@@ -69,16 +69,14 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
               읽기 전용 · 구성품별 현재 재고
             </p>
           </div>
-          <button
+          <DesktopPanelCloseButton
             ref={closeRef}
-            type="button"
-            aria-label="닫기"
             onClick={onClose}
+            ariaLabel="닫기"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full border transition-colors hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-          >
-            <X className="h-5 w-5" />
-          </button>
+            iconClassName="h-5 w-5"
+          />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <BomSubExpander itemId={itemId} open modal />

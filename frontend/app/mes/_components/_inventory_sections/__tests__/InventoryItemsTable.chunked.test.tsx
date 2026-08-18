@@ -86,6 +86,44 @@ const baseProps = {
 };
 
 describe("InventoryItemsTable — chunked render", () => {
+  it("데스크톱에서는 바깥 작업영역 기준으로 검색창 아래 열 헤더를 고정한다", () => {
+    const item = makeItem(1);
+    const { container, rerender } = renderWithProviders(
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={[item]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+      />,
+    );
+
+    const desktopTable = container.querySelector("table");
+    expect(desktopTable?.parentElement).not.toHaveClass("overflow-x-auto");
+    expect(container.querySelector("thead")).toHaveClass("top-[74px]");
+    const desktopHeaders = Array.from(container.querySelectorAll("th"));
+    expect(desktopHeaders[0]).toHaveClass("rounded-tl-[24px]");
+    expect(desktopHeaders.at(-1)).toHaveClass("rounded-tr-[24px]");
+
+    rerender(
+      <DepartmentsProvider>
+        <InventoryItemsTable
+          {...baseProps}
+          filteredItems={[item]}
+          displayLimit={100}
+          setDisplayLimit={() => {}}
+          compact
+        />
+      </DepartmentsProvider>,
+    );
+
+    const compactTable = container.querySelector("table");
+    expect(compactTable?.parentElement).toHaveClass("overflow-x-auto");
+    expect(container.querySelector("thead")).toHaveClass("top-0");
+    const compactHeaders = Array.from(container.querySelectorAll("th"));
+    expect(compactHeaders[0]).toHaveClass("rounded-tl-[24px]");
+    expect(compactHeaders.at(-1)).toHaveClass("rounded-tr-[24px]");
+  });
+
   it("displayLimit 100개 중 첫 chunk(20)만 초기 렌더", () => {
     const items = Array.from({ length: 100 }, (_, i) => makeItem(i));
     const { container } = renderWithProviders(

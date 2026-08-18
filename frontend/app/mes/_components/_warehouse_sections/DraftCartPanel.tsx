@@ -9,6 +9,7 @@ import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
+import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 import {
   useDeleteIoDraftMutation,
   useDeleteStockRequestDraftMutation,
@@ -106,7 +107,7 @@ export function DraftCartPanel({
   const empty = !loading && drafts.length === 0 && ioDrafts.length === 0 && !loadError;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
       {loadError && <LoadFailureCard message={loadError} onRetry={() => void refetch()} />}
       {opError && (
@@ -125,19 +126,12 @@ export function DraftCartPanel({
         </div>
       )}
       {empty && (
-        <div
-          className="rounded-[20px] border px-6 py-4"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <EmptyState
-            variant="no-data"
-            compact
-            icon={<FilePenLine className="h-6 w-6" style={{ color: LEGACY_COLORS.green }} />}
-            title="작업 중인 요청이 없습니다."
-            description="요청 작성 화면에서 입력하면 임시저장할 수 있습니다."
-            action={onStartCompose ? { label: "요청 작성", onClick: onStartCompose } : undefined}
-          />
-        </div>
+        <WarehouseEmptyWorkArea
+          icon={<FilePenLine style={{ color: LEGACY_COLORS.green }} />}
+          title="작업 중인 요청이 없습니다."
+          description="요청 작성 화면에서 입력하면 임시저장할 수 있습니다."
+          action={onStartCompose ? { label: "요청 작성", onClick: onStartCompose } : undefined}
+        />
       )}
 
       {ioDrafts.map((draft) => (
