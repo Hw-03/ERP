@@ -9,6 +9,8 @@ venv/
 
 # Test artifacts (Phase 5.4-H)
 .pytest_cache/
+.testmondata
+.testmondata-*
 .coverage
 coverage/
 htmlcov/

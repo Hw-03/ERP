@@ -4,42 +4,43 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERIFY_LOCAL = REPO_ROOT / "scripts" / "dev" / "verify_local.ps1"
+VERIFICATION_POLICY = REPO_ROOT / "scripts" / "dev" / "verification_policy.py"
 
 
 class VerifyLocalDocsScopeTests(unittest.TestCase):
-    """Run auto mode with fake commands so scope decisions stay observable."""
+    """Run auto mode in an isolated Git repository with recorded gate commands."""
 
     def run_auto_mode(self, changed_paths: list[str]) -> list[str]:
         with tempfile.TemporaryDirectory() as temporary_directory:
             temporary_root = Path(temporary_directory)
+            repo = temporary_root / "repo"
             command_directory = temporary_root / "commands"
-            command_directory.mkdir()
             process_temp_directory = temporary_root / "process-temp"
-            process_temp_directory.mkdir()
-            status_file = temporary_root / "git-status.txt"
             command_log = temporary_root / "commands.log"
-            status_file.write_text(
-                "".join(f" M {path}\n" for path in changed_paths), encoding="ascii"
-            )
+            repo.mkdir()
+            command_directory.mkdir()
+            process_temp_directory.mkdir()
 
+            self.prepare_repository(repo, changed_paths)
             self.write_fake_commands(command_directory)
             environment = os.environ.copy()
             environment.update(
                 {
                     "PATH": f"{command_directory}{os.pathsep}{environment['PATH']}",
-                    "FAKE_REPO_ROOT": str(REPO_ROOT),
-                    "FAKE_GIT_STATUS": str(status_file),
+                    "FAKE_REPO_ROOT": str(repo),
                     "FAKE_COMMAND_LOG": str(command_log),
-                    "FAKE_TEST_TEMP": str(process_temp_directory),
                     "TEMP": str(process_temp_directory),
                     "TMP": str(process_temp_directory),
+                    "DEXCOWIN_VERIFY_PARALLEL_CPU_THRESHOLD": "999",
                 }
             )
 
@@ -50,11 +51,11 @@ class VerifyLocalDocsScopeTests(unittest.TestCase):
                     "-ExecutionPolicy",
                     "Bypass",
                     "-File",
-                    str(VERIFY_LOCAL),
+                    str(repo / "scripts" / "dev" / "verify_local.ps1"),
                     "-Mode",
                     "auto",
                 ],
-                cwd=REPO_ROOT,
+                cwd=repo,
                 env=environment,
                 capture_output=True,
                 text=True,
@@ -71,57 +72,56 @@ class VerifyLocalDocsScopeTests(unittest.TestCase):
             temporary_artifacts = sorted(
                 path for path in process_temp_directory.rglob("*") if path.is_file()
             )
-            self.assertTrue(
-                all(
-                    artifact.resolve().is_relative_to(temporary_root.resolve())
-                    for artifact in temporary_artifacts
-                ),
-                temporary_artifacts,
-            )
-            openapi_capture_runs = [
-                command for command in commands if command.startswith("python:- ")
-            ]
-            if openapi_capture_runs:
-                self.assertEqual(
-                    temporary_artifacts,
-                    [process_temp_directory / "openapi-current.json"],
-                )
-            else:
-                self.assertEqual(temporary_artifacts, [])
+            self.assertEqual(temporary_artifacts, [])
 
         self.assertFalse(temporary_root.exists())
         return commands
 
-    def write_fake_commands(self, command_directory: Path) -> None:
-        """Create PATH shims that record gates without invoking real toolchains."""
-        (command_directory / "git.cmd").write_text(
-            """@echo off
-if /I \"%1\"==\"rev-parse\" (
-  echo %FAKE_REPO_ROOT%
-  exit /b 0
-)
-if /I \"%1\"==\"-C\" if /I \"%3\"==\"status\" (
-  type \"%FAKE_GIT_STATUS%\"
-  exit /b 0
-)
-if /I \"%1\"==\"status\" (
-  type \"%FAKE_GIT_STATUS%\"
-  exit /b 0
-)
-exit /b 0
-""",
-            encoding="ascii",
+    def prepare_repository(self, repo: Path, changed_paths: list[str]) -> None:
+        """Create a real Git change set while keeping all heavy gates mocked."""
+        script_dir = repo / "scripts" / "dev"
+        script_dir.mkdir(parents=True)
+        shutil.copy2(VERIFY_LOCAL, script_dir / VERIFY_LOCAL.name)
+        shutil.copy2(VERIFICATION_POLICY, script_dir / VERIFICATION_POLICY.name)
+        (repo / "backend").mkdir()
+        (repo / "frontend").mkdir()
+        baseline = repo / "_dev" / "baselines" / "openapi.json"
+        baseline.parent.mkdir(parents=True)
+        baseline.write_bytes(b"{}\r\n")
+
+        for relative_path in changed_paths:
+            target = repo / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("baseline\n", encoding="utf-8")
+
+        self.git(repo, "init", "-q")
+        self.git(repo, "config", "user.email", "test@example.com")
+        self.git(repo, "config", "user.name", "Verification Test")
+        self.git(repo, "add", ".")
+        self.git(repo, "commit", "-qm", "baseline")
+
+        for relative_path in changed_paths:
+            (repo / relative_path).write_text("changed\n", encoding="utf-8")
+
+    def git(self, repo: Path, *args: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
         )
+
+    def write_fake_commands(self, command_directory: Path) -> None:
+        """Record gates while allowing the real policy process to inspect Git."""
         (command_directory / "python.cmd").write_text(
-            """@echo off
+            f"""@echo off
+if /I \"%~nx1\"==\"verification_policy.py\" (
+  \"{sys.executable}\" %*
+  exit /b %ERRORLEVEL%
+)
 echo python:%*>> \"%FAKE_COMMAND_LOG%\"
 if \"%1\"==\"-\" (
-  if /I \"%2\"==\"%FAKE_TEST_TEMP%\\openapi-current.json\" (
-    type \"%FAKE_REPO_ROOT%\\_dev\\baselines\\openapi.json\" > \"%2\"
-    exit /b 0
-  )
-  echo Unexpected OpenAPI temporary path: %2 1>&2
-  exit /b 91
+  type \"%FAKE_REPO_ROOT%\\_dev\\baselines\\openapi.json\" > \"%2\"
+  exit /b 0
 )
 exit /b 0
 """,
@@ -176,21 +176,30 @@ exit /b 0
         commands = self.run_auto_mode(["README.md", "backend/app/main.py"])
 
         self.assert_docs_gates_once(commands)
-        self.assertIn("python:-m pytest -q", commands)
+        self.assertTrue(
+            any(command.startswith("python:-m pytest -q") for command in commands),
+            commands,
+        )
 
     def test_auto_runs_docs_gates_once_for_docs_and_infrastructure_changes(self) -> None:
         commands = self.run_auto_mode(["README.md", "scripts/dev/example.py"])
 
         self.assert_docs_gates_once(commands)
         self.assertIn("npm:run lint:strict", commands)
-        self.assertIn("python:-m pytest -q", commands)
+        self.assertTrue(
+            any(command.startswith("python:-m pytest -q") for command in commands),
+            commands,
+        )
 
     def test_auto_skips_docs_gates_for_pure_infrastructure_changes(self) -> None:
         commands = self.run_auto_mode(["scripts/dev/example.py"])
 
         self.assert_docs_gates_absent(commands)
         self.assertIn("npm:run lint:strict", commands)
-        self.assertIn("python:-m pytest -q", commands)
+        self.assertTrue(
+            any(command.startswith("python:-m pytest -q") for command in commands),
+            commands,
+        )
 
 
 if __name__ == "__main__":

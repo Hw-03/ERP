@@ -5,13 +5,25 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: "jsdom",
+    environment: "node",
+    environmentMatchGlobs: [
+      ["**/*.test.tsx", "jsdom"],
+      ["lib/queries/**/*.test.ts", "jsdom"],
+      ["lib/__tests__/query-*.test.ts", "jsdom"],
+      ["lib/__tests__/api-catalog.test.ts", "jsdom"],
+      ["lib/__tests__/activity-audit-context.test.ts", "jsdom"],
+      ["lib/__tests__/api-core.test.ts", "jsdom"],
+      ["lib/__tests__/api-notifications.test.ts", "jsdom"],
+      ["lib/__tests__/client-events.test.ts", "jsdom"],
+      ["app/mes/_components/login/__tests__/useCurrentOperator.test.ts", "jsdom"],
+      ["app/mes/_components/_warehouse_v2/__tests__/warehouseFlow.golden.test.ts", "jsdom"],
+    ],
+    isolate: true,
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
     include: ["app/**/*.test.{ts,tsx}", "lib/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "html", "lcov"],
       // 측정 대상 — 단위 테스트가 작성된 정본 모듈만 측정.
       // Round-16 (#1): admin/catalog/departments/operations/production/queue/stock-requests
       // mock 테스트 추가하면서 coverage include 에 합류.
