@@ -143,6 +143,45 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByRole("button", { name: "-1" })).toHaveClass("min-h-[44px]");
   });
 
+  it("shows the actual deduction source prominently on internal-use quantity rows", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "production",
+          from_department: "고압",
+          to_bucket: "none",
+          quantity: 2,
+        })}
+        subType="internal_use_out"
+        isChild={false}
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    const sourceField = screen.getByLabelText("차감 위치: 고압");
+    expect(sourceField).toHaveClass("min-w-[112px]", "flex-col", "gap-0.5");
+    expect(screen.getByText("차감 위치")).toHaveClass("text-xs", "tracking-[1.5px]");
+    const sourceContent = screen.getByText("고압").parentElement;
+    expect(sourceContent).toHaveClass(
+      "inline-flex",
+      "items-center",
+      "justify-center",
+      "gap-1.5",
+      "-translate-x-1",
+    );
+    expect(sourceContent?.parentElement).toHaveClass(
+      "h-11",
+      "min-h-[44px]",
+      "rounded-[10px]",
+      "flex",
+      "justify-center",
+    );
+  });
+
   it("opens child composition in compact tap-to-expand mode", () => {
     render(
       <IoLineRow

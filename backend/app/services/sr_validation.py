@@ -248,6 +248,24 @@ def validate_line_shape_for_request_type(
     if request_type not in _ALLOWED_SHAPES:
         # 새 request_type 이 추가됐는데 사양표에 없으면 명시적으로 거부 (안전 우선).
         raise ValueError(f"지원하지 않는 요청 유형: {request_type}")
+    if request_type == StockRequestTypeEnum.INTERNAL_USE:
+        if line.to_bucket != RequestBucketEnum.NONE:
+            raise ValueError("사용출고의 도착 버킷은 none만 허용합니다.")
+        if line.from_bucket == RequestBucketEnum.WAREHOUSE:
+            if line.from_department is not None:
+                raise ValueError("창고 원본 사용출고는 출발 부서를 받지 않습니다.")
+        elif line.from_bucket == RequestBucketEnum.PRODUCTION:
+            if line.from_department is None:
+                raise ValueError("부서 원본 사용출고는 출발 부서가 필수입니다.")
+        else:
+            raise ValueError("사용출고 원본은 창고 또는 생산부서만 허용합니다.")
+        destination = getattr(line.to_department, "value", line.to_department)
+        if destination not in {
+            DepartmentEnum.AS.value,
+            DepartmentEnum.RESEARCH.value,
+        }:
+            raise ValueError("사용출고 대상 부서는 AS 또는 연구만 허용합니다.")
+        return
     spec = _ALLOWED_SHAPES[request_type]
     if spec is None:
         # MANUAL_ADJUSTMENT — bucket/dept 조합 임의 허용
@@ -286,13 +304,6 @@ def validate_line_shape_for_request_type(
     if request_type == StockRequestTypeEnum.DEPT_INTERNAL:
         if line.from_department == line.to_department:
             raise ValueError("부서 내부 이동의 출발/도착 부서가 동일합니다.")
-    if request_type == StockRequestTypeEnum.INTERNAL_USE:
-        destination = getattr(line.to_department, "value", line.to_department)
-        if destination not in {
-            DepartmentEnum.AS.value,
-            DepartmentEnum.RESEARCH.value,
-        }:
-            raise ValueError("사용출고 대상 부서는 AS 또는 연구만 허용합니다.")
 
 
 # ---------------------------------------------------------------------------

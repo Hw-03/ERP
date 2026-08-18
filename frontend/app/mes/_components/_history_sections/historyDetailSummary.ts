@@ -258,6 +258,8 @@ function getStatus(logs: TransactionLog[], batch: IoBatch | null): HistoryDetail
     case "submitted":
     case "reserved":
       return { label: "처리 중", tone: "warning", reason: null };
+    case "partially_completed":
+      return { label: "부분 처리", tone: "warning", reason: null };
     case "rejected":
     case "failed":
       return { label: "처리 실패", tone: "danger", reason: null };

@@ -36,6 +36,7 @@ from app.services.io_preview import (
     _d,
     _get_item,
     validate_operation_sources,
+    validate_internal_use_bundles,
     validate_internal_use_operation,
     validate_internal_use_requester,
     validate_warehouse_adjust_operation,
@@ -47,6 +48,7 @@ from app.services.io_persist import (
     _load_requester,
     _persist_batch,
     normalize_batch_bom_stock_exempt,
+    sync_batch_from_stock_requests,
 )
 
 
@@ -129,22 +131,30 @@ def _request_bucket(value: str) -> RequestBucketEnum:
     return RequestBucketEnum(value)
 
 
-def _link_stock_request(db: Session, *, batch: IoBatch, request: StockRequest, lines: Sequence[IoLine]) -> None:
+def _link_stock_request(
+    db: Session,
+    *,
+    batch: IoBatch,
+    request: StockRequest,
+    lines: Sequence[IoLine],
+    update_batch: bool = True,
+) -> None:
     request.operation_batch_id = batch.batch_id
-    batch.stock_request_id = request.request_id
-    if request.request_code and not batch.reference_no:
-        batch.reference_no = request.request_code
-    # 창고 또는 부서 결재 어느 쪽이든 필요하면 결재 대기로 표시.
-    batch.requires_approval = bool(
-        request.requires_warehouse_approval or request.requires_department_approval
-    )
-    if request.status == StockRequestStatusEnum.COMPLETED:
-        batch.status = "completed"
-        batch.completed_at = request.completed_at or datetime.utcnow()
-    elif request.status == StockRequestStatusEnum.RESERVED:
-        batch.status = "reserved"
-    else:
-        batch.status = "submitted"
+    if update_batch:
+        batch.stock_request_id = request.request_id
+        if request.request_code and not batch.reference_no:
+            batch.reference_no = request.request_code
+        # 창고 또는 부서 결재 어느 쪽이든 필요하면 결재 대기로 표시.
+        batch.requires_approval = bool(
+            request.requires_warehouse_approval or request.requires_department_approval
+        )
+        if request.status == StockRequestStatusEnum.COMPLETED:
+            batch.status = "completed"
+            batch.completed_at = request.completed_at or datetime.utcnow()
+        elif request.status == StockRequestStatusEnum.RESERVED:
+            batch.status = "reserved"
+        else:
+            batch.status = "submitted"
 
     included_by_order = list(lines)
     for request_line, io_line in zip(request.lines, included_by_order):
@@ -176,9 +186,69 @@ def _prelock_line_inventories(db: Session, lines: Sequence[IoLine]) -> None:
     inventory_svc.ensure_and_lock_inventories(db, item_ids)
 
 
+def _submit_internal_use_approvals(
+    db: Session,
+    *,
+    requester: Employee,
+    batch: IoBatch,
+) -> None:
+    """사용출고 라인을 창고 1건과 원본 생산부서별 요청으로 분리한다."""
+    lines = _included_lines(batch)
+    _validate_included_lines(db, lines)
+    grouped: dict[tuple[str, Optional[str]], list[IoLine]] = {}
+    for line in lines:
+        key = (line.from_bucket, line.from_department)
+        grouped.setdefault(key, []).append(line)
+
+    requests: list[StockRequest] = []
+    ordered_groups = sorted(
+        grouped.items(),
+        key=lambda entry: (
+            0 if entry[0][0] == "warehouse" else 1,
+            entry[0][1] or "",
+        ),
+    )
+    for (from_bucket, _from_department), group_lines in ordered_groups:
+        inputs = [
+            stock_request_svc.LineInput(
+                item_id=line.item_id,
+                quantity=line.quantity,
+                from_bucket=_request_bucket(line.from_bucket),
+                from_department=line.from_department,
+                to_bucket=_request_bucket(line.to_bucket),
+                to_department=line.to_department,
+            )
+            for line in group_lines
+        ]
+        request = stock_request_svc.create_request(
+            db,
+            requester=requester,
+            request_type=StockRequestTypeEnum.INTERNAL_USE,
+            lines_input=inputs,
+            reference_no=batch.reference_no,
+            notes=batch.notes,
+            requires_department_approval=from_bucket == "production",
+            allow_internal_use=True,
+        )
+        _link_stock_request(
+            db,
+            batch=batch,
+            request=request,
+            lines=group_lines,
+            update_batch=False,
+        )
+        requests.append(request)
+        notif_svc.notify_request_arrived(db, request)
+
+    sync_batch_from_stock_requests(db, batch, requests)
+
+
 def _submit_approval(
     db: Session, *, requester: Employee, batch: IoBatch, force_dept_approval: bool = False
 ) -> None:
+    if batch.sub_type == INTERNAL_USE_SUB_TYPE:
+        _submit_internal_use_approvals(db, requester=requester, batch=batch)
+        return
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
     inputs = [
@@ -524,11 +594,17 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         work_type=batch.work_type,
         sub_type=batch.sub_type,
     )
+    validate_internal_use_bundles(
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        bundles=batch.bundles,
+    )
     validate_internal_use_operation(
         work_type=batch.work_type,
         sub_type=batch.sub_type,
         to_department=batch.to_department,
         lines=(line for bundle in batch.bundles for line in bundle.lines),
+        db=db,
     )
     validate_warehouse_adjust_requester(
         requester,
@@ -574,11 +650,13 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
             else "입출고가 반영되었습니다."
         )
     )
+    batch_payload = _batch_to_payload(batch, db=db)
     return {
-        "batch": _batch_to_payload(batch),
+        "batch": batch_payload,
         "status": batch.status,
         "requires_approval": batch.requires_approval,
         "stock_request_id": batch.stock_request_id,
+        "stock_requests": batch_payload["stock_requests"],
         "message": message,
     }
 

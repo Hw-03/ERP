@@ -67,6 +67,15 @@ function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
 }
 
 describe("buildHistoryDetailSummary", () => {
+  it("labels a mixed terminal batch as partially processed", () => {
+    const summary = buildHistoryDetailSummary(
+      [makeLog({ operation_batch_id: "batch-1" })],
+      makeBatch({ status: "partially_completed" }),
+    );
+
+    expect(summary.status).toEqual({ label: "부분 처리", tone: "warning", reason: null });
+  });
+
   it("uses only canonical non-zero inventory effects for a single log", () => {
     const summary = buildHistoryDetailSummary([makeLog()], null);
 

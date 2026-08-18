@@ -7,7 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { tint } from "@/lib/mes/colorUtils";
-import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
+import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
@@ -304,7 +304,12 @@ export function IoComposeView({
     state.subType,
   ]);
 
-  async function addItem(item: Item, sourceKind: IoSourceKind = "direct_item", subTypeOverride?: IoSubType) {
+  async function addItem(
+    item: Item,
+    sourceKind: IoSourceKind = "direct_item",
+    subTypeOverride?: IoSubType,
+    sourceLocation?: IoSourceLocation,
+  ) {
     setError(null);
     // setSubType은 다음 렌더로 미뤄지므로, previewTarget에는 effective 값을 즉시 전달.
     const effectiveSubType = subTypeOverride ?? state.subType;
@@ -318,10 +323,10 @@ export function IoComposeView({
         state.toDepartment,
       );
       // 선택 단계에서는 수량을 늘리지 않고 같은 선택 경로의 미리보기만 교체한다.
-      const existingIdx = state.bundles.findIndex(
-        (b) =>
-          b.source_item_id === item.item_id &&
-          (sourceKind === "manual" ? b.source_kind === "manual" : b.source_kind !== "manual"),
+      const existingIdx = state.bundles.findIndex((bundle) =>
+        bundle.source_item_id === item.item_id &&
+        (effectiveSubType === "internal_use_out" ||
+          (sourceKind === "manual" ? bundle.source_kind === "manual" : bundle.source_kind !== "manual")),
       );
       const response = await previewTarget({
         employeeId,
@@ -329,11 +334,22 @@ export function IoComposeView({
         subType: effectiveSubType,
         fromDepartment: departments.fromDepartment,
         toDepartment: departments.toDepartment,
-        target: { source_kind: sourceKind, item_id: item.item_id, quantity: 1 },
+        target: {
+          source_kind: sourceKind,
+          item_id: item.item_id,
+          quantity: 1,
+          source_location: effectiveSubType === "internal_use_out" ? sourceLocation : undefined,
+        },
       });
       const newBundles = response.bundles;
       if (existingIdx !== -1) {
         state.setBundles((prev) => {
+          if (effectiveSubType === "internal_use_out") {
+            return [
+              ...prev.filter((bundle) => bundle.source_item_id !== item.item_id),
+              ...newBundles,
+            ];
+          }
           const next = [...prev];
           next.splice(existingIdx, 1, ...newBundles);
           return next;
@@ -621,10 +637,14 @@ export function IoComposeView({
       });
       // 서버가 멱등 응답(409 → 기존 batch)이든 신규 처리든 동일한 IoSubmitResponse 모양 → 같은 흐름.
       // 결재 종류별로 토스트 문구 분기 (백엔드 response.message 는 fallback).
+      const requestSummaries = response.stock_requests ?? [];
+      const responseApprovalKind = requestSummaries[0]?.approval_kind ?? kind;
       const successTitle = response.requires_approval
-        ? kind === "department"
-          ? "부서 결재 요청 완료"
-          : "창고 결재 요청 완료"
+        ? state.subType === "internal_use_out" && requestSummaries.length > 1
+          ? "위치별 결재 요청 완료"
+          : responseApprovalKind === "department"
+            ? "부서 결재 요청 완료"
+            : "창고 결재 요청 완료"
         : "입출고 반영 완료";
       setResult({
         kind: "success",
@@ -1081,8 +1101,8 @@ export function IoComposeView({
               search={search}
               onSearchChange={setSearch}
               highlightItemId={highlightItemId}
-              onAddItem={(item, sourceKind, subTypeOverride) =>
-                addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
+              onAddItem={(item, sourceKind, subTypeOverride, sourceLocation) =>
+                addItem(item, sourceKind ?? "direct_item", subTypeOverride, sourceLocation)}
               onRemoveBundles={(bundleIds) =>
                 state.setBundles((prev) => prev.filter((bundle) => !bundleIds.includes(bundle.bundle_id)))}
               onAdvance={() => {

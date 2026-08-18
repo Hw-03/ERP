@@ -116,4 +116,64 @@ describe("IoBundleCard", () => {
     expect(onRemoveBundle).toHaveBeenCalledOnce();
     expect(header).toHaveAttribute("aria-expanded", "false");
   });
+
+  it("internal-use BOM header summarizes multiple deduction locations before quantity controls", () => {
+    const multiSourceBundle = {
+      ...bundle,
+      lines: [
+        parentLine,
+        {
+          ...childLine,
+          direction: "out" as const,
+          from_bucket: "warehouse" as const,
+          to_bucket: "none" as const,
+          to_department: null,
+        },
+        {
+          ...childLine,
+          line_id: "department-child",
+          direction: "out" as const,
+          from_bucket: "production" as const,
+          from_department: "고압",
+          to_bucket: "none" as const,
+          to_department: null,
+        },
+      ],
+    } satisfies IoBundle;
+
+    render(
+      <IoBundleCard
+        bundle={multiSourceBundle}
+        subType="internal_use_out"
+        itemMap={itemMap}
+        getAvailable={() => 10}
+        onToggleLine={() => {}}
+        onQuantityChange={() => {}}
+        onBundleQuantityChange={vi.fn()}
+        onRemoveLine={() => {}}
+        onRemoveBundle={() => {}}
+      />,
+    );
+
+    const sourceBadge = screen.getByLabelText("차감 위치: 2개 위치");
+    expect(sourceBadge).toHaveClass("min-w-[112px]", "flex-col", "gap-0.5");
+    expect(screen.getByText("차감 위치")).toHaveClass("text-xs", "tracking-[1.5px]");
+    const sourceContent = screen.getByText("2개 위치").parentElement;
+    expect(sourceContent).toHaveClass(
+      "inline-flex",
+      "items-center",
+      "justify-center",
+      "gap-1.5",
+    );
+    expect(sourceContent?.parentElement).toHaveClass(
+      "h-11",
+      "min-h-[44px]",
+      "rounded-[10px]",
+    );
+    expect(
+      sourceBadge.compareDocumentPosition(
+        screen.getByRole("spinbutton", { name: "기준 수량" }),
+      ),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
 });

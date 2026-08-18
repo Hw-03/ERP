@@ -27,6 +27,7 @@ export type IoSubType =
   | "internal_use_out";
 
 export type IoSourceKind = "direct_item" | "bom_parent" | "manual";
+export type IoSourceLocation = "warehouse" | "department";
 export type IoLineOrigin = "direct" | "bom_auto" | "package_auto" | "manual";
 export type IoLineDirection = "in" | "out" | "move" | "defective" | "adjust";
 export type IoBucket = "warehouse" | "production" | "defective" | "none";
@@ -69,6 +70,7 @@ export interface IoBundle {
 
 export interface IoPreviewTarget {
   source_kind: IoSourceKind;
+  source_location?: IoSourceLocation | null;
   item_id?: string | null;
   quantity: number;
 }
@@ -107,7 +109,7 @@ export interface IoBatch {
   batch_id: string;
   work_type: IoWorkType;
   sub_type: IoSubType;
-  status: "draft" | "submitted" | "reserved" | "completed" | "rejected" | "cancelled" | "failed";
+  status: "draft" | "submitted" | "reserved" | "completed" | "partially_completed" | "rejected" | "cancelled" | "failed";
   requester_employee_id: string;
   requester_name: string;
   requester_department: Department | string;
@@ -127,6 +129,20 @@ export interface IoBatch {
   submitted_at: string | null;
   completed_at: string | null;
   bundles: IoBundle[];
+  stock_requests?: IoStockRequestSummary[];
+}
+
+export interface IoStockRequestSummary {
+  stock_request_id: string;
+  request_code: string | null;
+  status: string;
+  from_bucket: IoBucket;
+  from_department: Department | string | null;
+  approval_kind: "warehouse" | "department" | "none";
+  requires_warehouse_approval: boolean;
+  requires_department_approval: boolean;
+  approver_employee_id: string | null;
+  approver_name: string | null;
 }
 
 export interface IoSubmitResponse {
@@ -134,6 +150,7 @@ export interface IoSubmitResponse {
   status: IoBatch["status"];
   requires_approval: boolean;
   stock_request_id: string | null;
+  stock_requests?: IoStockRequestSummary[];
   message: string;
 }
 

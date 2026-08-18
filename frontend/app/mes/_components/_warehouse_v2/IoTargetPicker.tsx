@@ -34,7 +34,7 @@ import {
   useResetMyItemOrderMutation,
 } from "@/lib/queries/useMyItemOrderQuery";
 import { useItemOrderDrag, type UseItemOrderDragResult } from "./useItemOrderDrag";
-import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel } from "./types";
+import type { IoBundle, IoSourceLocation, IoSubType, IoWorkType, Item, ProductModel } from "./types";
 import {
   allowsMixedBundles,
   deptIoSubType,
@@ -56,7 +56,12 @@ interface Props {
   bundles: IoBundle[];
   search: string;
   onSearchChange: (value: string) => void;
-  onAddItem: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
+  onAddItem: (
+    item: Item,
+    sourceKind?: "direct_item" | "manual",
+    subTypeOverride?: IoSubType,
+    sourceLocation?: IoSourceLocation,
+  ) => void;
   onRemoveBundles: (bundleIds: string[]) => void;
   onAdvance: () => void;
   busy?: boolean;
@@ -100,6 +105,87 @@ function actionButtonStyle(
           ? LEGACY_COLORS.white
           : LEGACY_COLORS.text,
   };
+}
+
+type ChoiceMode = "bom" | "single";
+type ChoiceSize = "compact" | "desktop-source" | "mobile-source";
+
+function ChoiceButtons({
+  bomSelected,
+  singleSelected,
+  hasBom,
+  bomLocked = false,
+  singleLocked = false,
+  busy,
+  size = "compact",
+  ariaPrefix,
+  onChoose,
+}: {
+  bomSelected: boolean;
+  singleSelected: boolean;
+  hasBom: boolean;
+  bomLocked?: boolean;
+  singleLocked?: boolean;
+  busy?: boolean;
+  size?: ChoiceSize;
+  ariaPrefix?: string;
+  onChoose: (mode: ChoiceMode) => void;
+}) {
+  const isMobileSource = size === "mobile-source";
+  const isDesktopSource = size === "desktop-source";
+  return (
+    <span
+      className={isMobileSource
+        ? "inline-flex min-h-11 w-full items-stretch justify-center gap-1"
+        : isDesktopSource
+          ? "inline-flex h-8 w-24 gap-1"
+          : "inline-flex gap-1"}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {(["bom", "single"] as const).map((mode) => {
+        const isBom = mode === "bom";
+        const selected = isBom ? bomSelected : singleSelected;
+        const locked = isBom ? bomLocked : singleLocked;
+        const disabled = Boolean(busy) || locked || (isBom && !hasBom);
+        const label = isBom ? "BOM" : "낱개";
+        const title = isBom && !hasBom
+          ? "등록된 BOM이 없습니다"
+          : locked
+            ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
+            : isBom
+              ? "BOM 적용 — 하위 자재까지 같이 처리"
+              : "낱개 — 선택 품목만 처리";
+        const button = (
+          <button
+            key={mode}
+            type="button"
+            aria-label={ariaPrefix ? `${ariaPrefix} ${label}` : undefined}
+            aria-pressed={selected}
+            disabled={disabled}
+            title={isMobileSource ? title : undefined}
+            onClick={() => onChoose(mode)}
+            className={isMobileSource
+              ? "inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-[10px] border px-2 text-[12px] font-black outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-50"
+              : isDesktopSource
+                ? "inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-[10px] border px-2 text-[12px] font-black disabled:opacity-50"
+                : "inline-flex items-center gap-1 whitespace-nowrap rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"}
+            style={actionButtonStyle(selected, disabled, isBom)}
+          >
+            {label}
+          </button>
+        );
+        return isMobileSource ? button : (
+          <Tooltip
+            key={mode}
+            content={title}
+            triggerClassName={isDesktopSource ? "relative inline-flex min-w-0 flex-1" : undefined}
+          >
+            {button}
+          </Tooltip>
+        );
+      })}
+    </span>
+  );
 }
 
 function outboundLocationStatus(
@@ -471,6 +557,90 @@ function internalUseConflictingBundleIds(bundles: IoBundle[]): string[] {
     .map((bundle) => bundle.bundle_id);
 }
 
+
+function InternalUseSourceControl({
+  source,
+  sourceLabel,
+  availableQuantity,
+  currentQuantity,
+  pendingQuantity,
+  variant,
+  expanded,
+  selectedMode,
+  hasBom,
+  busy,
+  onOpen,
+  onChoose,
+}: {
+  source: IoSourceLocation;
+  sourceLabel: string;
+  availableQuantity: number;
+  currentQuantity: number;
+  pendingQuantity: number;
+  variant: "desktop" | "mobile";
+  expanded: boolean;
+  selectedMode: "bom" | "single" | null;
+  hasBom: boolean;
+  busy?: boolean;
+  onOpen: () => void;
+  onChoose: (sourceKind: "direct_item" | "manual") => void;
+}) {
+  const ariaPrefix = variant === "mobile" ? "모바일 " : "";
+  const controlLabel = source === "warehouse" || variant === "mobile" ? sourceLabel : "부서";
+  const quantityLabel = `${ariaPrefix}${sourceLabel} 수량 ${formatQty(availableQuantity)}`;
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        aria-label={quantityLabel}
+        aria-expanded="false"
+        disabled={busy}
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+        className={`flex items-center justify-center rounded-[10px] border px-2 text-xs font-black outline-none transition-colors hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-50 ${
+          variant === "desktop" ? "mx-auto h-8 min-h-8 w-24" : "min-h-11 w-full"
+        }`}
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: availableQuantity > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+        }}
+      >
+        {variant === "mobile" ? (
+          <span className="whitespace-nowrap">
+            {sourceLabel} <strong className="tabular-nums">{formatQty(availableQuantity)}</strong>
+          </span>
+        ) : pendingQuantity > 0 ? (
+          <span className="flex flex-col items-center leading-tight">
+            <span className="whitespace-nowrap">
+              출고 가능 <strong className="tabular-nums">{formatQty(availableQuantity)}</strong>
+            </span>
+            <span className="mt-0.5 text-[10px] font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
+              실재고 {formatQty(currentQuantity)} · 예약 {formatQty(pendingQuantity)}
+            </span>
+          </span>
+        ) : (
+          <span className="text-base tabular-nums">{formatQty(availableQuantity)}</span>
+        )}
+      </button>
+    );
+  }
+  return (
+    <ChoiceButtons
+      bomSelected={selectedMode === "bom"}
+      singleSelected={selectedMode === "single"}
+      hasBom={hasBom}
+      busy={busy}
+      size={variant === "mobile" ? "mobile-source" : "desktop-source"}
+      ariaPrefix={`${ariaPrefix}${controlLabel}`}
+      onChoose={(mode) => onChoose(mode === "bom" ? "direct_item" : "manual")}
+    />
+  );
+}
+
 function ItemTable({
   items,
   displayLimit,
@@ -496,7 +666,12 @@ function ItemTable({
   items: Item[];
   displayLimit: number;
   onShowMore: () => void;
-  onAdd: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
+  onAdd: (
+    item: Item,
+    sourceKind?: "direct_item" | "manual",
+    subTypeOverride?: IoSubType,
+    sourceLocation?: IoSourceLocation,
+  ) => void;
   onRemove: (bundleIds: string[]) => void;
   busy?: boolean;
   hasActiveFilter: boolean;
@@ -515,6 +690,11 @@ function ItemTable({
   highlightItemId: string | null;
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
+  const isInternalUse = workType === "internal_use" && subType === "internal_use_out";
+  const [openInternalUseSource, setOpenInternalUseSource] = useState<{
+    itemId: string;
+    source: IoSourceLocation;
+  } | null>(null);
   const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
   const singleTarget = isProcess ? deptIoSubType(deptIoDirection!, "single") : null;
   const internalUseConflictBundleIds = useMemo(
@@ -529,15 +709,15 @@ function ItemTable({
 
   return (
     <>
-      <table className="w-full border-collapse text-sm">
+      <table className={`w-full border-collapse text-sm ${isInternalUse ? "lg:table-fixed" : ""}`}>
         {/* 모바일(<lg): 숨긴 3열(품목코드/창고/부서)을 0폭으로 접고 품목명열이 남는 폭 흡수 → 액션이 행 우측 끝.
-            데스크톱(lg:≥1024): 출고 가능·예약 2줄 표시를 위해 창고열 폭을 확보한 5열 비율. */}
+            데스크톱(lg:≥1024): AS·연구는 창고·부서를 128px로 고정하고 품목명이 남는 폭을 흡수. 그 외 유형은 기존 5열 비율 유지. */}
         <colgroup>
-          <col className="w-full lg:w-[51%]" />
+          <col className={isInternalUse ? "w-full lg:w-auto" : "w-full lg:w-[51%]"} />
           <col className="w-0 lg:w-[14%]" />
-          <col className="w-0 lg:w-[14%]" />
-          <col className="w-0 lg:w-[8%]" />
-          <col style={{ width: 128 }} />
+          <col className={isInternalUse ? "w-0 lg:w-32" : "w-0 lg:w-[14%]"} />
+          <col className={isInternalUse ? "w-0 lg:w-32" : "w-0 lg:w-[8%]"} />
+          {!isInternalUse && <col style={{ width: 128 }} />}
         </colgroup>
         <thead className="sticky top-0 z-10">
           <tr
@@ -580,15 +760,17 @@ function ItemTable({
             >
               부서
             </th>
-            <th
-              className="px-3 py-2 text-center"
-              style={{
-                background: "var(--c-popup-bg)",
-                borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-              }}
-            >
-              추가
-            </th>
+            {!isInternalUse && (
+              <th
+                className="px-3 py-2 text-center"
+                style={{
+                  background: "var(--c-popup-bg)",
+                  borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+                }}
+              >
+                추가
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -597,6 +779,14 @@ function ItemTable({
             const letter = deptOf(item.process_type_code);
             const impliedDeptName = letter ? DEPT_LETTER_TO_NAME[letter] : null;
             const impliedQty = impliedDeptName ? (prodByDept.get(impliedDeptName) ?? 0) : 0;
+            const internalUseDepartmentName = impliedDeptName ?? "조립";
+            const internalUseDepartmentLocation = findInventoryLocation(
+              item,
+              internalUseDepartmentName,
+              "PRODUCTION",
+            );
+            const internalUseDepartmentPending = locationPending(internalUseDepartmentLocation);
+            const internalUseDepartmentAvailable = locationAvailable(internalUseDepartmentLocation);
             const hasOthers = Array.from(prodByDept.keys()).some((d) => d !== impliedDeptName);
             const noDeptStock = prodByDept.size === 0;
             const wQty = Number(item.warehouse_qty) || 0;
@@ -620,6 +810,60 @@ function ItemTable({
             const isSelected = selectedBundles.length > 0;
             const isBomSelected = selectedBundles.some((bundle) => bundle.source_kind === "bom_parent");
             const isSingleSelected = selectedBundles.some((bundle) => bundle.source_kind !== "bom_parent");
+            const selectedSourceLocation: IoSourceLocation | null = selectedBundles.length === 0
+              ? null
+              : selectedBundles.some((bundle) =>
+                bundle.lines.some((line) => line.included && line.from_bucket === "production"),
+              )
+                ? "department"
+                : "warehouse";
+            const selectedMode: "bom" | "single" | null = isBomSelected
+              ? "bom"
+              : isSingleSelected
+                ? "single"
+                : null;
+            const openSource = openInternalUseSource?.itemId === item.item_id
+              ? openInternalUseSource.source
+              : null;
+            const expandedSource = openSource ?? selectedSourceLocation;
+            const selectedBundleIds = selectedBundles.map((bundle) => bundle.bundle_id);
+            const chooseInternalUseMode = (
+              source: IoSourceLocation,
+              sourceKind: "direct_item" | "manual",
+            ) => {
+              const nextMode = sourceKind === "manual" ? "single" : "bom";
+              if (selectedSourceLocation === source && selectedMode === nextMode) {
+                onRemove(selectedBundleIds);
+                setOpenInternalUseSource(null);
+                return;
+              }
+              onAdd(item, sourceKind, undefined, source);
+              setOpenInternalUseSource({ itemId: item.item_id, source });
+            };
+            const renderInternalUseSource = (
+              source: IoSourceLocation,
+              variant: "desktop" | "mobile",
+            ) => {
+              const departmentSource = source === "department";
+              return (
+                <InternalUseSourceControl
+                  source={source}
+                  sourceLabel={departmentSource ? internalUseDepartmentName : "창고"}
+                  availableQuantity={departmentSource ? internalUseDepartmentAvailable : warehouseAvailableQty}
+                  currentQuantity={departmentSource
+                    ? Number(internalUseDepartmentLocation?.quantity) || 0
+                    : wQty}
+                  pendingQuantity={departmentSource ? internalUseDepartmentPending : pendingQty}
+                  variant={variant}
+                  expanded={expandedSource === source}
+                  selectedMode={selectedSourceLocation === source ? selectedMode : null}
+                  hasBom={bomParents.has(item.item_id)}
+                  busy={busy}
+                  onOpen={() => setOpenInternalUseSource({ itemId: item.item_id, source })}
+                  onChoose={(sourceKind) => chooseInternalUseMode(source, sourceKind)}
+                />
+              );
+            };
             const rowClickEnabled = mode === "single_only" && !busy;
             const bomBundleIds = selectedBundles
               .filter((bundle) => bundle.source_kind === "bom_parent")
@@ -646,7 +890,16 @@ function ItemTable({
                   >
                     {item.item_name}
                   </div>
-                  {(isWarehouseOutbound || showsDepartmentAvailability) && (
+                  {isInternalUse && (
+                    <div
+                      data-testid={`picker-mobile-internal-use-sources-${item.item_id}`}
+                      className="mt-2 grid grid-cols-2 gap-1.5 lg:hidden"
+                    >
+                      {renderInternalUseSource("warehouse", "mobile")}
+                      {renderInternalUseSource("department", "mobile")}
+                    </div>
+                  )}
+                  {!isInternalUse && (isWarehouseOutbound || showsDepartmentAvailability) && (
                     <div
                       data-testid={`picker-mobile-source-available-${item.item_id}`}
                       className="mt-1 text-xs font-bold lg:hidden"
@@ -671,7 +924,9 @@ function ItemTable({
                     borderBottom: `1px solid ${LEGACY_COLORS.border}`,
                   }}
                 >
-                  {showsWarehouseAvailability ? (
+                  {isInternalUse ? (
+                    renderInternalUseSource("warehouse", "desktop")
+                  ) : showsWarehouseAvailability ? (
                     <div className="flex flex-col items-center leading-tight">
                       <span
                         className="whitespace-nowrap text-[11px] font-semibold"
@@ -700,7 +955,9 @@ function ItemTable({
                   className="hidden px-3 py-2 text-center lg:table-cell"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
-                  {showsDepartmentAvailability ? (
+                  {isInternalUse ? (
+                    renderInternalUseSource("department", "desktop")
+                  ) : showsDepartmentAvailability ? (
                     <div className="flex flex-col items-center leading-tight">
                       <span className="whitespace-nowrap text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                         출고 가능 <strong className="text-sm font-black tabular-nums" style={{ color: sourceAvailableQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>{formatQty(sourceAvailableQty)}</strong>
@@ -731,122 +988,38 @@ function ItemTable({
                     </Tooltip>
                   )}
                 </td>
-                <td
-                  className="whitespace-nowrap px-3 py-2 text-center"
-                  style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
-                >
-                  <span className="inline-flex gap-1">
-                    {isProcess ? (() => {
-                      const hasBom = bomParents.has(item.item_id);
-                      const bomLockedByMode = false;
-                      const singleLockedByMode = false;
-                      const bomDisabled = busy || bomLockedByMode || !hasBom;
-                      const singleDisabled = busy || singleLockedByMode;
-                      const bomTitle = !hasBom
-                        ? "등록된 BOM이 없습니다"
-                        : bomLockedByMode
-                          ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
-                          : "BOM 적용 — 하위 자재까지 같이 처리";
-                      const singleTitle = singleLockedByMode
-                        ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
-                        : "낱개 — 선택 품목만 처리";
-                      return (
-                        <>
-                          <Tooltip content={bomTitle}>
-                            <button
-                              type="button"
-                              aria-pressed={isBomSelected}
-                              disabled={bomDisabled}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (isBomSelected) onRemove(bomBundleIds);
-                                else onAdd(item, "direct_item", bomTarget!);
-                              }}
-                              className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
-                              style={actionButtonStyle(isBomSelected, bomDisabled, true)}
-                            >
-                              BOM
-                            </button>
-                          </Tooltip>
-                          <Tooltip content={singleTitle}>
-                            <button
-                              type="button"
-                              aria-pressed={isSingleSelected}
-                              disabled={singleDisabled}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (isSingleSelected) onRemove(singleBundleIds);
-                                else onAdd(item, "manual", singleTarget!);
-                              }}
-                              className="inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
-                              style={actionButtonStyle(isSingleSelected, singleDisabled, false)}
-                            >
-                              낱개
-                            </button>
-                          </Tooltip>
-                        </>
-                      );
-                    })() : mode === "bom_or_single" ? (() => {
-                      const hasBom = bomParents.has(item.item_id);
-                      const isInternalUse = subType === "internal_use_out";
-                      // 창고 입출고·사용출고(allowMix)는 서로 다른 품목의 BOM·낱개 혼합을 허용한다.
-                      // 사용출고는 같은 품목에서만 마지막 선택 방식으로 교체한다.
-                      // 그 외(produce/disassemble)는 종전대로 한쪽만 활성 — BOM 강제와 흐름 분기가 달라 락 유지.
-                      const bomLockedByMode = !allowMix && hasSingleBundle;
-                      const singleLockedByMode = !allowMix && hasBomBundle;
-                      const bomDisabled = busy || bomLockedByMode || !hasBom;
-                      const singleDisabled = busy || singleLockedByMode;
-                      const bomTitle = !hasBom
-                        ? "등록된 BOM이 없습니다"
-                        : bomLockedByMode
-                          ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
-                          : "BOM 적용 — 하위 자재까지 같이 처리";
-                      const singleTitle = singleLockedByMode
-                        ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
-                        : "낱개 — 선택 품목만 처리";
-                      return (
-                        <>
-                          <Tooltip content={bomTitle}>
-                            <button
-                              type="button"
-                              aria-pressed={isBomSelected}
-                              disabled={bomDisabled}
-                              onClick={() => {
-                                if (isBomSelected) {
-                                  onRemove(isInternalUse && isSingleSelected ? singleBundleIds : bomBundleIds);
-                                } else {
-                                  if (isInternalUse && isSingleSelected) onRemove(singleBundleIds);
-                                  onAdd(item);
-                                }
-                              }}
-                              className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
-                              style={actionButtonStyle(isBomSelected, bomDisabled, true)}
-                            >
-                              BOM
-                            </button>
-                          </Tooltip>
-                          <Tooltip content={singleTitle}>
-                            <button
-                              type="button"
-                              aria-pressed={isSingleSelected}
-                              disabled={singleDisabled}
-                              onClick={() => {
-                                if (isSingleSelected) {
-                                  onRemove(isInternalUse && isBomSelected ? bomBundleIds : singleBundleIds);
-                                } else {
-                                  if (isInternalUse && isBomSelected) onRemove(bomBundleIds);
-                                  onAdd(item, "manual");
-                                }
-                              }}
-                              className="inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
-                              style={actionButtonStyle(isSingleSelected, singleDisabled, false)}
-                            >
-                              낱개
-                            </button>
-                          </Tooltip>
-                        </>
-                      );
-                    })() : (
+                {!isInternalUse && (
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-center"
+                    style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
+                  >
+                    {isProcess || mode === "bom_or_single" ? (
+                      <ChoiceButtons
+                        bomSelected={isBomSelected}
+                        singleSelected={isSingleSelected}
+                        hasBom={bomParents.has(item.item_id)}
+                        bomLocked={!isProcess && !allowMix && hasSingleBundle}
+                        singleLocked={!isProcess && !allowMix && hasBomBundle}
+                        busy={busy}
+                        onChoose={(choiceMode) => {
+                          const isBom = choiceMode === "bom";
+                          const selected = isBom ? isBomSelected : isSingleSelected;
+                          if (selected) {
+                            onRemove(isBom ? bomBundleIds : singleBundleIds);
+                          } else if (isProcess) {
+                            onAdd(
+                              item,
+                              isBom ? "direct_item" : "manual",
+                              (isBom ? bomTarget : singleTarget)!,
+                            );
+                          } else if (isBom) {
+                            onAdd(item);
+                          } else {
+                            onAdd(item, "manual");
+                          }
+                        }}
+                      />
+                    ) : (
                       <button
                         type="button"
                         aria-pressed={isSingleSelected}
@@ -863,14 +1036,14 @@ function ItemTable({
                         선택
                       </button>
                     )}
-                  </span>
-                </td>
+                  </td>
+                )}
               </HighlightableRow>
             );
           })}
           {items.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-3 py-6">
+              <td colSpan={isInternalUse ? 4 : 5} className="px-3 py-6">
                 <EmptyState
                   variant={hasActiveFilter ? "filtered-out" : "no-data"}
                   compact

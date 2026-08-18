@@ -3664,6 +3664,13 @@
             ],
             "title": "Stock Request Id"
           },
+          "stock_requests": {
+            "items": {
+              "$ref": "#/components/schemas/IoStockRequestSummary"
+            },
+            "title": "Stock Requests",
+            "type": "array"
+          },
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
@@ -4144,9 +4151,113 @@
             "maxLength": 24,
             "title": "Source Kind",
             "type": "string"
+          },
+          "source_location": {
+            "anyOf": [
+              {
+                "enum": [
+                  "warehouse",
+                  "department"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Location"
           }
         },
         "title": "IoPreviewTarget",
+        "type": "object"
+      },
+      "IoStockRequestSummary": {
+        "properties": {
+          "approval_kind": {
+            "enum": [
+              "warehouse",
+              "department",
+              "none"
+            ],
+            "title": "Approval Kind",
+            "type": "string"
+          },
+          "approver_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Employee Id"
+          },
+          "approver_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Name"
+          },
+          "from_bucket": {
+            "title": "From Bucket",
+            "type": "string"
+          },
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
+          },
+          "request_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Code"
+          },
+          "requires_department_approval": {
+            "title": "Requires Department Approval",
+            "type": "boolean"
+          },
+          "requires_warehouse_approval": {
+            "title": "Requires Warehouse Approval",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_request_id": {
+            "format": "uuid",
+            "title": "Stock Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_request_id",
+          "status",
+          "from_bucket",
+          "approval_kind",
+          "requires_warehouse_approval",
+          "requires_department_approval"
+        ],
+        "title": "IoStockRequestSummary",
         "type": "object"
       },
       "IoSubmitRequest": {
@@ -4277,6 +4388,13 @@
               }
             ],
             "title": "Stock Request Id"
+          },
+          "stock_requests": {
+            "items": {
+              "$ref": "#/components/schemas/IoStockRequestSummary"
+            },
+            "title": "Stock Requests",
+            "type": "array"
           }
         },
         "required": [

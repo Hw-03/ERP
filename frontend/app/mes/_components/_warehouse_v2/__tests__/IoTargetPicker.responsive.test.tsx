@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "../types";
 import { IoTargetPicker } from "../IoTargetPicker";
@@ -66,5 +66,54 @@ describe("IoTargetPicker responsive layout", () => {
     const columns = container.querySelectorAll("table col");
 
     expect(columns[4]).toHaveStyle({ width: "128px" });
+  });
+
+  it("fixes internal-use source columns at the four-digit and action control width", () => {
+    const { container } = render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="internal_use"
+        subType="internal_use_out"
+      />,
+    );
+    const headers = container.querySelectorAll("thead th");
+    const columns = container.querySelectorAll("table col");
+    const table = container.querySelector("table");
+
+    expect(headers).toHaveLength(4);
+    expect(screen.queryByRole("columnheader", { name: "추가" })).not.toBeInTheDocument();
+    expect(columns).toHaveLength(4);
+    expect(table).toHaveClass("lg:table-fixed");
+    expect(columns[0]).toHaveClass("lg:w-auto");
+    expect(columns[2]).toHaveClass("lg:w-32");
+    expect(columns[3]).toHaveClass("lg:w-32");
+  });
+
+  it("shows mobile source chips under the item and opens actions in the tapped chip", () => {
+    const onAddItem = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="internal_use"
+        subType="internal_use_out"
+        bomParents={new Set(["item-1"])}
+        onAddItem={onAddItem}
+      />,
+    );
+
+    const warehouseChip = screen.getByRole("button", { name: "모바일 창고 수량 200" });
+    expect(screen.getByRole("button", { name: "모바일 조립 수량 0" })).toBeInTheDocument();
+    fireEvent.click(warehouseChip);
+
+    expect(screen.queryByRole("button", { name: "모바일 창고 수량 200" })).not.toBeInTheDocument();
+    const mobileBom = screen.getByRole("button", { name: "모바일 창고 BOM" });
+    expect(mobileBom).toHaveClass("min-h-11", "flex-1");
+    fireEvent.click(screen.getByRole("button", { name: "모바일 창고 낱개" }));
+    expect(onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: "item-1" }),
+      "manual",
+      undefined,
+      "warehouse",
+    );
   });
 });

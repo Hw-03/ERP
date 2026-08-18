@@ -39,8 +39,17 @@ vi.mock("../IoBundleCart", () => ({
 }));
 
 vi.mock("../IoConfirmStep", () => ({
-  IoConfirmStep: ({ onSaveDraft }: { onSaveDraft: () => void }) => (
-    <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
+  IoConfirmStep: ({
+    onSaveDraft,
+    onSubmit,
+  }: {
+    onSaveDraft: () => void;
+    onSubmit: () => void;
+  }) => (
+    <>
+      <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
+      <button type="button" data-testid="confirm-submit" onClick={onSubmit}>submit</button>
+    </>
   ),
 }));
 
@@ -262,6 +271,98 @@ describe("IoComposeView navigation chrome", () => {
     expect(onStatusChange).toHaveBeenCalledWith(expect.stringMatching(/^저장됨 · \d{2}:\d{2}$/));
   });
 
+  it("shows a location-based success title after multiple internal-use approval requests", async () => {
+    vi.mocked(api.submit).mockResolvedValue({
+      batch: {},
+      status: "submitted",
+      requires_approval: true,
+      stock_request_id: null,
+      stock_requests: [
+        { approval_kind: "warehouse" },
+        { approval_kind: "department" },
+      ],
+      message: "위치별 결재 요청이 생성되었습니다.",
+    } as never);
+
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={{ ...operator, department: "AS" }}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={5}
+        restoreDraft={{
+          batch_id: "draft-mixed-location",
+          work_type: "internal_use",
+          sub_type: "internal_use_out",
+          from_department: null,
+          to_department: "AS",
+          reference_no: null,
+          notes: null,
+          bundles: [{
+            bundle_id: "bundle-mixed-location",
+            source_kind: "direct_item",
+            title: "위치별 사용출고",
+            source_item_id: "warehouse-item",
+            source_mes_code: "8-TR-0001",
+            quantity: 1,
+            expanded_level: 0,
+            lines: [
+              {
+                line_id: "warehouse-line",
+                item_id: "warehouse-item",
+                item_name: "창고 품목",
+                mes_code: "8-TR-0001",
+                unit: "EA",
+                direction: "out",
+                from_bucket: "warehouse",
+                from_department: null,
+                to_bucket: "none",
+                to_department: "AS",
+                quantity: 1,
+                bom_expected: null,
+                included: true,
+                origin: "direct",
+                edited: false,
+                has_children: false,
+                shortage: 0,
+                exclusion_note: null,
+              },
+              {
+                line_id: "department-line",
+                item_id: "department-item",
+                item_name: "부서 품목",
+                mes_code: "8-TR-0002",
+                unit: "EA",
+                direction: "out",
+                from_bucket: "production",
+                from_department: "튜브",
+                to_bucket: "none",
+                to_department: "AS",
+                quantity: 1,
+                bom_expected: null,
+                included: true,
+                origin: "direct",
+                edited: false,
+                has_children: false,
+                shortage: 0,
+                exclusion_note: null,
+              },
+            ],
+          }],
+        } as never}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("confirm-submit"));
+
+    expect(await screen.findByText("위치별 결재 요청 완료")).toBeInTheDocument();
+    expect(screen.queryByText("원본별 결재 요청 완료")).not.toBeInTheDocument();
+  });
+
   it("AS 작업자에게 독립 사용출고 카드를 보이고 품목 전환은 숨긴다", async () => {
     renderCompose([], { ...operator, department: "AS" });
     await waitFor(() => {
@@ -269,6 +370,96 @@ describe("IoComposeView navigation chrome", () => {
       expect(screen.queryByTestId("warehouse-item-conversion-card")).not.toBeInTheDocument();
     });
   });
+
+  it("AS·연구 사용출고의 부서 원본 선택을 미리보기 요청에 전달한다", async () => {
+    const item = {
+      ...conversionItem("item-1", "AS 사용품", 5),
+      locations: [{
+        department: "조립",
+        status: "PRODUCTION",
+        quantity: 5,
+        pending_quantity: 1,
+        available_quantity: 4,
+      }],
+    } as Item;
+    vi.mocked(api.preview).mockResolvedValue({
+      bundles: [{
+        bundle_id: "bundle-department",
+        source_kind: "manual",
+        title: "AS 사용품",
+        source_item_id: "item-1",
+        source_mes_code: "item-1",
+        quantity: 1,
+        expanded_level: 0,
+        lines: [{
+          line_id: "line-department",
+          item_id: "item-1",
+          item_name: "AS 사용품",
+          mes_code: "item-1",
+          unit: "EA",
+          direction: "out",
+          from_bucket: "production",
+          from_department: "조립",
+          to_bucket: "none",
+          to_department: "AS",
+          quantity: 1,
+          bom_expected: null,
+          included: true,
+          origin: "manual",
+          edited: false,
+          has_children: false,
+          shortage: 0,
+          exclusion_note: null,
+        }],
+      }],
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <IoComposeView
+          globalSearch=""
+          operator={{ ...operator, department: "AS" }}
+          employees={[]}
+          items={[item]}
+          productModels={[]}
+          setItems={() => {}}
+          onStatusChange={() => {}}
+          restoreStep={3}
+          restoreDraft={{
+            batch_id: "draft-internal-use",
+            work_type: "internal_use",
+            sub_type: "internal_use_out",
+            from_department: null,
+            to_department: "AS",
+            reference_no: null,
+            notes: null,
+            bundles: [],
+          } as never}
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "조립 수량 4" }));
+    fireEvent.click(screen.getByRole("button", { name: "부서 낱개" }));
+
+    await waitFor(() => {
+      expect(api.preview).toHaveBeenCalledWith(expect.objectContaining({
+        work_type: "internal_use",
+        sub_type: "internal_use_out",
+        to_department: "AS",
+        targets: [{
+          source_kind: "manual",
+          item_id: "item-1",
+          quantity: 1,
+          source_location: "department",
+        }],
+      }));
+    });
+  });
+
   it("keeps one five-step navigation row and removes duplicate active headers", async () => {
     renderCompose();
 

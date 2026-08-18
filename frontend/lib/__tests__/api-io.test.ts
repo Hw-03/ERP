@@ -56,6 +56,29 @@ describe("ioApi.preview", () => {
       }),
     ).rejects.toThrow("충돌 발생");
   });
+
+  it("sends the selected internal-use source location", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ bundles: [] })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await ioApi.preview({
+      work_type: "internal_use",
+      sub_type: "internal_use_out",
+      to_department: "AS",
+      targets: [
+        {
+          source_kind: "manual",
+          source_location: "department",
+          item_id: "i-1",
+          quantity: 1,
+        },
+      ],
+    });
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.targets[0].source_location).toBe("department");
+  });
 });
 
 // ── submit ───────────────────────────────────────────────────────────────────

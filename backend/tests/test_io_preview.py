@@ -16,8 +16,13 @@ from app.services import io_preview as iop
 D = Decimal
 
 
-def _target(item_id, quantity="1", source_kind="direct_item"):
-    return SimpleNamespace(item_id=item_id, quantity=D(quantity), source_kind=source_kind)
+def _target(item_id, quantity="1", source_kind="direct_item", source_location=None):
+    return SimpleNamespace(
+        item_id=item_id,
+        quantity=D(quantity),
+        source_kind=source_kind,
+        source_location=source_location,
+    )
 
 
 # ──────────────────── _route_for_sub_type (순수 라우팅 규칙) ────────────────────
@@ -92,6 +97,90 @@ def test_preview_internal_use_expands_bom_parent(db_session, make_item, make_bom
             "to_department": "AS",
         }
     ]
+
+
+def test_preview_internal_use_manual_from_code_department(db_session, make_item):
+    item = make_item(name="고압 부서 사용품", process_type_code="HF")
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[_target(item.item_id, source_kind="manual", source_location="department")],
+        to_department="AS",
+    )
+
+    line = result["bundles"][0]["lines"][0]
+    assert line["from_bucket"] == "production"
+    assert line["from_department"] == "고압"
+    assert line["to_bucket"] == "none"
+    assert line["to_department"] == "AS"
+
+
+def test_preview_internal_use_department_bom_routes_each_child_by_code(
+    db_session, make_item, make_bom
+):
+    parent = make_item(name="연구 사용 BOM", process_type_code="AF")
+    tube_child = make_item(name="튜브 구성품", process_type_code="TF")
+    high_voltage_child = make_item(name="고압 구성품", process_type_code="HF")
+    make_bom(parent.item_id, tube_child.item_id, D("2"))
+    make_bom(parent.item_id, high_voltage_child.item_id, D("3"))
+    db_session.commit()
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[_target(parent.item_id, "4", source_location="department")],
+        to_department="연구",
+    )
+
+    lines_by_item_id = {
+        line["item_id"]: line for line in result["bundles"][0]["lines"]
+    }
+    assert lines_by_item_id[tube_child.item_id]["from_bucket"] == "production"
+    assert lines_by_item_id[tube_child.item_id]["from_department"] == "튜브"
+    assert lines_by_item_id[tube_child.item_id]["quantity"] == D("8")
+    assert lines_by_item_id[high_voltage_child.item_id]["from_bucket"] == "production"
+    assert lines_by_item_id[high_voltage_child.item_id]["from_department"] == "고압"
+    assert lines_by_item_id[high_voltage_child.item_id]["quantity"] == D("12")
+
+
+def test_preview_internal_use_department_falls_back_to_assembly(db_session, make_item):
+    item = make_item(name="공정 미매핑 사용품", process_type_code="AR")
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[_target(item.item_id, source_kind="manual", source_location="department")],
+        to_department="AS",
+    )
+
+    line = result["bundles"][0]["lines"][0]
+    assert line["from_bucket"] == "production"
+    assert line["from_department"] == "조립"
+
+
+def test_preview_rejects_source_location_outside_internal_use(db_session, make_item):
+    with pytest.raises(ValueError, match="AS·연구 사용출고"):
+        iop.preview(
+            db_session,
+            work_type="receive",
+            sub_type="receive_supplier",
+            targets=[_target(make_item().item_id, source_location="department")],
+        )
+
+
+def test_preview_rejects_unknown_internal_use_source_location(db_session, make_item):
+    with pytest.raises(ValueError, match="warehouse 또는 department"):
+        iop.preview(
+            db_session,
+            work_type="internal_use",
+            sub_type="internal_use_out",
+            targets=[_target(make_item().item_id, source_location="defective")],
+            to_department="AS",
+        )
 
 
 def test_route_defect_quarantine_warehouse_source(make_item):

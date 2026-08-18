@@ -1,6 +1,6 @@
 """입출고(IO) 미리보기·draft·제출·배치 schema."""
 
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 import uuid
 
 from pydantic import BaseModel, Field, model_validator
@@ -12,6 +12,7 @@ class IoPreviewTarget(BaseModel):
     source_kind: str = Field("direct_item", max_length=24)
     item_id: Optional[uuid.UUID] = None
     quantity: int = Field(1, gt=0)
+    source_location: Optional[Literal["warehouse", "department"]] = None
 
 
 class IoLinePayload(BaseModel):
@@ -90,6 +91,19 @@ class IoSubmitRequest(IoDraftUpsert):
     pass
 
 
+class IoStockRequestSummary(BaseModel):
+    stock_request_id: uuid.UUID
+    request_code: Optional[str] = None
+    status: str
+    from_bucket: str
+    from_department: Optional[str] = None
+    approval_kind: Literal["warehouse", "department", "none"]
+    requires_warehouse_approval: bool
+    requires_department_approval: bool
+    approver_employee_id: Optional[uuid.UUID] = None
+    approver_name: Optional[str] = None
+
+
 class IoBatchResponse(BaseModel):
     batch_id: uuid.UUID
     work_type: str
@@ -113,6 +127,7 @@ class IoBatchResponse(BaseModel):
     submitted_at: Optional[UtcDatetime] = None
     completed_at: Optional[UtcDatetime] = None
     bundles: List[IoBundlePayload] = Field(default_factory=list)
+    stock_requests: List[IoStockRequestSummary] = Field(default_factory=list)
 
 
 class IoSubmitResponse(BaseModel):
@@ -120,4 +135,5 @@ class IoSubmitResponse(BaseModel):
     status: str
     requires_approval: bool
     stock_request_id: Optional[uuid.UUID] = None
+    stock_requests: List[IoStockRequestSummary] = Field(default_factory=list)
     message: str

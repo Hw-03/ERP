@@ -22,6 +22,11 @@ import {
 } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal, type ConfirmTone } from "@/lib/ui/ConfirmModal";
+import {
+  deductionSourceName,
+  deductionSourceSummary,
+  IoDeductionSourceBadge,
+} from "./IoDeductionSourceBadge";
 
 interface Props {
   workType: IoWorkType;
@@ -65,6 +70,13 @@ const APPROVAL_META: Record<
     submitText: (n) => `부서 결재 요청 ${n}건`,
     accentColor: "yellow",
   },
+};
+
+const MIXED_SOURCE_APPROVAL_META = {
+  summaryLabel: "위치별 결재 요청",
+  badgeText: "위치별 결재 필요",
+  submitText: (_n: number) => "위치별 결재 요청",
+  accentColor: "yellow" as const,
 };
 
 function directionAccent(subType: IoSubType): string {
@@ -166,7 +178,6 @@ export function IoConfirmStep({
   onSaveDraft,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const meta = APPROVAL_META[approvalKind];
   const isApproval = approvalKind !== "none";
   const copy = confirmCopy(subType, approvalKind);
   const headerLabel = workType === "process"
@@ -174,6 +185,15 @@ export function IoConfirmStep({
     : subTypeLabel(subType);
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
+  const internalUseHasWarehouse = subType === "internal_use_out" &&
+    includedLines.some((line) => line.from_bucket === "warehouse");
+  const internalUseHasDepartment = subType === "internal_use_out" &&
+    includedLines.some((line) => line.from_bucket === "production");
+  const meta = internalUseHasWarehouse && internalUseHasDepartment
+    ? MIXED_SOURCE_APPROVAL_META
+    : internalUseHasDepartment
+      ? APPROVAL_META.department
+      : APPROVAL_META[approvalKind];
   // BOM 부모 라인(생산 결과품 등)은 묶음 카드 헤더에서 이미 표시되므로 표시 라인 목록에선 숨긴다.
   const bomParentLineIds = new Set<string>();
   for (const b of bundles) {
@@ -250,6 +270,7 @@ export function IoConfirmStep({
             key={bundle.bundle_id}
             bundle={bundle}
             bomParentLineIds={bomParentLineIds}
+            showDeductionSource={subType === "internal_use_out"}
           />
         ))}
       </div>
@@ -341,9 +362,11 @@ export function IoConfirmStep({
 function ConfirmBundleCard({
   bundle,
   bomParentLineIds,
+  showDeductionSource,
 }: {
   bundle: IoBundle;
   bomParentLineIds: Set<string>;
+  showDeductionSource: boolean;
 }) {
   // Hook 규칙: 모든 hook 은 early-return 위에서 호출.
   const [collapsed, setCollapsed] = useState(true);
@@ -370,18 +393,26 @@ function ConfirmBundleCard({
                 · {onlyLine.from_department ?? "창고"} → {onlyLine.to_department ?? "창고"}
               </span>
             )}
-            {onlyLine.direction !== "move" && (onlyLine.from_department || onlyLine.to_department) && (
+            {!showDeductionSource && onlyLine.direction !== "move" && (onlyLine.from_department || onlyLine.to_department) && (
               <span>· {onlyLine.from_department || onlyLine.to_department}</span>
             )}
           </div>
         </div>
-        <span
-          className="shrink-0 text-xl font-black tabular-nums"
-          style={{ color: dir.color }}
-        >
-          {dir.sign ?? ""}
-          {formatQty(onlyLine.quantity)}
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          {showDeductionSource && (
+            <IoDeductionSourceBadge
+              sourceName={deductionSourceName(onlyLine)}
+              variant="field"
+            />
+          )}
+          <span
+            className="shrink-0 text-xl font-black tabular-nums"
+            style={{ color: dir.color }}
+          >
+            {dir.sign ?? ""}
+            {formatQty(onlyLine.quantity)}
+          </span>
+        </div>
       </div>
     );
   }
@@ -407,6 +438,13 @@ function ConfirmBundleCard({
     ? signFor(headerLine)
     : { sign: null as null, color: LEGACY_COLORS.muted2 };
   const headerQty = headerLine ? formatQty(headerLine.quantity) : "";
+  const headerDeductionSource = showDeductionSource
+    ? bundle.source_kind === "bom_parent"
+      ? deductionSourceSummary(visibleLines)
+      : headerLine
+        ? deductionSourceName(headerLine)
+        : null
+    : null;
 
   return (
     <article
@@ -447,15 +485,20 @@ function ConfirmBundleCard({
               <ChevronUp className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
             ))}
         </span>
-        {headerLine && (
-          <span
-            className="shrink-0 text-xl font-black tabular-nums"
-            style={{ color: headerDir.color }}
-          >
-            {headerDir.sign ?? ""}
-            {headerQty}
-          </span>
-        )}
+        <span className="flex shrink-0 items-center gap-3">
+          {headerDeductionSource && (
+            <IoDeductionSourceBadge sourceName={headerDeductionSource} variant="field" />
+          )}
+          {headerLine && (
+            <span
+              className="shrink-0 text-xl font-black tabular-nums"
+              style={{ color: headerDir.color }}
+            >
+              {headerDir.sign ?? ""}
+              {headerQty}
+            </span>
+          )}
+        </span>
       </div>
 
       {/* 헤더 메타 한 줄 */}
@@ -465,7 +508,7 @@ function ConfirmBundleCard({
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           <span>{headerLine.mes_code ?? "-"}</span>
-          {(headerLine.from_department || headerLine.to_department) && (
+          {!showDeductionSource && (headerLine.from_department || headerLine.to_department) && (
             <span>
               · {headerLine.from_department ?? "-"}
               {headerLine.direction === "move" ? ` → ${headerLine.to_department ?? "-"}` : ""}
@@ -496,6 +539,7 @@ function ConfirmBundleCard({
               key={line.line_id}
               line={line}
               isChild={line.origin === "bom_auto" || line.origin === "package_auto"}
+              showDeductionSource={showDeductionSource}
             />
           ))}
         </ul>
@@ -504,7 +548,15 @@ function ConfirmBundleCard({
   );
 }
 
-function ConfirmLineRow({ line, isChild }: { line: IoLine; isChild: boolean }) {
+function ConfirmLineRow({
+  line,
+  isChild,
+  showDeductionSource,
+}: {
+  line: IoLine;
+  isChild: boolean;
+  showDeductionSource: boolean;
+}) {
   const dir = signFor(line);
   return (
     <li
@@ -523,7 +575,7 @@ function ConfirmLineRow({ line, isChild }: { line: IoLine; isChild: boolean }) {
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           <span>{line.mes_code ?? "-"}</span>
-          {(line.from_department || line.to_department) && (
+          {!showDeductionSource && (line.from_department || line.to_department) && (
             <span>
               · {line.from_department ?? "-"}
               {line.direction === "move" ? ` → ${line.to_department ?? "-"}` : ""}
@@ -531,13 +583,21 @@ function ConfirmLineRow({ line, isChild }: { line: IoLine; isChild: boolean }) {
           )}
         </div>
       </div>
-      <span
-        className="shrink-0 text-xl font-black tabular-nums"
-        style={{ color: dir.color }}
-      >
-        {dir.sign ?? ""}
-        {formatQty(line.quantity)}
-      </span>
+      <div className="flex shrink-0 items-center gap-3">
+        {showDeductionSource && (
+          <IoDeductionSourceBadge
+            sourceName={deductionSourceName(line)}
+            variant="field"
+          />
+        )}
+        <span
+          className="shrink-0 text-xl font-black tabular-nums"
+          style={{ color: dir.color }}
+        >
+          {dir.sign ?? ""}
+          {formatQty(line.quantity)}
+        </span>
+      </div>
     </li>
   );
 }

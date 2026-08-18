@@ -57,10 +57,10 @@ def is_legacy_defect_rework_reference(reference_no: Optional[str]) -> bool:
 
 
 def _history_visibility_filter() -> ColumnElement:
-    """완료된 배치 또는 배치 없는 기존 로그만 입출고 이력에 노출한다."""
+    """완료·부분 처리 배치 또는 배치 없는 기존 로그를 입출고 이력에 노출한다."""
     return or_(
         TransactionLog.operation_batch_id.is_(None),
-        IoBatch.status == "completed",
+        IoBatch.status.in_(("completed", "partially_completed")),
     )
 
 

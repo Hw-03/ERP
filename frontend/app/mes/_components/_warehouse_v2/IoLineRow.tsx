@@ -17,6 +17,7 @@ import {
 import { formatQty } from "@/lib/mes/format";
 import { BomSubExpander } from "./BomSubExpander";
 import { ExpandableItemName } from "./ExpandableItemName";
+import { deductionSourceName, IoDeductionSourceBadge } from "./IoDeductionSourceBadge";
 import { QuantityStepper } from "./QuantityStepper";
 
 interface Props {
@@ -110,6 +111,7 @@ export function IoLineRow({
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
   const deptBadge = item ? mesCodeDeptBadge(item.mes_code, getDeptColor) : null;
+  const deductionSource = subType === "internal_use_out" ? deductionSourceName(line) : null;
   const isWarehouseAdjust = isWarehouseAdjustSubType(subType);
   const displayedCurrent = isWarehouseAdjust && item
     ? Number(item.warehouse_qty) || 0
@@ -223,8 +225,10 @@ export function IoLineRow({
         </div>
       </div>
 
-      {/* 3. 분류 배지 */}
-      {deptBadge ? (
+      {/* 3. AS·연구 사용출고는 분류 대신 실제 차감 위치를 강조 */}
+      {deductionSource ? (
+        <IoDeductionSourceBadge sourceName={deductionSource} variant="field" />
+      ) : deptBadge ? (
         <span
           className="justify-self-start rounded-full px-2 py-0.5 text-[10px] font-bold"
           style={{ color: deptBadge.color, background: deptBadge.bg }}

@@ -8,6 +8,7 @@ import type { IoBundle, IoLine, IoSubType, Item } from "./types";
 import { IoLineRow, isOutgoing, expectedAfter } from "./IoLineRow";
 import { formatQty } from "@/lib/mes/format";
 import { ExpandableItemName } from "./ExpandableItemName";
+import { deductionSourceSummary, IoDeductionSourceBadge } from "./IoDeductionSourceBadge";
 import { QuantityStepper } from "./QuantityStepper";
 
 interface Props {
@@ -109,6 +110,8 @@ export function IoBundleCard({
   const visibleLines = directParentLine
     ? bundle.lines.filter((line) => line.line_id !== directParentLine.line_id)
     : bundle.lines;
+  const isInternalUse = subType === "internal_use_out";
+  const deductionSource = isInternalUse ? deductionSourceSummary(visibleLines) : null;
   const isCollapsible = visibleLines.length > 0;
   const stepperQty = directParentLine
     ? Number(directParentLine.quantity) || 0
@@ -132,7 +135,11 @@ export function IoBundleCard({
       }}
     >
       <div
-        className="relative mb-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px] lg:items-center"
+        className={`relative mb-3 grid grid-cols-1 gap-3 lg:items-center ${
+          isInternalUse
+            ? "lg:grid-cols-[minmax(0,1.6fr)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"
+            : "lg:grid-cols-[minmax(0,1.6fr)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"
+        }`}
         onClick={() => { if (isCollapsible) setCollapsed((v) => !v); }}
         style={{
           cursor: isCollapsible ? "pointer" : "default",
@@ -177,6 +184,15 @@ export function IoBundleCard({
             )}
           </div>
         </div>
+        {isInternalUse && (
+          deductionSource ? (
+            <IoDeductionSourceBadge sourceName={deductionSource} variant="field" />
+          ) : (
+            <span className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              차감 위치 확인
+            </span>
+          )
+        )}
         <div onClick={(e) => e.stopPropagation()} className="border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0">
           {showBundleQtyStepper ? (
             <QuantityStepper

@@ -547,6 +547,7 @@ function getStatusChips(
 ): HistoryStatusChip[] {
   const chips: HistoryStatusChip[] = [];
   if (log.cancelled || batch?.status === "cancelled") chips.push({ label: "취소", tone: "danger" });
+  if (batch?.status === "partially_completed") chips.push({ label: "부분 처리", tone: "warning" });
   const editCount = log.edit_count ?? 0;
   if (editCount > 0) chips.push({ label: `수정 ${editCount}`, tone: "warning" });
 

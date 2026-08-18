@@ -297,6 +297,15 @@ describe("historyPresentation", () => {
     expect(row.people).toEqual({ requester: "김현우", approver: "" });
   });
 
+  it("shows a partial-processing chip for a partially completed batch", () => {
+    const row = getHistoryRowPresentation(
+      makeLog({ operation_batch_id: "batch-1" }),
+      makeBatch({ status: "partially_completed" }),
+    );
+
+    expect(row.statusChips).toContainEqual({ label: "부분 처리", tone: "warning" });
+  });
+
   it("does not add a memo chip for a rework child system note", () => {
     const row = getHistoryRowPresentation(makeLog({ notes: "[rework:scrap_child]" }));
 

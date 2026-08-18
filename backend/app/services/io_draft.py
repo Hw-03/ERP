@@ -18,6 +18,7 @@ from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     _bucket_available,
     _d,
+    validate_internal_use_bundles,
     validate_internal_use_operation,
     validate_internal_use_requester,
     validate_operation_sources,
@@ -69,11 +70,17 @@ def save_draft(db: Session, payload) -> dict:
         work_type=payload.work_type,
         sub_type=payload.sub_type,
     )
+    validate_internal_use_bundles(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+    )
     validate_internal_use_operation(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         to_department=payload.to_department,
         lines=(line for bundle in payload.bundles for line in bundle.lines),
+        db=db,
     )
     validate_warehouse_adjust_requester(
         requester,

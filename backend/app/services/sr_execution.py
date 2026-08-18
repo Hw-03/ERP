@@ -157,7 +157,14 @@ def _handle_internal_use(
     qty: Decimal,
     item_id: uuid.UUID,
 ) -> Decimal:
-    inventory_svc.consume_warehouse(db, item_id, qty)
+    if line.from_bucket == RequestBucketEnum.WAREHOUSE:
+        inventory_svc.consume_warehouse(db, item_id, qty)
+    elif line.from_bucket == RequestBucketEnum.PRODUCTION:
+        if line.from_department is None:
+            raise ValueError("부서 원본 사용출고는 출발 부서가 필요합니다.")
+        inventory_svc.consume_from_department(db, item_id, qty, line.from_department)
+    else:
+        raise ValueError("사용출고 원본은 창고 또는 생산부서만 허용됩니다.")
     return -qty
 
 

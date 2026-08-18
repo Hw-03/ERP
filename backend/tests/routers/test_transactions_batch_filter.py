@@ -64,10 +64,13 @@ def test_list_transactions_filters_exact_operation_batch_id(client, db_session, 
 def test_history_endpoints_only_include_completed_batches_and_legacy_logs(
     client, db_session, make_item
 ):
-    """이력 조회는 완료 배치와 배치 없는 기존 로그만 감사 이력으로 취급한다."""
+    """이력 조회는 완료·부분 처리 배치와 배치 없는 기존 로그를 노출한다."""
     item = make_item(name="history-visibility-item", warehouse_qty=Decimal("0"))
     visible_batch = _make_batch(db_session, "visible")
     visible_log = _make_log(db_session, item, visible_batch, "1")
+    partial_batch = _make_batch(db_session, "partial")
+    partial_batch.status = "partially_completed"
+    partial_log = _make_log(db_session, item, partial_batch, "1")
     legacy_log = TransactionLog(
         item_id=item.item_id,
         transaction_type=TransactionTypeEnum.RECEIVE,
@@ -85,7 +88,11 @@ def test_history_endpoints_only_include_completed_batches_and_legacy_logs(
         hidden_logs.append(_make_log(db_session, item, batch, "1"))
     db_session.commit()
 
-    visible_ids = {str(visible_log.log_id), str(legacy_log.log_id)}
+    visible_ids = {
+        str(visible_log.log_id),
+        str(partial_log.log_id),
+        str(legacy_log.log_id),
+    }
     for endpoint in ("/transactions", "/transactions/display-groups"):
         response = client.get(f"/api/inventory{endpoint}")
         assert response.status_code == 200, response.text
@@ -101,7 +108,7 @@ def test_history_endpoints_only_include_completed_batches_and_legacy_logs(
 
     summary = client.get("/api/inventory/transactions/summary")
     assert summary.status_code == 200, summary.text
-    assert summary.json()["total"] == 2
+    assert summary.json()["total"] == 3
 
     references = client.get("/api/inventory/transactions/reference-summaries")
     assert references.status_code == 200, references.text

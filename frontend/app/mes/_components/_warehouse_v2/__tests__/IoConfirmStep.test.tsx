@@ -169,6 +169,91 @@ describe("IoConfirmStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "창고 결재 요청 1건" }));
     expect(screen.getByText("AS·연구 사용출고를 요청하시겠습니까?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "결재 요청" })).toBeInTheDocument();
+    const sourceBadge = screen.getByLabelText("차감 위치: 창고");
+    expect(sourceBadge).toHaveClass("min-w-[112px]", "flex-col", "gap-0.5");
+    expect(sourceBadge.parentElement).toContainElement(screen.getByText("-1"));
+  });
+
+  it("internal use가 창고와 부서 위치를 함께 쓰면 위치별 결재 문구를 사용한다", () => {
+    const warehouseLine = {
+      ...parentLine,
+      to_bucket: "none" as const,
+      to_department: "AS",
+    };
+    const departmentLine = {
+      ...parentLine,
+      line_id: "department-line",
+      item_id: "department-item",
+      item_name: "부서 재고 품목",
+      from_bucket: "production" as const,
+      from_department: "튜브",
+      to_bucket: "none" as const,
+      to_department: "AS",
+    };
+
+    render(
+      <IoConfirmStep
+        workType="internal_use"
+        subType="internal_use_out"
+        bundles={[{ ...bundle, source_kind: "direct_item", lines: [warehouseLine, departmentLine] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="warehouse"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText("위치별 결재 요청")).toHaveLength(2);
+    expect(screen.getByText("위치별 결재 필요")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "위치별 결재 요청" })).toBeInTheDocument();
+    expect(screen.queryByText(/원본별 결재/)).not.toBeInTheDocument();
+  });
+
+  it("internal-use BOM 자식마다 실제 부서 차감 위치를 표시한다", () => {
+    const highVoltageChild = {
+      ...childLine,
+      line_id: "high-voltage-child",
+      from_bucket: "production" as const,
+      from_department: "고압",
+      to_bucket: "none" as const,
+      to_department: "연구",
+    };
+    const tubeChild = {
+      ...childLine,
+      line_id: "tube-child",
+      item_id: "tube-child-item",
+      item_name: "튜브 구성품",
+      from_bucket: "production" as const,
+      from_department: "튜브",
+      to_bucket: "none" as const,
+      to_department: "연구",
+    };
+    render(
+      <IoConfirmStep
+        workType="internal_use"
+        subType="internal_use_out"
+        bundles={[{ ...bundle, lines: [highVoltageChild, tubeChild] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="warehouse"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ }));
+
+    expect(screen.getByLabelText("차감 위치: 고압")).toHaveClass("flex-col", "gap-0.5");
+    expect(screen.getByLabelText("차감 위치: 튜브")).toHaveClass("flex-col", "gap-0.5");
   });
 
   it("uses a full-width row button to expand confirmation bundles", () => {

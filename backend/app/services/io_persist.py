@@ -33,6 +33,7 @@ from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     _enum_value,
     _new_id,
+    validate_internal_use_bundles,
     validate_internal_use_operation,
     validate_internal_use_requester,
     validate_operation_sources,
@@ -241,6 +242,36 @@ def _bom_fallback_child_lines(
     return fallback
 
 
+def _stock_request_summary(request: StockRequest) -> dict:
+    first_line = request.lines[0] if request.lines else None
+    if request.requires_warehouse_approval:
+        approval_kind = "warehouse"
+        approver_employee_id = request.approved_by_employee_id
+        approver_name = request.approved_by_name
+    elif request.requires_department_approval:
+        approval_kind = "department"
+        approver_employee_id = request.department_approved_by_employee_id
+        approver_name = request.department_approved_by_name
+    else:
+        approval_kind = "none"
+        approver_employee_id = request.approved_by_employee_id
+        approver_name = request.approved_by_name
+    return {
+        "stock_request_id": request.request_id,
+        "request_code": request.request_code,
+        "status": _enum_value(request.status),
+        "from_bucket": (
+            _enum_value(first_line.from_bucket) if first_line is not None else "none"
+        ),
+        "from_department": first_line.from_department if first_line is not None else None,
+        "approval_kind": approval_kind,
+        "requires_warehouse_approval": bool(request.requires_warehouse_approval),
+        "requires_department_approval": bool(request.requires_department_approval),
+        "approver_employee_id": approver_employee_id,
+        "approver_name": approver_name,
+    }
+
+
 def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
     bundles_payload: list[dict] = []
     for bundle in batch.bundles:
@@ -270,15 +301,34 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
                 "lines": lines_payload,
             }
         )
-    # 승인자: stock_request 가 있으면 그 request 의 approved_by (창고 결재자). 없거나 NULL 이면 요청자 자신
-    # (정/부 직원 직접 처리 시 결재 없이 바로 — 사용자 정의로는 요청자=승인자).
+    linked_requests: list[StockRequest] = []
+    if db is not None:
+        linked_requests = (
+            db.query(StockRequest)
+            .filter(StockRequest.operation_batch_id == batch.batch_id)
+            .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
+            .all()
+        )
+        if not linked_requests and batch.stock_request_id is not None:
+            legacy_request = (
+                db.query(StockRequest)
+                .filter(StockRequest.request_id == batch.stock_request_id)
+                .first()
+            )
+            if legacy_request is not None:
+                linked_requests = [legacy_request]
+
+    # 복수 결재 요청의 승인자를 하나로 대표하지 않는다. 단일·즉시처리는 기존 호환 규칙 유지.
     approver_employee_id: Optional[uuid.UUID] = batch.requester_employee_id
     approver_name: Optional[str] = batch.requester_name
-    if db is not None and batch.stock_request_id is not None:
-        sr = db.query(StockRequest).filter(StockRequest.request_id == batch.stock_request_id).first()
-        if sr is not None and sr.approved_by_employee_id is not None:
-            approver_employee_id = sr.approved_by_employee_id
-            approver_name = sr.approved_by_name or batch.requester_name
+    if len(linked_requests) > 1:
+        approver_employee_id = None
+        approver_name = None
+    elif len(linked_requests) == 1:
+        summary = _stock_request_summary(linked_requests[0])
+        if summary["approver_employee_id"] is not None:
+            approver_employee_id = summary["approver_employee_id"]
+            approver_name = summary["approver_name"] or batch.requester_name
     return {
         "batch_id": batch.batch_id,
         "work_type": batch.work_type,
@@ -301,6 +351,9 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
         "submitted_at": batch.submitted_at,
         "completed_at": batch.completed_at,
         "bundles": bundles_payload,
+        "stock_requests": [
+            _stock_request_summary(request) for request in linked_requests
+        ],
     }
 
 
@@ -318,11 +371,17 @@ def _persist_batch(
         sub_type=payload.sub_type,
     )
     normalize_payload_bom_stock_exempt(db, payload)
+    validate_internal_use_bundles(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+    )
     validate_internal_use_operation(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         to_department=payload.to_department,
         lines=(line for bundle in payload.bundles for line in bundle.lines),
+        db=db,
     )
     validate_warehouse_adjust_requester(
         requester,
@@ -493,6 +552,66 @@ def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
     return _batch_to_payload(batch, db=db) if batch else None
 
 
+def sync_batch_from_stock_requests(
+    db: Session,
+    batch: IoBatch,
+    requests: Optional[list[StockRequest]] = None,
+) -> None:
+    """연결된 모든 결재 요청을 집계해 배치 상태와 단일 호환 필드를 갱신한다."""
+    linked_requests = requests
+    if linked_requests is None:
+        linked_requests = (
+            db.query(StockRequest)
+            .filter(StockRequest.operation_batch_id == batch.batch_id)
+            .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
+            .all()
+        )
+    if not linked_requests:
+        return
+
+    statuses = {_enum_value(request.status) for request in linked_requests}
+    if StockRequestStatusEnum.RESERVED.value in statuses:
+        batch.status = "reserved"
+        batch.completed_at = None
+    elif StockRequestStatusEnum.SUBMITTED.value in statuses:
+        batch.status = "submitted"
+        batch.completed_at = None
+    elif statuses == {StockRequestStatusEnum.COMPLETED.value}:
+        batch.status = "completed"
+        batch.completed_at = max(
+            (request.completed_at or datetime.utcnow()) for request in linked_requests
+        )
+    elif StockRequestStatusEnum.COMPLETED.value in statuses:
+        batch.status = "partially_completed"
+        batch.completed_at = max(
+            (request.completed_at for request in linked_requests if request.completed_at),
+            default=datetime.utcnow(),
+        )
+    elif StockRequestStatusEnum.FAILED_APPROVAL.value in statuses:
+        batch.status = "failed"
+        batch.completed_at = None
+    elif statuses == {StockRequestStatusEnum.CANCELLED.value}:
+        batch.status = "cancelled"
+        batch.completed_at = None
+    else:
+        batch.status = "rejected"
+        batch.completed_at = None
+
+    batch.requires_approval = any(
+        request.requires_warehouse_approval or request.requires_department_approval
+        for request in linked_requests
+    )
+    if len(linked_requests) == 1:
+        request = linked_requests[0]
+        batch.stock_request_id = request.request_id
+        if request.request_code and not batch.reference_no:
+            batch.reference_no = request.request_code
+    else:
+        batch.stock_request_id = None
+    batch.updated_at = datetime.utcnow()
+    db.flush()
+
+
 def sync_batch_from_stock_request(db: Session, request: StockRequest) -> None:
     batch_id = getattr(request, "operation_batch_id", None)
     if not batch_id:
@@ -500,18 +619,4 @@ def sync_batch_from_stock_request(db: Session, request: StockRequest) -> None:
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         return
-    if request.status == StockRequestStatusEnum.COMPLETED:
-        batch.status = "completed"
-        batch.completed_at = request.completed_at or datetime.utcnow()
-    elif request.status == StockRequestStatusEnum.REJECTED:
-        batch.status = "rejected"
-    elif request.status == StockRequestStatusEnum.CANCELLED:
-        batch.status = "cancelled"
-    elif request.status == StockRequestStatusEnum.FAILED_APPROVAL:
-        batch.status = "failed"
-    elif request.status == StockRequestStatusEnum.RESERVED:
-        batch.status = "reserved"
-    else:
-        batch.status = "submitted"
-    batch.updated_at = datetime.utcnow()
-    db.flush()
+    sync_batch_from_stock_requests(db, batch)

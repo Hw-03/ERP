@@ -4,6 +4,7 @@ import type {
   IoBundle,
   IoLine,
   IoSourceKind,
+  IoSourceLocation,
   IoSubType,
   IoWorkType,
   Item,
@@ -11,7 +12,7 @@ import type {
 } from "@/lib/api";
 import type { IoStep } from "./useIoWorkState";
 
-export type { IoBundle, IoLine, IoSourceKind, IoSubType, IoWorkType, Item, ProductModel };
+export type { IoBundle, IoLine, IoSourceKind, IoSourceLocation, IoSubType, IoWorkType, Item, ProductModel };
 
 export interface OperatorLike {
   employee_id: string;

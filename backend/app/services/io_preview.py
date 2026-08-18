@@ -47,6 +47,7 @@ WORK_TYPES = {
 }
 INTERNAL_USE_WORK_TYPE = "internal_use"
 INTERNAL_USE_SUB_TYPE = "internal_use_out"
+INTERNAL_USE_SOURCE_LOCATIONS = frozenset({"warehouse", "department"})
 INTERNAL_USE_DEPARTMENTS = frozenset(
     {DepartmentEnum.AS.value, DepartmentEnum.RESEARCH.value}
 )
@@ -63,8 +64,9 @@ def validate_internal_use_operation(
     sub_type: str,
     to_department: Optional[str],
     lines: Iterable[object] = (),
+    db: Optional[Session] = None,
 ) -> None:
-    """사내 사용 작업의 고정 work/sub 조합과 창고 차감 라인을 검증한다."""
+    """사내 사용 라인의 창고 또는 품목 코드 기반 부서 원본을 검증한다."""
     is_internal = work_type == INTERNAL_USE_WORK_TYPE or sub_type == INTERNAL_USE_SUB_TYPE
     if not is_internal:
         return
@@ -72,16 +74,25 @@ def validate_internal_use_operation(
         raise ValueError("internal_use 작업은 internal_use_out 세부 작업만 허용됩니다.")
     if to_department not in INTERNAL_USE_DEPARTMENTS:
         raise ValueError("사내 사용 반출 부서는 AS 또는 연구만 선택할 수 있습니다.")
-    expected = ("out", "warehouse", None, "none", to_department)
     for line in lines:
-        actual = (
+        common_route = (
             getattr(line, "direction"),
-            getattr(line, "from_bucket"),
-            getattr(line, "from_department"),
             getattr(line, "to_bucket"),
             getattr(line, "to_department"),
         )
-        if actual != expected:
+        if common_route != ("out", "none", to_department):
+            raise ValueError("사내 사용 라인 구성이 올바르지 않습니다.")
+
+        from_bucket = getattr(line, "from_bucket")
+        from_department = getattr(line, "from_department")
+        if from_bucket == "warehouse" and from_department is None:
+            continue
+        if from_bucket != "production" or db is None:
+            raise ValueError("사내 사용 라인 구성이 올바르지 않습니다.")
+
+        item = _get_item(db, getattr(line, "item_id"))
+        expected_department = _component_source_dept(item, None)
+        if from_department != expected_department:
             raise ValueError("사내 사용 라인 구성이 올바르지 않습니다.")
 
 
@@ -101,6 +112,25 @@ def validate_internal_use_requester(
         "deputy",
     }:
         raise PermissionError("AS·연구 직원 또는 창고 정/부 담당자만 사내 사용 반출이 가능합니다.")
+
+
+def validate_internal_use_bundles(
+    *,
+    work_type: str,
+    sub_type: str,
+    bundles: Iterable[object],
+) -> None:
+    """같은 부모 품목의 원본 또는 방식을 둘 이상 제출하지 못하게 한다."""
+    if (work_type, sub_type) != (INTERNAL_USE_WORK_TYPE, INTERNAL_USE_SUB_TYPE):
+        return
+    source_item_ids: set[uuid.UUID] = set()
+    for bundle in bundles:
+        source_item_id = getattr(bundle, "source_item_id", None)
+        if source_item_id is None:
+            raise ValueError("AS·연구 사용출고에는 원본 품목이 필요합니다.")
+        if source_item_id in source_item_ids:
+            raise ValueError("같은 품목에는 한 원본과 한 방식만 선택할 수 있습니다.")
+        source_item_ids.add(source_item_id)
 
 
 def _is_warehouse_adjust(work_type: str, sub_type: str) -> bool:
@@ -315,6 +345,7 @@ def _route_for_sub_type(
     from_department: Optional[str],
     to_department: Optional[str],
     role: str = "component",
+    source_location: str = "warehouse",
 ) -> tuple[str, str, Optional[str], str, Optional[str]]:
     if sub_type == "receive_supplier":
         return ("in", "none", None, "warehouse", None)
@@ -323,6 +354,9 @@ def _route_for_sub_type(
     if sub_type == "dept_to_warehouse":
         return ("move", "production", from_department, "warehouse", None)
     if sub_type == INTERNAL_USE_SUB_TYPE:
+        if source_location == "department":
+            source_department = _component_source_dept(item, None)
+            return ("out", "production", source_department, "none", to_department)
         return ("out", "warehouse", None, "none", to_department)
     if sub_type == "produce":
         if role == "result":
@@ -379,6 +413,19 @@ def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> No
         raise ValueError("창고 수량보정은 단품 품목만 처리할 수 있습니다.")
 
 
+def _target_source_location(target: object, *, sub_type: str) -> str:
+    """AS·연구 사용출고의 재고 원본을 정규화하고 다른 흐름의 사용을 막는다."""
+    requested = getattr(target, "source_location", None)
+    if sub_type != INTERNAL_USE_SUB_TYPE:
+        if requested is not None:
+            raise ValueError("재고 원본 선택은 AS·연구 사용출고에서만 사용할 수 있습니다.")
+        return "warehouse"
+    source_location = requested or "warehouse"
+    if source_location not in INTERNAL_USE_SOURCE_LOCATIONS:
+        raise ValueError("재고 원본은 warehouse 또는 department만 허용됩니다.")
+    return source_location
+
+
 # BOM 전개 대상 세부 작업 — 결과/부품을 함께 펼친다.
 EXPAND_SUB_TYPES = frozenset(
     {"warehouse_to_dept", "dept_to_warehouse", "dept_transfer", "produce", "disassemble", "internal_use_out"}
@@ -397,6 +444,7 @@ def _routed_line(
     to_department: Optional[str],
     origin: str,
     role: str = "component",
+    source_location: str = "warehouse",
     bom_expected: Optional[Decimal] = None,
     exclusion_note: Optional[str] = None,
 ) -> dict:
@@ -407,6 +455,7 @@ def _routed_line(
         from_department=from_department,
         to_department=to_department,
         role=role,
+        source_location=source_location,
     )
     return _line_dict(
         db,
@@ -517,6 +566,7 @@ def _expanded_child_lines(
     sub_type: str,
     from_department: Optional[str],
     to_department: Optional[str],
+    source_location: str = "warehouse",
 ) -> list[dict]:
     """BOM 전개: 부품 라인들(bom_auto)만 생성(이동/이송류)."""
     lines: list[dict] = []
@@ -532,6 +582,7 @@ def _expanded_child_lines(
                 from_department=from_department,
                 to_department=to_department,
                 origin="bom_auto",
+                source_location=source_location,
                 bom_expected=required,
             )
         )
@@ -547,6 +598,7 @@ def _single_line(
     from_department: Optional[str],
     to_department: Optional[str],
     source_kind: str,
+    source_location: str = "warehouse",
 ) -> list[dict]:
     """전개 없는 낱개 라인 하나(수동이면 origin=manual, 그 외 direct)."""
     role = "result" if source_kind == MANUAL_SOURCE_KIND and sub_type in {"produce", "disassemble"} else "component"
@@ -560,6 +612,7 @@ def _single_line(
             to_department=to_department,
             origin="manual" if source_kind == MANUAL_SOURCE_KIND else "direct",
             role=role,
+            source_location=source_location,
         )
     ]
 
@@ -574,6 +627,7 @@ def _direct_item_bundle(
     from_department: Optional[str],
     to_department: Optional[str],
     source_kind: str = "direct_item",
+    source_location: str = "warehouse",
 ) -> dict:
     children = bom_svc.direct_children(db, item.item_id)
     should_expand = (
@@ -601,6 +655,7 @@ def _direct_item_bundle(
             from_department=from_department,
             to_department=to_department,
             source_kind=source_kind,
+            source_location=source_location,
         )
     elif sub_type == "produce":
         bundle["lines"] = _produce_lines(
@@ -630,6 +685,7 @@ def _direct_item_bundle(
             sub_type=sub_type,
             from_department=from_department,
             to_department=to_department,
+            source_location=source_location,
         )
     else:
         bundle["lines"] = _single_line(
@@ -640,6 +696,7 @@ def _direct_item_bundle(
             from_department=from_department,
             to_department=to_department,
             source_kind=source_kind,
+            source_location=source_location,
         )
     return bundle
 
@@ -704,6 +761,7 @@ def preview(
     bundles: list[dict] = []
     for target in targets:
         source_kind = getattr(target, "source_kind", "direct_item")
+        source_location = _target_source_location(target, sub_type=sub_type)
         qty = _d(getattr(target, "quantity", Decimal("1")))
         item_id = getattr(target, "item_id", None)
         if item_id is None:
@@ -718,6 +776,7 @@ def preview(
             from_department=from_department,
             to_department=to_department,
             source_kind=source_kind,
+            source_location=source_location,
         )
         _issue_bundle_bom_auto_tokens(
             db,

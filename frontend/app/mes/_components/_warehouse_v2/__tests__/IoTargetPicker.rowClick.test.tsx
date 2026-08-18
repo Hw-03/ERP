@@ -22,7 +22,17 @@ vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => ({ employee_id: "emp-1", assigned_model_slots: [] }),
 }));
 
-function makeItem({ warehouseQty = 0, pendingQty = 0, locations = [] }: { warehouseQty?: number; pendingQty?: number; locations?: unknown[] } = {}): Item {
+function makeItem({
+  warehouseQty = 0,
+  pendingQty = 0,
+  locations = [],
+  processTypeCode = "TR",
+}: {
+  warehouseQty?: number;
+  pendingQty?: number;
+  locations?: unknown[];
+  processTypeCode?: string;
+} = {}): Item {
   return {
     item_id: "item-1",
     item_name: "Clickable Item",
@@ -32,6 +42,7 @@ function makeItem({ warehouseQty = 0, pendingQty = 0, locations = [] }: { wareho
     pending_quantity: pendingQty,
     min_stock: null,
     locations,
+    process_type_code: processTypeCode,
     model_slots: [],
     deleted_at: null,
   } as unknown as Item;
@@ -53,7 +64,10 @@ const baseProps = {
   onAdvance: vi.fn(),
 };
 
-function makeBundle(sourceKind: IoBundle["source_kind"]): IoBundle {
+function makeBundle(
+  sourceKind: IoBundle["source_kind"],
+  sourceLocation: "warehouse" | "department" = "warehouse",
+): IoBundle {
   return {
     bundle_id: `bundle-${sourceKind}`,
     source_kind: sourceKind,
@@ -62,7 +76,28 @@ function makeBundle(sourceKind: IoBundle["source_kind"]): IoBundle {
     source_mes_code: "3-TR-0001",
     quantity: 1,
     expanded_level: 0,
-    lines: [],
+    lines: [
+      {
+        line_id: `line-${sourceKind}-${sourceLocation}`,
+        item_id: "item-1",
+        item_name: "Clickable Item",
+        mes_code: "3-TR-0001",
+        unit: "EA",
+        direction: "out",
+        from_bucket: sourceLocation === "warehouse" ? "warehouse" : "production",
+        from_department: sourceLocation === "warehouse" ? null : "튜브",
+        to_bucket: "none",
+        to_department: "AS",
+        quantity: 1,
+        bom_expected: null,
+        included: true,
+        origin: sourceKind === "manual" ? "manual" : "bom_auto",
+        edited: false,
+        has_children: false,
+        shortage: 0,
+        exclusion_note: null,
+      },
+    ],
   };
 }
 
@@ -278,7 +313,7 @@ describe("IoTargetPicker row click", () => {
     expect(onAddItem).not.toHaveBeenCalled();
   });
 
-  it("replaces a selected internal-use single item with BOM", () => {
+  it("replaces a selected warehouse-source internal-use single item with BOM in that cell", () => {
     const onAddItem = vi.fn();
     const onRemoveBundles = vi.fn();
     render(
@@ -294,15 +329,20 @@ describe("IoTargetPicker row click", () => {
     );
 
     const row = screen.getByText("Clickable Item").closest("tr")!;
-    const bomButton = within(row).getByRole("button", { name: "BOM" });
+    const bomButton = within(row).getByRole("button", { name: "창고 BOM" });
 
     fireEvent.click(bomButton);
 
-    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-manual"]);
-    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }));
+    expect(onRemoveBundles).not.toHaveBeenCalled();
+    expect(onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: "item-1" }),
+      "direct_item",
+      undefined,
+      "warehouse",
+    );
   });
 
-  it("replaces a selected internal-use BOM with a single item", () => {
+  it("replaces a selected warehouse-source internal-use BOM with a single item in that cell", () => {
     const onAddItem = vi.fn();
     const onRemoveBundles = vi.fn();
     render(
@@ -318,13 +358,90 @@ describe("IoTargetPicker row click", () => {
     );
 
     const row = screen.getByText("Clickable Item").closest("tr")!;
-    const bomButton = within(row).getByRole("button", { name: "BOM" });
-    const singleButton = within(row).getAllByRole("button").find((button) => button !== bomButton)!;
+    const singleButton = within(row).getByRole("button", { name: "창고 낱개" });
 
     fireEvent.click(singleButton);
 
-    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-bom_parent"]);
-    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual");
+    expect(onRemoveBundles).not.toHaveBeenCalled();
+    expect(onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: "item-1" }),
+      "manual",
+      undefined,
+      "warehouse",
+    );
+  });
+
+  it("opens BOM and single actions in the clicked internal-use warehouse quantity cell", () => {
+    const onAddItem = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="internal_use"
+        subType="internal_use_out"
+        bomParents={new Set(["item-1"])}
+        items={[makeItem({ warehouseQty: 10 })]}
+        onAddItem={onAddItem}
+      />,
+    );
+
+    const quantityButton = screen.getByRole("button", { name: "창고 수량 10" });
+    expect(quantityButton).toHaveClass("h-8", "min-h-8", "w-24");
+    expect(quantityButton).not.toHaveClass("min-h-11", "w-full");
+    fireEvent.click(quantityButton);
+
+    expect(screen.queryByRole("button", { name: "창고 수량 10" })).not.toBeInTheDocument();
+    const bomButton = screen.getByRole("button", { name: "창고 BOM" });
+    const singleButton = screen.getByRole("button", { name: "창고 낱개" });
+    const choiceGroup = bomButton.parentElement?.parentElement;
+    expect(choiceGroup).toHaveClass("w-24");
+    expect(bomButton.parentElement).toHaveClass("min-w-0", "flex-1");
+    expect(singleButton.parentElement).toHaveClass("min-w-0", "flex-1");
+    expect(bomButton).toHaveClass("h-8", "min-w-0", "flex-1", "px-2");
+    expect(bomButton).toHaveClass("whitespace-nowrap");
+    expect(bomButton).not.toHaveClass("min-h-11");
+    fireEvent.click(bomButton);
+    expect(onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: "item-1" }),
+      "direct_item",
+      undefined,
+      "warehouse",
+    );
+  });
+
+  it("replaces the selected warehouse source after confirming a department source", () => {
+    const onAddItem = vi.fn();
+    const onRemoveBundles = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="internal_use"
+        subType="internal_use_out"
+        bomParents={new Set(["item-1"])}
+        items={[
+          makeItem({
+            warehouseQty: 10,
+            processTypeCode: "HF",
+            locations: [
+              { department: "고압", status: "PRODUCTION", quantity: 9, pending_quantity: 2, available_quantity: 7 },
+            ],
+          }),
+        ]}
+        bundles={[makeBundle("manual", "warehouse")]}
+        onAddItem={onAddItem}
+        onRemoveBundles={onRemoveBundles}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "고압 수량 7" }));
+    fireEvent.click(screen.getByRole("button", { name: "부서 낱개" }));
+
+    expect(onRemoveBundles).not.toHaveBeenCalled();
+    expect(onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: "item-1" }),
+      "manual",
+      undefined,
+      "department",
+    );
   });
 
   it("keeps only the latest internal-use selection when both modes were already selected", () => {

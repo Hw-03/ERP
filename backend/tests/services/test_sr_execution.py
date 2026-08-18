@@ -232,6 +232,49 @@ def test_execute_line_raw_ship(db_session, make_item):
     assert logs[0].quantity_change == D("-4")
 
 
+def test_execute_line_internal_use_from_department_only_consumes_that_location(
+    db_session, make_item, make_location
+):
+    item = make_item(name="IU-DEPT", process_type_code="HF", warehouse_qty=D("7"))
+    make_location(
+        item.item_id,
+        department=HV,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=D("5"),
+    )
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inventory.quantity = D("12")
+    employee = _make_employee(db_session)
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.INTERNAL_USE,
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    line = _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("2"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        from_department=HV.value,
+        to_bucket=RequestBucketEnum.NONE,
+        to_department=DepartmentEnum.AS.value,
+    )
+
+    svc._execute_line(db_session, request, line, approver=employee, is_approval=True)
+    db_session.flush()
+
+    assert _wh_qty(db_session, item.item_id) == D("7")
+    assert _prod_qty(db_session, item.item_id, HV) == D("3")
+    assert _total_qty(db_session, item.item_id) == D("10")
+    logs = _logs(db_session, item.item_id)
+    assert len(logs) == 1
+    assert logs[0].transaction_type == TransactionTypeEnum.INTERNAL_USE
+    assert logs[0].reference_no == request.request_code
+
+
 def test_execute_line_warehouse_to_dept(db_session, make_item):
     """WAREHOUSE_TO_DEPT: 창고 -qty / 부서 생산 +qty, 총량 불변, change=0."""
     item = make_item(name="W2D", warehouse_qty=D("10"))

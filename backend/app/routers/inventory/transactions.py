@@ -342,9 +342,9 @@ def list_transactions(
 
     result = []
     for log, item, edit_count in rows:
-        info = batch_map.get(log.operation_batch_id)
-        if info is None and log.reference_no:
-            info = sr_map.get(log.reference_no)
+        info = sr_map.get(log.reference_no) if log.reference_no else None
+        if info is None:
+            info = batch_map.get(log.operation_batch_id)
         result.append(
             _to_log_response(
                 log,
@@ -426,9 +426,9 @@ def list_transaction_display_groups(
     stock_request_map = _stock_request_info_map(db, reference_nos)
     logs = []
     for log, item, edit_count in rows:
-        info = batch_map.get(log.operation_batch_id)
-        if info is None and log.reference_no:
-            info = stock_request_map.get(log.reference_no)
+        info = stock_request_map.get(log.reference_no) if log.reference_no else None
+        if info is None:
+            info = batch_map.get(log.operation_batch_id)
         logs.append(
             _to_log_response(
                 log,
@@ -679,9 +679,9 @@ def export_transactions_csv(
         ]
     )
     for log, item in rows:
-        info = batch_map.get(log.operation_batch_id)
-        if info is None and log.reference_no:
-            info = sr_map.get(log.reference_no)
+        info = sr_map.get(log.reference_no) if log.reference_no else None
+        if info is None:
+            info = batch_map.get(log.operation_batch_id)
         requester = info.requester_name if info else None
         approver = info.approver_name if info else None
         writer.writerow(
@@ -777,9 +777,9 @@ def export_transactions_xlsx(
 
     for log, item in rows:
         tx_val = log.transaction_type.value
-        info = batch_map.get(log.operation_batch_id)
-        if info is None and log.reference_no:
-            info = sr_map.get(log.reference_no)
+        info = sr_map.get(log.reference_no) if log.reference_no else None
+        if info is None:
+            info = batch_map.get(log.operation_batch_id)
         requester = info.requester_name if info else None
         approver = info.approver_name if info else None
         row_data = [
