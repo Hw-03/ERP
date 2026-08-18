@@ -62,5 +62,5 @@
 
 ## 관련
 
-- [project_kwon_donghwan_requests](C:\Users\user\.claude\projects\c--ERP\memory\project_kwon_donghwan_requests.md) — `%TEMP%` 찌꺼기 정리 요청과 같은 맥락 (저장 공간 위생)
+- `project_kwon_donghwan_requests` 도구 로컬 메모리 — `%TEMP%` 찌꺼기 정리 요청과 같은 맥락 (저장 공간 위생). 저장소 밖의 역사 메모리이므로 링크하지 않는다.
 - 2026-05-29 cleanup 커밋: `8dd5c9a9` (루트), `b4b1cf16` (backend), 이후 (안전망)

@@ -3,7 +3,7 @@
 이 문서는 DEXCOWIN MES 에서 코드·UI·문서가 같은 의미로 쓰는 도메인 용어를 한 곳에 정리한다.
 새로운 작업자/문서/기능은 여기 있는 단어를 그대로 사용한다.
 
-> 프론트엔드 화면 라벨의 단일 소스는 `frontend/lib/io/glossary.ts` (P0-1 에서 도입).
+> 프론트엔드 화면 라벨의 단일 소스는 [`frontend/lib/io/glossary.ts`](../../frontend/lib/io/glossary.ts)다.
 > 본 문서는 사람용 사전, 위 모듈은 코드용 사전 — 두 곳이 일치해야 한다.
 
 ## 부서 / 분류
@@ -11,7 +11,7 @@
 | 한국어 | 코드 / 영문 | 설명 |
 |---|---|---|
 | 창고 | `WAREHOUSE` | 자재 보관 부서. 재고의 1차 위치. |
-| 출하부 | `SHIPPING` | 출하 직전 재고를 모아 두는 부서. 출고는 항상 출하부에서. |
+| 출하부 | `SHIPPING` | 출하 공정 부서. 창고 재고와 별도 bucket이며, 외부 출하는 창고에서 차감될 수 있다. |
 | 튜브 / 고압 / 진공 / 튜닝 / 조립 | (그대로) | 생산 부서. 카테고리 코드와 다름. |
 | process_type_code | `process_type_code` | 품목 마스터의 부서 분류 (예: "조립", "고압"). |
 | department | `Department` | 백엔드 enum. UI 부서 필터·이동/불량/반품에서 사용. |
@@ -20,7 +20,7 @@
 
 ## 공정코드 (`process_type_code`)
 
-품목 분류의 단일 기준. 18개. `{부서 계열 1글자}{단계 1글자}` 형식.
+품목 분류의 단일 기준. `{부서 계열 1글자}{단계 1글자}` 형식이며, 현재 구성은 `python _attic/backend-scripts/facts.py`로 확인한다.
 
 | 부서 | R (원자재) | A (조립체) | F (F타입) |
 |---|---|---|---|
@@ -79,9 +79,9 @@
 
 ## 출하 규칙
 
-**출하(ship)는 별도 work type 이 아니다** (사용자 확인 2026-05-27).
+입출고의 **출하** 표시는 별도 work type이 아니다.
 
-입출고 V2 compose 에는 다음 work type 이 존재한다: `receive` / `warehouse_io` / `process` / `defect` / `internal_use`.
+입출고 V2 compose의 현재 work type과 sub type 라벨은 `frontend/lib/io/glossary.ts`를 정본으로 확인한다.
 
 `internal_use` 는 AS·연구 부서와 창고 정/부만 접근한다. 사용 부서로 `AS` 또는 `연구`를
 선택하면 창고 정/부 결재를 요청하고, 승인 시 창고 재고만 차감하며 부서 재고는 생성하지
@@ -90,16 +90,16 @@
 
 | 조건 | 화면 표시 |
 |---|---|
-| `transaction_type=SHIP` + 품목 `process_type_code ∈ {PR, PA, PF}` + 창고 → 외부 방향 | **"출하"** |
+| `transaction_type=SHIP` + 품목 `process_type_code ∈ {PR, PA, PF}` + `warehouse → none(외부)` | **"출하"** |
 | 그 외 SHIP | "출고" |
 
-→ V2 compose 에 `ship` work type 을 추가하지 말 것 (`SHIP_RULE.workTypeShouldNotExist = true` in `frontend/lib/io/glossary.ts`).
+사이드바 **출하** 탭은 위 분류와 다른 전용 workflow다. `ShippingRequest`를 생성하고 요청·준비·픽업 완료를 관리하며, 픽업 완료 시 연결된 출하 차감을 만든다. 따라서 전용 workflow를 V2 `ship` work type으로 추가하지 않는다.
 
-사용자가 "출하" 작업을 하려면: 입출고 탭 → `warehouse_io` 의 출고 작업 → PF 품목 선택 → 출고. 자동으로 출하로 기록됨.
+입출고에서 PF 계열 품목을 창고에서 외부로 `SHIP` 처리하면 이력은 출하로 분류된다. 전용 출하 업무는 사이드바 출하 탭에서 처리한다.
 
 ## 단일 사전 (코드)
 
-화면 라벨은 [`frontend/lib/io/glossary.ts`](../frontend/lib/io/glossary.ts) 가 코드용 단일 소스. 새 라벨 추가/변경 시 위 표와 해당 모듈을 함께 갱신한다. drift 방지 단위 테스트: `frontend/lib/io/__tests__/glossary.test.ts`.
+화면 라벨은 [`frontend/lib/io/glossary.ts`](../../frontend/lib/io/glossary.ts)가 코드용 단일 소스다. 새 라벨 추가/변경 시 위 표와 해당 모듈을 함께 갱신한다. drift 방지 단위 테스트: [`frontend/lib/io/__tests__/glossary.test.ts`](../../frontend/lib/io/__tests__/glossary.test.ts).
 
 ## 에러 코드 (Phase 4 표준화)
 
@@ -119,7 +119,7 @@
 
 ## 그 외 용어
 
-- **wizard**: 입출고 화면의 5단계 흐름 (담당자 → 작업유형 → 품목 → 수량 → 실행).
+- **wizard**: 입출고 화면의 단계 흐름. 현재 단계명과 진행 조건은 `_warehouse_v2/useIoWorkState.ts`의 `IO_STEP_LABELS`와 `canAdvance`를 정본으로 확인한다.
 - **Topbar pill**: 화면 상단의 상태 알림 작은 알약 (정상/주의/실패).
 - **completionFlyout**: 입출고 직후 0.38s in / 1.1s 표시 / 0.38s out 애니메이션.
 - **ResultModal**: 부분 성공/실패 결과 다이얼로그. `partial` / `fail` / `success` 변형.

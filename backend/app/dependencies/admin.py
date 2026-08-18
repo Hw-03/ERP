@@ -32,7 +32,10 @@ from app.routers.settings import require_admin, require_admin_readonly
 async def extract_admin_pin(
     request: Request,
     x_admin_pin: Annotated[Optional[str], Header(alias="X-Admin-Pin")] = None,
-    pin: Annotated[Optional[str], Query()] = None,
+    pin: Annotated[
+        Optional[str],
+        Query(description="관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)", deprecated=True),
+    ] = None,
 ) -> str:
     """다중 source에서 PIN 추출. 우선순위: 헤더 → query → body."""
     if x_admin_pin:

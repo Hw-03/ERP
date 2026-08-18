@@ -4,8 +4,13 @@ setlocal
 rem ====== Prerequisites: Python + Node.js ======
 set "MISSING_PY=0"
 set "MISSING_NODE=0"
+set "PYTHON_CMD="
 where py >nul 2>&1
-if errorlevel 1 set "MISSING_PY=1"
+if not errorlevel 1 (
+    py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
+    if not errorlevel 1 set "PYTHON_CMD=py -3"
+)
+if not defined PYTHON_CMD set "MISSING_PY=1"
 where node >nul 2>&1
 if errorlevel 1 set "MISSING_NODE=1"
 if "%MISSING_PY%%MISSING_NODE%"=="00" goto :prereq_ok
@@ -14,7 +19,7 @@ echo.
 echo ================================================================
 echo  [MES] 필수 프로그램이 설치되어 있지 않습니다
 echo ================================================================
-if "%MISSING_PY%"=="1"   echo   [ ] Python 3.13+    ^(미설치^)
+if "%MISSING_PY%"=="1"   echo   [ ] Python 3.11+    ^(미설치^)
 if "%MISSING_PY%"=="0"   echo   [O] Python          ^(설치됨^)
 if "%MISSING_NODE%"=="1" echo   [ ] Node.js LTS     ^(미설치^)
 if "%MISSING_NODE%"=="0" echo   [O] Node.js         ^(설치됨^)
@@ -83,15 +88,15 @@ popd
 
 pushd "%~dp0backend"
 if exist "requirements.txt" (
-    py -c "import fastapi, uvicorn, sqlalchemy, psycopg2, alembic, dotenv, pydantic, openpyxl" >nul 2>&1
+    %PYTHON_CMD% -c "from zoneinfo import ZoneInfo; import fastapi, uvicorn, sqlalchemy, psycopg2, alembic, dotenv, pydantic, openpyxl; ZoneInfo('Asia/Seoul')" >nul 2>&1
     if errorlevel 1 (
         echo [MES] Installing backend dependencies ^(first run only, may take a few minutes^)...
-        py -m pip install -r requirements.txt
+        %PYTHON_CMD% -m pip install -r requirements.txt
         if errorlevel 1 (
             echo.
             echo [MES] WARNING: backend pip install failed.
             echo [MES] If you see a psycopg2 build error, your Python version may be too new.
-            echo [MES] Recommended: install Python 3.13 from https://www.python.org/downloads/
+            echo [MES] Supported Python: 3.11+ ^(automatic install selects Python 3.13^).
             echo.
         )
     )

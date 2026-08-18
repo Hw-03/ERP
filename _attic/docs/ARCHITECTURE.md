@@ -4,7 +4,8 @@
 > 기준이며, 현재 활성 UI 인 `IoComposeView` (`frontend/app/mes/_components/_warehouse_v2/`)
 > 와 정합하지 않는 부분이 있다. 입출고 흐름·엔드포인트·책임 분리 진행 상황 섹션은
 > V2 기준으로 재작성 예정. 백엔드 god-service 분리(P1-4) 와 함께 갱신한다.
-> 도메인 한눈 보기는 [docs/CONTEXT.md](CONTEXT.md), 결정 기록은 [docs/adr/](adr/) 참조.
+> 도메인 한눈 보기는 [CONTEXT.md](CONTEXT.md), 현재 운영 절차는 [OPERATIONS.md](OPERATIONS.md),
+> 실제 구조는 코드(`backend/app/`, `frontend/app/mes/`)를 참조한다. 결정 기록은 [adr/](adr/)에 보관한다.
 
 이 문서는 다음 사람이 한 시간 안에 코드 구조를 머리에 넣을 수 있도록 쓴 짧은 안내서다.
 

@@ -4538,7 +4538,7 @@
             "title": "Min Stock"
           },
           "model_slots": {
-            "description": "사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)",
+            "description": "사용 제품 슬롯 목록. 현재 등록된 슬롯은 GET /api/models 응답을 참조하세요.",
             "items": {
               "type": "integer"
             },
@@ -4556,7 +4556,7 @@
                 "type": "null"
               }
             ],
-            "description": "공정 코드 (TR/HR/.../PF 18개)",
+            "description": "공정 코드. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
             "title": "Process Type Code"
           },
           "sales_review_required": {
@@ -4905,7 +4905,7 @@
                 "type": "null"
               }
             ],
-            "description": "공정 코드 (TR/HR/.../PF 18개)",
+            "description": "공정 코드. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
             "title": "Process Type Code"
           },
           "sales_review_required": {
@@ -11074,8 +11074,8 @@
     }
   },
   "info": {
-    "description": "\n    ## DEXCOWIN 경량 MES\n\n    ### 공정 분류 코드 (18종)\n    `process_type_code` = 부서(T/H/V/N/A/P) × 단계(R=원자재 / A=중간공정 / F=공정완료)\n\n    TR/TA/TF (튜브) · HR/HA/HF (고압) · VR/VA/VF (진공) · NR/NA/NF (튜닝) · AR/AA/AF (조립) · PR/PA/PF (출하)\n\n    ### 주요 기능\n    - 품목 마스터 조회 및 수정\n    - 재고 요약, 입고, 출고, 조정, 거래 이력\n    - 직원 마스터 및 출하 패키지 관리\n    - BOM 관리와 트리 조회\n    - 생산 입고와 BOM 기반 Backflush\n    ",
-    "title": "DEXCOWIN MES",
+    "description": "\n    ## DEXCOWIN MES API\n\n    DEXCOWIN MES의 품목, 재고, 생산, 출하 및 관리 기능을 제공하는 공식 API입니다.\n\n    ### 주요 기능\n    - 품목 마스터 조회 및 수정\n    - 재고 요약, 입고, 출고, 조정, 거래 이력\n    - 직원 마스터 및 출하 관리\n    - BOM 관리와 트리 조회\n    - 생산 입고와 BOM 기반 Backflush\n    ",
+    "title": "DEXCOWIN MES API",
     "version": "1.3.0"
   },
   "openapi": "3.1.0",
@@ -11104,6 +11104,8 @@
         "operationId": "list_activity_audit_files_api_admin_activity_audit_files_get",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11116,6 +11118,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11174,6 +11178,8 @@
         "operationId": "upsert_current_terminal_api_admin_activity_audit_terminals_current_put",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11186,6 +11192,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11258,6 +11266,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11270,6 +11280,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11330,6 +11342,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11342,6 +11356,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11404,6 +11420,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11416,6 +11434,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11469,6 +11489,8 @@
         "operationId": "list_files_api_admin_audit_csv_files_get",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11481,6 +11503,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11547,6 +11571,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11559,6 +11585,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11619,6 +11647,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11631,6 +11661,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11694,6 +11726,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11706,6 +11740,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11821,6 +11857,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11833,6 +11871,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -11902,6 +11942,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -11914,6 +11956,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -12533,6 +12577,8 @@
         "operationId": "create_bom_api_bom_post",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -12545,6 +12591,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -12667,6 +12715,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -12679,6 +12729,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -12734,6 +12786,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -12746,6 +12800,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -13078,6 +13134,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -13090,6 +13148,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -13592,6 +13652,8 @@
         "operationId": "create_department_api_departments_post",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -13604,6 +13666,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -13667,6 +13731,8 @@
         "operationId": "reorder_departments_api_departments_reorder_patch",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -13679,6 +13745,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -13750,6 +13818,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -13762,6 +13832,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -13832,6 +13904,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -13844,6 +13918,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -14128,6 +14204,8 @@
         "operationId": "create_employee_api_employees_post",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -14140,6 +14218,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -14213,6 +14293,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -14225,6 +14307,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -14284,6 +14368,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -14296,6 +14382,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -14471,6 +14559,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -14483,6 +14573,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -15162,7 +15254,7 @@
     },
     "/api/health/db-info": {
       "get": {
-        "description": "서버가 실제 연결 중인 DB 정보 반환 — preflight 전용.\nDATABASE_URL 전체 노출 금지. 엔진 종류 + 30명 안전 여부만 반환.",
+        "description": "서버가 실제 연결 중인 DB 정보 반환 — preflight 전용.\nDATABASE_URL 전체 노출 금지. 엔진 종류와 실제 연결 확인 결과만 반환.",
         "operationId": "health_db_info_api_health_db_info_get",
         "responses": {
           "200": {
@@ -15327,7 +15419,7 @@
     },
     "/api/inventory/summary": {
       "get": {
-        "description": "process_type_code 18개 단일 기준 요약. category 컬럼 제거 후 단일 원천.",
+        "description": "공정 코드 기준 재고 요약. 코드 목록은 GET /api/codes/process-types에서 조회한다.",
         "operationId": "get_inventory_summary_api_inventory_summary_get",
         "responses": {
           "200": {
@@ -17329,7 +17421,7 @@
         "operationId": "list_items_api_items_get",
         "parameters": [
           {
-            "description": "process_type_code 필터 (TR/HR/.../PF 18개)",
+            "description": "process_type_code 필터. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
             "in": "query",
             "name": "process_type_code",
             "required": false,
@@ -17342,7 +17434,7 @@
                   "type": "null"
                 }
               ],
-              "description": "process_type_code 필터 (TR/HR/.../PF 18개)",
+              "description": "process_type_code 필터. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
               "title": "Process Type Code"
             }
           },
@@ -17477,6 +17569,8 @@
         "operationId": "create_item_api_items_post",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -17489,6 +17583,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -17767,6 +17863,8 @@
         "operationId": "reorder_items_api_items_reorder_patch",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -17779,6 +17877,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -17891,6 +17991,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -17903,6 +18005,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -17977,6 +18081,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -17989,6 +18095,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -18063,6 +18171,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -18075,6 +18185,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -18139,6 +18251,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -18151,6 +18265,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -18229,6 +18345,8 @@
         "operationId": "create_model_api_models_post",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -18241,6 +18359,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -18305,6 +18425,8 @@
         "operationId": "reorder_models_api_models_reorder_patch",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -18317,6 +18439,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -18388,6 +18512,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -18400,6 +18526,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -18471,6 +18599,8 @@
             }
           },
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -18483,6 +18613,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -18912,7 +19044,7 @@
     },
     "/api/production/capacity": {
       "get": {
-        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
+        "description": "현재 재고와 BOM을 기준으로 즉시·최대 생산 가능 수량을 조회합니다.",
         "operationId": "get_production_capacity_api_production_capacity_get",
         "responses": {
           "200": {
@@ -18926,7 +19058,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "전체 생산 가능수량 조회",
+        "summary": "생산 가능 수량 조회",
         "tags": [
           "Production"
         ]
@@ -18934,7 +19066,8 @@
     },
     "/api/production/possible": {
       "get": {
-        "description": "생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.\n\n- **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).\n- **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_production / total_production).\n\n계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.",
+        "deprecated": true,
+        "description": "기존 호출자 호환용 경로입니다. 신규 연동은 /api/production/capacity를 사용하세요.",
         "operationId": "get_production_capacity_api_production_possible_get",
         "responses": {
           "200": {
@@ -18948,7 +19081,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Production capacity alias",
+        "summary": "생산 가능 수량 조회 (호환)",
         "tags": [
           "Production"
         ]
@@ -19071,10 +19204,12 @@
     },
     "/api/settings/integrity/inventory": {
       "get": {
+        "deprecated": true,
         "description": "Deprecated compatibility endpoint.\n\nPIN 은 request body(`{\"pin\": \"...\"}`) 로 전달하면 access log 에 남지 않는다.\n하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.",
         "operationId": "check_inventory_integrity_api_settings_integrity_inventory_get",
         "parameters": [
           {
+            "deprecated": true,
             "description": "관리자 PIN (deprecated — body 사용 권장)",
             "in": "query",
             "name": "pin",
@@ -19090,6 +19225,7 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
               "description": "관리자 PIN (deprecated — body 사용 권장)",
               "title": "Pin"
             }
@@ -21710,6 +21846,8 @@
         "operationId": "set_box_tracking_api_warehouse_map_box_tracking_put",
         "parameters": [
           {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -21722,6 +21860,8 @@
                   "type": "null"
                 }
               ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
               "title": "Pin"
             }
           },
@@ -22744,10 +22884,6 @@
       "name": "Settings"
     },
     {
-      "description": "출하 묶음 CRUD.",
-      "name": "Ship Packages"
-    },
-    {
       "description": "제품 모델 슬롯.",
       "name": "Models"
     },
@@ -22756,12 +22892,52 @@
       "name": "Codes"
     },
     {
-      "description": "차이 분석.",
-      "name": "Variance"
-    },
-    {
       "description": "관리자 액션 감사로그 조회 (마스터/설정 변경).",
       "name": "Admin Audit"
+    },
+    {
+      "description": "관리자용 생산 이력 내보내기.",
+      "name": "Admin Export"
+    },
+    {
+      "description": "조립 체크리스트 관리.",
+      "name": "Assembly Checklists"
+    },
+    {
+      "description": "클라이언트 이벤트 수집.",
+      "name": "Client Events"
+    },
+    {
+      "description": "일일 작업 보고서 관리.",
+      "name": "Daily Work Reports"
+    },
+    {
+      "description": "불량 등록과 처리.",
+      "name": "Defects"
+    },
+    {
+      "description": "부서 마스터 관리.",
+      "name": "Departments"
+    },
+    {
+      "description": "부서 재고 조정.",
+      "name": "Dept Adjustment"
+    },
+    {
+      "description": "입출고 업무 처리.",
+      "name": "Inventory IO"
+    },
+    {
+      "description": "출하 요청과 준비·완료 처리.",
+      "name": "Shipping"
+    },
+    {
+      "description": "재고 요청과 결재 처리.",
+      "name": "Stock Requests"
+    },
+    {
+      "description": "창고 배치도 관리.",
+      "name": "Warehouse Map"
     },
     {
       "description": "결재 알림 — 요청 도착/승인/반려.",

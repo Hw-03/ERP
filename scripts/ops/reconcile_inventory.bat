@@ -9,13 +9,19 @@ rem  실제 정합성 복구는 별도 절차(서비스 레이어 수동 호출 
 rem  이 스크립트는 "발견 + 백업 + 보고"만 자동화한다.
 rem ============================================================
 setlocal
-set "URL=http://127.0.0.1:8010/health/detailed"
+set "BACKEND_URL="
+for /f "usebackq delims=" %%U in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\dev\resolve-server-profile.ps1" -Property BackendInternalUrl`) do set "BACKEND_URL=%%U"
+if not defined BACKEND_URL (
+    echo [RECONCILE] ERROR: server profile did not provide a backend URL.
+    exit /b 1
+)
+set "URL=%BACKEND_URL%/health/detailed"
 set "OUT=%TEMP%\mes_health_%RANDOM%.json"
 
 echo [RECONCILE] /health/detailed 호출 중...
-curl -s -m 8 "%URL%" -o "%OUT%"
+curl -f -s -m 8 "%URL%" -o "%OUT%"
 if not "%ERRORLEVEL%"=="0" (
-    echo [RECONCILE] 백엔드 호출 실패. 백엔드가 8010 포트에서 떠 있는지 확인하세요.
+    echo [RECONCILE] ERROR: request failed or returned an HTTP error.
     if exist "%OUT%" del "%OUT%"
     exit /b 1
 )

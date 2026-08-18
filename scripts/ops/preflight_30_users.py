@@ -2,7 +2,7 @@
 """30명 동시 운영 사전 점검 스크립트 (100점 기준).
 
 사용법:
-    python scripts/ops/preflight_30_users.py --url http://localhost:8000
+    python scripts/ops/preflight_30_users.py --url http://localhost:8011
 
 각 점검 항목을 ✅ PASS / ⚠️  WARN / ❌ FAIL 로 출력하고,
 마지막에 전체 판정을 보고합니다.
@@ -82,10 +82,9 @@ async def check_db_engine_from_server(client: httpx.AsyncClient, base_url: str) 
             return True
         data = res.json()
         engine = data.get("db_engine", "unknown")
-        safe = data.get("safe_for_30_users", False)
         if engine == "postgresql":
             record("DB 엔진 (서버)", "PASS",
-                   f"PostgreSQL 확인 — 30명 동시 운영 가능")
+                   "PostgreSQL 확인 — DB 엔진 조건 통과 (전체 준비 상태는 모든 사전 점검 결과로 판단)")
             return True
         elif engine == "sqlite":
             record("DB 엔진 (서버)", "FAIL",
@@ -410,7 +409,7 @@ async def check_employee_count(client: httpx.AsyncClient, base_url: str) -> None
 
 async def main():
     parser = argparse.ArgumentParser(description="30명 동시 운영 사전 점검 (100점 기준)")
-    parser.add_argument("--url", default="http://localhost:8000", help="서버 URL")
+    parser.add_argument("--url", required=True, metavar="BASE_URL", help="점검할 서버 base URL (필수)")
     args = parser.parse_args()
     base_url = args.url.rstrip("/")
 

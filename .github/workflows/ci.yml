@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "feat/**", "fix/**", "refactor/**"]
+    branches: [main, "feat/**", "fix/**", "refactor/**", "codex/**"]
   pull_request:
     branches: [main]
 
@@ -51,6 +51,24 @@ jobs:
                 && echo "If this schema change is intentional, refresh the baseline and commit it:" \
                 && echo "  cd backend && python -c \"from app.main import app; import json; open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))\"" \
                 && exit 1)
+
+  windows-ops-profile:
+    name: Windows ops profile contract
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ops test dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Run ops profile contract tests
+        working-directory: backend
+        run: pytest tests/ops/test_runtime_paths.py -q -k "profile_resolver_test_root or ops_batches_treat_a_fake_http_503_as_failure_before_success_flow"
 
   frontend:
     name: Frontend (lint + tsc + vitest+coverage + build)

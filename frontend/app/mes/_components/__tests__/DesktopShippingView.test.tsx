@@ -2383,7 +2383,7 @@ describe("DesktopShippingView", () => {
     expect(actionBar).not.toHaveTextContent("기준 PF를 먼저 선택하세요.");
   });
 
-  it("uses event types to repair garbled shipping history messages", async () => {
+  it("uses event types to replace stale shipping history messages", async () => {
     navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=hist-1";
     const eventRequest = request({
         request_id: "hist-1",
@@ -2392,7 +2392,7 @@ describe("DesktopShippingView", () => {
           {
             event_id: "event-1",
             event_type: "REQUEST_CREATED",
-            message: "異쒗븯 ?붿껌 ?앹꽦",
+            message: "이전 이력 메시지",
             created_at: "2026-07-02T02:25:00Z",
           },
         ],
@@ -2404,7 +2404,7 @@ describe("DesktopShippingView", () => {
 
     const detail = await screen.findByTestId("shipping-history-detail");
     await waitFor(() => expect(detail).toHaveTextContent("출하 요청 생성"));
-    expect(detail).not.toHaveTextContent("異쒗븯 ?붿껌 ?앹꽦");
+    expect(detail).not.toHaveTextContent("이전 이력 메시지");
   });
 
   it("shows requester as read-only information and gives memo the main request-info space", async () => {

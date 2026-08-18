@@ -186,9 +186,16 @@ def _explode_bom(
 @router.get(
     "/capacity",
     response_model=CapacityResponse,
-    summary="전체 생산 가능수량 조회",
+    summary="생산 가능 수량 조회",
+    description="현재 재고와 BOM을 기준으로 즉시·최대 생산 가능 수량을 조회합니다.",
 )
-@router.get("/possible", response_model=CapacityResponse, summary="Production capacity alias")
+@router.get(
+    "/possible",
+    response_model=CapacityResponse,
+    summary="생산 가능 수량 조회 (호환)",
+    description="기존 호출자 호환용 경로입니다. 신규 연동은 /api/production/capacity를 사용하세요.",
+    deprecated=True,
+)
 def get_production_capacity(db: Session = Depends(get_db)):
     """생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.
 

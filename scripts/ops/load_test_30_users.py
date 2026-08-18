@@ -2,9 +2,9 @@
 """30명 동시 입출고 부하 테스트.
 
 사용법:
-    python scripts/ops/load_test_30_users.py --url http://localhost:8000
-    python scripts/ops/load_test_30_users.py --url http://localhost:8000 --users 10 --rounds 3
-    python scripts/ops/load_test_30_users.py --url http://localhost:8000 --dry-run
+    python scripts/ops/load_test_30_users.py --url http://localhost:8011
+    python scripts/ops/load_test_30_users.py --url http://localhost:8011 --users 10 --rounds 3
+    python scripts/ops/load_test_30_users.py --url http://localhost:8011 --dry-run
 
 경고:
     - 운영 DB에 실제 데이터가 생성/변경됩니다.
@@ -533,7 +533,7 @@ def parse_args():
         description="30명 동시 입출고 부하 테스트",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--url", default="http://localhost:8000", help="서버 URL (기본: http://localhost:8000)")
+    parser.add_argument("--url", required=True, metavar="BASE_URL", help="테스트할 서버 base URL (필수)")
     parser.add_argument("--users", type=int, default=30, help="동시 사용자 수 (기본: 30)")
     parser.add_argument("--rounds", type=int, default=3, help="라운드 수 (기본: 3)")
     parser.add_argument("--dry-run", action="store_true", help="실제 실행 없이 설정만 출력")

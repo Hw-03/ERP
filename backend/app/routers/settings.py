@@ -157,10 +157,14 @@ def _inventory_integrity_payload(db: Session, limit: int) -> dict:
     }
 
 
-@router.get("/integrity/inventory", response_model=IntegrityCheckResponse)
+@router.get("/integrity/inventory", response_model=IntegrityCheckResponse, deprecated=True)
 def check_inventory_integrity(
     pin: Optional[str] = Query(
-        None, min_length=4, max_length=32, description="관리자 PIN (deprecated — body 사용 권장)"
+        None,
+        min_length=4,
+        max_length=32,
+        description="관리자 PIN (deprecated — body 사용 권장)",
+        deprecated=True,
     ),
     limit: int = Query(100, ge=1, le=2000),
     body: Optional[IntegrityCheckBody] = Body(None),

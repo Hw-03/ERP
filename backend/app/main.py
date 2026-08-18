@@ -73,19 +73,16 @@ _BOOT_STARTED_AT: str = _dt.datetime.utcnow().isoformat()
 
 
 app = FastAPI(
-    title="DEXCOWIN MES",
+    title="DEXCOWIN MES API",
     description="""
-    ## DEXCOWIN 경량 MES
+    ## DEXCOWIN MES API
 
-    ### 공정 분류 코드 (18종)
-    `process_type_code` = 부서(T/H/V/N/A/P) × 단계(R=원자재 / A=중간공정 / F=공정완료)
-
-    TR/TA/TF (튜브) · HR/HA/HF (고압) · VR/VA/VF (진공) · NR/NA/NF (튜닝) · AR/AA/AF (조립) · PR/PA/PF (출하)
+    DEXCOWIN MES의 품목, 재고, 생산, 출하 및 관리 기능을 제공하는 공식 API입니다.
 
     ### 주요 기능
     - 품목 마스터 조회 및 수정
     - 재고 요약, 입고, 출고, 조정, 거래 이력
-    - 직원 마스터 및 출하 패키지 관리
+    - 직원 마스터 및 출하 관리
     - BOM 관리와 트리 조회
     - 생산 입고와 BOM 기반 Backflush
     """,
@@ -101,11 +98,20 @@ app = FastAPI(
         {"name": "BOM", "description": "BOM CRUD + 트리 + Where-Used."},
         {"name": "Production", "description": "생산 입고 + BOM Backflush."},
         {"name": "Settings", "description": "관리자 PIN, 시스템 정합성 점검·복구."},
-        {"name": "Ship Packages", "description": "출하 묶음 CRUD."},
         {"name": "Models", "description": "제품 모델 슬롯."},
         {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
-        {"name": "Variance", "description": "차이 분석."},
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
+        {"name": "Admin Export", "description": "관리자용 생산 이력 내보내기."},
+        {"name": "Assembly Checklists", "description": "조립 체크리스트 관리."},
+        {"name": "Client Events", "description": "클라이언트 이벤트 수집."},
+        {"name": "Daily Work Reports", "description": "일일 작업 보고서 관리."},
+        {"name": "Defects", "description": "불량 등록과 처리."},
+        {"name": "Departments", "description": "부서 마스터 관리."},
+        {"name": "Dept Adjustment", "description": "부서 재고 조정."},
+        {"name": "Inventory IO", "description": "입출고 업무 처리."},
+        {"name": "Shipping", "description": "출하 요청과 준비·완료 처리."},
+        {"name": "Stock Requests", "description": "재고 요청과 결재 처리."},
+        {"name": "Warehouse Map", "description": "창고 배치도 관리."},
         {"name": "Notifications", "description": "결재 알림 — 요청 도착/승인/반려."},
         {"name": "Handover", "description": "튜브→고압/진공 인수인계서."},
     ],
@@ -319,7 +325,7 @@ def health_check():
 
 
 @app.get("/health/live", tags=["System"])
-def health_live(db: Session = Depends(get_db)):
+def health_live(request: Request, db: Session = Depends(get_db)):
     """경량 liveness — 컨테이너/오케스트레이터 프로브 전용 (WS3).
 
     정적 `/health` 와 달리 DB-down 을 구분: DB 미연결이면 503.
@@ -328,8 +334,13 @@ def health_live(db: Session = Depends(get_db)):
     """
     try:
         db.execute(text("SELECT 1"))
-    except Exception as e:  # noqa: BLE001 — 프로브는 사유 무관 비가용이면 503
-        raise HTTPException(status_code=503, detail=f"DB unreachable: {e}")
+    except Exception as exc:  # noqa: BLE001 — 프로브는 사유 무관 비가용이면 503
+        _log.warning(
+            "evt=health_live_db_unavailable rid=%s err_type=%s",
+            _rid(request),
+            type(exc).__name__,
+        )
+        raise HTTPException(status_code=503, detail="DB 연결 확인 실패")
     return {"status": "live"}
 
 
@@ -338,8 +349,42 @@ def app_session():
     return {"boot_id": _BOOT_ID, "started_at": _BOOT_STARTED_AT}
 
 
+def _detailed_health_degraded_response(
+    request: Request,
+    db: Session,
+    exc: Exception,
+    *,
+    event: str,
+) -> JSONResponse:
+    """진단 쿼리 실패 세션을 정리하고 민감정보 없는 503을 반환한다."""
+    try:
+        db.rollback()
+    except Exception as rollback_exc:  # noqa: BLE001 — rollback 실패 원문도 기록하지 않음
+        _log.warning(
+            "evt=health_detailed_rollback_failed rid=%s err_type=%s",
+            _rid(request),
+            type(rollback_exc).__name__,
+        )
+    _log.warning(
+        "evt=%s rid=%s err_type=%s",
+        event,
+        _rid(request),
+        type(exc).__name__,
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "status": "degraded",
+            "db": {"ok": False},
+            "rows": {},
+            "inventory_mismatch_count": None,
+            "last_transaction_at": None,
+        },
+    )
+
+
 @app.get("/health/detailed", tags=["System"])
-def health_detailed(db: Session = Depends(get_db)):
+def health_detailed(request: Request, db: Session = Depends(get_db)):
     """운영 점검용 상세 헬스. 프론트엔드는 /health 만 사용.
 
     - DB ping
@@ -349,32 +394,42 @@ def health_detailed(db: Session = Depends(get_db)):
     - 최근 transaction_log created_at
     """
     # 1) DB ping
-    db_ok = True
     try:
         db.execute(text("SELECT 1"))
-    except Exception:
-        db_ok = False
+    except Exception as exc:  # noqa: BLE001 — 상세 점검도 DB 장애면 즉시 중단
+        return _detailed_health_degraded_response(
+            request,
+            db,
+            exc,
+            event="health_detailed_db_unavailable",
+        )
 
-    # 2) Row counts
-    rows = {
-        "items": db.query(Item).count(),
-        "employees": db.query(Employee).count(),
-        "inventory": db.query(Inventory).count(),
-        "transaction_logs": db.query(TransactionLog).count(),
-    }
+    try:
+        # 2) Row counts
+        rows = {
+            "items": db.query(Item).count(),
+            "employees": db.query(Employee).count(),
+            "inventory": db.query(Inventory).count(),
+            "transaction_logs": db.query(TransactionLog).count(),
+        }
 
-    # 3) inventory mismatch — 가벼운 검사
-    mismatches = integrity_svc.check_inventory_consistency(db)
-    mismatch_count = len(mismatches)
+        # 3) inventory mismatch — 가벼운 검사
+        mismatches = integrity_svc.check_inventory_consistency(db)
+        mismatch_count = len(mismatches)
 
-    # 4) 최근 transaction log 시간
-    last_tx = (
-        db.query(func.max(TransactionLog.created_at)).scalar()
-    )
+        # 4) 최근 transaction log 시간
+        last_tx = db.query(func.max(TransactionLog.created_at)).scalar()
+    except Exception as exc:  # noqa: BLE001 — 모든 후속 진단 실패를 동일한 503으로 처리
+        return _detailed_health_degraded_response(
+            request,
+            db,
+            exc,
+            event="health_detailed_diagnostics_unavailable",
+        )
 
     return {
-        "status": "ok" if db_ok and mismatch_count == 0 else "degraded",
-        "db": {"ok": db_ok},
+        "status": "ok" if mismatch_count == 0 else "degraded",
+        "db": {"ok": True},
         "rows": rows,
         "inventory_mismatch_count": mismatch_count,
         "last_transaction_at": last_tx.isoformat() if last_tx else None,
@@ -382,26 +437,39 @@ def health_detailed(db: Session = Depends(get_db)):
 
 
 @app.get("/api/health/db-info", tags=["System"])
-def health_db_info():
+def health_db_info(request: Request, db: Session = Depends(get_db)):
     """서버가 실제 연결 중인 DB 정보 반환 — preflight 전용.
-    DATABASE_URL 전체 노출 금지. 엔진 종류 + 30명 안전 여부만 반환.
+    DATABASE_URL 전체 노출 금지. 엔진 종류와 실제 연결 확인 결과만 반환.
     """
     db_engine = "sqlite" if _is_sqlite else "postgresql"
-    return {
+    info = {
         "db_engine": db_engine,
         "is_sqlite": _is_sqlite,
         "pool_enabled": not _is_sqlite,
-        "safe_for_30_users": not _is_sqlite,
+        "safe_for_30_users": False if _is_sqlite else None,
         "note": (
             "SQLite는 개발/테스트 전용. 30명 운영은 PostgreSQL 필수."
             if _is_sqlite else
-            "PostgreSQL 연결 정상. 30명 동시 운영 가능."
+            "동시 사용자 운영 준비 상태는 부하 테스트와 운영 구성 검증이 필요합니다."
         ),
+        "connection_ok": True,
     }
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001 — 연결 실패 원문은 응답에 포함하지 않음
+        _log.warning(
+            "evt=health_db_info_unavailable rid=%s err_type=%s",
+            _rid(request),
+            type(exc).__name__,
+        )
+        info["connection_ok"] = False
+        info["note"] = "DB 연결 확인에 실패했습니다."
+        return JSONResponse(status_code=503, content=info)
+    return info
 
 
 @app.post("/api/health/write-check", tags=["System"])
-def health_write_check(db: Session = Depends(get_db)):
+def health_write_check(request: Request, db: Session = Depends(get_db)):
     """DB 쓰기 가능 여부 점검 — preflight 전용.
     SAVEPOINT 안에서 실제 INSERT 실행 후 rollback. 데이터 변경 없음.
     """
@@ -428,18 +496,23 @@ def health_write_check(db: Session = Depends(get_db)):
             "writable": True,
             "latency_ms": latency_ms,
         }
-    except Exception as e:
+    except Exception as exc:  # noqa: BLE001 — 쓰기 점검 실패는 사유 무관 503
         try:
             db.rollback()
         except Exception:
             pass
-        raise HTTPException(status_code=503, detail=f"DB 쓰기 테스트 실패: {str(e)}")
+        _log.warning(
+            "evt=health_write_check_failed rid=%s err_type=%s",
+            _rid(request),
+            type(exc).__name__,
+        )
+        raise HTTPException(status_code=503, detail="DB 쓰기 테스트 실패")
 
 
 @app.get("/", tags=["System"])
 def root():
     return {
-        "message": "DEXCOWIN MES System API",
+        "message": "DEXCOWIN MES API",
         "docs": "/docs",
         "version": app.version,
     }

@@ -7,12 +7,12 @@ DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토�
 - 품목 수 등 기준정보 수치: `python _attic/backend-scripts/facts.py` 로 확인 (문서에 박지 않음)
 - 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
-- 주 사용 화면: `/mes` (데스크톱 셸: 대시보드 / 입출고 / 입출고 내역 / 관리자)
+- 주 사용 화면: `/mes` (데스크톱 셸의 현재 탭 구성은 `frontend/app/mes/README.md` 참조)
 - 품목코드 기준 문서: `_attic/docs/ITEM_CODE_RULES.md`
 
 ## 빠른 시작 (Windows · 권장)
 
-루트의 `start.bat` 한 번 실행으로 백엔드·프론트가 함께 뜨고 LAN IP 기준 브라우저가 자동 실행된다.
+루트의 `start.bat` 한 번 실행으로 백엔드·프론트가 background 프로세스로 함께 뜬다. 시작 후 표시된 URL을 브라우저에서 직접 연다.
 
 ```bat
 start.bat
@@ -26,11 +26,16 @@ start.bat
 
 관제창은 서버 본체가 아니라 상태 화면이다. 관제창을 닫아도 서버는 계속 실행된다. Windows Terminal이 있으면 왼쪽 Backend, 오른쪽 Frontend 분할창으로 열린다.
 
-- 백엔드: `http://0.0.0.0:8011` (로컬 호출은 `http://127.0.0.1:8011`) — dev 기준. prod 는 8010.
-- 프론트엔드: `http://<LAN IP>:3001` 또는 `http://localhost:3001` — dev 기준. prod 는 3000.
-- 같은 사설망 안의 다른 PC에서도 `http://<LAN IP>:3001` 으로 접속 가능
+- `start.bat`는 `scripts/dev/resolve-server-profile.ps1`가 결정한 현재 profile로 서버를 시작한다. `C:\ERP`와 그 worktree는 development (8011/3001), `C:\ERP-dev`는 employee (8010/3000)다.
+- 현재 backend URL과 frontend port는 다음으로 확인한다.
+
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev\resolve-server-profile.ps1
+  ```
+- 같은 사설망 안의 다른 PC는 profile 출력의 `FrontendPort`를 사용해 `http://<LAN IP>:<FrontendPort>`로 접속한다.
 
 처음 실행 시 `npm install` 과 `pip install -r backend/requirements.txt` 가 자동 수행된다.
+Python은 **3.11+**를 지원하며, `start.bat`의 자동 설치를 선택하면 Python 3.13을 설치한다.
 
 ## 수동 실행
 
@@ -72,7 +77,7 @@ http://localhost:3001
 
 ## 품목코드 핵심 규칙
 
-공정코드는 18개를 사용한다.
+공정코드의 현재 구성은 아래 기준표와 `python _attic/backend-scripts/facts.py`로 확인한다.
 
 | 부서 | R 타입 | A 타입 | F 타입 |
 |---|---|---|---|
@@ -93,15 +98,7 @@ http://localhost:3001
 {모델기호}-{process_type_code}-{일련번호:04d}
 ```
 
-모델기호 목록:
-
-| 기호 | 모델명 |
-|---|---|
-| `3` | DX3000 |
-| `4` | ADX4000W |
-| `6` | ADX6000FB |
-| `7` | COCOON |
-| `8` | SOLO |
+모델 슬롯·기호·이름은 변경 가능한 기준정보다. `python _attic/backend-scripts/facts.py` 또는 `GET /api/models`를 정본으로 확인한다.
 
 예시:
 
@@ -119,9 +116,9 @@ ERP/
 │   ├── mes.db            활성 DB (품목 수 등은 `python _attic/backend-scripts/facts.py` 로 확인)
 │   └── requirements.txt
 ├── frontend/             Next.js 14 · Tailwind
-│   ├── app/mes/          현재 활성 셸 (대시보드/입출고/내역/관리자)
+│   ├── app/mes/          현재 활성 MES 셸
 │   └── lib/
-│       ├── api/          15 도메인 모듈 (admin/catalog/defects/.../warehouse-map/weekly)
+│       ├── api/          도메인 API 모듈
 │       │   └── types/    도메인별 type 정본 (Round-10A #2)
 │       ├── api-core.ts   fetch 헬퍼 (postJson/putJson/deleteJson/parseError)
 │       └── mes/          MES 디자인시스템 (color/format/status/...)
@@ -156,7 +153,7 @@ ERP/
 | [_attic/docs/CONTEXT.md](_attic/docs/CONTEXT.md) | 신규 합류자 | 도메인 한눈 보기 (조직·품목·재고·BOM·입출고·결재) — 코드 보기 전 필독 |
 | [_attic/docs/OPERATIONS.md](_attic/docs/OPERATIONS.md) | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
 | [_attic/docs/ARCHITECTURE.md](_attic/docs/ARCHITECTURE.md) | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델 *(V2 흐름은 갱신 예정 — STALE 마커 참조)* |
-| [_attic/docs/ERD.md](_attic/docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) *(V2 IoBatch/IoBundle/IoLine 누락 — STALE 마커 참조)* |
+| [_attic/docs/ERD.md](_attic/docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid). 현재 모델·Alembic 기준의 유지 문서 |
 | [_attic/docs/GLOSSARY.md](_attic/docs/GLOSSARY.md) | 모두 | 도메인 용어 단일 소스 (부서·공정코드·재고 모델·에러코드) |
 | [_attic/docs/ITEM_CODE_RULES.md](_attic/docs/ITEM_CODE_RULES.md) | 모두 | 품목코드 최종 기준 |
 | [_attic/docs/REPO_LAYOUT.md](_attic/docs/REPO_LAYOUT.md) | 모두 | 현재 저장소 구조와 이동된 파일 경로 안내 |
@@ -168,13 +165,13 @@ ERP/
 
 ## 검증
 
-### 5게이트 일괄 검증 (commit 전 권장)
+### 로컬 일괄 검증 (commit 전 권장)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
 
-backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / OpenAPI drift 를 CI 와 동일 기준으로 검사. coverage threshold 75/75/75/75.
+변경 범위에 따라 docs·frontend·backend 검증을 선택하며, 인프라 또는 범위를 알 수 없는 변경은 전체 게이트로 승격한다. frontend coverage 기준은 `frontend/vitest.config.mts`를 정본으로 확인한다.
 
 ### 개별 검증
 

@@ -158,7 +158,11 @@ def update_model(
 def delete_model(
     slot: int,
     _admin: Annotated[None, Depends(require_admin_pin)],
-    pin: Optional[str] = Query(None, description="관리자 PIN (deprecated — body 사용 권장)"),
+    pin: Optional[str] = Query(
+        None,
+        description="관리자 PIN (deprecated — body 사용 권장)",
+        deprecated=True,
+    ),
     body: Optional[ProductModelDeleteRequest] = Body(None),
     db: Session = Depends(get_db),
 ) -> None:

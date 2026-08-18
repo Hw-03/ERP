@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
+LOCAL_DEV_WORKTREE_PREFIX = r"c:\erp\.worktrees" + "\\"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -136,6 +137,249 @@ def test_preflight_backup_check_ignores_pre_only_snapshots(
 
     assert preflight_30_users.results[-1].level == "WARN"
     assert "백업 파일 없음" in preflight_30_users.results[-1].message
+
+
+@pytest.mark.parametrize(
+    ("script", "args"),
+    [
+        ("preflight_30_users.py", []),
+        ("load_test_30_users.py", ["--dry-run"]),
+    ],
+)
+def test_30_user_scripts_require_an_explicit_target_url(
+    script: str,
+    args: list[str],
+) -> None:
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "ops" / script), *args],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "PYTHONUTF8": "1"},
+    )
+
+    assert result.returncode == 2
+    assert "required: --url" in result.stderr
+
+
+def test_operations_diagnostics_use_profile_aware_healthcheck_command() -> None:
+    operations = (ROOT / "_attic" / "docs" / "OPERATIONS.md").read_text(encoding="utf-8")
+
+    assert "scripts\\ops\\healthcheck.bat" in operations
+    assert "curl http://127.0.0.1:8011/health/detailed" not in operations
+
+
+def test_start_documentation_describes_resolved_profiles_instead_of_a_fixed_dev_port() -> None:
+    for document in (ROOT / "README.md", ROOT / "_attic" / "docs" / "OPERATIONS.md"):
+        content = document.read_text(encoding="utf-8")
+
+        assert "resolve-server-profile.ps1" in content
+        assert "C:\\ERP-dev" in content
+        assert "worktree" in content.lower()
+
+
+def test_repo_layout_uses_dynamic_process_code_facts() -> None:
+    content = (ROOT / "_attic" / "docs" / "REPO_LAYOUT.md").read_text(encoding="utf-8")
+
+    assert "python _attic/backend-scripts/facts.py" in content
+    assert "18-code" not in content
+
+
+def test_start_batch_selects_supported_python_and_probes_timezone_dependency() -> None:
+    content = (ROOT / "start.bat").read_text(encoding="utf-8")
+
+    assert "py -3 -c \"import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)\"" in content
+    assert 'set "PYTHON_CMD=py -3"' in content
+    assert "py -3.11" not in content
+    assert "%PYTHON_CMD% -c" in content
+    assert "ZoneInfo('Asia/Seoul')" in content
+    assert "%PYTHON_CMD% -m pip install -r requirements.txt" in content
+    assert "Python.Python.3.13" in content
+
+
+@pytest.mark.skipif(os.name != "nt", reason="operations batch behavior is Windows cmd-specific")
+@pytest.mark.parametrize(
+    ("batch_name", "success_marker"),
+    [
+        ("healthcheck.bat", "[HEALTH] OK"),
+        ("reconcile_inventory.bat", "inventory_mismatch_count ="),
+    ],
+)
+def test_ops_batches_treat_a_fake_http_503_as_failure_before_success_flow(
+    tmp_path: Path,
+    batch_name: str,
+    success_marker: str,
+) -> None:
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    (fake_bin / "powershell.cmd").write_text(
+        "@echo off\n"
+        "if /I \"%4\"==\"-File\" (\n"
+        "  echo http://fake-backend:8011\n"
+        "  exit /b 0\n"
+        ")\n"
+        "echo 0\n"
+        "exit /b 0\n",
+        encoding="ascii",
+    )
+    (fake_bin / "curl.cmd").write_text(
+        "@echo off\n"
+        "set \"OUT=\"\n"
+        ":next\n"
+        "if \"%~1\"==\"\" goto write\n"
+        "if /I \"%~1\"==\"-f\" exit /b 22\n"
+        "if /I \"%~1\"==\"-o\" (\n"
+        "  set \"OUT=%~2\"\n"
+        "  shift\n"
+        ")\n"
+        "shift\n"
+        "goto next\n"
+        ":write\n"
+        "if defined OUT > \"%OUT%\" echo {\"inventory_mismatch_count\":0}\n"
+        "exit /b 0\n",
+        encoding="ascii",
+    )
+    environment = os.environ.copy()
+    environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+    result = subprocess.run(
+        ["cmd.exe", "/d", "/c", str(ROOT / "scripts" / "ops" / batch_name)],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        env=environment,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert success_marker not in result.stdout
+
+
+def test_windows_ci_runs_the_ops_profile_contract_suite() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    backend_section = workflow[workflow.index("  backend:"):workflow.index("  windows-ops-profile:")]
+    windows_section = workflow[workflow.index("  windows-ops-profile:"):workflow.index("  frontend:")]
+
+    assert "runs-on: windows-latest" in windows_section
+    assert "actions/checkout@v4" in windows_section
+    assert "actions/setup-python@v5" in windows_section
+    assert 'python-version: "3.11"' in windows_section
+    assert "pip install -r requirements.txt" in windows_section
+    assert (
+        'pytest tests/ops/test_runtime_paths.py -q -k '
+        '"profile_resolver_test_root or '
+        'ops_batches_treat_a_fake_http_503_as_failure_before_success_flow"'
+    ) in windows_section
+    assert "run: pytest -q" in backend_section
+    assert "profile_resolver_test_root" not in backend_section
+
+
+def test_ops_batches_reference_the_shared_profile_instead_of_a_hardcoded_url() -> None:
+    for batch_name in ("healthcheck.bat", "reconcile_inventory.bat"):
+        content = (ROOT / "scripts" / "ops" / batch_name).read_text(encoding="utf-8")
+
+        assert "resolve-server-profile.ps1" in content
+        assert "BackendInternalUrl" in content
+        assert "127.0.0.1:8010" not in content
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not str(ROOT).lower().startswith(LOCAL_DEV_WORKTREE_PREFIX),
+    reason="actual script-location profile is only asserted from the local C:\\ERP development worktree",
+)
+def test_worktree_profile_output_drives_ops_batches_not_just_a_profile_reference() -> None:
+    """Static references alone cannot prove a worktree resolves to the development URL."""
+    resolver = ROOT / "scripts" / "dev" / "resolve-server-profile.ps1"
+    result = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(resolver),
+            "-Property",
+            "BackendInternalUrl",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "http://localhost:8011"
+    for batch_name in ("healthcheck.bat", "reconcile_inventory.bat"):
+        content = (ROOT / "scripts" / "ops" / batch_name).read_text(encoding="utf-8")
+        assert "-Property BackendInternalUrl" in content
+
+
+def _run_profile_resolver(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "dev" / "resolve-server-profile.ps1"),
+            *args,
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+@pytest.mark.skipif(os.name != "nt", reason="server profile resolver is a Windows PowerShell script")
+@pytest.mark.parametrize(
+    ("test_repo_root", "expected_url"),
+    [
+        (r"C:\ERP", "http://localhost:8011"),
+        (r"C:\ERP\.worktrees\github-actions-contract", "http://localhost:8011"),
+        (r"C:\ERP\.worktrees\github actions contract", "http://localhost:8011"),
+        (r"C:\ERP-dev", "http://localhost:8010"),
+    ],
+)
+def test_profile_resolver_test_root_covers_development_worktree_with_spaces_and_employee_contracts(
+    test_repo_root: str,
+    expected_url: str,
+) -> None:
+    result = _run_profile_resolver(
+        "-TestRepoRoot",
+        test_repo_root,
+        "-Property",
+        "BackendInternalUrl",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected_url
+
+
+@pytest.mark.skipif(os.name != "nt", reason="server profile resolver is a Windows PowerShell script")
+def test_profile_resolver_test_root_rejects_unknown_runtime_root() -> None:
+    result = _run_profile_resolver(
+        "-TestRepoRoot",
+        r"C:\unknown-mes-root",
+        "-Property",
+        "BackendInternalUrl",
+    )
+
+    assert result.returncode != 0
+    assert "Unknown DEXCOWIN MES runtime root" in result.stderr
+
+
+def test_ops_batches_fail_fast_before_curl_when_profile_url_is_empty() -> None:
+    for batch_name in ("healthcheck.bat", "reconcile_inventory.bat"):
+        content = (ROOT / "scripts" / "ops" / batch_name).read_text(encoding="utf-8")
+
+        assert 'set "BACKEND_URL="' in content
+        assert 'if not defined BACKEND_URL (' in content
+        assert "ERROR: server profile did not provide a backend URL." in content
+        assert content.index('if not defined BACKEND_URL (') < content.index("curl -f -s")
 
 
 @pytest.mark.parametrize("compose_name", ["docker-compose.yml", "docker-compose.nas.yml"])

@@ -98,7 +98,11 @@ def update_department(
 def delete_department(
     dept_id: int,
     _admin: Annotated[None, Depends(require_admin_pin)],
-    pin: Optional[str] = Query(None, description="관리자 PIN (deprecated — body 사용 권장)"),
+    pin: Optional[str] = Query(
+        None,
+        description="관리자 PIN (deprecated — body 사용 권장)",
+        deprecated=True,
+    ),
     body: Optional[DepartmentDeleteRequest] = Body(None),
     db: Session = Depends(get_db),
 ):

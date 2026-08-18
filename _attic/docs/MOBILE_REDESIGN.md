@@ -1,7 +1,8 @@
 # 모바일 UI 전체 개편 계획
 
-> 전체 계획 정본: 이 파일 (구현 기준)
-> Claude가 goal-driven 방식으로 순서대로 실행하고 자율 검증합니다.
+> **[STALE · 역사 보관]** 이 문서는 과거 모바일 개편 계획이다. 현재 모바일 화면은
+> [`frontend/app/mes/_components/mobile/`](../../frontend/app/mes/_components/mobile/)를 기준으로 확인한다.
+> 아래의 레거시 경로와 계획 단계는 현재 구현 기준이 아니다.
 
 ## Context
 

@@ -135,6 +135,27 @@ def _primary_database_path() -> Path:
     return Path(result.stdout.strip()).resolve().parent / "backend" / "mes.db"
 
 
+def _database_revision(path: Path) -> str | None:
+    """읽기 가능한 Alembic stamp가 없으면 DB를 만들거나 변경하지 않고 None을 반환한다."""
+    if not path.exists() or path.stat().st_size == 0:
+        return None
+
+    try:
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        with sqlite3.connect(uri, uri=True) as db:
+            stamped = db.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type = 'table' AND name = 'alembic_version'"
+            ).fetchone()
+            if stamped is None:
+                return None
+            row = db.execute("SELECT version_num FROM alembic_version").fetchone()
+    except sqlite3.DatabaseError:
+        return None
+
+    return str(row[0]) if row and row[0] else None
+
+
 def _shipping_dependent_rows(
     path: Path,
 ) -> dict[str, Counter[tuple[tuple[type[object], object], ...]]]:
@@ -216,6 +237,22 @@ def test_postgresql_offline_sql_uses_idempotent_repair_ddl() -> None:
     assert "fk_shipping_requests_prepared_by_employee" in sql
 
 
+def test_database_revision_is_none_for_missing_empty_or_unstamped_sqlite(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing.db"
+    empty = tmp_path / "empty.db"
+    empty.touch()
+    unstamped = tmp_path / "unstamped.db"
+    with sqlite3.connect(unstamped) as db:
+        db.execute("CREATE TABLE sample (id INTEGER PRIMARY KEY)")
+
+    assert _database_revision(missing) is None
+    assert not missing.exists()
+    assert _database_revision(empty) is None
+    assert _database_revision(unstamped) is None
+
+
 def test_repair_upgrades_actual_0010_database_copy_without_data_loss(tmp_path: Path) -> None:
     source = _primary_database_path()
     if not source.exists():
@@ -223,10 +260,9 @@ def test_repair_upgrades_actual_0010_database_copy_without_data_loss(tmp_path: P
 
     path = tmp_path / "actual-mes-0010.db"
     shutil.copy2(source, path)
-    with sqlite3.connect(path) as db:
-        source_revision = db.execute(
-            "SELECT version_num FROM alembic_version"
-        ).fetchone()[0]
+    source_revision = _database_revision(path)
+    if source_revision is None:
+        pytest.skip("actual backend/mes.db has no readable Alembic revision stamp")
     if source_revision != PREVIOUS_REVISION:
         pytest.skip(f"actual backend/mes.db is at {source_revision}, not 0010")
     before = _shipping_dependent_rows(path)

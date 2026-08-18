@@ -24,7 +24,7 @@ export function SegmentedControl<T extends string>({
   active: T;
   onChange: (next: T) => void;
   className?: string;
-  /** ??ぉ 5-1 ??opt-in ?뺣?. 湲곕낯 md(?꾪뻾), lg???몄텧泥섏뿉?쒕쭔 ?ㅼ?(? ?붾㈃ 臾댁쁺??. */
+  /** 기본은 기존 md이며, lg는 필요한 화면에서만 opt-in한다. */
   size?: "md" | "lg";
 }) {
   return (
@@ -44,7 +44,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(tab.id)}
             className={clsx(
               "flex flex-1 items-center justify-center gap-1.5 rounded-[10px] font-bold transition-[background-color]",
-              // ??ぉ 7-6 ??lg ??遺덈웾 寃⑸━ Step1 異쒖쿂 ?좉? ?⑥씪 ?ъ슜泥? 寃⑸━ 遺??踰꾪듉 ?믪씠? 留욎텛??py ?뺣?.
+              // lg는 해당 화면의 다른 버튼 높이와 맞춘 패딩을 사용한다.
               size === "lg" ? "px-3 py-4" : "px-2 py-[7px]",
               size === "lg" ? TYPO.title : TYPO.caption,
             )}

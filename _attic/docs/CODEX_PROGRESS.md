@@ -1,5 +1,8 @@
 # MES 진행 기록
 
+> **[STALE · 역사 보관]** 이 문서는 특정 시점의 구현·진행 스냅샷이다. 현재 업무 규칙과
+> 운영 절차는 [CONTEXT.md](CONTEXT.md), [OPERATIONS.md](OPERATIONS.md), 실제 코드를 기준으로 확인한다.
+
 > Path note (2026-06-15): the active item-code rules live at
 > `_attic/docs/ITEM_CODE_RULES.md`.
 > Any `docs/...` path mentioned below refers to the older pre-move layout.

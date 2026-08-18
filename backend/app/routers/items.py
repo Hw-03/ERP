@@ -244,7 +244,10 @@ def create_item(
 
 @router.get("", response_model=List[ItemWithInventory])
 def list_items(
-    process_type_code: Optional[str] = Query(None, description="process_type_code 필터 (TR/HR/.../PF 18개)"),
+    process_type_code: Optional[str] = Query(
+        None,
+        description="process_type_code 필터. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
+    ),
     search: Optional[str] = Query(None, description="품목명, 품목코드, 위치 검색"),
     legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
     department: Optional[str] = Query(None, description="부서 필터 (창고|조립|고압|진공|튜닝|튜브|출하|…)"),

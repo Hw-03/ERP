@@ -4,16 +4,25 @@
 
 ## 표준 실행 경로
 
-- **표준은 `start.bat`**. `docker-compose.yml`은 실험 용도로만 두며 정규 운영에 사용하지 않는다(포트 정렬 등은 다음 단계 작업으로 미뤄둔 상태).
-- 백엔드 포트: **8011** (dev) / **8010** (prod) — `start.bat` 는 dev 포트로 띄운다 (`scripts/dev/start-backend.ps1` 도 동일)
-- 프론트엔드 포트: **3001** (dev) / **3000** (prod) — `start.bat` 의 PORT 환경변수가 3001 로 설정됨
-- 처음 실행 시 의존성이 자동 설치된다.
+- **표준은 `start.bat`**. 컨테이너 정의는 루트가 아닌 `docker/docker-compose.yml`에 있으며, 정규 운영 경로는 아니다.
+- `start.bat`와 운영 batch는 `scripts/dev/resolve-server-profile.ps1`로 현재 checkout의 profile을 결정한다. `C:\ERP`와 그 `.worktrees` 하위는 development (백엔드 8011 / 프론트엔드 3001), `C:\ERP-dev`는 employee (백엔드 8010 / 프론트엔드 3000)다.
+- 현재 profile과 URL은 다음 명령으로 확인한다.
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev\resolve-server-profile.ps1
+  ```
+- Python **3.11+**를 지원한다. 처음 실행 시 의존성이 자동 설치되며, `start.bat`에서 자동 설치를 선택하면 Python 3.13을 설치할 수 있다.
 
 ```bat
 start.bat
 ```
 
-LAN IP는 자동 감지된다. 같은 사설망의 다른 PC에서도 `http://<LAN IP>:3001` 으로 접근 가능 (dev 기준 — prod 는 3000).
+LAN IP는 자동 감지된다. 같은 사설망의 다른 PC에서는 profile 출력의 `FrontendPort`를 사용해 `http://<LAN IP>:<FrontendPort>`로 접근한다.
+
+`start.bat`는 백엔드와 프론트엔드를 background 프로세스로 시작한다. 종료와 재시작 전 정리는 반드시 루트의 `stop.bat`로 한다.
+
+```bat
+stop.bat
+```
 
 ## 매일 운영 시작 전 확인 (1분)
 
@@ -36,7 +45,18 @@ WARN missing transaction effects: N이 함께 나오면 재고 합계는 정상�
 scripts\ops\healthcheck.bat
 ```
 
-응답에 `status: "ok"`, `database: "ok"`, 최근 거래 시각이 정상이면 OK. `inventory_mismatch_count > 0` 이면 데이터 정합성 점검 필요.
+응답의 `status: "ok"`, `db.ok: true`, `rows`의 주요 테이블 행 수, `last_transaction_at`을 함께 확인한다. `inventory_mismatch_count > 0`이면 `status`가 `"degraded"`가 되며 데이터 정합성 점검이 필요하다.
+
+## 30명 동시 운영 사전 점검 및 부하 테스트
+
+두 스크립트 모두 대상 서버 URL을 명시해야 한다. dev profile 예시는 다음과 같다.
+
+```bat
+python scripts\ops\preflight_30_users.py --url http://localhost:8011
+python scripts\ops\load_test_30_users.py --url http://localhost:8011 --dry-run
+```
+
+Preflight의 DB 엔진 결과는 한 점검 항목일 뿐이다. PostgreSQL 확인만으로 준비 완료를 선언하지 않으며, 최종 readiness는 모든 preflight PASS/WARN/FAIL 결과로 판단한다. 실제 부하 테스트는 테스트 데이터를 만들 수 있으므로 `--confirm` 요구 사항을 확인한 뒤 별도 승인된 환경에서 실행한다.
 
 ## DB 백업
 
@@ -82,7 +102,7 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 
 운영 중에는 절대 DB 파일을 수동으로 덮어쓰지 말고, 반드시 다음 절차를 따른다.
 
-1. **백엔드 정지** — `start.bat` 가 띄운 Backend 콘솔 창 닫기
+1. **백엔드·프론트 정지** — 루트에서 `stop.bat` 실행
 2. 복구 명령 실행 (백업 파일명만 인자로 전달):
    ```bat
    scripts\ops\restore_db.bat mes_20260426_101530.db
@@ -114,9 +134,9 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 
 ## 재시작 절차
 
-1. **부드러운 재시작**: `start.bat` 가 띄운 두 검은 창(Backend / Frontend) 을 각각 닫고 다시 `start.bat` 실행
-2. **강제 재시작**(잘 응답 안 할 때): 작업 관리자에서 `node`, `python`(uvicorn) 프로세스 종료 → `start.bat`
-3. PC 재부팅 후에는 `start.bat` 만 다시 실행하면 된다(자동 시작 등록은 미적용)
+1. **재시작**: 루트에서 `stop.bat`가 성공한 것을 확인한 뒤 `start.bat` 실행
+2. **정지 실패 또는 무응답**: `stop.bat`의 오류와 `status.bat` 출력을 보관하고 운영 담당자에게 전달한다. background 프로세스를 작업 관리자에서 임의 종료하지 않는다.
+3. PC 재부팅 후에는 `start.bat`만 다시 실행하면 된다(자동 시작 등록은 미적용).
 
 ## 포트 충돌 대응
 
@@ -149,17 +169,19 @@ taskkill /PID <PID> /F
 
 ## 데이터 정합성 점검(수동)
 
-```bash
-curl http://127.0.0.1:8011/health/detailed
+현재 checkout의 server profile(개발 `C:\ERP` 계열 또는 직원 서버 `C:\ERP-dev`)에 맞는 backend URL은 표준 헬스체크가 자동으로 선택한다.
+
+```bat
+scripts\ops\healthcheck.bat
 ```
 
 응답 필드:
 
-- `database`: `"ok"` 면 DB 연결 정상
-- `tables`: 주요 테이블 행 수
-- `open_queue_count`: 미처리 큐 건 수
+- `status`: `"ok"`는 정합성까지 정상, `"degraded"`는 DB 또는 재고 정합성 점검 필요
+- `db.ok`: `true`면 DB 연결 정상
+- `rows`: `items` / `employees` / `inventory` / `transaction_logs` 행 수
 - `inventory_mismatch_count`: Inventory 합계와 InventoryLocation 합계 불일치 건수 — `0` 이 정상
-- `latest_transaction_at`: 최근 거래 시각
+- `last_transaction_at`: 최근 거래 시각
 
 ### 자동 1차 진단 (Phase 4 추가)
 
@@ -173,9 +195,10 @@ curl http://127.0.0.1:8011/health/detailed
 
 ## 로그 확인
 
-### 콘솔 로그
-- 백엔드: `start.bat` 가 띄운 **Backend** 콘솔 창
-- 프론트: **Frontend** 콘솔 창
+### 실행·관제 로그
+- `start.bat`는 백엔드와 프론트를 background 프로세스로 시작하며 서버별 콘솔 창을 열지 않는다.
+- 실행 중 로그는 `watch.bat`로 연 관제 창에서 확인한다. 관제 창을 닫아도 서버는 계속 실행된다.
+- 중지·재시작 전 정리는 루트의 `stop.bat`를 사용한다.
 - 브라우저: F12 → Console / Network 탭
 
 ### 파일 로그 (Phase 4 추가)
@@ -211,15 +234,19 @@ GET /api/admin/audit-logs?since=2026-04-26T00:00:00    # 시각 이후
 
 운영 PC 에 일과 종료 백업과 주 1회 백업 검증을 등록할 수 있다.
 
-```bat
-rem 매일 18:00 백업
-schtasks /Create /TN "MES Backup Daily" /TR "%USERPROFILE%\Documents\GitHub\ERP\scripts\ops\backup_db.bat" /SC DAILY /ST 18:00 /F
+```powershell
+# 저장소 루트에서 실행: 현재 checkout 경로를 자동으로 사용한다.
+$repoRoot = (Resolve-Path .).Path
+$ops = Join-Path $repoRoot "scripts\ops"
 
-rem 매주 월요일 09:00 백업 검증
-schtasks /Create /TN "MES Verify Weekly" /TR "%USERPROFILE%\Documents\GitHub\ERP\scripts\ops\verify_backup.bat" /SC WEEKLY /D MON /ST 09:00 /F
+# 매일 18:00 백업
+schtasks /Create /TN "MES Backup Daily" /TR "cmd /d /c `"$(Join-Path $ops 'backup_db.bat')`"" /SC DAILY /ST 18:00 /F
 
-rem 매월 1일 03:00 정식 백업 최신 10개 유지 확인
-schtasks /Create /TN "MES Cleanup Monthly" /TR "%USERPROFILE%\Documents\GitHub\ERP\scripts\ops\cleanup_backups.bat" /SC MONTHLY /D 1 /ST 03:00 /F
+# 매주 월요일 09:00 백업 검증
+schtasks /Create /TN "MES Verify Weekly" /TR "cmd /d /c `"$(Join-Path $ops 'verify_backup.bat')`"" /SC WEEKLY /D MON /ST 09:00 /F
+
+# 매월 1일 03:00 정식 백업 최신 10개 유지 확인
+schtasks /Create /TN "MES Cleanup Monthly" /TR "cmd /d /c `"$(Join-Path $ops 'cleanup_backups.bat')`"" /SC MONTHLY /D 1 /ST 03:00 /F
 ```
 
 등록 후 작업 스케줄러 GUI 에서 "가장 높은 권한으로 실행" 옵션 체크 권장. 1회 등록하고 그대로 두면 365일 자동 운영.

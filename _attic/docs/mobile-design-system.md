@@ -1,7 +1,8 @@
 # DEXCOWIN MES — 모바일 디자인 시스템 가이드
 
-> 모바일 쉘([frontend/app/legacy/_components/mobile/](frontend/app/legacy/_components/mobile/))의 토큰·primitives·체크리스트를 정리한 단일 참조 문서.
-> 신규 컴포넌트 추가 / 기존 컴포넌트 수정 시 본 문서를 따른다.
+> **[STALE · 역사 보관]** 이 문서는 이전 모바일 디자인 시스템 정리본이다. 현재 모바일
+> 컴포넌트는 [`frontend/app/mes/_components/mobile/`](../../frontend/app/mes/_components/mobile/)와
+> 실제 import 경로를 기준으로 확인한다. 아래 레거시 경로·규칙을 신규 구현의 단일 기준으로 사용하지 않는다.
 
 ## 1. 토큰
 

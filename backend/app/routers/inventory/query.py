@@ -34,7 +34,7 @@ router = APIRouter()
 
 @router.get("/summary", response_model=InventorySummaryResponse)
 def get_inventory_summary(db: Session = Depends(get_db)):
-    """process_type_code 18개 단일 기준 요약. category 컬럼 제거 후 단일 원천."""
+    """공정 코드 기준 재고 요약. 코드 목록은 GET /api/codes/process-types에서 조회한다."""
     rows = (
         db.query(
             Item.process_type_code,

@@ -4,7 +4,7 @@
 
 ## 공정 코드 기준표
 
-`process_type_code`는 `{부서 계열 1글자}{단계 1글자}` 형식이다.
+`process_type_code`는 `{부서 계열 1글자}{단계 1글자}` 형식이다. 현재 코드 구성은 `python _attic/backend-scripts/facts.py`를 정본으로 확인한다.
 
 | 부서 | R 타입 | A 타입 | F 타입 |
 |---|---|---|---|
@@ -15,7 +15,6 @@
 | 조립 | `AR` | `AA` | `AF` |
 | 출하 | `PR` | `PA` | `PF` |
 
-- 총 18개 코드다.
 - 조립 A 타입은 반드시 `AA`다. (`BA`는 구형 오염 코드)
 - 조립 F 타입은 반드시 `AF`다. (`BF`는 구형 오염 코드)
 
@@ -24,6 +23,8 @@
 ```text
 {모델기호}-{process_type_code}-{일련번호:04d}
 ```
+
+모델 슬롯·기호·이름은 변경 가능한 기준정보다. `python _attic/backend-scripts/facts.py` 또는 `GET /api/models`를 정본으로 확인한다.
 
 예시:
 
@@ -47,8 +48,8 @@
 | process types 시드 | `backend/bootstrap/seed.py` | `_PROCESS_TYPES` |
 | process types DB 테이블 | `backend/app/models/code.py` | `ProcessType` |
 | 부서 매핑 (프론트 단독 — 백엔드엔 없음) | `frontend/lib/mes/process.ts` | `PROCESS_TO_DEPT` |
-| 공정 라벨 프론트 | `frontend/app/legacy/_components/_history_sections/historyTheme.ts` | `PROCESS_TYPE_META` |
-| 공정 선택 UI 상수 | `frontend/app/legacy/_components/_admin_sections/adminShared.ts` | `PROCESS_TYPE_OPTIONS` |
+| 공정 라벨 프론트 | `frontend/app/mes/_components/_history_sections/historyTheme.ts` | `PROCESS_TYPE_META` |
+| 공정 선택 UI 상수 | `frontend/app/mes/_components/_admin_sections/adminShared.ts` | `PROCESS_TYPE_OPTIONS` |
 | Item 공정코드 타입 | `frontend/lib/api/types/shared.ts` | `ProcessTypeCode` (`lib/api.ts` 재노출) |
 
 > 위 경로는 리팩터로 변할 수 있으니 심볼명(`_PROCESS_TYPES`·`ProcessType`·`PROCESS_TO_DEPT`·`PROCESS_TYPE_META`·`PROCESS_TYPE_OPTIONS`·`ProcessTypeCode`)으로 grep 해 확인할 것.
@@ -56,8 +57,8 @@
 ## 최신 변경 메모
 
 - 2026-04-23: `BF → AF`, `BA → AA` 전환. 조립 A/F 타입을 `AA`/`AF`로 확정.
-- 2026-04-29: `Item.category` (`CategoryEnum` 11개) 완전 제거. `process_type_code` 18개 단일 기준으로 통일.
+- 2026-04-29: `Item.category` (`CategoryEnum`) 완전 제거. `process_type_code`를 단일 기준으로 통일.
   - 백엔드: `CategoryEnum` 클래스, `Item.category` 컬럼, `_CATEGORY_TO_PROCESS` 매핑 제거.
   - 프론트: `Category` 타입, `CATEGORY_META`, `item.category` 참조 전체 제거. `PROCESS_TYPE_META` / `ProcessTypeCode`로 대체.
   - DB: 정리본 기준으로 재생성 (현재 수치는 `python _attic/backend-scripts/facts.py`).
-- `TR/TA/TF`, `HR/HA/HF`, `VR/VA/VF`, `NR/NA/NF`, `AR/AA/AF`, `PR/PA/PF` 18개 코드가 현재 기준이다.
+- 현재 공정 코드 구성은 이 문서의 표와 `python _attic/backend-scripts/facts.py`를 함께 확인한다.

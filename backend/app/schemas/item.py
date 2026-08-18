@@ -17,7 +17,11 @@ class InitialLocationInput(BaseModel):
 
 class ItemCreate(BaseModel):
     item_name: str = Field(..., max_length=200, description="품목명")
-    process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
+    process_type_code: Optional[str] = Field(
+        None,
+        max_length=2,
+        description="공정 코드. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
+    )
     unit: str = Field("EA", max_length=20, description="단위")
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
@@ -26,7 +30,11 @@ class ItemCreate(BaseModel):
     sales_review_required: Optional[bool] = None
     bom_stock_exempt: Optional[bool] = None
     initial_quantity: int = Field(..., ge=0, description="초기 재고 수량")
-    model_slots: List[int] = Field(..., min_length=1, description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
+    model_slots: List[int] = Field(
+        ...,
+        min_length=1,
+        description="사용 제품 슬롯 목록. 현재 등록된 슬롯은 GET /api/models 응답을 참조하세요.",
+    )
     initial_locations: Optional[List[InitialLocationInput]] = Field(
         None, description="부서별 초기 배분. 합계 ≤ initial_quantity, 나머지는 창고."
     )
@@ -34,7 +42,11 @@ class ItemCreate(BaseModel):
 
 class ItemUpdate(BaseModel):
     item_name: Optional[str] = Field(None, max_length=200)
-    process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
+    process_type_code: Optional[str] = Field(
+        None,
+        max_length=2,
+        description="공정 코드. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
+    )
     unit: Optional[str] = Field(None, max_length=20)
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)

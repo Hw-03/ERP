@@ -23,7 +23,7 @@ export const DESKTOP_TAB_ICON_COLORS: Record<DesktopTabId, string> = {
   admin: LEGACY_COLORS.muted2,
   settings: LEGACY_COLORS.cyan,
 };
-// ??ぉ 3-6 ???ъ씠?쒕컮 ?꾩씠肄섏뿉 ??퀎 怨좎쑀??鍮꾪솢?????쒖떆). ?쒖꽦? 湲곗〈 blue 諛뺤뒪+white ?꾩씠肄??좎?.
+// 사이드바 탭 아이콘은 탭별 고유 색상을 사용한다. 선택 상태는 기존 blue 배경과 white 아이콘을 유지한다.
 const MAIN_TABS: TabDef[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: DESKTOP_TAB_ICON_COLORS.dashboard },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: DESKTOP_TAB_ICON_COLORS.warehouse },
@@ -100,12 +100,12 @@ export function DesktopSidebar({
           boxShadow: "none",
         }}
       >
-        {/* 濡쒓퀬 */}
+        {/* 로고 */}
         <div
           className="flex items-center justify-center"
           style={{ height: expanded ? 68 : 44, transition: "height 180ms ease", flexShrink: 0 }}
         >
-          {/* 異뺤냼 ?곹깭: ?꾩껜 ??濡쒓퀬 */}
+          {/* 축소 상태: 전체 로고 */}
           <div
             className="flex w-full items-center justify-center"
             style={{
@@ -125,7 +125,7 @@ export function DesktopSidebar({
               priority
             />
           </div>
-          {/* ?뺤옣 ?곹깭: ??濡쒓퀬 */}
+          {/* 확장 상태: 큰 로고 */}
           <div
             style={{
               opacity: expanded ? 1 : 0,
@@ -147,7 +147,7 @@ export function DesktopSidebar({
           </div>
         </div>
 
-        {/* ???대퉬寃뚯씠??*/}
+        {/* 주 내비게이션 */}
         <nav className="mt-5 space-y-1.5">
           {MAIN_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
             <TabButton
@@ -163,7 +163,7 @@ export function DesktopSidebar({
           ))}
         </nav>
 
-        {/* ?섎떒 怨좎젙: 愿由?+ ?뚮쭏 */}
+        {/* 하단 고정: 설정과 관리자 진입 */}
         <div className="mt-auto space-y-1.5 pt-1.5">
           <SettingsButton
             expanded={expanded}

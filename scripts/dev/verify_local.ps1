@@ -107,7 +107,7 @@ function Get-Category {
 function Resolve-Scope {
     $files = @(Get-ChangedFiles)
     if ($files.Count -eq 0) {
-        return @{ Scope = 'none'; Reason = 'no changes'; Files = @() }
+        return @{ Scope = 'none'; Reason = 'no changes'; Files = @(); DocsChanged = $false }
     }
     $cats = New-Object System.Collections.Generic.HashSet[string]
     foreach ($f in $files) {
@@ -115,20 +115,33 @@ function Resolve-Scope {
     }
     if ($cats.Contains('infra') -or $cats.Contains('unknown')) {
         $reason = if ($cats.Contains('infra')) { 'infra' } else { 'unknown files present' }
-        return @{ Scope = 'full'; Reason = "escalated: $reason"; Files = $files }
+        return @{ Scope = 'full'; Reason = "escalated: $reason"; Files = $files; DocsChanged = $cats.Contains('docs') }
     }
     $parts = @()
     if ($cats.Contains('frontend')) { $parts += 'frontend' }
     if ($cats.Contains('backend')) { $parts += 'backend' }
     if ($cats.Contains('docs') -and $parts.Count -eq 0) { $parts += 'docs' }
     if ($parts.Count -eq 0) { $parts += 'docs' }
-    return @{ Scope = ($parts -join '+'); Reason = 'auto-detected'; Files = $files }
+    return @{ Scope = ($parts -join '+'); Reason = 'auto-detected'; Files = $files; DocsChanged = $cats.Contains('docs') }
+}
+
+function Test-DocsChanged {
+    foreach ($file in @(Get-ChangedFiles)) {
+        if ((Get-Category $file) -eq 'docs') { return $true }
+    }
+    return $false
 }
 
 function Invoke-DocsGates {
     Invoke-Check "Docs whitespace check" $RepoRoot {
         git diff --check
         if ($LASTEXITCODE -ne 0) { throw "Whitespace issues detected" }
+    }
+    Invoke-Check "Maintained Markdown link checker tests" $RepoRoot {
+        python -m unittest scripts.dev.tests.test_check_markdown_links scripts.dev.tests.test_verify_local_docs_scope -v
+    }
+    Invoke-Check "Maintained Markdown links" $RepoRoot {
+        python scripts/dev/check_markdown_links.py --root $RepoRoot
     }
 }
 
@@ -180,11 +193,16 @@ with open(out, "w", encoding="utf-8") as f:
 $effectiveMode = $Mode
 $scopeReason = $null
 $scopeFiles = @()
+$docsChanged = $false
 if ($Mode -eq 'auto') {
     $resolved = Resolve-Scope
     $effectiveMode = $resolved.Scope
     $scopeReason = $resolved.Reason
     $scopeFiles = $resolved.Files
+    $docsChanged = $resolved.DocsChanged
+}
+elseif ($Mode -eq 'full') {
+    $docsChanged = Test-DocsChanged
 }
 
 Write-Host ""
@@ -206,13 +224,15 @@ $runFrontend = $false
 $runBackend = $false
 $runDocs = $false
 switch ($effectiveMode) {
-    'full'              { $runFrontend = $true; $runBackend = $true }
+    'full'              { $runFrontend = $true; $runBackend = $true; $runDocs = $docsChanged }
     'frontend'          { $runFrontend = $true }
     'backend'           { $runBackend = $true }
     'docs'              { $runDocs = $true }
     'frontend+backend'  { $runFrontend = $true; $runBackend = $true }
     default { throw "Unknown effective mode: $effectiveMode" }
 }
+
+if ($docsChanged) { $runDocs = $true }
 
 if ($runDocs)     { Invoke-DocsGates }
 if ($runBackend)  { Invoke-BackendGates }

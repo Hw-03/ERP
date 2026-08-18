@@ -24,8 +24,12 @@ Use these first when you need the current rules or structure:
 - `_attic/docs/CONTEXT.md`
 - `_attic/docs/GLOSSARY.md`
 - `_attic/docs/ITEM_CODE_RULES.md`
-- `_attic/docs/CODEX_PROGRESS.md`
 - `_attic/docs/OPERATIONS.md`
+- `_attic/docs/ERD.md`
+- `_attic/docs/USER_GUIDE.md`
+- `_attic/docs/ATTIC_POLICY.md`
+
+`_attic/docs/CODEX_PROGRESS.md`는 구현·진행의 역사 스냅샷이며, 현재 기준 문서로 사용하지 않는다.
 
 ## Archive Boundaries
 
@@ -56,7 +60,8 @@ Older notes may still mention these paths:
 
 ## Item-Code Rule Reminder
 
-The current process code set is the 18-code system documented in
+Check the current process-code facts with
+`python _attic/backend-scripts/facts.py`; the governing rules are documented in
 `_attic/docs/ITEM_CODE_RULES.md`.
 
 Assembly uses `AR/AA/AF`.

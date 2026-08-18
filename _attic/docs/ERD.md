@@ -1,407 +1,375 @@
 # 엔티티 관계도 (ERD)
 
-> **2026-06-08 현행 기준.** 컬럼 정의 단일 소스: `backend/app/models/` 디렉토리.
-> 총 25개 테이블 · 8개 도메인. 도메인별로 다이어그램을 나눔.
+> **현재 기준**: 이 문서는 유지하는 Markdown ERD다. 스키마의 단일 소스는
+> [`backend/app/models/`](../../backend/app/models/)의 SQLAlchemy 모델과 Alembic migration이다.
+> 모델의 `ForeignKey` 선언이 없는 ID/코드 참조는 관계선으로 단정하지 않는다. 렌더링 HTML은
+> [ERD.html](ERD.html) 스냅샷이며 자동 동기화 대상이 아니다.
+
+## 읽는 법과 범위
+
+- 도메인 지도는 현재 모델의 `__tablename__`을 적고, Mermaid 엔티티는 읽기 쉽게 모델 클래스명 단수형을 쓴다. 테이블·도메인 수는 고정값으로 기록하지 않는다.
+- `FK`는 모델에 선언된 외래 키이고, `참조값`은 외래 키 제약이 없는 저장 값이다.
+- 정확한 컬럼 타입·제약·기본값은 모델을 확인한다.
 
 ## 도메인 지도
 
-| 도메인 | 테이블 | 핵심 목적 |
+| 도메인 | 테이블 | 역할 |
 |---|---|---|
-| 품목/코드 | items · bom · process_types · product_symbols | 품목 마스터 + BOM + 코드 체계 |
-| 직원/조직 | employees · departments · employee_assigned_models · employee_item_orders | 사원 + 담당 모델 + 품목 순서 |
-| 재고 | inventory · inventory_locations | 창고/부서별 수량 |
-| 거래 이력 | transaction_logs · transaction_edit_logs | 입출고 로그 + 수정 이력 |
-| 입출고 배치 | io_batches · io_bundles · io_lines | IO 제출 단위 |
-| 재고 요청/결재 | stock_requests · stock_request_lines | 창고/부서 결재 흐름 |
-| 창고 지도 | warehouse_angles · warehouse_boxes · warehouse_box_items | 앵글 위치 시각화 |
-| 기타 | notifications · handovers · handover_lines · admin_audit_logs · system_settings | 알림·인수인계·감사·설정 |
+| 품목·코드 | `items`, `bom`, `process_types`, `product_symbols` | 품목 마스터, BOM, 공정·모델 코드 |
+| 직원·업무 기록 | `departments`, `employees`, `employee_assigned_models`, `employee_item_orders`, `daily_work_reports`, `assembly_checklists`, `assembly_checklist_sections`, `assembly_checklist_items` | 조직, 담당 모델·품목 순서, 일보, 조립 체크리스트 |
+| 재고·거래 | `inventory`, `inventory_locations`, `transaction_logs`, `transaction_edit_logs` | 재고 잔량·위치와 변동/수정 이력 |
+| 입출고 V2·결재 | `io_batches`, `io_bundles`, `io_lines`, `stock_requests`, `stock_request_lines` | 제출 배치, BOM 전개 라인, 결재 요청 |
+| 출하 | `shipping_requests`, `shipping_request_bom_lines`, `shipping_request_companion_lines`, `shipping_allocations`, `shipping_request_checklist_lines`, `shipping_request_events`, `shipping_request_revisions` | 출하 요청, 준비·배정·체크·이력 |
+| 창고 지도 | `warehouse_angles`, `warehouse_boxes`, `warehouse_box_items`, `warehouse_special_zones`, `warehouse_special_zone_items`, `warehouse_special_zone_audits` | 랙/박스와 자유 영역의 배치·감사 |
+| 알림·인수인계 | `notifications`, `handovers`, `handover_lines` | 결재/인수 알림과 인수인계 문서 |
+| 시스템·감사 | `admin_audit_logs`, `audit_terminals`, `activity_audit_logs`, `data_revision`, `system_settings` | 관리자·사용자 작업 감사와 시스템 상태 |
 
 ---
 
-## 1. 품목/코드 도메인
+## 1. 품목·코드
 
 ```mermaid
 erDiagram
+    ProcessType ||--o{ Item : "process_type_code"
+    Item ||--o{ BOM : "parent_item_id"
+    Item ||--o{ BOM : "child_item_id"
+
     Item {
         uuid item_id PK
-        string item_name
-        string mes_code "STORED 생성열 — model_symbol+process_type_code+serial_no"
-        string model_symbol "ProductSymbol.symbol 조합 (예: 346)"
+        string mes_code "STORED 생성열"
+        string model_symbol "코드 규약 참조"
         string process_type_code FK
         int serial_no
-        string legacy_part "자재창고·조립출하 등 현역"
-        string legacy_item_type "원자재·완성품·반제품류 현역"
-        string unit
-        int min_stock
-        datetime bom_completed_at
-        datetime deleted_at "NULL=활성, 값=소프트삭제"
+        bool sales_review_required
+        bool bom_stock_exempt
+        datetime deleted_at
     }
-
     BOM {
         uuid bom_id PK
         uuid parent_item_id FK
         uuid child_item_id FK
         int quantity
         string unit
-        string notes
     }
-
     ProcessType {
-        string code PK "2자리 (TR·TA·TF 등 18종)"
-        string prefix
-        string suffix
-        int stage_order
-        string description
+        string code PK
     }
-
     ProductSymbol {
-        int slot PK "1~8 자리"
-        string symbol "단일 문자 (예: 3=COCOON)"
-        string model_name
-        bool is_finished_good
-        int display_order
+        int slot PK
     }
-
-    Item }o--|| ProcessType : "process_type_code"
-    Item ||--o{ BOM : "parent_item_id"
-    Item ||--o{ BOM : "child_item_id"
 ```
 
-**규칙:**
-- `mes_code` 는 DB STORED 생성열. 직접 쓰기 불가 — 분해 필드(model_symbol·process_type_code·serial_no)가 진실 소스.
-- `model_symbol` 과 `ProductSymbol.symbol` 은 코드 규약으로 연결 (별도 FK 없음).
-- BOM 순환 참조 금지 — 서비스 레이어(`_is_circular`)에서 검증, 위반 시 400.
+- `items.mes_code`는 `model_symbol`, `process_type_code`, `serial_no`에서 DB가 계산하는 STORED 생성열이다. `model_symbol`과 `product_symbols.symbol`은 코드 규약으로 연결되며 FK는 아니다.
+- `bom`은 부모와 자식 모두 `items`를 참조한다. 순환 방지는 스키마 관계가 아니라 서비스 검증의 책임이다.
 
----
-
-## 2. 직원/조직 도메인
+## 2. 직원·업무 기록
 
 ```mermaid
 erDiagram
-    Employee {
-        uuid employee_id PK
-        string employee_code
-        string name
-        enum role "admin | employee"
-        string department
-        enum level "admin | manager | staff"
-        string warehouse_role "primary | deputy | null"
-        string department_role "primary | deputy | null"
-        bool io_enabled
-        int display_order
-        string pin_hash
-    }
+    Employee ||--o{ EmployeeAssignedModel : "employee_id"
+    ProductSymbol ||--o{ EmployeeAssignedModel : "slot"
+    Employee ||--o{ EmployeeItemOrder : "employee_id"
+    Item ||--o{ EmployeeItemOrder : "item_id"
+    Employee ||--o{ DailyWorkReport : "employee_id"
+    ProductSymbol ||--o| AssemblyChecklist : "model_slot (unique)"
+    AssemblyChecklist ||--o{ AssemblyChecklistSection : "checklist_id"
+    AssemblyChecklistSection ||--o{ AssemblyChecklistItem : "section_id"
 
     Department {
         int id PK
-        string name
-        int display_order
-        bool io_enabled
     }
-
+    Employee {
+        uuid employee_id PK
+        string department "문자열, FK 없음"
+        string hidden_sidebar_tabs
+    }
     EmployeeAssignedModel {
-        uuid employee_id PK-FK
-        int slot PK-FK
-        int priority
+        uuid employee_id PK, FK
+        int slot PK, FK
     }
-
     EmployeeItemOrder {
-        uuid employee_id PK-FK
-        uuid item_id PK-FK
-        int display_order
+        uuid employee_id PK, FK
+        uuid item_id PK, FK
     }
-
-    Employee }o--|| Department : "department"
-    Employee ||--o{ EmployeeAssignedModel : ""
-    Employee ||--o{ EmployeeItemOrder : ""
-    ProductSymbol ||--o{ EmployeeAssignedModel : "slot"
-    Item ||--o{ EmployeeItemOrder : "item_id"
+    DailyWorkReport {
+        uuid employee_id FK
+        date work_date
+    }
+    AssemblyChecklist {
+        uuid checklist_id PK
+        int model_slot FK
+    }
+    AssemblyChecklistSection {
+        uuid section_id PK
+        uuid checklist_id FK
+    }
+    AssemblyChecklistItem {
+        uuid item_id PK
+        uuid section_id FK
+    }
 ```
 
----
+- `employees.department`와 `daily_work_reports.department`는 문자열이며 `departments`에 대한 FK를 선언하지 않는다.
+- `assembly_checklists.model_slot`은 `product_symbols.slot` FK이면서 unique이므로, 제품 모델 슬롯 하나에는 체크리스트가 없거나 하나만 연결된다. 섹션과 항목은 부모 삭제 시 함께 삭제된다.
 
-## 3. 재고 도메인
+## 3. 재고·거래
 
 ```mermaid
 erDiagram
-    Item ||--o| Inventory : "1:1"
-    Item ||--o{ InventoryLocation : "부서×상태별 N개"
+    Item ||--o| Inventory : "item_id"
+    Employee o|--o{ Inventory : "last_reserver_employee_id (nullable)"
+    Item ||--o{ InventoryLocation : "item_id"
+    Item ||--o{ TransactionLog : "item_id"
+    Employee o|--o{ TransactionLog : "producer_employee_id / cancelled_by (nullable)"
+    TransactionLog ||--o{ TransactionEditLog : "original_log_id"
+    TransactionLog o|--o{ TransactionEditLog : "correction_log_id (nullable)"
+    Employee ||--o{ TransactionEditLog : "edited_by_employee_id"
 
     Inventory {
-        uuid inventory_id PK
         uuid item_id FK
-        int quantity "warehouse_qty + Σ(InventoryLocation)"
-        int warehouse_qty "창고 재고"
-        int pending_quantity "OUT 예약 중"
-        uuid last_reserver_employee_id FK
-    }
-
-    InventoryLocation {
-        uuid location_id PK
-        uuid item_id FK
-        enum department
-        enum status "PRODUCTION | DEFECTIVE"
         int quantity
-        datetime defective_at "불량 격리 시각"
+        int warehouse_qty
+        int pending_quantity
     }
-```
-
-**불변식:** `Inventory.quantity == warehouse_qty + Σ(InventoryLocation.quantity for item_id)`
-→ `/health/detailed` 의 `inventory_mismatch_count` 가 위반 건수를 실시간 감시.
-
----
-
-## 4. 거래 이력 도메인
-
-```mermaid
-erDiagram
-    Item ||--o{ TransactionLog : "품목별 이력"
-    Employee ||--o{ TransactionLog : "producer_employee_id"
-    TransactionLog ||--o{ TransactionEditLog : "수정 감사"
-
-    TransactionLog {
-        uuid log_id PK
+    InventoryLocation {
         uuid item_id FK
-        enum transaction_type
-        int quantity_change
-        int quantity_before
-        int quantity_after
         string department
-        string produced_by
-        uuid producer_employee_id FK
-        string reference_no
-        string reason_category
-        uuid operation_batch_id FK
-        datetime created_at
-        datetime archived_at
+        string status
+        int quantity
+        int pending_quantity
     }
-
+    TransactionLog {
+        uuid item_id FK
+        uuid operation_batch_id FK "nullable"
+        uuid shipping_request_id FK "nullable"
+        string transaction_type
+        int quantity_change
+    }
     TransactionEditLog {
-        uuid edit_id PK
         uuid original_log_id FK
+        uuid correction_log_id FK "nullable"
         uuid edited_by_employee_id FK
-        string reason
-        json before_payload
-        json after_payload
-        uuid correction_log_id FK
-        datetime created_at
     }
 ```
 
----
+- `inventory.item_id`는 품목당 하나의 재고 행을 보장한다. `inventory_locations`는 품목·부서·상태 조합의 위치 재고다.
+- 거래 수정 이력은 원본/보정 거래를 분리해 보관한다.
 
-## 5. 입출고 배치 도메인
+## 4. 입출고 V2·결재
 
 ```mermaid
 erDiagram
     Employee ||--o{ IoBatch : "requester_employee_id"
-    IoBatch ||--o{ IoBundle : ""
-    IoBundle ||--o{ IoLine : ""
+    ShippingRequest o|--o{ IoBatch : "shipping_request_id (nullable)"
+    IoBatch ||--o{ IoBundle : "batch_id"
+    IoBundle ||--o{ IoLine : "bundle_id"
+    Item o|--o{ IoBundle : "source_item_id (nullable)"
     Item ||--o{ IoLine : "item_id"
-    Item ||--o{ IoBundle : "source_item_id"
-    IoBatch }o--o| StockRequest : "stock_request_id"
+    Employee ||--o{ StockRequest : "requester_employee_id"
+    Employee o|--o{ StockRequest : "approved_by_employee_id / rejected_by_employee_id / department_approved_by_employee_id (nullable)"
+    IoBatch o|--o{ StockRequest : "operation_batch_id (nullable)"
+    StockRequest ||--o{ StockRequestLine : "request_id"
+    Item ||--o{ StockRequestLine : "item_id"
+    IoLine o|--o{ StockRequestLine : "operation_line_id (nullable)"
 
     IoBatch {
         uuid batch_id PK
-        string work_type "warehouse_io | production_io"
-        string sub_type "warehouse_to_dept 등"
-        string status
         uuid requester_employee_id FK
-        string from_department
-        string to_department
-        bool requires_approval
-        uuid stock_request_id FK
-        datetime submitted_at
-        datetime completed_at
+        uuid shipping_request_id FK "nullable"
+        uuid stock_request_id "참조값, FK 없음"
+        string work_type
+        string sub_type
+        string status
     }
-
     IoBundle {
-        uuid bundle_id PK
         uuid batch_id FK
-        string source_kind "direct_item | stock_request_line"
-        uuid source_item_id FK
+        uuid source_item_id FK "nullable"
+        string source_kind
         int quantity
     }
-
     IoLine {
-        uuid line_id PK
         uuid bundle_id FK
         uuid item_id FK
-        string direction "in | out"
+        string direction
         string from_bucket
         string to_bucket
         int quantity
         bool included
-        string origin
+    }
+    StockRequest {
+        uuid requester_employee_id FK
+        uuid operation_batch_id FK "nullable"
+        string request_type
+        string status
+    }
+    StockRequestLine {
+        uuid request_id FK
+        uuid item_id FK
+        uuid operation_line_id FK "nullable"
+        int quantity
     }
 ```
 
----
+- **IoBatch → IoBundle → IoLine**은 입출고 V2의 제출·전개·실제 반영 후보 라인 구조다. 제외된 `io_lines`도 감사 내역으로 남는다.
+- `io_batches.stock_request_id`는 저장된 참조값이고 모델 FK가 아니다. 결재 요청의 실제 배치 연결은 `stock_requests.operation_batch_id` FK다.
 
-## 6. 재고 요청/결재 도메인
+## 5. 출하
 
 ```mermaid
 erDiagram
-    Employee ||--o{ StockRequest : "requester"
-    Employee ||--o{ StockRequest : "warehouse_approver"
-    Employee ||--o{ StockRequest : "dept_approver"
-    StockRequest ||--o{ StockRequestLine : ""
-    Item ||--o{ StockRequestLine : "item_id"
+    Item ||--o{ ShippingRequest : "base_pf_item_id"
+    Item o|--o{ ShippingRequest : "final_pa_item_id / final_pf_item_id / reuse_pf_item_id (nullable)"
+    Employee o|--o{ ShippingRequest : "prepared_by_employee_id / cancelled_by_employee_id (nullable)"
+    ShippingRequest ||--o{ ShippingRequestBomLine : "request_id"
+    ShippingRequest ||--o{ ShippingRequestCompanionLine : "request_id"
+    ShippingRequest ||--o{ ShippingAllocation : "request_id"
+    ShippingRequest ||--o{ ShippingRequestChecklistLine : "request_id"
+    ShippingRequest ||--o{ ShippingRequestEvent : "request_id"
+    ShippingRequest ||--o{ ShippingRequestRevision : "request_id"
+    Item ||--o{ ShippingRequestBomLine : "child_item_id"
+    Item ||--o{ ShippingRequestCompanionLine : "item_id"
+    Item ||--o{ ShippingAllocation : "item_id"
+    Item ||--o{ ShippingRequestChecklistLine : "item_id"
+    Employee ||--o{ ShippingRequestRevision : "edited_by_employee_id"
 
-    StockRequest {
+    ShippingRequest {
         uuid request_id PK
-        string request_code
-        uuid requester_employee_id FK
-        enum request_type
-        enum status "SUBMITTED | RESERVED | APPROVED | REJECTED | COMPLETED | CANCELLED"
-        bool requires_warehouse_approval
-        bool requires_department_approval
-        uuid approved_by_employee_id FK
-        uuid department_approved_by_employee_id FK
-        uuid operation_batch_id FK
-        datetime submitted_at
-        datetime approved_at
-        datetime completed_at
+        uuid base_pf_item_id FK
+        uuid final_pa_item_id FK "nullable"
+        uuid final_pf_item_id FK "nullable"
+        uuid reuse_pf_item_id FK "nullable"
+        string status
+        string finalization_mode
+        string invoice_number
     }
-
-    StockRequestLine {
+    ShippingRequestBomLine {
+        uuid line_id PK
+        uuid request_id FK
+        uuid child_item_id FK
+    }
+    ShippingRequestCompanionLine {
         uuid line_id PK
         uuid request_id FK
         uuid item_id FK
-        int quantity
-        enum from_bucket "WAREHOUSE | PRODUCTION | DEFECTIVE | NONE"
-        enum to_bucket
-        string from_department
-        string to_department
-        enum status
+    }
+    ShippingAllocation {
+        uuid allocation_id PK
+        uuid request_id FK
+        uuid item_id FK
+    }
+    ShippingRequestChecklistLine {
+        uuid line_id PK
+        uuid request_id FK
+        uuid item_id FK
+    }
+    ShippingRequestEvent {
+        uuid event_id PK
+        uuid request_id FK
+    }
+    ShippingRequestRevision {
+        uuid revision_id PK
+        uuid request_id FK
+        uuid edited_by_employee_id FK
     }
 ```
 
-**결재 흐름:**
-- 창고 결재: `warehouse_role = primary | deputy` 인 사원만 가능.
-- 부서 결재: `department_role = primary | deputy` 또는 `level = admin`.
-- 두 결재 모두 통과 → `COMPLETED`.
+- 출하 요청은 기본·최종·재사용 PF/PA 품목을 `items`로 참조한다. 각 출하 하위 행은 요청 삭제 시 함께 삭제되도록 모델에 정의되어 있다.
+- `transaction_logs`와 `io_batches`도 출하 요청을 FK로 참조하므로 출하 준비/픽업의 재고 반영 경로는 거래·입출고 이력에서 추적한다.
 
----
-
-## 7. 창고 지도 도메인
+## 6. 창고 지도
 
 ```mermaid
 erDiagram
-    WarehouseAngle ||--o{ WarehouseBox : ""
-    WarehouseBox ||--o{ WarehouseBoxItem : ""
+    WarehouseAngle ||--o{ WarehouseBox : "angle_id"
+    WarehouseBox ||--o{ WarehouseBoxItem : "box_id"
     Item ||--o{ WarehouseBoxItem : "item_id"
+    WarehouseSpecialZone ||--o{ WarehouseSpecialZoneItem : "zone_id"
+    Item ||--o{ WarehouseSpecialZoneItem : "item_id"
+    WarehouseSpecialZone o|--o{ WarehouseSpecialZoneAudit : "zone_id (nullable)"
+    Employee o|--o{ WarehouseSpecialZoneAudit : "actor_employee_id (nullable)"
 
     WarehouseAngle {
-        uuid id PK
-        string label "앵글 이름 (예: A-1)"
-        int rows "열 수"
-        int layers "층 수"
-        int jaris_per_cell "칸당 자리 수"
-        float pos_x
-        float pos_y
-        float width
-        float height
-        int display_order
-        bool is_active
+        int id PK
     }
-
     WarehouseBox {
         uuid box_id PK
-        uuid angle_id FK
-        int row_no "열 번호"
-        int layer_no "층 번호"
-        int jari_index "자리 인덱스"
-        string size "small | medium | large"
-        int stack_order
+        int angle_id FK
     }
-
     WarehouseBoxItem {
         uuid id PK
         uuid box_id FK
         uuid item_id FK
-        int quantity
+    }
+    WarehouseSpecialZone {
+        int id PK
+    }
+    WarehouseSpecialZoneItem {
+        uuid id PK
+        int zone_id FK
+        uuid item_id FK
+    }
+    WarehouseSpecialZoneAudit {
+        int zone_id FK "nullable"
+        uuid actor_employee_id FK "nullable"
+        string action
     }
 ```
 
----
+- 랙은 `warehouse_angles`와 `warehouse_boxes`로, 통로·팔레트 자유 영역은 `warehouse_special_zones`로 분리한다.
+- 특별 영역 감사의 `zone_id`, `actor_employee_id`는 삭제 뒤에도 감사 행을 남길 수 있도록 nullable FK다.
 
-## 8. 기타 도메인
+## 7. 알림·인수인계·시스템 감사
 
 ```mermaid
 erDiagram
     Employee ||--o{ Notification : "recipient_employee_id"
-    StockRequest ||--o{ Notification : "related_request_id"
+    StockRequest o|--o{ Notification : "related_request_id (nullable)"
     Employee ||--o{ HandoverDoc : "author_employee_id"
-    Employee ||--o{ HandoverDoc : "received_by_employee_id"
-    HandoverDoc ||--o{ HandoverLine : ""
+    Employee o|--o{ HandoverDoc : "received_by_employee_id (nullable)"
+    HandoverDoc ||--o{ HandoverLine : "handover_id"
     Item ||--o{ HandoverLine : "item_id"
 
     Notification {
-        uuid notification_id PK
         uuid recipient_employee_id FK
+        uuid related_request_id FK "nullable"
         string type
-        string title
-        uuid related_request_id FK
         bool is_read
-        datetime created_at
     }
-
     HandoverDoc {
-        uuid handover_id PK
-        string handover_code
-        enum status
         uuid author_employee_id FK
-        string from_department
-        string to_department
-        datetime doc_date
-        uuid received_by_employee_id FK
-        datetime received_at
+        uuid received_by_employee_id FK "nullable"
+        string status
     }
-
     HandoverLine {
-        uuid line_id PK
         uuid handover_id FK
         uuid item_id FK
         int quantity
     }
-
     AdminAuditLog {
         uuid audit_id PK
-        string actor_pin_role
-        string actor_employee_code
-        string action
-        string target_type
-        string target_id
-        string payload_summary
-        datetime created_at
     }
-
+    AuditTerminal {
+        string terminal_id PK
+    }
+    ActivityAuditLog {
+        string terminal_id "참조값, FK 없음"
+        string actor_employee_code "스냅샷"
+        string source
+        string outcome
+    }
+    DataRevision {
+        int id PK "singleton"
+    }
     SystemSetting {
         string setting_key PK
-        string setting_value
-        datetime updated_at
     }
 ```
 
----
+- `admin_audit_logs`는 관리자 변경 감사, `activity_audit_logs`는 데스크톱/모바일 사용자 작업 스냅샷을 보관한다. `activity_audit_logs.terminal_id`는 `audit_terminals`의 FK가 아닌 식별자 참조값이다.
+- `data_revision`은 단일 행 제약을 둔 데이터 변경 리비전이고, `system_settings`는 키-값 설정 저장소다.
 
-## 불변식 (코드로 강제)
+## 변경 시 확인
 
-- `Inventory.quantity == warehouse_qty + Σ(InventoryLocation.quantity for item_id)` — `/health/detailed` 실시간 감시.
-- BOM 순환 참조 금지 — `_is_circular` 검증, 위반 시 400.
-- `mes_code` unique 전역 (소프트삭제 포함) — 삭제된 코드 재등록 불가.
-
-## 변경 이력
-
-| 날짜 | 변경 내용 |
-|---|---|
-| 2026-06-08 | 전면 재작성 — io_batches·io_bundles·io_lines·stock_requests·stock_request_lines·warehouse_angles·warehouse_boxes·warehouse_box_items·handovers·notifications·employee_item_orders 추가. STALE 표기 제거. |
-| 2026-06-01 | mes_code 전환 반영 (item_code→mes_code) |
-| 초기 | V1 핵심 5개 테이블 |
-
-## 변경 시 주의
-
-- DB 스키마 변경 시 이 문서도 함께 갱신.
-- `mes_code` 는 STORED 생성열 — `model_symbol`, `process_type_code`, `serial_no` 를 바꾸면 자동 재계산.
-- `Inventory.quantity` 불변식 위반 시 `/health/detailed` 가 즉시 감지.
+1. 모델 또는 Alembic migration에서 테이블·FK를 바꾸면 이 문서의 도메인 지도와 관계도를 함께 갱신한다.
+2. 새 관계선은 모델의 `ForeignKey`와 `ondelete` 설정을 확인한 뒤에만 추가한다.
+3. 런타임 데이터 수량·품목 수·모델 수 등 변동 사실은 문서에 고정하지 말고 `python _attic/backend-scripts/facts.py` 또는 관련 API로 확인한다.
