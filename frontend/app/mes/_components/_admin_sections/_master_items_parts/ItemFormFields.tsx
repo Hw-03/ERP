@@ -17,6 +17,7 @@ export type ItemFormData = {
   process_type_code: string;
   unit: string;
   model_slots: number[];
+  bom_stock_exempt?: boolean;
   sales_review_required: boolean;
   initial_quantity?: string;
   mes_code?: string;
@@ -125,6 +126,7 @@ function MesCodeSection({
 
 export function ItemFormFields({ form, setForm, showInitialQuantity, showInitialLocations, showMesCode, enableAfSalesReviewDefault, productModels = [] }: Props) {
   const departments = useDepartments();
+  const bomStockExempt = Boolean(form.bom_stock_exempt);
   const deptOptions = departments.map((d) => ({ value: d.name, label: d.name }));
   const locationOptions = [{ value: WAREHOUSE_LOCATION, label: WAREHOUSE_LOCATION }, ...deptOptions];
   const materialOptions = [
@@ -376,6 +378,35 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
           </span>
           <span className="block text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             출하 요청 작성 시 강조하여 영업 확인이 필요한 품목임을 알립니다.
+          </span>
+        </span>
+      </label>
+
+      <label
+        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[18px] border px-4 py-3"
+        style={{
+          background: bomStockExempt
+            ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 12%, ${LEGACY_COLORS.s1})`
+            : LEGACY_COLORS.s1,
+          borderColor: bomStockExempt ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+        }}
+      >
+        <input
+          type="checkbox"
+          aria-label="BOM 재고 미반영"
+          checked={bomStockExempt}
+          onChange={(event) => {
+            const checked = event.target.checked;
+            setForm((current) => ({ ...current, bom_stock_exempt: checked }));
+          }}
+          className="h-5 w-5 shrink-0 accent-[var(--c-purple)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+            BOM 재고 미반영
+          </span>
+          <span className="block text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            BOM 자동 처리만 재고 변동에서 제외합니다. 수동 입출고와 수량 조정은 가능합니다.
           </span>
         </span>
       </label>

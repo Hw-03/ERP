@@ -50,6 +50,7 @@ function makeBundle(): IoBundle {
     to_department: null,
     quantity: 1,
     bom_expected: null,
+    bom_stock_exempt: false,
     included: true,
     origin: "manual",
     edited: false,

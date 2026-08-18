@@ -116,6 +116,116 @@ def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutati
     assert events[0] == ("lock", expected_ids)
 
 
+def test_normal_rework_skips_flagged_bom_leaf_inventory(
+    make_item, make_bom, make_location, db_session
+):
+    parent = make_item(name="재작업 부모", process_type_code="AF")
+    child = make_item(name="재작업 미반영 자재", process_type_code="AR")
+    child.bom_stock_exempt = True
+    make_bom(parent.item_id, child.item_id, D("1"))
+    make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
+    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    db_session.flush()
+    template_child = next(
+        line
+        for line in svc.build_disassembly_template(db_session, parent.item_id, D("1"))
+        if line.item_id == child.item_id
+    )
+
+    result = svc.submit_normal_disassemble(
+        db_session,
+        parent.item_id,
+        D("1"),
+        "production",
+        ASSEMBLY,
+        [
+            {
+                "item_id": str(child.item_id),
+                "qty": "1",
+                "normal_qty": "1",
+                "bom_auto_token": template_child.bom_auto_token,
+            }
+        ],
+        reason_category="재작업",
+        reason_memo="BOM 재고 미반영",
+        actor="tester",
+    )
+
+    assert result["child_log_ids"] == []
+    assert _prod_qty(db_session, parent.item_id) == D("0")
+    assert _prod_qty(db_session, child.item_id) == D("0")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [parent.item_id]
+
+
+def test_normal_rework_keeps_flagged_bom_leaf_without_server_template_token(
+    make_item, make_bom, make_location, db_session
+):
+    """정상 재작업의 수동 결정은 BOM 품목과 같아도 재고를 반영한다."""
+    parent = make_item(name="수동 재작업 BOM 부모", process_type_code="AF")
+    child = make_item(name="수동 재작업 BOM 자재", process_type_code="AR")
+    child.bom_stock_exempt = True
+    make_bom(parent.item_id, child.item_id, D("1"))
+    make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
+    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    db_session.flush()
+
+    result = svc.submit_normal_disassemble(
+        db_session,
+        parent.item_id,
+        D("1"),
+        "production",
+        ASSEMBLY,
+        [
+            {
+                "item_id": str(child.item_id),
+                "qty": "1",
+                "normal_qty": "1",
+            }
+        ],
+        reason_category="재작업",
+        reason_memo="수동 결정",
+        actor="tester",
+    )
+
+    assert len(result["child_log_ids"]) == 1
+    assert _prod_qty(db_session, child.item_id) == D("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [parent.item_id, child.item_id]
+
+
+def test_normal_rework_keeps_flagged_non_bom_decision_inventory(
+    make_item, make_location, db_session
+):
+    """재작업 결정에만 포함된 수동 품목은 BOM 미반영 설정이어도 정상 반영한다."""
+    parent = make_item(name="수동 재작업 부모", process_type_code="AF")
+    child = make_item(name="수동 재작업 품목", process_type_code="AR")
+    child.bom_stock_exempt = True
+    make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
+    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    db_session.flush()
+
+    result = svc.submit_normal_disassemble(
+        db_session,
+        parent.item_id,
+        D("1"),
+        "production",
+        ASSEMBLY,
+        [
+            {
+                "item_id": str(child.item_id),
+                "qty": "1",
+                "normal_qty": "1",
+            }
+        ],
+        reason_category="재작업",
+        reason_memo="수동 품목",
+        actor="tester",
+    )
+
+    assert len(result["child_log_ids"]) == 1
+    assert _prod_qty(db_session, child.item_id) == D("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [parent.item_id, child.item_id]
+
+
 # ──────────────────────────── 템플릿 빌더 ────────────────────────────
 
 def test_production_template_basic(make_item, make_bom, db_session):
@@ -413,6 +523,98 @@ def test_submit_production_manual_edit(make_item, make_location, db_session):
     db_session.commit()
 
     assert _prod_qty(db_session, comp.item_id) == D("3")  # 10 - 7
+
+
+def test_submit_adjustment_skips_flagged_bom_line_but_keeps_result(
+    make_bom, make_item, db_session
+):
+    component = make_item(name="부서 조정 미반영 자재")
+    component.bom_stock_exempt = True
+    result = make_item(name="부서 조정 결과품", process_type_code="AF")
+    make_bom(result.item_id, component.item_id, D("2"))
+    db_session.flush()
+
+    log_ids = svc.submit_adjustment(
+        db_session,
+        DeptAdjSubTypeEnum.PRODUCTION,
+        svc.build_production_template(db_session, result.item_id, D("1")),
+    )
+
+    assert len(log_ids) == 1
+    assert _prod_qty(db_session, component.item_id) == D("0")
+    assert _prod_qty(db_session, result.item_id) == D("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [result.item_id]
+
+
+def test_submit_adjustment_keeps_flagged_line_without_matching_bom_parent(
+    make_item, make_location, db_session
+):
+    """수동 생산 조정의 bom_expected 입력만으로 재고 반영을 건너뛰지 않는다."""
+    component = make_item(name="수동 조정 대상")
+    result = make_item(name="무관한 생산 결과품", process_type_code="AF")
+    component.bom_stock_exempt = True
+    make_location(component.item_id, department=ASSEMBLY, quantity=D("2"))
+
+    log_ids = svc.submit_adjustment(
+        db_session,
+        DeptAdjSubTypeEnum.PRODUCTION,
+        [
+            svc.AdjLine(
+                item_id=component.item_id,
+                direction="out",
+                quantity=D("2"),
+                department=ASSEMBLY,
+                bom_expected=D("2"),
+            ),
+            svc.AdjLine(
+                item_id=result.item_id,
+                direction="in",
+                quantity=D("1"),
+                department=ASSEMBLY,
+            ),
+        ],
+    )
+
+    assert len(log_ids) == 2
+    assert _prod_qty(db_session, component.item_id) == D("0")
+    assert _prod_qty(db_session, result.item_id) == D("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [component.item_id, result.item_id]
+
+
+def test_submit_adjustment_keeps_flagged_bom_shape_without_server_token(
+    make_bom, make_item, make_location, db_session
+):
+    """실제 BOM 수량을 흉내 내도 템플릿 발급 근거 없이는 수동 조정으로 반영한다."""
+    component = make_item(name="토큰 없는 부서 수동 자재")
+    result = make_item(name="토큰 없는 부서 수동 결과품", process_type_code="AF")
+    component.bom_stock_exempt = True
+    make_bom(result.item_id, component.item_id, D("2"))
+    make_location(component.item_id, department=ASSEMBLY, quantity=D("2"))
+
+    log_ids = svc.submit_adjustment(
+        db_session,
+        DeptAdjSubTypeEnum.PRODUCTION,
+        [
+            svc.AdjLine(
+                item_id=component.item_id,
+                direction="out",
+                quantity=D("2"),
+                department=ASSEMBLY,
+                bom_expected=D("2"),
+            ),
+            svc.AdjLine(
+                item_id=result.item_id,
+                direction="in",
+                quantity=D("1"),
+                department=ASSEMBLY,
+            ),
+        ],
+    )
+
+    assert len(log_ids) == 2
+    assert _prod_qty(db_session, component.item_id) == D("0")
+    assert _prod_qty(db_session, result.item_id) == D("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [component.item_id, result.item_id]
 
 
 def test_submit_disassembly_mixed(make_item, make_location, db_session):

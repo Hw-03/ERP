@@ -33,6 +33,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import io_dispatch as svc
+from app.services.bom_stock_policy import io_bom_auto_claims, issue_bom_auto_token
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.routers.inventory._tx_filters import _batch_name_map
 
@@ -80,6 +81,8 @@ def _build_batch(
     status: str = "submitted",
     from_department=None,
     to_department=None,
+    source_kind: str = "bom_parent",
+    source_item_id=None,
     lines: list[dict],
 ) -> IoBatch:
     """라인 dict 목록으로 IoBatch/IoBundle/IoLine 한 묶음을 DB 에 만든다.
@@ -104,8 +107,8 @@ def _build_batch(
     bundle = IoBundle(
         bundle_id=uuid.uuid4(),
         batch_id=batch.batch_id,
-        source_kind="bom_parent",
-        source_item_id=None,
+        source_kind=source_kind,
+        source_item_id=source_item_id,
         title_snapshot="테스트 묶음",
         quantity=D("1"),
         expanded_level=1,
@@ -151,6 +154,30 @@ def _prod_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
         .first()
     )
     return loc.quantity if loc else D("0")
+
+
+def _issue_bom_auto_token(db_session, batch: IoBatch, line: IoLine) -> None:
+    """미리보기에서 받은 자동 BOM 행을 서비스 단위 테스트에 재현한다."""
+    bundle = line.bundle
+    line.bom_auto_token = issue_bom_auto_token(
+        db_session,
+        flow="io",
+        claims=io_bom_auto_claims(
+            bundle_id=bundle.bundle_id,
+            line_id=line.line_id,
+            source_kind=bundle.source_kind,
+            source_item_id=bundle.source_item_id,
+            item_id=line.item_id,
+            work_type=batch.work_type,
+            sub_type=batch.sub_type,
+            direction=line.direction,
+            from_bucket=line.from_bucket,
+            from_department=line.from_department,
+            to_bucket=line.to_bucket,
+            to_department=line.to_department,
+        ),
+    )
+    db_session.flush()
 
 
 def _loc_pending(
@@ -1027,7 +1054,6 @@ def test_mixed_process_manual_waits_for_department_approval_then_applies_all_lin
             },
         ],
     )
-
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
     request = db_session.query(StockRequest).one()
@@ -1061,6 +1087,134 @@ def test_mixed_process_manual_waits_for_department_approval_then_applies_all_lin
     assert _prod_qty(db_session, result_item.item_id) == D("1")
     assert _prod_qty(db_session, manual_item.item_id) == D("3")
     assert db_session.query(TransactionLog).count() == 3
+
+
+def test_execute_submission_skips_flagged_bom_component_but_keeps_result_inventory(
+    make_bom, make_item, db_session
+):
+    component = make_item(name="재고 미반영 BOM 자재")
+    component.bom_stock_exempt = True
+    result_item = make_item(name="생산 결과품", process_type_code="AF")
+    make_bom(result_item.item_id, component.item_id, D("2"))
+    requester = _make_employee(db_session)
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        to_department=ASSEMBLY.value,
+        source_item_id=result_item.item_id,
+        lines=[
+            {
+                "item_id": component.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY.value,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "bom_auto",
+            },
+            {
+                "item_id": result_item.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY.value,
+                "quantity": D("1"),
+                "origin": "direct",
+            },
+        ],
+    )
+    _issue_bom_auto_token(
+        db_session,
+        batch,
+        next(line for line in batch.bundles[0].lines if line.item_id == component.item_id),
+    )
+
+    result = svc._execute_submission(db_session, requester=requester, batch=batch)
+
+    component_line = next(line for line in batch.bundles[0].lines if line.item_id == component.item_id)
+    assert result["status"] == "completed"
+    assert component_line.bom_stock_exempt is True
+    assert component_line.included is False
+    assert component_line.exclusion_note == "BOM 재고 미반영"
+    assert _prod_qty(db_session, component.item_id) == D("0")
+    assert _prod_qty(db_session, result_item.item_id) == D("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [result_item.item_id]
+
+
+def test_execute_submission_keeps_flagged_line_without_matching_bom_relation(
+    make_item, make_location, db_session
+):
+    """클라이언트 origin 표시만으로 수동 라인을 BOM 자동 자재로 취급하지 않는다."""
+    component = make_item(name="수동 처리 대상")
+    unrelated_parent = make_item(name="무관한 부모", process_type_code="AF")
+    component.bom_stock_exempt = True
+    make_location(component.item_id, department=ASSEMBLY, quantity=D("2"))
+    requester = _make_employee(db_session)
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        to_department=ASSEMBLY.value,
+        source_item_id=unrelated_parent.item_id,
+        lines=[
+            {
+                "item_id": component.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY.value,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "bom_auto",
+            }
+        ],
+    )
+
+    svc._execute_submission(db_session, requester=requester, batch=batch)
+
+    line = _single_line(batch)
+    assert line.bom_stock_exempt is False
+    assert line.included is True
+    assert _prod_qty(db_session, component.item_id) == D("0")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [component.item_id]
+
+
+def test_execute_submission_keeps_flagged_line_without_server_issued_bom_token(
+    make_bom, make_item, make_location, db_session
+):
+    """실제 BOM 관계를 흉내 내도 미리보기 발급 토큰 없이는 수동 처리로 남는다."""
+    component = make_item(name="토큰 없는 수동 BOM 형태 자재")
+    parent = make_item(name="토큰 없는 수동 BOM 형태 부모", process_type_code="AF")
+    component.bom_stock_exempt = True
+    make_bom(parent.item_id, component.item_id, D("2"))
+    make_location(component.item_id, department=ASSEMBLY, quantity=D("2"))
+    requester = _make_employee(db_session)
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        to_department=ASSEMBLY.value,
+        source_item_id=parent.item_id,
+        lines=[
+            {
+                "item_id": component.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY.value,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "bom_auto",
+            }
+        ],
+    )
+
+    svc._execute_submission(db_session, requester=requester, batch=batch)
+
+    line = _single_line(batch)
+    assert line.bom_stock_exempt is False
+    assert line.included is True
+    assert _prod_qty(db_session, component.item_id) == D("0")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [component.item_id]
 
 
 def test_execute_batch_after_dept_approval_applies_inventory(
@@ -1110,6 +1264,86 @@ def test_execute_batch_after_dept_approval_applies_inventory(
     assert mapped.approver_name == approver.name
     # operator_name 은 승인자 기준으로 기록.
     assert log.produced_by == approver.name
+
+
+def test_execute_batch_after_dept_approval_preserves_bom_stock_exempt_snapshot(
+    make_bom, make_item, db_session
+):
+    """결재 대기 배치는 이후 품목 설정이 바뀌어도 제출 당시 스냅샷으로 처리한다."""
+    component = make_item(name="결재 대기 BOM 자재")
+    component.bom_stock_exempt = True
+    result_item = make_item(name="결재 대기 결과품", process_type_code="AF")
+    make_bom(result_item.item_id, component.item_id, D("2"))
+    requester = _make_employee(db_session)
+    approver = _make_employee(
+        db_session,
+        code="APPR-SNAPSHOT",
+        name="스냅샷결재자",
+        department_role="primary",
+    )
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        status="reserved",
+        to_department=ASSEMBLY.value,
+        source_item_id=result_item.item_id,
+        lines=[
+            {
+                "item_id": component.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY.value,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "bom_auto",
+                "included": False,
+            },
+            {
+                "item_id": result_item.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY.value,
+                "quantity": D("1"),
+                "origin": "direct",
+            },
+        ],
+    )
+    component_line = next(
+        line for line in batch.bundles[0].lines if line.item_id == component.item_id
+    )
+    component_line.bom_stock_exempt = True
+    component_line.exclusion_note = "BOM 재고 미반영"
+    _issue_bom_auto_token(db_session, batch, component_line)
+    request = StockRequest(
+        request_id=uuid.uuid4(),
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department.value,
+        request_type=svc.StockRequestTypeEnum.MANUAL_ADJUSTMENT,
+        request_code="SR-BOM-SNAPSHOT",
+        status=StockRequestStatusEnum.RESERVED,
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+        department_approved_by_employee_id=approver.employee_id,
+        department_approved_by_name=approver.name,
+        operation_batch_id=batch.batch_id,
+    )
+    db_session.add(request)
+    db_session.flush()
+
+    component.bom_stock_exempt = False
+    db_session.flush()
+
+    svc.execute_batch_after_dept_approval(db_session, request=request, approver=approver)
+
+    assert batch.status == "completed"
+    assert component_line.bom_stock_exempt is True
+    assert component_line.included is False
+    assert _prod_qty(db_session, component.item_id) == D("0")
+    assert _prod_qty(db_session, result_item.item_id) == D("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [result_item.item_id]
 
 
 def test_shipping_linked_department_approval_is_read_only(
@@ -1227,6 +1461,53 @@ def test_submit_existing_draft_completes_immediate(make_item, db_session):
     assert result["status"] == "completed"
     assert _warehouse_qty(db_session, item.item_id) == D("7")
     assert db_session.query(IoBatch).count() == 1
+
+
+def test_submit_existing_draft_applies_current_bom_stock_exempt_setting(
+    make_bom, make_item, db_session
+):
+    component = make_item(name="초안의 BOM 자재")
+    parent = make_item(name="초안의 BOM 부모", process_type_code="AF")
+    make_bom(parent.item_id, component.item_id, D("2"))
+    requester = _make_employee(db_session)
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        work_type="warehouse_io",
+        sub_type="warehouse_to_dept",
+        status="draft",
+        to_department=ASSEMBLY.value,
+        source_item_id=parent.item_id,
+        lines=[
+            {
+                "item_id": component.item_id,
+                "direction": "move",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY.value,
+                "quantity": D("2"),
+                "origin": "bom_auto",
+            }
+        ],
+    )
+    _issue_bom_auto_token(db_session, batch, _single_line(batch))
+    component.bom_stock_exempt = True
+    db_session.flush()
+
+    result = svc.submit_existing_draft(
+        db_session,
+        batch_id=batch.batch_id,
+        requester_employee_id=requester.employee_id,
+    )
+
+    line = _single_line(batch)
+    assert result["status"] == "completed"
+    assert result["message"] == "BOM 재고 미반영 품목만 포함되어 재고 변동 없이 처리되었습니다."
+    assert batch.requires_approval is False
+    assert line.bom_stock_exempt is True
+    assert line.included is False
+    assert db_session.query(StockRequest).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_submit_existing_draft_wrong_owner_raises(make_item, db_session):

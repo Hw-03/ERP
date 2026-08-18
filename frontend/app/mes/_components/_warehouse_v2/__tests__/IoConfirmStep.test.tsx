@@ -96,17 +96,20 @@ function DepartmentSingleAdjustHarness({ initialNotes = "" }: { initialNotes?: s
 }
 
 describe("IoConfirmStep", () => {
-  it("requires a non-blank memo before submitting a department single adjustment", () => {
+  it("빈 메모 안내를 입력칸 안에 표시하고 제출은 차단한다", () => {
     render(<DepartmentSingleAdjustHarness />);
 
     expect(screen.getByText("메모 (필수)")).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toHaveAttribute("aria-required", "true");
-    expect(screen.getByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).toBeInTheDocument();
+    const memoInput = screen.getByRole("textbox");
+    expect(memoInput).toHaveAttribute("aria-required", "true");
+    expect(memoInput).toHaveAttribute("placeholder", "메모를 입력해야 부서 결재 요청을 할 수 있습니다.");
+    expect(screen.queryByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "저장" })).toBeEnabled();
 
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "재고 실사 차이" } });
+    fireEvent.change(memoInput, { target: { value: "재고 실사 차이" } });
 
+    expect(memoInput).toHaveAttribute("placeholder", "작업 메모");
     expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeEnabled();
   });
 

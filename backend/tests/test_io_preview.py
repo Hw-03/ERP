@@ -166,6 +166,31 @@ def test_preview_produce_expands_bom(db_session, make_item, make_bom):
     assert result[0]["direction"] == "in" and result[0]["item_id"] == parent.item_id
 
 
+def test_preview_excludes_flagged_bom_child_from_inventory(db_session, make_item, make_bom):
+    parent = make_item(name="BOM 부모", process_type_code="AF")
+    child = make_item(name="롤 단위 자재", process_type_code="AR")
+    child.bom_stock_exempt = True
+    make_bom(parent.item_id, child.item_id, D("2"))
+    db_session.commit()
+
+    out = iop.preview(
+        db_session,
+        work_type="process",
+        sub_type="produce",
+        targets=[_target(parent.item_id, "3")],
+        to_department="조립",
+    )
+
+    component = next(line for line in out["bundles"][0]["lines"] if line["origin"] == "bom_auto")
+    assert component["quantity"] == D("6")
+    assert component["bom_stock_exempt"] is True
+    assert component["included"] is False
+    assert component["shortage"] == D("0")
+    assert component["exclusion_note"] == "BOM 재고 미반영"
+    assert isinstance(component["bom_auto_token"], str)
+    assert len(component["bom_auto_token"]) == 64
+
+
 def test_preview_disassemble_recovers_children(db_session, make_item, make_bom):
     parent = make_item(name="완제품", process_type_code="AF")
     child = make_item(name="부품", process_type_code="AR")

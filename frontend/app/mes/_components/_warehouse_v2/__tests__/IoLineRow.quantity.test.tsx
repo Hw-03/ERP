@@ -42,6 +42,7 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
     to_department: null,
     quantity: 1,
     bom_expected: null,
+    bom_stock_exempt: false,
     included: true,
     origin: "direct",
     edited: false,
@@ -162,5 +163,32 @@ describe("IoLineRow quantity", () => {
       "data-tap-to-expand-name",
       "true",
     );
+  });
+
+  it("locks an exempt automatic BOM child and shows its no-stock-effect state", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "production",
+          quantity: 2,
+          origin: "bom_auto",
+          bom_stock_exempt: true,
+          included: false,
+          exclusion_note: "BOM 재고 미반영",
+        })}
+        subType="produce"
+        isChild
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("BOM 재고 미반영")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "BOM 재고 미반영 항목" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "수량" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "+1" })).toBeDisabled();
   });
 });

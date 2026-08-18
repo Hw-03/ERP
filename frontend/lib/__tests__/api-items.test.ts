@@ -132,14 +132,27 @@ describe("itemsApi.createItem / updateItem", () => {
     expect(JSON.parse(init.body as string)).toEqual({ process_type_code: "HF" });
   });
 
-  it("preserves the sales review boolean for create and update", async () => {
+  it("preserves item policy booleans for create and update", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ body: { item_id: "abc" } })));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
-    await itemsApi.createItem({ item_name: "A", sales_review_required: true });
-    await itemsApi.updateItem("abc", { sales_review_required: false });
+    await itemsApi.createItem({
+      item_name: "A",
+      bom_stock_exempt: true,
+      sales_review_required: true,
+    });
+    await itemsApi.updateItem("abc", {
+      bom_stock_exempt: false,
+      sales_review_required: false,
+    });
 
-    expect(JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({ sales_review_required: true });
-    expect(JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string)).toMatchObject({ sales_review_required: false });
+    expect(JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({
+      bom_stock_exempt: true,
+      sales_review_required: true,
+    });
+    expect(JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string)).toMatchObject({
+      bom_stock_exempt: false,
+      sales_review_required: false,
+    });
   });
 });

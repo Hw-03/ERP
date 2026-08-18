@@ -42,7 +42,7 @@ def release_reservation(db: Session, request: StockRequest) -> None:
     if not _is_sqlite:
         inventory_svc.ensure_and_lock_inventories(
             db,
-            _request_inventory_item_ids(request, lines),
+            _request_inventory_item_ids(db, request, lines),
         )
     sr_reservation.release_lines(db, lines, request_id=request.request_id)
 
@@ -240,6 +240,7 @@ def _child_decisions_from_notes(request) -> list[dict]:
 
 
 def _request_inventory_item_ids(
+    db: Session,
     request: StockRequest,
     lines: Iterable[StockRequestLine],
 ) -> list[uuid.UUID]:
@@ -257,7 +258,16 @@ def _request_inventory_item_ids(
         from app.services.dept_adjustment import rework_inventory_item_ids
 
         for line in lines:
-            item_ids.update(rework_inventory_item_ids(line.item_id, child_decisions))
+            item_ids.update(
+                rework_inventory_item_ids(
+                    line.item_id,
+                    child_decisions,
+                    db=db,
+                    require_bom_template_token=(
+                        request.request_type == StockRequestTypeEnum.REWORK_NORMAL
+                    ),
+                )
+            )
     except (KeyError, TypeError, ValueError):
         # Invalid decisions will fail before child mutation in the rework service.
         # Parent-only locking still allows rejection/cancellation to release safely.
@@ -423,7 +433,7 @@ def _execute_all_lines(
     lines = list(lines)
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
     if not _is_sqlite:
-        all_item_ids = _request_inventory_item_ids(request, lines)
+        all_item_ids = _request_inventory_item_ids(db, request, lines)
         inventory_svc.ensure_and_lock_inventories(db, all_item_ids)
     for line in lines:
         _execute_line(db, request, line, approver=approver, is_approval=is_approval)

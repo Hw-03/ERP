@@ -22,6 +22,7 @@ from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services._tx import transactional
 from app.services.bom import explode_bom, merge_requirements
+from app.services.bom_stock_policy import should_skip_bom_inventory
 
 
 class ProductionReceiptError(Exception):
@@ -82,6 +83,25 @@ def _preload_components(
         sorted({*comp_ids, produced_item_id}),
     )
     return items_map, invs_map
+
+
+def _stock_tracked_requirements(
+    db: Session,
+    merged: Dict[uuid.UUID, Decimal],
+) -> Dict[uuid.UUID, Decimal]:
+    """생산 BOM의 미반영 자재를 부족 검사·잠금·차감 대상에서 제외한다."""
+    if not merged:
+        return {}
+    items_map = {
+        item.item_id: item
+        for item in db.query(Item).filter(Item.item_id.in_(merged)).all()
+    }
+    return {
+        item_id: quantity
+        for item_id, quantity in merged.items()
+        if item_id not in items_map
+        or not should_skip_bom_inventory(items_map[item_id], bom_generated=True)
+    }
 
 
 def _assert_no_shortage(
@@ -212,13 +232,14 @@ def _execute_production_receipt(
       - ValueError            : ?? ?? ?? ??? ?? ?? ?? (? 422)
     """
     merged = _load_and_merge_requirements(db, payload, produced_item)
-    items_map, invs_map = _preload_components(db, merged, produced_item.item_id)
-    _assert_no_shortage(db, merged, items_map, invs_map)
+    tracked_requirements = _stock_tracked_requirements(db, merged)
+    items_map, invs_map = _preload_components(db, tracked_requirements, produced_item.item_id)
+    _assert_no_shortage(db, tracked_requirements, items_map, invs_map)
 
     transaction_ids: List[uuid.UUID] = []
     backflushed: List[BackflushDetail] = []
     _backflush_components(
-        db, payload, produced_item, merged, items_map,
+        db, payload, produced_item, tracked_requirements, items_map,
         producer_name, producer_id, transaction_ids, backflushed,
     )
     _record_production(

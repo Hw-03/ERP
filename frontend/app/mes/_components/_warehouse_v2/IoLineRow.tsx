@@ -100,9 +100,11 @@ export function IoLineRow({
     line.origin === "bom_auto" &&
     line.bom_expected != null &&
     Number(line.bom_expected) > 0;
-  const stepperDisabled = disabled || qtyLocked;
+  const bomStockExempt = line.origin === "bom_auto" && line.bom_stock_exempt;
+  const interactionLocked = qtyLocked || bomStockExempt;
+  const stepperDisabled = disabled || interactionLocked;
   // + 버튼은 미체크 상태에서도 활성 — qty=0 자동 해제된 라인 복귀용. qtyLocked 만 차단.
-  const incrementDisabled = qtyLocked;
+  const incrementDisabled = interactionLocked;
   const shortage = line.included && line.shortage > 0;
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
@@ -112,7 +114,7 @@ export function IoLineRow({
   const displayedCurrent = isWarehouseAdjust && item
     ? Number(item.warehouse_qty) || 0
     : available;
-  const expected = expectedAfter(line, displayedCurrent);
+  const expected = bomStockExempt ? displayedCurrent : expectedAfter(line, displayedCurrent);
   const tag = lineTagLabel(line, subType);
   const tagColor = toneToColor(tag.tone);
   const expectedColor =
@@ -154,7 +156,8 @@ export function IoLineRow({
       <button
         type="button"
         onClick={onToggle}
-        disabled={qtyLocked}
+        disabled={interactionLocked}
+        aria-label={bomStockExempt ? "BOM 재고 미반영 항목" : "재고 반영 변경"}
         className="flex h-6 w-6 items-center justify-center rounded-[6px] border transition-colors disabled:cursor-not-allowed"
         style={{
           background: line.included ? LEGACY_COLORS.blue : "transparent",
@@ -200,8 +203,18 @@ export function IoLineRow({
           >
             {tag.text}
           </span>
+          {bomStockExempt && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{ background: tint(LEGACY_COLORS.purple, 14), color: LEGACY_COLORS.purple }}
+            >
+              BOM 재고 미반영
+            </span>
+          )}
           <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            {qtyLocked
+            {bomStockExempt
+              ? "BOM 자동 처리 시 재고 미반영"
+              : qtyLocked
               ? "상위 품목과 함께 자동 처리"
               : line.included
                 ? "재고 반영 포함"
@@ -226,10 +239,10 @@ export function IoLineRow({
       <QuantityStepper
         value={currentQty}
         onChange={onStepperChange}
-        disabled={qtyLocked}
+        disabled={interactionLocked}
         decrementDisabled={stepperDisabled}
         incrementDisabled={incrementDisabled}
-        inputTitle={qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
+        inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
         className="w-full lg:w-auto"
       />
 

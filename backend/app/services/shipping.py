@@ -32,6 +32,7 @@ from app.repositories import item_repository
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services.bom import bom_child_item_ordering
+from app.services.bom_stock_policy import should_skip_bom_inventory
 from app.services.inv_calc import _sync_total
 from app.utils.mes_code import make_mes_code, next_serial_no
 
@@ -363,6 +364,9 @@ def _normalize_bom_lines(db: Session, base_pf: Item, payload_lines: list[dict] |
     default_lines = _default_lines_from_base_pf(db, base_pf)
     if not payload_lines:
         return default_lines
+    defaults_by_key = {
+        (line["parent_stage"], line["child_item_id"]): line for line in default_lines
+    }
     normalized: list[dict] = []
     for idx, raw in enumerate(payload_lines):
         stage = str(raw.get("parent_stage") or "PA").upper()
@@ -373,14 +377,21 @@ def _normalize_bom_lines(db: Session, base_pf: Item, payload_lines: list[dict] |
             raise ShippingError("BOM 수량은 1 이상이어야 합니다.")
         child_id = raw.get("child_item_id")
         _get_item(db, child_id)
+        unit = raw.get("unit") or "EA"
+        default_line = defaults_by_key.get((stage, child_id))
+        is_default_line = (
+            default_line is not None
+            and qty == int(default_line["quantity"])
+            and unit == (default_line.get("unit") or "EA")
+        )
         normalized.append(
             {
                 "parent_stage": stage,
                 "child_item_id": child_id,
                 "quantity": qty,
-                "unit": raw.get("unit") or "EA",
+                "unit": unit,
                 "included": bool(raw.get("included", True)),
-                "origin": str(raw.get("origin") or "CUSTOM").upper(),
+                "origin": "DEFAULT" if is_default_line else "CUSTOM",
                 "sort_order": int(raw.get("sort_order", idx)),
             }
         )
@@ -920,6 +931,11 @@ def prepare_stock_shortages(db: Session, req: ShippingRequest) -> list[dict]:
     for line in req.bom_lines:
         if not line.included or line.child_item_id == final_pa.item_id:
             continue
+        if should_skip_bom_inventory(
+            line.child_item,
+            bom_generated=line.origin == "DEFAULT",
+        ):
+            continue
         add_check(line.child_item, int(line.quantity or 0) * request_qty)
     for line in req.companion_lines:
         qty = int(line.quantity or 0)
@@ -1143,7 +1159,8 @@ def _component_change_lines(db: Session, source_pa: Item, target_pa: Item, quant
         delta = int(target_qty) - int(source_qty)
         total_delta = delta * quantity
         dept, current, available = _item_location_available_after_shipping_allocations(db, item)
-        shortage = max(total_delta - available, 0) if total_delta > 0 else 0
+        bom_stock_exempt = should_skip_bom_inventory(item, bom_generated=True)
+        shortage = max(total_delta - available, 0) if total_delta > 0 and not bom_stock_exempt else 0
         if total_delta == 0:
             continue
         lines.append(
@@ -1161,6 +1178,7 @@ def _component_change_lines(db: Session, source_pa: Item, target_pa: Item, quant
                 "current_quantity": current,
                 "available_quantity": available,
                 "shortage_quantity": shortage,
+                "bom_stock_exempt": bom_stock_exempt,
                 "line_kind": "consume" if total_delta > 0 else "recover",
             }
         )
@@ -1335,7 +1353,8 @@ def _execute_component_change_core(
         raise ShippingError("구성 전환은 메모를 입력해야 합니다.")
     if preview["source_shortage_quantity"] > 0:
         raise ShippingError("소스 품목 재고가 부족해 품목 전환을 할 수 없습니다.")
-    shortages = [line for line in preview["lines"] if line["shortage_quantity"] > 0]
+    applied_lines = [line for line in preview["lines"] if not line.get("bom_stock_exempt")]
+    shortages = [line for line in applied_lines if line["shortage_quantity"] > 0]
     if shortages:
         names = ", ".join(f"{line['item_name']} {line['shortage_quantity']}" for line in shortages)
         raise ShippingError(f"추가 구성품 재고가 부족합니다: {names}")
@@ -1356,7 +1375,7 @@ def _execute_component_change_core(
         {
             source_pa.item_id,
             target_pa.item_id,
-            *(line["item_id"] for line in preview["lines"]),
+            *(line["item_id"] for line in applied_lines),
         }
     )
     inventory_svc.ensure_and_lock_inventories(db, item_ids)
@@ -1371,7 +1390,7 @@ def _execute_component_change_core(
         produced_by=produced_by,
         producer_employee_id=requester_employee_id,
     ))
-    for line in preview["lines"]:
+    for line in applied_lines:
         delta = int(line["total_delta"])
         if delta > 0:
             item = _get_item(db, line["item_id"])
@@ -1396,7 +1415,7 @@ def _execute_component_change_core(
         produced_by=produced_by,
         producer_employee_id=requester_employee_id,
     ))
-    for line in preview["lines"]:
+    for line in applied_lines:
         delta = int(line["total_delta"])
         if delta < 0:
             item = _get_item(db, line["item_id"])

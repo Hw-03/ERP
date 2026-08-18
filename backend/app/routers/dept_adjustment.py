@@ -41,6 +41,9 @@ class AdjLineResponse(BaseModel):
     direction: str
     quantity: Decimal
     bom_expected: Optional[Decimal]
+    bom_parent_item_id: Optional[uuid.UUID]
+    bom_auto_token: Optional[str]
+    bom_stock_exempt: bool
     has_children: bool
     department: str
     reason: Optional[str]
@@ -67,6 +70,8 @@ class AdjLineInput(BaseModel):
     department: str
     reason: Optional[str] = None
     bom_expected: Optional[Decimal] = None
+    bom_parent_item_id: Optional[uuid.UUID] = None
+    bom_auto_token: Optional[str] = Field(None, pattern="^[0-9a-f]{64}$")
 
 
 class DeptAdjSubmitRequest(BaseModel):
@@ -104,6 +109,9 @@ def _line_to_response(ln: svc.AdjLine) -> AdjLineResponse:
         direction=ln.direction,
         quantity=ln.quantity,
         bom_expected=ln.bom_expected,
+        bom_parent_item_id=ln.bom_parent_item_id,
+        bom_auto_token=ln.bom_auto_token,
+        bom_stock_exempt=ln.bom_stock_exempt,
         has_children=ln.has_children,
         department=ln.department.value,
         reason=ln.reason,
@@ -178,6 +186,8 @@ def submit_adjustment(
             department=dept_enum,
             reason=ln.reason,
             bom_expected=ln.bom_expected,
+            bom_parent_item_id=ln.bom_parent_item_id,
+            bom_auto_token=ln.bom_auto_token,
         ))
 
     _, producer_id = resolve_producer(db, payload.operator_employee_code)

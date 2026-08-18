@@ -18,6 +18,7 @@ export type ItemEditForm = {
   process_type_code: string;
   unit: string;
   model_slots: number[];
+  bom_stock_exempt: boolean;
   sales_review_required: boolean;
   mes_code: string;
 };
@@ -30,6 +31,7 @@ export const EMPTY_ITEM_EDIT_FORM: ItemEditForm = {
   process_type_code: "TR",
   unit: "EA",
   model_slots: [],
+  bom_stock_exempt: false,
   sales_review_required: false,
   mes_code: "",
 };
@@ -56,6 +58,7 @@ export function itemToEditForm(item: Item): ItemEditForm {
     process_type_code: item.process_type_code ?? "TR",
     unit: item.unit ?? "EA",
     model_slots: savedSlots.length > 0 ? savedSlots : inferModelSlots(mesCode),
+    bom_stock_exempt: item.bom_stock_exempt ?? false,
     sales_review_required: item.sales_review_required ?? false,
     mes_code: mesCode,
   };
@@ -70,6 +73,7 @@ type UpdateItemPayload = {
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
+  bom_stock_exempt?: boolean;
   sales_review_required?: boolean;
   mes_code?: string;
 };
@@ -141,6 +145,7 @@ export function useAdminMasterItemsForm({
         process_type_code: form.process_type_code || undefined,
         unit: form.unit || undefined,
         model_slots: form.model_slots,
+        bom_stock_exempt: form.bom_stock_exempt,
         sales_review_required: form.sales_review_required,
       };
       const updated = await api.updateItem(selectedItem.item_id, payload);

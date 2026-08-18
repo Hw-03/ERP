@@ -389,7 +389,7 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
     for req in open_requests:
         if req.status == StockRequestStatusEnum.RESERVED:
             all_item_ids.update(
-                _request_inventory_item_ids(req, list(req.lines))
+                _request_inventory_item_ids(db, req, list(req.lines))
             )
     if all_item_ids:
         inventory_svc.ensure_and_lock_inventories(db, sorted(all_item_ids))

@@ -19,6 +19,7 @@ export interface ChildDecision {
   scrap_qty: number;
   keep_qty: number;
   reason_memo: string;
+  bom_auto_token?: string | null;
   has_bom: boolean;
   children: ChildDecision[] | null;
   manuallySet?: boolean;
@@ -45,6 +46,7 @@ function toChildDecision(line: {
   item_name: string;
   mes_code: string | null;
   quantity: number;
+  bom_auto_token?: string | null;
   has_children: boolean;
 }): ChildDecision {
   const qty = Number(line.quantity);
@@ -58,6 +60,7 @@ function toChildDecision(line: {
     scrap_qty: 0,
     keep_qty: qty,
     reason_memo: "",
+    bom_auto_token: line.bom_auto_token,
     manuallySet: false,
     has_bom: line.has_children,
     children: null,
@@ -419,12 +422,14 @@ export function toServerDecision(node: ChildDecision): Record<string, unknown> {
     return {
       item_id: node.item_id,
       qty: node.qty,
+      bom_auto_token: node.bom_auto_token ?? null,
       children: node.children.map(toServerDecision),
     };
   }
   return {
     item_id: node.item_id,
     qty: node.qty,
+    bom_auto_token: node.bom_auto_token ?? null,
     normal_qty: node.normal_qty,
     defective_qty: node.defective_qty,
     scrap_qty: node.scrap_qty,

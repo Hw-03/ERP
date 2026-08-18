@@ -22,6 +22,7 @@ export const EMPTY_ADD_FORM = {
   process_type_code: "TR",
   unit: "EA",
   model_slots: [] as number[],
+  bom_stock_exempt: false,
   sales_review_required: false,
   legacy_item_type: "",
   supplier: "",

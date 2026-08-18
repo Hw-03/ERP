@@ -14,8 +14,9 @@ re-export 만 하며, 동기 patch 가 필요한 경우 패키지 측 글로벌�
 from __future__ import annotations
 
 import logging
+import secrets
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app.database import engine
 from app.services.pin_auth import DEFAULT_PIN_HASH
@@ -58,6 +59,7 @@ _PG_TRANSACTION_TYPE_ENUM_ADDITIONS: tuple[str, ...] = (
     "INTERNAL_USE",
 )
 _PG_STOCK_REQUEST_TYPE_ENUM_ADDITIONS: tuple[str, ...] = ("INTERNAL_USE",)
+_BOM_AUTO_TOKEN_SETTING_KEY = "security.bom_auto_token_secret"
 
 
 def _is_benign_migration_skip(exc: Exception) -> bool:
@@ -65,6 +67,32 @@ def _is_benign_migration_skip(exc: Exception) -> bool:
     orig = getattr(exc, "orig", exc)
     msg = str(orig).lower()
     return any(pat in msg for pat in _BENIGN_MIGRATION_PATTERNS)
+
+
+def _ensure_bom_auto_token_secret() -> None:
+    """레거시 raw 경로에도 자동 BOM 근거 토큰의 DB별 서명 키를 보장한다."""
+    if "system_settings" not in inspect(engine).get_table_names():
+        return
+    with engine.begin() as conn:
+        secret = conn.execute(
+            text(
+                "SELECT setting_value FROM system_settings "
+                "WHERE setting_key = :setting_key"
+            ),
+            {"setting_key": _BOM_AUTO_TOKEN_SETTING_KEY},
+        ).scalar()
+        if secret:
+            return
+        conn.execute(
+            text(
+                "INSERT INTO system_settings (setting_key, setting_value) "
+                "VALUES (:setting_key, :setting_value)"
+            ),
+            {
+                "setting_key": _BOM_AUTO_TOKEN_SETTING_KEY,
+                "setting_value": secrets.token_urlsafe(48),
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +184,8 @@ _MIGRATION_DDL: list[str] = [
         to_department VARCHAR(50),
         quantity NUMERIC(15,4) NOT NULL,
         bom_expected NUMERIC(15,4),
+        bom_stock_exempt BOOLEAN NOT NULL DEFAULT 0,
+        bom_auto_token VARCHAR(64),
         included BOOLEAN NOT NULL DEFAULT 1,
         origin VARCHAR(24) NOT NULL,
         edited BOOLEAN NOT NULL DEFAULT 0,
@@ -181,6 +211,10 @@ _MIGRATION_DDL: list[str] = [
     # 05-18 라인 추가 컬럼 (모델에는 있으나 마이그레이션 누락분 — 구 DB 호환용)
     # BOM 완료 워크플로우 — 명시적 "완료로 표시" 시각
     "ALTER TABLE items ADD COLUMN bom_completed_at DATETIME",
+    "ALTER TABLE items ADD COLUMN sales_review_required BOOLEAN NOT NULL DEFAULT 0",
+    "ALTER TABLE items ADD COLUMN bom_stock_exempt BOOLEAN NOT NULL DEFAULT 0",
+    "ALTER TABLE io_lines ADD COLUMN bom_stock_exempt BOOLEAN NOT NULL DEFAULT 0",
+    "ALTER TABLE io_lines ADD COLUMN bom_auto_token VARCHAR(64)",
     # 거래 로그 아카이브 시각 (NULL = 미아카이브)
     "ALTER TABLE transaction_logs ADD COLUMN archived_at DATETIME",
     "CREATE INDEX IF NOT EXISTS ix_transaction_logs_archived_at ON transaction_logs(archived_at)",
@@ -624,6 +658,8 @@ def _drop_dead_m1_objects() -> None:
                         legacy_item_type VARCHAR(50),
                         supplier VARCHAR(200),
                         min_stock NUMERIC(15, 4),
+                        sales_review_required BOOLEAN NOT NULL DEFAULT 0,
+                        bom_stock_exempt BOOLEAN NOT NULL DEFAULT 0,
                         model_symbol VARCHAR(20),
                         process_type_code VARCHAR(2),
                         serial_no INTEGER,
@@ -638,10 +674,12 @@ def _drop_dead_m1_objects() -> None:
                     INSERT INTO items_new
                         (item_id, item_name, sort_order, unit, created_at, updated_at,
                          legacy_part, legacy_item_type, supplier, min_stock,
+                         sales_review_required, bom_stock_exempt,
                          model_symbol, process_type_code, serial_no,
                          bom_completed_at, item_code, deleted_at)
                     SELECT item_id, item_name, sort_order, unit, created_at, updated_at,
                            legacy_part, legacy_item_type, supplier, min_stock,
+                           sales_review_required, bom_stock_exempt,
                            model_symbol, process_type_code, serial_no,
                            bom_completed_at, item_code, deleted_at
                     FROM items
@@ -1081,6 +1119,8 @@ def _recreate_items_with_generated_mes_code() -> None:
                     legacy_item_type VARCHAR(50),
                     supplier VARCHAR(200),
                     min_stock INTEGER,
+                    sales_review_required BOOLEAN NOT NULL DEFAULT 0,
+                    bom_stock_exempt BOOLEAN NOT NULL DEFAULT 0,
                     model_symbol VARCHAR(20) NOT NULL,
                     process_type_code VARCHAR(2) NOT NULL,
                     serial_no INTEGER NOT NULL,
@@ -1100,9 +1140,11 @@ def _recreate_items_with_generated_mes_code() -> None:
                 INSERT INTO items_new
                     (item_id, item_name, sort_order, unit, created_at, updated_at,
                      legacy_part, legacy_item_type, supplier, min_stock,
+                     sales_review_required, bom_stock_exempt,
                      model_symbol, process_type_code, serial_no, bom_completed_at, deleted_at)
                 SELECT item_id, item_name, sort_order, unit, created_at, updated_at,
                        legacy_part, legacy_item_type, supplier, min_stock,
+                       sales_review_required, bom_stock_exempt,
                        model_symbol, process_type_code, serial_no, bom_completed_at, deleted_at
                 FROM items
                 """
@@ -1187,6 +1229,13 @@ def run_migrations() -> dict[str, object]:
 
     for sql in _MIGRATION_DDL:
         _run(sql, label="ddl")
+
+    try:
+        _ensure_bom_auto_token_secret()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] BOM auto token secret setup failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
 
     # io_bundles.package_id → ship_packages FK 제거 (ship_packages DROP 후 FK 깨짐)
     try:

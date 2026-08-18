@@ -44,6 +44,10 @@ export interface IoLine {
   to_department: Department | string | null;
   quantity: number;
   bom_expected: number | null;
+  /** 구 이력 응답과의 호환을 위해 optional로 읽는다. */
+  bom_stock_exempt?: boolean;
+  /** 서버 미리보기에서 발급한 자동 BOM 행 근거. */
+  bom_auto_token?: string | null;
   included: boolean;
   origin: IoLineOrigin;
   edited: boolean;
@@ -149,6 +153,7 @@ export interface ItemConversionLine {
   current_quantity: number;
   available_quantity: number;
   shortage_quantity: number;
+  bom_stock_exempt?: boolean;
   line_kind: "consume" | "recover" | string | null;
 }
 

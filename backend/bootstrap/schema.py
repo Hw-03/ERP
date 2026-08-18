@@ -50,6 +50,8 @@ POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "assembly_checklist",
     "shipping_request_revisions",
     "sales_review_required",
+    "bom_stock_exempt",
+    "bom_auto_token",
     "invoice_number",
     "cancelled_at",
     "cancelled_by_employee_id",
@@ -661,6 +663,16 @@ def validate_unversioned_data(connection: Connection) -> None:
         )
 
 
+def _is_expected_post_legacy_addition(difference: str) -> bool:
+    """기존 무버전 DB에 Alembic이 안전하게 추가할 차이만 허용한다."""
+    if not any(marker in difference for marker in POST_LEGACY_ADDITIVE_SCHEMA_MARKERS):
+        return False
+    return difference.startswith("Alembic metadata diff: ('add_") or (
+        difference.startswith("foreign key mismatch: shipping_requests ")
+        and "cancelled_by_employee_id" in difference
+    )
+
+
 def _is_pre_assembly_checklist_schema(
     tables: set[str],
     differences: tuple[str, ...],
@@ -674,28 +686,21 @@ def _is_pre_assembly_checklist_schema(
         | REALTIME_INFRASTRUCTURE_TABLES
     )
 
-    def is_expected_addition(difference: str) -> bool:
-        if not any(
-            marker in difference for marker in POST_LEGACY_ADDITIVE_SCHEMA_MARKERS
-        ):
-            return False
-        return difference.startswith("Alembic metadata diff: ('add_") or (
-            difference.startswith("foreign key mismatch: shipping_requests ")
-            and "cancelled_by_employee_id" in difference
-        )
-
     return (
         missing_tables == expected_missing_tables
-        and all(is_expected_addition(str(difference)) for difference in differences)
+        and all(_is_expected_post_legacy_addition(str(difference)) for difference in differences)
     )
 
 
 def _has_only_obsolete_manual_pf_pin_table(
     differences: tuple[str, ...],
 ) -> bool:
-    """Allow an unversioned pre-migration database to reach its removal migration."""
+    """폐기 테이블과 이후의 순수 추가 마이그레이션만 있는 DB를 온보딩한다."""
     marker = "Alembic metadata diff: ('remove_table', Table('model_pf_pins'"
-    return bool(differences) and all(difference.startswith(marker) for difference in differences)
+    return bool(differences) and all(
+        difference.startswith(marker) or _is_expected_post_legacy_addition(difference)
+        for difference in differences
+    )
 
 
 def inspect_schema(connection: Connection) -> SchemaInspection:

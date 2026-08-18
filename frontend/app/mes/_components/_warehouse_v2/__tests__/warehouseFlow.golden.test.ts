@@ -65,6 +65,7 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
     to_department: null,
     quantity: 10,
     bom_expected: null,
+    bom_stock_exempt: false,
     included: true,
     origin: "direct",
     edited: false,
@@ -1181,6 +1182,35 @@ describe("[bomSync] applyToggleLine", () => {
     expect(c.exclusion_note).toBeNull();
   });
 
+  it("BOM 재고 미반영 자식은 부모·자체 토글로 다시 포함되지 않는다", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", included: false, quantity: 1 }),
+          makeLine({
+            line_id: "C",
+            origin: "bom_auto",
+            bom_expected: 2,
+            bom_stock_exempt: true,
+            included: false,
+            quantity: 2,
+            exclusion_note: "BOM 재고 미반영",
+          }),
+        ],
+      }),
+    ];
+
+    const afterParentToggle = applyToggleLine(bundles, "B", "P", "produce", availMap({ C: 0 }));
+    const childAfterParentToggle = afterParentToggle[0].lines[1];
+    expect(childAfterParentToggle.included).toBe(false);
+    expect(childAfterParentToggle.shortage).toBe(0);
+    expect(childAfterParentToggle.exclusion_note).toBe("BOM 재고 미반영");
+
+    const afterChildToggle = applyToggleLine(afterParentToggle, "B", "C", "produce", availMap({ C: 0 }));
+    expect(afterChildToggle).toEqual(afterParentToggle);
+  });
+
   it("대상 번들/라인 없음 → 원본 그대로", () => {
     const bundles = [makeBundle({ bundle_id: "B", lines: [makeLine({ line_id: "L1" })] })];
     expect(applyToggleLine(bundles, "ZZ", "L1", "produce", availMap({}))).toEqual(bundles);
@@ -1220,6 +1250,33 @@ describe("[bomSync] applyLineQuantityChange", () => {
     ];
     const next = applyLineQuantityChange(bundles, "B", "P", 5, 0, "warehouse_to_dept", availMap({ C: 100 }));
     expect(next[0].lines[1].quantity).toBe(99); // edited 보존
+  });
+
+  it("상위 수량 변경은 BOM 재고 미반영 자식의 표시 수량만 동기화한다", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", quantity: 1 }),
+          makeLine({
+            line_id: "C",
+            origin: "bom_auto",
+            bom_expected: 3,
+            bom_stock_exempt: true,
+            included: false,
+            quantity: 3,
+            exclusion_note: "BOM 재고 미반영",
+          }),
+        ],
+      }),
+    ];
+
+    const next = applyLineQuantityChange(bundles, "B", "P", 5, 0, "produce", availMap({ C: 0 }));
+    const child = next[0].lines[1];
+    expect(child.quantity).toBe(15);
+    expect(child.included).toBe(false);
+    expect(child.shortage).toBe(0);
+    expect(child.exclusion_note).toBe("BOM 재고 미반영");
   });
 
   it("비-direct(단품) 변경 → 단순 갱신 + edited 산정", () => {

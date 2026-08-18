@@ -113,6 +113,7 @@ class ShippingComponentChangeLineResponse(BaseModel):
     current_quantity: int = 0
     available_quantity: int = 0
     shortage_quantity: int = 0
+    bom_stock_exempt: bool = False
     line_kind: Optional[str] = None
 
 

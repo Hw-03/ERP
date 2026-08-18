@@ -11,6 +11,11 @@ import type { IoBundle, IoLine, IoSubType } from "./types";
 import { exclusionNoteFor, isBomForced } from "./ioWorkType";
 
 type GetAvailable = (line: IoLine) => number | null;
+const BOM_STOCK_EXEMPT_NOTE = "BOM 재고 미반영";
+
+function isBomStockExempt(line: IoLine): boolean {
+  return line.origin === "bom_auto" && Boolean(line.bom_stock_exempt);
+}
 
 /**
  * 라인 체크 토글. 부모(direct) 토글이면 같은 묶음의 활성 bom_auto 자식도 함께 토글.
@@ -27,6 +32,7 @@ export function applyToggleLine(
     if (bundle.bundle_id !== bundleId) return bundle;
     const target = bundle.lines.find((l) => l.line_id === lineId);
     if (!target) return bundle;
+    if (isBomStockExempt(target)) return bundle;
     const isParentToggle = target.origin === "direct";
     const newIncluded = !target.included;
     return {
@@ -36,6 +42,7 @@ export function applyToggleLine(
           line.line_id === lineId ||
           (isParentToggle &&
             line.origin === "bom_auto" &&
+            !isBomStockExempt(line) &&
             line.bom_expected != null &&
             Number(line.bom_expected) > 0);
         if (!shouldSync) return line;
@@ -94,10 +101,20 @@ export function applyLineQuantityChange(
             line.origin === "bom_auto" &&
             line.bom_expected != null &&
             Number(line.bom_expected) > 0 &&
-            (forced || !line.edited)
+            (isBomStockExempt(line) || forced || !line.edited)
           ) {
             const ratio = Number(line.bom_expected);
             const childQty = quantity * ratio;
+            if (isBomStockExempt(line)) {
+              return {
+                ...line,
+                quantity: childQty,
+                shortage: 0,
+                included: false,
+                edited: false,
+                exclusion_note: BOM_STOCK_EXEMPT_NOTE,
+              };
+            }
             const childAvail = getAvailable(line);
             const childIncluded = childQty > 0;
             const childShortage =
@@ -117,6 +134,7 @@ export function applyLineQuantityChange(
         }),
       };
     }
+    if (isBomStockExempt(target)) return bundle;
     // 그 외 (단품/수동): 기존 단순 업데이트 + qty 0 자동 체크 해제
     return {
       ...bundle,
@@ -165,10 +183,20 @@ export function applyBundleQuantityChange(
           line.origin === "bom_auto" &&
           line.bom_expected != null &&
           Number(line.bom_expected) > 0 &&
-          (forced || !line.edited)
+          (isBomStockExempt(line) || forced || !line.edited)
         ) {
           const ratio = Number(line.bom_expected);
           const childQty = newQty * ratio;
+          if (isBomStockExempt(line)) {
+            return {
+              ...line,
+              quantity: childQty,
+              shortage: 0,
+              included: false,
+              edited: false,
+              exclusion_note: BOM_STOCK_EXEMPT_NOTE,
+            };
+          }
           const childAvail = getAvailable(line);
           const childIncluded = childQty > 0;
           const childShortage =

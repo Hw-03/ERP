@@ -197,9 +197,6 @@ export function IoConfirmStep({
   const submitDisabled =
     submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity || memoMissing;
   const saveDisabled = submitting || saving || bundles.length === 0;
-  const memoBlockerText = memoMissing
-    ? "메모를 입력해야 부서 결재 요청을 할 수 있습니다."
-    : null;
   const accent = directionAccent(subType);
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
@@ -263,7 +260,7 @@ export function IoConfirmStep({
         label={memoRequired ? "메모 (필수)" : "메모 (선택)"}
         value={notes}
         onChange={onNotesChange}
-        placeholder="작업 메모"
+        placeholder={memoMissing ? "메모를 입력해야 부서 결재 요청을 할 수 있습니다." : "작업 메모"}
         required={memoRequired}
         invalid={memoMissing}
       />
@@ -271,7 +268,7 @@ export function IoConfirmStep({
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
       <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-1 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
         {/* blocker */}
-        {(blockerText ?? memoBlockerText) && (
+        {blockerText && (
           <div
             className="rounded-[16px] border px-4 py-3 text-center text-sm font-bold"
             style={{
@@ -280,7 +277,7 @@ export function IoConfirmStep({
               color: LEGACY_COLORS.yellow,
             }}
           >
-            {blockerText ?? memoBlockerText}
+            {blockerText}
           </div>
         )}
 

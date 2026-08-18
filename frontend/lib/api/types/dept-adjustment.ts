@@ -13,6 +13,9 @@ export interface AdjLineTemplate {
   direction: AdjDirection;
   quantity: number;
   bom_expected: number | null;
+  bom_parent_item_id?: string | null;
+  bom_auto_token?: string | null;
+  bom_stock_exempt?: boolean;
   has_children: boolean;
   department: Department;
   reason: string | null;
@@ -30,6 +33,8 @@ export interface AdjLineInput {
   department: Department;
   reason?: string | null;
   bom_expected?: number | null;
+  bom_parent_item_id?: string | null;
+  bom_auto_token?: string | null;
 }
 
 export interface DeptAdjSubmitPayload {

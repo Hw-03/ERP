@@ -83,6 +83,7 @@ describe("useAdminMasterItemsCommands", () => {
       result.current.setAddForm((f) => ({
         ...f,
         item_name: "신규",
+        bom_stock_exempt: true,
         sales_review_required: true,
         legacy_item_type: "원자재",
         min_stock: "0",
@@ -95,7 +96,10 @@ describe("useAdminMasterItemsCommands", () => {
     });
     expect(args.setItems).not.toHaveBeenCalled();
     expect(args.setSelectedItem).toHaveBeenCalled();
-    expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ sales_review_required: true }));
+    expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      bom_stock_exempt: true,
+      sales_review_required: true,
+    }));
     expect(result.current.addMode).toBe(false);
   });
 

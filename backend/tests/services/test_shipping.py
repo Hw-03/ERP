@@ -763,6 +763,113 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     assert all(log.producer_employee_id is None for log in pickup_logs)
 
 
+def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_change(
+    db_session, make_item, make_bom, make_location
+):
+    common = make_item(name="shipping-exempt-common", process_type_code="AF")
+    exempt = make_item(name="shipping-exempt-cable", process_type_code="PR")
+    source_pa = make_item(name="shipping-exempt-source", process_type_code="PA")
+    target_pa = make_item(name="shipping-exempt-target", process_type_code="PA")
+    base_pf = make_item(name="shipping-exempt-pf", process_type_code="PF")
+    exempt.bom_stock_exempt = True
+    make_bom(source_pa.item_id, common.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, common.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, exempt.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, target_pa.item_id, Decimal("1"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(target_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(common.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+
+    request = shipping_svc.create_request(
+        db_session,
+        {"base_pf_item_id": base_pf.item_id, "requested_by_name": "shipping-user"},
+    )
+    stocked_items = {
+        request.final_pa_item_id: request.final_pa_item,
+        **{
+            line.child_item_id: line.child_item
+            for line in request.bom_lines
+            if line.child_item_id != exempt.item_id
+        },
+    }
+    for item_id, item in stocked_items.items():
+        department = shipping_svc.inventory_svc.department_for_item(item)
+        location = db_session.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == department,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).first()
+        if location is None:
+            make_location(item_id, department=department, quantity=Decimal("10"))
+        else:
+            location.quantity = Decimal("10")
+    shipping_svc.send_to_prep(db_session, request.request_id)
+
+    prepare_shortages = shipping_svc.prepare_stock_shortages(db_session, request)
+    assert prepare_shortages == [], {row["item_name"] for row in prepare_shortages}
+
+    preview = shipping_svc.component_change_preview_independent(
+        db_session,
+        source_pa.item_id,
+        target_pa.item_id,
+        1,
+    )
+    exempt_line = next(line for line in preview["lines"] if line["item_id"] == exempt.item_id)
+    assert preview["executable"] is True
+    assert exempt_line["bom_stock_exempt"] is True
+    assert exempt_line["shortage_quantity"] == 0
+
+    result = shipping_svc.execute_component_change_independent(
+        db_session,
+        source_pa.item_id,
+        target_pa.item_id,
+        1,
+        memo="BOM 재고 미반영 구성품",
+    )
+
+    assert _location_qty(db_session, exempt, DepartmentEnum.SHIPPING) == 0
+    assert {log.item_id for log in result["transactions"]} == {source_pa.item_id, target_pa.item_id}
+
+
+def test_shipping_prepare_keeps_custom_flagged_bom_line_in_shortage_check(
+    db_session, make_item, make_bom, make_location
+):
+    """사용자가 추가한 CUSTOM 구성품은 품목 면제 설정과 무관하게 재고를 확인한다."""
+    default_component = make_item(name="출하 기본 구성품", process_type_code="AF")
+    custom_component = make_item(name="출하 수동 구성품", process_type_code="PR")
+    base_pa = make_item(name="출하 기본 PA", process_type_code="PA")
+    base_pf = make_item(name="출하 기본 PF", process_type_code="PF")
+    custom_component.bom_stock_exempt = True
+    make_bom(base_pa.item_id, default_component.item_id, Decimal("1"))
+    make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
+    db_session.flush()
+
+    request = shipping_svc.create_request(
+        db_session,
+        {
+            "base_pf_item_id": base_pf.item_id,
+            "finalization_mode": "CREATE_NEW",
+            "custom_pa_name": "수동 구성 출하 PA",
+            "custom_pf_name": "수동 구성 출하 PF",
+            "bom_lines": [
+                _bom_line(base_pa, stage="PF", origin="DEFAULT"),
+                _bom_line(default_component, stage="PA", origin="DEFAULT"),
+                _bom_line(custom_component, stage="PA", origin="DEFAULT"),
+            ],
+        },
+    )
+    for item in (request.final_pa_item, base_pa, default_component):
+        make_location(item.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    shipping_svc.send_to_prep(db_session, request.request_id)
+
+    shortages = shipping_svc.prepare_stock_shortages(db_session, request)
+
+    custom_line = next(line for line in request.bom_lines if line.child_item_id == custom_component.item_id)
+    assert custom_line.origin == "CUSTOM"
+    custom_shortage = next(row for row in shortages if row["item_id"] == custom_component.item_id)
+    assert custom_shortage["shortage_quantity"] == 1
+
 
 def test_independent_component_change_rejects_invalid_pairs_and_shortages(
     db_session, make_item, make_bom, make_location

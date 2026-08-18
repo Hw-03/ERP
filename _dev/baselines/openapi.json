@@ -31,6 +31,18 @@
       },
       "AdjLineInput": {
         "properties": {
+          "bom_auto_token": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Auto Token"
+          },
           "bom_expected": {
             "anyOf": [
               {
@@ -45,6 +57,18 @@
               }
             ],
             "title": "Bom Expected"
+          },
+          "bom_parent_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Parent Item Id"
           },
           "department": {
             "title": "Department",
@@ -100,6 +124,17 @@
       },
       "AdjLineResponse": {
         "properties": {
+          "bom_auto_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Auto Token"
+          },
           "bom_expected": {
             "anyOf": [
               {
@@ -111,6 +146,22 @@
               }
             ],
             "title": "Bom Expected"
+          },
+          "bom_parent_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Parent Item Id"
+          },
+          "bom_stock_exempt": {
+            "title": "Bom Stock Exempt",
+            "type": "boolean"
           },
           "department": {
             "title": "Department",
@@ -185,6 +236,9 @@
           "direction",
           "quantity",
           "bom_expected",
+          "bom_parent_item_id",
+          "bom_auto_token",
+          "bom_stock_exempt",
           "has_children",
           "department",
           "reason"
@@ -3828,6 +3882,18 @@
       },
       "IoLinePayload": {
         "properties": {
+          "bom_auto_token": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Auto Token"
+          },
           "bom_expected": {
             "anyOf": [
               {
@@ -3838,6 +3904,11 @@
               }
             ],
             "title": "Bom Expected"
+          },
+          "bom_stock_exempt": {
+            "default": false,
+            "title": "Bom Stock Exempt",
+            "type": "boolean"
           },
           "direction": {
             "title": "Direction",
@@ -4275,6 +4346,17 @@
       },
       "ItemCreate": {
         "properties": {
+          "bom_stock_exempt": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Stock Exempt"
+          },
           "initial_locations": {
             "anyOf": [
               {
@@ -4452,6 +4534,11 @@
             ],
             "title": "Bom Completed At"
           },
+          "bom_stock_exempt": {
+            "default": false,
+            "title": "Bom Stock Exempt",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -4606,6 +4693,17 @@
       },
       "ItemUpdate": {
         "properties": {
+          "bom_stock_exempt": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Stock Exempt"
+          },
           "item_name": {
             "anyOf": [
               {
@@ -4749,6 +4847,11 @@
               }
             ],
             "title": "Bom Completed At"
+          },
+          "bom_stock_exempt": {
+            "default": false,
+            "title": "Bom Stock Exempt",
+            "type": "boolean"
           },
           "created_at": {
             "format": "date-time",
@@ -6765,6 +6868,11 @@
             "default": 0,
             "title": "Available Quantity",
             "type": "integer"
+          },
+          "bom_stock_exempt": {
+            "default": false,
+            "title": "Bom Stock Exempt",
+            "type": "boolean"
           },
           "current_quantity": {
             "default": 0,

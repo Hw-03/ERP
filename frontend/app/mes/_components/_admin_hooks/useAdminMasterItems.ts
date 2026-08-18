@@ -33,6 +33,7 @@ type UpdateItemPayload = {
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
+  bom_stock_exempt?: boolean;
   sales_review_required?: boolean;
   mes_code?: string;
 };

@@ -158,6 +158,38 @@ def test_production_receipt_blocks_when_department_location_is_short(
     assert _warehouse_qty(db_session, component) == Decimal("10")
 
 
+def test_production_receipt_skips_flagged_bom_component_inventory(
+    db_session, make_item, make_bom
+):
+    component = make_item(
+        name="롤 단위 BOM 자재",
+        process_type_code="TR",
+        warehouse_qty=Decimal("0"),
+    )
+    component.bom_stock_exempt = True
+    produced = make_item(
+        name="미반영 자재 사용 생산품",
+        process_type_code="PF",
+        warehouse_qty=Decimal("0"),
+    )
+    make_bom(produced.item_id, component.item_id, Decimal("2"))
+    db_session.commit()
+
+    result = execute_production_receipt(
+        db_session,
+        ProductionReceiptRequest(item_id=produced.item_id, quantity=1, produced_by="operator"),
+        produced,
+        "operator",
+        None,
+    )
+
+    assert result["backflushed"] == []
+    assert len(result["transaction_ids"]) == 1
+    assert _location_qty(db_session, component, DepartmentEnum.TUBE) == Decimal("0")
+    assert _location_qty(db_session, produced, DepartmentEnum.SHIPPING) == Decimal("1")
+    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [produced.item_id]
+
+
 def test_production_receipt_rolls_back_backflush_when_production_log_fails(
     db_session, make_item, make_bom, make_location, monkeypatch
 ):

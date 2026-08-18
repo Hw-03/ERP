@@ -95,6 +95,7 @@ class Item(Base):
     supplier = Column(String(200), nullable=True)
     min_stock = Column(IntQuantity, nullable=True)
     sales_review_required = Column(Boolean, nullable=False, default=False, server_default="0")
+    bom_stock_exempt = Column(Boolean, nullable=False, default=False, server_default="0")
 
     # 3-part item code ([모델기호조합]-[구분코드]-[일련번호])
     # mes_code 는 분해필드 3종에서 DB 가 계산하는 STORED 생성열 — 진실소스는 분해필드, 직접 쓰기 불가.

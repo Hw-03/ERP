@@ -87,11 +87,11 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
       style={bomRowSurfaceStyle({ gridTemplateColumns: BOM_CURRENT_ROW_GRID_TEMPLATE })}
     >
       <BomBadge processTypeCode={childItem?.process_type_code} />
-      <div className="min-w-0">
+      <div className="flex min-w-0 items-center gap-1.5">
         <span
           ref={nameRef}
           data-bom-row-label
-          className="block min-w-0 truncate text-sm font-semibold"
+          className="block min-w-0 flex-1 truncate text-sm font-semibold"
           style={{
             color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
             textDecoration: isDeleted ? "line-through" : "none",
@@ -99,6 +99,15 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
         >
           {childName}
         </span>
+        {childItem?.bom_stock_exempt && (
+          <span
+            className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+            style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)`, color: LEGACY_COLORS.purple }}
+            title="BOM 자동 처리 시 재고 변동에서 제외"
+          >
+            BOM 재고 미반영
+          </span>
+        )}
       </div>
       <span data-bom-row-code className="min-w-0 truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
         {mesCode || "—"}

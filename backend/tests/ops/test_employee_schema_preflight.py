@@ -145,6 +145,8 @@ def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path)
         "20260812_0018_drop_model_pf_pins.py",
         "20260812_0019_add_inventory_location_pending.py",
         "20260813_0020_add_activity_audit.py",
+        "20260818_0021_add_bom_stock_exempt.py",
+        "20260818_0022_add_io_bom_auto_tokens.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

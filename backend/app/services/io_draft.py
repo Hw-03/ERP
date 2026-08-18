@@ -30,6 +30,7 @@ from app.services.io_persist import (
     ensure_batch_is_mutable,
     _load_requester,
     _persist_batch,
+    normalize_payload_bom_stock_exempt,
 )
 
 
@@ -57,6 +58,7 @@ def save_draft(db: Session, payload) -> dict:
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
+    normalize_payload_bom_stock_exempt(db, payload)
     validate_operation_sources(
         payload.sub_type,
         (bundle.source_kind for bundle in payload.bundles),

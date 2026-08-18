@@ -163,6 +163,19 @@ describe("ItemFormFields", () => {
     expect(updater(baseForm()).sales_review_required).toBe(true);
   });
 
+  it("renders a BOM stock-exemption checkbox while keeping manual adjustments available", () => {
+    const setForm = vi.fn();
+    render(<ItemFormFields form={baseForm()} setForm={setForm} />);
+
+    const checkbox = screen.getByRole("checkbox", { name: "BOM 재고 미반영" });
+    expect(checkbox).not.toBeChecked();
+    expect(screen.getByText(/수동 입출고와 수량 조정은 가능합니다/)).toBeInTheDocument();
+
+    fireEvent.click(checkbox);
+    const updater = setForm.mock.calls[0][0] as (form: ItemFormData) => ItemFormData;
+    expect((updater(baseForm()) as ItemFormData & { bom_stock_exempt?: boolean }).bom_stock_exempt).toBe(true);
+  });
+
   it("left-aligns the minimum-stock quantity input", () => {
     render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
 

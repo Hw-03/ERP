@@ -1181,7 +1181,8 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
     body = create.json()
     excluded = [line for line in body["bom_lines"] if line["child_item_id"] == str(cable.item_id)][0]
     assert excluded["included"] is False
-    assert excluded["origin"] == "DEFAULT"
+    # 클라이언트가 DEFAULT라고 보내도 실제 기본 BOM에 없는 수동 행은 서버가 CUSTOM으로 정규화한다.
+    assert excluded["origin"] == "CUSTOM"
     assert all(line["item_id"] != str(cable.item_id) for line in body["checklist_lines"])
 
     request_id = body["request_id"]

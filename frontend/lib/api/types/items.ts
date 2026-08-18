@@ -29,6 +29,7 @@ export interface Item {
   model_symbol: string | null;
   model_slots: number[];
   process_type_code: string | null;
+  bom_stock_exempt?: boolean;
   sales_review_required?: boolean;
   has_bom?: boolean;
   serial_no: number | null;

@@ -141,6 +141,8 @@ class IoLine(Base):
     to_department = Column(String(50), nullable=True)
     quantity = Column(IntQuantity, nullable=False)
     bom_expected = Column(IntQuantity, nullable=True)
+    bom_stock_exempt = Column(Boolean, nullable=False, default=False, server_default="0")
+    bom_auto_token = Column(String(64), nullable=True)
     included = Column(Boolean, nullable=False, default=True)
     origin = Column(String(24), nullable=False)
     edited = Column(Boolean, nullable=False, default=False)

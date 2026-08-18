@@ -28,6 +28,12 @@ from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services._tx import transactional
+from app.services.bom_stock_policy import (
+    bom_template_claims,
+    has_valid_bom_auto_token,
+    issue_bom_auto_token,
+    should_skip_bom_inventory,
+)
 from app.repositories import item_repository
 
 AdjDirection = Literal["in", "out", "defective"]
@@ -41,6 +47,9 @@ class AdjLine:
     department: DepartmentEnum
     reason: Optional[str] = None
     bom_expected: Optional[Decimal] = None
+    bom_parent_item_id: Optional[uuid.UUID] = None
+    bom_auto_token: Optional[str] = None
+    bom_stock_exempt: bool = False
     has_children: bool = False
     item_name: str = ""
     mes_code: Optional[str] = None
@@ -75,6 +84,39 @@ def _enrich(db: Session, lines: list[AdjLine]) -> list[AdjLine]:
             ln.process_type_code = item.process_type_code
             ln.unit = item.unit
             ln.has_children = _has_bom_children(db, ln.item_id)
+            ln.bom_stock_exempt = False
+    return lines
+
+
+def _mark_bom_template_lines(
+    db: Session,
+    *,
+    parent_item_id: uuid.UUID,
+    lines: list[AdjLine],
+) -> list[AdjLine]:
+    """서버가 만든 BOM 자식에만 제출 시 검증할 구조 토큰을 붙인다."""
+    child_ids = {line.item_id for line in lines if line.bom_expected is not None}
+    items_by_id = {
+        item.item_id: item
+        for item in db.query(Item).filter(Item.item_id.in_(child_ids)).all()
+    }
+    for line in lines:
+        if line.bom_expected is None:
+            continue
+        line.bom_parent_item_id = parent_item_id
+        line.bom_auto_token = issue_bom_auto_token(
+            db,
+            flow="bom_template",
+            claims=bom_template_claims(
+                parent_item_id=parent_item_id,
+                item_id=line.item_id,
+                quantity=line.bom_expected,
+            ),
+        )
+        item = items_by_id.get(line.item_id)
+        line.bom_stock_exempt = bool(
+            item is not None and should_skip_bom_inventory(item, bom_generated=True)
+        )
     return lines
 
 
@@ -121,7 +163,11 @@ def build_production_template(
         department=result_dept,
     ))
 
-    return _enrich(db, lines)
+    return _mark_bom_template_lines(
+        db,
+        parent_item_id=item_id,
+        lines=_enrich(db, lines),
+    )
 
 
 def build_disassembly_template(
@@ -164,7 +210,11 @@ def build_disassembly_template(
             bom_expected=Decimal(str(row.quantity)) * qty,
         ))
 
-    return _enrich(db, lines)
+    return _mark_bom_template_lines(
+        db,
+        parent_item_id=item_id,
+        lines=_enrich(db, lines),
+    )
 
 
 def expand_component(
@@ -223,6 +273,91 @@ def _validate_adjustment_lines(lines: list[AdjLine]) -> None:
             raise ValueError(f"수량은 0보다 커야 합니다 ({index}번째 라인).")
 
 
+def _stock_tracked_adjustment_lines(
+    db: Session,
+    sub_type: DeptAdjSubTypeEnum,
+    lines: list[AdjLine],
+) -> list[AdjLine]:
+    """생산·분해 템플릿의 BOM 자동 자재만 재고 반영 대상에서 제외한다."""
+    item_ids = {line.item_id for line in lines}
+    items_by_id = {
+        item.item_id: item
+        for item in db.query(Item).filter(Item.item_id.in_(item_ids)).all()
+    }
+    parent_direction = {
+        DeptAdjSubTypeEnum.PRODUCTION: "in",
+        DeptAdjSubTypeEnum.DISASSEMBLY: "out",
+    }.get(sub_type)
+    child_direction = {
+        DeptAdjSubTypeEnum.PRODUCTION: "out",
+        DeptAdjSubTypeEnum.DISASSEMBLY: "in",
+    }.get(sub_type)
+    parent_lines = {
+        line.item_id: line
+        for line in lines
+        if parent_direction is not None
+        and line.direction == parent_direction
+        and line.bom_expected is None
+    }
+    tracked: list[AdjLine] = []
+    for line in lines:
+        item = items_by_id.get(line.item_id)
+        parent_line = parent_lines.get(line.bom_parent_item_id)
+        parent_item = (
+            items_by_id.get(line.bom_parent_item_id)
+            if line.bom_parent_item_id is not None
+            else None
+        )
+        bom_quantity = None
+        if (
+            item is not None
+            and parent_item is not None
+            and parent_line is not None
+            and child_direction is not None
+            and line.direction == child_direction
+            and line.bom_expected is not None
+        ):
+            bom_quantity = (
+                db.query(BOM.quantity)
+                .filter(
+                    BOM.parent_item_id == line.bom_parent_item_id,
+                    BOM.child_item_id == line.item_id,
+                )
+                .scalar()
+            )
+        expected_quantity = (
+            Decimal(str(bom_quantity)) * parent_line.quantity
+            if bom_quantity is not None and parent_line is not None
+            else None
+        )
+        bom_generated = bool(
+            expected_quantity is not None
+            and line.quantity == expected_quantity
+            and line.bom_expected == expected_quantity
+            and parent_item is not None
+            and parent_line is not None
+            and parent_line.department == _dept_for_item(parent_item)
+            and item is not None
+            and line.department == _dept_for_item(item)
+            and has_valid_bom_auto_token(
+                db,
+                flow="bom_template",
+                claims=bom_template_claims(
+                    parent_item_id=line.bom_parent_item_id,
+                    item_id=line.item_id,
+                    quantity=line.bom_expected,
+                ),
+                token=line.bom_auto_token,
+            )
+        )
+        line.bom_stock_exempt = bool(
+            item is not None and should_skip_bom_inventory(item, bom_generated=bom_generated)
+        )
+        if not line.bom_stock_exempt:
+            tracked.append(line)
+    return tracked
+
+
 def _apply_adjustment(
     db: Session,
     sub_type: DeptAdjSubTypeEnum,
@@ -238,7 +373,7 @@ def _apply_adjustment(
     처리 순서: out → defective → in  (소비 먼저, 입고 마지막).
     """
     if not lines:
-        raise ValueError("처리할 라인이 없습니다.")
+        return []
 
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지
     if not _is_sqlite:
@@ -318,19 +453,20 @@ def submit_adjustment(
 ) -> list[uuid.UUID]:
     """부서 재고 조정과 원장을 하나의 업무 트랜잭션으로 확정한다."""
     _validate_adjustment_lines(lines)
+    tracked_lines = _stock_tracked_adjustment_lines(db, sub_type, lines)
     with transactional(db):
         log_ids = _apply_adjustment(
             db,
             sub_type,
-            lines,
+            tracked_lines,
             operator_name=operator_name,
             producer_employee_id=producer_employee_id,
             reference_no=reference_no,
             notes=notes,
         )
-        if len(log_ids) != len(lines):
+        if len(log_ids) != len(tracked_lines):
             raise RuntimeError(
-                f"부서 재고 조정 로그 수 불일치: 라인 {len(lines)}건, 로그 {len(log_ids)}건"
+                f"부서 재고 조정 로그 수 불일치: 라인 {len(tracked_lines)}건, 로그 {len(log_ids)}건"
             )
         return log_ids
 
@@ -384,12 +520,9 @@ def _split_rework_quantities(decision: dict, qty: Decimal) -> tuple[Decimal, Dec
     return normal_qty, defective_qty, scrap_qty
 
 
-def rework_inventory_item_ids(
-    parent_item_id: uuid.UUID,
-    child_decisions: list[dict],
-) -> list[uuid.UUID]:
-    """Return every parent/branch/leaf item in deterministic lock order."""
-    item_ids = {parent_item_id}
+def _rework_decision_item_ids(child_decisions: list[dict]) -> set[uuid.UUID]:
+    """재작업 결정 트리에 나타난 BOM 하위 품목 ID를 수집한다."""
+    item_ids: set[uuid.UUID] = set()
 
     def collect(decision: dict) -> None:
         item_ids.add(uuid.UUID(str(decision["item_id"])))
@@ -400,6 +533,87 @@ def rework_inventory_item_ids(
 
     for decision in child_decisions:
         collect(decision)
+    return item_ids
+
+
+def _rework_bom_stock_exempt_item_ids(
+    db: Session,
+    parent_item_id: uuid.UUID,
+    child_decisions: list[dict],
+    *,
+    require_bom_template_token: bool = False,
+) -> set[uuid.UUID]:
+    """현재 BOM 결정 트리에 있는 재고 미반영 하위 품목만 반환한다."""
+    item_ids = _rework_decision_item_ids(child_decisions)
+    if not item_ids:
+        return set()
+    flagged_item_ids = {
+        item.item_id
+        for item in db.query(Item)
+        .filter(Item.item_id.in_(item_ids), Item.bom_stock_exempt.is_(True))
+        .all()
+    }
+    if not flagged_item_ids:
+        return set()
+
+    bom_generated_item_ids: set[uuid.UUID] = set()
+
+    def collect(parent_id: uuid.UUID, decisions: list[dict]) -> None:
+        decision_ids = {uuid.UUID(str(decision["item_id"])) for decision in decisions}
+        if not decision_ids:
+            return
+        valid_child_ids = {
+            child_item_id
+            for (child_item_id,) in db.query(BOM.child_item_id)
+            .filter(
+                BOM.parent_item_id == parent_id,
+                BOM.child_item_id.in_(decision_ids),
+            )
+            .all()
+        }
+        for decision in decisions:
+            child_id = uuid.UUID(str(decision["item_id"]))
+            if child_id not in valid_child_ids:
+                continue
+            has_template_token = has_valid_bom_auto_token(
+                db,
+                flow="bom_template",
+                claims=bom_template_claims(
+                    parent_item_id=parent_id,
+                    item_id=child_id,
+                    quantity=decision.get("qty"),
+                ),
+                token=decision.get("bom_auto_token"),
+            )
+            if child_id in flagged_item_ids and (
+                not require_bom_template_token or has_template_token
+            ):
+                bom_generated_item_ids.add(child_id)
+            children = decision.get("children")
+            if isinstance(children, list) and children:
+                collect(child_id, children)
+
+    collect(parent_item_id, child_decisions)
+    return bom_generated_item_ids
+
+
+def rework_inventory_item_ids(
+    parent_item_id: uuid.UUID,
+    child_decisions: list[dict],
+    *,
+    db: Session | None = None,
+    require_bom_template_token: bool = False,
+) -> list[uuid.UUID]:
+    """Return every parent/branch/leaf item in deterministic lock order."""
+    item_ids = {parent_item_id, *_rework_decision_item_ids(child_decisions)}
+    if db is not None:
+        item_ids -= _rework_bom_stock_exempt_item_ids(
+            db,
+            parent_item_id,
+            child_decisions,
+            require_bom_template_token=require_bom_template_token,
+        )
+        item_ids.add(parent_item_id)
     return sorted(item_ids)
 
 
@@ -429,9 +643,21 @@ def _submit_rework_disassemble(
             child_decisions,
         )
 
+    require_bom_template_token = parent_source == "normal"
+    exempt_child_item_ids = _rework_bom_stock_exempt_item_ids(
+        db,
+        parent_item_id,
+        child_decisions,
+        require_bom_template_token=require_bom_template_token,
+    )
     inventory_svc.ensure_and_lock_inventories(
         db,
-        rework_inventory_item_ids(parent_item_id, child_decisions),
+        rework_inventory_item_ids(
+            parent_item_id,
+            child_decisions,
+            db=db,
+            require_bom_template_token=require_bom_template_token,
+        ),
     )
 
     batch_id = uuid.uuid4()
@@ -494,6 +720,9 @@ def _submit_rework_disassemble(
         if children:
             for child in children:
                 process(child, depth + 1)
+            return
+
+        if item_id in exempt_child_item_ids:
             return
 
         normal_qty, defective_qty, scrap_qty = _split_rework_quantities(decision, qty)

@@ -24,6 +24,13 @@ from app.models import (
 from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
 from app.services import stock_math
+from app.services.bom_stock_policy import (
+    BOM_AUTO_ORIGIN,
+    BOM_STOCK_EXEMPT_NOTE,
+    io_bom_auto_claims,
+    issue_bom_auto_token,
+    should_skip_bom_inventory,
+)
 
 # 결재 규칙 단일 원천(approval_rules). io.py / io_dispatch / io_persist 가 본 모듈에서
 # 이 이름들을 re-export·import 하므로 네임스페이스에 노출한다.
@@ -261,8 +268,15 @@ def _line_dict(
     edited: bool = False,
     exclusion_note: Optional[str] = None,
 ) -> dict:
+    bom_stock_exempt = should_skip_bom_inventory(
+        item,
+        bom_generated=origin == "bom_auto",
+    )
+    if bom_stock_exempt:
+        included = False
+        exclusion_note = BOM_STOCK_EXEMPT_NOTE
     shortage = Decimal("0")
-    if from_bucket != "none":
+    if included and from_bucket != "none":
         available = _bucket_available(
             db,
             item_id=item.item_id,
@@ -283,6 +297,8 @@ def _line_dict(
         "to_department": to_department,
         "quantity": quantity,
         "bom_expected": bom_expected,
+        "bom_stock_exempt": bom_stock_exempt,
+        "bom_auto_token": None,
         "included": included,
         "origin": origin,
         "edited": edited,
@@ -628,6 +644,37 @@ def _direct_item_bundle(
     return bundle
 
 
+def _issue_bundle_bom_auto_tokens(
+    db: Session,
+    bundle: dict,
+    *,
+    work_type: str,
+    sub_type: str,
+) -> None:
+    """미리보기에서 생성한 자동 BOM 자식에만 서버 근거 토큰을 붙인다."""
+    for line in bundle["lines"]:
+        if line["origin"] != BOM_AUTO_ORIGIN:
+            continue
+        line["bom_auto_token"] = issue_bom_auto_token(
+            db,
+            flow="io",
+            claims=io_bom_auto_claims(
+                bundle_id=bundle["bundle_id"],
+                line_id=line["line_id"],
+                source_kind=bundle["source_kind"],
+                source_item_id=bundle["source_item_id"],
+                item_id=line["item_id"],
+                work_type=work_type,
+                sub_type=sub_type,
+                direction=line["direction"],
+                from_bucket=line["from_bucket"],
+                from_department=line["from_department"],
+                to_bucket=line["to_bucket"],
+                to_department=line["to_department"],
+            ),
+        )
+
+
 def preview(
     db: Session,
     *,
@@ -662,18 +709,23 @@ def preview(
         if item_id is None:
             raise ValueError("품목 선택 정보가 없습니다.")
         item = _get_item(db, item_id)
-        bundles.append(
-            _direct_item_bundle(
-                db,
-                item=item,
-                quantity=qty,
-                work_type=work_type,
-                sub_type=sub_type,
-                from_department=from_department,
-                to_department=to_department,
-                source_kind=source_kind,
-            )
+        bundle = _direct_item_bundle(
+            db,
+            item=item,
+            quantity=qty,
+            work_type=work_type,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+            source_kind=source_kind,
         )
+        _issue_bundle_bom_auto_tokens(
+            db,
+            bundle,
+            work_type=work_type,
+            sub_type=sub_type,
+        )
+        bundles.append(bundle)
     return {
         "work_type": work_type,
         "sub_type": sub_type,

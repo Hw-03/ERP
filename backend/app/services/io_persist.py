@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
+    Item,
     IoBatch,
     IoBundle,
     IoLine,
@@ -22,6 +23,12 @@ from app.models import (
     StockRequestStatusEnum,
 )
 from app.schemas.io import IoBundlePayload
+from app.services.bom_stock_policy import (
+    BOM_STOCK_EXEMPT_NOTE,
+    BOM_AUTO_ORIGIN,
+    is_bom_generated_line,
+    should_skip_bom_inventory,
+)
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     _enum_value,
@@ -35,6 +42,108 @@ from app.services.io_preview import (
 
 
 LEGACY_SHIPPING_LINK_READ_ONLY_MESSAGE = "폐기된 출하 준비 연결 작업은 조회만 가능합니다."
+
+
+def _normalize_bom_stock_exempt_line(
+    db: Session,
+    bundle: object,
+    line: object,
+    item: Item,
+    *,
+    work_type: object,
+    sub_type: object,
+) -> None:
+    """자동 BOM 라인의 재고 미반영 스냅샷을 현재 품목 설정으로 정규화한다."""
+    bom_generated = is_bom_generated_line(
+        db,
+        bundle_id=getattr(bundle, "bundle_id", None),
+        line_id=getattr(line, "line_id", None),
+        source_kind=getattr(bundle, "source_kind", None),
+        source_item_id=getattr(bundle, "source_item_id", None),
+        item_id=getattr(line, "item_id", None),
+        work_type=work_type,
+        sub_type=sub_type,
+        direction=getattr(line, "direction", None),
+        from_bucket=getattr(line, "from_bucket", None),
+        from_department=getattr(line, "from_department", None),
+        to_bucket=getattr(line, "to_bucket", None),
+        to_department=getattr(line, "to_department", None),
+        bom_auto_token=getattr(line, "bom_auto_token", None),
+    )
+    was_auto_excluded = (
+        bool(getattr(line, "bom_stock_exempt", False))
+        and getattr(line, "exclusion_note", None) == BOM_STOCK_EXEMPT_NOTE
+    )
+    if should_skip_bom_inventory(item, bom_generated=bom_generated):
+        line.origin = BOM_AUTO_ORIGIN
+        line.bom_stock_exempt = True
+        line.included = False
+        line.shortage = 0
+        line.exclusion_note = BOM_STOCK_EXEMPT_NOTE
+        return
+    line.bom_stock_exempt = False
+    if was_auto_excluded:
+        line.included = True
+        line.exclusion_note = None
+
+
+def normalize_payload_bom_stock_exempt(db: Session, payload: object) -> None:
+    """새 제출·임시저장 payload의 자동 BOM 자재 정책을 서버 기준으로 강제한다."""
+    bundle_lines = [
+        (bundle, line)
+        for bundle in getattr(payload, "bundles", [])
+        for line in bundle.lines
+    ]
+    _normalize_bom_stock_exempt_lines(
+        db,
+        bundle_lines,
+        work_type=getattr(payload, "work_type", None),
+        sub_type=getattr(payload, "sub_type", None),
+    )
+
+
+def normalize_batch_bom_stock_exempt(db: Session, batch: IoBatch) -> None:
+    """미제출 draft를 제출할 때 현재 품목 설정으로 스냅샷을 다시 계산한다."""
+    bundle_lines = [(bundle, line) for bundle in batch.bundles for line in bundle.lines]
+    _normalize_bom_stock_exempt_lines(
+        db,
+        bundle_lines,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+    )
+
+
+def _normalize_bom_stock_exempt_lines(
+    db: Session,
+    bundle_lines: list[tuple[object, object]],
+    *,
+    work_type: object,
+    sub_type: object,
+) -> None:
+    item_ids = {
+        line.item_id
+        for _, line in bundle_lines
+        if getattr(line, "bom_auto_token", None)
+    }
+    if not item_ids:
+        for _, line in bundle_lines:
+            line.bom_stock_exempt = False
+        return
+    items = db.query(Item).filter(Item.item_id.in_(item_ids)).all()
+    items_by_id = {item.item_id: item for item in items}
+    for bundle, line in bundle_lines:
+        item = items_by_id.get(line.item_id)
+        if item is None:
+            line.bom_stock_exempt = False
+            continue
+        _normalize_bom_stock_exempt_line(
+            db,
+            bundle,
+            line,
+            item,
+            work_type=work_type,
+            sub_type=sub_type,
+        )
 
 
 def ensure_batch_is_mutable(batch: IoBatch) -> None:
@@ -66,6 +175,8 @@ def _line_to_dict(line: IoLine) -> dict:
         "to_department": line.to_department,
         "quantity": line.quantity,
         "bom_expected": line.bom_expected,
+        "bom_stock_exempt": line.bom_stock_exempt,
+        "bom_auto_token": line.bom_auto_token,
         "included": line.included,
         "origin": line.origin,
         "edited": line.edited,
@@ -118,6 +229,7 @@ def _bom_fallback_child_lines(
                 "to_department": parent_line.to_department,
                 "quantity": expected,
                 "bom_expected": expected,
+                "bom_auto_token": None,
                 "included": True,
                 "origin": "bom_fallback",
                 "edited": False,
@@ -205,6 +317,7 @@ def _persist_batch(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
     )
+    normalize_payload_bom_stock_exempt(db, payload)
     validate_internal_use_operation(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
@@ -353,6 +466,8 @@ def _add_bundles_and_lines(db: Session, batch: IoBatch, payload) -> None:
                     to_department=incoming_line.to_department,
                     quantity=incoming_line.quantity,
                     bom_expected=incoming_line.bom_expected,
+                    bom_stock_exempt=incoming_line.bom_stock_exempt,
+                    bom_auto_token=incoming_line.bom_auto_token,
                     included=incoming_line.included,
                     origin=incoming_line.origin,
                     edited=incoming_line.edited,

@@ -46,6 +46,7 @@ from app.services.io_persist import (
     ensure_batch_is_mutable,
     _load_requester,
     _persist_batch,
+    normalize_batch_bom_stock_exempt,
 )
 
 
@@ -506,8 +507,18 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
     db.flush()
 
 
+def _complete_without_inventory(batch: IoBatch) -> None:
+    """BOM 자동 자재가 모두 재고 미반영일 때 이력만 완료 상태로 남긴다."""
+    now = datetime.utcnow()
+    batch.requires_approval = False
+    batch.status = "completed"
+    batch.completed_at = now
+    batch.updated_at = now
+
+
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     ensure_batch_is_mutable(batch)
+    normalize_batch_bom_stock_exempt(db, batch)
     validate_internal_use_requester(
         requester,
         work_type=batch.work_type,
@@ -537,7 +548,9 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     )
     try:
         included_lines = _included_lines(batch)
-        if batch.sub_type in APPROVAL_SUB_TYPES:
+        if not included_lines:
+            _complete_without_inventory(batch)
+        elif batch.sub_type in APPROVAL_SUB_TYPES:
             # 창고 승인 sub_type — manual line 유무 무관, 창고 승인 1회로만.
             # 새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재.
             _submit_approval(db, requester=requester, batch=batch)
@@ -552,7 +565,15 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         db.flush()
         raise
 
-    message = "승인 요청이 생성되었습니다." if batch.status in {"submitted", "reserved"} else "입출고가 반영되었습니다."
+    message = (
+        "승인 요청이 생성되었습니다."
+        if batch.status in {"submitted", "reserved"}
+        else (
+            "BOM 재고 미반영 품목만 포함되어 재고 변동 없이 처리되었습니다."
+            if not _included_lines(batch)
+            else "입출고가 반영되었습니다."
+        )
+    )
     return {
         "batch": _batch_to_payload(batch),
         "status": batch.status,
@@ -600,6 +621,7 @@ def submit_existing_draft(
         notes=batch.notes,
     )
     requester = _load_requester(db, requester_employee_id)
+    normalize_batch_bom_stock_exempt(db, batch)
     batch.status = "submitted"
     batch.submitted_at = datetime.utcnow()
     db.flush()

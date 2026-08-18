@@ -139,3 +139,23 @@ def test_update_item_can_clear_sales_review_required(client, make_item):
     )
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["sales_review_required"] is False
+
+
+def test_update_item_can_toggle_bom_stock_exempt(client, make_item):
+    item = make_item(name="BOM 재고 미반영 대상", process_type_code="HR")
+
+    before = client.get(f"/api/items/{item.item_id}")
+    assert before.status_code == 200
+    assert before.json()["bom_stock_exempt"] is False
+
+    updated = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={"bom_stock_exempt": True},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["bom_stock_exempt"] is True
+
+    reread = client.get(f"/api/items/{item.item_id}")
+    assert reread.status_code == 200
+    assert reread.json()["bom_stock_exempt"] is True

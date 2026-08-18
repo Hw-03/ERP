@@ -24,6 +24,7 @@ class ItemCreate(BaseModel):
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[int] = None
     sales_review_required: Optional[bool] = None
+    bom_stock_exempt: Optional[bool] = None
     initial_quantity: int = Field(..., ge=0, description="초기 재고 수량")
     model_slots: List[int] = Field(..., min_length=1, description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
     initial_locations: Optional[List[InitialLocationInput]] = Field(
@@ -40,6 +41,7 @@ class ItemUpdate(BaseModel):
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[int] = None
     sales_review_required: Optional[bool] = None
+    bom_stock_exempt: Optional[bool] = None
     mes_code: Optional[str] = Field(None, max_length=40)
     model_slots: Optional[List[int]] = None
 
@@ -55,6 +57,7 @@ class ItemResponse(BaseModel):
     supplier: Optional[str] = None
     min_stock: Optional[int] = None
     sales_review_required: bool = False
+    bom_stock_exempt: bool = False
     # item code fields
     mes_code: Optional[str] = None
     model_symbol: Optional[str] = None

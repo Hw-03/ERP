@@ -27,6 +27,8 @@ class IoLinePayload(BaseModel):
     to_department: Optional[str] = None
     quantity: int
     bom_expected: Optional[int] = None
+    bom_stock_exempt: bool = False
+    bom_auto_token: Optional[str] = Field(None, pattern="^[0-9a-f]{64}$")
     included: bool = True
     origin: str
     edited: bool = False
