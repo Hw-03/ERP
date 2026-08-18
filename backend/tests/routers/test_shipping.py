@@ -680,14 +680,17 @@ def test_shipping_request_component_change_rejects_other_department_preview_and_
         (
             "/api/shipping/component-change-preview",
             {
-                "source_pa_item_id": str(uuid.uuid4()),
-                "target_pa_item_id": str(uuid.uuid4()),
+                "source_pa_item_id": "00000000-0000-0000-0000-000000000001",
+                "target_pa_item_id": "00000000-0000-0000-0000-000000000002",
                 "quantity": 1,
             },
         ),
         (
-            f"/api/shipping/requests/{uuid.uuid4()}/component-change-preview",
-            {"source_pa_item_id": str(uuid.uuid4()), "quantity": 1},
+            "/api/shipping/requests/00000000-0000-0000-0000-000000000003/component-change-preview",
+            {
+                "source_pa_item_id": "00000000-0000-0000-0000-000000000004",
+                "quantity": 1,
+            },
         ),
     ],
 )

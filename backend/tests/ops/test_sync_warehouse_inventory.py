@@ -621,8 +621,7 @@ def test_execute_sync_requires_confirmation_and_backs_up_before_apply(
     item = make_item(name="현재 품명", warehouse_qty=10, model_symbol="3", serial_no=1)
     db_session.commit()
     dev_db = tmp_path / "dev.db"
-    with sqlite3.connect(dev_db) as target:
-        db_session.connection().connection.driver_connection.backup(target)
+    dev_db.write_bytes(db_session.connection().connection.driver_connection.serialize())
     employee_db = tmp_path / "employee.db"
     _write_employee_db(
         employee_db,

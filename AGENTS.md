@@ -131,12 +131,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 - Before commit/push, run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged
 ```
 
-  기본 `-Mode auto` 는 워킹트리 변경 영역만 검증합니다 (docs 약 1초 / frontend 또는 backend 만 해당 게이트). 인프라 파일 또는 매핑되지 않은 경로가 섞이면 자동으로 풀 게이트로 승격. 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`.
+  기본 `-Mode smart -ChangeSet auto` 는 staged 변경이 있으면 staged만, 없으면 전체 작업 트리를 영향 분석 대상으로 선택합니다. 명시한 `-ChangeSet staged`는 staged 변경이 없어도 working tree로 fallback하지 않습니다. 게이트 명령은 현재 working tree에서 실행되므로 ignored 변경이 결과에 간접 영향을 줄 수 있으며, 정확한 staged 스냅샷 검증은 깨끗한 전용 worktree에서 실행합니다. `-Mode auto` 는 변경 영역의 전체 게이트를 실행하는 기존 호환 모드입니다. 인프라·검증 구조·미분류 경로는 자동으로 풀 게이트로 승격하며, 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`를 사용합니다.
 
-  검증은 변경 범위와 위험도에 맞춘다. 같은 세션에서 관련 영역 게이트가 이미 통과한 뒤 CI 실패를 재현·수정한 좁은 변경은, 실패했던 테스트와 직접 영향받는 테스트만 다시 실행한다. 이 경우 전체 게이트를 관성적으로 반복하지 않는다. 전체 게이트는 아직 검증되지 않은 영역을 넓게 건드렸거나, 인프라·통합 경계 변경이 추가됐거나, 통합 과정에서 검증 대상이 달라졌을 때만 실행한다.
+  구현 중에는 직접 관련 테스트만 반복합니다. 같은 세션에서 관련 영역 게이트가 이미 통과한 뒤 CI 실패를 재현·수정한 좁은 변경은 실패했던 테스트와 직접 영향받는 테스트만 다시 실행합니다. 인프라·검증 구조 변경, 아직 검증되지 않은 넓은 변경, 통합 경계 변경 또는 명시적 요청일 때만 `-Mode full`을 실행합니다. GitHub CI는 전체 테스트·커버리지·빌드·번들 검사를 계속 수행합니다.
 
 ## Shared AI Context and Session Handoff
 

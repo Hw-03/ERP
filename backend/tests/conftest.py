@@ -1,15 +1,20 @@
 """공용 pytest fixtures.
 
-in-memory SQLite + 단일 connection 기반. PRAGMA 셋업과 Base.metadata.create_all
-이후 세션을 yield 한다. 각 테스트는 독립된 DB 를 받는다 (모듈 스코프 X).
+xdist worker마다 in-memory SQLite 스키마를 한 번 만들고, 각 테스트는 외부
+transaction 안의 SAVEPOINT 세션을 사용한다. 애플리케이션의 ``commit()``은
+SAVEPOINT만 해제하며 테스트 종료 시 outer transaction을 rollback한다.
 """
 
 from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Generator
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
+from typing import Any, Callable
 
 # 5.4-C: pytest 가 실제 backend/mes.db 를 건드리지 않도록 보장.
 # database.py 가 모듈 로드 시 engine = create_engine(DATABASE_URL) 을 평가하므로
@@ -19,7 +24,8 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import pytest
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.engine import Connection, Engine, Transaction
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 # tests/ 가 backend/ 하위지만, app 패키지 import 를 위해 backend 를 path 에 추가
@@ -29,6 +35,16 @@ if str(BACKEND_DIR) not in sys.path:
 
 from app.database import Base  # noqa: E402  (path 보강 후 import)
 from app import models  # noqa: F401, E402  (Base.metadata 등록을 위해 import)
+
+
+_PROCESS_TYPE_SEED = [
+    ("TR", "T", "R", 10), ("TA", "T", "A", 20), ("TF", "T", "F", 25),
+    ("HR", "H", "R", 15), ("HA", "H", "A", 30), ("HF", "H", "F", 35),
+    ("VR", "V", "R", 25), ("VA", "V", "A", 40), ("VF", "V", "F", 45),
+    ("NR", "N", "R", 50), ("NA", "N", "A", 55), ("NF", "N", "F", 60),
+    ("AR", "A", "R", 45), ("AA", "A", "A", 65), ("AF", "A", "F", 70),
+    ("PR", "P", "R", 55), ("PA", "P", "A", 75), ("PF", "P", "F", 80),
+]
 
 
 @pytest.fixture(autouse=True)
@@ -44,9 +60,9 @@ def _reset_rate_limit():
     rate_limit.reset_all()
 
 
-@pytest.fixture()
-def db_session() -> Session:
-    """함수당 신규 in-memory SQLite + 모든 테이블 생성 + 세션 yield."""
+@pytest.fixture(scope="session")
+def _worker_db_engine() -> Generator[Engine, None, None]:
+    """xdist worker 하나가 공유할 SQLite 스키마와 기준 데이터를 준비한다."""
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -54,42 +70,78 @@ def db_session() -> Session:
     )
 
     @event.listens_for(engine, "connect")
-    def _pragmas(dbapi_conn, _):
+    def _configure_sqlite(dbapi_conn: Any, _connection_record: Any) -> None:
+        """pysqlite 자동 BEGIN을 끄고 FK 검사를 connection 단위로 고정한다."""
+        dbapi_conn.isolation_level = None
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA foreign_keys=ON")
         cur.close()
 
+    @event.listens_for(engine, "begin")
+    def _begin_explicitly(connection: Connection) -> None:
+        """Python 3.11 pysqlite에서도 SAVEPOINT 경계가 보존되게 BEGIN을 발행한다."""
+        connection.exec_driver_sql("BEGIN")
+
     Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = SessionLocal()
-
-    # mes_code 의 symbol↔slot 캐시는 전역 프로세스-로컬이다. 테스트 간 누수를 막기 위해
-    # 시작/종료에 비운다. (운영 캐시는 app startup + 모델 CRUD 때 적재. 테스트에서 파생
-    # 결과가 필요하면 mc.refresh_symbol_cache(session) 을 직접 호출한다.)
-    from app.utils import mes_code as _mc
-    _mc.invalidate_symbol_cache()
-
-    # process_types FK 참조 테이블 시드 (items.process_type_code FK 충족)
     from app.models import ProcessType
-    _PT_SEED = [
-        ("TR", "T", "R", 10), ("TA", "T", "A", 20), ("TF", "T", "F", 25),
-        ("HR", "H", "R", 15), ("HA", "H", "A", 30), ("HF", "H", "F", 35),
-        ("VR", "V", "R", 25), ("VA", "V", "A", 40), ("VF", "V", "F", 45),
-        ("NR", "N", "R", 50), ("NA", "N", "A", 55), ("NF", "N", "F", 60),
-        ("AR", "A", "R", 45), ("AA", "A", "A", 65), ("AF", "A", "F", 70),
-        ("PR", "P", "R", 55), ("PA", "P", "A", 75), ("PF", "P", "F", 80),
-    ]
-    for code, prefix, suffix, order in _PT_SEED:
-        session.add(ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order))
-    session.commit()
+
+    with Session(engine) as seed_session:
+        for code, prefix, suffix, order in _PROCESS_TYPE_SEED:
+            seed_session.add(
+                ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order)
+            )
+        seed_session.commit()
 
     try:
-        yield session
+        yield engine
     finally:
-        _mc.invalidate_symbol_cache()
-        session.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
+
+
+@contextmanager
+def _isolated_db_session(engine: Engine) -> Generator[Session, None, None]:
+    """하나의 테스트를 outer transaction으로 감싸고 종료 시 전부 되돌린다."""
+    with ExitStack() as cleanup:
+        connection = cleanup.enter_context(engine.connect())
+        outer_transaction = connection.begin()
+        cleanup.callback(_rollback_if_active, outer_transaction)
+        session = Session(
+            bind=connection,
+            autocommit=False,
+            autoflush=False,
+            join_transaction_mode="create_savepoint",
+        )
+        cleanup.callback(session.close)
+
+        from app.utils import mes_code as _mc
+        _mc.invalidate_symbol_cache()
+        cleanup.callback(_mc.invalidate_symbol_cache)
+
+        yield session
+
+
+def _rollback_if_active(transaction: Transaction) -> None:
+    """정리 중 앞 단계가 실패해도 살아 있는 outer transaction을 되돌린다."""
+    if transaction.is_active:
+        transaction.rollback()
+
+
+@pytest.fixture(scope="session")
+def _isolated_db_session_factory(
+    _worker_db_engine: Engine,
+) -> Callable[[], AbstractContextManager[Session]]:
+    """실제 db_session fixture와 계약 테스트가 공유할 격리 세션 생성기다."""
+    return partial(_isolated_db_session, _worker_db_engine)
+
+
+@pytest.fixture()
+def db_session(
+    _isolated_db_session_factory: Callable[[], AbstractContextManager[Session]],
+) -> Generator[Session, None, None]:
+    """테스트별 outer transaction에 참여하는 SAVEPOINT 세션을 제공한다."""
+    with _isolated_db_session_factory() as session:
+        yield session
 
 
 @pytest.fixture()

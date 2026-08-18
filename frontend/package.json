@@ -11,7 +11,9 @@
     "lint:strict": "next lint --max-warnings=0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text",
+    "test:coverage:ci": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov",
+    "test:coverage:html": "vitest run --coverage --coverage.reporter=html",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "check:bundle-size": "node --test scripts/check-bundle-size.test.mjs && node scripts/check-bundle-size.mjs"

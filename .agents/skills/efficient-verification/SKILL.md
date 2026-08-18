@@ -7,7 +7,7 @@ description: Choose the right verification scope for DEXCOWIN MES work without w
 
 ## Goal
 
-Verify the real risk without turning every iteration into a full CI run. Use targeted checks while developing, then run the required full gate only when the work is ready to claim complete, commit, or push.
+Verify the real risk without turning every iteration into a full CI run. Use targeted checks while developing, then use the staged smart gate before commit or push. Reserve the full gate for verification infrastructure, broad integration risk, or an explicit request.
 
 This skill complements `verification-before-completion`; it does not replace it.
 
@@ -27,14 +27,15 @@ This skill complements `verification-before-completion`; it does not replace it.
 3. Do not loop full verification.
    - Avoid rerunning `verify_local.ps1 -Mode frontend` after every small edit.
    - If a targeted test fails, fix that failure and rerun only that test first.
-   - Run the full gate once near the end, or when the user explicitly asks for it.
+   - Before commit or push, run the staged smart gate. Staged selection limits impact planning, while gate commands still read the current working tree; use a clean dedicated worktree when exact staged-snapshot isolation is required. Run the full gate only for verification infrastructure, broad integration risk, or an explicit request.
 
 4. When a full gate fails late, isolate the failing gate.
    - If lint/type/tests/build passed and only the final independent check failed, fix that check and rerun the failed command first.
    - Only rerun the full command when you need to claim the full command now passes.
 
 5. Before completion, commit, push, or PR, use `verification-before-completion`.
-   - If the user or plan explicitly requires `verify_local`, run the full required command and read the final exit code.
+   - Before commit or push, run `verify_local.ps1 -Mode smart -ChangeSet staged` and read the final exit code. Treat ignored changes as excluded from impact planning, not from the working tree used by the commands.
+   - If verification infrastructure changed or the user or plan explicitly requires the full gate, run `-Mode full`.
    - If you intentionally use partial verification, say exactly which gate was not rerun.
 
 ## Project Commands
@@ -42,15 +43,23 @@ This skill complements `verification-before-completion`; it does not replace it.
 Use these defaults in `C:\ERP`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode auto
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged
 ```
 
-Use a narrower mode when the changed area is known:
+Preview a smart decision without executing commands:
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -PlanOnly
+```
+
+Use legacy area-wide auto detection or a narrower explicit mode when needed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode auto
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode frontend
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode backend
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode docs
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode full
 ```
 
 For frontend iteration:

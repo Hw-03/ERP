@@ -11,6 +11,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verification-runtime:
+    name: Verification policy (Windows PowerShell)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: python -m pip install "pytest>=8.0"
+
+      - name: Verify smart policy and PowerShell orchestration
+        run: python -m pytest backend/tests/ops/test_verification_policy.py backend/tests/ops/test_verify_local_runtime.py backend/tests/ops/test_verify_local_parallel_contract.py backend/tests/ops/test_verify_e2e_runtime.py --confcutdir=backend/tests/ops -q
+
   backend:
     name: Backend (pytest + compile + openapi-drift)
     runs-on: ubuntu-latest
@@ -86,7 +102,7 @@ jobs:
 
       - name: Vitest (with coverage gate)
         working-directory: frontend
-        run: npm run test:coverage
+        run: npm run test:coverage:ci
 
       - name: Upload coverage report
         if: always()

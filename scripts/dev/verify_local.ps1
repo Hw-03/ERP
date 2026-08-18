@@ -1,6 +1,12 @@
 param(
-    [ValidateSet("auto", "full", "frontend", "backend", "docs")]
-    [string] $Mode = "auto",
+    [ValidateSet("smart", "auto", "full", "frontend", "backend", "docs")]
+    [string] $Mode = "smart",
+    [ValidateSet("auto", "staged", "working")]
+    [string] $ChangeSet = "auto",
+    [switch] $PlanOnly,
+    [string] $TimingOutput,
+    [Parameter(DontShow = $true)]
+    [string] $InternalGateFile,
     [switch] $DbReadOnlyCheck,
     # Playwright E2E 까지 포함(전용 DB·서버 기동 — 느림). 기본 게이트는 가볍게 유지하고 opt-in.
     [switch] $IncludeE2E
@@ -8,15 +14,39 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
-# RepoRoot 을 git으로 정확히 계산 (스크립트 위치와 무관)
 $RepoRoot = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or -not $RepoRoot) {
+    throw "Git repository root not found"
+}
+$RepoRoot = $RepoRoot.Trim()
 $FrontendRoot = Join-Path $RepoRoot "frontend"
 $BackendRoot = Join-Path $RepoRoot "backend"
+$FrontendNextBin = Join-Path $FrontendRoot "node_modules\.bin\next.cmd"
+$FrontendTscBin = Join-Path $FrontendRoot "node_modules\.bin\tsc.cmd"
+$FrontendVitestBin = Join-Path $FrontendRoot "node_modules\.bin\vitest.cmd"
 $VerifyE2EScript = Join-Path $RepoRoot "scripts\dev\verify_e2e.ps1"
+$PolicyScript = Join-Path $RepoRoot "scripts\dev\verification_policy.py"
+$ParallelCpuThreshold = 8
+if ($env:DEXCOWIN_VERIFY_PARALLEL_CPU_THRESHOLD) {
+    $ParallelCpuThreshold = [Math]::Max(
+        1,
+        [int] $env:DEXCOWIN_VERIFY_PARALLEL_CPU_THRESHOLD
+    )
+}
+$HeartbeatSeconds = 15
+$TotalWatch = [System.Diagnostics.Stopwatch]::StartNew()
+$GateTimings = New-Object System.Collections.Generic.List[object]
+$Plan = $null
+$FailureMessage = $null
 
 function Invoke-Check {
     param(
+        [Parameter(Mandatory = $true)]
+        [string] $GateId,
+
         [Parameter(Mandatory = $true)]
         [string] $Name,
 
@@ -29,127 +59,42 @@ function Invoke-Check {
 
     Write-Host ""
     Write-Host "==> $Name"
-    Push-Location $WorkingDirectory
+    $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    $status = "passed"
+    $pushed = $false
     try {
+        Push-Location $WorkingDirectory
+        $pushed = $true
+        $global:LASTEXITCODE = 0
         & $Command
         if ($LASTEXITCODE -ne 0) {
             throw "$Name failed with exit code $LASTEXITCODE"
         }
     }
+    catch {
+        $status = "failed"
+        throw
+    }
     finally {
-        Pop-Location
-    }
-}
-
-function Get-ChangedFiles {
-    # staged + unstaged + untracked 모두 수집. rename/copy 의 경우 dest 경로(`->` 뒷부분)만 사용.
-    $lines = git -C $RepoRoot status --porcelain 2>$null
-    if (-not $lines) { return @() }
-    $paths = New-Object System.Collections.Generic.List[string]
-    foreach ($line in $lines) {
-        if ($line.Length -lt 4) { continue }
-        $rest = $line.Substring(3)
-        if ($rest -match ' -> ') {
-            $rest = ($rest -split ' -> ', 2)[1]
+        if ($pushed) {
+            Pop-Location
         }
-        # 따옴표로 둘러싸인 경로(비ASCII) 처리
-        $rest = $rest.Trim().Trim('"')
-        if ($rest) { $paths.Add($rest) }
-    }
-    return $paths.ToArray()
-}
-
-function Get-Category {
-    param([string] $Path)
-    # infra/full 우선 매칭 — 인프라 파일이 다른 영역 prefix 아래 있을 수 있음.
-    $infraPatterns = @(
-        '^scripts/',
-        '^\.github/workflows/',
-        '^Dockerfile',
-        '^package\.json$',
-        '^package-lock\.json$',
-        '^pyproject\.toml$',
-        '^bootstrap_db\.py$'
-    )
-    foreach ($p in $infraPatterns) {
-        if ($Path -match $p) { return 'infra' }
-    }
-
-    # backend 영역 (OpenAPI baseline 포함)
-    if ($Path -match '^backend/') { return 'backend' }
-    if ($Path -eq '_dev/baselines/openapi.json') { return 'backend' }
-
-    # frontend 영역
-    if ($Path -match '^frontend/') { return 'frontend' }
-
-    # docs / config 영역
-    $docsPatterns = @(
-        '^_attic/',
-        '^\.codex/',
-        '^\.claude/',
-        '^\.github/',
-        '^_dev/',
-        '\.md$',
-        '^AGENTS\.md$',
-        '^CLAUDE\.md$',
-        '^\.gitignore$',
-        '^\.gitattributes$',
-        '^LICENSE',
-        '^README'
-    )
-    foreach ($p in $docsPatterns) {
-        if ($Path -match $p) { return 'docs' }
-    }
-
-    return 'unknown'
-}
-
-function Resolve-Scope {
-    $files = @(Get-ChangedFiles)
-    if ($files.Count -eq 0) {
-        return @{ Scope = 'none'; Reason = 'no changes'; Files = @() }
-    }
-    $cats = New-Object System.Collections.Generic.HashSet[string]
-    foreach ($f in $files) {
-        $null = $cats.Add((Get-Category $f))
-    }
-    if ($cats.Contains('infra') -or $cats.Contains('unknown')) {
-        $reason = if ($cats.Contains('infra')) { 'infra' } else { 'unknown files present' }
-        return @{ Scope = 'full'; Reason = "escalated: $reason"; Files = $files }
-    }
-    $parts = @()
-    if ($cats.Contains('frontend')) { $parts += 'frontend' }
-    if ($cats.Contains('backend')) { $parts += 'backend' }
-    if ($cats.Contains('docs') -and $parts.Count -eq 0) { $parts += 'docs' }
-    if ($parts.Count -eq 0) { $parts += 'docs' }
-    return @{ Scope = ($parts -join '+'); Reason = 'auto-detected'; Files = $files }
-}
-
-function Invoke-DocsGates {
-    Invoke-Check "Docs whitespace check" $RepoRoot {
-        git diff --check
-        if ($LASTEXITCODE -ne 0) { throw "Whitespace issues detected" }
+        $watch.Stop()
+        $GateTimings.Add([pscustomobject]@{
+            id = $GateId
+            name = $Name
+            status = $status
+            duration_ms = [Math]::Round($watch.Elapsed.TotalMilliseconds, 3)
+        })
     }
 }
 
-function Invoke-FrontendGates {
-    Invoke-Check "Frontend strict lint" $FrontendRoot { npm run lint:strict }
-    Invoke-Check "Frontend type check" $FrontendRoot { npx tsc --noEmit }
-    # coverage gate (Round-10A #5) — CI 와 동일한 threshold 50/50/50/50.
-    Invoke-Check "Frontend tests + coverage" $FrontendRoot { npm run test:coverage }
-    Invoke-Check "Frontend production build" $FrontendRoot { npm run build }
-    # Round-16 #4 — bundle size gate (.next-prod/static/chunks, frontend script 기준).
-    Invoke-Check "Frontend bundle size" $FrontendRoot { npm run check:bundle-size }
-}
-
-function Invoke-BackendGates {
-    Invoke-Check "Backend pytest" $BackendRoot { python -m pytest -q }
-    # OpenAPI drift check (Round-10A #5) — backend 라우터/스키마 변경 시 _dev/baselines/openapi.json 갱신 강제.
-    Invoke-Check "OpenAPI drift" $BackendRoot {
-        $TmpFile = Join-Path $env:TEMP "openapi-current.json"
+function Invoke-OpenApiDrift {
+    Invoke-Check "backend-openapi" "OpenAPI drift" $BackendRoot {
+        $TmpFile = Join-Path $env:TEMP "openapi-current-$PID.json"
         $BaselineFile = Join-Path $RepoRoot "_dev/baselines/openapi.json"
-
-        $PyScript = @'
+        try {
+            $PyScript = @'
 import json
 import sys
 sys.path.insert(0, ".")
@@ -159,67 +104,30 @@ with open(out, "w", encoding="utf-8") as f:
     json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
     f.write("\n")
 '@
-        $PyScript | python - $TmpFile
-        if ($LASTEXITCODE -ne 0) {
-            throw "OpenAPI 캡처 실패"
-        }
+            $PyScript | python - $TmpFile
+            if ($LASTEXITCODE -ne 0) {
+                throw "OpenAPI capture failed"
+            }
 
-        $current = Get-Content $TmpFile -Raw
-        $baseline = Get-Content $BaselineFile -Raw
-        if ($current -ne $baseline) {
-            Write-Host ""
-            Write-Host "✗ OpenAPI drift detected. baseline 갱신 필요:"
-            Write-Host "  cd backend; python -c `"from app.main import app; import json; open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))`""
-            throw "OpenAPI drift"
+            $current = Get-Content -LiteralPath $TmpFile -Raw
+            $baseline = Get-Content -LiteralPath $BaselineFile -Raw
+            if ($current -ne $baseline) {
+                Write-Host ""
+                Write-Host "OpenAPI drift detected. Update _dev/baselines/openapi.json."
+                throw "OpenAPI drift"
+            }
+            Write-Host "OpenAPI spec matches baseline."
         }
-        Write-Host "✓ OpenAPI spec matches baseline."
+        finally {
+            if ([System.IO.File]::Exists($TmpFile)) {
+                [System.IO.File]::Delete($TmpFile)
+            }
+        }
     }
 }
 
-# ── 영역 결정 ───────────────────────────────────────
-$effectiveMode = $Mode
-$scopeReason = $null
-$scopeFiles = @()
-if ($Mode -eq 'auto') {
-    $resolved = Resolve-Scope
-    $effectiveMode = $resolved.Scope
-    $scopeReason = $resolved.Reason
-    $scopeFiles = $resolved.Files
-}
-
-Write-Host ""
-Write-Host "==> Scope: $Mode → $effectiveMode$(if ($scopeReason) { " ($scopeReason)" })"
-if ($scopeFiles.Count -gt 0 -and $scopeFiles.Count -le 12) {
-    foreach ($f in $scopeFiles) { Write-Host "   · $f" }
-}
-elseif ($scopeFiles.Count -gt 12) {
-    Write-Host "   · ($($scopeFiles.Count) files)"
-}
-
-if ($effectiveMode -eq 'none') {
-    Write-Host ""
-    Write-Host "No changes detected — skipping all gates."
-    exit 0
-}
-
-$runFrontend = $false
-$runBackend = $false
-$runDocs = $false
-switch ($effectiveMode) {
-    'full'              { $runFrontend = $true; $runBackend = $true }
-    'frontend'          { $runFrontend = $true }
-    'backend'           { $runBackend = $true }
-    'docs'              { $runDocs = $true }
-    'frontend+backend'  { $runFrontend = $true; $runBackend = $true }
-    default { throw "Unknown effective mode: $effectiveMode" }
-}
-
-if ($runDocs)     { Invoke-DocsGates }
-if ($runBackend)  { Invoke-BackendGates }
-if ($runFrontend) { Invoke-FrontendGates }
-
-if ($DbReadOnlyCheck) {
-    Invoke-Check "DB read-only consistency" $RepoRoot {
+function Invoke-DbReadOnlyGate {
+    Invoke-Check "db-read-only" "DB read-only consistency" $RepoRoot {
         $DbPath = Join-Path $BackendRoot "mes.db"
         if (-not (Test-Path $DbPath)) {
             throw "DB file not found: $DbPath"
@@ -261,14 +169,12 @@ WHERE COALESCE(i.quantity, 0) != COALESCE(i.warehouse_qty, 0) + COALESCE(loc.loc
 """).fetchone()[0]
 
 last_transaction_at = cur.execute("SELECT MAX(created_at) FROM transaction_logs").fetchone()[0]
-
-report = {
+print(json.dumps({
     "db": str(db_path),
     "rows": rows,
     "inventory_mismatch_count": mismatch_count,
     "last_transaction_at": last_transaction_at,
-}
-print(json.dumps(report, ensure_ascii=False, indent=2))
+}, ensure_ascii=False, indent=2))
 con.close()
 
 if mismatch_count != 0:
@@ -282,17 +188,624 @@ if mismatch_count != 0:
     }
 }
 
-if ($IncludeE2E) {
-    # 전용 DB(mes_e2e.db)·전용 백엔드(8021)·전용 프론트(3100) — globalSetup/teardown 자동.
-    Invoke-Check "Playwright E2E (전용 DB)" $RepoRoot {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $VerifyE2EScript
+function Get-GateName {
+    param([string] $GateId)
+    switch ($GateId) {
+        "docs-whitespace"          { return "Docs whitespace check" }
+        "frontend-lint-files"      { return "Frontend changed-file lint" }
+        "frontend-tsc-incremental" { return "Frontend incremental type check" }
+        "frontend-vitest-related"  { return "Frontend related tests" }
+        "frontend-direct-tests"    { return "Frontend directly changed tests" }
+        "frontend-lint"            { return "Frontend strict lint" }
+        "frontend-typecheck"       { return "Frontend type check" }
+        "frontend-coverage"        { return "Frontend tests + coverage" }
+        "frontend-build"           { return "Frontend production build" }
+        "frontend-bundle-size"     { return "Frontend bundle size" }
+        "backend-testmon"          { return "Backend pytest-testmon" }
+        "backend-pytest-full"      { return "Backend full pytest" }
+        "backend-openapi"          { return "OpenAPI drift" }
+        "git-status"               { return "Git working tree status" }
+        "db-read-only"             { return "DB read-only consistency" }
+        "playwright-e2e"           { return "Playwright E2E (dedicated DB)" }
+        default { return $GateId }
     }
 }
 
-# 풀 게이트가 돈 경우에만 working tree status 노출 (부분 모드에선 노이즈).
-if ($effectiveMode -eq 'full' -or $effectiveMode -eq 'frontend+backend') {
-    Invoke-Check "Git working tree status" $RepoRoot { git status --short --branch }
+function Get-BackendWorkerCount {
+    $HalfCpu = [Math]::Floor([Environment]::ProcessorCount / 2)
+    return [int] [Math]::Max(1, [Math]::Min(4, $HalfCpu))
 }
 
-Write-Host ""
-Write-Host "All local verification checks passed."
+function Get-FrontendParallelWorkerCount {
+    $QuarterCpu = [Math]::Floor([Environment]::ProcessorCount / 4)
+    return [int] [Math]::Max(1, [Math]::Min(2, $QuarterCpu))
+}
+
+function Test-ContainsGateIds {
+    param(
+        [object[]] $Gates,
+        [string[]] $RequiredIds
+    )
+
+    $PresentIds = @($Gates | ForEach-Object { [string] $_.id })
+    foreach ($RequiredId in $RequiredIds) {
+        if ($RequiredId -notin $PresentIds) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Merge-ChildTimingReport {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+    $ChildReport = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($Timing in @($ChildReport.gates)) {
+        $GateTimings.Add([pscustomobject]@{
+            id = [string] $Timing.id
+            name = [string] $Timing.name
+            status = [string] $Timing.status
+            duration_ms = [double] $Timing.duration_ms
+        })
+    }
+}
+
+function New-ChildArtifactPath {
+    param(
+        [Parameter(Mandatory = $true)] [string] $Area,
+        [Parameter(Mandatory = $true)] [string] $Kind
+    )
+
+    $Token = [Guid]::NewGuid().ToString("N")
+    return Join-Path ([System.IO.Path]::GetTempPath()) "dexcowin-$Kind-$Area-$PID-$Token.log"
+}
+
+function Invoke-ParallelAreaGates {
+    param([Parameter(Mandatory = $true)] [object[]] $Gates)
+
+    $AreaRecords = New-Object System.Collections.Generic.List[object]
+    $ParallelWatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $NextHeartbeat = $HeartbeatSeconds
+    $PreviousFrontendMaxWorkers = [Environment]::GetEnvironmentVariable(
+        "DEXCOWIN_FRONTEND_MAX_WORKERS",
+        "Process"
+    )
+    try {
+        [Environment]::SetEnvironmentVariable(
+            "DEXCOWIN_FRONTEND_MAX_WORKERS",
+            (Get-FrontendParallelWorkerCount).ToString(),
+            "Process"
+        )
+        foreach ($Area in @("backend", "frontend")) {
+            $StdoutPath = New-ChildArtifactPath -Area $Area -Kind "stdout"
+            $StderrPath = New-ChildArtifactPath -Area $Area -Kind "stderr"
+            $TimingPath = New-ChildArtifactPath -Area $Area -Kind "child_timing"
+            $Arguments = (
+                "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" " +
+                "-Mode $Area -ChangeSet working -TimingOutput `"$TimingPath`""
+            )
+            $Process = Start-Process `
+                -FilePath "powershell.exe" `
+                -ArgumentList $Arguments `
+                -PassThru `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput $StdoutPath `
+                -RedirectStandardError $StderrPath
+            # Windows PowerShell 5.1은 프로세스가 빨리 끝나면 ExitCode를 비워 둔다.
+            # 생성 직후 Handle을 열어 두면 종료 코드가 안정적으로 보존된다.
+            $null = $Process.Handle
+            $AreaRecords.Add([pscustomobject]@{
+                Area = $Area
+                Process = $Process
+                StdoutPath = $StdoutPath
+                StderrPath = $StderrPath
+                TimingPath = $TimingPath
+            })
+        }
+        [Environment]::SetEnvironmentVariable(
+            "DEXCOWIN_FRONTEND_MAX_WORKERS",
+            $PreviousFrontendMaxWorkers,
+            "Process"
+        )
+
+        while (@($AreaRecords | Where-Object { -not $_.Process.HasExited }).Count -gt 0) {
+            Start-Sleep -Milliseconds 250
+            if ($ParallelWatch.Elapsed.TotalSeconds -ge $NextHeartbeat) {
+                $States = @(
+                    $AreaRecords | ForEach-Object {
+                        "$($_.Area)=$(if ($_.Process.HasExited) { 'done' } else { 'running' })"
+                    }
+                )
+                Write-Host "Parallel verification $([Math]::Floor($ParallelWatch.Elapsed.TotalSeconds))s: $($States -join ', ')"
+                $NextHeartbeat += $HeartbeatSeconds
+            }
+        }
+
+        $FailedAreas = New-Object System.Collections.Generic.List[string]
+        foreach ($Record in $AreaRecords) {
+            $Record.Process.WaitForExit()
+            $Record.Process.Refresh()
+            $ExitCode = $Record.Process.ExitCode
+            if (Test-Path -LiteralPath $Record.StdoutPath) {
+                $Stdout = Get-Content -LiteralPath $Record.StdoutPath -Raw -Encoding UTF8
+                if ($Stdout) { Write-Host $Stdout.TrimEnd() }
+            }
+            if (Test-Path -LiteralPath $Record.StderrPath) {
+                $Stderr = Get-Content -LiteralPath $Record.StderrPath -Raw -Encoding UTF8
+                if ($Stderr) { [Console]::Error.WriteLine($Stderr.TrimEnd()) }
+            }
+            Merge-ChildTimingReport -Path $Record.TimingPath
+            if ($ExitCode -ne 0) {
+                $FailedAreas.Add("$($Record.Area)=$ExitCode")
+            }
+        }
+        if ($FailedAreas.Count -gt 0) {
+            throw "Parallel area verification failed: $($FailedAreas -join ', ')"
+        }
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable(
+            "DEXCOWIN_FRONTEND_MAX_WORKERS",
+            $PreviousFrontendMaxWorkers,
+            "Process"
+        )
+        $ParallelWatch.Stop()
+        foreach ($Record in $AreaRecords) {
+            if (-not $Record.Process.HasExited) {
+                $Record.Process.WaitForExit()
+            }
+            foreach ($Path in @($Record.StdoutPath, $Record.StderrPath, $Record.TimingPath)) {
+                if (Test-Path -LiteralPath $Path) {
+                    Remove-Item -LiteralPath $Path -Force
+                }
+            }
+            $Record.Process.Dispose()
+        }
+    }
+}
+
+function Invoke-ParallelTargetedGates {
+    param([Parameter(Mandatory = $true)] [object[]] $Gates)
+
+    $GateRecords = New-Object System.Collections.Generic.List[object]
+    $ParallelWatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $NextHeartbeat = $HeartbeatSeconds
+    try {
+        foreach ($Gate in $Gates) {
+            $GateId = [string] $Gate.id
+            $StdoutPath = New-ChildArtifactPath -Area $GateId -Kind "stdout"
+            $StderrPath = New-ChildArtifactPath -Area $GateId -Kind "stderr"
+            $TimingPath = New-ChildArtifactPath -Area $GateId -Kind "child_timing"
+            $GatePath = New-ChildArtifactPath -Area $GateId -Kind "gate"
+            $Gate | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $GatePath -Encoding UTF8
+            $Arguments = (
+                "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" " +
+                "-InternalGateFile `"$GatePath`" -TimingOutput `"$TimingPath`""
+            )
+            $Process = Start-Process `
+                -FilePath "powershell.exe" `
+                -ArgumentList $Arguments `
+                -PassThru `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput $StdoutPath `
+                -RedirectStandardError $StderrPath
+            # Windows PowerShell 5.1에서 빠르게 끝난 child의 종료 코드를 보존한다.
+            $null = $Process.Handle
+            $GateRecords.Add([pscustomobject]@{
+                GateId = $GateId
+                Process = $Process
+                StdoutPath = $StdoutPath
+                StderrPath = $StderrPath
+                TimingPath = $TimingPath
+                GatePath = $GatePath
+            })
+        }
+
+        while (@($GateRecords | Where-Object { -not $_.Process.HasExited }).Count -gt 0) {
+            Start-Sleep -Milliseconds 100
+            if ($ParallelWatch.Elapsed.TotalSeconds -ge $NextHeartbeat) {
+                $RunningCount = @($GateRecords | Where-Object { -not $_.Process.HasExited }).Count
+                Write-Host (
+                    "Smart parallel verification {0}s: {1}/{2} running" -f
+                    [Math]::Floor($ParallelWatch.Elapsed.TotalSeconds),
+                    $RunningCount,
+                    $GateRecords.Count
+                )
+                $NextHeartbeat += $HeartbeatSeconds
+            }
+        }
+
+        $FailedGates = New-Object System.Collections.Generic.List[string]
+        foreach ($Record in $GateRecords) {
+            $Record.Process.WaitForExit()
+            $Record.Process.Refresh()
+            $ExitCode = $Record.Process.ExitCode
+            if (Test-Path -LiteralPath $Record.StdoutPath) {
+                $Stdout = Get-Content -LiteralPath $Record.StdoutPath -Raw -Encoding UTF8
+                if ($Stdout) { Write-Host $Stdout.TrimEnd() }
+            }
+            if (Test-Path -LiteralPath $Record.StderrPath) {
+                $Stderr = Get-Content -LiteralPath $Record.StderrPath -Raw -Encoding UTF8
+                if ($Stderr) { [Console]::Error.WriteLine($Stderr.TrimEnd()) }
+            }
+            Merge-ChildTimingReport -Path $Record.TimingPath
+            if ($ExitCode -ne 0) {
+                $FailedGates.Add("$($Record.GateId)=$ExitCode")
+            }
+        }
+        if ($FailedGates.Count -gt 0) {
+            throw "Parallel targeted verification failed: $($FailedGates -join ', ')"
+        }
+    }
+    finally {
+        $ParallelWatch.Stop()
+        foreach ($Record in $GateRecords) {
+            if (-not $Record.Process.HasExited) {
+                $Record.Process.WaitForExit()
+            }
+            foreach ($Path in @(
+                $Record.StdoutPath,
+                $Record.StderrPath,
+                $Record.TimingPath,
+                $Record.GatePath
+            )) {
+                if (Test-Path -LiteralPath $Path) {
+                    Remove-Item -LiteralPath $Path -Force
+                }
+            }
+            $Record.Process.Dispose()
+        }
+    }
+}
+
+function Get-FrontendRelativeFiles {
+    param([object[]] $Files)
+    return @(
+        $Files |
+            Where-Object { $_ -is [string] -and $_.StartsWith("frontend/") } |
+            ForEach-Object { $_.Substring("frontend/".Length) }
+    )
+}
+
+function Assert-UntrackedFilesHaveNoWhitespaceErrors {
+    param([string[]] $Files)
+
+    $IssueCount = 0
+    foreach ($File in $Files) {
+        $Untracked = @(git --literal-pathspecs ls-files --others --exclude-standard -- $File)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to inspect untracked file: $File"
+        }
+        if ($Untracked.Count -eq 0) {
+            continue
+        }
+        $FullPath = Join-Path $RepoRoot $File
+        if (-not (Test-Path -LiteralPath $FullPath -PathType Leaf)) {
+            continue
+        }
+        $LineNumber = 0
+        foreach ($Line in Get-Content -LiteralPath $FullPath -Encoding UTF8) {
+            $LineNumber += 1
+            if ($Line -match '[ \t]+$') {
+                Write-Host ("{0}:{1}: trailing whitespace." -f $File, $LineNumber)
+                $IssueCount += 1
+            }
+        }
+    }
+    if ($IssueCount -gt 0) {
+        throw "Whitespace issues detected in untracked files"
+    }
+}
+
+function Invoke-Gate {
+    param([Parameter(Mandatory = $true)] $Gate)
+
+    $GateId = [string] $Gate.id
+    $GateFiles = @($Gate.files)
+    switch ($GateId) {
+        "docs-whitespace" {
+            Invoke-Check $GateId (Get-GateName $GateId) $RepoRoot {
+                if ($Plan.change_set -eq "staged") {
+                    git diff --cached --check
+                    if ($LASTEXITCODE -ne 0) { throw "Whitespace issues detected in staged changes" }
+                }
+                elseif ($Plan.change_set -eq "working") {
+                    git diff --check
+                    if ($LASTEXITCODE -ne 0) { throw "Whitespace issues detected in working changes" }
+                    Assert-UntrackedFilesHaveNoWhitespaceErrors -Files $GateFiles
+                }
+                else {
+                    git diff --cached --check
+                    if ($LASTEXITCODE -ne 0) { throw "Whitespace issues detected in staged changes" }
+                    git diff --check
+                    if ($LASTEXITCODE -ne 0) { throw "Whitespace issues detected in working changes" }
+                    Assert-UntrackedFilesHaveNoWhitespaceErrors -Files $GateFiles
+                }
+            }
+        }
+        "frontend-lint-files" {
+            $SourceFiles = @(Get-FrontendRelativeFiles $GateFiles | Where-Object { $_ -match '\.[cm]?[jt]sx?$' })
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot {
+                if ($SourceFiles.Count -eq 0) {
+                    Write-Host "No lintable changed frontend files."
+                    return
+                }
+                $FileArgs = @()
+                foreach ($file in $SourceFiles) { $FileArgs += @("--file", $file) }
+                & $FrontendNextBin lint --max-warnings=0 @FileArgs
+            }
+        }
+        "frontend-tsc-incremental" {
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot {
+                & $FrontendTscBin --noEmit --incremental
+            }
+        }
+        "frontend-vitest-related" {
+            $RelatedFiles = @(Get-FrontendRelativeFiles $GateFiles)
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot {
+                & $FrontendVitestBin related @RelatedFiles --run --passWithNoTests --pool=threads
+            }
+        }
+        "frontend-direct-tests" {
+            $TestFiles = @(Get-FrontendRelativeFiles $GateFiles)
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot {
+                & $FrontendVitestBin run @TestFiles --pool=threads
+            }
+        }
+        "frontend-lint" {
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run lint:strict }
+        }
+        "frontend-typecheck" {
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npx tsc --noEmit }
+        }
+        "frontend-coverage" {
+            if ($env:DEXCOWIN_FRONTEND_MAX_WORKERS) {
+                [int] $FrontendMaxWorkers = $env:DEXCOWIN_FRONTEND_MAX_WORKERS
+                Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot {
+                    npm run test:coverage -- "--maxWorkers=$FrontendMaxWorkers" "--minWorkers=1"
+                }
+            }
+            else {
+                Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run test:coverage }
+            }
+        }
+        "frontend-build" {
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run build }
+        }
+        "frontend-bundle-size" {
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run check:bundle-size }
+        }
+        "backend-testmon" {
+            Invoke-Check $GateId (Get-GateName $GateId) $BackendRoot { python -m pytest -q --testmon }
+        }
+        "backend-pytest-full" {
+            $WorkerCount = Get-BackendWorkerCount
+            Invoke-Check $GateId (Get-GateName $GateId) $BackendRoot {
+                python -m pytest -q -n $WorkerCount --dist=loadfile --testmon-noselect
+            }
+        }
+        "backend-openapi" {
+            Invoke-OpenApiDrift
+        }
+        "git-status" {
+            Invoke-Check $GateId (Get-GateName $GateId) $RepoRoot { git status --short --branch }
+        }
+        "db-read-only" {
+            Invoke-DbReadOnlyGate
+        }
+        "playwright-e2e" {
+            Invoke-Check $GateId (Get-GateName $GateId) $RepoRoot {
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $VerifyE2EScript
+            }
+        }
+        default {
+            throw "Unknown verification gate: $GateId"
+        }
+    }
+}
+
+function Write-VerificationPlan {
+    param([Parameter(Mandatory = $true)] $VerificationPlan, [object[]] $Gates)
+
+    Write-Host ""
+    Write-Host "==> Verification plan"
+    Write-Host "Mode: $($VerificationPlan.mode)"
+    Write-Host "Change set: $($VerificationPlan.change_set)"
+    $Selected = @($VerificationPlan.selected_files)
+    if ($Selected.Count -eq 0) {
+        Write-Host "Selected changes: none"
+    }
+    else {
+        Write-Host "Selected changes:"
+        foreach ($file in $Selected) { Write-Host "   - $file" }
+    }
+    $Ignored = @($VerificationPlan.ignored_files)
+    if ($Ignored.Count -gt 0) {
+        Write-Host "Ignored changes:"
+        foreach ($file in $Ignored) { Write-Host "   - $file" }
+        Write-Warning "Ignored changes affect only impact planning."
+        Write-Warning "Gates still run against the current working tree."
+        Write-Warning "For an exact staged snapshot, use a clean dedicated worktree."
+    }
+    foreach ($item in @($VerificationPlan.escalations)) {
+        Write-Host "Escalation [$($item.area)]: $($item.reason)"
+    }
+    if ($Gates.Count -eq 0) {
+        Write-Host "Gates: none"
+    }
+    else {
+        Write-Host "Gates:"
+        foreach ($gate in $Gates) {
+            Write-Host "   - $($gate.id) [$($gate.area)]: $($gate.reason)"
+        }
+    }
+}
+
+function Write-TimingReport {
+    $TotalWatch.Stop()
+    Write-Host ""
+    Write-Host "==> Timing summary"
+    if ($GateTimings.Count -eq 0) {
+        Write-Host "   - no gates executed"
+    }
+    else {
+        foreach ($timing in $GateTimings) {
+            Write-Host "   - $($timing.id): $($timing.status), $($timing.duration_ms) ms"
+        }
+    }
+    Write-Host "   - total: $([Math]::Round($TotalWatch.Elapsed.TotalMilliseconds, 3)) ms"
+
+    if ($TimingOutput) {
+        $TimingPath = if ([System.IO.Path]::IsPathRooted($TimingOutput)) {
+            [System.IO.Path]::GetFullPath($TimingOutput)
+        }
+        else {
+            [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $TimingOutput))
+        }
+        $TimingParent = Split-Path -Parent $TimingPath
+        if (-not (Test-Path -LiteralPath $TimingParent)) {
+            [System.IO.Directory]::CreateDirectory($TimingParent) | Out-Null
+        }
+        $Report = [ordered]@{
+            mode = if ($Plan) { [string]($Plan.mode) } else { $Mode }
+            change_set = if ($Plan) { [string]($Plan.change_set) } else { $ChangeSet }
+            plan_only = [bool] $PlanOnly
+            total_ms = [Math]::Round($TotalWatch.Elapsed.TotalMilliseconds, 3)
+            gates = $GateTimings.ToArray()
+        }
+        $Report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $TimingPath -Encoding UTF8
+    }
+}
+
+try {
+    if ($InternalGateFile) {
+        if (-not (Test-Path -LiteralPath $InternalGateFile -PathType Leaf)) {
+            throw "Internal gate file not found: $InternalGateFile"
+        }
+        $InternalGate = Get-Content -LiteralPath $InternalGateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        Invoke-Gate $InternalGate
+    }
+    else {
+        if (-not (Test-Path $PolicyScript)) {
+            throw "Verification policy script not found: $PolicyScript"
+        }
+        $PolicyJson = (& python $PolicyScript --repo-root $RepoRoot --mode $Mode --change-set $ChangeSet | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) {
+            throw "Verification policy failed with exit code $LASTEXITCODE"
+        }
+        $Plan = $PolicyJson | ConvertFrom-Json
+        $Conflicts = @($Plan.conflicts)
+        if ($Conflicts.Count -gt 0) {
+            throw "Staged/working conflict: $($Conflicts -join ', ')"
+        }
+
+        $PlannedGates = @($Plan.gates)
+        if ($DbReadOnlyCheck) {
+            $PlannedGates += [pscustomobject]@{
+                id = "db-read-only"
+                area = "backend"
+                kind = "optional"
+                reason = "requested by -DbReadOnlyCheck"
+                files = @()
+            }
+        }
+        if ($IncludeE2E) {
+            $PlannedGates += [pscustomobject]@{
+                id = "playwright-e2e"
+                area = "frontend"
+                kind = "optional"
+                reason = "requested by -IncludeE2E"
+                files = @()
+                runtime_guard = $VerifyE2EScript
+            }
+        }
+
+        Write-VerificationPlan $Plan $PlannedGates
+        if (-not $PlanOnly) {
+            $BackendFullIds = @("backend-pytest-full", "backend-openapi")
+            $FrontendFullIds = @(
+                "frontend-lint",
+                "frontend-typecheck",
+                "frontend-coverage",
+                "frontend-build",
+                "frontend-bundle-size"
+            )
+            $ParallelGateIds = @($BackendFullIds + $FrontendFullIds)
+            $CanRunFullAreasInParallel = (
+                [Environment]::ProcessorCount -ge $ParallelCpuThreshold -and
+                (Test-ContainsGateIds -Gates $PlannedGates -RequiredIds $BackendFullIds) -and
+                (Test-ContainsGateIds -Gates $PlannedGates -RequiredIds $FrontendFullIds)
+            )
+            if ($CanRunFullAreasInParallel) {
+                Write-Host ""
+                Write-Host "==> Running backend and frontend gates in parallel"
+                Invoke-ParallelAreaGates -Gates $PlannedGates
+                $PlannedGates = @(
+                    $PlannedGates | Where-Object { [string] $_.id -notin $ParallelGateIds }
+                )
+            }
+
+            $SmartParallelGateIds = @(
+                "backend-testmon",
+                "backend-openapi",
+                "frontend-lint-files",
+                "frontend-tsc-incremental",
+                "frontend-vitest-related",
+                "frontend-direct-tests"
+            )
+            $EscalatedAreas = @($Plan.escalations | ForEach-Object { [string] $_.area })
+            $SmartParallelGates = @(
+                $PlannedGates | Where-Object {
+                    [string] $_.id -in $SmartParallelGateIds -and
+                    (
+                        [string] $_.kind -eq "targeted" -or
+                        (
+                            [string] $_.id -eq "backend-openapi" -and
+                            "backend" -notin $EscalatedAreas
+                        )
+                    )
+                }
+            )
+            $CanRunSmartGatesInParallel = (
+                $Mode -eq "smart" -and
+                [Environment]::ProcessorCount -ge $ParallelCpuThreshold -and
+                $SmartParallelGates.Count -ge 2
+            )
+            if ($CanRunSmartGatesInParallel) {
+                Write-Host ""
+                Write-Host "==> Running $($SmartParallelGates.Count) smart targeted gates in parallel"
+                Invoke-ParallelTargetedGates -Gates $SmartParallelGates
+                $ExecutedSmartIds = @($SmartParallelGates | ForEach-Object { [string] $_.id })
+                $PlannedGates = @(
+                    $PlannedGates | Where-Object { [string] $_.id -notin $ExecutedSmartIds }
+                )
+            }
+            foreach ($gate in $PlannedGates) {
+                Invoke-Gate $gate
+            }
+        }
+    }
+}
+catch {
+    $FailureMessage = $_.Exception.Message
+    [Console]::Error.WriteLine("Verification failed: $FailureMessage")
+}
+finally {
+    Write-TimingReport
+}
+
+if ($FailureMessage) {
+    exit 1
+}
+if ($PlanOnly) {
+    Write-Host ""
+    Write-Host "Plan only - no gates executed."
+}
+else {
+    Write-Host ""
+    Write-Host "All local verification checks passed."
+}
+exit 0

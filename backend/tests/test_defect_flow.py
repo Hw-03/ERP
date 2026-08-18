@@ -361,6 +361,8 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
 
     item = make_item(name="R001-IDEM-RACE", warehouse_qty=Decimal("10"))
     actor = _make_employee(db_session, code="E01-IDEM-W", name="멱등 경합 작업자")
+    item_id = item.item_id
+    actor_employee_id = actor.employee_id
     db_session.commit()
     request_id = "defect-idem-matching-race"
     original_action = defects_router.defect_actions_svc.quarantine_inventory
@@ -368,18 +370,19 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
         autocommit=False,
         autoflush=False,
         bind=db_session.get_bind(),
+        join_transaction_mode="create_savepoint",
     )
     winner_session = session_factory()
     winner_session_identity = id(winner_session)
     try:
         winner_actor = (
             winner_session.query(Employee)
-            .filter(Employee.employee_id == actor.employee_id)
+            .filter(Employee.employee_id == actor_employee_id)
             .one()
         )
         original_action(
             winner_session,
-            item_id=item.item_id,
+            item_id=item_id,
             qty=Decimal("2"),
             source="warehouse",
             target_dept=DepartmentEnum.ASSEMBLY,
@@ -433,13 +436,13 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
         response = client.post(
             "/api/defects/quarantine",
             json={
-                "item_id": str(item.item_id),
+                "item_id": str(item_id),
                 "qty": "2",
                 "source": "warehouse",
                 "target_dept": DepartmentEnum.ASSEMBLY.value,
                 "reason_category": "외관불량",
                 "reason_memo": "경합 재시도",
-                "actor_employee_id": str(actor.employee_id),
+                "actor_employee_id": str(actor_employee_id),
                 "client_request_id": request_id,
             },
         )
@@ -456,13 +459,13 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
     try:
         inventory = (
             verify_session.query(Inventory)
-            .filter(Inventory.item_id == item.item_id)
+            .filter(Inventory.item_id == item_id)
             .one()
         )
         defective_location = (
             verify_session.query(InventoryLocation)
             .filter(
-                InventoryLocation.item_id == item.item_id,
+                InventoryLocation.item_id == item_id,
                 InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
                 InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
             )

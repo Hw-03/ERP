@@ -528,8 +528,7 @@ def test_execute_sync_is_dry_run_by_default_and_requires_confirmation_for_apply(
     item = make_item(name="품목", process_type_code="AR", model_symbol="3", serial_no=1)
     db_session.commit()
     dev_db = tmp_path / "dev.db"
-    with sqlite3.connect(dev_db) as target:
-        db_session.connection().connection.driver_connection.backup(target)
+    dev_db.write_bytes(db_session.connection().connection.driver_connection.serialize())
     employee_db = tmp_path / "employee.db"
     _write_employee_db(employee_db, [_employee_item(item_id=str(item.item_id), mes_code=item.mes_code, item_name=item.item_name)])
     snapshot = DepartmentSnapshot(rows=(_row(row_number=3, code=item.mes_code, name=item.item_name, quantity=8),), source_hashes={})

@@ -168,13 +168,15 @@ ERP/
 
 ## 검증
 
-### 5게이트 일괄 검증 (commit 전 권장)
+### 위험 기반 일괄 검증 (commit 전 권장)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged
 ```
 
-backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / OpenAPI drift 를 CI 와 동일 기준으로 검사. coverage threshold 75/75/75/75.
+`smart`는 변경 파일에 맞춰 관련 lint·증분 타입 검사·Vitest 또는 testmon pytest를 선택하고, 설정·DB 모델·검증 인프라처럼 위험한 변경은 영역 전체나 풀 게이트로 승격한다. 기본 `-ChangeSet auto`에서는 staged 변경이 없을 때 전체 작업 트리를 대상으로 하며, 명시한 `-ChangeSet staged`는 staged 변경만 영향 계획에 포함한다. 게이트 자체는 현재 working tree에서 실행되므로, 정확한 staged 스냅샷 검증이 필요하면 깨끗한 전용 worktree를 사용한다. `-PlanOnly`로 실행 계획만 확인할 수 있다.
+
+검증 인프라 변경이나 전체 CI 수준 확인이 필요할 때는 `-Mode full`을 사용한다. GitHub CI는 backend pytest·OpenAPI drift와 frontend lint·tsc·coverage·build·bundle 검사를 항상 전체 범위로 실행하며 coverage threshold 75/75/75/75를 유지한다.
 
 ### 개별 검증
 
