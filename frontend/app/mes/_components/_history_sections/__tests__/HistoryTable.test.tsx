@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryTable } from "../HistoryTable";
 import type { LogGroup } from "../historyTableHelpers";
 
@@ -46,16 +47,22 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "작업" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" })).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" }).parentElement).toHaveClass(
+    const surface = screen.getByTestId("history-table-surface");
+    expect(surface).toHaveClass(
       "min-w-0",
       "overflow-x-clip",
       "rounded-[24px]",
       "border",
     );
+    expect(surface).toHaveStyle({ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border });
+    expect(surface).not.toHaveClass("overflow-y-auto");
+    expect(surface).not.toHaveClass("overflow-hidden");
+    expect(surface).not.toHaveClass("flex-1");
+    expect(screen.queryByTestId("history-table-scroll-area")).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" }).parentElement).toBe(surface);
     expect(container.querySelectorAll("[data-history-loading-row='true']")).toHaveLength(8);
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("rounded-tl-[22px]");
     expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("rounded-tr-[22px]");
-    expect(screen.getByTestId("history-table-surface")).not.toHaveClass("overflow-y-auto");
   });
 
   it("keeps both sticky header corners aligned with the table surface", () => {
@@ -64,6 +71,8 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "rounded-tl-[22px]");
     expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("sticky", "rounded-tr-[22px]");
     expect(screen.getByTestId("history-table-surface")).not.toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("history-table-surface")).not.toHaveClass("overflow-hidden");
+    expect(screen.queryByTestId("history-table-scroll-area")).not.toBeInTheDocument();
   });
 
   it("keeps existing rows visible and retries from a non-blocking refresh failure", () => {
@@ -88,13 +97,10 @@ describe("HistoryTable hierarchy", () => {
     );
 
     expect(screen.getByText("현재 내역")).toBeInTheDocument();
-    expect(screen.getByRole("table").parentElement).toHaveClass(
-      "min-w-0",
-      "overflow-x-clip",
-      "rounded-[24px]",
-      "border",
-    );
+    const surface = screen.getByTestId("history-table-surface");
+    expect(screen.getByRole("table").parentElement).toBe(surface);
     expect(screen.getByRole("alert")).toHaveTextContent("최신 입출고 내역을 동기화하지 못했습니다");
+    expect(surface).not.toContainElement(screen.getByRole("alert"));
     fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
     expect(retryRefresh).toHaveBeenCalledOnce();
   });

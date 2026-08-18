@@ -32,17 +32,23 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseHeader", () => ({
 
 vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () => ({
   WarehouseDraftPanelTabs: ({
+    sectionTab,
     onContinueIoDraft,
   }: {
+    sectionTab: string;
     onContinueIoDraft?: (draft: never) => void;
-  }) => (
-    <button
-      type="button"
-      onClick={() => onContinueIoDraft?.({ batch_id: "draft-2" } as never)}
-    >
-      continue draft
-    </button>
-  ),
+  }) => {
+    if (sectionTab === "compose") return null;
+
+    return (
+      <button
+        type="button"
+        onClick={() => onContinueIoDraft?.({ batch_id: "draft-2" } as never)}
+      >
+        continue draft
+      </button>
+    );
+  },
 }));
 
 vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
@@ -53,9 +59,11 @@ vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
   }) => {
     currentComposeProps.value = props;
     return (
-      <button type="button" data-testid="item-conversion-focus" onClick={() => props.onItemConversionFocusChange(true)}>
-        품목 전환 포커스
-      </button>
+      <div data-testid="io-compose-view">
+        <button type="button" data-testid="item-conversion-focus" onClick={() => props.onItemConversionFocusChange(true)}>
+          품목 전환 포커스
+        </button>
+      </div>
     );
   },
 }));
@@ -143,6 +151,16 @@ describe("DesktopWarehouseView", () => {
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
 
     expect(screen.getByTestId("warehouse-section-work-area")).toHaveClass("flex-1", "min-h-0");
+  });
+
+  it("요청 작성에서는 섹션 탭 다음에 작성 본문을 바로 렌더한다", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose");
+    const { container } = render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    const tabSlot = container.querySelector('[role="tablist"]')?.parentElement;
+    const composeContent = screen.getByTestId("io-compose-view").parentElement;
+
+    expect(tabSlot?.nextElementSibling).toBe(composeContent);
   });
 
   it("요청 작성의 품목 전환 포커스에서는 상단 탭을 숨긴다", () => {

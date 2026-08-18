@@ -82,7 +82,7 @@ function HistoryTableSkeleton() {
     <div
       data-testid="history-table-surface"
       className={HISTORY_TABLE_SURFACE_CLASS}
-      style={{ borderColor: LEGACY_COLORS.border }}
+      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <table
         aria-busy="true"
@@ -386,7 +386,7 @@ export function HistoryTable({
         <div
           data-testid="history-table-surface"
           className={HISTORY_TABLE_SURFACE_CLASS}
-          style={{ borderColor: LEGACY_COLORS.border }}
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
             <thead>
