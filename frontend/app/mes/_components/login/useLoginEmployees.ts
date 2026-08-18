@@ -15,7 +15,9 @@ export function useLoginEmployees(): Employee[] {
     void api
       .getEmployees({ activeOnly: true })
       .then((emps) => setEmployees(emps))
-      .catch(() => {});
+      .catch((error) => {
+        console.error("[MES login] Failed to load active employees.", error);
+      });
   }, []);
   return employees;
 }
