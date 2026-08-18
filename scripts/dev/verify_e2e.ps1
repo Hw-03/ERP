@@ -1,4 +1,4 @@
-# Playwright E2E 검증 — 전용 DB(mes_e2e.db)·전용 백엔드(8021)·전용 프론트(3100).
+﻿# Playwright E2E 검증 — 전용 DB(mes_e2e.db)·전용 백엔드(8021)·전용 프론트(3100).
 # globalSetup 이 전용 DB 부트스트랩·시드·백엔드 기동을 자동 처리하고, teardown 이
 # 전용 DB 삭제 + 실 backend/mes.db SHA256 불변을 검증한다(실 DB 절대 미접촉).
 #

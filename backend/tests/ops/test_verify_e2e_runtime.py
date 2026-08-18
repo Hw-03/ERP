@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import os
 import shutil
 import subprocess
@@ -16,6 +17,10 @@ VERIFY_LOCAL = ROOT / "scripts" / "dev" / "verify_local.ps1"
 
 def _write_fake_command(path: Path, body: str) -> None:
     path.write_text("@echo off\r\n" + body, encoding="ascii")
+
+
+def test_verify_e2e_has_utf8_bom_for_windows_powershell() -> None:
+    assert VERIFY_E2E.read_bytes().startswith(codecs.BOM_UTF8)
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime guard is Windows-only")
