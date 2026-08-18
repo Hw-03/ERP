@@ -25,6 +25,7 @@ export function DesktopRightPanel({
   subtitleBadge,
   headerBadge,
   backButton,
+  topContent,
   onClose,
   children,
 }: {
@@ -34,6 +35,7 @@ export function DesktopRightPanel({
   subtitleBadge?: React.ReactNode;
   headerBadge?: React.ReactNode;
   backButton?: React.ReactNode;
+  topContent?: ReactNode;
   onClose?: () => void;
   children: React.ReactNode;
 }) {
@@ -47,41 +49,42 @@ export function DesktopRightPanel({
           className="flex h-full min-h-0 w-[420px] shrink-0 flex-col overflow-hidden rounded-[32px] border px-5 py-5"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
-      <div className="mb-4 px-1 pb-4 border-b" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex items-start gap-3">
-          {backButton ? <div className="shrink-0 pt-0.5">{backButton}</div> : null}
-          <div className="min-w-0 flex-1 pr-1">
-            <TruncatedText
-              id={titleId}
-              accessibilityLabel={title}
-              className="line-clamp-2 text-[22px] font-black"
-            >
-              {title}
-            </TruncatedText>
-            {subtitle || subtitleBadge ? (
-              <div className="mt-1.5 flex items-center gap-2 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
-                {subtitle ? <span>{subtitle}</span> : null}
-                {subtitleBadge}
+          {topContent}
+          <div className="mb-4 px-1 pb-4 border-b" style={{ borderColor: LEGACY_COLORS.border }}>
+            <div className="flex items-start gap-3">
+              {backButton ? <div className="shrink-0 pt-0.5">{backButton}</div> : null}
+              <div className="min-w-0 flex-1 pr-1">
+                <TruncatedText
+                  id={titleId}
+                  accessibilityLabel={title}
+                  className="line-clamp-2 text-[22px] font-black"
+                >
+                  {title}
+                </TruncatedText>
+                {subtitle || subtitleBadge ? (
+                  <div className="mt-1.5 flex items-center gap-2 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
+                    {subtitle ? <span>{subtitle}</span> : null}
+                    {subtitleBadge}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+              {headerBadge ? <div className="shrink-0 pt-1">{headerBadge}</div> : null}
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="패널 닫기"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                  style={{
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
+                    color: LEGACY_COLORS.red,
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
-          {headerBadge ? <div className="shrink-0 pt-1">{headerBadge}</div> : null}
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="패널 닫기"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
-              style={{
-                background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
-                color: LEGACY_COLORS.red,
-              }}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </div>
           <div ref={setBody} data-testid="desktop-right-panel-body" className="sg min-h-0 flex-1 overflow-y-auto">{children}</div>
           <div ref={setFooter} data-testid="desktop-right-panel-footer" className="max-h-[45%] shrink-0 overflow-y-auto empty:hidden pt-4" />
         </div>

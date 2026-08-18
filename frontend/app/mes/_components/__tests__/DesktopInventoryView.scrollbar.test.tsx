@@ -73,7 +73,7 @@ vi.mock("../_inventory_sections/DesktopInventoryRightPanel", () => ({
 }));
 
 describe("DesktopInventoryView scrollbar", () => {
-  it("keeps the dashboard material list scrollbar visible and draggable", () => {
+  it("keeps the full dashboard workspace in one visible outer scrollbar", () => {
     const { container } = render(
       <DesktopInventoryView
         globalSearch=""
@@ -82,11 +82,20 @@ describe("DesktopInventoryView scrollbar", () => {
       />,
     );
 
-    const scroller = container.querySelector(".overflow-y-auto");
+    const viewport = screen.getByTestId("inventory-left-viewport");
+    const scroller = screen.getByTestId("inventory-left-content");
+    const listCard = screen.getByTestId("inventory-list-card");
 
     expect(scroller).not.toBeNull();
     expect(scroller).not.toHaveClass("scrollbar-hide");
-    expect(scroller).toHaveClass("sg");
+    expect(scroller).toHaveClass("sg", "min-h-0", "flex-1", "overflow-y-auto");
+    expect(viewport).toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-hidden", "rounded-[32px]");
+    expect(viewport).not.toHaveClass("border");
+    expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
+    expect(viewport).not.toHaveClass("overflow-y-auto");
+    expect(screen.queryByTestId("inventory-list-scroller")).not.toBeInTheDocument();
+    expect(listCard).toHaveClass("card", "desktop-flat-surface");
+    expect(listCard).not.toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-y-auto");
     expect(scroller).not.toHaveClass("rounded-[28px]", "desktop-flat-surface");
     expect(scroller).not.toHaveClass("border");
     expect(scroller).not.toHaveStyle({ background: "var(--c-s1)" });

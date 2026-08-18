@@ -60,47 +60,48 @@ export function DesktopInventoryRightPanel({
           subtitle={displayItem.legacy_part ? `${displayItem.mes_code} · ${displayItem.legacy_part}` : (displayItem.mes_code ?? undefined)}
           subtitleBadge={headerBadge}
           onClose={onClose}
-        >
-          <div className="px-1 pt-1">
-            <div
-              aria-label="재고 상세 보기"
-              className="flex gap-1 rounded-[12px] p-1"
-              role="tablist"
-              style={{ background: "color-mix(in srgb, var(--c-blue) 8%, transparent)" }}
-            >
-              <button
-                id={INVENTORY_DETAIL_TAB_ID}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "detail"}
-                aria-controls={INVENTORY_DETAIL_PANEL_ID}
-                onClick={() => setActiveTab("detail")}
-                className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
-                style={{
-                  background: activeTab === "detail" ? "var(--c-s1)" : "transparent",
-                  color: activeTab === "detail" ? "var(--c-text)" : "var(--c-muted2)",
-                }}
+          topContent={
+            <div className="px-1 pt-1">
+              <div
+                aria-label="재고 상세 보기"
+                className="flex gap-1 rounded-[12px] p-1"
+                role="tablist"
+                style={{ background: "color-mix(in srgb, var(--c-blue) 8%, transparent)" }}
               >
-                상세 정보
-              </button>
-              <button
-                id={INVENTORY_HISTORY_TAB_ID}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "history"}
-                aria-controls={INVENTORY_HISTORY_PANEL_ID}
-                onClick={() => setActiveTab("history")}
-                className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
-                style={{
-                  background: activeTab === "history" ? "var(--c-s1)" : "transparent",
-                  color: activeTab === "history" ? "var(--c-text)" : "var(--c-muted2)",
-                }}
-              >
-                최근 내역
-              </button>
+                <button
+                  id={INVENTORY_DETAIL_TAB_ID}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "detail"}
+                  aria-controls={INVENTORY_DETAIL_PANEL_ID}
+                  onClick={() => setActiveTab("detail")}
+                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  style={{
+                    background: activeTab === "detail" ? "var(--c-s1)" : "transparent",
+                    color: activeTab === "detail" ? "var(--c-text)" : "var(--c-muted2)",
+                  }}
+                >
+                  상세 정보
+                </button>
+                <button
+                  id={INVENTORY_HISTORY_TAB_ID}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "history"}
+                  aria-controls={INVENTORY_HISTORY_PANEL_ID}
+                  onClick={() => setActiveTab("history")}
+                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  style={{
+                    background: activeTab === "history" ? "var(--c-s1)" : "transparent",
+                    color: activeTab === "history" ? "var(--c-text)" : "var(--c-muted2)",
+                  }}
+                >
+                  최근 내역
+                </button>
+              </div>
             </div>
-          </div>
-
+          }
+        >
           {activeTab === "detail" ? (
             <div id={INVENTORY_DETAIL_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_DETAIL_TAB_ID}>
               <InventoryDetailPanel

@@ -46,6 +46,12 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "작업" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" }).parentElement).toHaveClass(
+      "min-w-0",
+      "overflow-x-clip",
+      "rounded-[24px]",
+      "border",
+    );
     expect(container.querySelectorAll("[data-history-loading-row='true']")).toHaveLength(8);
   });
 
@@ -71,6 +77,12 @@ describe("HistoryTable hierarchy", () => {
     );
 
     expect(screen.getByText("현재 내역")).toBeInTheDocument();
+    expect(screen.getByRole("table").parentElement).toHaveClass(
+      "min-w-0",
+      "overflow-x-clip",
+      "rounded-[24px]",
+      "border",
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("최신 입출고 내역을 동기화하지 못했습니다");
     fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
     expect(retryRefresh).toHaveBeenCalledOnce();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, SyntheticEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -1548,7 +1548,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         />
       );
       return hubEntryAnimationView === "requestList"
-        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade">{entry}</div>
+        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade flex min-h-0 flex-1 flex-col">{entry}</div>
         : entry;
     }
 
@@ -1708,9 +1708,26 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         : entry;
     }
 
+    const hasPickedUpSerialNumbers = selectedHistory?.status === "PICKED_UP" && Boolean(selectedHistory.serial_numbers?.trim());
     return (
       <div className="grid gap-3">
-        <ViewHeader title="출하 상세 이력" subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다." onBack={() => navigateView("historyList")} />
+        <ViewHeader
+          dataTestId="shipping-history-view-header"
+          title="출하 상세 이력"
+          subtitle="최종 PA/PF와 연결 입출고 로그를 확인합니다."
+          onBack={() => navigateView("historyList")}
+          right={selectedHistory && (
+            <>
+              {hasPickedUpSerialNumbers && (
+                <div data-testid="shipping-history-serial-summary" className="min-w-0 flex-1 rounded-[14px] border px-3 py-2" style={{ background: tint(LEGACY_COLORS.cyan, 10), borderColor: tint(LEGACY_COLORS.cyan, 45) }}>
+                  <div className="text-xs font-black" style={{ color: LEGACY_COLORS.cyan }}>{SERIAL_NUMBERS_LABEL}</div>
+                  <div className="sn-b truncate text-sm font-bold" title={selectedHistory.serial_numbers ?? undefined} style={{ color: LEGACY_COLORS.text }}>{serialNumberText(selectedHistory.serial_numbers)}</div>
+                </div>
+              )}
+              <InvoiceNumberEditor request={selectedHistory} onSaved={handleInvoiceSaved} />
+            </>
+          )}
+        />
         <HistorySection
           rows={historyRows}
           selected={selectedHistory}
@@ -1719,7 +1736,6 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           onRetryRefresh={() => setHistoryDetailRetryNonce((nonce) => nonce + 1)}
           onSelect={(req) => setSelectedHistoryId(req.request_id)}
           onPickupCancel={cancelPickup}
-          onInvoiceSaved={handleInvoiceSaved}
           showList={false}
         />
       </div>
@@ -1784,10 +1800,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   );
 }
 
-function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack: () => void }) {
+function ViewHeader({ title, subtitle, onBack, right, dataTestId }: { title: string; subtitle?: string; onBack: () => void; right?: ReactNode; dataTestId?: string }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
-      <div className={SHIPPING_ROW_CLASS}>
+    <div data-testid={dataTestId} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
+      <div className={`${SHIPPING_ROW_CLASS} min-w-0 flex-wrap`}>
         <button
           type="button"
           aria-label="이전 화면"
@@ -1802,6 +1818,7 @@ function ViewHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
           {subtitle && <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{subtitle}</div>}
         </div>
       </div>
+      {right && <div data-testid="shipping-view-header-right" className="flex min-w-0 min-w-[min(100%,620px)] basis-[620px] flex-1 flex-wrap items-center gap-3">{right}</div>}
     </div>
   );
 }
@@ -2342,6 +2359,8 @@ function HistoryListEntry({
   onLoadMore: () => void;
   onOpen: (request: ShippingRequest) => void;
 }) {
+  const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
+  const pendingDisclosureOpenRef = useRef<string | null>(null);
   const years = useMemo(() => Array.from(new Set(months.map((row) => row.year))), [months]);
   const searchGroups = useMemo(() => {
     const groups = new Map<string, { year: number; month: number; rows: ShippingRequest[] }>();
@@ -2359,6 +2378,21 @@ function HistoryListEntry({
   const historyEmptyBody = status === "PICKED_UP"
     ? "출하 완료 처리된 요청이 아직 없습니다."
     : "요청 취소 처리된 이력이 아직 없습니다.";
+
+  function disclosureKey(mode: "browse" | "search", year: number, month?: number): string {
+    return `${mode}:${status}:${appliedSearch}:${year}:${month ?? "year"}`;
+  }
+
+  function disclosureOpen(mode: "browse" | "search", year: number, initialOpen: boolean, month?: number): boolean {
+    const key = disclosureKey(mode, year, month);
+    return disclosureOverrides[key] ?? initialOpen;
+  }
+
+  function rememberDisclosure(event: SyntheticEvent<HTMLDetailsElement>, mode: "browse" | "search", year: number, month?: number) {
+    const key = disclosureKey(mode, year, month);
+    const open = pendingDisclosureOpenRef.current === key ? true : event.currentTarget.open;
+    setDisclosureOverrides((current) => current[key] === open ? current : { ...current, [key]: open });
+  }
 
   const renderRows = (groupRows: ShippingRequest[]) => (
     <div className="grid content-start gap-2 p-2">
@@ -2451,11 +2485,11 @@ function HistoryListEntry({
             ) : (
               <div className="grid flex-1 content-start gap-2">
                 {Array.from(new Set(searchGroups.map((group) => group.year))).map((year, yearIndex) => (
-                  <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={yearIndex === 0} className="min-w-0">
+                  <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={disclosureOpen("search", year, yearIndex === 0)} onToggle={(event) => rememberDisclosure(event, "search", year)} className="min-w-0">
                     <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{year}년</summary>
                     <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
                       {searchGroups.filter((group) => group.year === year).map((group) => (
-                        <details key={`${group.year}-${group.month}`} data-testid={`shipping-history-month-${group.year}-${group.month}`} data-surface="layout-only" open className="min-w-0">
+                        <details key={`${group.year}-${group.month}`} data-testid={`shipping-history-month-${group.year}-${group.month}`} data-surface="layout-only" open={disclosureOpen("search", group.year, true, group.month)} onToggle={(event) => rememberDisclosure(event, "search", group.year, group.month)} className="min-w-0">
                           <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>{group.month}월 · {group.rows.length}건</summary>
                           {renderRows(group.rows)}
                         </details>
@@ -2470,12 +2504,21 @@ function HistoryListEntry({
           ) : (
             <div className="grid flex-1 content-start gap-2">
               {years.map((year) => (
-                <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={year === selectedYear} className="min-w-0">
+                <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={disclosureOpen("browse", year, year === selectedYear)} onToggle={(event) => rememberDisclosure(event, "browse", year)} className="min-w-0">
                   <summary
                     className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black"
                     style={{ color: LEGACY_COLORS.text }}
-                    onClick={(event) => {
-                      event.preventDefault();
+                    onClick={() => {
+                      const key = disclosureKey("browse", year);
+                      if (year === selectedYear) {
+                        if (pendingDisclosureOpenRef.current === key) pendingDisclosureOpenRef.current = null;
+                        return;
+                      }
+                      pendingDisclosureOpenRef.current = key;
+                      setDisclosureOverrides((current) => ({
+                        ...current,
+                        ...(selectedYear === null ? {} : { [disclosureKey("browse", selectedYear)]: false }),
+                      }));
                       onYear(year);
                     }}
                   >
@@ -2485,12 +2528,23 @@ function HistoryListEntry({
                     {months.filter((row) => row.year === year).map((row) => {
                       const selected = selectedYear === row.year && selectedMonth === row.month;
                       return (
-                        <details key={`${row.year}-${row.month}`} data-testid={`shipping-history-month-${row.year}-${row.month}`} data-surface="layout-only" open={selected} className="min-w-0">
+                        <details key={`${row.year}-${row.month}`} data-testid={`shipping-history-month-${row.year}-${row.month}`} data-surface="layout-only" open={disclosureOpen("browse", row.year, selected, row.month)} onToggle={(event) => rememberDisclosure(event, "browse", row.year, row.month)} className="min-w-0">
                           <summary
                             className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black"
                             style={{ color: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
-                            onClick={(event) => {
-                              event.preventDefault();
+                            onClick={() => {
+                              const key = disclosureKey("browse", row.year, row.month);
+                              if (selected) {
+                                if (pendingDisclosureOpenRef.current === key) pendingDisclosureOpenRef.current = null;
+                                return;
+                              }
+                              pendingDisclosureOpenRef.current = key;
+                              setDisclosureOverrides((current) => ({
+                                ...current,
+                                ...(selectedYear === row.year && selectedMonth !== null
+                                  ? { [disclosureKey("browse", row.year, selectedMonth)]: false }
+                                  : {}),
+                              }));
                               onMonth(row.year, row.month);
                             }}
                           >
@@ -3316,8 +3370,7 @@ function CompanionPrepList({
   );
 }
 
-function HistorySection({ showList = true, rows, selected, emptyBody, refreshError, onRetryRefresh, onSelect, onPickupCancel, onInvoiceSaved }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; refreshError?: string | null; onRetryRefresh?: () => void; onSelect: (req: ShippingRequest) => void; onPickupCancel: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void }) {
-  const hasPickedUpSerialNumbers = selected?.status === "PICKED_UP" && Boolean(selected.serial_numbers?.trim());
+function HistorySection({ showList = true, rows, selected, emptyBody, refreshError, onRetryRefresh, onSelect, onPickupCancel }: { showList?: boolean; rows: ShippingRequest[]; selected: ShippingRequest | null; emptyBody?: string; refreshError?: string | null; onRetryRefresh?: () => void; onSelect: (req: ShippingRequest) => void; onPickupCancel: (request: ShippingRequest) => void }) {
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[420px_minmax(0,1fr)]" : "grid min-h-[620px] gap-3"}>
       {showList && (
@@ -3347,18 +3400,12 @@ function HistorySection({ showList = true, rows, selected, emptyBody, refreshErr
                 onRetry={onRetryRefresh}
               />
             )}
-            <div data-testid="shipping-history-detail-header" className={hasPickedUpSerialNumbers ? "grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)_auto] xl:items-center" : "flex flex-wrap items-center justify-between gap-3"}>
+            <div data-testid="shipping-history-detail-header" className="flex flex-wrap items-center justify-between gap-3">
               <PanelTitle
                 icon={PackageCheck}
                 title={selected.final_pf_item_name ?? selected.base_pf_item_name}
                 subtitle={`${selected.status === "CANCELLED" ? "요청 취소" : "출하 완료"} ${formatDate(selected.status === "CANCELLED" ? selected.cancelled_at ?? null : selected.picked_up_at)}`}
               />
-              {hasPickedUpSerialNumbers && (
-                <div data-testid="shipping-history-serial-summary" className="min-w-0 rounded-[14px] border px-3 py-2" style={{ background: tint(LEGACY_COLORS.cyan, 10), borderColor: tint(LEGACY_COLORS.cyan, 45) }}>
-                  <div className="text-xs font-black" style={{ color: LEGACY_COLORS.cyan }}>{SERIAL_NUMBERS_LABEL}</div>
-                  <div className="sn-b truncate text-sm font-bold" title={selected.serial_numbers ?? undefined} style={{ color: LEGACY_COLORS.text }}>{serialNumberText(selected.serial_numbers)}</div>
-                </div>
-              )}
               <div data-testid="shipping-history-detail-actions" className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 <StatusBadge status={selected.status} />
                 {selected.status === "PICKED_UP" && (
@@ -3366,11 +3413,8 @@ function HistorySection({ showList = true, rows, selected, emptyBody, refreshErr
                 )}
               </div>
             </div>
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-              <InvoiceNumberEditor request={selected} onSaved={onInvoiceSaved} />
-              <RevisionHistory request={selected} />
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <RevisionHistory request={selected} />
+            <div data-testid="shipping-history-metrics" className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
               <Metric label="최종 PA" value={selected.final_pa_item_name ?? "-"} />
               <Metric label="최종 PF" value={selected.final_pf_item_name ?? "-"} />
               <Metric label="입출고 로그" value={`${selected.transaction_count}건`} />

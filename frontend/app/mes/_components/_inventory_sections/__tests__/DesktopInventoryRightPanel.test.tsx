@@ -45,7 +45,13 @@ describe("DesktopInventoryRightPanel", () => {
 
     const detailTab = screen.getByRole("tab", { name: "상세 정보" });
     const historyTab = screen.getByRole("tab", { name: "최근 내역" });
-    expect(screen.getByRole("tablist", { name: "재고 상세 보기" })).toBeInTheDocument();
+    const tablist = screen.getByRole("tablist", { name: "재고 상세 보기" });
+    const title = screen.getByText("테스트 품목");
+    const tabpanel = screen.getByRole("tabpanel");
+    expect(tablist.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(title.compareDocumentPosition(tabpanel) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(detailTab).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("상세 내용")).toBeInTheDocument();
 

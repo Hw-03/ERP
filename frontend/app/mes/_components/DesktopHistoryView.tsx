@@ -470,9 +470,11 @@ export function DesktopHistoryView() {
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       {/* ── 좌측: 스크롤 영역 ── */}
       <div
-      className="sg min-h-0 min-w-0 flex-1 overflow-y-auto"
+        data-testid="history-left-viewport"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[32px]"
       >
-        <div className="flex flex-col gap-3 pb-6">
+        <div data-testid="history-left-content" className="sg min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-3">
           <HistoryStatsBar
             baseline={baselineSummary}
             currentCount={summary?.total ?? null}
@@ -511,6 +513,7 @@ export function DesktopHistoryView() {
             }}
             selectedDay={selectedDay}
             onClearSelectedDay={() => setSelectedDay(null)}
+            flatSurface
           />
 
           {filterPanelOpen && (
@@ -578,6 +581,7 @@ export function DesktopHistoryView() {
             referenceSummariesLoading={referenceSummariesLoading}
             collapseRequestNonce={collapseRequestNonce}
           />
+          </div>
         </div>
       </div>
 

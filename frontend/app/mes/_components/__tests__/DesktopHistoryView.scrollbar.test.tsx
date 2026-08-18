@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DesktopHistoryView } from "../DesktopHistoryView";
 
@@ -22,22 +22,36 @@ vi.mock("../_hooks/useToggleSet", () => ({
   useToggleSet: () => ({ selected: [], toggle: vi.fn(), setSelected: vi.fn() }),
 }));
 vi.mock("../_history_sections/HistoryStatsBar", () => ({ HistoryStatsBar: () => <div /> }));
-vi.mock("../_history_sections/HistoryFilterBar", () => ({ HistoryFilterBar: () => <div /> }));
+vi.mock("../_history_sections/HistoryFilterBar", () => ({
+  HistoryFilterBar: ({ flatSurface }: { flatSurface?: boolean }) => (
+    <div data-testid="history-filter-bar" data-flat-surface={flatSurface ? "true" : "false"} />
+  ),
+}));
 vi.mock("../_history_sections/HistoryFilterPanel", () => ({ HistoryFilterPanel: () => <div /> }));
 vi.mock("../_history_sections/HistoryCalendarPanel", () => ({ HistoryCalendarPanel: () => <div /> }));
-vi.mock("../_history_sections/HistoryTable", () => ({ HistoryTable: () => <div /> }));
+vi.mock("../_history_sections/HistoryTable", () => ({ HistoryTable: () => <div data-testid="history-table" /> }));
 vi.mock("../_history_sections/DesktopHistoryRightPanel", () => ({ DesktopHistoryRightPanel: () => <div /> }));
 
 describe("DesktopHistoryView scrollbar", () => {
-  it("keeps the transaction list scrollbar visible and draggable", () => {
+  it("keeps the full transaction workspace in one visible outer scrollbar", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(
+    render(
       <QueryClientProvider client={queryClient}><DesktopHistoryView /></QueryClientProvider>,
     );
 
-    const scroller = container.querySelector(".overflow-y-auto");
-    expect(scroller).toHaveClass("sg");
+    const viewport = screen.getByTestId("history-left-viewport");
+    const scroller = screen.getByTestId("history-left-content");
+    const historyTable = screen.getByTestId("history-table");
+    expect(scroller).toHaveClass("sg", "min-h-0", "flex-1", "overflow-y-auto");
     expect(scroller).not.toHaveClass("scrollbar-hide");
+    expect(viewport).toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-hidden", "rounded-[32px]");
+    expect(viewport).not.toHaveClass("border");
+    expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
+    expect(viewport).not.toHaveClass("overflow-y-auto");
+    expect(screen.queryByTestId("history-list-scroller")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("history-list-card")).not.toBeInTheDocument();
+    expect(historyTable.parentElement).toHaveClass("flex", "flex-col", "gap-3");
+    expect(screen.getByTestId("history-filter-bar")).toHaveAttribute("data-flat-surface", "true");
     expect(scroller).not.toHaveClass("rounded-[28px]", "desktop-flat-surface");
     expect(scroller).not.toHaveClass("border");
     expect(scroller).not.toHaveStyle({ background: "var(--c-s1)" });

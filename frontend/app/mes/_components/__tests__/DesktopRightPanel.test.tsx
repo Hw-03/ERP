@@ -19,6 +19,19 @@ describe("DesktopRightPanel", () => {
     expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
   });
 
+  it("renders optional top content before the shared item header", () => {
+    render(
+      <DesktopRightPanel title="선택 품목" topContent={<div data-testid="panel-top-content">탭</div>}>
+        상세 내용
+      </DesktopRightPanel>,
+    );
+
+    const topContent = screen.getByTestId("panel-top-content");
+    const title = screen.getByText("선택 품목");
+    expect(topContent.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("keeps the detail body scrollbar visible and draggable", () => {
     const { container } = render(
       <DesktopRightPanel title="상세">

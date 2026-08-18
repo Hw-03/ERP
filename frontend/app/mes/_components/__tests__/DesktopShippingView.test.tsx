@@ -1180,7 +1180,8 @@ describe("DesktopShippingView", () => {
     const { rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     const detail = await screen.findByTestId("shipping-history-detail");
-    expect(await within(detail).findByRole("textbox", { name: "인보이스 번호" })).toHaveValue("INV-STALE");
+    const viewHeader = screen.getByTestId("shipping-history-view-header");
+    expect(await within(viewHeader).findByRole("textbox", { name: "인보이스 번호" })).toHaveValue("INV-STALE");
     const historyCallsBeforeRevision = vi.mocked(api.getShippingHistory).mock.calls.length;
     const detailCallsBeforeRevision = vi.mocked(api.getShippingRequest).mock.calls.length;
 
@@ -1193,7 +1194,7 @@ describe("DesktopShippingView", () => {
     expect(detailSignal?.aborted).toBe(false);
     await act(async () => detailRefresh.resolve({ ...stale, invoice_number: "INV-FRESH" }));
 
-    expect(within(detail).getByRole("textbox", { name: "인보이스 번호" })).toHaveValue("INV-FRESH");
+    expect(within(screen.getByTestId("shipping-history-view-header")).getByRole("textbox", { name: "인보이스 번호" })).toHaveValue("INV-FRESH");
     expect(screen.getByTestId("shipping-history-detail")).toBeInTheDocument();
   });
 
@@ -2027,6 +2028,7 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("flex-1");
     expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("flex-1");
     expect(screen.getByTestId("shipping-request-column-body-PREPARED")).toHaveClass("flex-1");
+    expect(screen.getByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("min-h-0", "overflow-y-auto");
   });
 
   it("removes the request list outer frame and lets the three status columns fill the workspace", async () => {
@@ -2039,7 +2041,9 @@ describe("DesktopShippingView", () => {
     expect(panel).not.toHaveClass("rounded-[24px]");
     expect(panel).not.toHaveClass("border");
     expect(panel).not.toHaveClass("p-4");
+    expect(panel).toHaveClass("flex-1", "min-h-0");
     expect(screen.getByTestId("shipping-request-list-grid")).toHaveClass("flex-1");
+    expect(screen.getByTestId("shipping-request-list-grid")).toHaveClass("min-h-0");
   });
 
   it("puts the new-request action inside the shipping request column", async () => {
@@ -2175,6 +2179,9 @@ describe("DesktopShippingView", () => {
     const historyDetail = await screen.findByTestId("shipping-history-detail");
     expect(within(historyDetail).queryByTestId("shipping-history-serial-summary")).not.toBeInTheDocument();
     expect(within(historyDetail).queryByTestId("shipping-pickup-cancel-from-history")).not.toBeInTheDocument();
+    const viewHeader = screen.getByTestId("shipping-history-view-header");
+    expect(within(viewHeader).queryByTestId("shipping-history-serial-summary")).not.toBeInTheDocument();
+    expect(within(viewHeader).getByTestId("shipping-invoice-editor")).toBeInTheDocument();
   });
 
   it("shows a preparation failure inside the confirmation modal", async () => {
@@ -3371,7 +3378,7 @@ describe("DesktopShippingView", () => {
 
     await openHubCard(container, "request");
     const animatedEntry = await screen.findByTestId("shipping-hub-entry-animation");
-    expect(animatedEntry).toHaveClass("animate-view-fade");
+    expect(animatedEntry).toHaveClass("animate-view-fade", "flex", "flex-1", "min-h-0", "flex-col");
 
     navigationMock.search = "tab=shipping&shippingView=requestList";
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
@@ -3390,7 +3397,7 @@ describe("DesktopShippingView", () => {
     expect(container.querySelector("[data-testid='shipping-hub-entry-animation']")).toBeNull();
   });
 
-  it("keeps picked-up serial numbers and pickup cancellation in the history header", async () => {
+  it("puts picked-up serial numbers and invoice editing in the view header while keeping pickup cancellation in detail", async () => {
     const historyRequest = request({
       request_id: "history-header-layout",
       status: "PICKED_UP",
@@ -3406,14 +3413,21 @@ describe("DesktopShippingView", () => {
     render(<DesktopShippingView onStatusChange={() => {}} />);
 
     const detail = await screen.findByTestId("shipping-history-detail");
+    const viewHeader = screen.getByTestId("shipping-history-view-header");
+    const headerRight = within(viewHeader).getByTestId("shipping-view-header-right");
+    expect(headerRight).toHaveClass("min-w-[min(100%,620px)]", "basis-[620px]", "flex-1", "flex-wrap");
+    expect(within(viewHeader).getByTestId("shipping-history-serial-summary")).toHaveTextContent("34M25H0490 ~ 34M25H0493 (4개)");
+    expect(within(viewHeader).getByTestId("shipping-invoice-editor")).toBeInTheDocument();
     const header = within(detail).getByTestId("shipping-history-detail-header");
-    expect(within(header).getByTestId("shipping-history-serial-summary")).toHaveTextContent("34M25H0490 ~ 34M25H0493 (4개)");
     const actions = within(header).getByTestId("shipping-history-detail-actions");
     expect(actions).toHaveClass("items-center");
     expect(within(actions).getByText("픽업 완료")).toBeInTheDocument();
     expect(within(actions).getByTestId("shipping-pickup-cancel-from-history")).toBeInTheDocument();
-    expect(within(detail).getAllByText("34M25H0490 ~ 34M25H0493 (4개)")).toHaveLength(1);
+    expect(within(detail).queryByTestId("shipping-history-serial-summary")).not.toBeInTheDocument();
+    expect(within(detail).queryByTestId("shipping-invoice-editor")).not.toBeInTheDocument();
+    expect(screen.getAllByText("34M25H0490 ~ 34M25H0493 (4개)")).toHaveLength(1);
     expect(within(detail).getAllByTestId("shipping-pickup-cancel-from-history")).toHaveLength(1);
+    expect(screen.getByTestId("shipping-history-metrics")).toHaveClass("xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]");
   });
 
   it.each([
@@ -3592,6 +3606,19 @@ describe("DesktopShippingView", () => {
     expect(searchMonth).toHaveAttribute("data-surface", "layout-only");
     expect(searchMonth).not.toHaveClass("rounded-[12px]", "border");
     expect(within(searchMonth).getByRole("button", { name: /Standard PF/ })).toHaveClass("rounded-[14px]", "border");
+
+    const historyCallsBeforeSearchToggle = vi.mocked(api.getShippingHistory).mock.calls.length;
+    fireEvent.click(within(searchMonth).getByText("6월 · 1건", { selector: "summary" }));
+    expect(searchMonth).not.toHaveAttribute("open");
+    fireEvent.click(within(searchMonth).getByText("6월 · 1건", { selector: "summary" }));
+    expect(searchMonth).toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(historyCallsBeforeSearchToggle);
+    const searchMonthSummary = within(searchMonth).getByText("6월 · 1건", { selector: "summary" });
+    fireEvent.keyDown(searchMonthSummary, { key: " " });
+    searchMonth.open = false;
+    fireEvent(searchMonth, new Event("toggle"));
+    expect(searchMonth).not.toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(historyCallsBeforeSearchToggle);
   });
 
   it("uses semantic history colors, a balanced title, and controlled month disclosure", async () => {
@@ -3633,6 +3660,10 @@ describe("DesktopShippingView", () => {
     expect(june).toHaveStyle({ color: LEGACY_COLORS.blue });
 
     fireEvent.click(june);
+    expect(june.closest("details")).not.toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeJune + 1);
+
+    fireEvent.click(june);
     expect(june.closest("details")).toHaveAttribute("open");
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeJune + 1);
 
@@ -3651,7 +3682,13 @@ describe("DesktopShippingView", () => {
     ).toHaveAttribute("open"));
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeYearChange + 1);
     fireEvent.click(within(historyPanel).getByText("2025년", { selector: "summary" }));
-    expect(within(historyPanel).getByText("2025년", { selector: "summary" }).closest("details")).toHaveAttribute("open");
+    expect(within(historyPanel).getByText("2025년", { selector: "summary" }).closest("details")).not.toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeYearChange + 1);
+    const year2025Details = within(historyPanel).getByText("2025년", { selector: "summary" }).closest("details") as HTMLDetailsElement;
+    fireEvent.keyDown(within(historyPanel).getByText("2025년", { selector: "summary" }), { key: "Enter" });
+    year2025Details.open = true;
+    fireEvent(year2025Details, new Event("toggle"));
+    expect(year2025Details).toHaveAttribute("open");
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeYearChange + 1);
     fireEvent.click(within(historyPanel).getByText("2026년", { selector: "summary" }));
     expect(within(historyPanel).getByText("2025년", { selector: "summary" }).closest("details")).not.toHaveAttribute("open");
@@ -3660,6 +3697,55 @@ describe("DesktopShippingView", () => {
 
     fireEvent.click(within(historyPanel).getByRole("button", { name: "요청 취소" }));
     expect(within(historyPanel).getByRole("button", { name: "요청 취소" })).toHaveStyle({ color: LEGACY_COLORS.red });
+    const cancelledMonth = await within(historyPanel).findByText("7월 · 1건", { selector: "summary" });
+    const cancelledCallsBeforeToggle = vi.mocked(api.getShippingHistory).mock.calls.length;
+    fireEvent.click(cancelledMonth);
+    expect(cancelledMonth.closest("details")).not.toHaveAttribute("open");
+    fireEvent.click(cancelledMonth);
+    expect(cancelledMonth.closest("details")).toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(cancelledCallsBeforeToggle);
+  });
+
+  it("closes a manually reopened month when selecting a different month in the same year", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([
+      { year: 2026, month: 7, count: 1 },
+      { year: 2026, month: 6, count: 1 },
+    ]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params?: any) => ({
+      requests: [request({
+        request_id: `history-${params?.month}`,
+        status: "PICKED_UP",
+        picked_up_at: "2026-07-20T01:00:00Z",
+      })],
+      next_cursor: null,
+      has_more: false,
+    }));
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const historyPanel = await screen.findByTestId("shipping-history-list");
+    const june = await within(historyPanel).findByText("6월 · 1건", { selector: "summary" });
+    const callsBeforeMonthChange = vi.mocked(api.getShippingHistory).mock.calls.length;
+    fireEvent.click(june);
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "PICKED_UP", year: 2026, month: 6, limit: 50 }),
+    ));
+    const juneDetails = june.closest("details") as HTMLDetailsElement;
+    expect(juneDetails).toHaveAttribute("open");
+    fireEvent.click(june);
+    expect(juneDetails).not.toHaveAttribute("open");
+    fireEvent.click(june);
+    expect(juneDetails).toHaveAttribute("open");
+
+    const july = within(historyPanel).getByText("7월 · 1건", { selector: "summary" });
+    fireEvent.click(july);
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "PICKED_UP", year: 2026, month: 7, limit: 50 }),
+    ));
+    expect(juneDetails).not.toHaveAttribute("open");
+    expect(july.closest("details")).toHaveAttribute("open");
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeMonthChange + 2);
   });
 
   it("ignores an older completed-history response after switching to cancelled", async () => {

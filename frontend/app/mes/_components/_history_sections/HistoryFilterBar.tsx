@@ -21,6 +21,7 @@ type Props = {
   /** 달력에서 고른 날짜(YYYY-MM-DD). null = 미선택. */
   selectedDay: string | null;
   onClearSelectedDay: () => void;
+  flatSurface?: boolean;
 };
 
 export function HistoryFilterBar({
@@ -35,9 +36,10 @@ export function HistoryFilterBar({
   onToggleCalendar,
   selectedDay,
   onClearSelectedDay,
+  flatSurface = false,
 }: Props) {
   return (
-    <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
+    <section className={flatSurface ? "card desktop-flat-surface" : "card"} style={{ paddingTop: 14, paddingBottom: 14 }}>
       <div className="flex flex-wrap items-center gap-2">
         <div
           className="flex min-h-[44px] flex-1 items-center gap-2 rounded-[12px] border px-3 py-2 lg:min-h-0"
