@@ -125,7 +125,7 @@ describe("MobileShell layout", () => {
   it("does not render the old mobile top header controls", () => {
     render(<MobileShell />);
 
-    expect(screen.queryByText("DEXCOWIN MES System")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-status-target")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "알림" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "사용자 메뉴" })).not.toBeInTheDocument();
     expect(screen.getByText("dashboard screen")).toBeInTheDocument();

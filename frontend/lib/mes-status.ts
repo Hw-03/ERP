@@ -50,7 +50,7 @@ export function toMesTone(value: string | null | undefined): MesTone {
  */
 export function inferTone(status: string | null | undefined): MesTone {
   if (!status) return "info";
-  if (status === "DEXCOWIN MES System") return "neutral";
+  if (status === "DEXCOWIN MES") return "neutral";
   if (status.startsWith("방금 완료")) return "success";
   if (/실패|오류|불러오지 못|에러/.test(status)) return "danger";
   if (/주의|경고|부족|품절/.test(status)) return "warning";

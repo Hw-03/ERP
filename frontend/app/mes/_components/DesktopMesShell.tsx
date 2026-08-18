@@ -46,7 +46,7 @@ import {
 } from "./tabAccess";
 
 const VALID_TABS = new Set<DesktopTabId>([...SIDEBAR_TAB_IDS, "settings"]);
-const DEFAULT_STATUS = "DEXCOWIN MES System";
+const DEFAULT_STATUS = "DEXCOWIN MES";
 const MS_PER_DAY = 86400000;
 
 type DesktopTabNavigation = "push" | "replace" | "none";

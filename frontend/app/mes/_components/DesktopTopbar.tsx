@@ -13,7 +13,7 @@ import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOper
 import { NotificationBell } from "./notifications/NotificationBell";
 import type { NotificationNavigationTarget } from "./notifications/NotificationBell";
 
-const DEFAULT_STATUS = "DEXCOWIN MES System";
+const DEFAULT_STATUS = "DEXCOWIN MES";
 
 const WAREHOUSE_ROLE_LABEL: Record<string, string | null> = {
   primary: "창고 정",

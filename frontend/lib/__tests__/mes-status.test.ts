@@ -34,8 +34,8 @@ describe("toMesTone", () => {
 });
 
 describe("inferTone", () => {
-  it("DEXCOWIN MES System 은 neutral", () => {
-    expect(inferTone("DEXCOWIN MES System")).toBe("neutral");
+  it("DEXCOWIN MES 는 neutral", () => {
+    expect(inferTone("DEXCOWIN MES")).toBe("neutral");
   });
 
   it("'방금 완료' prefix 는 success", () => {

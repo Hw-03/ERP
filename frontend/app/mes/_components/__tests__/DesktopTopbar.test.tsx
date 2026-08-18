@@ -47,12 +47,12 @@ describe("DesktopTopbar", () => {
         title="출하"
         icon={AlertTriangle}
         iconColor={LEGACY_COLORS.blue}
-        status="DEXCOWIN MES System"
+        status="DEXCOWIN MES"
         onRefresh={vi.fn()}
       />,
     );
 
-    expect(screen.getByTestId("desktop-status-target")).toHaveTextContent("DEXCOWIN MES System");
+    expect(screen.getByTestId("desktop-status-target")).toHaveTextContent("DEXCOWIN MES");
   });
 
   it("enables the login notification dialog for the desktop top bar", () => {
