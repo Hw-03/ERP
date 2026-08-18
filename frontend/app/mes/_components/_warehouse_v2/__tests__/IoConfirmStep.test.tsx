@@ -271,6 +271,50 @@ describe("IoConfirmStep", () => {
     expect(screen.getByText("ADX6000 BODY RIGHT ASSY")).toBeInTheDocument();
   });
 
+  it("최종 확인 목록을 요약 카드의 좌우 기준선과 같은 품목 표면으로 맞춘다", () => {
+    const directLine = {
+      ...parentLine,
+      line_id: "direct-line",
+      item_id: "direct-item",
+      item_name: "직접 선택 품목",
+    };
+    render(
+      <IoConfirmStep
+        workType="warehouse_io"
+        subType="warehouse_to_dept"
+        bundles={[
+          bundle,
+          {
+            ...bundle,
+            bundle_id: "direct-bundle",
+            source_kind: "direct_item",
+            title: directLine.item_name,
+            source_item_id: directLine.item_id,
+            lines: [directLine],
+          },
+        ]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="warehouse"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    const bundleRow = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
+    const directName = screen.getByText("직접 선택 품목");
+    const directRow = directName.parentElement?.parentElement;
+
+    expect(bundleRow.parentElement).not.toHaveClass("pr-1");
+    expect(bundleRow).toHaveClass("px-5", "py-4");
+    expect(directRow).toHaveClass("rounded-[18px]", "px-5", "py-3");
+    expect(directRow?.style.background).toBe(bundleRow.style.background);
+  });
+
   it("aligns the save action with the Step 4 mobile action button rhythm", () => {
     renderConfirmStep();
 

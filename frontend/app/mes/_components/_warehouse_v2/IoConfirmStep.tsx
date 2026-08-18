@@ -264,7 +264,7 @@ export function IoConfirmStep({
       </div>
 
       {/* 묶음 카드 목록 (1단 세로 스크롤) */}
-      <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-4">
         {displayBundles.map((bundle) => (
           <ConfirmBundleCard
             key={bundle.bundle_id}
@@ -378,7 +378,10 @@ function ConfirmBundleCard({
     if (!onlyLine.included || bomParentLineIds.has(onlyLine.line_id)) return null;
     const dir = signFor(onlyLine);
     return (
-      <div className="flex min-h-[60px] items-center justify-between gap-4 px-1 py-2">
+      <div
+        className="flex min-h-[60px] items-center justify-between gap-4 rounded-[18px] px-5 py-3"
+        style={{ background: tint(LEGACY_COLORS.blue, 6) }}
+      >
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
             {onlyLine.item_name}
@@ -461,7 +464,7 @@ function ConfirmBundleCard({
           setCollapsed((v) => !v);
         }
       }}
-      className="rounded-[18px] p-4 outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] hover:brightness-[1.01]"
+      className="rounded-[18px] px-5 py-4 outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] hover:brightness-[1.01]"
       style={{
         background: tint(tone, 6),
         cursor: isCollapsible ? "pointer" : "default",

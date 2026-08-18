@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Layers, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, Item } from "./types";
@@ -10,6 +10,7 @@ import { formatQty } from "@/lib/mes/format";
 import { ExpandableItemName } from "./ExpandableItemName";
 import { deductionSourceSummary, IoDeductionSourceBadge } from "./IoDeductionSourceBadge";
 import { QuantityStepper } from "./QuantityStepper";
+import { IoRemoveButton } from "./IoRemoveButton";
 
 interface Props {
   bundle: IoBundle;
@@ -249,15 +250,11 @@ export function IoBundleCard({
             <span aria-hidden="true" className="hidden lg:block" />
           </>
         )}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onRemoveBundle(); }}
-          className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:h-11 lg:w-11 lg:self-center"
-          style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
-          title="묶음 삭제"
-        >
-          <Trash2 className="h-5 w-5 lg:h-7 lg:w-7" />
-        </button>
+        <IoRemoveButton
+          label="묶음 삭제"
+          onClick={onRemoveBundle}
+          className="absolute right-0 top-0 lg:static lg:self-center"
+        />
       </div>
 
       {!collapsed && isCollapsible && (

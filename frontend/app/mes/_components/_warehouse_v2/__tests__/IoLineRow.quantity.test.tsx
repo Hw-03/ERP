@@ -143,6 +143,32 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByRole("button", { name: "-1" })).toHaveClass("min-h-[44px]");
   });
 
+  it("aligns stock and remove controls to the BOM header desktop columns", () => {
+    render(
+      <IoLineRow
+        line={makeLine({ origin: "manual" })}
+        subType="receive_supplier"
+        isChild={false}
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    const removeButton = screen.getByRole("button", { name: "삭제" });
+    const row = removeButton.parentElement;
+    expect(row).toHaveClass("lg:pr-[18px]");
+    expect(row).toHaveStyle({
+      gridTemplateColumns:
+        "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
+    });
+    expect(screen.getByText("현재 재고").parentElement).toHaveClass("text-center");
+    expect(screen.getByText("현재 재고").parentElement).not.toHaveClass("lg:text-right");
+    expect(removeButton).toHaveClass("h-11", "w-11");
+    expect(removeButton.querySelector("svg")).toHaveClass("h-5", "w-5");
+  });
+
   it("shows the actual deduction source prominently on internal-use quantity rows", () => {
     render(
       <IoLineRow

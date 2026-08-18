@@ -117,6 +117,26 @@ describe("IoBundleCard", () => {
     expect(header).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("묶음 삭제 버튼은 수량 행과 같은 44px 버튼과 20px 아이콘을 사용한다", () => {
+    render(
+      <IoBundleCard
+        bundle={bundle}
+        subType="produce"
+        itemMap={itemMap}
+        getAvailable={() => 10}
+        onToggleLine={() => {}}
+        onQuantityChange={() => {}}
+        onBundleQuantityChange={vi.fn()}
+        onRemoveLine={() => {}}
+        onRemoveBundle={() => {}}
+      />,
+    );
+
+    const removeButton = screen.getByRole("button", { name: "묶음 삭제" });
+    expect(removeButton).toHaveClass("h-11", "w-11");
+    expect(removeButton.querySelector("svg")).toHaveClass("h-5", "w-5");
+  });
+
   it("internal-use BOM header summarizes multiple deduction locations before quantity controls", () => {
     const multiSourceBundle = {
       ...bundle,

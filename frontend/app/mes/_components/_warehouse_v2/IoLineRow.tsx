@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, ChevronRight, MinusCircle, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, MinusCircle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { getStockState } from "@/lib/mes/inventory";
@@ -19,6 +19,7 @@ import { BomSubExpander } from "./BomSubExpander";
 import { ExpandableItemName } from "./ExpandableItemName";
 import { deductionSourceName, IoDeductionSourceBadge } from "./IoDeductionSourceBadge";
 import { QuantityStepper } from "./QuantityStepper";
+import { IoRemoveButton } from "./IoRemoveButton";
 
 interface Props {
   line: IoLine;
@@ -145,10 +146,11 @@ export function IoLineRow({
     <div
       // 모바일: flex-wrap 으로 줄바꿈(품목명 칸이 0폭 붕괴 → 세로글자 나던 문제 해소).
       // 데스크톱(lg): 기존 7열 그리드 유지(인라인 gridTemplateColumns 는 display:grid 일 때만 의미).
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-4 lg:grid lg:gap-3"
+      // 데스크톱 우측 18px은 BOM 카드의 border-2(2px) + p-4(16px) 안쪽 기준선과 맞춘다.
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-4 lg:grid lg:gap-3 lg:pr-[18px]"
       style={{
         gridTemplateColumns:
-          "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 40px",
+          "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
         background: rowBackground,
         paddingLeft: isChild ? 32 : 16,
         borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
@@ -253,7 +255,7 @@ export function IoLineRow({
       {/* 항목 5-6 — 모바일만 가능재고+실행후를 가운데 정렬·간격 확보. lg:contents 로 데스크톱 7열 그리드 유지. */}
       <div className="flex w-full items-start justify-center gap-10 lg:contents">
       {/* 5. 현재 재고 */}
-      <div className="text-center lg:text-right">
+      <div className="text-center">
         <div
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
@@ -269,7 +271,7 @@ export function IoLineRow({
       </div>
 
       {/* 6. 실행 후 재고 */}
-      <div className="text-center lg:text-right">
+      <div className="text-center">
         <div
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
@@ -315,15 +317,7 @@ export function IoLineRow({
 
       {/* 7. 삭제 (manual 또는 forceShowRemove) */}
       {line.origin === "manual" || forceShowRemove ? (
-        <button
-          type="button"
-          onClick={onRemove}
-          className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:brightness-110"
-          style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
-          title="삭제"
-        >
-          <Trash2 className="h-6 w-6" />
-        </button>
+        <IoRemoveButton label="삭제" onClick={onRemove} />
       ) : (
         <span aria-hidden className="block" />
       )}
