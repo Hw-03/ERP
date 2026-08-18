@@ -318,8 +318,17 @@ function Get-FileFingerprint {
     param([string] $Path)
 
     $item = Get-Item -LiteralPath $Path
+    $stream = [System.IO.File]::OpenRead($Path)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "")
+    }
+    finally {
+        $sha256.Dispose()
+        $stream.Dispose()
+    }
     return [pscustomobject]@{
-        Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
+        Hash = $hash
         Mtime = $item.LastWriteTimeUtc.Ticks
     }
 }
