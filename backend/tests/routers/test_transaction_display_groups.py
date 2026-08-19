@@ -233,6 +233,31 @@ def test_display_groups_apply_parent_operation_keys_visibility_and_request_date(
     assert str(hidden_log.log_id) not in returned_ids
 
 
+def test_display_groups_date_range_uses_kst_business_day_bounds(client, db_session, make_item):
+    """UTC-naive 로그는 KST 포함 시작일·포함 종료일로 표시 묶음을 필터한다."""
+    item = make_item(name="KST 표시 묶음 경계 품목")
+    july_last = _add_log(db_session, item, created_at=datetime(2026, 7, 31, 14, 59))
+    august_first = _add_log(db_session, item, created_at=datetime(2026, 7, 31, 15, 0))
+    august_last = _add_log(db_session, item, created_at=datetime(2026, 8, 31, 14, 59))
+    september_first = _add_log(db_session, item, created_at=datetime(2026, 8, 31, 15, 0))
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/display-groups",
+        params={"date_from": "2026-08-01", "date_to": "2026-08-31"},
+    )
+
+    assert response.status_code == 200, response.text
+    returned_ids = {
+        row["log_id"]
+        for group in response.json()["groups"]
+        for row in group["logs"]
+    }
+    assert returned_ids == {str(august_first.log_id), str(august_last.log_id)}
+    assert str(july_last.log_id) not in returned_ids
+    assert str(september_first.log_id) not in returned_ids
+
+
 def test_display_groups_cursor_skips_a_batch_that_gains_a_newer_log(client, db_session, make_item):
     item = make_item(name="커서 갱신 품목")
     base = datetime(2026, 7, 15, 12, 0, 0)

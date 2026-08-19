@@ -26,6 +26,13 @@ export interface ModelCapacityGroup {
   };
 }
 
+export interface PfCapacityModelGroup {
+  key: string;
+  label: string;
+  variants: ProductionCapacityPfVariant[];
+  autoRepresentative: ProductionCapacityPfVariant | null;
+}
+
 const UNCLASSIFIED = "미분류";
 
 /**
@@ -77,4 +84,91 @@ export function getAutoRepresentative(
   return (af.auto_representatives ?? []).find(
     (variant) => (variant.model_symbol ?? "").trim() === modelKey,
   ) ?? null;
+}
+
+function getModelKey(modelSymbol?: string | null): string {
+  return modelSymbol?.trim() || UNCLASSIFIED;
+}
+
+function compareModelKeys(a: string, b: string): number {
+  if (a === UNCLASSIFIED) return 1;
+  if (b === UNCLASSIFIED) return -1;
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+function comparePfVariants(
+  a: ProductionCapacityPfVariant,
+  b: ProductionCapacityPfVariant,
+): number {
+  const capacityA = a.ship_ready + a.fast_production + a.total_production;
+  const capacityB = b.ship_ready + b.fast_production + b.total_production;
+  return (
+    capacityB - capacityA ||
+    b.total_production - a.total_production ||
+    b.fast_production - a.fast_production ||
+    b.ship_ready - a.ship_ready ||
+    (a.pf_code ?? "").localeCompare(b.pf_code ?? "") ||
+    (a.af_item_id ?? "").localeCompare(b.af_item_id ?? "")
+  );
+}
+
+/**
+ * AF 경로별 PF 변형을 모델별로 묶고, 같은 PF는 자동 대표 또는 수량 기준으로 하나만 남긴다.
+ */
+export function groupPfVariantsByModel(
+  af: ProductionCapacityAfBlock,
+): PfCapacityModelGroup[] {
+  const variantsByModel = new Map<string, ProductionCapacityPfVariant[]>();
+  for (const variant of af.pf_variants) {
+    const key = getModelKey(variant.model_symbol);
+    const variants = variantsByModel.get(key);
+    if (variants) variants.push(variant);
+    else variantsByModel.set(key, [variant]);
+  }
+
+  return Array.from(variantsByModel.entries())
+    .map(([key, variants]) => {
+      const autoRepresentatives = (af.auto_representatives ?? []).filter(
+        (variant) => getModelKey(variant.model_symbol) === key,
+      );
+      const variantsByPf = new Map<string, ProductionCapacityPfVariant[]>();
+      for (const variant of variants) {
+        const candidates = variantsByPf.get(variant.pf_item_id);
+        if (candidates) candidates.push(variant);
+        else variantsByPf.set(variant.pf_item_id, [variant]);
+      }
+      const deduplicated = Array.from(variantsByPf.values()).map((candidates) => {
+        const autoRepresentative = autoRepresentatives.find((representative) =>
+          representative.pf_item_id === candidates[0].pf_item_id &&
+          candidates.some((variant) => variant.af_item_id === representative.af_item_id),
+        );
+        return autoRepresentative
+          ? candidates.find((variant) => variant.af_item_id === autoRepresentative.af_item_id)!
+          : [...candidates].sort(comparePfVariants)[0];
+      });
+      const sortedVariants = deduplicated.sort((a, b) =>
+        (a.pf_code ?? "").localeCompare(b.pf_code ?? "") ||
+        a.pf_name.localeCompare(b.pf_name) ||
+        a.pf_item_id.localeCompare(b.pf_item_id),
+      );
+      const autoRepresentative = sortedVariants.find((variant) =>
+        autoRepresentatives.some((representative) =>
+          representative.pf_item_id === variant.pf_item_id,
+        ),
+      ) ?? null;
+      const label = key === UNCLASSIFIED
+        ? UNCLASSIFIED
+        : getModelLabel(key, sortedVariants[0]?.pf_name) || `모델${key}`;
+      return { key, label, variants: sortedVariants, autoRepresentative };
+    })
+    .sort((a, b) => compareModelKeys(a.key, b.key));
+}
+
+/** 모델 순서에서 자동 대표 PF를 우선하고, 없으면 첫 PF를 반환한다. */
+export function getInitialPfVariant(
+  groups: PfCapacityModelGroup[],
+): ProductionCapacityPfVariant | null {
+  return groups.find((group) => group.autoRepresentative)?.autoRepresentative
+    ?? groups.find((group) => group.variants.length > 0)?.variants[0]
+    ?? null;
 }

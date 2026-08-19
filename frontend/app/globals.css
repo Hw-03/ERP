@@ -44,6 +44,9 @@
     --c-bg: #eff4fb;
     --c-s1: rgba(255, 255, 255, 0.92);
     --c-s2: rgba(244, 247, 252, 0.96);
+    --c-inventory-table-header: #f4f7fc;
+    --c-history-table-header: #f4f7fc;
+    --c-inventory-table-corner-backdrop: #ffffff;
     --c-s3: rgba(230, 236, 245, 0.96);
     --c-s4: rgba(214, 224, 237, 0.98);
     --c-border: rgba(76, 97, 130, 0.1);
@@ -128,6 +131,9 @@
     --c-bg: #151a21;
     --c-s1: rgba(27, 34, 42, 0.96);
     --c-s2: rgba(35, 44, 54, 0.96);
+    --c-inventory-table-header: #232c36;
+    --c-history-table-header: #232c36;
+    --c-inventory-table-corner-backdrop: #1b222a;
     --c-s3: rgba(44, 55, 67, 0.96);
     --c-s4: rgba(56, 69, 83, 0.98);
     --c-border: rgba(139, 148, 158, 0.24);

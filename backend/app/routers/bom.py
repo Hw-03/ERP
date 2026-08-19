@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, Inventory, Item
+from app.models import BOM, Item
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
-from app.services import audit
+from app.services import audit, stock_math
 from app.services._tx import commit_and_refresh, commit_only
 from app._evt import emit as _evt_emit
 from app.services.bom import BomCache, bom_child_item_ordering, bom_modal_tree_child_ordering_key, build_bom_cache
@@ -213,7 +213,7 @@ def get_bom_tree(
 ):
     """Return a recursive BOM tree for a given parent item.
 
-    진입 시 BOM 캐시 1회 + 후손 후보 Items/Inventory IN 1회씩으로 N+1 제거.
+    진입 시 BOM 캐시 1회 + 후손 후보 Items/정상 재고 집계 IN 1회씩으로 N+1 제거.
     """
     bom_cache = build_bom_cache(db)
     needed_ids = _collect_descendants(parent_item_id, bom_cache, set())
@@ -226,16 +226,16 @@ def get_bom_tree(
     if parent_item_id not in items_map:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
-    invs_map = {
-        i.item_id: i
-        for i in db.query(Inventory).filter(Inventory.item_id.in_(list(needed_ids))).all()
+    normal_stock_by_item = {
+        item_id: figure.warehouse_qty + figure.production_total
+        for item_id, figure in stock_math.bulk_compute(db, needed_ids).items()
     }
 
     return _build_tree_cached(
         items_map[parent_item_id],
         Decimal("1"),
         items_map,
-        invs_map,
+        normal_stock_by_item,
         bom_cache,
         depth=0,
         visited=set(),
@@ -339,15 +339,14 @@ def _build_tree_cached(
     item: Item,
     required_quantity: Decimal,
     items_map: dict,
-    invs_map: dict,
+    normal_stock_by_item: dict,
     cache: BomCache,
     depth: int,
     visited: set,
     department_order: Literal["desc"] | None = None,
 ) -> BOMTreeNode:
     """메모리 dict 만 참조하는 순수 재귀 — DB 쿼리 0건."""
-    inv = invs_map.get(item.item_id)
-    current_stock = inv.quantity if inv else Decimal("0")
+    current_stock = normal_stock_by_item.get(item.item_id, Decimal("0"))
 
     if item.item_id in visited or depth > 10:
         return BOMTreeNode(
@@ -378,7 +377,7 @@ def _build_tree_cached(
                 child_item,
                 child_per_unit * required_quantity,
                 items_map,
-                invs_map,
+                normal_stock_by_item,
                 cache,
                 depth + 1,
                 visited,

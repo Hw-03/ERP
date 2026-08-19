@@ -381,6 +381,7 @@ interface Props {
 export function useBomTree(itemId: string, open: boolean, departmentOrder?: "desc") {
   const revision = useRealtimeRevision();
   const [tree, setTree] = useState<BOMTreeNode | false | null>(null);
+  const [error, setError] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
   const loadedItemRef = useRef<string | null>(null);
   const loadedRequestRef = useRef<string | null>(null);
@@ -390,6 +391,7 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
     const requestKey = `${itemId}:${departmentOrder ?? "default"}:${revision ?? "initial"}:${requestVersion}`;
     if (!open || loadedRequestRef.current === requestKey) return;
     const refreshingCurrentItem = loadedItemRef.current === itemId;
+    setError(false);
     if (!refreshingCurrentItem) setTree(null);
     api
       .getBOMTree(itemId, departmentOrder ? { departmentOrder } : undefined)
@@ -397,10 +399,12 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
         if (!active) return;
         loadedItemRef.current = itemId;
         loadedRequestRef.current = requestKey;
+        setError(false);
         setTree(nextTree);
       })
       .catch(() => {
         if (!active) return;
+        setError(true);
         if (!refreshingCurrentItem) setTree(false);
       });
     return () => {
@@ -410,7 +414,9 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
 
   return {
     tree,
+    error,
     retry: () => {
+      setError(false);
       setTree(null);
       setRequestVersion((version) => version + 1);
     },
@@ -433,6 +439,18 @@ type ModalBomTreeProps = {
   expandedItemIds: ReadonlySet<string>;
   onToggleItem: (itemId: string) => void;
 };
+
+function hasSelectedRowText(row: HTMLElement): boolean {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !selection.toString().trim()) return false;
+
+  const range = selection.getRangeAt(0);
+  return row.contains(range.startContainer) || row.contains(range.endContainer);
+}
+
+function formatModalBomQuantity(quantity: number, unit: string): string {
+  return `${formatQty(quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} ${unit}`;
+}
 
 function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
   node: BOMTreeNode;
@@ -467,16 +485,16 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
       </span>
       <span
         data-testid="bom-modal-name-cell"
-        className="min-w-0 break-words px-3 py-2 font-semibold leading-snug"
+        className="min-w-0 cursor-text select-text break-words px-3 py-2 font-semibold leading-snug"
         style={{ color: LEGACY_COLORS.text, paddingLeft: 12 + depth * MODAL_TREE_DEPTH_INDENT_PX }}
       >
         {node.item_name}
       </span>
-      <span className="min-w-0 truncate px-3 font-mono text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+      <span className="min-w-0 cursor-text select-text truncate px-3 font-mono text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
         <ModalBomCode code={node.mes_code} />
       </span>
       <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
-        {formatBomQuantity(node.required_quantity, node.unit)}
+        {formatModalBomQuantity(node.required_quantity, node.unit)}
       </span>
       <span
         className={`text-center font-bold tabular-nums${isCapacityIgnoredZeroStock ? " line-through" : ""}`}
@@ -491,15 +509,24 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
     <>
       <li data-testid="bom-modal-row" data-depth={depth}>
         {hasKids ? (
-          <button
-            type="button"
-            onClick={() => onToggleItem(node.item_id)}
-            className="bom-modal-grid bom-detail-modal-grid min-h-[52px] w-full border-b text-left text-sm transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]"
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
+              if (!hasSelectedRowText(event.currentTarget)) onToggleItem(node.item_id);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onToggleItem(node.item_id);
+              }
+            }}
+            className="bom-modal-grid bom-detail-modal-grid min-h-[52px] w-full cursor-pointer border-b text-left text-sm transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]"
             style={{ borderColor: LEGACY_COLORS.border, background }}
             aria-expanded={open}
           >
             {cells}
-          </button>
+          </div>
         ) : (
           <div
             className="bom-modal-grid bom-detail-modal-grid min-h-[52px] border-b text-sm transition-[filter] hover:brightness-95"
@@ -526,35 +553,40 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem }: ModalBomTr
   return (
     <div
       data-testid="bom-modal-tree-scroll"
-      className="min-h-0 flex-1 overflow-y-scroll rounded-[18px] border"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      className="min-h-0 flex-1 overflow-y-scroll"
     >
       <div
-        data-testid="bom-modal-grid-header"
-        className="bom-modal-grid bom-detail-modal-grid sticky top-0 z-10 min-h-11 border-b text-xs font-bold"
-        style={{
-          background: "var(--c-popup-bg)",
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.muted2,
-        }}
+        data-testid="bom-modal-tree-table"
+        className="min-h-full overflow-clip rounded-[18px] border"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        <span aria-hidden />
-        <span className="px-3">구성품명</span>
-        <span className="px-3">품목코드</span>
-        <span className="text-center">소요량</span>
-        <span className="text-center">현재 재고</span>
+        <div
+          data-testid="bom-modal-grid-header"
+          className="bom-modal-grid bom-detail-modal-grid sticky top-0 z-10 min-h-11 border-b text-xs font-bold"
+          style={{
+            background: "var(--c-popup-bg)",
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.muted2,
+          }}
+        >
+          <span aria-hidden />
+          <span className="px-3">구성품명</span>
+          <span className="px-3">품목코드</span>
+          <span className="text-center">소요량</span>
+          <span className="text-center">현재 재고</span>
+        </div>
+        <ul>
+          {tree.children.map((child) => (
+            <ModalBomTreeRow
+              key={child.item_id}
+              node={child}
+              depth={0}
+              expandedItemIds={expandedItemIds}
+              onToggleItem={onToggleItem}
+            />
+          ))}
+        </ul>
       </div>
-      <ul>
-        {tree.children.map((child) => (
-          <ModalBomTreeRow
-            key={child.item_id}
-            node={child}
-            depth={0}
-            expandedItemIds={expandedItemIds}
-            onToggleItem={onToggleItem}
-          />
-        ))}
-      </ul>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryCalendarStrip } from "./HistoryCalendarStrip";
+import type { SelectedHistoryMonth } from "./historyQuery";
 
 /**
  * 입출고 내역 달력 본문 — 3차 C8: 자체 헤더/토글 제거.
@@ -18,6 +19,7 @@ export interface HistoryCalendarPanelProps {
   nextMonth: () => void;
   setCalendarYear: (updater: (y: number) => number) => void;
   setCalendarMonth: (m: number) => void;
+  onSelectMonth: (month: SelectedHistoryMonth) => void;
   calendarLoading: boolean;
   calendarDays: (number | null)[];
   calendarDayMap: Map<string, TransactionLog[]>;
@@ -37,6 +39,7 @@ export function HistoryCalendarPanel({
   nextMonth,
   setCalendarYear,
   setCalendarMonth,
+  onSelectMonth,
   calendarLoading,
   calendarDays,
   calendarDayMap,
@@ -56,6 +59,7 @@ export function HistoryCalendarPanel({
         nextMonth={nextMonth}
         setCalendarYear={setCalendarYear}
         setCalendarMonth={setCalendarMonth}
+        onSelectMonth={onSelectMonth}
         calendarLoading={calendarLoading}
         calendarDays={calendarDays}
         calendarDayMap={calendarDayMap}

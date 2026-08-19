@@ -2,7 +2,7 @@
 
 import { CalendarDays, ChevronDown, Filter, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { DATE_OPTIONS } from "./historyQuery";
+import { DATE_OPTIONS, formatHistoryMonthLabel, type SelectedHistoryMonth } from "./historyQuery";
 
 // 3차 C8: 상단 컨트롤 한 줄 통합 — [검색][기간][필터][달력] + 선택날짜 칩.
 // 거래 유형 칩 줄·"적용됨" 요약 줄은 폐기(거래 종류 = "필터" 패널 카드).
@@ -21,6 +21,8 @@ type Props = {
   /** 달력에서 고른 날짜(YYYY-MM-DD). null = 미선택. */
   selectedDay: string | null;
   onClearSelectedDay: () => void;
+  selectedMonth: SelectedHistoryMonth | null;
+  onClearSelectedMonth: () => void;
   flatSurface?: boolean;
 };
 
@@ -36,6 +38,8 @@ export function HistoryFilterBar({
   onToggleCalendar,
   selectedDay,
   onClearSelectedDay,
+  selectedMonth,
+  onClearSelectedMonth,
   flatSurface = false,
 }: Props) {
   return (
@@ -76,11 +80,26 @@ export function HistoryFilterBar({
             </button>
           </span>
         )}
+        {selectedMonth && (
+          <span
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`,
+              color: LEGACY_COLORS.blue,
+            }}
+          >
+            선택: {formatHistoryMonthLabel(selectedMonth)}
+            <button type="button" aria-label="선택 월 해제" onClick={onClearSelectedMonth}>
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        )}
 
         {/* 기간 세그먼트 */}
         <div className="flex shrink-0 overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
           {DATE_OPTIONS.map((opt) => {
-            const active = dateFilter === opt.value;
+            const active = !selectedDay && !selectedMonth && dateFilter === opt.value;
             return (
               <button
                 key={opt.value}

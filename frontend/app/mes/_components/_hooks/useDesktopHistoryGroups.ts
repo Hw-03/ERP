@@ -6,7 +6,7 @@ import { productionApi, type TransactionDisplayGroup, type TransactionDisplayGro
 import { queryKeys } from "@/lib/queries/keys";
 import { STALE_TIME } from "@/lib/queries/client";
 import { HISTORY_PAGE_SIZE } from "../_history_sections/historyConstants";
-import { dateFilterToFrom } from "../_history_sections/historyQuery";
+import { resolveHistoryDateRange } from "../_history_sections/historyQuery";
 import type { UseHistoryDataArgs } from "./useHistoryData";
 
 export interface UseDesktopHistoryGroupsResult {
@@ -33,14 +33,14 @@ export function useDesktopHistoryGroups({
   dateFilter,
   debouncedSearch,
   selectedDateKey,
+  selectedMonth = null,
   department,
   model = "",
   realtimeRevision,
 }: UseHistoryDataArgs): UseDesktopHistoryGroupsResult {
   const queryClient = useQueryClient();
   const operationKeys = operations || undefined;
-  const dateFrom = selectedDateKey ?? dateFilterToFrom(dateFilter);
-  const dateTo = selectedDateKey ?? undefined;
+  const { dateFrom, dateTo } = resolveHistoryDateRange(dateFilter, selectedDateKey, selectedMonth);
   const search = debouncedSearch.trim() || undefined;
   const departmentParam = department || undefined;
   const modelParam = model || undefined;

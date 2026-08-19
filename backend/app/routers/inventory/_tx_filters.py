@@ -8,8 +8,9 @@ transactions.py 의 list_transactions / summary / export 가 공유하는
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from typing import NamedTuple, Optional
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, and_, case, false, func, not_, or_
 from sqlalchemy.orm import Query, Session
@@ -49,6 +50,7 @@ _SUMMARY_DEFECT_TYPES = [
     TransactionTypeEnum.SUPPLIER_RETURN,
 ]
 LEGACY_DEFECT_REWORK_REFERENCE_PREFIX = "defect-disassemble:"
+KST = ZoneInfo("Asia/Seoul")
 
 
 def is_legacy_defect_rework_reference(reference_no: Optional[str]) -> bool:
@@ -71,6 +73,15 @@ def _history_request_date_expr() -> ColumnElement:
         IoBatch.created_at,
         TransactionLog.created_at,
     )
+
+
+def _kst_date_to_utc_naive_bounds(kst_date: date) -> tuple[datetime, datetime]:
+    """KST 업무 날짜를 DB의 UTC-naive 반개구간으로 변환한다."""
+    start = datetime.combine(kst_date, time.min, tzinfo=KST).astimezone(UTC).replace(tzinfo=None)
+    end = datetime.combine(
+        kst_date + timedelta(days=1), time.min, tzinfo=KST
+    ).astimezone(UTC).replace(tzinfo=None)
+    return start, end
 
 
 def _department_label_expr() -> ColumnElement:
@@ -411,9 +422,11 @@ def _apply_common_filters(
         query = query.filter(_md)
     request_date_expr = _history_request_date_expr()
     if date_from:
-        query = query.filter(request_date_expr >= datetime.combine(date_from, time.min))
+        date_from_start, _ = _kst_date_to_utc_naive_bounds(date_from)
+        query = query.filter(request_date_expr >= date_from_start)
     if date_to:
-        query = query.filter(request_date_expr <= datetime.combine(date_to, time.max))
+        _, date_to_end = _kst_date_to_utc_naive_bounds(date_to)
+        query = query.filter(request_date_expr < date_to_end)
     if not include_archived:
         query = query.filter(TransactionLog.archived_at.is_(None))
     search_filter = build_normalized_search_filter(

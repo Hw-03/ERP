@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { api } from "@/lib/api";
 import type { ProductionCapacity } from "@/lib/api/types/production";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 
@@ -77,6 +78,32 @@ function renderModal() {
 }
 
 describe("CapacityDetailModal 모바일 모델 요약", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn((query: string): MediaQueryList => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    vi.spyOn(api, "getBOMTree").mockReturnValue(new Promise(() => {}));
+  });
+
+  it("375px 모바일에서는 데스크톱 BOM 작업공간과 BOM 요청을 만들지 않는다", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
+    renderModal();
+
+    expect(screen.queryByRole("region", { name: "PF별 생산 가능수량 및 BOM" })).not.toBeInTheDocument();
+    expect(api.getBOMTree).not.toHaveBeenCalled();
+  });
+
   it("자동 기준 출하 완제품을 모델 제목과 분리해 표시한다", () => {
     const { mobileList } = renderModal();
     const mobile = within(mobileList);

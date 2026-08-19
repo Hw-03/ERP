@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Item } from "@/lib/api";
 import { SlidePanel } from "../common";
-import { DesktopRightPanel } from "../DesktopRightPanel";
+import { DesktopPanelCloseButton, DesktopRightPanel } from "../DesktopRightPanel";
 import { InventoryDetailPanel } from "./InventoryDetailPanel";
 import { InventoryRecentHistoryPanel } from "./InventoryRecentHistoryPanel";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
@@ -84,12 +84,11 @@ export function DesktopInventoryRightPanel({
           titleId={INVENTORY_DETAIL_TITLE_ID}
           subtitle={displayItem.legacy_part ? `${displayItem.mes_code} · ${displayItem.legacy_part}` : (displayItem.mes_code ?? undefined)}
           subtitleBadge={headerBadge}
-          onClose={onClose}
           topContent={
-            <div className="pr-3">
+            <div className="mb-4 flex items-center gap-2">
               <div
                 aria-label="재고 상세 보기"
-                className="inline-flex w-fit gap-1 rounded-[12px] p-1"
+                className="flex min-w-0 flex-1 w-full gap-1 rounded-[12px] p-1"
                 role="tablist"
                 style={{ background: "color-mix(in srgb, var(--c-blue) 8%, transparent)" }}
               >
@@ -103,7 +102,7 @@ export function DesktopInventoryRightPanel({
                   tabIndex={activeTab === "detail" ? 0 : -1}
                   onClick={() => selectTab("detail")}
                   onKeyDown={handleTabKeyDown}
-                  className="min-h-9 shrink-0 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
                   style={{
                     background: activeTab === "detail" ? "var(--c-s1)" : "transparent",
                     color: activeTab === "detail" ? "var(--c-text)" : "var(--c-muted2)",
@@ -121,7 +120,7 @@ export function DesktopInventoryRightPanel({
                   tabIndex={activeTab === "history" ? 0 : -1}
                   onClick={() => selectTab("history")}
                   onKeyDown={handleTabKeyDown}
-                  className="min-h-9 shrink-0 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
+                  className="min-h-9 flex-1 rounded-[10px] px-3 text-sm font-bold transition-colors hover:brightness-110"
                   style={{
                     background: activeTab === "history" ? "var(--c-s1)" : "transparent",
                     color: activeTab === "history" ? "var(--c-text)" : "var(--c-muted2)",
@@ -130,6 +129,7 @@ export function DesktopInventoryRightPanel({
                   최근 내역
                 </button>
               </div>
+              <DesktopPanelCloseButton onClick={onClose} />
             </div>
           }
         >

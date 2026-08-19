@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import type { SelectedHistoryMonth } from "./historyQuery";
 import {
   isAdjustmentLike,
   isDepartmentInternalType,
@@ -17,6 +18,7 @@ type Props = {
   nextMonth: () => void;
   setCalendarYear: (updater: (y: number) => number) => void;
   setCalendarMonth: (m: number) => void;
+  onSelectMonth: (month: SelectedHistoryMonth) => void;
   calendarLoading: boolean;
   calendarDays: (number | null)[];
   calendarDayMap: Map<string, TransactionLog[]>;
@@ -52,6 +54,7 @@ export function HistoryCalendarStrip({
   nextMonth,
   setCalendarYear,
   setCalendarMonth,
+  onSelectMonth,
   calendarLoading,
   calendarDays,
   calendarDayMap,
@@ -85,7 +88,8 @@ export function HistoryCalendarStrip({
           <button
             type="button"
             onClick={() => setViewMode("month")}
-            className="rounded-md px-2 py-0.5 text-base font-bold hover:bg-white/10"
+            className="rounded-md border px-2 py-0.5 text-base font-bold transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2"
+            style={{ borderColor: LEGACY_COLORS.border }}
             aria-label={`${calendarYear}년 — 월 뷰로 돌아가기`}
           >
             {calendarYear}
@@ -109,6 +113,7 @@ export function HistoryCalendarStrip({
                 type="button"
                 onClick={() => {
                   setCalendarMonth(m);
+                  onSelectMonth({ year: calendarYear, month: m });
                   setViewMode("month");
                 }}
                 className="flex flex-col items-center justify-center rounded-[14px] border p-3 transition-colors hover:brightness-110"
@@ -166,7 +171,8 @@ export function HistoryCalendarStrip({
         <button
           type="button"
           onClick={() => setViewMode("year")}
-          className="rounded-md px-2 py-0.5 text-base font-bold hover:bg-white/10"
+          className="rounded-md border px-2 py-0.5 text-base font-bold transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2"
+          style={{ borderColor: LEGACY_COLORS.border }}
           aria-label={`${calendarYear}년 ${calendarMonth + 1}월 — 연 뷰 열기`}
         >
           {calendarYear}년 {calendarMonth + 1}월

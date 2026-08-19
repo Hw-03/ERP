@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import csv
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO, StringIO
 
@@ -175,10 +175,136 @@ def _seed_multi_request_batch_transactions(db) -> dict[str, str]:
 
 
 def _range():
-    # 시드 거래는 created_at=datetime.utcnow() (UTC). 필터 범위도 UTC 날짜로 맞춰야
-    # KST 자정~오전9시 구간에서 로컬 날짜(today)와 어긋나 빈 결과가 나오지 않는다.
-    today = datetime.utcnow().date().isoformat()
+    # API 날짜 범위는 UTC-naive 저장값을 KST 업무 날짜로 해석한다.
+    today = (datetime.utcnow() + timedelta(hours=9)).date().isoformat()
     return f"start_date={today}&end_date={today}"
+
+
+def _seed_kst_boundary_transactions(db) -> set[str]:
+    item = Item(
+        item_name="KST 내보내기 경계 품목",
+        process_type_code="TR",
+        model_symbol="9",
+        serial_no=99,
+    )
+    db.add(item)
+    db.flush()
+    logs = [
+        ("KST-JULY-LAST", datetime(2026, 7, 31, 14, 59)),
+        ("KST-AUGUST-FIRST", datetime(2026, 7, 31, 15, 0)),
+        ("KST-AUGUST-LAST", datetime(2026, 8, 31, 14, 59)),
+        ("KST-SEPTEMBER-FIRST", datetime(2026, 8, 31, 15, 0)),
+    ]
+    db.add_all(
+        [
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.RECEIVE,
+                quantity_change=Decimal("1"),
+                reference_no=reference_no,
+                created_at=created_at,
+            )
+            for reference_no, created_at in logs
+        ]
+    )
+    db.commit()
+    return {"KST-AUGUST-FIRST", "KST-AUGUST-LAST"}
+
+
+def test_export_csv_date_range_uses_kst_business_day_bounds(client, db_session):
+    """CSV 내보내기는 UTC-naive 로그를 KST 포함 날짜 범위로 필터한다."""
+    expected_references = _seed_kst_boundary_transactions(db_session)
+
+    response = client.get(
+        "/api/inventory/transactions/export.csv",
+        params={"start_date": "2026-08-01", "end_date": "2026-08-31"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert {
+        row["reference_no"] for row in csv.DictReader(StringIO(response.text))
+    } == expected_references
+
+
+def test_export_xlsx_date_range_uses_kst_business_day_bounds(client, db_session):
+    """XLSX 내보내기는 UTC-naive 로그를 KST 포함 날짜 범위로 필터한다."""
+    expected_references = _seed_kst_boundary_transactions(db_session)
+
+    response = client.get(
+        "/api/inventory/transactions/export.xlsx",
+        params={"start_date": "2026-08-01", "end_date": "2026-08-31"},
+    )
+
+    assert response.status_code == 200, response.text
+    workbook = load_workbook(BytesIO(response.content), read_only=True)
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert {row[8] for row in rows[1:]} == expected_references
+
+
+def _seed_batch_with_different_created_and_submitted_months(db) -> str:
+    employee = _emp(db, "EXPORT-KST-CREATED", "내보내기 생성일 작업자")
+    item = Item(
+        item_name="KST 생성일 기준 내보내기 품목",
+        process_type_code="TR",
+        model_symbol="9",
+        serial_no=100,
+    )
+    db.add(item)
+    db.flush()
+    batch = IoBatch(
+        work_type="warehouse_io",
+        sub_type="warehouse_to_dept",
+        status="completed",
+        requester_employee_id=employee.employee_id,
+        requester_name=employee.name,
+        requester_department=employee.department,
+        submitted_at=datetime(2026, 8, 31, 15, 0),
+    )
+    db.add(batch)
+    db.flush()
+    reference_no = "KST-CREATED-AT-AUGUST"
+    db.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.TRANSFER_TO_PROD,
+            quantity_change=Decimal("1"),
+            operation_batch_id=batch.batch_id,
+            reference_no=reference_no,
+            created_at=datetime(2026, 7, 31, 15, 0),
+        )
+    )
+    db.commit()
+    return reference_no
+
+
+def test_export_csv_filters_batch_log_by_created_at(client, db_session):
+    """CSV 내보내기는 배치 제출일이 아니라 로그 생성일의 KST 월을 사용한다."""
+    reference_no = _seed_batch_with_different_created_and_submitted_months(db_session)
+
+    response = client.get(
+        "/api/inventory/transactions/export.csv",
+        params={"start_date": "2026-08-01", "end_date": "2026-08-31"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert reference_no in {
+        row["reference_no"] for row in csv.DictReader(StringIO(response.text))
+    }
+
+
+def test_export_xlsx_filters_batch_log_by_created_at(client, db_session):
+    """XLSX 내보내기는 배치 제출일이 아니라 로그 생성일의 KST 월을 사용한다."""
+    reference_no = _seed_batch_with_different_created_and_submitted_months(db_session)
+
+    response = client.get(
+        "/api/inventory/transactions/export.xlsx",
+        params={"start_date": "2026-08-01", "end_date": "2026-08-31"},
+    )
+
+    assert response.status_code == 200, response.text
+    workbook = load_workbook(BytesIO(response.content), read_only=True)
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert reference_no in {row[8] for row in rows[1:]}
 
 
 def test_export_csv_includes_requester_and_approver(client, db_session):

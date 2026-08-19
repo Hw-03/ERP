@@ -62,7 +62,7 @@ const COLUMNS: ColSpec[] = [
   { label: "담당자", width: "120px", align: "center" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
-const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-x-clip rounded-[24px] border";
+const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-x-clip rounded-[24px]";
 
 function historyTableHeaderClass(column: (typeof COLUMNS)[number], index: number): string {
   const alignment = column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left";
@@ -77,27 +77,47 @@ function historyTableHeaderClass(column: (typeof COLUMNS)[number], index: number
   ].filter(Boolean).join(" ");
 }
 
+function HistoryTableCornerMask() {
+  return (
+    <div
+      aria-hidden
+      data-testid="history-table-corner-mask"
+      className="pointer-events-none sticky top-0 z-20 -mb-6 flex h-6 justify-between"
+    >
+      <span
+        className="h-6 w-6"
+        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-history-table-header) 24px)" }}
+      />
+      <span
+        className="h-6 w-6"
+        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-history-table-header) 24px)" }}
+      />
+    </div>
+  );
+}
+
 function HistoryTableSkeleton() {
   return (
     <div
       data-testid="history-table-surface"
       className={HISTORY_TABLE_SURFACE_CLASS}
-      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      style={{ background: LEGACY_COLORS.s1 }}
     >
+      <HistoryTableCornerMask />
       <table
         aria-busy="true"
         aria-label="입출고 내역 불러오는 중"
         className="w-full table-fixed border-separate border-spacing-0 text-sm"
       >
         <thead>
-          <tr style={{ background: LEGACY_COLORS.s2 }}>
+          <tr style={{ background: "var(--c-history-table-header)" }}>
             {COLUMNS.map((column, index) => (
               <th
                 key={column.label || `loading-spacer-${index}`}
                 scope={column.label ? "col" : undefined}
                 aria-hidden={column.label ? undefined : true}
                 className={historyTableHeaderClass(column, index)}
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
+                style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
               >
                 {column.label}
               </th>
@@ -386,18 +406,19 @@ export function HistoryTable({
         <div
           data-testid="history-table-surface"
           className={HISTORY_TABLE_SURFACE_CLASS}
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+          style={{ background: LEGACY_COLORS.s1 }}
         >
+          <HistoryTableCornerMask />
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
             <thead>
-              <tr style={{ background: LEGACY_COLORS.s2 }}>
+              <tr style={{ background: "var(--c-history-table-header)" }}>
                 {COLUMNS.map((column, index) => (
                   <th
                     key={column.label || `spacer-${index}`}
                     scope={column.label ? "col" : undefined}
                     aria-hidden={column.label ? undefined : true}
                     className={historyTableHeaderClass(column, index)}
-                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
+                    style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
                     {column.label}
                   </th>

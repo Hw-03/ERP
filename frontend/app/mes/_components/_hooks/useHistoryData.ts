@@ -7,7 +7,7 @@ import { productionApi } from "@/lib/api/production";
 import { queryKeys } from "@/lib/queries/keys";
 import { STALE_TIME } from "@/lib/queries/client";
 import { HISTORY_PAGE_SIZE } from "../_history_sections/historyConstants";
-import { dateFilterToFrom } from "../_history_sections/historyQuery";
+import { resolveHistoryDateRange, type SelectedHistoryMonth } from "../_history_sections/historyQuery";
 
 export interface UseHistoryDataArgs {
   /** 거래 종류(필터 패널) operation_keys 쉼표 결합. "" = 미적용(전체). */
@@ -17,6 +17,8 @@ export interface UseHistoryDataArgs {
   debouncedSearch: string;
   /** 달력에서 선택한 날짜 (YYYY-MM-DD). 있으면 dateFilter 무시하고 그날만 fetch. */
   selectedDateKey: string | null;
+  /** 달력에서 선택한 월(0-based). 있으면 period preset 대신 그 달 전체를 조회한다. */
+  selectedMonth?: SelectedHistoryMonth | null;
   /** 필터 패널 — 부서 쉼표 결합(다중). "" = 전체. */
   department: string;
   /** 필터 패널 — 제품 모델명 쉼표 결합. "" / 미지정 = 미적용. */
@@ -80,6 +82,7 @@ export function useHistoryData({
   dateFilter,
   debouncedSearch,
   selectedDateKey,
+  selectedMonth = null,
   department,
   model = "",
   totalCount,
@@ -88,9 +91,7 @@ export function useHistoryData({
   const queryClient = useQueryClient();
 
   const operationKeys = operations || undefined;
-  // selectedDateKey 가 있으면 dateFilter 를 무시하고 그날 단일로 좁힌다.
-  const dateFrom = selectedDateKey ?? dateFilterToFrom(dateFilter);
-  const dateTo = selectedDateKey ?? undefined;
+  const { dateFrom, dateTo } = resolveHistoryDateRange(dateFilter, selectedDateKey, selectedMonth);
   const search = debouncedSearch.trim() || undefined;
   const departmentParam = department || undefined;
   const modelParam = model || undefined;

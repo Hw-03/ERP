@@ -176,13 +176,8 @@ export function InventoryTableStickyHeader({
       }}
     >
       <div className="flex flex-wrap items-center gap-2.5 px-5 pb-3 pt-5">
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
-            자재 목록
-          </span>
-        </div>
         <div
-          className="flex min-w-[240px] flex-1 items-center gap-2 rounded-[14px] border px-3 py-2"
+          className="flex w-full min-w-[240px] items-center gap-2 rounded-[14px] border px-3 py-2"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />

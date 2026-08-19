@@ -21,19 +21,27 @@ const baseProps = {
 };
 
 describe("InventoryFilters", () => {
-  it("uses an opaque token surface and compact gap for the sticky table controls", () => {
+  it("보이는 목록 제목 없이 검색 입력 변경을 전달한다", () => {
+    const onSearchChange = vi.fn();
     render(
       <InventoryTableStickyHeader
         searchValue=""
-        onSearchChange={() => {}}
+        onSearchChange={onSearchChange}
         count={0}
         isFiltered={false}
       />,
     );
 
-    const header = screen.getByText("자재 목록").closest(".sticky");
+    const searchInput = screen.getByRole("textbox", { name: "자재 검색" });
+    const header = searchInput.closest(".sticky");
+    expect(screen.queryByText("자재 목록")).not.toBeInTheDocument();
+    expect(searchInput).toHaveAttribute("placeholder", "품명 · 품목 코드 · 위치 · 공급처 검색");
     expect(header).toHaveStyle({ background: "var(--c-popup-bg)" });
     expect(header).toHaveClass("mb-0");
+
+    fireEvent.change(searchInput, { target: { value: "진공" } });
+
+    expect(onSearchChange).toHaveBeenCalledWith("진공");
   });
 
   it("불용 칩을 렌더하고 안내 문구 없이 토글을 전달한다", () => {

@@ -350,6 +350,16 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(screen.getByRole("button", { name: "모두 접기" })).toBeDisabled();
   });
 
+  it("uses a space before the unit in both BOM quantity columns", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+
+    expect(await screen.findByText("2 EA", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("10 EA", { exact: true })).toBeInTheDocument();
+  });
+
   it("marks zero stock in red in both the BOM header and component row", async () => {
     const zeroStockTree: BOMTreeNode = {
       ...bomTree,
@@ -391,11 +401,48 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(await screen.findByText("하위 구성품")).toBeInTheDocument();
     expect(branch).toHaveAttribute("aria-expanded", "true");
 
+    fireEvent.keyDown(branch, { key: " " });
+    expect(screen.queryByText("하위 구성품")).not.toBeInTheDocument();
+
+    fireEvent.keyDown(branch, { key: "Enter" });
+    expect(await screen.findByText("하위 구성품")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "모두 접기" }));
     expect(screen.queryByText("하위 구성품")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "모두 펼치기" }));
     expect(await screen.findByText("하위 구성품")).toBeInTheDocument();
+  });
+
+  it("does not toggle a branch while its item code text is selected", async () => {
+    const nestedTree: BOMTreeNode = {
+      ...bomTree,
+      children: [{
+        ...bomTree.children[0],
+        item_name: "선택 가능한 상위 구성품",
+        mes_code: "3-PA-0002",
+        children: [{ ...bomTree.children[0], item_id: "nested-component", item_name: "하위 구성품" }],
+      }],
+    };
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(nestedTree);
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+
+    const branch = await screen.findByRole("button", { name: /선택 가능한 상위 구성품/ });
+    const code = within(branch).getByTestId("bom-modal-code");
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    vi.spyOn(window, "getSelection").mockReturnValue({
+      isCollapsed: false,
+      toString: () => "3-PA-0002",
+      getRangeAt: () => range,
+    } as unknown as Selection);
+
+    fireEvent.click(branch);
+
+    expect(screen.queryByText("하위 구성품")).not.toBeInTheDocument();
+    expect(branch).toHaveAttribute("aria-expanded", "false");
   });
 
   it("reserves scrollbar space and spreads blue tint across the deepest BOM hierarchy", async () => {
@@ -416,7 +463,10 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
 
     fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
-    expect(await screen.findByTestId("bom-modal-tree-scroll")).toHaveClass("overflow-y-scroll");
+    const scrollHost = await screen.findByTestId("bom-modal-tree-scroll");
+    expect(scrollHost).toHaveClass("overflow-y-scroll");
+    expect(scrollHost).not.toHaveClass("rounded-[18px]", "border");
+    expect(screen.getByTestId("bom-modal-tree-table")).toHaveClass("min-h-full", "overflow-clip", "rounded-[18px]", "border");
     expect(screen.getByTestId("bom-modal-grid-header")).toHaveClass("bom-detail-modal-grid");
     expect(screen.getByTestId("bom-modal-grid-header")).toHaveTextContent("현재 재고");
     fireEvent.click(await screen.findByRole("button", { name: "모두 펼치기" }));
@@ -430,9 +480,9 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(depthOneToggle).toHaveClass("w-11");
     expect(depthOneToggle.style.transform).toBe("translateX(58px)");
     expect(depthEightToggle.style.transform).toBe("translateX(394px)");
-    expect(depthOneRow.querySelector("button")).toHaveAttribute("style", expect.stringContaining("2.00%"));
-    expect(depthTwoRow.querySelector("button")).toHaveAttribute("style", expect.stringContaining("4.57%"));
-    expect(depthEightRow.querySelector("div")).toHaveAttribute("style", expect.stringContaining("20.00%"));
+    expect(depthOneRow.querySelector("[role='button']")).toHaveAttribute("style", expect.stringContaining("2.00%"));
+    expect(depthTwoRow.querySelector("[role='button']")).toHaveAttribute("style", expect.stringContaining("4.57%"));
+    expect(depthEightRow.firstElementChild).toHaveAttribute("style", expect.stringContaining("20.00%"));
   });
 
   it("keeps a capacity-ignored zero-stock component row normal while striking its stock", async () => {
@@ -736,7 +786,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     const rowContext = within(row!);
     expect(rowContext.getByText(longItemName)).toBeInTheDocument();
     expect(rowContext.getByTestId("bom-modal-code")).toHaveTextContent("46-AA-0081");
-    expect(rowContext.getByText("2EA")).toHaveClass("text-center");
+    expect(rowContext.getByText("2 EA")).toHaveClass("text-center");
     expect(rowContext.getByText("10 EA")).toHaveClass("text-center");
     expect(rowContext.getByRole("button", { expanded: false })).toHaveClass("bom-modal-grid");
     expect(rowContext.getByTestId("bom-modal-name-cell")).toHaveClass("break-words");

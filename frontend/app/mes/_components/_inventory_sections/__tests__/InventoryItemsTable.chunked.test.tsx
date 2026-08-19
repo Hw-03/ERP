@@ -99,10 +99,19 @@ describe("InventoryItemsTable — chunked render", () => {
 
     const desktopTable = container.querySelector("table");
     expect(desktopTable?.parentElement).not.toHaveClass("overflow-x-auto");
+    expect(desktopTable?.parentElement).toHaveClass("overflow-clip");
+    expect(desktopTable?.parentElement).not.toHaveClass("border");
     expect(container.querySelector("thead")).toHaveClass("top-[74px]");
+    const desktopCornerMask = container.querySelector('[data-testid="inventory-table-corner-mask"]');
+    expect(desktopCornerMask).toHaveClass("sticky", "top-[74px]", "z-20", "-mb-6");
+    expect(desktopCornerMask?.children).toHaveLength(2);
+    expect(desktopCornerMask?.children[0].getAttribute("style")).toContain(
+      "var(--c-inventory-table-corner-backdrop)",
+    );
     const desktopHeaders = Array.from(container.querySelectorAll("th"));
     expect(desktopHeaders[0]).toHaveClass("rounded-tl-[24px]");
     expect(desktopHeaders.at(-1)).toHaveClass("rounded-tr-[24px]");
+    expect(desktopHeaders[0]).toHaveStyle({ background: "var(--c-inventory-table-header)" });
 
     rerender(
       <DepartmentsProvider>
@@ -118,7 +127,10 @@ describe("InventoryItemsTable — chunked render", () => {
 
     const compactTable = container.querySelector("table");
     expect(compactTable?.parentElement).toHaveClass("overflow-x-auto");
+    expect(compactTable?.parentElement).not.toHaveClass("overflow-clip");
+    expect(compactTable?.parentElement).toHaveClass("border");
     expect(container.querySelector("thead")).toHaveClass("top-0");
+    expect(container.querySelector('[data-testid="inventory-table-corner-mask"]')).not.toBeInTheDocument();
     const compactHeaders = Array.from(container.querySelectorAll("th"));
     expect(compactHeaders[0]).toHaveClass("rounded-tl-[24px]");
     expect(compactHeaders.at(-1)).toHaveClass("rounded-tr-[24px]");

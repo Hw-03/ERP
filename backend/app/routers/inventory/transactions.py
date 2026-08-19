@@ -7,14 +7,14 @@ import binascii
 import csv
 import json
 import uuid
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime
 from decimal import Decimal
 from io import StringIO
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import case, extract, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -56,6 +56,7 @@ from app.routers.inventory._tx_filters import (
     _apply_common_filters,
     _history_visibility_filter,
     _history_request_date_expr,
+    _kst_date_to_utc_naive_bounds,
     _batch_name_map,
     _stock_request_info_map,
     _to_log_response,
@@ -171,7 +172,9 @@ def _require_export_range(start_date: Optional[date], end_date: Optional[date]) 
             code=ErrorCode.EXPORT_RANGE_REQUIRED,
             message="export 는 start_date 와 end_date 를 모두 지정해야 합니다.",
         )
-    return datetime.combine(start_date, time.min), datetime.combine(end_date, time.max)
+    start_dt, _ = _kst_date_to_utc_naive_bounds(start_date)
+    _, end_dt = _kst_date_to_utc_naive_bounds(end_date)
+    return start_dt, end_dt
 
 
 def _enforce_export_limit(count: int) -> None:
@@ -240,22 +243,45 @@ def monthly_counts(
     archived_at 이 있는 레코드는 제외한다.
     """
     request_date_expr = _history_request_date_expr()
-    rows = (
-        db.query(
-            extract("month", request_date_expr).label("month"),
-            func.count(TransactionLog.log_id).label("count"),
-        )
+    year_start, _ = _kst_date_to_utc_naive_bounds(date(year, 1, 1))
+    year_end, _ = _kst_date_to_utc_naive_bounds(date(year + 1, 1, 1))
+    month_columns = []
+    for month in range(1, 13):
+        month_start, _ = _kst_date_to_utc_naive_bounds(date(year, month, 1))
+        month_end = year_end if month == 12 else _kst_date_to_utc_naive_bounds(date(year, month + 1, 1))[0]
+        month_columns.append(
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                request_date_expr >= month_start,
+                                request_date_expr < month_end,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label(f"month_{month}")
+    )
+    counts = (
+        db.query(*month_columns)
+        .select_from(TransactionLog)
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
         .filter(
-            extract("year", request_date_expr) == year,
+            request_date_expr >= year_start,
+            request_date_expr < year_end,
             TransactionLog.archived_at.is_(None),
             _history_visibility_filter(),
         )
-        .group_by(extract("month", request_date_expr))
-        .all()
+        .one()
     )
-    counts = {f"{year:04d}-{int(r.month):02d}": int(r.count) for r in rows}
-    return {f"{year:04d}-{m:02d}": counts.get(f"{year:04d}-{m:02d}", 0) for m in range(1, 13)}
+    return {
+        f"{year:04d}-{month:02d}": int(getattr(counts, f"month_{month}"))
+        for month in range(1, 13)
+    }
 
 
 @router.get("/transactions", response_model=List[TransactionLogResponse])
@@ -633,7 +659,7 @@ def export_transactions_csv(
     )
     query = query.filter(
         TransactionLog.created_at >= start_dt,
-        TransactionLog.created_at <= end_dt,
+        TransactionLog.created_at < end_dt,
     )
 
     if transaction_type:
@@ -728,7 +754,7 @@ def export_transactions_xlsx(
     )
     query = query.filter(
         TransactionLog.created_at >= start_dt,
-        TransactionLog.created_at <= end_dt,
+        TransactionLog.created_at < end_dt,
     )
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)

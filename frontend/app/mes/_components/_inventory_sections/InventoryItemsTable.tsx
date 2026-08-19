@@ -122,7 +122,26 @@ export function InventoryItemsTable({
           />
         </div>
       )}
-      <div className={`${compact ? "overflow-x-auto " : ""}rounded-[24px] border`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <div
+        className={`${compact ? "overflow-x-auto border" : "overflow-clip"} rounded-[24px]`}
+        style={compact ? { borderColor: LEGACY_COLORS.border } : undefined}
+      >
+        {!compact && (
+          <div
+            aria-hidden
+            data-testid="inventory-table-corner-mask"
+            className="pointer-events-none sticky top-[74px] z-20 -mb-6 flex h-6 justify-between"
+          >
+            <span
+              className="h-6 w-6"
+              style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-inventory-table-corner-backdrop) 24px)" }}
+            />
+            <span
+              className="h-6 w-6"
+              style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-inventory-table-corner-backdrop) 24px)" }}
+            />
+          </div>
+        )}
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead className={`sticky ${compact ? "top-0" : "top-[74px]"} z-10`}>
             <tr>
@@ -132,7 +151,7 @@ export function InventoryItemsTable({
                   scope="col"
                   className={`border-b px-4 py-2.5 text-sm font-bold${columnIndex === 0 ? " rounded-tl-[24px]" : ""}${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
                   style={{
-                    background: LEGACY_COLORS.s2,
+                    background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)",
                     borderColor: LEGACY_COLORS.border,
                     color: LEGACY_COLORS.muted2,
                     width,
@@ -145,7 +164,7 @@ export function InventoryItemsTable({
               <th
                 scope="col"
                 className={`border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "rounded-tr-[24px] text-center" : "text-right sm:text-center"}`}
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
+                style={{ background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
               >
                 총재고
               </th>
@@ -153,7 +172,7 @@ export function InventoryItemsTable({
                 <th
                   scope="col"
                   className="hidden rounded-tr-[24px] border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center sm:table-cell"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
+                  style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
                 >
                   안전재고
                 </th>

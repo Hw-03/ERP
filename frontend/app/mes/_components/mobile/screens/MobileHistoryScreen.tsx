@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type TransactionLog } from "@/lib/api";
 import { productionApi, type TransactionSummary } from "@/lib/api/production";
@@ -19,13 +19,13 @@ import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-import { parseUtc, toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
+import { toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
   getHistoryDisplayLabel,
 } from "../../_history_sections/historyBatchInterpreter";
 import { type HistorySelection } from "../../_history_sections/historyConstants";
-import { DATE_OPTIONS, dateFilterToFrom } from "../../_history_sections/historyQuery";
+import { resolveHistoryDateRange, type SelectedHistoryMonth } from "../../_history_sections/historyQuery";
 import { MobileHistoryList } from "../history/MobileHistoryList";
 import {
   advanceHistoryLoadReconcileState,
@@ -35,6 +35,11 @@ import {
 } from "../../_history_sections/historyCancellation";
 
 const SEARCH_DEBOUNCE_MS = 350;
+
+function getCurrentKstCalendarMonth(): SelectedHistoryMonth {
+  const key = toDateKey(new Date().toISOString());
+  return { year: Number(key.slice(0, 4)), month: Number(key.slice(5, 7)) - 1 };
+}
 
 /**
  * 입출고 내역 모바일 화면.
@@ -80,15 +85,31 @@ export function MobileHistoryScreen() {
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const calendarLoadedKeyRef = useRef<string | null>(null);
-  const now = new Date();
-  const [calendarYear, setCalendarYear] = useState(now.getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
+  const [calendarCursor, setCalendarCursor] = useState<SelectedHistoryMonth>(getCurrentKstCalendarMonth);
+  const calendarCursorRef = useRef(calendarCursor);
+  calendarCursorRef.current = calendarCursor;
+  const calendarYear = calendarCursor.year;
+  const calendarMonth = calendarCursor.month;
+  const setCalendarYear = useCallback((updater: (year: number) => number) => {
+    const current = calendarCursorRef.current;
+    const next = { ...current, year: updater(current.year) };
+    calendarCursorRef.current = next;
+    setCalendarCursor(next);
+  }, []);
+  const setCalendarMonth = useCallback((month: number) => {
+    const next = { ...calendarCursorRef.current, month };
+    calendarCursorRef.current = next;
+    setCalendarCursor(next);
+  }, []);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<SelectedHistoryMonth | null>(null);
   const lastSelectionRef = useRef<HistorySelection | null>(null);
 
-  const periodLabel = selectedDay
-    ? selectedDay
-    : DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "전체";
+  const selectedDateRange = useMemo(
+    () => resolveHistoryDateRange(dateFilter, selectedDay, selectedMonth),
+    [dateFilter, selectedDay, selectedMonth],
+  );
+  const periodLabel = selectedDateRange.periodLabel;
 
   const [summary, setSummary] = useState<TransactionSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -101,6 +122,7 @@ export function MobileHistoryScreen() {
     dateFilter,
     debouncedSearch,
     selectedDateKey: selectedDay,
+    selectedMonth,
     department: deptParam,
     model: modelParam,
     totalCount: summary?.total ?? null,
@@ -157,16 +179,10 @@ export function MobileHistoryScreen() {
   }, [calendarOpen, calendarYear, calendarMonth, realtimeRevision]);
 
   function prevMonth() {
-    if (calendarMonth === 0) {
-      setCalendarYear((y) => y - 1);
-      setCalendarMonth(11);
-    } else setCalendarMonth((m) => m - 1);
+    moveCalendarMonth(-1);
   }
   function nextMonth() {
-    if (calendarMonth === 11) {
-      setCalendarYear((y) => y + 1);
-      setCalendarMonth(0);
-    } else setCalendarMonth((m) => m + 1);
+    moveCalendarMonth(1);
   }
 
   // 연 뷰 — 그 해 12개월 거래 건수 집계.
@@ -186,8 +202,7 @@ export function MobileHistoryScreen() {
     const map = new Map<string, TransactionLog[]>();
     for (const log of calendarLogs) {
       const key = toDateKey(log.created_at);
-      const d = parseUtc(log.created_at);
-      if (d.getFullYear() !== calendarYear || d.getMonth() !== calendarMonth) continue;
+      if (!key.startsWith(`${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-`)) continue;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(log);
     }
@@ -208,8 +223,7 @@ export function MobileHistoryScreen() {
 
   useEffect(() => {
     const transactionTypes = opParam || undefined;
-    const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
-    const dateTo = selectedDay ?? undefined;
+    const { dateFrom, dateTo } = selectedDateRange;
     const searchParam = debouncedSearch.trim() || undefined;
     const department = deptParam || undefined;
     const model = modelParam || undefined;
@@ -252,7 +266,7 @@ export function MobileHistoryScreen() {
         }
       });
     return () => ctrl.abort();
-  }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam, realtimeRevision]);
+  }, [debouncedSearch, deptParam, modelParam, opParam, realtimeRevision, selectedDateRange]);
 
   const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
   const [baselineLoading, setBaselineLoading] = useState(false);
@@ -261,8 +275,7 @@ export function MobileHistoryScreen() {
   const baselineSummaryRef = useRef<TransactionSummary | null>(null);
 
   useEffect(() => {
-    const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
-    const dateTo = selectedDay ?? undefined;
+    const { dateFrom, dateTo } = selectedDateRange;
     const conditionsKey = JSON.stringify([dateFrom ?? null, dateTo ?? null]);
     const myKey = JSON.stringify([conditionsKey, realtimeRevision ?? null]);
     const background = baselineConditionsRef.current === conditionsKey && baselineSummaryRef.current !== null;
@@ -292,7 +305,7 @@ export function MobileHistoryScreen() {
         }
       });
     return () => ctrl.abort();
-  }, [dateFilter, selectedDay, realtimeRevision]);
+  }, [realtimeRevision, selectedDateRange]);
 
   useEffect(() => {
     const decision = advanceHistoryLoadReconcileState(loadReconcileRef.current, {
@@ -372,6 +385,7 @@ export function MobileHistoryScreen() {
     const logYmd = toDateKey(log.created_at);
     if (logYmd && logYmd !== selectedDay) {
       setSelectedDay(logYmd);
+      setSelectedMonth(null);
     }
     setSelection((cur) => {
       if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
@@ -407,6 +421,30 @@ export function MobileHistoryScreen() {
   function handleDateFilterChange(v: string) {
     setDateFilter(v);
     setSelectedDay(null);
+    setSelectedMonth(null);
+  }
+
+  function handleCalendarSelectedDay(next: string | null) {
+    if (next) setSelectedMonth(null);
+    setSelectedDay(next);
+  }
+
+  function selectCalendarMonth(month: SelectedHistoryMonth) {
+    calendarCursorRef.current = month;
+    setCalendarCursor(month);
+    setSelectedDay(null);
+    setSelectedMonth(month);
+  }
+
+  function moveCalendarMonth(offset: number) {
+    const current = calendarCursorRef.current;
+    const absoluteMonth = current.year * 12 + current.month + offset;
+    const month = ((absoluteMonth % 12) + 12) % 12;
+    const next = { year: (absoluteMonth - month) / 12, month };
+    calendarCursorRef.current = next;
+    setCalendarCursor(next);
+    setSelectedDay(null);
+    setSelectedMonth(next);
   }
 
   function closeSheet() {
@@ -470,6 +508,8 @@ export function MobileHistoryScreen() {
             onToggleCalendar={() => setCalendarOpen((o) => !o)}
             selectedDay={selectedDay}
             onClearSelectedDay={() => setSelectedDay(null)}
+            selectedMonth={selectedMonth}
+            onClearSelectedMonth={() => setSelectedMonth(null)}
           />
 
           {filterPanelOpen && (
@@ -504,13 +544,14 @@ export function MobileHistoryScreen() {
             nextMonth={nextMonth}
             setCalendarYear={setCalendarYear}
             setCalendarMonth={setCalendarMonth}
+            onSelectMonth={selectCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayMap={calendarDayMap}
             monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
-            setSelectedDay={setSelectedDay}
+            setSelectedDay={handleCalendarSelectedDay}
             hideWeekends
           />
 
