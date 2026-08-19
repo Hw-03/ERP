@@ -104,6 +104,7 @@ def _mock_full_gate_runtime(
         f"@echo off\r\nexit /b {npm_exit_code}\r\n",
         encoding="ascii",
     )
+    (fake_bin / "node.cmd").write_text("@echo off\r\necho v20.20.2\r\nexit /b 0\r\n", encoding="ascii")
     (fake_bin / "npx.cmd").write_text("@echo off\r\nexit /b 0\r\n", encoding="ascii")
     return repo, {
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
@@ -160,6 +161,18 @@ def _mock_smart_targeted_runtime(
                 '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-openapi" echo backend-openapi end',
                 "  exit /b 0",
                 ")",
+                'if /I "%~2"=="ruff" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-ruff" echo backend-ruff start',
+                "  ping -n 4 127.0.0.1 >nul",
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-ruff" echo backend-ruff end',
+                "  exit /b 0",
+                ")",
+                'if /I "%~2"=="mypy" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-mypy" echo backend-mypy start',
+                "  ping -n 4 127.0.0.1 >nul",
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-mypy" echo backend-mypy end',
+                "  exit /b 0",
+                ")",
                 '>>"%DEXCOWIN_MOCK_GATE_LOG%.backend-testmon" echo backend-testmon start',
                 "ping -n 4 127.0.0.1 >nul",
                 '>>"%DEXCOWIN_MOCK_GATE_LOG%.backend-testmon" echo backend-testmon end',
@@ -169,6 +182,8 @@ def _mock_smart_targeted_runtime(
         ),
         encoding="ascii",
     )
+    (fake_bin / "node.cmd").write_text("@echo off\r\necho v20.20.2\r\nexit /b 0\r\n", encoding="ascii")
+    (fake_bin / "npm.cmd").write_text("@echo off\r\nexit /b 0\r\n", encoding="ascii")
     local_bin = repo / "frontend" / "node_modules" / ".bin"
     local_bin.mkdir(parents=True)
     commands = {
@@ -359,10 +374,15 @@ def test_full_mode_runs_both_areas_in_parallel_and_merges_timings(tmp_path: Path
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     gate_ids = {gate["id"] for gate in report["gates"]}
     assert gate_ids == {
+        "backend-ruff",
+        "backend-mypy",
+        "backend-postgres-concurrency",
         "backend-pytest-full",
         "backend-openapi",
         "frontend-lint",
         "frontend-typecheck",
+        "frontend-test-typecheck",
+        "frontend-e2e-typecheck",
         "frontend-coverage",
         "frontend-build",
         "frontend-bundle-size",
@@ -422,6 +442,9 @@ def test_parallel_failure_waits_for_other_area_and_stops_followup_gates(tmp_path
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     gate_statuses = {gate["id"]: gate["status"] for gate in report["gates"]}
     assert gate_statuses == {
+        "backend-ruff": "passed",
+        "backend-mypy": "passed",
+        "backend-postgres-concurrency": "passed",
         "backend-pytest-full": "passed",
         "backend-openapi": "passed",
         "frontend-lint": "failed",
@@ -446,17 +469,22 @@ def test_smart_targeted_gates_run_in_parallel_and_merge_each_timing(tmp_path: Pa
 
     output = _output(result)
     assert result.returncode == 0, output
-    assert "Running 6 smart targeted gates in parallel" in output
+    assert "Running 8 smart targeted gates in parallel" in output
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     assert {gate["id"] for gate in report["gates"]} == {
+        "backend-ruff",
+        "backend-mypy",
         "backend-testmon",
         "backend-openapi",
         "frontend-lint-files",
         "frontend-tsc-incremental",
         "frontend-vitest-related",
+        "frontend-test-typecheck",
         "frontend-direct-tests",
     }
     for gate_id in {
+        "backend-ruff",
+        "backend-mypy",
         "backend-testmon",
         "backend-openapi",
         "frontend-lint-files",
@@ -503,7 +531,7 @@ def test_smart_parallel_failure_waits_for_all_children_and_merges_timings(tmp_pa
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     statuses = {gate["id"]: gate["status"] for gate in report["gates"]}
     assert statuses["frontend-lint-files"] == "failed"
-    assert len(statuses) == 6
+    assert len(statuses) == 8
 
 
 def test_verify_local_keeps_existing_switches_and_adds_smart_policy_parameters() -> None:

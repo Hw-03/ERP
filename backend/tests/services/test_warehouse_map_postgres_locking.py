@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import os
 import uuid
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from types import SimpleNamespace
 
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -23,6 +27,69 @@ from app.services.inventory import consume_warehouse
 
 
 TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL")
+
+
+@pytest.mark.skipif(
+    not TEST_POSTGRES_URL,
+    reason="TEST_POSTGRES_URL이 없어 PostgreSQL Alembic-head 검증을 건너뜁니다.",
+)
+def test_postgres_head_public_tables_serialize_two_connections():
+    """Alembic head의 실제 public inventory 행을 두 연결이 직렬화한다."""
+    assert os.environ.get("DEXCOWIN_POSTGRES_TEST_ACK") == "ALLOW_TEST_DB_MUTATION"
+    expected_database = make_url(TEST_POSTGRES_URL).database
+    assert expected_database and (
+        expected_database.startswith("test_") or expected_database.endswith("_test")
+    )
+    engine = create_engine(TEST_POSTGRES_URL, poolclass=NullPool)
+    config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
+    item_id = uuid.uuid4()
+    inventory_id = uuid.uuid4()
+    session_a = None
+    session_b = None
+    try:
+        with engine.begin() as connection:
+            assert connection.execute(text("SELECT current_database()")).scalar_one() == expected_database
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == head
+            connection.execute(
+                text(
+                    """INSERT INTO items
+                    (item_id, item_name, unit, model_symbol, process_type_code, serial_no)
+                    VALUES (:item_id, :name, 'EA', :symbol, 'TR', :serial)"""
+                ),
+                {"item_id": item_id.hex, "name": f"PG lock {item_id.hex}", "symbol": f"PG{item_id.hex[:8]}", "serial": 1},
+            )
+            connection.execute(
+                text(
+                    """INSERT INTO inventory
+                    (inventory_id, item_id, quantity, warehouse_qty, pending_quantity)
+                    VALUES (:inventory_id, :item_id, 2, 2, 0)"""
+                ),
+                {"inventory_id": inventory_id.hex, "item_id": item_id.hex},
+            )
+
+        session_a = Session(engine)
+        session_b = Session(engine)
+        assert session_a.execute(text("SELECT pg_backend_pid()")).scalar_one() != session_b.execute(
+            text("SELECT pg_backend_pid()")
+        ).scalar_one()
+        warehouse_map_service.lock_warehouse_map_rows(session_a, item_ids=[item_id])
+        session_b.execute(text("SET LOCAL lock_timeout = '100ms'"))
+        with pytest.raises(OperationalError):
+            warehouse_map_service.lock_warehouse_map_rows(session_b, item_ids=[item_id])
+        session_b.rollback()
+        session_a.commit()
+        warehouse_map_service.lock_warehouse_map_rows(session_b, item_ids=[item_id])
+        session_b.rollback()
+    finally:
+        if session_b is not None:
+            session_b.close()
+        if session_a is not None:
+            session_a.close()
+        with engine.begin() as cleanup:
+            cleanup.execute(text("DELETE FROM inventory WHERE inventory_id = :id"), {"id": inventory_id.hex})
+            cleanup.execute(text("DELETE FROM items WHERE item_id = :id"), {"id": item_id.hex})
+        engine.dispose()
 
 
 class _ScalarResult:

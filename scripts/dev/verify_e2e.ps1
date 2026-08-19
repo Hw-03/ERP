@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0 -or $nodeVersion -notmatch '^v20\.') {
 Write-Host "==> Playwright E2E (전용 DB mes_e2e.db · 실 mes.db 미접촉)"
 Push-Location $FrontendRoot
 try {
-    npx playwright test
+    npm run test:e2e
     if ($LASTEXITCODE -ne 0) {
         throw "Playwright E2E failed with exit code $LASTEXITCODE"
     }

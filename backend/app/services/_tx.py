@@ -55,7 +55,7 @@ def transactional(db: Session) -> Iterator[None]:
             db.info[_TRANSACTION_DEPTH_KEY] = depth
 
 
-def commit_and_refresh(db: Session, *objs) -> None:
+def commit_and_refresh(db: Session, *objs: object) -> None:
     """`db.commit()` 후 전달된 모든 객체를 refresh한다.
 
     Args:

@@ -15,8 +15,8 @@
 
 ```bash
 cd frontend
-npx playwright test            # globalSetup 이 전용 DB·서버·시드 자동 처리
-npx playwright test io-receive # 단일 spec
+npm run test:e2e                        # Node 20 guard + 전체 E2E
+npm run test:e2e -- io-receive.spec.ts  # Node 20 guard + 단일 spec
 ```
 
 또는 리포지토리 루트에서:
@@ -44,6 +44,7 @@ boot_id·활성직원)을 런타임 조회로 inject. 결재 2-세션 테스트�
 | `io-approval-cycle.spec.ts` | 제출(E01) → 창고 승인함 PIN 승인(E22) → 큐 소멸 | **2-세션 결재 풀사이클** |
 | `io-defect.spec.ts` | 불량 격리 → 정상 복귀 | 불량 흐름(즉시 처리) |
 | `io-history-labels.spec.ts` | 같은 작업이 화면에서 같은 라벨로 보임 | P0-1 라벨 회귀 방어 |
+| `shipping-request-to-prep.spec.ts` | 출하 목록 → 요청 상세 → 준비 중 전환 | 실제 출하 화면과 API 상태 전이 smoke |
 
 ## 작성 원칙
 
@@ -55,5 +56,5 @@ boot_id·활성직원)을 런타임 조회로 inject. 결재 2-세션 테스트�
 
 ## CI
 
-`.github/workflows/ci.yml` 의 `e2e` job 이 동일 코드로 돈다(전용 DB globalSetup). teardown 은
-OS 분기(Windows taskkill / POSIX SIGKILL)로 크로스플랫폼.
+`.github/workflows/ci.yml` 의 필수 `e2e` job 이 `npm run test:e2e`로 동일 코드 전체를 돈다
+(전용 DB globalSetup). teardown 은 OS 분기(Windows taskkill / POSIX SIGKILL)로 크로스플랫폼.

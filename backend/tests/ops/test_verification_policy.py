@@ -23,6 +23,17 @@ from scripts.dev.verification_policy import (
 
 
 DOCS_GATE_IDS = ["docs-whitespace", "docs-link-tests", "docs-links"]
+BACKEND_STATIC_GATE_IDS = ["backend-ruff", "backend-mypy"]
+BACKEND_FULL_GATE_IDS = [*BACKEND_STATIC_GATE_IDS, "backend-postgres-concurrency", "backend-pytest-full", "backend-openapi"]
+FRONTEND_FULL_GATE_IDS = [
+    "frontend-lint",
+    "frontend-typecheck",
+    "frontend-test-typecheck",
+    "frontend-e2e-typecheck",
+    "frontend-coverage",
+    "frontend-build",
+    "frontend-bundle-size",
+]
 
 
 def test_smart_auto_prefers_staged_changes() -> None:
@@ -37,7 +48,7 @@ def test_smart_auto_prefers_staged_changes() -> None:
     assert plan["change_set"] == "staged"
     assert plan["selected_files"] == ["backend/app/services/items.py"]
     assert plan["ignored_files"] == ["frontend/app/page.tsx"]
-    assert [gate["id"] for gate in plan["gates"]] == ["backend-testmon"]
+    assert [gate["id"] for gate in plan["gates"]] == [*BACKEND_STATIC_GATE_IDS, "backend-testmon"]
 
 
 def test_smart_auto_uses_working_changes_when_nothing_is_staged() -> None:
@@ -111,6 +122,7 @@ def test_frontend_test_file_is_run_directly_in_smart_mode() -> None:
         "frontend-lint-files",
         "frontend-tsc-incremental",
         "frontend-vitest-related",
+        "frontend-test-typecheck",
         "frontend-direct-tests",
     ]
 
@@ -136,13 +148,7 @@ def test_frontend_risky_change_escalates_to_full_frontend(change: Change) -> Non
     )
 
     assert plan["escalations"][0]["area"] == "frontend"
-    assert [gate["id"] for gate in plan["gates"]] == [
-        "frontend-lint",
-        "frontend-typecheck",
-        "frontend-coverage",
-        "frontend-build",
-        "frontend-bundle-size",
-    ]
+    assert [gate["id"] for gate in plan["gates"]] == FRONTEND_FULL_GATE_IDS
 
 
 def test_frontend_verification_script_escalates_to_full_frontend() -> None:
@@ -162,13 +168,7 @@ def test_frontend_verification_script_escalates_to_full_frontend() -> None:
             "reason": "frontend shared configuration, dependency, test setup, or verification script change",
         }
     ]
-    assert [gate["id"] for gate in plan["gates"]] == [
-        "frontend-lint",
-        "frontend-typecheck",
-        "frontend-coverage",
-        "frontend-build",
-        "frontend-bundle-size",
-    ]
+    assert [gate["id"] for gate in plan["gates"]] == FRONTEND_FULL_GATE_IDS
 
 
 def test_backend_without_testmon_cache_escalates_to_full_backend() -> None:
@@ -183,10 +183,7 @@ def test_backend_without_testmon_cache_escalates_to_full_backend() -> None:
     assert plan["escalations"] == [
         {"area": "backend", "reason": "testmon cache is not built"}
     ]
-    assert [gate["id"] for gate in plan["gates"]] == [
-        "backend-pytest-full",
-        "backend-openapi",
-    ]
+    assert [gate["id"] for gate in plan["gates"]] == BACKEND_FULL_GATE_IDS
 
 
 @pytest.mark.parametrize(
@@ -212,10 +209,7 @@ def test_backend_risky_change_escalates_to_full_backend(change: Change) -> None:
     )
 
     assert plan["escalations"][0]["area"] == "backend"
-    assert [gate["id"] for gate in plan["gates"]] == [
-        "backend-pytest-full",
-        "backend-openapi",
-    ]
+    assert [gate["id"] for gate in plan["gates"]] == BACKEND_FULL_GATE_IDS
 
 
 def test_router_or_schema_change_adds_openapi_to_backend_testmon() -> None:
@@ -228,6 +222,7 @@ def test_router_or_schema_change_adds_openapi_to_backend_testmon() -> None:
     )
 
     assert [gate["id"] for gate in plan["gates"]] == [
+        *BACKEND_STATIC_GATE_IDS,
         "backend-testmon",
         "backend-openapi",
     ]
@@ -245,10 +240,7 @@ def test_backend_runtime_change_outside_staged_selection_escalates_backend() -> 
     assert plan["escalations"] == [
         {"area": "backend", "reason": "backend runtime change exists outside selected staged changes"}
     ]
-    assert [gate["id"] for gate in plan["gates"]] == [
-        "backend-pytest-full",
-        "backend-openapi",
-    ]
+    assert [gate["id"] for gate in plan["gates"]] == BACKEND_FULL_GATE_IDS
 
 
 def test_cross_area_rename_keeps_the_old_runtime_area_in_the_plan() -> None:
@@ -268,8 +260,7 @@ def test_cross_area_rename_keeps_the_old_runtime_area_in_the_plan() -> None:
 
     assert plan["areas"] == ["backend", "docs"]
     assert [gate["id"] for gate in plan["gates"]] == [
-        "backend-pytest-full",
-        "backend-openapi",
+        *BACKEND_FULL_GATE_IDS,
         *DOCS_GATE_IDS,
     ]
 
@@ -296,8 +287,7 @@ def test_staged_cross_area_rename_counts_as_ignored_backend_runtime() -> None:
         }
     ]
     assert [gate["id"] for gate in plan["gates"]] == [
-        "backend-pytest-full",
-        "backend-openapi",
+        *BACKEND_FULL_GATE_IDS,
         *DOCS_GATE_IDS,
     ]
 
@@ -329,13 +319,8 @@ def test_docs_and_infra_smart_plan_keeps_docs_gates_during_full_escalation() -> 
 
     assert [gate["id"] for gate in plan["gates"]][:3] == DOCS_GATE_IDS
     assert [gate["id"] for gate in plan["gates"]][3:] == [
-        "backend-pytest-full",
-        "backend-openapi",
-        "frontend-lint",
-        "frontend-typecheck",
-        "frontend-coverage",
-        "frontend-build",
-        "frontend-bundle-size",
+        *BACKEND_FULL_GATE_IDS,
+        *FRONTEND_FULL_GATE_IDS,
         "git-status",
     ]
 
@@ -369,6 +354,7 @@ def test_smart_mixed_frontend_and_backend_changes_keep_both_targeted_gates() -> 
 
     assert plan["areas"] == ["backend", "frontend"]
     assert [gate["id"] for gate in plan["gates"]] == [
+        *BACKEND_STATIC_GATE_IDS,
         "backend-testmon",
         "frontend-lint-files",
         "frontend-tsc-incremental",
@@ -387,13 +373,8 @@ def test_infra_change_escalates_to_full_plan() -> None:
 
     assert plan["escalations"] == [{"area": "infra", "reason": "infra change requires full verification"}]
     assert [gate["id"] for gate in plan["gates"]] == [
-        "backend-pytest-full",
-        "backend-openapi",
-        "frontend-lint",
-        "frontend-typecheck",
-        "frontend-coverage",
-        "frontend-build",
-        "frontend-bundle-size",
+        *BACKEND_FULL_GATE_IDS,
+        *FRONTEND_FULL_GATE_IDS,
         "git-status",
     ]
 
@@ -413,13 +394,8 @@ def test_legacy_auto_uses_all_changes_and_full_area_gates() -> None:
         "frontend/app/page.tsx",
     ]
     assert [gate["id"] for gate in plan["gates"]] == [
-        "backend-pytest-full",
-        "backend-openapi",
-        "frontend-lint",
-        "frontend-typecheck",
-        "frontend-coverage",
-        "frontend-build",
-        "frontend-bundle-size",
+        *BACKEND_FULL_GATE_IDS,
+        *FRONTEND_FULL_GATE_IDS,
         "git-status",
     ]
 
@@ -428,16 +404,10 @@ def test_legacy_auto_uses_all_changes_and_full_area_gates() -> None:
     ("mode", "expected_ids"),
     [
         ("docs", DOCS_GATE_IDS),
-        ("backend", ["backend-pytest-full", "backend-openapi"]),
+        ("backend", BACKEND_FULL_GATE_IDS),
         (
             "frontend",
-            [
-                "frontend-lint",
-                "frontend-typecheck",
-                "frontend-coverage",
-                "frontend-build",
-                "frontend-bundle-size",
-            ],
+            FRONTEND_FULL_GATE_IDS,
         ),
     ],
 )

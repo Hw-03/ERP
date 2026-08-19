@@ -25,23 +25,23 @@ def test_verify_e2e_has_utf8_bom_for_windows_powershell() -> None:
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime guard is Windows-only")
 @pytest.mark.parametrize(
-    ("node_version", "expected_exit", "expect_npx"),
+    ("node_version", "expected_exit", "expect_npm"),
     [("v20.20.2", 0, True), ("v24.0.0", 1, False)],
 )
 def test_verify_e2e_requires_node_20_before_playwright(
     tmp_path: Path,
     node_version: str,
     expected_exit: int,
-    expect_npx: bool,
+    expect_npm: bool,
 ) -> None:
     powershell = shutil.which("powershell.exe")
     assert powershell is not None
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
-    marker = tmp_path / "npx-called.txt"
+    marker = tmp_path / "npm-called.txt"
     _write_fake_command(fake_bin / "node.cmd", f"echo {node_version}\r\nexit /b 0\r\n")
     _write_fake_command(
-        fake_bin / "npx.cmd",
+        fake_bin / "npm.cmd",
         f"> \"{marker}\" echo called\r\nexit /b 0\r\n",
     )
     env = os.environ.copy()
@@ -65,8 +65,8 @@ def test_verify_e2e_requires_node_20_before_playwright(
 
     output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
     assert result.returncode == expected_exit, output
-    assert marker.exists() is expect_npx
-    if not expect_npx:
+    assert marker.exists() is expect_npm
+    if not expect_npm:
         assert "Node.js 20" in output
 
 

@@ -17,6 +17,9 @@ import { spawn, spawnSync } from "child_process";
 import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import { assertSupportedNodeVersion } from "../../scripts/require-node-20.cjs";
+
+assertSupportedNodeVersion(process.version);
 
 const HERE = __dirname; // frontend/tests/e2e
 const REPO_ROOT = path.resolve(HERE, "..", "..", ".."); // c:\ERP
@@ -116,6 +119,36 @@ async function seed() {
     min_stock: 0,
     initial_quantity: 1,
   });
+  const shippingPaItem = await postJson(`${BACKEND_URL}/api/items`, {
+    item_name: "E2E출하PA",
+    process_type_code: "PA",
+    unit: "EA",
+    model_slots: [1],
+    legacy_item_type: "반제품",
+    min_stock: 0,
+    initial_quantity: 1,
+  });
+  const shippingItem = await postJson(`${BACKEND_URL}/api/items`, {
+    item_name: "E2E출하PF",
+    process_type_code: "PF",
+    unit: "EA",
+    model_slots: [1],
+    legacy_item_type: "완제품",
+    min_stock: 0,
+    initial_quantity: 1,
+  });
+  await postJson(`${BACKEND_URL}/api/bom`, {
+    parent_item_id: shippingPaItem.item_id,
+    child_item_id: rawItem.item_id,
+    quantity: 1,
+    unit: "EA",
+  });
+  await postJson(`${BACKEND_URL}/api/bom`, {
+    parent_item_id: shippingItem.item_id,
+    child_item_id: shippingPaItem.item_id,
+    quantity: 1,
+    unit: "EA",
+  });
   // BOM: 부모(TA) → 자식(TR) x2 — produce 의 자동 전개 대상.
   await postJson(`${BACKEND_URL}/api/bom`, {
     parent_item_id: parentItem.item_id,
@@ -152,13 +185,13 @@ async function seed() {
   fs.writeFileSync(
     SEED_FILE,
     JSON.stringify(
-      { rawItem, parentItem, warehouseEmployee, departmentEmployee, plainEmployee },
+      { rawItem, parentItem, shippingPaItem, shippingItem, warehouseEmployee, departmentEmployee, plainEmployee },
       null,
       2,
     ),
   );
   console.log(
-    `[e2e:setup] seed 완료 — raw=${rawItem.mes_code} parent=${parentItem.mes_code} ` +
+    `[e2e:setup] seed 완료 — raw=${rawItem.mes_code} parent=${parentItem.mes_code} shipping=${shippingItem.mes_code} ` +
       `wh=${warehouseEmployee?.employee_code}(${warehouseEmployee?.warehouse_role}) ` +
       `dept=${departmentEmployee?.employee_code}(${departmentEmployee?.department_role})`,
   );

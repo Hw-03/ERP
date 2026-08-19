@@ -1,0 +1,28 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+exclude = ["alembic/versions"]
+# IC-20 incremental baseline (NOT_FULL_COVERAGE): inventory mutation, locking,
+# or transaction ownership을 새 모듈로 옮길 때 Ruff와 mypy의 files/include를
+# 같은 변경에서 함께 넓히고, 기존 항목은 해당 모듈의 debt가 0이 된 뒤 추가한다.
+include = [
+  "app/services/_tx.py",
+  "app/services/shipping_actions.py",
+  "app/services/warehouse_map.py",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+python_version = "3.11"
+files = [
+  "app/services/_tx.py",
+  "app/services/shipping_actions.py",
+]
+follow_imports = "skip"
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+show_error_codes = true

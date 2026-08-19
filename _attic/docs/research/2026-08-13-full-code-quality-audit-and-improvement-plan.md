@@ -6,10 +6,11 @@
 
 - 원 감사 기준일·SHA: 2026-08-13 KST, `71d6a34faf27ef736fe7dc64a5084ff2a7f46893`
 - 첫 개선 체크포인트 기준 SHA: `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`
-- 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-improvement`
+- 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
+- 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
 - Git 상태: detached HEAD의 미커밋 working diff, 브랜치·커밋·푸시 없음
-- 실행 진척: 체크포인트 1 완료, 후속 체크포인트 2~7의 6개 구간 대기
-- 잔여 작업: 미완료 `IC` 24개(미착수 23개 + 부분 완료 `IC-20`)와 최종 closeout `DOC-01`, `AT-01`, `AT-02`
+- 실행 진척: 체크포인트 1 완료. 체크포인트 2의 `IC-04`·`IC-20` 저장소 구현과 이중 리뷰는 완료했으며, 실제 PostgreSQL CI와 GitHub required-check 적용 증거를 기다린다.
+- 잔여 작업: 엄격한 완료 판정상 `IC` 24개 중 `IC-04`·`IC-20`은 외부 증거 대기, 나머지 22개는 미착수다. 최종 closeout은 `DOC-01`, `AT-01`, `AT-02`다.
 - 최종 판정: **조건부 사용 가능**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
@@ -28,7 +29,7 @@
 3. 일반 거래취소는 재고 효과만 역재생하고 출하 요청·allocation·IO batch·StockRequest 같은 업무 상태를 함께 되돌리지 않는다. 픽업 로그를 일반 취소하면 재고는 복원되지만 출하는 `PICKED_UP`, allocation은 `CONSUMED`로 남을 수 있다. `backend/app/services/transaction_actions.py:182-257`, `backend/app/services/inv_effect.py:35-104`
 4. 원 감사에서 부서조정 `direction="scrap"`의 무음 성공을 재현했으나, 첫 체크포인트 `IC-02`에서 request enum·service·frontend submit type을 함께 좁혀 모든 subtype을 422로 차단했다. 폐기는 전용 재작업 `scrap_qty` 흐름만 사용한다.
 5. 운영 무결성 검사는 부서 예약, 출하 allocation, 창고 박스·특수구역 수량을 검사하지 않고, 누락·0 효과 거래를 경고만 한 뒤 성공 종료할 수 있다. 즉 “검사 통과”가 모든 재고 표현의 일치를 보증하지 않는다. `scripts/ops/check_inventory_integrity.py:62-332,349-409`
-6. 재고 초기화 도구는 출하 요청·allocation을 지우지 않는다. 기존 `PREPARED` 출하가 새 기준 재고에서 나중에 픽업되면 초기화 후 재고가 다시 차감될 수 있다. `scripts/ops/inventory_cutover.py:290-326`, `backend/app/services/shipping.py:1692-1704`
+6. 기준 SHA의 재고 초기화 도구는 출하 요청·allocation을 지우지 않아 기존 출하가 새 기준 재고를 다시 바꿀 수 있었다. 체크포인트 2 working diff의 `IC-04`는 미래 delta 가능 또는 불일치 출하를 dry-run/apply mutation 전에 차단하고, `CANCELLED` terminal-safe 조합만 허용한다. 이 보호막이 main에 통합되기 전과 체크포인트 5 운영 readiness 완료 전에는 실제 cutover를 계속 금지한다.
 
 따라서 현 상태의 운영 조건은 다음과 같다.
 
@@ -73,7 +74,7 @@
 | 거래 수량보정·일반 취소 | `FAILED` | 창고 RECEIVE 정정의 순차 primitive와 단일 effect 취소만 제한적으로 동작 | 부서 출하 SHIP도 창고 bucket을 정정하는 wrong-bucket 결함, 복합 업무 상태 분리 |
 | 창고 박스·특수구역 | `PARTIAL` | 위치 표현과 reconcile 조회 | 출고 source 정책·중복 품목·운영 gate 사각지대 |
 | 대시보드·입출고·이력 표시 | `PARTIAL` | 정상 입고의 화면/SQL 일치 | mixed cache, 지도 optimistic 경합, 일부 오류 화면 |
-| cutover·readiness·복구 | `PARTIAL` | 제한된 local SQLite 검사와 backup primitive는 동작 | cutover는 정책 결정 전 운영 차단, WAL freshness·schema·allocation·box 사각지대 |
+| cutover·readiness·복구 | `PARTIAL` | 체크포인트 2 working diff에서 상태 5종×allocation 9종의 45조합, orphan·손상 원장, rollback과 SQLite writer exclusion을 검증해 unsafe cutover를 차단 | 실제 PostgreSQL 실행 증거와 체크포인트 5의 WAL·schema·allocation·box readiness가 남음 |
 | PostgreSQL 동시성 | `NOT_VERIFIED` | 없음 | `TEST_POSTGRES_URL`/ephemeral PostgreSQL 부재 |
 
 ### 1.4 가장 먼저 할 일
@@ -568,8 +569,8 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `CQ-013` | `CONFIRMED` | backup verifier가 고정 20개 테이블만 검사하고 Alembic head/전체 schema를 증명하지 않는다. restore 기본은 inventory check도 선택 사항이다. | `scripts/ops/_verify_backup.py:28-93`, `scripts/ops/restore_db.py:221-248` |
 | `CQ-014` | `CONFIRMED` | readiness가 SQLite main DB mtime으로 backup freshness를 판단해 WAL에만 있는 후속 쓰기를 놓칠 수 있다. DB가 없을 때 eager check가 traceback하거나 일반 SQLite URL의 integrity subprocess가 빈 DB 파일을 만들 가능성도 있다. | `operational_readiness.py:49-92,114-128`, `backend/app/database.py:48-55` |
 | `CQ-015` | `RESOLVED_CHECKPOINT_1` | baseline E2E 실패의 stale selector와 자가승인 기대 drift를 Gate 0에서 고쳤고, 사용자가 닫을 수 있던 visible 전용 backend 콘솔도 숨김 실행으로 보강했다. CI E2E non-blocking은 `IC-20`, 보조 E2E 진입점의 Node 20 계약은 `CQ-030`으로 남는다. | RED 단일 0/1, focused 1/1·3/3, 무계측 Node 20 정본 전체 14/14, 숨김 backend 적용 후 전체 14/14. 12.9절 evidence |
-| `CQ-016` | `CONFIRMED` | backend CI는 Python 3.11 단일 버전과 pytest/compile/OpenAPI 중심이며 Ruff/mypy/필수 PostgreSQL job이 없다. | `.github/workflows/ci.yml:14-53` |
-| `CQ-017` | `CONFIRMED` | frontend `tsc`는 tests/e2e를 제외하고 coverage는 선택된 module whitelist만 측정한다. 전체 75%처럼 읽으면 안 된다. | `frontend/tsconfig.json:30-46`, `frontend/vitest.config.mts:11-54` |
+| `CQ-016` | `MITIGATED_CHECKPOINT_2_REPO` | 체크포인트 2 working diff에 Alembic-head PostgreSQL 2-connection 필수 job과 단계적 Ruff/mypy 0-error 범위를 추가했다. 전체 backend Ruff 사전 부채 184건은 숨기지 않고 `NOT_FULL_COVERAGE`로 남겼으며, 실제 CI 실행은 외부 대기다. | `.github/workflows/ci.yml`, `backend/pyproject.toml`, `backend/scripts/verify_postgres_concurrency.py` |
+| `CQ-017` | `MITIGATED_CHECKPOINT_2_REPO` | app typecheck와 별도로 unit test manifest/type baseline 및 E2E zero-error typecheck를 blocking gate로 추가했다. unit test 기존 진단 409건은 정규화 baseline으로 고정해 신규 종류·증가만 막으며, 실제 CI 실행은 외부 대기다. | `frontend/tsconfig.tests.json`, `frontend/tsconfig.e2e.json`, `frontend/scripts/typecheck-baseline.mjs`, `frontend/scripts/verify-test-typecheck-manifest.mjs` |
 | `CQ-018` | `CONFIRMED` | 수동 DTO에 `package_out`이 빠지고 defect `mes_code` nullability가 backend와 다르다. | `frontend/lib/api/types/stock-requests.ts:18-36`, `frontend/lib/api/types/defects.ts:6-16`, `backend/app/routers/defects.py:48-58` |
 | `CQ-019` | `CONFIRMED` | 부서 server state를 React Query, Context fetch, admin bootstrap/panel mutation이 따로 소유해 freshness/error/loading 계약이 다르다. | `DepartmentsContext.tsx:25-69`, `useDepartmentsQuery.ts:16-63`, `useAdminBootstrap.ts:68-78`, `DeptManagementPanel.tsx:51-93` |
 | `CQ-020` | `CONFIRMED` | active shipping list는 무제한/N+1이고 mobile은 추가 page를 소비하지 않아 데이터 증가 시 최신 화면/응답성이 나빠질 수 있다. | `routers/shipping.py:149-169,392-404,659-711`, `useShippingQuery.ts:51-57`, `MobileShippingScreen.tsx:39-42,182-188` |
@@ -578,7 +579,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `CQ-023` | `CONFIRMED` | 현재 dependency audit에 20건이 보고됐고 production Next와 dev tooling 취약점을 분리해 올려야 한다. | `frontend/package.json:19-40`, 감사 `npm audit --json` evidence |
 | `CQ-026` | `CONFIRMED` | handoff는 이미 열린 결과에서 다른 작성자로 바꿀 때만 animation을 요구하지만 구현·테스트는 첫 작성자 선택에도 적용한다. | `_attic/handoff/2026-07-24-shipping-sales-followup-todo.md:262-275`, `_daily_report/DailyWorkReportScreen.tsx:278-298`, 관련 test `:155-166` |
 | `CQ-029` | `RESOLVED_CHECKPOINT_1` | schema readiness는 `0=READY`, `2=NOT_READY`, `3=CHECK_ERROR`로 분리되고 status/watch가 이를 다른 label로 표시한다. | Start/Report × ready/not-ready/check-error/malformed/missing·wrong path/launch-error behavior matrix와 상시 Windows pytest wrapper |
-| `CQ-030` | `MITIGATED_CHECKPOINT_1` | 로컬 E2E가 Node 20을 강제하지 않아 Node 24 PATH에서 Next worker 조기 종료와 연결 거부 연쇄 실패가 발생할 수 있었음 | Gate 0에서 Node 24 실패와 무계측 Node 20 14/14를 비교한 뒤 정본 `verify_e2e.ps1`과 `verify_local -IncludeE2E`가 Node major 20을 Playwright 전에 강제하도록 보강했다. Windows behavior test가 Node 20에서는 npx 호출, Node 24에서는 호출 0과 fail-closed, full gate의 wrapper 위임을 검증한다. `npm run test:e2e` 같은 보조 진입점과 `.nvmrc`·`engines.node` 설치 안내는 `IC-20` 후속 범위다. |
+| `CQ-030` | `RESOLVED_CHECKPOINT_2_REPO` | 로컬 E2E가 Node 20을 강제하지 않아 Node 24 PATH에서 Next worker 조기 종료와 연결 거부 연쇄 실패가 발생할 수 있었음 | 체크포인트 1의 wrapper guard에 더해 `.nvmrc`, `engines.node`, 모든 npm E2E script, Playwright config/global setup에 Node 20 fail-closed 계약을 연결했다. 지원하지 않는 Node에서는 npx·Playwright·제품 서버 호출이 0이며, 실제 CI 성공은 외부 대기다. |
 
 ### 6.5 보존해야 할 현재 강점
 
@@ -612,7 +613,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 |---|---|---|---|
 | `QP-001` 결과 불명·semantic idempotency | **미해결** | frontend timeout은 abort/key 보존이 없고 IO/StockRequest는 fingerprint가 없다. defect의 semantic 409 패턴만 참고 자산이다. `api-core.ts:210-235`, `useIoSubmit.ts:20-44`, `io.py:257-267` | `IC-09` |
 | `QP-002` 행위자 위조 차단 | **미해결** | 공통 VerifiedActor 없이 body/header ID, 일부 익명/비활성 actor mutation이 남는다. | `IC-01` |
-| `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock이 있고 `IC-27`로 startup check의 DB identity 분리는 해소됐다. 다만 운영 DB 결정과 필수 PostgreSQL concurrency gate는 닫히지 않았다. `database.py:22-63`, `tests/concurrency/conftest.py:36-68` | `IC-08`, `IC-18`, `IC-20`; `IC-27` 완료 |
+| `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock이 있고 `IC-27`로 startup check의 DB identity 분리는 해소됐다. 체크포인트 2 working diff에 Alembic-head PostgreSQL 2-connection 공통 runner와 필수 CI job을 추가했지만 실제 PostgreSQL CI 증거는 아직 없다. | `IC-08`, `IC-18`; `IC-20` 외부 증거 대기, `IC-27` 완료 |
 | `QP-004` 승인 정책 단일 진실 | **부분 해결** | 입출고 subtype 상수와 drift test는 생겼지만 role/self/admin/list/count/button 판정은 같은 policy를 쓰지 않는다. `approval_rules.py:1-29`, `sr_execution.py:453-483` | `IC-24`; IO defect 표시/실행은 별도 `RV-007` 결정 |
 | `QP-005` 불량 idempotency·actor | **부분 해결** | same-key/different-payload semantic matcher와 중복 race는 해결. actor 검증은 공통 경계가 없어 미해결. `defects.py:135-167,293-342`, `test_defect_flow.py:323-472` | `IC-01` |
 | `QP-006` 출하 원자 상태 전이 | **미해결** | action transaction은 생겼지만 request/allocation 상태 직렬화, command receipt, 공통 예약은 없다. | `IC-07`, `IC-08` |
@@ -621,11 +622,11 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `QP-009` soft-deleted 품목 계약 | **미해결** | repository/IO lookup이 deleted item을 반환하고 delete가 open command를 확인하지 않는다. | `IC-11` |
 | `QP-010` 부서 dirty/save Promise | **미해결** | parent dirty false 고정과 void save가 남는다. | `IC-12` |
 | `QP-011` 출하 BOM race·dirty 의미 | **미해결** | dirty는 view 기반으로 확정 drift, BOM match는 generation/abort 없이 경쟁 가능하다. step 5 frozen layout을 건드리지 않고 hook/baseline만 고친다. | `IC-13` |
-| `QP-012` 필수 E2E gate | **미해결** | Gate 0에서 stale selector와 자가승인 기대 drift를 고치고 visible 전용 backend 콘솔을 숨김 실행으로 보강해 로컬 Node 20 정본 14/14를 복구했다. 그러나 CI E2E가 여전히 `continue-on-error: true`라 회귀를 차단하지 못한다. `.github/workflows/ci.yml:109-144` | `IC-20` |
+| `QP-012` 필수 E2E gate | **부분 해결** | Gate 0의 selector/lifecycle 복구에 이어 체크포인트 2 working diff에서 E2E `continue-on-error`를 제거하고 Node 20 blocking job과 실제 출하 REQUESTED→PREPARING UI smoke를 추가했다. 로컬 E2E와 계약은 통과했으며 새 CI 실행·required-check 적용은 외부 대기다. | `IC-20` 외부 증거 대기 |
 | `QP-013A` 공통 식별 경계 | **미해결** | VerifiedActor, mutation rate/identity boundary가 없다. PIN rate limiter는 일부 employee 경로뿐이다. | `IC-01` |
 | `QP-013B` PIN 보안 이행 | **대체** | 현재 SHA256/default PIN은 식별용이라는 정책이 유지된다. 인증 수단으로 격상할지는 별도 제품·운영 결정이며 이번 재고 카드에 몰아넣지 않는다. `pin_auth.py:1-29` | 결정 시 독립 security plan |
-| `QP-014` backend 품질 gate | **부분 해결** | pytest/compile/OpenAPI는 있으나 Ruff/mypy/Python matrix/필수 PG job은 없다. | `IC-20` |
-| `QP-015` frontend test type·coverage | **부분 해결** | product `tsc --noEmit`과 whitelist coverage는 실행되지만 tests/e2e typecheck와 위험 module coverage는 빠진다. | `IC-20` |
+| `QP-014` backend 품질 gate | **부분 해결** | 체크포인트 2 working diff에 필수 PostgreSQL job과 Ruff 3파일·mypy 2파일의 0-error blocking 범위를 추가했다. 전체 backend Ruff 사전 부채 184건과 Python matrix 확대는 후속 측정 대상으로 남고 실제 CI 실행은 외부 대기다. | `IC-20` 외부 증거 대기, 이후 범위 확대 |
+| `QP-015` frontend test type·coverage | **부분 해결** | product typecheck에 더해 unit test 247파일 manifest/baseline과 E2E zero-error typecheck를 blocking gate로 추가했다. unit test 기존 진단 409건과 위험 module coverage 확대는 남는다. | `IC-20` 외부 증거 대기, 이후 baseline 감축 |
 | `QP-016` 접근성 공통 계약 | **미해결** | 일부 화면 테스트는 있으나 공통 focus/error/live-region 계약과 필수 a11y gate는 없다. frozen nav styling은 제외한다. | `IC-23` |
 | `QP-017` server-state seam | **부분 해결** | QueryProvider와 departments query는 생겼지만 Context/direct fetch/admin bootstrap/panel mutation이 병존한다. production SWR consumer는 확인되지 않았다. | `IC-14` |
 | `QP-018` shipping frontend module 심화 | **근거 부족** | 대형 조정 component는 남지만 구조 분해 자체보다 QP-006/011과 pagination이 선행이다. 선행 seam을 닫은 뒤 다시 측정한다. | `IC-13`, `IC-16`, `IC-24` 후 재평가 |
@@ -713,6 +714,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-04` inventory cutover의 미결 출하 차단
 
+- **체크포인트 상태:** `저장소 구현·이중 리뷰 완료, 실제 PostgreSQL 증거 대기`. 5개 status×9개 allocation 조합의 persisted 45행, legacy `PICKED_UP`, orphan allocation/log, 손상 effect, CLI evidence, SQLite writer exclusion과 rollback을 검증했다. PostgreSQL 2-connection test는 공통 필수 runner에 연결했지만 로컬 전용 DB가 없어 실행 증거는 외부 대기다.
 - **작업자 영향:** 새 기준 재고를 올린 직후 과거 출하가 다시 차감하는 위험을 제거한다.
 - **근거/근본 원인:** `RV-002`. cutover의 삭제 집합과 shipping lifecycle의 소유권이 분리되어 있다.
 - **수정 경계:** `scripts/ops/inventory_cutover.py`, cutover runbook, 관련 ops tests. 제품 runtime shipping service는 cutover용 우회 로직을 넣지 않는다.
@@ -913,13 +915,13 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-20` 필수 E2E·test type·PostgreSQL gate 복구
 
-- **체크포인트 상태:** `부분 완료`. stale selector·자가승인 기대를 바로잡고 전용 backend를 숨김 실행해 Node 20에서 14/14를 복구했으며, `verify_e2e.ps1`은 다른 Node major에서 Playwright 전에 fail-closed한다. CI blocking, version file/`engines.node`, test typecheck와 PostgreSQL job은 후속 범위다.
+- **체크포인트 상태:** `저장소 구현·이중 리뷰 완료, 실제 CI·required-check 증거 대기`. 체크포인트 1의 selector·숨김 backend를 유지하면서 `.nvmrc`/`engines.node`/모든 E2E entry의 Node 20 fail-closed, unit 247파일 manifest와 409진단 baseline, E2E zero-error typecheck, blocking 출하 smoke, 단계적 Ruff/mypy, Alembic-head PostgreSQL 2-connection 공통 runner/job을 구현했다. 로컬 PostgreSQL 부재 시 runner는 거짓 성공 대신 exit 3 `NOT_VERIFIED`다.
 - **작업자 영향:** 실제로 깨진 재고/승인/화면 흐름이 CI에서 초록으로 통과하지 못하게 한다.
 - **근거/근본 원인:** 체크포인트에서 해결한 `CQ-015`, `CQ-030`과 남은 `CQ-016`, `CQ-017`.
 - **수정 경계:** 완료된 selector/runtime guard를 유지하고 핵심 smoke E2E는 blocking job으로 분리한다. Node 20 버전 파일과 `engines.node`로 설치 단계도 맞춘다. 별도 test tsconfig로 unit/e2e typecheck, backend Ruff/mypy 단계적 baseline, PostgreSQL concurrency job을 추가한다.
 - **API/type/schema:** 없음. CI artifact naming과 required check 설정 변경.
 - **실패 정책:** flaky 격리는 quarantine 목록·owner·만료일이 있는 경우만 허용하고 핵심 재고 smoke는 `continue-on-error` 금지.
-- **테스트:** Node 20에서 현 14 E2E, 지원하지 않는 Node major의 명시적 fail-fast, inventory/approval/shipping smoke, test source typecheck, PG race matrix.
+- **테스트:** Node 20에서 기존 14 E2E와 신규 shipping smoke를 포함한 15 E2E, 지원하지 않는 Node major의 npx 호출 0 fail-fast, test source typecheck, PG race matrix.
 - **합격 조건:** baseline E2E 14/14, 전용 backend 콘솔 노출 0, 로컬·CI Node major drift 0, 지원하지 않는 runtime에서 Next worker cascade 전 명시적 오류, 필수 job non-optional, tests/e2e type error가 CI를 실패시킴.
 - **의존성/롤백:** `IC-08`·`IC-10` 완료 선언에 필요한 선행 infrastructure다. 신규 broad lint는 기존 debt를 baseline file로 단계 적용하되 핵심 E2E/PG safety job은 optional로 되돌리지 않는다.
 
@@ -1073,12 +1075,12 @@ flowchart LR
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`을 완료했다. `IC-20`은 Node 20 정본·E2E selector·숨김 backend lifecycle까지만 완료되어 부분 완료다. 따라서 **남은 IC는 24개**이며, 다음 **6개 체크포인트**로 닫는다. `DOC-01`, `AT-01`, `AT-02`는 IC 24개에 포함하지 않고 마지막 closeout으로 수행한다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`을 완료했다. 체크포인트 2에서는 `IC-04`와 `IC-20`의 저장소 구현·이중 리뷰까지 끝냈지만, 실제 PostgreSQL CI와 GitHub required-check 증거가 없으므로 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 24개**이며, 외부 증거가 확보되는 즉시 22개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 24개에 포함하지 않고 마지막 closeout으로 수행한다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
 | 체크포인트 1 | `완료` | `IC-02`, `IC-05`, `IC-27`; `IC-20` 일부 | 24 |
-| 체크포인트 2 | `대기` | `IC-04`, `IC-20` | 22 |
+| 체크포인트 2 | `저장소 구현·리뷰 완료 / 외부 증거 대기` | `IC-04`, `IC-20` | 외부 증거 전 24, 통과 후 22 |
 | 체크포인트 3 | `대기` | `IC-01` | 21 |
 | 체크포인트 4 | `대기` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 안전 차단까지만 | 18 |
 | 체크포인트 5 | `대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 11 |
@@ -1108,10 +1110,10 @@ flowchart LR
 
 **GOAL:** 후속 동시성 카드를 증명할 Node·E2E·type·PostgreSQL 필수 gate를 완성하고, 향후 재고를 바꿀 수 있는 기존 출하가 있는 cutover를 mutation 전에 차단한다.
 
-- [ ] **`IC-20` 완료:** 체크포인트 1의 selector·Node 20·숨김 backend 보강을 유지하고, Node version file·`engines.node`, test/e2e typecheck, blocking 핵심 E2E, 필수 PostgreSQL two-connection job, 단계적 Ruff/mypy baseline을 닫는다.
+- [x] **`IC-20` 저장소 구현:** 체크포인트 1의 selector·Node 20·숨김 backend 보강을 유지하고, Node version file·`engines.node`, test/e2e typecheck, blocking 핵심 E2E, 필수 PostgreSQL two-connection job, 단계적 Ruff/mypy baseline을 구현하고 이중 리뷰를 통과했다.
 - [ ] **필수 job 증명:** CI required-check 설정과 local wrapper가 같은 Node·test·PostgreSQL 계약을 사용하고, `continue-on-error`로 핵심 재고 smoke를 우회할 수 없게 한다.
-- [ ] **`IC-04` 상태표:** 각 shipping request status×allocation status에서 앞으로 허용되는 pickup/cancel과 가능한 inventory delta를 선언적 표로 고정한다. 단순 terminal row 존재와 실제 미래 delta 가능성을 구분한다.
-- [ ] **`IC-04` kill-switch:** 미래 delta 가능 lifecycle이 하나라도 있으면 cutover dry-run/apply 모두 0 mutation으로 실패하고 상태별 evidence를 남긴다. 자동 삭제·자동 승계·실제 cutover 실행은 하지 않는다.
+- [x] **`IC-04` 상태표:** 각 shipping request status×allocation status에서 앞으로 허용되는 pickup/cancel과 가능한 inventory delta를 45개 persisted 조합으로 고정했다. 단순 terminal row 존재와 실제 미래 delta 가능성을 구분한다.
+- [x] **`IC-04` kill-switch:** 미래 delta 가능 lifecycle, orphan, 손상 evidence가 하나라도 있으면 cutover dry-run/apply 모두 0 mutation으로 실패하고 상태별 evidence를 남긴다. 자동 삭제·자동 승계·실제 cutover 실행은 하지 않는다.
 
 `IC-20`을 먼저 완료하고 그 gate 위에서 `IC-04`를 구현한다. 이 순서를 바꾸면 후속 PostgreSQL 경합 카드의 합격 증거를 만들 수 없고 cutover 안전 회귀도 CI가 차단하지 못한다.
 
@@ -1121,7 +1123,7 @@ flowchart LR
 
 **필수 검증:** Node 20 blocking E2E 14/14, unsupported Node의 npx 호출 0, test/e2e type error failure, 실제 PostgreSQL 두 connection smoke, REQUESTED/PREPARING/PREPARED/PICKED_UP/CANCELLED와 RESERVED/CONSUMED/RELEASED 조합의 cutover matrix, 후반 failure rollback. Matrix의 기대 결과는 세 부류로 고정한다. `FUTURE_DELTA` 또는 `INCONSISTENT` 조합은 apply 실패·0 mutation, `TERMINAL_SAFE` 조합은 apply 허용·기준재고 반영 후 과거 request의 미래 delta 0, dry-run은 모든 조합에서 mutation 0이다.
 
-**완료·정지 조건:** 핵심 safety job optional 0, PostgreSQL 경합 harness가 CI에서 실제 실행, 미래 재고 delta 가능 출하가 있는 cutover mutation 0. `IC-20`과 `IC-04`를 완료하고 멈춘다.
+**완료·정지 조건:** 핵심 safety job optional 0과 미래 재고 delta 가능 출하의 cutover mutation 0은 저장소 diff와 로컬 검증으로 충족했다. PostgreSQL 경합 harness의 실제 CI 실행과 GitHub required-check 적용이 남았으므로 체크포인트와 Goal은 아직 완료로 표시하지 않는다. 그 증거가 확보되면 `IC-20`과 `IC-04`를 완료 처리하고 즉시 멈춘다.
 
 #### 8.9.4 체크포인트 3 — 신뢰 가능한 작업자 actor `[GPT-5.6 Sol] [순차]`
 
@@ -1739,5 +1741,54 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 증거 정본은 ignored 디렉터리 `_attic/runtime/code-quality-improvement/20260813-115532-checkpoint1/`의 `ic27/`, `ic02/`, `ic05/`와 Gate 0 로그에 보존한다. 작업 파일은 `IC-27` 8개, `IC-02` 6개(요청 enum·frontend submit type·OpenAPI baseline 포함), `IC-05` 4개, Gate 0 7개(test-only 보정 3, Node runtime guard·정본 위임 2, Windows 회귀 test 1, 전용 backend 숨김 실행 1), 감사 문서 1개로 전체 26개다. DB migration·response schema·frozen UI는 변경하지 않았고, 공개 API 변화는 일반 부서조정 request에서 처리하지 않던 `scrap`을 제거한 의도적 축소 하나뿐이다.
 
 최종 통합 검증은 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`로 수행했다. backend pytest, OpenAPI drift, frontend strict lint·typecheck, Vitest 232파일/1,861테스트와 coverage threshold(전체 statement 92.5%), production build, bundle 2,381,157 bytes/한도 2,381,316.096 bytes, DB read-only consistency는 통과했다. E2E는 사용자가 visible 전용 backend 콘솔을 닫은 외부 중단으로 2/14 뒤 실패했으며, 원인 제거 1줄만 반영한 뒤 영향받는 정본 E2E를 재실행해 14/14를 통과했다. 변경 범위가 전용 E2E 프로세스 표시 방식뿐이므로 이미 통과한 비영향 gate는 반복하지 않았다. 종료 시 `mes.db`·lockfile 해시 불변, E2E 임시 DB/PID/seed 0, 8021·3100 listener 0을 확인했다.
+
+### 12.10 체크포인트 2 저장소 구현과 외부 증거 경계 (`90ce42d9`)
+
+- **기준:** 최신 `main`의 고정 SHA `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`에서 `C:\ERP\.worktrees\full-code-quality-checkpoint-2` detached worktree를 만들었다. branch·commit·push는 수행하지 않았다.
+- **delta:** 직전 체크포인트 통합 뒤 `ab8b2a1e..90ce42d9`의 28개 commit, 281개 변경 경로를 manifest로 다시 읽어 `IC-04`·`IC-20`의 전제와 동결 범위를 재판정했다.
+- **기준선:** Python dependency, 전용 Alembic `20260818_0022`, backend, frontend lint/type/Vitest/coverage/build/bundle, docs, DB read-only와 Node 20 E2E 14/14가 구현 전 통과했다. 최초 frontend 시도는 `npm ci`가 끝나기 전 시작한 환경 경쟁이었고 설치 완료 뒤 같은 gate가 통과했다.
+- **환경:** 로컬에 `TEST_POSTGRES_URL`, Docker/Podman, `psql`이 없어 실제 PostgreSQL 연결은 시도하지 않았다. GitHub repository admin 권한은 확인했지만 기존 `main` branch protection/ruleset은 없었고, uncommitted workflow를 먼저 required check로 설정하지 않았다.
+
+#### `IC-20` 필수 gate
+
+| 경계 | 저장소 구현·로컬 증거 | 남은 증거 |
+|---|---|---|
+| Node | `.nvmrc`, `engines.node >=20 <21`, npm·Playwright config/global setup·PowerShell entrypoint의 Node 20 fail-closed. 지원하지 않는 Node에서는 npx·Playwright·서버 호출 0 | 새 commit의 GitHub Node 20 E2E 성공 |
+| frontend type | product typecheck, unit 247파일 manifest 양방향 차집합 0, 기존 409진단 normalized baseline의 신규 종류·증가 차단, E2E zero-error typecheck | 기존 409진단 감축은 후속 debt이며 이번 카드의 거짓 0으로 세지 않음 |
+| backend quality | Ruff 3파일·mypy 2파일 0-error blocking 범위와 확대 절차. 전체 Ruff 사전 부채 184건은 `NOT_FULL_COVERAGE`로 명시 | 범위 확대는 후속 change |
+| 핵심 E2E | 기존 14개와 실제 UI 출하 `REQUESTED→PREPARING` smoke를 blocking `npm run test:e2e`로 연결하고 `continue-on-error` 제거 | 새 workflow의 실제 15/15 CI |
+| PostgreSQL | Alembic head 확인 뒤 public table의 독립 Session/PID 2개로 warehouse-map 3행과 cutover lock 1행을 실행하는 공통 runner. ACK·test DB 이름·URL 동일성·`current_database()`를 mutation 전에 검사하며 URL 없음은 exit 3 | 전용 PostgreSQL에서 skip 0·4행 PASS, 이후 check context를 required로 설정 |
+
+`IC-20` 명세 리뷰와 코드 품질 리뷰는 저장소 diff에 Critical/Important 0을 판정했다. 단, 결과 상태는 실제 CI와 required-check가 없으므로 `APPROVED_REPO_WITH_EXTERNAL_PENDING`이다.
+
+#### `IC-04` cutover kill-switch
+
+| 검증 경계 | 결과 |
+|---|---|
+| 선언적 상태표 | `REQUESTED`, `PREPARING`, `PREPARED`, `PICKED_UP`, `CANCELLED` × allocation 9조합의 persisted 45행을 `FUTURE_DELTA`·`INCONSISTENT`·`TERMINAL_SAFE`로 판정 |
+| legacy·손상 상태 | allocation 없는 legacy `PICKED_UP`도 유효 PICKUP effect가 있으면 취소 가능하므로 `FUTURE_DELTA`; orphan allocation/log, unknown transaction type/status, 빈·0·bool·float·string·범위 밖 effect는 `INCONSISTENT` |
+| mutation 0 | unsafe dry-run/apply, `--keep-history`, 열린 transaction, 미지원 dialect를 fail-closed. 후반 target failure와 lock failure는 history·inventory 전체 rollback |
+| terminal-safe | `CANCELLED`이며 allocation 없음/`RELEASED`만 허용. 적용 후 기존 request의 prepare/pickup/cancel command가 재고를 바꾸지 못함 |
+| 증거 출력 | safe summary와 unsafe exception/CLI 모두 request/status/disposition, allocation 상태별 수량 합, active phase, pickup/effective effect/malformed count를 보존 |
+| 경합 | SQLite `BEGIN IMMEDIATE` 실제 두 writer exclusion 통과. PostgreSQL은 3개 public table의 `ACCESS EXCLUSIVE` lock 뒤 두 번째 connection `ROW EXCLUSIVE` 차단·rollback 후 재진입 test를 공통 runner에 연결 |
+
+부모 focused 검증은 관련 188개 중 **184 PASS, PostgreSQL 전용 4 SKIP**였고, 별도 PostgreSQL runner는 의도한 `NOT_VERIFIED`, exit 3을 반환했다. `IC-04`의 최초 명세·품질 리뷰 Important 6개 고유 항목을 TDD로 보강한 뒤 두 재리뷰 모두 `APPROVED_REPO_WITH_EXTERNAL_PG_PENDING`으로 Critical/Important 0을 확인했다. 실제 cutover, 자동 삭제·승계, 직원 환경 접근은 수행하지 않았고, Checkpoint 5와 별도 사용자 승인 전 실제 운영 cutover 금지는 유지한다.
+
+#### 최종 로컬 검증
+
+정본 명령 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`를 Node 20.20.2에서 한 번 실행했다. frontend lint·app/unit/E2E type·coverage·build·bundle은 모두 통과했고 backend Ruff/mypy도 통과했다. backend PostgreSQL gate가 전용 URL 부재를 exit 3으로 정확히 차단했기 때문에 전체 명령의 최종 exit는 1이며, 같은 backend 묶음의 후속 pytest/OpenAPI와 docs·DB·E2E는 fail-fast로 실행되지 않았다. 이는 성공으로 기록하지 않고 다음 직접 증거로 누락 gate를 보완했다.
+
+- backend full pytest: 1,642개 중 **1,636 PASS, PostgreSQL/환경 전용 6 SKIP**, exit 0
+- OpenAPI drift: baseline 일치, exit 0
+- Node 20 Playwright: 기존 14개 + 신규 출하 smoke, **15/15 PASS**, exit 0
+- docs: 14개 중 13 PASS·Windows symlink 권한 1 SKIP, maintained link·whitespace PASS
+- DB read-only: inventory mismatch 0, exit 0
+- `git diff --check`: PASS, 실질 변경 경로 35개(기존 18 + 신규 17)
+- worktree `backend/mes.db` SHA-256: 전후 `F427E7E53BFABEA900D6D6A6A18385BE09734966DC89F182FFA33C2DC53061B5`
+- 종료 상태: 8021·3100 listener 0, `mes_e2e.db`·E2E PID file 0
+
+#### 현재 정지 조건
+
+저장소 diff 기준으로 `IC-04`·`IC-20` 구현과 리뷰는 완료됐다. 그러나 이 체크포인트의 완료 조건은 **실제 PostgreSQL 4행 skip 0**, 새 GitHub E2E·PostgreSQL job 성공, 두 safety context의 required-check 적용까지 포함한다. 현재는 commit·push 권한을 이번 체크포인트에서 받지 않았으므로 이를 실행할 수 없다. 따라서 체크포인트 3을 시작하거나 Goal을 완료 표시하지 않고 외부 증거 대기 상태로 정지한다.
 
 ---

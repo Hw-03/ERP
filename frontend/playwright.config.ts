@@ -9,12 +9,15 @@
  * 실행:
  *   npm run test:e2e          # headless
  *   npm run test:e2e:headed   # 브라우저 보임
- *   npx playwright test --ui  # UI 모드
+ *   npm run test:e2e:ui       # UI 모드
  *
  * 전용 DB·전용 백엔드(포트 8021)·시드는 globalSetup 이 자동 처리한다(실 mes.db 미접촉).
  * 프론트는 전용 포트 3100 에서 next dev 로 띄우고, /api/* 는 BACKEND_INTERNAL_URL 로 8021 에 프록시.
  */
 import { defineConfig, devices } from "@playwright/test";
+import { assertSupportedNodeVersion } from "./scripts/require-node-20.cjs";
+
+assertSupportedNodeVersion(process.version);
 
 const FRONT_PORT = 3100;
 const BACKEND_PORT = 8021;

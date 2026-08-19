@@ -25,7 +25,7 @@ jobs:
         run: python -m pip install "pytest>=8.0"
 
       - name: Verify smart policy and PowerShell orchestration
-        run: python -m pytest backend/tests/ops/test_verification_policy.py backend/tests/ops/test_verify_local_runtime.py backend/tests/ops/test_verify_local_parallel_contract.py backend/tests/ops/test_verify_e2e_runtime.py --confcutdir=backend/tests/ops -q
+        run: python -m pytest backend/tests/ops/test_verification_policy.py backend/tests/ops/test_verify_local_runtime.py backend/tests/ops/test_verify_local_parallel_contract.py backend/tests/ops/test_verify_e2e_runtime.py backend/tests/ops/test_ic20_verification_contract.py --confcutdir=backend/tests/ops -q
 
   backend:
     name: Backend (pytest + compile + openapi-drift)
@@ -41,7 +41,15 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff baseline
+        working-directory: backend
+        run: python -m ruff check .
+
+      - name: mypy baseline
+        working-directory: backend
+        run: python -m mypy
 
       - name: Compile check
         run: python -m compileall backend
@@ -86,6 +94,50 @@ jobs:
         working-directory: backend
         run: pytest tests/ops/test_runtime_paths.py -q -k "profile_resolver_test_root or ops_batches_treat_a_fake_http_503_as_failure_before_success_flow"
 
+  postgres-concurrency:
+    name: PostgreSQL concurrency (Alembic head · two connections)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mes_test
+          POSTGRES_PASSWORD: mes_test
+          POSTGRES_DB: mes_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mes_test -d mes_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://mes_test:mes_test@127.0.0.1:5432/mes_test
+      TEST_POSTGRES_URL: postgresql://mes_test:mes_test@127.0.0.1:5432/mes_test
+      DEXCOWIN_POSTGRES_TEST_ACK: ALLOW_TEST_DB_MUTATION
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Bootstrap PostgreSQL schema to Alembic head
+        working-directory: backend
+        run: |
+          python bootstrap_db.py --all
+          python bootstrap_db.py --check
+
+      - name: Run real two-connection locking tests
+        working-directory: backend
+        run: python scripts/verify_postgres_concurrency.py
+
   frontend:
     name: Frontend (lint + tsc + vitest+coverage + build)
     runs-on: ubuntu-latest
@@ -94,7 +146,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -116,7 +168,15 @@ jobs:
 
       - name: Type check
         working-directory: frontend
-        run: npx tsc --noEmit
+        run: npm run typecheck:app
+
+      - name: Unit test type check
+        working-directory: frontend
+        run: npm run typecheck:tests
+
+      - name: E2E type check
+        working-directory: frontend
+        run: npm run typecheck:e2e
 
       - name: Vitest (with coverage gate)
         working-directory: frontend
@@ -143,7 +203,6 @@ jobs:
   e2e:
     name: E2E (Playwright · 전용 DB)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -159,7 +218,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -175,7 +234,7 @@ jobs:
       # 실 backend/mes.db 는 CI 체크아웃에 없음(.gitignore) → 해시 가드 자동 생략.
       - name: Playwright E2E
         working-directory: frontend
-        run: npx playwright test
+        run: npm run test:e2e
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 

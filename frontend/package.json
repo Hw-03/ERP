@@ -2,6 +2,9 @@
   "name": "xray-erp-frontend",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <21"
+  },
   "scripts": {
     "dev": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\dev\\start-frontend.ps1",
     "dev:raw": "next dev --hostname 0.0.0.0",
@@ -14,8 +17,14 @@
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "test:coverage:ci": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov",
     "test:coverage:html": "vitest run --coverage --coverage.reporter=html",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
+    "typecheck:app": "tsc --noEmit",
+    "typecheck:tests": "npm run test:verification-contract && node scripts/verify-test-typecheck-manifest.mjs tsconfig.tests.json && node scripts/typecheck-baseline.mjs tsconfig.tests.json scripts/typecheck-tests-baseline.json",
+    "typecheck:tests:update-baseline": "node scripts/typecheck-baseline.mjs tsconfig.tests.json scripts/typecheck-tests-baseline.json --update-baseline",
+    "typecheck:e2e": "tsc --project tsconfig.e2e.json",
+    "test:verification-contract": "node --test scripts/require-node-20.test.mjs scripts/typecheck-baseline.test.mjs",
+    "test:e2e": "node scripts/require-node-20.mjs && playwright test",
+    "test:e2e:headed": "node scripts/require-node-20.mjs && playwright test --headed",
+    "test:e2e:ui": "node scripts/require-node-20.mjs && playwright test --ui",
     "check:bundle-size": "node --test scripts/check-bundle-size.test.mjs && node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
