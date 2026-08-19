@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, AlertCircle, X } from "lucide-react";
 import type {
   ProductionCapacity,
   ProductionCapacityAfBlock,
@@ -13,14 +13,16 @@ import { formatQty } from "@/lib/mes/format";
 import { DesktopCapacityPfWorkspace } from "./_capacity_sections/DesktopCapacityPfWorkspace";
 
 const DESKTOP_PF_GRID =
-  "sm:grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]";
+  "sm:grid-cols-[20px_120px_72px_minmax(0,1fr)_120px_84px_84px_84px]";
 
-const SHARED_HINT_LINES = [
-  "공용 자재가 겹치는 모델은 표시 수량을 모두 동시에 생산할 수 없습니다.",
-  "한 모델에 자재를 사용하면 다른 모델의 생산 가능 수량은 줄어들 수 있습니다.",
-];
+const DESKTOP_CAPACITY_GRID =
+  "grid-cols-[20px_120px_72px_minmax(0,1fr)_120px_84px_84px_84px]";
+
+const SHARED_HINT =
+  "공용 자재가 겹치는 모델은 표시 수량을 모두 동시에 생산할 수 없으며, 한 모델에 사용하면 다른 모델의 생산 가능 수량이 줄어들 수 있습니다.";
 
 const DESKTOP_CAPACITY_MEDIA_QUERY = "(min-width: 640px)";
+const CAPACITY_DETAIL_HISTORY_KEY = "capacityDetailPfItemId";
 
 function getDesktopCapacitySnapshot(): boolean {
   return typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -58,108 +60,176 @@ export function CapacityDetailModal({
 }) {
   const af = capacityData?.af ?? null;
   const isDesktopCapacityLayout = useDesktopCapacityLayout();
+  const [selectedPfItemId, setSelectedPfItemId] = useState<string | null>(null);
+  const selectedPf = useMemo(
+    () => af?.pf_variants.find((variant) => variant.pf_item_id === selectedPfItemId) ?? null,
+    [af, selectedPfItemId],
+  );
+
+  useEffect(() => {
+    if (!isDesktopCapacityLayout || (selectedPfItemId && !selectedPf)) {
+      setSelectedPfItemId(null);
+    }
+  }, [isDesktopCapacityLayout, selectedPf, selectedPfItemId]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [onClose]);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const historyState = event.state;
+      const pfItemId =
+        historyState && typeof historyState === "object"
+          ? historyState[CAPACITY_DETAIL_HISTORY_KEY]
+          : null;
+      setSelectedPfItemId(typeof pfItemId === "string" ? pfItemId : null);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const openBom = (variant: ProductionCapacityPfVariant) => {
+    const historyState = window.history.state;
+    window.history.pushState(
+      {
+        ...(historyState && typeof historyState === "object" ? historyState : {}),
+        [CAPACITY_DETAIL_HISTORY_KEY]: variant.pf_item_id,
+      },
+      "",
+    );
+    setSelectedPfItemId(variant.pf_item_id);
+  };
+
+  const returnToCapacitySummary = () => {
+    const historyState = window.history.state;
+    if (
+      historyState &&
+      typeof historyState === "object" &&
+      historyState[CAPACITY_DETAIL_HISTORY_KEY] === selectedPfItemId
+    ) {
+      window.history.back();
+      return;
+    }
+    setSelectedPfItemId(null);
+  };
+
+  const isPfDetail = isDesktopCapacityLayout && selectedPf !== null;
 
   return (
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,.55)" }}
+      style={{ background: LEGACY_COLORS.bg }}
       onClick={onClose}
     >
       <div
-        className="flex w-full max-w-[min(1600px,97vw)] flex-col rounded-[28px] border"
+        className="flex h-[92vh] w-[calc(100vw-32px)] min-h-0 flex-col rounded-[24px] border sm:h-[84vh] sm:w-[calc(100vw-128px)]"
         style={{
-          background: LEGACY_COLORS.s1,
+          background: "var(--c-popup-bg)",
           borderColor: LEGACY_COLORS.border,
-          height: "min(900px, 92vh)",
+          boxShadow: "var(--c-card-shadow)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── 헤더 ───────────────────────────────────────── */}
-        <div className="border-b px-4 pb-3 pt-4 sm:px-7 sm:pb-5 sm:pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="flex items-start justify-between">
-            <div className="text-lg font-black sm:text-2xl" style={{ color: LEGACY_COLORS.text }}>
-              생산 가능수량
+        {!isPfDetail && (
+          <>
+            {/* ── 헤더 ───────────────────────────────────────── */}
+            <div className="border-b px-4 py-3 sm:px-7 sm:py-4" style={{ borderColor: LEGACY_COLORS.border }}>
+              <div className="flex items-center gap-4">
+                <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-3">
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
+                    <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 박스 포장까지 완료되어 픽업을 기다리는 재고</span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
+                    <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span> — 테스트 완료 완제품과 포장 자재로 빠르게 포장 가능한 수량</span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.purple }} />
+                    <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — 튜브부터 박스까지 사내 재고로 이론상 생산 가능한 총합</span>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                  style={{
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
+                    color: LEGACY_COLORS.red,
+                  }}
+                  aria-label="닫기"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <div className="shrink-0 text-lg font-black sm:text-2xl" style={{ color: LEGACY_COLORS.text }}>
+                  생산 가능수량
+                </div>
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-1.5 text-xs font-semibold sm:text-sm"
+                  style={{
+                    background: LEGACY_COLORS.warningBg,
+                    borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`,
+                    color: LEGACY_COLORS.yellow,
+                  }}
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{SHARED_HINT}</span>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={onClose}
-              className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
-              style={{
-                background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
-                color: LEGACY_COLORS.red,
-              }}
-              aria-label="닫기"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="mt-2 space-y-1 sm:mt-3 sm:space-y-1.5">
-            <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 박스 포장까지 완료되어 픽업을 기다리고 있는 재고입니다.</span>
-            </div>
-            <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span> — 테스트가 완료된 완제품 재고와 포장 자재를 확인해 빠르게 박스 포장까지 할 수 있는 수량입니다.</span>
-            </div>
-            <div className="flex items-start gap-2 text-xs leading-snug sm:text-base sm:leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span className="mt-[4px] h-2 w-2 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.purple }} />
-              <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — 튜브부터 박스까지 사내 재고를 사용해 이론적으로 생산할 수 있는 총합입니다.</span>
-            </div>
-          </div>
-          <div
-            className="mt-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold sm:mt-3 sm:inline-flex sm:rounded-full sm:py-1 sm:text-base"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`,
-              color: LEGACY_COLORS.yellow,
-            }}
-          >
-            <span className="flex flex-col">
-              {SHARED_HINT_LINES.map((line) => <span key={line}>{line}</span>)}
-            </span>
-          </div>
-        </div>
+          </>
+        )}
 
-        {/* ── 본문 ─────────────────────────────────────────── */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-7 sm:py-8">
-          {af ? (
-            <>
-              {!isDesktopCapacityLayout && <div className="min-h-0 flex-1 overflow-y-auto sm:hidden">
-                <MobileAfCapacityView af={af} />
-              </div>}
-              {isDesktopCapacityLayout && <DesktopCapacityPfWorkspace af={af} />}
-            </>
-          ) : (
-            <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-              {capacityData == null
-                ? "데이터를 불러오는 중…"
-                : "AF 기준 데이터가 없습니다. 백엔드 갱신 후 다시 확인해 주세요."}
+        {isPfDetail && selectedPf ? (
+          <DesktopCapacityPfWorkspace
+            variant={selectedPf}
+            onBack={returnToCapacitySummary}
+            onClose={onClose}
+          />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-7 sm:py-8">
+            <div className="flex min-h-0 flex-1 flex-col">
+              {af ? (
+                <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll">
+                  <AfCapacitySummary
+                    af={af}
+                    onOpenBom={isDesktopCapacityLayout
+                      ? openBom
+                      : undefined}
+                  />
+                </div>
+              ) : (
+                <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {capacityData == null
+                    ? "데이터를 불러오는 중…"
+                    : "AF 기준 데이터가 없습니다. 백엔드 갱신 후 다시 확인해 주세요."}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* ── 푸터 ───────────────────────────────────────── */}
-        <div className="border-t px-7 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-          <button
-            className="w-full rounded-[18px] border py-3 text-lg font-semibold"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.muted2,
-            }}
-            onClick={onClose}
-          >
-            닫기
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function MobileAfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
+function AfCapacitySummary({
+  af,
+  onOpenBom,
+}: {
+  af: ProductionCapacityAfBlock;
+  onOpenBom?: (variant: ProductionCapacityPfVariant) => void;
+}) {
   const items = af.items;
-  const unregisteredBomCount = items.filter((item) => item.bom_status === "incomplete").length;
-
   const filtered = items;
 
   // 모델(model_symbol) 단위 그룹화 + 모델 합계.
@@ -210,20 +280,6 @@ function MobileAfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
 
   return (
     <>
-      {unregisteredBomCount > 0 && (
-        <div
-          className="mb-3 flex items-center gap-2 rounded-[14px] border px-3 py-2 text-sm font-bold sm:mb-4 sm:px-4 sm:py-3"
-          style={{
-            background: LEGACY_COLORS.warningBg,
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`,
-            color: LEGACY_COLORS.yellow,
-          }}
-        >
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>BOM 미등록 {unregisteredBomCount}건 · 모델 그룹을 펼쳐 해당 품목을 확인하세요.</span>
-        </div>
-      )}
-
       {/* AF 목록 — 모바일: 카드 레이아웃 / 데스크톱: 테이블 */}
 
       {/* 모바일 카드 레이아웃 (< 640px) */}
@@ -358,6 +414,7 @@ function MobileAfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         hasPfPath={it.has_pf_path}
                         autoRepresentative={autoRepresentative}
                         showAutoRepresentativeBadge
+                        onOpenBom={onOpenBom}
                       />
                     </div>
                   )}
@@ -368,6 +425,156 @@ function MobileAfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           );
         })}
       </div>
+
+      <section
+        aria-label="모델별 생산 가능수량"
+        className="hidden min-h-full overflow-clip rounded-[16px] border sm:block"
+        style={{ borderColor: LEGACY_COLORS.border }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none sticky top-0 z-20 -mb-4 flex h-4 justify-between"
+        >
+          <span
+            className="h-4 w-4"
+            style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-popup-bg) 16px)" }}
+          />
+          <span
+            className="h-4 w-4"
+            style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-popup-bg) 16px)" }}
+          />
+        </div>
+        <div
+          className={`sticky top-0 z-10 grid ${DESKTOP_CAPACITY_GRID} border-b px-4 py-4 text-sm font-bold uppercase tracking-[0.12em]`}
+          style={{ background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+        >
+          <span />
+          <span>조립 완제품</span>
+          <span>모델 수</span>
+          <span>자동 기준 출하품</span>
+          <span className="text-center">품목코드</span>
+          <span className="text-center">출하 대기</span>
+          <span className="text-center">빠른 생산</span>
+          <span className="text-center">총생산</span>
+        </div>
+
+        {grouped.map((group) => {
+          const autoRepresentative = getAutoRepresentative(group.key, af);
+          const groupCollapsed = !expandedGroups.has(group.key);
+          return (
+            <div key={group.key}>
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.key)}
+                aria-expanded={!groupCollapsed}
+                className={`grid w-full ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-5 text-left`}
+                style={{
+                  borderColor: LEGACY_COLORS.border,
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
+                }}
+              >
+                {groupCollapsed ? (
+                  <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
+                )}
+                <span className="text-base font-black" style={{ color: LEGACY_COLORS.blue }}>
+                  {group.label}
+                </span>
+                <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {group.items.length}종
+                </span>
+                <span className="min-w-0">
+                  {autoRepresentative ? (
+                    <span
+                      className="inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-sm font-bold"
+                      style={{
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)`,
+                        color: LEGACY_COLORS.cyan,
+                      }}
+                    >
+                      <span className="truncate">{autoRepresentative.pf_name || autoRepresentative.pf_code}</span>
+                    </span>
+                  ) : (
+                    <span style={{ color: LEGACY_COLORS.muted2 }}>출하 경로 없음</span>
+                  )}
+                </span>
+                <span className="truncate text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {autoRepresentative?.pf_code || "—"}
+                </span>
+                {autoRepresentative ? (
+                  <>
+                    <QtyCell value={autoRepresentative.ship_ready} color={LEGACY_COLORS.cyan} />
+                    <QtyCell value={autoRepresentative.fast_production} color={LEGACY_COLORS.blue} />
+                    <QtyCell value={autoRepresentative.total_production} color={LEGACY_COLORS.purple} />
+                  </>
+                ) : (
+                  <>
+                    <QtyCell value={null} color={LEGACY_COLORS.muted2} />
+                    <QtyCell value={null} color={LEGACY_COLORS.muted2} />
+                    <QtyCell value={null} color={LEGACY_COLORS.muted2} />
+                  </>
+                )}
+              </button>
+
+              {!groupCollapsed && group.items.map((item) => {
+                const expanded = expandedIds.has(item.af_item_id);
+                const variants = variantsByAf.get(item.af_item_id) ?? [];
+                return (
+                  <div key={item.af_item_id}>
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(item.af_item_id)}
+                      aria-expanded={expanded}
+                      className={`grid w-full ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-2.5 text-left transition-colors hover:brightness-110`}
+                      style={{ borderColor: LEGACY_COLORS.border }}
+                    >
+                      {expanded ? (
+                        <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
+                      )}
+                      <span className="col-span-3 min-w-0 pr-4">
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-base leading-5" style={{ color: LEGACY_COLORS.text }}>
+                            {item.af_name}
+                          </span>
+                          {item.bom_status === "incomplete" && <Badge color={LEGACY_COLORS.yellow}>BOM 미등록</Badge>}
+                          {item.bom_status !== "incomplete" && !item.has_pf_path && <Badge color={LEGACY_COLORS.muted2}>출하경로 없음</Badge>}
+                        </span>
+                        {item.af_code && <span className="block text-sm sm:hidden" style={{ color: LEGACY_COLORS.muted2 }}>{item.af_code}</span>}
+                      </span>
+                      <span className="hidden truncate text-center text-sm font-bold sm:block" style={{ color: LEGACY_COLORS.muted2 }}>
+                        {item.af_code || "—"}
+                      </span>
+                      <QtyCell value={item.ship_ready} color={LEGACY_COLORS.cyan} />
+                      <QtyCell value={item.fast_production} color={LEGACY_COLORS.blue} />
+                      <QtyCell value={item.total_production} color={LEGACY_COLORS.purple} />
+                    </button>
+
+                    {expanded && (
+                      <div
+                        className="border-t px-4 py-3 sm:px-0 sm:py-0"
+                        style={{
+                          borderColor: LEGACY_COLORS.border,
+                          background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
+                        }}
+                      >
+                        <PfVariants
+                          variants={variants}
+                          hasPfPath={item.has_pf_path}
+                          autoRepresentative={autoRepresentative}
+                          onOpenBom={onOpenBom}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </section>
 
     </>
   );
@@ -393,6 +600,17 @@ function DashLabelCell({ label }: { label: string }) {
   );
 }
 
+function QtyCell({ value, color }: { value: number | null; color: string }) {
+  return (
+    <span
+      className="text-center text-base font-bold"
+      style={{ color: value && value > 0 ? color : LEGACY_COLORS.muted2 }}
+    >
+      {value == null ? "—" : formatQty(value)}
+    </span>
+  );
+}
+
 function Badge({ color, children }: { color: string; children: ReactNode }) {
   return (
     <span
@@ -412,45 +630,39 @@ function PfVariants({
   hasPfPath,
   autoRepresentative,
   showAutoRepresentativeBadge = false,
+  onOpenBom,
 }: {
   variants: ProductionCapacityPfVariant[];
   hasPfPath: boolean;
   autoRepresentative?: ProductionCapacityPfVariant | null;
   showAutoRepresentativeBadge?: boolean;
+  onOpenBom?: (variant: ProductionCapacityPfVariant) => void;
 }) {
   if (variants.length === 0) {
     return (
-      <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-        {hasPfPath
-          ? "연결된 출하(PF) 변형 정보가 없습니다."
-          : "출하 경로(PF)가 연결되지 않았습니다 — 출하 준비 가능 수량 0."}
+      <div className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+        <AlertCircle className="h-4 w-4 shrink-0" />
+        <Badge color={LEGACY_COLORS.muted2}>{hasPfPath ? "출하 완제품 없음" : "출하 경로 없음"}</Badge>
+        <span>{hasPfPath ? "연결된 출하 완제품 정보가 없습니다." : "연결된 출하 완제품이 없습니다."}</span>
       </div>
     );
   }
   return (
-    <div className="space-y-1">
-      <div className="mb-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+    <div>
+      <div className="mb-1 text-sm font-bold sm:hidden" style={{ color: LEGACY_COLORS.muted2 }}>
         출고처별 출하 준비 가능
       </div>
       {variants.map((v) => {
-        const ok = v.ship_ready > 0 || v.fast_production > 0;
         const isAutoRepresentative =
           autoRepresentative?.pf_item_id === v.pf_item_id &&
           autoRepresentative.af_item_id === v.af_item_id;
         return (
           <div
             key={v.pf_item_id}
-            className={`grid grid-cols-[minmax(0,1fr)_72px_72px_72px] ${DESKTOP_PF_GRID} items-center gap-2 rounded-[8px] px-2 py-1.5 sm:gap-0 sm:px-0`}
-            style={{
-              background: isAutoRepresentative
-                ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 10%, transparent)`
-                : ok
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 6%, transparent)`
-                  : `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
-              outline: isAutoRepresentative ? `1.5px solid color-mix(in srgb, ${LEGACY_COLORS.cyan} 40%, transparent)` : undefined,
-            }}
+            className={`grid grid-cols-[minmax(0,1fr)_72px_72px_72px] ${DESKTOP_PF_GRID} items-center gap-2 border-t px-2 py-1.5 sm:gap-0 sm:px-4 sm:py-2.5`}
+            style={{ borderColor: LEGACY_COLORS.border }}
           >
-            <div className="min-w-0 sm:col-span-4">
+            <div className="min-w-0 sm:hidden">
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="break-words text-sm leading-5" style={{ color: LEGACY_COLORS.text }}>
@@ -461,11 +673,6 @@ function PfVariants({
                       </span>
                     )}
                   </div>
-                  {v.fast_production_limiting_item && (
-                    <div className="break-words text-sm leading-5" style={{ color: LEGACY_COLORS.yellow }}>
-                      빠른 생산 병목: {v.fast_production_limiting_item}
-                    </div>
-                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {showAutoRepresentativeBadge && isAutoRepresentative && (
@@ -479,30 +686,63 @@ function PfVariants({
                       자동 기준
                     </span>
                   )}
-                  <span className="flex" aria-label={ok ? "생산 가능" : "생산 제한"}>
-                    {ok ? (
-                      <CheckCircle2 className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.green }} />
-                    ) : (
-                      <AlertCircle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.yellow }} />
-                    )}
-                  </span>
+                  {onOpenBom && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenBom(v)}
+                      className="hidden min-h-11 items-center rounded-[10px] border px-3 text-sm font-bold transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] sm:inline-flex"
+                      style={{
+                        background: LEGACY_COLORS.s2,
+                        borderColor: LEGACY_COLORS.border,
+                        color: LEGACY_COLORS.blue,
+                      }}
+                      aria-label={`${v.pf_name || v.pf_code} BOM 확인`}
+                    >
+                      BOM 확인
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
+            <div className="col-span-4 hidden min-w-0 grid-cols-[minmax(0,1fr)_72px] items-center gap-2 pl-5 pr-8 sm:grid">
+              <div className="min-w-0 break-words text-sm leading-5" style={{ color: LEGACY_COLORS.text }}>
+                {v.pf_name}
+              </div>
+              <span className="justify-self-center">
+                {onOpenBom && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenBom(v)}
+                    className="min-h-11 rounded-[10px] border px-3 text-sm font-bold transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+                    style={{
+                      background: LEGACY_COLORS.s2,
+                      borderColor: LEGACY_COLORS.border,
+                      color: LEGACY_COLORS.blue,
+                    }}
+                    aria-label={`${v.pf_name || v.pf_code} BOM 확인`}
+                  >
+                    BOM 확인
+                  </button>
+                )}
+              </span>
+            </div>
+            <span className="hidden truncate text-center text-sm font-bold sm:block" style={{ color: LEGACY_COLORS.muted2 }}>
+              {v.pf_code || "—"}
+            </span>
             <div
-              className="text-right text-base font-bold"
+              className="text-center text-base font-bold"
               style={{ color: v.ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
             >
               {formatQty(v.ship_ready)}
             </div>
             <div
-              className="text-right text-base font-bold"
+              className="text-center text-base font-bold"
               style={{ color: v.fast_production > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
             >
               {formatQty(v.fast_production)}
             </div>
             <div
-              className="text-right text-base font-bold"
+              className="text-center text-base font-bold"
               style={{ color: v.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
             >
               {formatQty(v.total_production)}

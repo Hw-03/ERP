@@ -356,7 +356,7 @@ function ModalBomTreeItem({ node, depth }: { node: BOMTreeNode; depth: number })
         <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
           {formatBomQuantity(node.required_quantity, node.unit)}
         </span>
-        <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted }}>
+        <span className="pr-3 text-right font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted }}>
           {formatQty(node.current_stock)} {node.unit}
         </span>
       </li>
@@ -497,7 +497,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
         {formatModalBomQuantity(node.required_quantity, node.unit)}
       </span>
       <span
-        className={`text-center font-bold tabular-nums${isCapacityIgnoredZeroStock ? " line-through" : ""}`}
+        className={`pr-3 text-right font-bold tabular-nums${isCapacityIgnoredZeroStock ? " line-through" : ""}`}
         style={{ color: node.current_stock === 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted }}
       >
         {formatQty(node.current_stock)} {node.unit}
@@ -573,7 +573,7 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem }: ModalBomTr
           <span className="px-3">구성품명</span>
           <span className="px-3">품목코드</span>
           <span className="text-center">소요량</span>
-          <span className="text-center">현재 재고</span>
+          <span className="pr-3 text-right">현재 재고</span>
         </div>
         <ul>
           {tree.children.map((child) => (
@@ -705,7 +705,7 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
               <span className="px-3">구성품명</span>
               <span className="px-3">품목코드</span>
               <span className="text-center">소요량</span>
-              <span className="text-center">현재재고</span>
+              <span className="pr-3 text-right">현재재고</span>
             </div>
             <ul>
               {tree.children.map((child) => <ModalBomTreeItem

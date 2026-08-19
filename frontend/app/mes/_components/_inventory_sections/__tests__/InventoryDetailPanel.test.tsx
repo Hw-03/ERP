@@ -646,7 +646,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(within(row).queryByText("Packaging")).not.toBeInTheDocument();
     expect(within(row).getByTestId("bom-modal-code")).toHaveTextContent("46-AA-0081");
     expect(within(row).getByText("1.5EA")).toHaveClass("text-center");
-    expect(within(row).getByText("10 EA")).toHaveClass("text-center");
+    expect(within(row).getByText("10 EA")).toHaveClass("text-right", "pr-3");
     expect(screen.queryByTestId("bom-modal-rail")).not.toBeInTheDocument();
     expect(screen.queryByTestId("bom-modal-connector")).not.toBeInTheDocument();
     expect(screen.queryByText("nested-component")).not.toBeInTheDocument();
@@ -787,7 +787,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(rowContext.getByText(longItemName)).toBeInTheDocument();
     expect(rowContext.getByTestId("bom-modal-code")).toHaveTextContent("46-AA-0081");
     expect(rowContext.getByText("2 EA")).toHaveClass("text-center");
-    expect(rowContext.getByText("10 EA")).toHaveClass("text-center");
+    expect(rowContext.getByText("10 EA")).toHaveClass("text-right", "pr-3");
     expect(rowContext.getByRole("button", { expanded: false })).toHaveClass("bom-modal-grid");
     expect(rowContext.getByTestId("bom-modal-name-cell")).toHaveClass("break-words");
     expect(rowContext.queryByTestId("bom-modal-connector")).not.toBeInTheDocument();
