@@ -65,6 +65,31 @@ def test_bom_tree_marks_production_capacity_ignored_components(client, make_item
     assert children_by_id[str(included.item_id)]["production_capacity_ignored"] is False
 
 
+def test_bom_tree_current_stock_excludes_defective_locations(
+    client,
+    db_session,
+    make_item,
+    make_location,
+    make_bom,
+):
+    from app.models import Inventory, LocationStatusEnum
+
+    parent = make_item(name="정상 재고 상위", process_type_code="AF")
+    component = make_item(name="불량 포함 구성품", process_type_code="AR", warehouse_qty=Decimal("4"))
+    make_bom(parent.item_id, component.item_id, Decimal("1"))
+    make_location(component.item_id, status=LocationStatusEnum.PRODUCTION, quantity=Decimal("2"))
+    make_location(component.item_id, status=LocationStatusEnum.DEFECTIVE, quantity=Decimal("7"))
+
+    inventory = db_session.query(Inventory).filter_by(item_id=component.item_id).one()
+    inventory.quantity = Decimal("13")
+    db_session.flush()
+
+    response = client.get(f"/api/bom/{parent.item_id}/tree")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["children"][0]["current_stock"] == 6
+
+
 def test_bom_flat_orders_children_by_department_stage_and_serial(client, make_item, make_bom):
     parent = make_item(name="Sort parent", process_type_code="AF", model_symbol="9", serial_no=1)
     tf_first = make_item(name="TF first", process_type_code="TF", model_symbol="6", serial_no=1)

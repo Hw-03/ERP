@@ -12915,7 +12915,7 @@
     },
     "/api/bom/{parent_item_id}/tree": {
       "get": {
-        "description": "Return a recursive BOM tree for a given parent item.\n\n진입 시 BOM 캐시 1회 + 후손 후보 Items/Inventory IN 1회씩으로 N+1 제거.",
+        "description": "Return a recursive BOM tree for a given parent item.\n\n진입 시 BOM 캐시 1회 + 후손 후보 Items/정상 재고 집계 IN 1회씩으로 N+1 제거.",
         "operationId": "get_bom_tree_api_bom__parent_item_id__tree_get",
         "parameters": [
           {
