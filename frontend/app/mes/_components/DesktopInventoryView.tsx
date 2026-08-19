@@ -71,6 +71,7 @@ export function DesktopInventoryView({
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>(DEFAULT_INVENTORY_FILTER_LOGIC);
+  const [showDisused, setShowDisused] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSelectedItemRef = useRef<Item | null>(null);
@@ -84,6 +85,10 @@ export function DesktopInventoryView({
     useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
   const { selected: selectedProcessSteps, toggle: toggleProcessStep, setSelected: setSelectedProcessSteps } =
     useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
+  const toggleDisused = useCallback(() => {
+    setShowDisused((prev) => !prev);
+    setDisplayLimit(DESKTOP_PAGE_SIZE);
+  }, []);
 
   const showUnclassified = selectedModels.includes("미분류");
   const hasNonDefaultFilterLogic = filterLogic !== DEFAULT_INVENTORY_FILTER_LOGIC;
@@ -104,13 +109,14 @@ export function DesktopInventoryView({
             selectedDepts,
             selectedSlots,
             showUnclassified,
+            showDisused,
             selectedProcessSteps,
             logic: filterLogic,
           })
         ) return false;
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps, filterLogic],
+    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -128,6 +134,7 @@ export function DesktopInventoryView({
     selectedDepts,
     selectedModels,
     selectedProcessSteps,
+    showDisused,
     deferredLocalSearch,
     displayItem,
     onSummaryChange,
@@ -137,6 +144,7 @@ export function DesktopInventoryView({
     setSelectedDepts([]);
     setSelectedModels([]);
     setSelectedProcessSteps([]);
+    setShowDisused(false);
     setLocalSearch("");
     setKpi("ALL");
     setFilterLogic(DEFAULT_INVENTORY_FILTER_LOGIC);
@@ -176,14 +184,15 @@ export function DesktopInventoryView({
             </div>
             <InventoryFilters
               open={filtersOpen}
-              logic={filterLogic}
               selectedDepts={selectedDepts}
               selectedModels={selectedModels}
               selectedProcessSteps={selectedProcessSteps}
+              showDisused={showDisused}
               productModels={productModels}
               toggleDept={toggleDept}
               toggleModel={toggleModel}
               toggleProcessStep={toggleProcessStep}
+              toggleDisused={toggleDisused}
               onClearDepts={() => setSelectedDepts([])}
               onClearModels={() => setSelectedModels([])}
               onClearProcessSteps={() => setSelectedProcessSteps([])}
@@ -192,6 +201,7 @@ export function DesktopInventoryView({
                 selectedDepts.length > 0 ||
                 selectedModels.length > 0 ||
                 selectedProcessSteps.length > 0 ||
+                showDisused ||
                 kpi !== "ALL" ||
                 localSearch.length > 0 ||
                 hasNonDefaultFilterLogic

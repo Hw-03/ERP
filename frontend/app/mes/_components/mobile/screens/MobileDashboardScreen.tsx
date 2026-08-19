@@ -76,6 +76,7 @@ export function MobileDashboardScreen({
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>(DEFAULT_INVENTORY_FILTER_LOGIC);
+  const [showDisused, setShowDisused] = useState(false);
   // 생산 가능 현황은 첫 화면 면적을 크게 차지하므로 기본 접힘 — 품목 목록을 위로 끌어올린다(리뷰 §4.2).
   const [capacityOpen, setCapacityOpen] = useState(false);
 
@@ -88,6 +89,10 @@ export function MobileDashboardScreen({
     useToggleSet(() => setDisplayLimit(PAGE_SIZE));
   const { selected: selectedProcessSteps, toggle: toggleProcessStep, setSelected: setSelectedProcessSteps } =
     useToggleSet(() => setDisplayLimit(PAGE_SIZE));
+  const toggleDisused = useCallback(() => {
+    setShowDisused((prev) => !prev);
+    setDisplayLimit(PAGE_SIZE);
+  }, []);
 
   const showUnclassified = selectedModels.includes("미분류");
 
@@ -107,13 +112,14 @@ export function MobileDashboardScreen({
             selectedDepts,
             selectedSlots,
             showUnclassified,
+            showDisused,
             selectedProcessSteps,
             logic: filterLogic,
           })
         ) return false;
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps, filterLogic],
+    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -127,7 +133,7 @@ export function MobileDashboardScreen({
     setFilterChanging(true);
     const t = setTimeout(() => setFilterChanging(false), 200);
     return () => clearTimeout(t);
-  }, [selectedDepts, selectedModels, selectedProcessSteps, filterLogic, kpi]);
+  }, [selectedDepts, selectedModels, selectedProcessSteps, showDisused, filterLogic, kpi]);
 
   if (selectedItem) lastSelectedItemRef.current = selectedItem;
   const displayItem = selectedItem ?? lastSelectedItemRef.current;
@@ -139,6 +145,7 @@ export function MobileDashboardScreen({
     selectedDepts,
     selectedModels,
     selectedProcessSteps,
+    showDisused,
     deferredLocalSearch,
     displayItem,
     onSummaryChange,
@@ -149,6 +156,7 @@ export function MobileDashboardScreen({
     setSelectedDepts([]);
     setSelectedModels([]);
     setSelectedProcessSteps([]);
+    setShowDisused(false);
     setLocalSearch("");
     setKpi("ALL");
     setFilterLogic(DEFAULT_INVENTORY_FILTER_LOGIC);
@@ -288,14 +296,15 @@ export function MobileDashboardScreen({
             <div className="-mx-3 px-3 pb-2.5">
               <InventoryFilters
                 open={filtersOpen}
-                logic={filterLogic}
                 selectedDepts={selectedDepts}
                 selectedModels={selectedModels}
                 selectedProcessSteps={selectedProcessSteps}
+                showDisused={showDisused}
                 productModels={productModels}
                 toggleDept={toggleDept}
                 toggleModel={toggleModel}
                 toggleProcessStep={toggleProcessStep}
+                toggleDisused={toggleDisused}
                 onClearDepts={() => setSelectedDepts([])}
                 onClearModels={() => setSelectedModels([])}
                 onClearProcessSteps={() => setSelectedProcessSteps([])}

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { InventoryFilters, InventoryTableStickyHeader } from "../InventoryFilterBar";
 
@@ -7,10 +7,12 @@ const baseProps = {
   selectedDepts: [],
   selectedModels: [],
   selectedProcessSteps: [],
+  showDisused: false,
   productModels: [],
   toggleDept: vi.fn(),
   toggleModel: vi.fn(),
   toggleProcessStep: vi.fn(),
+  toggleDisused: vi.fn(),
   onClearDepts: vi.fn(),
   onClearModels: vi.fn(),
   onClearProcessSteps: vi.fn(),
@@ -34,18 +36,12 @@ describe("InventoryFilters", () => {
     expect(header).toHaveClass("mb-0");
   });
 
-  it("AND와 OR의 적용 범위 및 같은 분류 내부 OR 규칙을 안내한다", () => {
-    const { rerender } = render(<InventoryFilters {...baseProps} logic="AND" />);
+  it("불용 칩을 렌더하고 안내 문구 없이 토글을 전달한다", () => {
+    render(<InventoryFilters {...baseProps} />);
 
-    expect(screen.getByText("선택한 부서·모델·공정을 모두 만족합니다.")).toBeInTheDocument();
-    expect(
-      screen.getByText("같은 구분에서 여러 항목을 선택하면 하나만 일치해도 됩니다."),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "불용" }));
 
-    rerender(<InventoryFilters {...baseProps} logic="OR" />);
-
-    expect(
-      screen.getByText("선택한 부서·모델·공정 중 하나만 만족해도 됩니다."),
-    ).toBeInTheDocument();
+    expect(baseProps.toggleDisused).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("선택한 부서·모델·공정을 모두 만족합니다.")).not.toBeInTheDocument();
   });
 });

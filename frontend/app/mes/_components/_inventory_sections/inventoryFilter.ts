@@ -5,11 +5,13 @@ import type { KpiFilter } from "./InventoryKpiPanel";
 
 export type InventoryFilterLogic = "OR" | "AND";
 export const DEFAULT_INVENTORY_FILTER_LOGIC: InventoryFilterLogic = "AND";
+const DISUSED_MATERIAL_TYPE = "불용";
 
 type InventoryCategoryFilters = {
   selectedDepts: string[];
   selectedSlots: Set<number>;
   showUnclassified: boolean;
+  showDisused: boolean;
   selectedProcessSteps: string[];
   logic: InventoryFilterLogic;
 };
@@ -41,38 +43,35 @@ export function matchesKpi(item: Item, kpi: KpiFilter): boolean {
   return true;
 }
 
-function matchesDepartmentGroup(item: Item, selectedDepts: string[]): boolean | null {
-  if (selectedDepts.length === 0) return null;
+export function isDisusedInventoryItem(item: Item): boolean {
+  return item.legacy_item_type === DISUSED_MATERIAL_TYPE;
+}
 
-  return selectedDepts.some((department) =>
-    department === "창고"
-      ? (item.warehouse_qty ?? 0) > 0
-      : item.department === department ||
-        mesCodeDept(item.mes_code) === department ||
-        item.locations.some((location) => location.department === department),
-  );
+function matchesDepartment(item: Item, department: string): boolean {
+  return department === "창고"
+    ? (item.warehouse_qty ?? 0) > 0
+    : item.department === department ||
+      mesCodeDept(item.mes_code) === department ||
+      item.locations.some((location) => location.department === department);
 }
 
 export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCategoryFilters): boolean {
-  const departmentMatch = matchesDepartmentGroup(item, filters.selectedDepts);
-  const modelMatch =
-    filters.selectedSlots.size > 0 || filters.showUnclassified
-      ? (filters.selectedSlots.size > 0 && item.model_slots.some((slot) => filters.selectedSlots.has(slot))) ||
-        (filters.showUnclassified && item.model_slots.length === 0)
-      : null;
+  const isDisused = isDisusedInventoryItem(item);
+  if (isDisused && !filters.showDisused) return false;
+
   const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
   const hasDefect = item.locations.some(
     (location) => location.status === "DEFECTIVE" && (location.quantity ?? 0) > 0,
   );
-  const processMatch =
-    filters.selectedProcessSteps.length > 0
-      ? filters.selectedProcessSteps.some(
-          (processStep) => processStep === stage || (processStep === "DEFECT" && hasDefect),
-        )
-      : null;
-  const activeMatches = [departmentMatch, modelMatch, processMatch].filter(
-    (match): match is boolean => match !== null,
-  );
+  const activeMatches = [
+    ...filters.selectedDepts.map((department) => matchesDepartment(item, department)),
+    ...Array.from(filters.selectedSlots, (slot) => item.model_slots.includes(slot)),
+    ...(filters.showUnclassified ? [item.model_slots.length === 0] : []),
+    ...filters.selectedProcessSteps.map(
+      (processStep) => processStep === stage || (processStep === "DEFECT" && hasDefect),
+    ),
+    ...(filters.showDisused ? [isDisused] : []),
+  ];
 
   if (activeMatches.length === 0) return true;
   return filters.logic === "OR" ? activeMatches.some(Boolean) : activeMatches.every(Boolean);
