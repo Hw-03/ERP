@@ -122,6 +122,14 @@ def test_postgres_runner_reports_not_verified_or_fails_closed_without_url() -> N
     assert "NOT_VERIFIED" in required.stdout
 
 
+def test_verification_policy_job_installs_postgres_runner_dependencies() -> None:
+    ci = _text(".github/workflows/ci.yml")
+    job = ci[ci.index("  verification-runtime:") : ci.index("  backend:")]
+
+    assert "working-directory: backend" in job
+    assert "pip install -r requirements.txt" in job
+
+
 def test_postgres_runner_rejects_missing_ack_and_non_test_database_before_connect() -> None:
     script = ROOT / "backend/scripts/verify_postgres_concurrency.py"
     base = os.environ.copy()
