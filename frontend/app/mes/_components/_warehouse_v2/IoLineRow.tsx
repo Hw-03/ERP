@@ -146,8 +146,8 @@ export function IoLineRow({
     <div
       // 모바일: flex-wrap 으로 줄바꿈(품목명 칸이 0폭 붕괴 → 세로글자 나던 문제 해소).
       // 데스크톱(lg): 기존 7열 그리드 유지(인라인 gridTemplateColumns 는 display:grid 일 때만 의미).
-      // 데스크톱 우측 18px은 BOM 카드의 border-2(2px) + p-4(16px) 안쪽 기준선과 맞춘다.
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-4 lg:grid lg:gap-3 lg:pr-[18px]"
+      // 바깥 행의 우측 18px은 카드 안쪽 기준선과 맞춘다. 카드 안의 BOM 자식은 이미 그 기준선 안에 있으므로 추가 여백을 두지 않는다.
+      className={`flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-4 lg:grid lg:gap-3 ${isChild ? "lg:pr-0" : "lg:pr-[18px]"}`}
       style={{
         gridTemplateColumns:
           "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",

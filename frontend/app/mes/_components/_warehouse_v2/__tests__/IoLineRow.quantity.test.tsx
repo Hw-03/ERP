@@ -169,6 +169,25 @@ describe("IoLineRow quantity", () => {
     expect(removeButton.querySelector("svg")).toHaveClass("h-5", "w-5");
   });
 
+  it("aligns nested BOM controls to the enclosing card header edge on desktop", () => {
+    render(
+      <IoLineRow
+        line={makeLine({ origin: "bom_auto" })}
+        subType="receive_supplier"
+        isChild
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    const row = screen.getByRole("spinbutton", { name: "수량" }).closest("[style*='grid-template-columns']");
+    if (!row) throw new Error("하위 BOM 수량 행을 찾을 수 없습니다.");
+    expect(row).toHaveClass("lg:pr-0");
+    expect(row).not.toHaveClass("lg:pr-[18px]");
+  });
+
   it("shows the actual deduction source prominently on internal-use quantity rows", () => {
     render(
       <IoLineRow
