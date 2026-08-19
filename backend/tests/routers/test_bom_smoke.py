@@ -50,6 +50,21 @@ def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
     assert where_used.json()[0]["parent_item_id"] == str(parent.item_id)
 
 
+def test_bom_tree_marks_production_capacity_ignored_components(client, make_item, make_bom):
+    parent = make_item(name="생산가능 수량 상위", process_type_code="AF", model_symbol="4", serial_no=1)
+    ignored = make_item(name="OS 라이센스 라벨", process_type_code="PR", model_symbol="4", serial_no=58)
+    included = make_item(name="일반 구성품", process_type_code="PR", model_symbol="4", serial_no=59)
+    make_bom(parent.item_id, ignored.item_id, Decimal("1"))
+    make_bom(parent.item_id, included.item_id, Decimal("1"))
+
+    response = client.get(f"/api/bom/{parent.item_id}/tree")
+
+    assert response.status_code == 200, response.text
+    children_by_id = {row["item_id"]: row for row in response.json()["children"]}
+    assert children_by_id[str(ignored.item_id)]["production_capacity_ignored"] is True
+    assert children_by_id[str(included.item_id)]["production_capacity_ignored"] is False
+
+
 def test_bom_flat_orders_children_by_department_stage_and_serial(client, make_item, make_bom):
     parent = make_item(name="Sort parent", process_type_code="AF", model_symbol="9", serial_no=1)
     tf_first = make_item(name="TF first", process_type_code="TF", model_symbol="6", serial_no=1)
@@ -78,6 +93,27 @@ def test_bom_flat_orders_children_by_department_stage_and_serial(client, make_it
         str(aa.item_id),
         str(ar.item_id),
         str(pr.item_id),
+    ]
+
+
+def test_bom_tree_modal_order_reverses_only_department_priority(client, make_item, make_bom):
+    parent = make_item(name="Tree sort parent", process_type_code="AF", model_symbol="9", serial_no=1)
+    tf = make_item(name="TF", process_type_code="TF", model_symbol="3", serial_no=1)
+    hf = make_item(name="HF", process_type_code="HF", model_symbol="3", serial_no=1)
+    aa = make_item(name="AA", process_type_code="AA", model_symbol="3", serial_no=1)
+    pr = make_item(name="PR", process_type_code="PR", model_symbol="3", serial_no=1)
+
+    for child in [tf, hf, aa, pr]:
+        make_bom(parent.item_id, child.item_id, Decimal("1"))
+
+    response = client.get(f"/api/bom/{parent.item_id}/tree?department_order=desc")
+
+    assert response.status_code == 200, response.text
+    assert [row["item_id"] for row in response.json()["children"]] == [
+        str(pr.item_id),
+        str(aa.item_id),
+        str(hf.item_id),
+        str(tf.item_id),
     ]
 
 

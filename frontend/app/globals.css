@@ -951,6 +951,10 @@
   align-items: center;
 }
 
+.bom-detail-modal-grid {
+  grid-template-columns: 44px minmax(0, 3.2fr) minmax(120px, 1fr) 200px 112px;
+}
+
 .bom-modal-toggle {
   display: flex;
   width: 44px;

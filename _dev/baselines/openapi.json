@@ -851,6 +851,11 @@
             ],
             "title": "Process Type Code"
           },
+          "production_capacity_ignored": {
+            "default": false,
+            "title": "Production Capacity Ignored",
+            "type": "boolean"
+          },
           "required_quantity": {
             "title": "Required Quantity",
             "type": "integer"
@@ -12921,6 +12926,23 @@
               "format": "uuid",
               "title": "Parent Item Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department_order",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "desc",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Order"
             }
           }
         ],

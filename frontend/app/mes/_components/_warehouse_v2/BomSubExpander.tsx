@@ -14,6 +14,13 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 const ROW_H = 34; // 일정한 행 높이(px) — 연결선이 정확히 이어지려면 고정
 const GUIDE_W = 22; // 가이드(레일/엘보) 컬럼 폭(px)
+const MODAL_TREE_DEPTH_INDENT_PX = 48;
+const MODAL_TREE_CHEVRON_TEXT_OFFSET_PX = 10;
+const MODAL_TREE_MAX_VISIBLE_DEPTH = 8; // 현재 BOM 최대 9단계 중 최상위 표시 행은 흰색(depth 0)
+const MODAL_TREE_MIN_TINT_PERCENT = 2;
+const MODAL_TREE_MAX_TINT_PERCENT = 20;
+const MODAL_TREE_TINT_STEP = (MODAL_TREE_MAX_TINT_PERCENT - MODAL_TREE_MIN_TINT_PERCENT)
+  / (MODAL_TREE_MAX_VISIBLE_DEPTH - 1);
 const RAIL = tint(LEGACY_COLORS.muted2, 30); // depth 무관 단일 중립 연결선색
 const RAIL_W = 1.5;
 
@@ -371,7 +378,7 @@ interface Props {
   modal?: boolean;
 }
 
-export function BomSubExpander({ itemId, open, compact = false, tapToExpandName = false, modal = false }: Props) {
+export function useBomTree(itemId: string, open: boolean, departmentOrder?: "desc") {
   const revision = useRealtimeRevision();
   const [tree, setTree] = useState<BOMTreeNode | false | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
@@ -380,12 +387,12 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
 
   useEffect(() => {
     let active = true;
-    const requestKey = `${itemId}:${revision ?? "initial"}:${requestVersion}`;
+    const requestKey = `${itemId}:${departmentOrder ?? "default"}:${revision ?? "initial"}:${requestVersion}`;
     if (!open || loadedRequestRef.current === requestKey) return;
     const refreshingCurrentItem = loadedItemRef.current === itemId;
     if (!refreshingCurrentItem) setTree(null);
     api
-      .getBOMTree(itemId)
+      .getBOMTree(itemId, departmentOrder ? { departmentOrder } : undefined)
       .then((nextTree) => {
         if (!active) return;
         loadedItemRef.current = itemId;
@@ -399,7 +406,161 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
     return () => {
       active = false;
     };
-  }, [open, itemId, requestVersion, revision]);
+  }, [open, itemId, departmentOrder, requestVersion, revision]);
+
+  return {
+    tree,
+    retry: () => {
+      setTree(null);
+      setRequestVersion((version) => version + 1);
+    },
+  };
+}
+
+export function getBomBranchItemIds(tree: BOMTreeNode): string[] {
+  const itemIds: string[] = [];
+  const visit = (node: BOMTreeNode) => {
+    if (node.children.length === 0) return;
+    itemIds.push(node.item_id);
+    node.children.forEach(visit);
+  };
+  tree.children.forEach(visit);
+  return itemIds;
+}
+
+type ModalBomTreeProps = {
+  tree: BOMTreeNode;
+  expandedItemIds: ReadonlySet<string>;
+  onToggleItem: (itemId: string) => void;
+};
+
+function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
+  node: BOMTreeNode;
+  depth: number;
+  expandedItemIds: ReadonlySet<string>;
+  onToggleItem: (itemId: string) => void;
+}) {
+  const hasKids = node.children.length > 0;
+  const open = expandedItemIds.has(node.item_id);
+  const isCapacityIgnoredZeroStock = node.production_capacity_ignored === true && node.current_stock === 0;
+  const tintPercent = MODAL_TREE_MIN_TINT_PERCENT
+    + (Math.min(depth, MODAL_TREE_MAX_VISIBLE_DEPTH) - 1) * MODAL_TREE_TINT_STEP;
+  const background = node.current_stock === 0 && !isCapacityIgnoredZeroStock
+    ? tint(LEGACY_COLORS.red, 15, "var(--c-s1)")
+    : depth === 0
+      ? LEGACY_COLORS.s1
+      : `color-mix(in srgb, ${LEGACY_COLORS.blue} ${tintPercent.toFixed(2)}%, var(--c-s1))`;
+  const cells = (
+    <>
+      <span
+        aria-hidden
+        className="flex h-11 w-11 shrink-0 items-center justify-center"
+        style={{
+          color: LEGACY_COLORS.muted2,
+          transform: `translateX(${depth * MODAL_TREE_DEPTH_INDENT_PX + MODAL_TREE_CHEVRON_TEXT_OFFSET_PX}px)`,
+        }}
+      >
+        {hasKids && <ChevronRight
+          className="h-4 w-4 transition-transform duration-150"
+          style={{ transform: open ? "rotate(90deg)" : "none" }}
+        />}
+      </span>
+      <span
+        data-testid="bom-modal-name-cell"
+        className="min-w-0 break-words px-3 py-2 font-semibold leading-snug"
+        style={{ color: LEGACY_COLORS.text, paddingLeft: 12 + depth * MODAL_TREE_DEPTH_INDENT_PX }}
+      >
+        {node.item_name}
+      </span>
+      <span className="min-w-0 truncate px-3 font-mono text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+        <ModalBomCode code={node.mes_code} />
+      </span>
+      <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+        {formatBomQuantity(node.required_quantity, node.unit)}
+      </span>
+      <span
+        className={`text-center font-bold tabular-nums${isCapacityIgnoredZeroStock ? " line-through" : ""}`}
+        style={{ color: node.current_stock === 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted }}
+      >
+        {formatQty(node.current_stock)} {node.unit}
+      </span>
+    </>
+  );
+
+  return (
+    <>
+      <li data-testid="bom-modal-row" data-depth={depth}>
+        {hasKids ? (
+          <button
+            type="button"
+            onClick={() => onToggleItem(node.item_id)}
+            className="bom-modal-grid bom-detail-modal-grid min-h-[52px] w-full border-b text-left text-sm transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]"
+            style={{ borderColor: LEGACY_COLORS.border, background }}
+            aria-expanded={open}
+          >
+            {cells}
+          </button>
+        ) : (
+          <div
+            className="bom-modal-grid bom-detail-modal-grid min-h-[52px] border-b text-sm transition-[filter] hover:brightness-95"
+            style={{ borderColor: LEGACY_COLORS.border, background }}
+          >
+            {cells}
+          </div>
+        )}
+      </li>
+      {open && hasKids && node.children.map((child) => (
+        <ModalBomTreeRow
+          key={child.item_id}
+          node={child}
+          depth={depth + 1}
+          expandedItemIds={expandedItemIds}
+          onToggleItem={onToggleItem}
+        />
+      ))}
+    </>
+  );
+}
+
+export function ModalBomTree({ tree, expandedItemIds, onToggleItem }: ModalBomTreeProps) {
+  return (
+    <div
+      data-testid="bom-modal-tree-scroll"
+      className="min-h-0 flex-1 overflow-y-scroll rounded-[18px] border"
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+    >
+      <div
+        data-testid="bom-modal-grid-header"
+        className="bom-modal-grid bom-detail-modal-grid sticky top-0 z-10 min-h-11 border-b text-xs font-bold"
+        style={{
+          background: "var(--c-popup-bg)",
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted2,
+        }}
+      >
+        <span aria-hidden />
+        <span className="px-3">구성품명</span>
+        <span className="px-3">품목코드</span>
+        <span className="text-center">소요량</span>
+        <span className="text-center">현재 재고</span>
+      </div>
+      <ul>
+        {tree.children.map((child) => (
+          <ModalBomTreeRow
+            key={child.item_id}
+            node={child}
+            depth={0}
+            expandedItemIds={expandedItemIds}
+            onToggleItem={onToggleItem}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function BomSubExpander({ itemId, open, compact = false, tapToExpandName = false, modal = false }: Props) {
+  const { tree, retry } = useBomTree(itemId, open);
 
   if (!open) return null;
 
@@ -455,10 +616,7 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
       )}
       {modal && tree === false && <button
         type="button"
-        onClick={() => {
-          setTree(null);
-          setRequestVersion((version) => version + 1);
-        }}
+        onClick={retry}
         className="mt-3 min-h-11 rounded-[10px] border px-4 py-2 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
         style={{ borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red, background: LEGACY_COLORS.s2 }}
       >다시 시도</button>}

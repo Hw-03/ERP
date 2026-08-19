@@ -2,9 +2,9 @@
 
 import uuid
 from decimal import Decimal
-from typing import Annotated, List
+from typing import Annotated, List, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,7 +15,8 @@ from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, 
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
 from app._evt import emit as _evt_emit
-from app.services.bom import BomCache, bom_child_item_ordering, build_bom_cache
+from app.services.bom import BomCache, bom_child_item_ordering, bom_modal_tree_child_ordering_key, build_bom_cache
+from app.services.production_capacity import is_production_capacity_ignored
 from app.repositories import item_repository
 
 router = APIRouter()
@@ -205,7 +206,11 @@ def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{parent_item_id}/tree", response_model=BOMTreeNode)
-def get_bom_tree(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_bom_tree(
+    parent_item_id: uuid.UUID,
+    department_order: Literal["desc"] | None = Query(None),
+    db: Session = Depends(get_db),
+):
     """Return a recursive BOM tree for a given parent item.
 
     진입 시 BOM 캐시 1회 + 후손 후보 Items/Inventory IN 1회씩으로 N+1 제거.
@@ -234,6 +239,7 @@ def get_bom_tree(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
         bom_cache,
         depth=0,
         visited=set(),
+        department_order=department_order,
     )
 
 
@@ -337,6 +343,7 @@ def _build_tree_cached(
     cache: BomCache,
     depth: int,
     visited: set,
+    department_order: Literal["desc"] | None = None,
 ) -> BOMTreeNode:
     """메모리 dict 만 참조하는 순수 재귀 — DB 쿼리 0건."""
     inv = invs_map.get(item.item_id)
@@ -351,15 +358,21 @@ def _build_tree_cached(
             unit=item.unit,
             required_quantity=required_quantity,
             current_stock=current_stock,
+            production_capacity_ignored=is_production_capacity_ignored(item.mes_code),
             children=[],
         )
 
     visited = visited | {item.item_id}
+    child_rows = [
+        (child_id, child_per_unit, child_item)
+        for child_id, child_per_unit in cache.get(item.item_id, [])
+        if (child_item := items_map.get(child_id)) is not None
+    ]
+    if department_order == "desc":
+        child_rows.sort(key=lambda row: bom_modal_tree_child_ordering_key(row[2]))
+
     children = []
-    for child_id, child_per_unit in cache.get(item.item_id, []):
-        child_item = items_map.get(child_id)
-        if not child_item:
-            continue
+    for child_id, child_per_unit, child_item in child_rows:
         children.append(
             _build_tree_cached(
                 child_item,
@@ -369,6 +382,7 @@ def _build_tree_cached(
                 cache,
                 depth + 1,
                 visited,
+                department_order,
             )
         )
 
@@ -380,6 +394,7 @@ def _build_tree_cached(
         unit=item.unit,
         required_quantity=required_quantity,
         current_stock=current_stock,
+        production_capacity_ignored=is_production_capacity_ignored(item.mes_code),
         children=children,
     )
 
