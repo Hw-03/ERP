@@ -471,12 +471,12 @@ describe("history table helper rendering policies", () => {
     );
 
     const tableCard = container.querySelector("section.card");
-    const tableScroller = container.querySelector("div.overflow-x-clip");
+    const tableScroller = container.querySelector("div.overflow-clip");
     const table = tableScroller?.querySelector("table");
 
     expect(tableCard).not.toBeInTheDocument();
     expect(tableScroller).toHaveClass("min-w-0");
-    expect(tableScroller).toHaveClass("overflow-x-clip");
+    expect(tableScroller).toHaveClass("overflow-clip");
     expect(tableScroller).not.toHaveClass("overflow-x-hidden");
     expect(tableScroller).not.toHaveClass("-mr-5");
     expect(table).toHaveClass("w-full");
@@ -490,7 +490,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByRole("button", { name: "현재 묶음 접기" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "top-0", "z-10");
     expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "228px" });
-    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "120px" });
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "160px" });
   });
 
   it("defines a single fixed rhythm for main history rows", () => {
@@ -552,7 +552,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
-    expect(statusHeader.style.width).toBe("120px");
+    expect(statusHeader.style.width).toBe("160px");
     expect(statusHeader).toHaveClass("text-center");
 
     const row = screen.getByRole("button");
@@ -655,7 +655,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
-    expect(statusHeader.style.width).toBe("120px");
+    expect(statusHeader.style.width).toBe("160px");
     expect(statusHeader).toHaveClass("text-center");
   });
 

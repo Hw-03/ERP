@@ -50,7 +50,7 @@ describe("HistoryTable hierarchy", () => {
     const surface = screen.getByTestId("history-table-surface");
     expect(surface).toHaveClass(
       "min-w-0",
-      "overflow-x-clip",
+      "overflow-clip",
       "rounded-[24px]",
     );
     expect(surface).not.toHaveClass("border");
@@ -66,11 +66,12 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveStyle({
       background: "var(--c-history-table-header)",
     });
+    expect(screen.getByRole("columnheader", { name: "담당자" }).parentElement).not.toHaveAttribute("style");
     const cornerMask = screen.getByTestId("history-table-corner-mask");
     expect(cornerMask).toHaveClass("sticky", "top-0", "z-20", "-mb-6");
     expect(cornerMask.children).toHaveLength(2);
     expect(cornerMask.children[0].getAttribute("style")).toContain(
-      "var(--c-history-table-header)",
+      "var(--c-inventory-table-corner-backdrop)",
     );
   });
 
