@@ -86,11 +86,11 @@ function HistoryTableCornerMask() {
     >
       <span
         className="h-6 w-6"
-        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-inventory-table-corner-backdrop) 24px)" }}
+        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-bg) 24px)" }}
       />
       <span
         className="h-6 w-6"
-        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-inventory-table-corner-backdrop) 24px)" }}
+        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-bg) 24px)" }}
       />
     </div>
   );

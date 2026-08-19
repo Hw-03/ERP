@@ -71,7 +71,7 @@ describe("HistoryTable hierarchy", () => {
     expect(cornerMask).toHaveClass("sticky", "top-0", "z-20", "-mb-6");
     expect(cornerMask.children).toHaveLength(2);
     expect(cornerMask.children[0].getAttribute("style")).toContain(
-      "var(--c-inventory-table-corner-backdrop)",
+      "var(--c-bg)",
     );
   });
 
