@@ -13,7 +13,6 @@ describe("inventoryFilter matchesSearch", () => {
 });
 
 describe("matchesInventoryCategoryFilters", () => {
-  const LOGICS = ["AND", "OR"] as const;
   const assemblyItem = {
     item_id: "assembly-item",
     department: "조립",
@@ -23,10 +22,11 @@ describe("matchesInventoryCategoryFilters", () => {
     locations: [],
   } as Item;
 
-  const filters = {
-    selectedDepts: ["조립"],
-    selectedSlots: new Set([2]),
+  const noFilters = {
+    selectedDepts: [],
+    selectedSlots: new Set<number>(),
     showUnclassified: false,
+    showDisused: false,
     selectedProcessSteps: [],
   };
 
@@ -37,69 +37,97 @@ describe("matchesInventoryCategoryFilters", () => {
     ).toBe("AND");
   });
 
-  it("OR에서는 선택한 분류 중 하나만 일치해도 포함한다", () => {
-    expect(matchesInventoryCategoryFilters(assemblyItem, { ...filters, logic: "OR" })).toBe(true);
-  });
+  it("불용은 불용 필터를 켜기 전에는 항상 제외한다", () => {
+    const disusedItem = { ...assemblyItem, legacy_item_type: "불용" } as Item;
 
-  it("AND에서는 선택한 모든 분류가 일치해야 포함한다", () => {
-    expect(matchesInventoryCategoryFilters(assemblyItem, { ...filters, logic: "AND" })).toBe(false);
-  });
-
-  it.each(LOGICS)("소속 부서만 일치해도 %s에서 포함한다", (logic) => {
     expect(
-      matchesInventoryCategoryFilters(assemblyItem, {
-        ...filters,
-        selectedDepts: ["조립"],
-        selectedSlots: new Set(),
-        logic,
+      matchesInventoryCategoryFilters(disusedItem, { ...noFilters, showDisused: false, logic: "AND" }),
+    ).toBe(false);
+  });
+
+  it("불용 필터만 켜면 불용 품목만 포함한다", () => {
+    const disusedItem = { ...assemblyItem, legacy_item_type: "불용" } as Item;
+
+    expect(
+      matchesInventoryCategoryFilters(disusedItem, { ...noFilters, showDisused: true, logic: "AND" }),
+    ).toBe(true);
+    expect(
+      matchesInventoryCategoryFilters(assemblyItem, { ...noFilters, showDisused: true, logic: "AND" }),
+    ).toBe(false);
+  });
+
+  it("AND는 같은 구분을 포함한 모든 선택 칩을 만족해야 한다", () => {
+    const fullyMatchedItem = {
+      ...assemblyItem,
+      warehouse_qty: 1,
+      model_slots: [1, 2],
+      locations: [{ department: "출하", status: "DEFECTIVE", quantity: 1 }],
+      legacy_item_type: "불용",
+    } as Item;
+
+    expect(
+      matchesInventoryCategoryFilters(fullyMatchedItem, {
+        ...noFilters,
+        selectedDepts: ["창고", "조립", "출하"],
+        selectedSlots: new Set([1, 2]),
+        selectedProcessSteps: ["R", "DEFECT"],
+        showDisused: true,
+        logic: "AND",
       }),
     ).toBe(true);
-  });
-
-  it.each(LOGICS)("같은 부서 분류의 여러 선택은 %s에서도 하나만 일치하면 포함한다", (logic) => {
     expect(
-      matchesInventoryCategoryFilters(assemblyItem, {
-        ...filters,
-        selectedDepts: ["조립", "출하"],
-        selectedSlots: new Set(),
-        logic,
+      matchesInventoryCategoryFilters(fullyMatchedItem, {
+        ...noFilters,
+        selectedDepts: ["창고", "조립", "출하"],
+        selectedSlots: new Set([1, 3]),
+        selectedProcessSteps: ["R", "DEFECT"],
+        showDisused: true,
+        logic: "AND",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it.each(LOGICS)("같은 모델 분류의 여러 선택은 %s에서도 하나만 일치하면 포함한다", (logic) => {
+  it("AND는 동시에 성립하지 않는 공정 선택을 제외한다", () => {
     expect(
       matchesInventoryCategoryFilters(
         assemblyItem,
         {
-          ...filters,
+          ...noFilters,
           selectedDepts: [],
-          selectedSlots: new Set([1, 2]),
-          logic,
+          selectedProcessSteps: ["R", "A"],
+          logic: "AND",
         },
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it.each(LOGICS)("multiple selected processes stay OR within the process group for %s", (logic) => {
+  it("OR는 불용 또는 다른 선택 칩 하나만 일치해도 포함한다", () => {
+    const disusedItem = { ...assemblyItem, legacy_item_type: "불용" } as Item;
+
+    expect(
+      matchesInventoryCategoryFilters(disusedItem, {
+        ...noFilters,
+        selectedDepts: ["출하"],
+        showDisused: true,
+        logic: "OR",
+      }),
+    ).toBe(true);
     expect(
       matchesInventoryCategoryFilters(assemblyItem, {
-        ...filters,
-        selectedDepts: [],
-        selectedSlots: new Set(),
-        selectedProcessSteps: ["R", "S"],
-        logic,
+        ...noFilters,
+        selectedDepts: ["조립"],
+        showDisused: true,
+        logic: "OR",
       }),
     ).toBe(true);
   });
 
-  it.each(LOGICS)("department match sources do not change with %s", (logic) => {
+  it("부서의 기존 일치 원본은 유지한다", () => {
     const matchDepartment = (item: Item, selectedDept: string) =>
       matchesInventoryCategoryFilters(item, {
-        ...filters,
+        ...noFilters,
         selectedDepts: [selectedDept],
-        selectedSlots: new Set(),
-        logic,
+        logic: "AND",
       });
 
     expect(

@@ -56,6 +56,7 @@ describe("useDesktopInventoryDerivations", () => {
           selectedDepts: [],
           selectedModels,
           selectedProcessSteps: [],
+          showDisused: false,
           deferredLocalSearch: "",
           displayItem: null,
           onSummaryChange,
@@ -82,5 +83,36 @@ describe("useDesktopInventoryDerivations", () => {
       ["ZERO", 0],
     ]);
     await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 1, zero: 0 }));
+  });
+
+  it("불용은 기본 KPI 전체에서 빼고 불용 필터를 켜면 유효 필터로 포함한다", () => {
+    const normal = item({ item_id: "normal", quantity: 12 });
+    const disused = item({ item_id: "disused", quantity: 12, legacy_item_type: "불용" });
+
+    const { result, rerender } = renderHook(
+      ({ showDisused, scopedItems }: { showDisused: boolean; scopedItems: Item[] }) =>
+        useDesktopInventoryDerivations({
+          items: [normal, disused],
+          scopedItems,
+          filteredItems: scopedItems,
+          selectedDepts: [],
+          selectedModels: [],
+          selectedProcessSteps: [],
+          showDisused,
+          deferredLocalSearch: "",
+          displayItem: null,
+        }),
+      { initialProps: { showDisused: false, scopedItems: [normal] } },
+    );
+
+    expect(result.current.kpiCards.find((card) => card.key === "ALL")?.value).toBe(1);
+    expect(result.current.isFiltered).toBe(false);
+    expect(result.current.activeFilterCount).toBe(0);
+
+    rerender({ showDisused: true, scopedItems: [normal, disused] });
+
+    expect(result.current.kpiCards.find((card) => card.key === "ALL")?.value).toBe(2);
+    expect(result.current.isFiltered).toBe(true);
+    expect(result.current.activeFilterCount).toBe(1);
   });
 });

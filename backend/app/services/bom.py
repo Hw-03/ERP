@@ -15,6 +15,7 @@ from app.models import BOM, Item
 MAX_DEPTH = 10
 
 DEPARTMENT_DISPLAY_ORDER = {"T": 0, "H": 1, "V": 2, "N": 3, "A": 4, "P": 5}
+MODAL_TREE_DEPARTMENT_DISPLAY_ORDER = {"P": 0, "A": 1, "N": 2, "V": 3, "H": 4, "T": 5}
 STAGE_DISPLAY_ORDER = {"F": 0, "A": 1, "R": 2}
 
 # parent_item_id -> List[(child_item_id, per-unit quantity)]
@@ -33,6 +34,20 @@ def bom_child_item_ordering() -> tuple:
         Item.mes_code.is_(None),
         Item.mes_code.asc(),
         Item.item_id.asc(),
+    )
+
+
+def bom_modal_tree_child_ordering_key(item: Item) -> tuple:
+    """Return the BOM modal sibling ordering with reversed department priority."""
+    process_type_code = item.process_type_code or ""
+    return (
+        MODAL_TREE_DEPARTMENT_DISPLAY_ORDER.get(process_type_code[:1], len(MODAL_TREE_DEPARTMENT_DISPLAY_ORDER)),
+        STAGE_DISPLAY_ORDER.get(process_type_code[1:2], len(STAGE_DISPLAY_ORDER)),
+        item.serial_no is None,
+        item.serial_no or 0,
+        item.mes_code is None,
+        item.mes_code or "",
+        str(item.item_id),
     )
 
 

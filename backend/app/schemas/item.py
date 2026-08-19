@@ -165,6 +165,7 @@ class BOMTreeNode(BaseModel):
     unit: str
     required_quantity: int
     current_stock: int = 0
+    production_capacity_ignored: bool = False
     children: List["BOMTreeNode"] = []
 
 

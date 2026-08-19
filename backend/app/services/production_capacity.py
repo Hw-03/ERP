@@ -48,6 +48,11 @@ ReverseBom = Dict[uuid.UUID, List[Tuple[uuid.UUID, Decimal]]]
 FigById = Dict[uuid.UUID, "stock_math.StockFigures"]
 
 
+def is_production_capacity_ignored(mes_code: str | None) -> bool:
+    """AF 생산가능 수량 계산에서만 제외하는 현행 품목 코드 정책."""
+    return mes_code in _AF_CAPACITY_IGNORED_MES_CODES
+
+
 def select_auto_representatives(variants: List[dict]) -> List[dict]:
     """모델별 PF 후보 중 자동 기준으로 표시할 하나를 결정한다.
 
@@ -134,7 +139,7 @@ def build_af_capacity_bom_cache(
     excluded_item_ids = {
         item_id
         for item_id, item in items_map.items()
-        if item.mes_code in _AF_CAPACITY_IGNORED_MES_CODES
+        if is_production_capacity_ignored(item.mes_code)
     }
     return {
         parent_id: [

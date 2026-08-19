@@ -6,7 +6,7 @@ import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getStockState } from "@/lib/mes/inventory";
 import type { KpiCardData as KpiCard } from "../_inventory_sections/InventoryKpiPanel";
-import { getMinStock, safeQty } from "../_inventory_sections/inventoryFilter";
+import { getMinStock, isDisusedInventoryItem, safeQty } from "../_inventory_sections/inventoryFilter";
 
 /**
  * Round-13 (#20) 추출 — DesktopInventoryView 의 summary/kpiCards/badge derivation hook.
@@ -30,6 +30,7 @@ export function useDesktopInventoryDerivations({
   selectedDepts,
   selectedModels,
   selectedProcessSteps,
+  showDisused,
   deferredLocalSearch,
   displayItem,
   onSummaryChange,
@@ -40,6 +41,7 @@ export function useDesktopInventoryDerivations({
   selectedDepts: string[];
   selectedModels: string[];
   selectedProcessSteps: string[];
+  showDisused: boolean;
   deferredLocalSearch: string;
   displayItem: Item | null;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
@@ -67,8 +69,11 @@ export function useDesktopInventoryDerivations({
   // 전체 KPI도 소프트삭제 품목을 제외해 정상/부족/품절(scopedItems 기준) 합과 일치시킨다.
   // (필터와 무관한 전체 카운트라 items 에서 deleted_at 만 제외.)
   const activeTotal = useMemo(
-    () => items.filter((item) => !item.deleted_at && isKpiInventoryItem(item)).length,
-    [items],
+    () =>
+      items.filter(
+        (item) => !item.deleted_at && (showDisused || !isDisusedInventoryItem(item)) && isKpiInventoryItem(item),
+      ).length,
+    [items, showDisused],
   );
 
   useEffect(() => {
@@ -79,11 +84,13 @@ export function useDesktopInventoryDerivations({
     selectedDepts.length > 0 ||
     selectedModels.length > 0 ||
     selectedProcessSteps.length > 0 ||
+    showDisused ||
     deferredLocalSearch.length > 0;
   const activeFilterCount =
     selectedDepts.length +
     selectedModels.length +
     selectedProcessSteps.length +
+    (showDisused ? 1 : 0) +
     (deferredLocalSearch.length > 0 ? 1 : 0);
 
   const kpiCards: KpiCard[] = [
