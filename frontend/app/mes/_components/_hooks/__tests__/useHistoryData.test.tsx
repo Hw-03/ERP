@@ -61,6 +61,21 @@ afterEach(() => {
 });
 
 describe("useHistoryData", () => {
+  it("uses the shared selected-month range in the mobile list request", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = makeClient();
+
+    const { result } = renderHook(
+      () => useHistoryData({ ...baseArgs, selectedMonth: { year: 2026, month: 7 } }),
+      { wrapper: makeWrapper(client) },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("date_from=2026-08-01");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("date_to=2026-08-31");
+  });
+
   it("마운트 시 첫 페이지 fetch + loading 반영", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(page1)));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

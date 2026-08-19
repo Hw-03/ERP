@@ -53,9 +53,12 @@ describe("DesktopInventoryRightPanel", () => {
     expect(title.compareDocumentPosition(tabpanel) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(detailTab).toHaveAttribute("aria-selected", "true");
-    expect(tablist).toHaveClass("inline-flex", "w-fit");
-    expect(tablist.parentElement).toHaveClass("pr-3");
-    expect(tablist.parentElement).not.toHaveClass("pt-1");
+    expect(tablist).toHaveClass("flex", "min-w-0", "flex-1", "w-full");
+    expect(detailTab).toHaveClass("flex-1");
+    expect(historyTab).toHaveClass("flex-1");
+    const closeButton = screen.getByRole("button", { name: "패널 닫기" });
+    expect(tablist.parentElement).toHaveClass("flex", "items-center", "gap-2");
+    expect(tablist.parentElement).toContainElement(closeButton);
     expect(screen.getByText("상세 내용")).toBeInTheDocument();
 
     fireEvent.click(historyTab);

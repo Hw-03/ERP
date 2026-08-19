@@ -52,9 +52,9 @@ describe("HistoryTable hierarchy", () => {
       "min-w-0",
       "overflow-x-clip",
       "rounded-[24px]",
-      "border",
     );
-    expect(surface).toHaveStyle({ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border });
+    expect(surface).not.toHaveClass("border");
+    expect(surface).toHaveStyle({ background: LEGACY_COLORS.s1 });
     expect(surface).not.toHaveClass("overflow-y-auto");
     expect(surface).not.toHaveClass("overflow-hidden");
     expect(surface).not.toHaveClass("flex-1");
@@ -63,6 +63,15 @@ describe("HistoryTable hierarchy", () => {
     expect(container.querySelectorAll("[data-history-loading-row='true']")).toHaveLength(8);
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("rounded-tl-[22px]");
     expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("rounded-tr-[22px]");
+    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveStyle({
+      background: "var(--c-history-table-header)",
+    });
+    const cornerMask = screen.getByTestId("history-table-corner-mask");
+    expect(cornerMask).toHaveClass("sticky", "top-0", "z-20", "-mb-6");
+    expect(cornerMask.children).toHaveLength(2);
+    expect(cornerMask.children[0].getAttribute("style")).toContain(
+      "var(--c-history-table-header)",
+    );
   });
 
   it("keeps both sticky header corners aligned with the table surface", () => {

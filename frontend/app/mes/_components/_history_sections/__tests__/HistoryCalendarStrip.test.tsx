@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api/types/production";
 import { HistoryCalendarStrip } from "../HistoryCalendarStrip";
@@ -56,6 +56,7 @@ describe("HistoryCalendarStrip", () => {
         nextMonth={vi.fn()}
         setCalendarYear={vi.fn()}
         setCalendarMonth={vi.fn()}
+        onSelectMonth={vi.fn()}
         calendarLoading={false}
         calendarDays={[1]}
         calendarDayMap={new Map([["2026-07-01", dayLogs]])}
@@ -67,5 +68,33 @@ describe("HistoryCalendarStrip", () => {
 
     expect(screen.getByText("총 4건")).toBeInTheDocument();
     expect(screen.getByText("기타 1건")).toBeInTheDocument();
+  });
+
+  it("gives the month label a bordered keyboard-focusable control and selects a year-card month", () => {
+    const onSelectMonth = vi.fn();
+    render(
+      <HistoryCalendarStrip
+        calendarYear={2026}
+        calendarMonth={6}
+        prevMonth={vi.fn()}
+        nextMonth={vi.fn()}
+        setCalendarYear={vi.fn()}
+        setCalendarMonth={vi.fn()}
+        onSelectMonth={onSelectMonth}
+        calendarLoading={false}
+        calendarDays={[1]}
+        calendarDayMap={new Map()}
+        todayKey="2026-07-09"
+        selectedDay={null}
+        setSelectedDay={vi.fn()}
+      />,
+    );
+
+    const monthLabel = screen.getByRole("button", { name: "2026년 7월 — 연 뷰 열기" });
+    expect(monthLabel).toHaveClass("border", "focus-visible:outline-none", "focus-visible:ring-2");
+
+    fireEvent.click(monthLabel);
+    fireEvent.click(screen.getByRole("button", { name: "2026년 8월 — 0건" }));
+    expect(onSelectMonth).toHaveBeenCalledWith({ year: 2026, month: 7 });
   });
 });

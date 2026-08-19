@@ -636,6 +636,42 @@ def test_transactions_date_filter_uses_display_request_date(client, db_session, 
     assert res.status_code == 200, res.text
     assert res.json()["total"] == 1
 
+
+def test_list_and_summary_date_range_use_kst_business_day_bounds(
+    client, db_session, make_item
+):
+    """목록과 요약은 UTC-naive 로그를 같은 KST 월 범위로 해석한다."""
+    item = make_item(name="KST 목록 요약 경계 품목", warehouse_qty=Decimal("0"))
+    logs = [
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=Decimal("1"),
+            created_at=created_at,
+        )
+        for created_at in (
+            datetime(2026, 7, 31, 14, 59),
+            datetime(2026, 7, 31, 15, 0),
+            datetime(2026, 8, 31, 14, 59),
+            datetime(2026, 8, 31, 15, 0),
+        )
+    ]
+    db_session.add_all(logs)
+    db_session.commit()
+
+    params = {"date_from": "2026-08-01", "date_to": "2026-08-31"}
+    list_response = client.get("/api/inventory/transactions", params=params)
+    summary_response = client.get("/api/inventory/transactions/summary", params=params)
+
+    assert list_response.status_code == 200, list_response.text
+    assert {row["log_id"] for row in list_response.json()} == {
+        str(logs[1].log_id),
+        str(logs[2].log_id),
+    }
+    assert summary_response.status_code == 200, summary_response.text
+    assert summary_response.json()["total"] == 2
+
+
 def test_summary_process_step_filter(client, db_session, make_item):
     """process_step = process_type_code 마지막 글자(R/A/F) IN 필터."""
     raw = make_item(name="원자재품", process_type_code="TR", warehouse_qty=Decimal("0"))

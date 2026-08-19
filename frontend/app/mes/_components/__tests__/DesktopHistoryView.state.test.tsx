@@ -16,6 +16,10 @@ const testState = vi.hoisted(() => ({
   summaryMock: vi.fn(),
   summaryQuery: vi.fn(),
   referenceSummaryQuery: { data: [], isLoading: false, refetch: vi.fn() },
+  currentSummaryParams: [] as any[],
+  baselineSummaryParams: [] as any[],
+  referenceSummaryParams: [] as any[],
+  nextMonth: null as null | (() => void),
   queryClient: null as QueryClient | null,
   realtimeRevision: null as number | null,
 }));
@@ -37,7 +41,7 @@ vi.mock("../_hooks/useDesktopHistoryGroups", () => ({
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getTransactions: vi.fn(),
+    getTransactions: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -57,8 +61,15 @@ vi.mock("@/lib/queries/realtime", () => ({
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useMonthlyCountsQuery: () => ({ data: {} }),
-  useTransactionsSummaryQuery: (...args: any[]) => testState.summaryQuery(...args),
-  useTransactionReferenceSummariesQuery: () => testState.referenceSummaryQuery,
+  useTransactionsSummaryQuery: (params: any) => {
+    if (Object.hasOwn(params, "operationKeys")) testState.currentSummaryParams.push(params);
+    else testState.baselineSummaryParams.push(params);
+    return testState.summaryQuery(params);
+  },
+  useTransactionReferenceSummariesQuery: (params: any) => {
+    testState.referenceSummaryParams.push(params);
+    return testState.referenceSummaryQuery;
+  },
 }));
 
 vi.mock("../_history_sections/HistoryStatsBar", () => ({
@@ -72,12 +83,28 @@ vi.mock("../_history_sections/HistoryStatsBar", () => ({
   ),
 }));
 vi.mock("../_history_sections/HistoryFilterBar", () => ({
-  HistoryFilterBar: ({ setDateFilter }: any) => (
-    <button type="button" onClick={() => setDateFilter("WEEK")}>기간 변경</button>
+  HistoryFilterBar: ({ setDateFilter, selectedMonth, onClearSelectedMonth, onToggleCalendar, calendarOpen }: any) => (
+    <>
+      <button type="button" onClick={() => setDateFilter("WEEK")}>기간 변경</button>
+      <button type="button" onClick={onToggleCalendar}>달력 토글</button>
+      <output data-testid="calendar-open">{calendarOpen ? "open" : "closed"}</output>
+      <span data-testid="selected-month-chip">{selectedMonth ? `${selectedMonth.year}-${selectedMonth.month}` : "none"}</span>
+      <button type="button" onClick={onClearSelectedMonth}>선택 월 해제</button>
+    </>
   ),
 }));
 vi.mock("../_history_sections/HistoryFilterPanel", () => ({ HistoryFilterPanel: () => null }));
-vi.mock("../_history_sections/HistoryCalendarPanel", () => ({ HistoryCalendarPanel: () => null }));
+vi.mock("../_history_sections/HistoryCalendarPanel", () => ({
+  HistoryCalendarPanel: ({ onSelectMonth, prevMonth, nextMonth, setSelectedDay }: any) => {
+    testState.nextMonth = nextMonth;
+    return <>
+      <button type="button" onClick={() => onSelectMonth({ year: 2026, month: 7 })}>8월 선택</button>
+      <button type="button" onClick={prevMonth}>이전 월</button>
+      <button type="button" onClick={nextMonth}>다음 월</button>
+      <button type="button" onClick={() => setSelectedDay("2026-08-14")}>8월 14일 선택</button>
+    </>;
+  },
+}));
 
 vi.mock("../_history_sections/HistoryTable", () => ({
   HistoryTable: ({
@@ -235,11 +262,21 @@ function setHistoryResult(logs: TransactionLog[], loading: boolean, error: strin
   };
 }
 
+function expectDesktopSummaryRanges(dateFrom: string, dateTo: string): void {
+  expect(testState.currentSummaryParams.at(-1)).toMatchObject({ dateFrom, dateTo });
+  expect(testState.baselineSummaryParams.at(-1)).toMatchObject({ dateFrom, dateTo });
+  expect(testState.referenceSummaryParams.at(-1)).toMatchObject({ dateFrom, dateTo });
+}
+
 beforeEach(() => {
   testState.queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   testState.historyArgs = null;
+  testState.currentSummaryParams.length = 0;
+  testState.baselineSummaryParams.length = 0;
+  testState.referenceSummaryParams.length = 0;
+  testState.nextMonth = null;
   testState.realtimeRevision = null;
   testState.batch = makeBatch();
   testState.drillTarget = null;
@@ -258,6 +295,82 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it("applies two rapid next-month actions without losing either move", async () => {
+    render(<DesktopHistoryView />);
+    fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));
+
+    act(() => {
+      testState.nextMonth();
+      testState.nextMonth();
+    });
+
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({
+      selectedMonth: { year: 2026, month: 9 },
+    }));
+    expectDesktopSummaryRanges("2026-10-01", "2026-10-31");
+  });
+
+  it("moves calendar months into the list and every desktop summary", async () => {
+    render(<DesktopHistoryView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "다음 월" }));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({
+      selectedMonth: { year: 2026, month: 8 },
+      selectedDateKey: null,
+    }));
+    expectDesktopSummaryRanges("2026-09-01", "2026-09-30");
+
+    fireEvent.click(screen.getByRole("button", { name: "이전 월" }));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({
+      selectedMonth: { year: 2026, month: 7 },
+    }));
+    expectDesktopSummaryRanges("2026-08-01", "2026-08-31");
+  });
+
+  it("replaces a selected month with its selected day range", async () => {
+    render(<DesktopHistoryView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "8월 14일 선택" }));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({
+      selectedMonth: null,
+      selectedDateKey: "2026-08-14",
+    }));
+    expectDesktopSummaryRanges("2026-08-14", "2026-08-14");
+  });
+
+  it("keeps a selected month after the calendar is closed", async () => {
+    render(<DesktopHistoryView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "달력 토글" }));
+    await waitFor(() => expect(screen.getByTestId("calendar-open")).toHaveTextContent("open"));
+    fireEvent.click(screen.getByRole("button", { name: "달력 토글" }));
+    await waitFor(() => expect(screen.getByTestId("calendar-open")).toHaveTextContent("closed"));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({
+      selectedMonth: { year: 2026, month: 7 },
+    }));
+    expect(screen.getByTestId("selected-month-chip")).toHaveTextContent("2026-7");
+    expectDesktopSummaryRanges("2026-08-01", "2026-08-31");
+  });
+
+  it("uses a calendar-selected month for the list and every summary, then clears it on a period preset", async () => {
+    render(<DesktopHistoryView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({
+      selectedMonth: { year: 2026, month: 7 },
+      selectedDateKey: null,
+    }));
+    expect(screen.getByTestId("selected-month-chip")).toHaveTextContent("2026-7");
+    expectDesktopSummaryRanges("2026-08-01", "2026-08-31");
+
+    fireEvent.click(screen.getByRole("button", { name: "기간 변경" }));
+    await waitFor(() => expect(testState.historyArgs).toMatchObject({ selectedMonth: null, dateFilter: "WEEK" }));
+    expect(screen.getByTestId("selected-month-chip")).toHaveTextContent("none");
+  });
+
   it("passes the realtime revision to HistoryTable as its cache epoch", () => {
     testState.realtimeRevision = 41;
     const { rerender } = render(<DesktopHistoryView />);

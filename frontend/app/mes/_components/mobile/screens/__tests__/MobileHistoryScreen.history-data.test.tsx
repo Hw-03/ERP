@@ -7,6 +7,7 @@ import { MobileHistoryScreen } from "../MobileHistoryScreen";
 
 type HistoryHookArgs = {
   totalCount?: number | null;
+  selectedMonth?: { year: number; month: number } | null;
 };
 
 type HistoryResult = {
@@ -35,6 +36,7 @@ const testState = vi.hoisted(() => ({
   historyArgs: [] as HistoryHookArgs[],
   getTransactionsSummary: vi.fn(),
   realtimeRevision: 1 as number | null,
+  nextMonth: null as null | (() => void),
 }));
 
 vi.mock("@/lib/queries/realtime", () => ({
@@ -99,10 +101,18 @@ vi.mock("../../../_history_sections/HistoryFilterBar", () => ({
     search,
     setSearch,
     onToggleFilterPanel,
+    setDateFilter,
+    selectedMonth,
+    onToggleCalendar,
+    calendarOpen,
   }: {
     search: string;
     setSearch: (value: string) => void;
     onToggleFilterPanel: () => void;
+    setDateFilter: (value: string) => void;
+    selectedMonth: { year: number; month: number } | null;
+    onToggleCalendar: () => void;
+    calendarOpen: boolean;
   }) => (
     <div>
       <input
@@ -113,6 +123,10 @@ vi.mock("../../../_history_sections/HistoryFilterBar", () => ({
       <button type="button" onClick={onToggleFilterPanel}>
         filters
       </button>
+      <button type="button" onClick={() => setDateFilter("WEEK")}>period week</button>
+      <button type="button" onClick={onToggleCalendar}>calendar toggle</button>
+      <output data-testid="calendar-open">{calendarOpen ? "open" : "closed"}</output>
+      <output data-testid="selected-month-chip">{selectedMonth ? `${selectedMonth.year}-${selectedMonth.month}` : "none"}</output>
     </div>
   ),
 }));
@@ -131,7 +145,25 @@ vi.mock("../../../_history_sections/HistoryFilterPanel", () => ({
 }));
 
 vi.mock("../../../_history_sections/HistoryCalendarPanel", () => ({
-  HistoryCalendarPanel: () => null,
+  HistoryCalendarPanel: ({
+    onSelectMonth,
+    prevMonth,
+    nextMonth,
+    setSelectedDay,
+  }: {
+    onSelectMonth: (month: { year: number; month: number }) => void;
+    prevMonth: () => void;
+    nextMonth: () => void;
+    setSelectedDay: (day: string) => void;
+  }) => {
+    testState.nextMonth = nextMonth;
+    return <>
+      <button type="button" onClick={() => onSelectMonth({ year: 2026, month: 7 })}>select August</button>
+      <button type="button" onClick={prevMonth}>previous month</button>
+      <button type="button" onClick={nextMonth}>next month</button>
+      <button type="button" onClick={() => setSelectedDay("2026-08-14")}>select August 14</button>
+    </>;
+  },
 }));
 
 vi.mock("../../../_history_sections/HistoryDetailPanel", () => ({
@@ -185,6 +217,15 @@ function isCurrentSummary(params: SummaryParams): boolean {
   return Object.prototype.hasOwnProperty.call(params, "transactionTypes");
 }
 
+function expectMobileSummaryRanges(dateFrom: string, dateTo: string): void {
+  const summaryCalls = testState.getTransactionsSummary.mock.calls.map(([params]) => params as SummaryParams);
+  const currentParams = summaryCalls.filter(isCurrentSummary);
+  const baselineParams = summaryCalls.filter((params) => !isCurrentSummary(params));
+
+  expect(currentParams.at(-1)).toMatchObject({ dateFrom, dateTo });
+  expect(baselineParams.at(-1)).toMatchObject({ dateFrom, dateTo });
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -208,6 +249,7 @@ function renderScreen() {
 
 beforeEach(() => {
   testState.historyArgs.length = 0;
+  testState.nextMonth = null;
   testState.getTransactionsSummary.mockReset();
   testState.realtimeRevision = 1;
   testState.historyResult = {
@@ -225,6 +267,81 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history data states", () => {
+  it("applies two rapid next-month actions without losing either move", async () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "select August" }));
+
+    act(() => {
+      testState.nextMonth();
+      testState.nextMonth();
+    });
+
+    await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({
+      selectedMonth: { year: 2026, month: 9 },
+    }));
+    await waitFor(() => expectMobileSummaryRanges("2026-10-01", "2026-10-31"));
+  });
+
+  it("moves calendar months into the mobile list and both summaries", async () => {
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: "select August" }));
+    fireEvent.click(screen.getByRole("button", { name: "next month" }));
+    await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({
+      selectedMonth: { year: 2026, month: 8 },
+      selectedDateKey: null,
+    }));
+    await waitFor(() => expectMobileSummaryRanges("2026-09-01", "2026-09-30"));
+
+    fireEvent.click(screen.getByRole("button", { name: "previous month" }));
+    await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({
+      selectedMonth: { year: 2026, month: 7 },
+    }));
+    await waitFor(() => expectMobileSummaryRanges("2026-08-01", "2026-08-31"));
+  });
+
+  it("replaces a selected month with its selected day range", async () => {
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: "select August" }));
+    fireEvent.click(screen.getByRole("button", { name: "select August 14" }));
+    await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({
+      selectedMonth: null,
+      selectedDateKey: "2026-08-14",
+    }));
+    await waitFor(() => expectMobileSummaryRanges("2026-08-14", "2026-08-14"));
+  });
+
+  it("keeps a selected month after the mobile calendar is closed", async () => {
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: "select August" }));
+    fireEvent.click(screen.getByRole("button", { name: "calendar toggle" }));
+    await waitFor(() => expect(screen.getByTestId("calendar-open")).toHaveTextContent("open"));
+    fireEvent.click(screen.getByRole("button", { name: "calendar toggle" }));
+    await waitFor(() => expect(screen.getByTestId("calendar-open")).toHaveTextContent("closed"));
+    await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({
+      selectedMonth: { year: 2026, month: 7 },
+    }));
+    expect(screen.getByTestId("selected-month-chip")).toHaveTextContent("2026-7");
+    await waitFor(() => expectMobileSummaryRanges("2026-08-01", "2026-08-31"));
+  });
+
+  it("uses a calendar-selected month for the mobile list and both summaries, then clears it for a preset", async () => {
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: "select August" }));
+    await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({
+      selectedMonth: { year: 2026, month: 7 },
+    }));
+    expect(screen.getByTestId("selected-month-chip")).toHaveTextContent("2026-7");
+    await waitFor(() => expectMobileSummaryRanges("2026-08-01", "2026-08-31"));
+
+    fireEvent.click(screen.getByRole("button", { name: "period week" }));
+    await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({ selectedMonth: null, dateFilter: "WEEK" }));
+    expect(screen.getByTestId("selected-month-chip")).toHaveTextContent("none");
+  });
+
   it("re-fetches summaries and passes the realtime revision to local history data", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { rerender } = render(

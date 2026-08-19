@@ -72,8 +72,8 @@ def test_monthly_counts_use_history_visibility_and_request_date(client, make_ite
 
     response = client.get("/api/inventory/transactions/monthly-counts?year=2026")
     assert response.status_code == 200, response.text
-    assert response.json()["2026-06"] == 1
-    assert response.json()["2026-07"] == 1
+    assert response.json()["2026-06"] == 0
+    assert response.json()["2026-07"] == 2
 
 
 def _make_log(db_session, item, tx_type: str, created_at: datetime):
@@ -117,6 +117,26 @@ def test_monthly_counts_normal(client, make_item, db_session):
     assert data["2026-12"] == 0
     # 12개월 모두 존재해야 함
     assert len(data) == 12
+
+
+def test_monthly_counts_group_utc_naive_logs_by_kst_month(client, make_item, db_session):
+    """KST 자정 경계의 UTC-naive 로그는 해당 KST 월에 집계한다."""
+    item = make_item(name="monthly-kst-boundary")
+    for created_at in (
+        datetime(2026, 7, 31, 14, 59),
+        datetime(2026, 7, 31, 15, 0),
+        datetime(2026, 8, 31, 14, 59),
+        datetime(2026, 8, 31, 15, 0),
+    ):
+        _make_log(db_session, item, "RECEIVE", created_at)
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions/monthly-counts?year=2026")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["2026-07"] == 1
+    assert response.json()["2026-08"] == 2
+    assert response.json()["2026-09"] == 1
 
 
 def test_monthly_counts_empty_year(client, make_item, db_session):

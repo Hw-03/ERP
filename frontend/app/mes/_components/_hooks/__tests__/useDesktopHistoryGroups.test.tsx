@@ -49,6 +49,21 @@ afterEach(() => {
 });
 
 describe("useDesktopHistoryGroups", () => {
+  it("uses the shared selected-month range in the desktop group request", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(makeResponse({ groups: [], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const { result } = renderHook(
+      () => useDesktopHistoryGroups({ ...baseArgs, selectedMonth: { year: 2026, month: 7 } }),
+      { wrapper: makeWrapper(client) },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("date_from=2026-08-01");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("date_to=2026-08-31");
+  });
+
   it("restores fresh groups immediately without another request after remount", async () => {
     const page = { groups: [makeGroup(0)], next_cursor: null, has_more: false };
     const fetchSpy = vi.fn().mockResolvedValue(makeResponse(page));

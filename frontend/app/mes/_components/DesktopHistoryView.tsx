@@ -17,9 +17,9 @@ import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery, useTransa
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
+import { toDateKey } from "./_history_sections/historyFormat";
 import { type HistorySelection } from "./_history_sections/historyConstants";
-import { DATE_OPTIONS, dateFilterToFrom } from "./_history_sections/historyQuery";
+import { resolveHistoryDateRange, type SelectedHistoryMonth } from "./_history_sections/historyQuery";
 import {
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
@@ -29,6 +29,11 @@ import {
 import { toHistoryLogGroups } from "./_history_sections/historyTableHelpers";
 
 const SEARCH_DEBOUNCE_MS = 350;
+
+function getCurrentKstCalendarMonth(): SelectedHistoryMonth {
+  const key = toDateKey(new Date().toISOString());
+  return { year: Number(key.slice(0, 4)), month: Number(key.slice(5, 7)) - 1 };
+}
 
 export function DesktopHistoryView() {
   const queryClient = useQueryClient();
@@ -88,30 +93,46 @@ export function DesktopHistoryView() {
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const calendarLoadedKeyRef = useRef<string | null>(null);
-  const now = new Date();
-  const [calendarYear, setCalendarYear] = useState(now.getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
+  const [calendarCursor, setCalendarCursor] = useState<SelectedHistoryMonth>(getCurrentKstCalendarMonth);
+  const calendarCursorRef = useRef(calendarCursor);
+  calendarCursorRef.current = calendarCursor;
+  const calendarYear = calendarCursor.year;
+  const calendarMonth = calendarCursor.month;
+  const setCalendarYear = useCallback((updater: (year: number) => number) => {
+    const current = calendarCursorRef.current;
+    const next = { ...current, year: updater(current.year) };
+    calendarCursorRef.current = next;
+    setCalendarCursor(next);
+  }, []);
+  const setCalendarMonth = useCallback((month: number) => {
+    const next = { ...calendarCursorRef.current, month };
+    calendarCursorRef.current = next;
+    setCalendarCursor(next);
+  }, []);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<SelectedHistoryMonth | null>(null);
   const lastSelectionRef = useRef<HistorySelection | null>(null);
   // 13-2번: navigateToLog 가 다른 날짜로 이동했을 때 그 거래 행을 리스트에서 찾아 scrollIntoView.
   const pendingScrollLogIdRef = useRef<string | null>(null);
 
-  const periodLabel = selectedDay
-    ? selectedDay
-    : (DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "전체");
+  const selectedDateRange = useMemo(
+    () => resolveHistoryDateRange(dateFilter, selectedDay, selectedMonth),
+    [dateFilter, selectedDay, selectedMonth],
+  );
+  const periodLabel = selectedDateRange.periodLabel;
 
   const historyFilterParams = useMemo(() => ({
     operationKeys: opParam || undefined,
-    dateFrom: selectedDay ?? dateFilterToFrom(dateFilter),
-    dateTo: selectedDay ?? undefined,
+    dateFrom: selectedDateRange.dateFrom,
+    dateTo: selectedDateRange.dateTo,
     search: debouncedSearch.trim() || undefined,
     department: deptParam || undefined,
     model: modelParam || undefined,
-  }), [dateFilter, debouncedSearch, deptParam, modelParam, opParam, selectedDay]);
+  }), [debouncedSearch, deptParam, modelParam, opParam, selectedDateRange]);
   const baselineSummaryParams = useMemo(() => ({
-    dateFrom: selectedDay ?? dateFilterToFrom(dateFilter),
-    dateTo: selectedDay ?? undefined,
-  }), [dateFilter, selectedDay]);
+    dateFrom: selectedDateRange.dateFrom,
+    dateTo: selectedDateRange.dateTo,
+  }), [selectedDateRange]);
   const {
     data: summary = null,
     isLoading: summaryLoading,
@@ -140,6 +161,7 @@ export function DesktopHistoryView() {
     dateFilter,
     debouncedSearch,
     selectedDateKey: selectedDay,
+    selectedMonth,
     department: deptParam,
     model: modelParam,
     realtimeRevision,
@@ -205,16 +227,10 @@ export function DesktopHistoryView() {
   }, [calendarOpen, calendarYear, calendarMonth, realtimeRevision]);
 
   function prevMonth() {
-    if (calendarMonth === 0) {
-      setCalendarYear((y) => y - 1);
-      setCalendarMonth(11);
-    } else setCalendarMonth((m) => m - 1);
+    moveCalendarMonth(-1);
   }
   function nextMonth() {
-    if (calendarMonth === 11) {
-      setCalendarYear((y) => y + 1);
-      setCalendarMonth(0);
-    } else setCalendarMonth((m) => m + 1);
+    moveCalendarMonth(1);
   }
 
   // 연 뷰(iOS 캘린더 스타일 줌) — 그 해 12개월 거래 건수 집계.
@@ -235,8 +251,7 @@ export function DesktopHistoryView() {
     const map = new Map<string, TransactionLog[]>();
     for (const log of calendarLogs) {
       const key = toDateKey(log.created_at);
-      const d = parseUtc(log.created_at);
-      if (d.getFullYear() !== calendarYear || d.getMonth() !== calendarMonth) continue;
+      if (!key.startsWith(`${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-`)) continue;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(log);
     }
@@ -422,7 +437,26 @@ export function DesktopHistoryView() {
 
   function handleCalendarSelectedDay(next: string | null) {
     if (next && next !== selectedDay) pushHistoryStep();
+    if (next) setSelectedMonth(null);
     setSelectedDay(next);
+  }
+
+  function selectCalendarMonth(month: SelectedHistoryMonth) {
+    calendarCursorRef.current = month;
+    setCalendarCursor(month);
+    setSelectedDay(null);
+    setSelectedMonth(month);
+  }
+
+  function moveCalendarMonth(offset: number) {
+    const current = calendarCursorRef.current;
+    const absoluteMonth = current.year * 12 + current.month + offset;
+    const month = ((absoluteMonth % 12) + 12) % 12;
+    const next = { year: (absoluteMonth - month) / 12, month };
+    calendarCursorRef.current = next;
+    setCalendarCursor(next);
+    setSelectedDay(null);
+    setSelectedMonth(next);
   }
 
   // 브라우저 뒤로가기 → 화면 단계(드릴/날짜/상세/달력/필터)를 최신 순서로 닫는다.
@@ -443,6 +477,10 @@ export function DesktopHistoryView() {
         setSelectedDay(null);
         return;
       }
+      if (selectedMonth) {
+        setSelectedMonth(null);
+        return;
+      }
       if (calendarOpen) {
         setCalendarOpen(false);
         return;
@@ -453,12 +491,13 @@ export function DesktopHistoryView() {
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [calendarOpen, filterPanelOpen, selectedDay, selection, selectionStack]);
+  }, [calendarOpen, filterPanelOpen, selectedDay, selectedMonth, selection, selectionStack]);
 
   // 기간 칩 변경 시 선택 날짜 해제 — 동시에 두 날짜 필터가 살아있으면 사용자가 혼란.
   function handleDateFilterChange(v: string) {
     setDateFilter(v);
     setSelectedDay(null);
+    setSelectedMonth(null);
   }
 
   if (selection) lastSelectionRef.current = selection;
@@ -471,7 +510,7 @@ export function DesktopHistoryView() {
       {/* ── 좌측: 스크롤 영역 ── */}
       <div
         data-testid="history-left-viewport"
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[32px]"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[24px]"
       >
         <div data-testid="history-left-content" className="sg min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-2">
@@ -513,6 +552,8 @@ export function DesktopHistoryView() {
             }}
             selectedDay={selectedDay}
             onClearSelectedDay={() => setSelectedDay(null)}
+            selectedMonth={selectedMonth}
+            onClearSelectedMonth={() => setSelectedMonth(null)}
             flatSurface
           />
 
@@ -548,6 +589,7 @@ export function DesktopHistoryView() {
             nextMonth={nextMonth}
             setCalendarYear={setCalendarYear}
             setCalendarMonth={setCalendarMonth}
+            onSelectMonth={selectCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayMap={calendarDayMap}

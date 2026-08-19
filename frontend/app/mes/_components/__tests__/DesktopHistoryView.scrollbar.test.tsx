@@ -45,7 +45,8 @@ describe("DesktopHistoryView scrollbar", () => {
 
     expect(scroller).toHaveClass("sg", "min-h-0", "flex-1", "overflow-y-auto");
     expect(scroller).not.toHaveClass("scrollbar-hide");
-    expect(viewport).toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-hidden", "rounded-[32px]");
+    expect(viewport).toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-hidden", "rounded-[24px]");
+    expect(viewport).not.toHaveClass("rounded-[32px]");
     expect(viewport).not.toHaveClass("border");
     expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
     expect(viewport).not.toHaveClass("overflow-y-auto");
