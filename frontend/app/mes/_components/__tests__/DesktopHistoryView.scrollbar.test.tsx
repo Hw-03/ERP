@@ -33,7 +33,7 @@ vi.mock("../_history_sections/HistoryTable", () => ({ HistoryTable: () => <div d
 vi.mock("../_history_sections/DesktopHistoryRightPanel", () => ({ DesktopHistoryRightPanel: () => <div /> }));
 
 describe("DesktopHistoryView scrollbar", () => {
-  it("keeps the full transaction workspace in one visible outer scrollbar", () => {
+  it("keeps the full transaction workspace inside a rounded surface beside the outer scrollbar", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={queryClient}><DesktopHistoryView /></QueryClientProvider>,
@@ -43,17 +43,36 @@ describe("DesktopHistoryView scrollbar", () => {
     const scroller = screen.getByTestId("history-left-content");
     const historyTable = screen.getByTestId("history-table");
 
-    expect(scroller).toHaveClass("sg", "min-h-0", "flex-1", "overflow-y-auto");
+    expect(scroller).toHaveClass(
+      "sg",
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+      "[scrollbar-gutter:stable]",
+      "sm:block",
+      "sm:overflow-y-scroll",
+    );
     expect(scroller).not.toHaveClass("scrollbar-hide");
-    expect(viewport).toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-hidden", "rounded-[24px]");
+    expect(viewport).toHaveClass("relative", "min-h-0", "flex", "flex-1", "flex-col");
     expect(viewport).not.toHaveClass("rounded-[32px]");
-    expect(viewport).not.toHaveClass("border");
+    expect(viewport).not.toHaveClass("rounded-[24px]", "border", "overflow-hidden");
     expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
     expect(viewport).not.toHaveClass("overflow-y-auto");
     expect(screen.queryByTestId("history-controls")).not.toBeInTheDocument();
     expect(screen.queryByTestId("history-list-work-area")).not.toBeInTheDocument();
     expect(screen.queryByTestId("history-list-card")).not.toBeInTheDocument();
+    const surface = screen.getByTestId("history-scroll-surface");
+    expect(surface).toHaveClass("min-h-full");
+    expect(surface).not.toHaveClass("overflow-clip", "rounded-[24px]", "border");
+    expect(surface).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
     expect(historyTable.parentElement).toHaveClass("flex", "flex-col", "gap-2");
+    expect(historyTable.parentElement?.parentElement).toBe(surface);
+    const frame = screen.getByTestId("history-scroll-frame");
+    expect(frame).toHaveClass("pointer-events-none", "absolute", "bottom-0", "left-0", "right-2.5", "z-30", "h-6");
+    expect(frame).not.toHaveClass("sticky", "top-0", "-mb-full", "h-full");
+    expect(frame.children).toHaveLength(2);
+    expect(frame.children[0].getAttribute("style")).toContain("var(--c-bg)");
+    expect(frame.children[1].getAttribute("style")).toContain("var(--c-bg)");
     expect(screen.getByTestId("history-filter-bar")).toHaveAttribute("data-flat-surface", "true");
     expect(scroller).not.toHaveClass("rounded-[28px]");
     expect(scroller).not.toHaveClass("desktop-flat-surface");
