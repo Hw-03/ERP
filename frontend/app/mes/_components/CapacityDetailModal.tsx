@@ -1,20 +1,16 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, AlertCircle, CheckCircle2, X } from "lucide-react";
 import type {
   ProductionCapacity,
   ProductionCapacityAfBlock,
-  ProductionCapacityAfItem,
   ProductionCapacityPfVariant,
 } from "@/lib/api/types/production";
 import { getAutoRepresentative, groupAfByModel } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-
-
-const DESKTOP_CAPACITY_GRID =
-  "grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]";
+import { DesktopCapacityPfWorkspace } from "./_capacity_sections/DesktopCapacityPfWorkspace";
 
 const DESKTOP_PF_GRID =
   "sm:grid-cols-[20px_120px_72px_minmax(0,1fr)_84px_84px_84px]";
@@ -24,11 +20,35 @@ const SHARED_HINT_LINES = [
   "한 모델에 자재를 사용하면 다른 모델의 생산 가능 수량은 줄어들 수 있습니다.",
 ];
 
-/**
- * 생산 가능수량 상세 모달 — AF(조립 완제품) 기준.
- * ① AF별 3수량(출하 대기/빠른 조립/총생산) ② 각 병목 ③ 연결된 PF 변형(주문 기준 ship_ready)
- * ④ BOM 미등록 표시. af 블록이 없으면(구버전 응답) legacy 요약으로 fallback.
- */
+const DESKTOP_CAPACITY_MEDIA_QUERY = "(min-width: 640px)";
+
+function getDesktopCapacitySnapshot(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(DESKTOP_CAPACITY_MEDIA_QUERY).matches
+    : false;
+}
+
+function subscribeDesktopCapacity(onChange: () => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};
+  const mediaQuery = window.matchMedia(DESKTOP_CAPACITY_MEDIA_QUERY);
+  const handleChange = () => onChange();
+  if (typeof mediaQuery.addEventListener === "function") {
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }
+  mediaQuery.addListener(handleChange);
+  return () => mediaQuery.removeListener(handleChange);
+}
+
+function useDesktopCapacityLayout(): boolean {
+  return useSyncExternalStore(
+    subscribeDesktopCapacity,
+    getDesktopCapacitySnapshot,
+    () => false,
+  );
+}
+
+/** 생산 가능수량 상세 모달 — 모바일 AF 카드와 데스크톱 PF·전체 BOM 작업공간. */
 export function CapacityDetailModal({
   capacityData,
   onClose,
@@ -37,6 +57,7 @@ export function CapacityDetailModal({
   onClose: () => void;
 }) {
   const af = capacityData?.af ?? null;
+  const isDesktopCapacityLayout = useDesktopCapacityLayout();
 
   return (
     <div
@@ -98,10 +119,15 @@ export function CapacityDetailModal({
           </div>
         </div>
 
-        {/* ── 본문 (스크롤) ───────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-7 sm:py-8">
+        {/* ── 본문 ─────────────────────────────────────────── */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-7 sm:py-8">
           {af ? (
-            <AfCapacityView af={af} />
+            <>
+              {!isDesktopCapacityLayout && <div className="min-h-0 flex-1 overflow-y-auto sm:hidden">
+                <MobileAfCapacityView af={af} />
+              </div>}
+              {isDesktopCapacityLayout && <DesktopCapacityPfWorkspace af={af} />}
+            </>
           ) : (
             <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
               {capacityData == null
@@ -130,11 +156,7 @@ export function CapacityDetailModal({
   );
 }
 
-function isIncomplete(it: ProductionCapacityAfItem): boolean {
-  return it.bom_status === "incomplete" || !it.has_pf_path;
-}
-
-function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
+function MobileAfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
   const items = af.items;
   const unregisteredBomCount = items.filter((item) => item.bom_status === "incomplete").length;
 
@@ -347,152 +369,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         })}
       </div>
 
-      {/* 데스크톱 테이블 레이아웃 (≥ 640px) */}
-      <div className="hidden sm:block rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div
-          className={`grid ${DESKTOP_CAPACITY_GRID} border-b px-4 py-4 text-sm font-bold uppercase tracking-[0.12em]`}
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-        >
-          <span />
-          <span>조립 완제품</span>
-          <span>모델 수</span>
-          <span>자동 기준 출하품</span>
-          <span className="text-right">출하 대기</span>
-          <span className="text-right">빠른 생산</span>
-          <span className="text-right">총생산</span>
-        </div>
-
-        {grouped.length === 0 && (
-          <div className="px-4 py-6 text-center text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-            조건에 맞는 AF 가 없습니다.
-          </div>
-        )}
-
-        {grouped.map((group) => {
-          const autoRepresentative = getAutoRepresentative(group.key, af);
-          const groupCollapsed = !expandedGroups.has(group.key);
-          return (
-          <div key={group.key}>
-            <div
-              className={`grid ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-5 cursor-pointer select-none`}
-              style={{
-                borderColor: LEGACY_COLORS.border,
-                background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
-              }}
-              onClick={() => toggleGroup(group.key)}
-            >
-              {groupCollapsed ? (
-                <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
-              ) : (
-                <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-base font-black" style={{ color: LEGACY_COLORS.blue }}>
-                  {group.label}
-                </span>
-              </div>
-              <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {group.items.length}종
-              </span>
-              <div className="min-w-0">
-                {autoRepresentative ? (
-                  <span
-                    className="inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-sm font-bold"
-                    style={{
-                      background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)`,
-                      color: LEGACY_COLORS.cyan,
-                    }}
-                  >
-                    <span className="truncate">{autoRepresentative.pf_name || autoRepresentative.pf_code}</span>
-                  </span>
-                ) : (
-                  <span
-                    className="rounded-full px-2 py-0.5 text-sm font-semibold"
-                    style={{
-                      background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 12%, transparent)`,
-                      color: LEGACY_COLORS.muted2,
-                    }}
-                  >
-                    출하 경로 없음
-                  </span>
-                )}
-              </div>
-              {autoRepresentative ? (
-                <>
-                  <QtyCell value={autoRepresentative.ship_ready} color={LEGACY_COLORS.cyan} />
-                  <QtyCell value={autoRepresentative.fast_production} color={LEGACY_COLORS.blue} />
-                  <QtyCell value={autoRepresentative.total_production} color={LEGACY_COLORS.purple} />
-                </>
-                ) : (
-                <>
-                  <div className="text-right text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
-                  <div className="text-right text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
-                  <div className="text-right text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
-                </>
-                )}
-              </div>
-
-            {!groupCollapsed && group.items.map((it) => {
-              const expanded = expandedIds.has(it.af_item_id);
-              const variants = variantsByAf.get(it.af_item_id) ?? [];
-              return (
-                <div key={it.af_item_id}>
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(it.af_item_id)}
-                    className={`grid w-full cursor-pointer ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-2.5 text-left transition-colors hover:brightness-110`}
-                    style={{ borderColor: LEGACY_COLORS.border }}
-                  >
-                    {expanded ? (
-                      <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
-                    )}
-                    <div className="col-span-3 min-w-0 pr-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base leading-5" style={{ color: LEGACY_COLORS.text }}>
-                          {it.af_name}
-                        </span>
-                        {it.bom_status === "incomplete" && (
-                          <Badge color={LEGACY_COLORS.yellow}>BOM 미등록</Badge>
-                        )}
-                        {it.bom_status !== "incomplete" && !it.has_pf_path && (
-                          <Badge color={LEGACY_COLORS.muted2}>출하경로 없음</Badge>
-                        )}
-                      </div>
-                      {it.af_code && (
-                        <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {it.af_code}
-                        </div>
-                      )}
-                    </div>
-                    <QtyCell value={it.ship_ready} color={LEGACY_COLORS.cyan} />
-                    <QtyCell value={it.fast_production} color={LEGACY_COLORS.blue} />
-                    <QtyCell value={it.total_production} color={LEGACY_COLORS.purple} />
-                  </button>
-
-                  {expanded && (
-                    <div
-                      className="border-t px-4 py-3"
-                      style={{
-                        borderColor: LEGACY_COLORS.border,
-                        background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
-                      }}
-                    >
-                      <PfVariants
-                        variants={variants}
-                        hasPfPath={it.has_pf_path}
-                        autoRepresentative={autoRepresentative}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          );
-        })}
-      </div>
     </>
   );
 }
@@ -513,17 +389,6 @@ function DashLabelCell({ label }: { label: string }) {
     <div className="text-center">
       <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
       <div className="text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
-    </div>
-  );
-}
-
-function QtyCell({ value, color }: { value: number; color: string }) {
-  return (
-    <div
-      className="text-right text-base font-bold"
-      style={{ color: value > 0 ? color : LEGACY_COLORS.muted2 }}
-    >
-      {formatQty(value)}
     </div>
   );
 }

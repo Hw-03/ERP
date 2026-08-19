@@ -57,7 +57,7 @@ describe("DesktopInventoryRightPanel", () => {
     expect(detailTab).toHaveClass("flex-1");
     expect(historyTab).toHaveClass("flex-1");
     const closeButton = screen.getByRole("button", { name: "패널 닫기" });
-    expect(tablist.parentElement).toHaveClass("flex", "items-center", "gap-2");
+    expect(tablist.parentElement).toHaveClass("flex", "items-center", "gap-2", "mb-4");
     expect(tablist.parentElement).toContainElement(closeButton);
     expect(screen.getByText("상세 내용")).toBeInTheDocument();
 

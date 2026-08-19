@@ -381,6 +381,7 @@ interface Props {
 export function useBomTree(itemId: string, open: boolean, departmentOrder?: "desc") {
   const revision = useRealtimeRevision();
   const [tree, setTree] = useState<BOMTreeNode | false | null>(null);
+  const [error, setError] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
   const loadedItemRef = useRef<string | null>(null);
   const loadedRequestRef = useRef<string | null>(null);
@@ -390,6 +391,7 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
     const requestKey = `${itemId}:${departmentOrder ?? "default"}:${revision ?? "initial"}:${requestVersion}`;
     if (!open || loadedRequestRef.current === requestKey) return;
     const refreshingCurrentItem = loadedItemRef.current === itemId;
+    setError(false);
     if (!refreshingCurrentItem) setTree(null);
     api
       .getBOMTree(itemId, departmentOrder ? { departmentOrder } : undefined)
@@ -397,10 +399,12 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
         if (!active) return;
         loadedItemRef.current = itemId;
         loadedRequestRef.current = requestKey;
+        setError(false);
         setTree(nextTree);
       })
       .catch(() => {
         if (!active) return;
+        setError(true);
         if (!refreshingCurrentItem) setTree(false);
       });
     return () => {
@@ -410,7 +414,9 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
 
   return {
     tree,
+    error,
     retry: () => {
+      setError(false);
       setTree(null);
       setRequestVersion((version) => version + 1);
     },

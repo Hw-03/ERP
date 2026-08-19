@@ -210,7 +210,7 @@ export function DesktopInventoryView({
           </section>
 
           {/* ── 재고 테이블 ── */}
-          <section data-testid="inventory-list-card" className="card desktop-flat-surface">
+          <section data-testid="inventory-list-card" aria-label="자재 목록" className="card desktop-flat-surface">
             <InventoryTableStickyHeader
               searchValue={localSearch}
               onSearchChange={setLocalSearch}

@@ -85,7 +85,7 @@ export function DesktopInventoryRightPanel({
           subtitle={displayItem.legacy_part ? `${displayItem.mes_code} · ${displayItem.legacy_part}` : (displayItem.mes_code ?? undefined)}
           subtitleBadge={headerBadge}
           topContent={
-            <div className="flex items-center gap-2">
+            <div className="mb-4 flex items-center gap-2">
               <div
                 aria-label="재고 상세 보기"
                 className="flex min-w-0 flex-1 w-full gap-1 rounded-[12px] p-1"
