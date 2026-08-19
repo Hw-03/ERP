@@ -306,6 +306,70 @@ def _normalize_sql(value: object | None) -> str | None:
     return re.sub(r"\s*([(),=<>|+\-])\s*", r"\1", normalized)
 
 
+_POSTGRES_TEXT_CAST_RE = re.compile(
+    r"::\s*(?:character varying|varchar|text)(?:\[\])?",
+    flags=re.IGNORECASE,
+)
+_SQL_STRING_LITERAL_RE = re.compile(r"'(?:''|[^'])*'")
+_POSTGRES_GROUPING_SENSITIVE_OPERATOR_RE = re.compile(
+    r"(?<!\|)\|(?!\|)|[+*/%\-]|\b(?:and|or|not)\b",
+    flags=re.IGNORECASE,
+)
+_POSTGRES_PARENTHESIZED_NAME_RE = re.compile(
+    r"\b([a-z_][a-z0-9_]*)\s*\(",
+    flags=re.IGNORECASE,
+)
+_POSTGRES_CASE_KEYWORDS = frozenset({"case", "when", "then", "else", "end"})
+
+
+def _normalize_check_sql(value: object | None, dialect: str) -> str | None:
+    """Normalize PostgreSQL's equivalent IN/ANY reflection without hiding values."""
+    if value is None or dialect != "postgresql":
+        return _normalize_sql(value)
+    normalized = _POSTGRES_TEXT_CAST_RE.sub("", str(value))
+    normalized = re.sub(
+        r"([a-z_][a-z0-9_]*)\s*=\s*any\s*\(\s*array\s*\[(.*?)\]\s*\)",
+        r"\1 IN (\2)",
+        normalized,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    return _normalize_sql(normalized)
+
+
+def _normalize_computed_sql(
+    value: object | None,
+    dialect: str,
+    *,
+    discard_grouping_artifacts: bool = False,
+) -> str | None:
+    """Normalize PostgreSQL casts while preserving meaningful grouping by default."""
+    if value is None or dialect != "postgresql":
+        return _normalize_sql(value)
+    normalized = re.sub(
+        r"cast\(\s*([a-z_][a-z0-9_]*)\s+as\s+"
+        r"(?:character varying|varchar|text)\s*\)",
+        r"\1 ",
+        str(value),
+        flags=re.IGNORECASE,
+    )
+    normalized = _POSTGRES_TEXT_CAST_RE.sub("", normalized)
+    expression_without_literals = _SQL_STRING_LITERAL_RE.sub("", normalized)
+    has_function_call = any(
+        match.group(1).lower() not in _POSTGRES_CASE_KEYWORDS
+        for match in _POSTGRES_PARENTHESIZED_NAME_RE.finditer(
+            expression_without_literals
+        )
+    )
+    grouping_is_associative = not has_function_call and not (
+        _POSTGRES_GROUPING_SENSITIVE_OPERATOR_RE.search(
+            expression_without_literals
+        )
+    )
+    if discard_grouping_artifacts and grouping_is_associative:
+        normalized = normalized.replace("(", "").replace(")", "")
+    return _normalize_sql(normalized)
+
+
 def _compiled_sql(expression: object, connection: Connection) -> str | None:
     if hasattr(expression, "compile"):
         expression = expression.compile(
@@ -368,19 +432,28 @@ def _sqlite_computed_sql(
     return None
 
 
-def _constraint_signature(constraints: list[dict[str, object]]) -> frozenset[tuple[str, str]]:
+def _constraint_signature(
+    constraints: list[dict[str, object]],
+    dialect: str,
+) -> frozenset[tuple[str, str]]:
     return frozenset(
         (
             str(constraint.get("name") or ""),
-            _normalize_sql(constraint.get("sqltext")) or "",
+            _normalize_check_sql(constraint.get("sqltext"), dialect) or "",
         )
         for constraint in constraints
     )
 
 
-def _metadata_check_signature(table: sa.Table) -> frozenset[tuple[str, str]]:
+def _metadata_check_signature(
+    table: sa.Table,
+    dialect: str,
+) -> frozenset[tuple[str, str]]:
     return frozenset(
-        (str(constraint.name or ""), _normalize_sql(constraint.sqltext) or "")
+        (
+            str(constraint.name or ""),
+            _normalize_check_sql(constraint.sqltext, dialect) or "",
+        )
         for constraint in table.constraints
         if isinstance(constraint, sa.CheckConstraint)
     )
@@ -454,6 +527,7 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
         connection,
         opts={
             "compare_type": compare_migration_type,
+            "compare_server_default": connection.dialect.name == "postgresql",
             "include_object": (
                 lambda obj, name, type_, reflected, compare_to: name
                 not in {VERSION_TABLE, SCHEMA_STATE_TABLE}
@@ -500,13 +574,14 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
             actual = actual_columns.get(column.name)
             if actual is None:
                 continue
-            expected_default = _compiled_default(column, connection)
-            actual_default = _normalize_sql(actual.get("default"))
-            if expected_default != actual_default:
-                differences.append(
-                    f"server default mismatch: {table_name}.{column.name} "
-                    f"expected={expected_default!r} actual={actual_default!r}"
-                )
+            if connection.dialect.name != "postgresql":
+                expected_default = _compiled_default(column, connection)
+                actual_default = _normalize_sql(actual.get("default"))
+                if expected_default != actual_default:
+                    differences.append(
+                        f"server default mismatch: {table_name}.{column.name} "
+                        f"expected={expected_default!r} actual={actual_default!r}"
+                    )
 
             expected_computed = column.computed
             actual_computed = actual.get("computed")
@@ -515,8 +590,30 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
             if expected_computed is None or actual_computed is None:
                 differences.append(f"computed column mismatch: {table_name}.{column.name}")
                 continue
-            expected_sql = _compiled_sql(expected_computed.sqltext, connection)
-            actual_sql = _normalize_sql(actual_computed.get("sqltext"))
+            expected_expression = expected_computed.sqltext
+            if hasattr(expected_expression, "compile"):
+                expected_expression = expected_expression.compile(
+                    dialect=connection.dialect,
+                    compile_kwargs={"literal_binds": True},
+                )
+            expected_sql = _normalize_computed_sql(
+                expected_expression,
+                connection.dialect.name,
+                discard_grouping_artifacts=(
+                    connection.dialect.name == "postgresql"
+                    and table_name == "items"
+                    and column.name == "mes_code"
+                ),
+            )
+            actual_sql = _normalize_computed_sql(
+                actual_computed.get("sqltext"),
+                connection.dialect.name,
+                discard_grouping_artifacts=(
+                    connection.dialect.name == "postgresql"
+                    and table_name == "items"
+                    and column.name == "mes_code"
+                ),
+            )
             if not actual_sql:
                 actual_sql = _sqlite_computed_sql(
                     connection,
@@ -532,8 +629,11 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
                     f"actual={actual_sql!r}/{actual_persisted!r}"
                 )
 
-        expected_checks = _metadata_check_signature(table)
-        actual_checks = _constraint_signature(inspector.get_check_constraints(table_name))
+        expected_checks = _metadata_check_signature(table, connection.dialect.name)
+        actual_checks = _constraint_signature(
+            inspector.get_check_constraints(table_name),
+            connection.dialect.name,
+        )
         if expected_checks != actual_checks:
             differences.append(
                 f"check constraint mismatch: {table_name} "

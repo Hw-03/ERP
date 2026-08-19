@@ -17,6 +17,11 @@ from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.schema import CreateTable
 
 from app.models import Base, InventoryLocation, Item
+from bootstrap.schema import (
+    _normalize_check_sql,
+    _normalize_computed_sql,
+    schema_differences,
+)
 from migration_type_compare import compare_migration_type
 
 
@@ -458,6 +463,98 @@ def test_postgresql_offline_upgrade_compiles_without_sqlite_functions():
     assert "now()" in sql or "current_timestamp" in sql
 
 
+def test_postgresql_shipping_enum_repair_replaces_default_around_type_change():
+    output = io.StringIO()
+    config = _config(
+        "postgresql+psycopg2://migration-test:unused@invalid/migration-test",
+        output_buffer=output,
+    )
+
+    command.upgrade(config, "20260807_0016", sql=True)
+
+    sql = " ".join(output.getvalue().lower().split())
+    drop_default = sql.index(
+        "alter table shipping_requests alter column finalization_mode drop default"
+    )
+    change_type = sql.index(
+        "alter table shipping_requests alter column finalization_mode type "
+        "shipping_finalization_mode_enum"
+    )
+    restore_default = sql.index(
+        "alter table shipping_requests alter column finalization_mode set default "
+        "'keep_base'::shipping_finalization_mode_enum"
+    )
+
+    assert drop_default < change_type < restore_default
+
+
+def test_postgresql_computed_normalization_preserves_semantic_grouping():
+    left_grouped = _normalize_computed_sql(
+        "(a + b) * c",
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+    right_grouped = _normalize_computed_sql(
+        "a + (b * c)",
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+
+    assert left_grouped != right_grouped
+
+
+def test_postgresql_mes_code_normalization_accepts_only_reflection_artifacts():
+    expected = (
+        "model_symbol || '-' || process_type_code || '-' || CASE "
+        "WHEN serial_no < 10 THEN '000' || CAST(serial_no AS VARCHAR) "
+        "WHEN serial_no < 100 THEN '00' || CAST(serial_no AS VARCHAR) "
+        "WHEN serial_no < 1000 THEN '0' || CAST(serial_no AS VARCHAR) "
+        "ELSE CAST(serial_no AS VARCHAR) END"
+    )
+    reflected = (
+        "((((model_symbol)::text || '-'::text) || (process_type_code)::text) "
+        "|| '-'::text) || (CASE WHEN (serial_no < 10) THEN "
+        "(('000'::text || ((serial_no)::character varying)::text))::character varying "
+        "WHEN (serial_no < 100) THEN "
+        "(('00'::text || ((serial_no)::character varying)::text))::character varying "
+        "WHEN (serial_no < 1000) THEN "
+        "(('0'::text || ((serial_no)::character varying)::text))::character varying "
+        "ELSE (serial_no)::character varying END)::text)"
+    )
+    changed = reflected.replace("'000'::text", "'999'::text")
+
+    expected_normalized = _normalize_computed_sql(
+        expected,
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+
+    assert expected_normalized == _normalize_computed_sql(
+        reflected,
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+    assert expected_normalized != _normalize_computed_sql(
+        changed,
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+
+
+def test_postgresql_check_normalization_preserves_allowed_values():
+    expected = "outcome IN ('success', 'failed', 'cancelled')"
+    reflected = (
+        "outcome::text = ANY (ARRAY['success'::character varying, "
+        "'failed'::character varying, 'cancelled'::character varying]::text[])"
+    )
+    changed = reflected.replace("'cancelled'", "'ignored'")
+
+    expected_normalized = _normalize_check_sql(expected, "postgresql")
+
+    assert expected_normalized == _normalize_check_sql(reflected, "postgresql")
+    assert expected_normalized != _normalize_check_sql(changed, "postgresql")
+
+
 @pytest.mark.skipif(
     not os.getenv("TEST_POSTGRES_URL"),
     reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
@@ -472,6 +569,19 @@ def test_postgresql_upgrade_opt_in_uses_outer_rollback():
                 config.attributes["connection"] = connection
                 command.upgrade(config, "head")
                 assert "alembic_version" in sa.inspect(connection).get_table_names()
+                assert schema_differences(connection) == ()
+
+                connection.exec_driver_sql(
+                    "ALTER TABLE notifications "
+                    "ALTER COLUMN is_read SET DEFAULT TRUE"
+                )
+                default_differences = schema_differences(connection)
+                assert any(
+                    "modify_default" in difference
+                    and "notifications" in difference
+                    and "is_read" in difference
+                    for difference in default_differences
+                )
             finally:
                 transaction.rollback()
     finally:

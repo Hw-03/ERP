@@ -259,8 +259,9 @@ def move_box(
         .scalar()
     )
     box.stack_order = (max_order or 0) + 1
+    response_box_id = box.box_id
     db.commit()
-    return _box_response(db, box.box_id)
+    return _box_response(db, response_box_id)
 
 
 @router.patch("/boxes/restack", response_model=List[WarehouseBoxResponse])
