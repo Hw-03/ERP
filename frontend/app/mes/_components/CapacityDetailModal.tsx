@@ -363,12 +363,14 @@ function AfCapacitySummary({
             {!groupCollapsed && group.items.map((it) => {
               const expanded = expandedIds.has(it.af_item_id);
               const variants = variantsByAf.get(it.af_item_id) ?? [];
+              const dimmed = it.bom_status === "incomplete" || !it.has_pf_path;
               return (
                 <div key={it.af_item_id} className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
                   <button
                     type="button"
                     onClick={() => toggleExpand(it.af_item_id)}
-                    className="w-full px-4 py-3 text-left transition-colors hover:brightness-110"
+                    className={`w-full px-4 py-3 text-left transition-colors ${dimmed ? "" : "hover:brightness-110"}`}
+                    style={{ background: dimmed ? LEGACY_COLORS.s2 : undefined }}
                   >
                     <div className="flex items-start gap-2">
                       {expanded ? (
@@ -520,14 +522,18 @@ function AfCapacitySummary({
               {!groupCollapsed && group.items.map((item) => {
                 const expanded = expandedIds.has(item.af_item_id);
                 const variants = variantsByAf.get(item.af_item_id) ?? [];
+                const dimmed = item.bom_status === "incomplete" || !item.has_pf_path;
                 return (
                   <div key={item.af_item_id}>
                     <button
                       type="button"
                       onClick={() => toggleExpand(item.af_item_id)}
                       aria-expanded={expanded}
-                      className={`grid w-full ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-2.5 text-left transition-colors hover:brightness-110`}
-                      style={{ borderColor: LEGACY_COLORS.border }}
+                      className={`grid w-full ${DESKTOP_CAPACITY_GRID} items-center border-t px-4 py-2.5 text-left transition-colors ${dimmed ? "" : "hover:brightness-110"}`}
+                      style={{
+                        borderColor: LEGACY_COLORS.border,
+                        background: dimmed ? LEGACY_COLORS.s2 : undefined,
+                      }}
                     >
                       {expanded ? (
                         <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
