@@ -88,8 +88,17 @@ describe("DesktopInventoryView scrollbar", () => {
 
     expect(scroller).not.toBeNull();
     expect(scroller).not.toHaveClass("scrollbar-hide");
-    expect(scroller).toHaveClass("sg", "min-h-0", "flex-1", "overflow-y-auto");
-    expect(viewport).toHaveClass("min-h-0", "flex", "flex-1", "flex-col", "overflow-hidden", "rounded-[32px]");
+    expect(scroller).toHaveClass(
+      "sg",
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+      "[scrollbar-gutter:stable]",
+      "sm:block",
+      "sm:overflow-y-scroll",
+    );
+    expect(viewport).toHaveClass("relative", "min-h-0", "flex", "flex-1", "flex-col");
+    expect(viewport).not.toHaveClass("rounded-[32px]");
     expect(viewport).not.toHaveClass("border");
     expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
     expect(viewport).not.toHaveClass("overflow-y-auto");
@@ -97,6 +106,12 @@ describe("DesktopInventoryView scrollbar", () => {
     expect(screen.getByRole("region", { name: "자재 목록" })).toBe(listCard);
     expect(listCard).not.toHaveClass("overflow-hidden", "overflow-y-auto");
     expect(screen.queryByTestId("inventory-items-scroll-region")).not.toBeInTheDocument();
+    expect(screen.getByTestId("inventory-scroll-surface")).toHaveClass("min-h-full");
+    const frame = screen.getByTestId("inventory-scroll-frame");
+    expect(frame).toHaveClass("pointer-events-none", "absolute", "bottom-0", "left-0", "right-2.5", "z-30", "h-6");
+    expect(frame.children).toHaveLength(2);
+    expect(frame.children[0].getAttribute("style")).toContain("var(--c-bg)");
+    expect(frame.children[1].getAttribute("style")).toContain("var(--c-bg)");
   });
 
   it("uses flat work surfaces instead of elevated dashboard cards", () => {

@@ -152,17 +152,18 @@ export function DesktopInventoryView({
 
   return (
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
-      {/* ── 좌측: 스크롤 컨테이너 ── */}
+      {/* ── 좌측: 전체 작업 영역 스크롤 + 바깥 전용 스크롤 바 ── */}
       <div
         data-testid="inventory-left-viewport"
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[32px]"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col"
       >
         <div
           ref={scrollRef}
           data-testid="inventory-left-content"
-          className="sg min-h-0 flex-1 overflow-y-auto"
+          className="sg min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll"
         >
-          <div className="flex flex-col gap-3">
+          <div data-testid="inventory-scroll-surface" className="min-h-full">
+            <div className="flex flex-col gap-3">
           {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}
           <section className="card desktop-flat-surface" style={{ padding: "14px 16px" }}>
             <InventoryKpiPanel
@@ -234,7 +235,22 @@ export function DesktopInventoryView({
               imageManifest={imageManifest}
             />
           </section>
+            </div>
           </div>
+        </div>
+        <div
+          aria-hidden
+          data-testid="inventory-scroll-frame"
+          className="pointer-events-none absolute bottom-0 left-0 right-2.5 z-30 h-6"
+        >
+          <span
+            className="absolute bottom-0 left-0 h-6 w-6"
+            style={{ background: "radial-gradient(circle at 100% 0, transparent 0 23px, var(--c-bg) 24px)" }}
+          />
+          <span
+            className="absolute bottom-0 right-0 h-6 w-6"
+            style={{ background: "radial-gradient(circle at 0 0, transparent 0 23px, var(--c-bg) 24px)" }}
+          />
         </div>
       </div>
 
