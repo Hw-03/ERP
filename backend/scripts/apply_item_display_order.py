@@ -20,7 +20,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.models import Item
-from app.services.item_display_order import apply_default_item_display_order, default_item_display_order
+from app.services.item_display_order import _apply_default_item_display_order, default_item_display_order
 from scripts.ops.backup_db import backup_sqlite
 
 
@@ -54,7 +54,7 @@ def apply_item_display_order(
     engine = create_engine(f"sqlite:///{source.as_posix()}")
     try:
         with Session(engine) as db:
-            ordered = apply_default_item_display_order(db)
+            ordered = _apply_default_item_display_order(db)
             db.commit()
             return ItemDisplayOrderApplyResult(backup_path=backup_path, item_count=len(ordered))
     finally:

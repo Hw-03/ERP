@@ -84,6 +84,12 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgres_head_public_tables_serialize_two_connections" not in postgres_job
     assert "continue-on-error" not in postgres_job
 
+    runner = _text("backend/scripts/verify_postgres_concurrency.py")
+    assert "test_operator_session_postgres.py" in runner
+    assert "test_postgres_foreign_operator_preflight_stays_fail_closed_after_rotation" in runner
+    assert "test_postgres_same_cookie_login_then_logout_leaves_no_reissued_session" in runner
+    assert "test_postgres_same_cookie_logout_then_login_fails_after_revalidation" in runner
+
     verify_local = _text("scripts/dev/verify_local.ps1")
     assert "backend-postgres-concurrency" in verify_local
     assert "python scripts/verify_postgres_concurrency.py" in verify_local
@@ -104,6 +110,29 @@ def test_postgres_required_evidence_uses_alembic_head_public_tables() -> None:
     assert "CREATE SCHEMA" not in body
     assert "CREATE TABLE" not in body
     assert "Session(engine)" in body
+
+
+def test_postgres_lifecycle_evidence_uses_the_production_verified_route_boundary() -> None:
+    test_source = _text("backend/tests/concurrency/test_operator_session_postgres.py")
+    module = ast.parse(test_source)
+    function = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name
+        == "test_postgres_lifecycle_revoke_and_verified_mutation_share_lock_order"
+    )
+    body = ast.get_source_segment(test_source, function) or ""
+    runner = _text("backend/scripts/verify_postgres_concurrency.py")
+
+    assert "_get_employee_for_lifecycle_change" not in test_source
+    assert "require_verified_actor(" in body
+    assert "employees_router._locked_lifecycle_target(" in body
+    assert "employees_router.update_employee(" in body
+    assert (
+        "test_operator_session_postgres.py::"
+        "test_postgres_lifecycle_revoke_and_verified_mutation_share_lock_order"
+    ) in runner
 
 
 def test_postgres_runner_reports_not_verified_or_fails_closed_without_url() -> None:

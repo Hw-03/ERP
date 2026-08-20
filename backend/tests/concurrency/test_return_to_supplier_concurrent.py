@@ -1,4 +1,4 @@
-"""동시성 테스트: return_to_supplier() — DEFECTIVE 재고 10개, 20스레드 동시 반품 시 음수 없음."""
+"""동시성 테스트: _return_to_supplier() — DEFECTIVE 재고 10개, 20스레드 동시 반품 시 음수 없음."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _setup(make_session, defective_qty: Decimal, dept: DepartmentEnum):
 
 @pytest.mark.usefixtures("concurrent_engine")
 def test_return_to_supplier_concurrent(concurrent_engine, make_session):
-    """DEFECTIVE 10개, 20스레드 동시 return_to_supplier(1) → 음수 없음, 성공 ≤ 10, 총량 감소 정확."""
+    """DEFECTIVE 10개, 20스레드 동시 _return_to_supplier(1) → 음수 없음, 성공 ≤ 10, 총량 감소 정확."""
     from app.services import inventory as inventory_svc
 
     initial_qty = Decimal("10")
@@ -59,7 +59,7 @@ def test_return_to_supplier_concurrent(concurrent_engine, make_session):
     def try_return():
         session = make_session()
         try:
-            inventory_svc.return_to_supplier(session, item_id, Decimal("1"), dept)
+            inventory_svc._return_to_supplier(session, item_id, Decimal("1"), dept)
             session.commit()
             successes.append("ok")
         except ValueError as e:

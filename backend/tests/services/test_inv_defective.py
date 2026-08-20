@@ -80,7 +80,7 @@ def test_defective_flows_do_not_consume_reserved_location_stock(
     cases = (
         (
             LocationStatusEnum.PRODUCTION,
-            lambda item_id: svc.mark_defective(
+            lambda item_id: svc._mark_defective(
                 db_session,
                 item_id,
                 D("3"),
@@ -93,25 +93,25 @@ def test_defective_flows_do_not_consume_reserved_location_stock(
         ),
         (
             LocationStatusEnum.DEFECTIVE,
-            lambda item_id: svc.return_to_supplier(
+            lambda item_id: svc._return_to_supplier(
                 db_session, item_id, D("3"), ASSEMBLY
             ),
         ),
         (
             LocationStatusEnum.DEFECTIVE,
-            lambda item_id: svc.unmark_defective(
+            lambda item_id: svc._unmark_defective(
                 db_session, item_id, D("3"), ASSEMBLY, reason
             ),
         ),
         (
             LocationStatusEnum.DEFECTIVE,
-            lambda item_id: svc.scrap_defective(
+            lambda item_id: svc._scrap_defective(
                 db_session, item_id, D("3"), ASSEMBLY, reason
             ),
         ),
         (
             LocationStatusEnum.PRODUCTION,
-            lambda item_id: svc.scrap_normal(
+            lambda item_id: svc._scrap_normal(
                 db_session,
                 item_id,
                 D("3"),
@@ -153,7 +153,7 @@ def test_mark_defective_locks_locations_in_deterministic_order(
 
     monkeypatch.setattr(svc, "_lock_location", track_lock_location)
 
-    svc.mark_defective(
+    svc._mark_defective(
         db_session,
         item.item_id,
         D("1"),
@@ -177,7 +177,7 @@ def test_mark_defective_from_warehouse_total_invariant(make_item, db_session):
     item = make_item(warehouse_qty=D("10"))
     before_total = _total(db_session, item.item_id)
 
-    svc.mark_defective(
+    svc._mark_defective(
         db_session, item.item_id, D("3"),
         DefectSource(kind="warehouse", target_dept=ASSEMBLY),
     )
@@ -193,7 +193,7 @@ def test_mark_defective_from_production_total_invariant(make_item, make_location
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("8"))
     # 총량 재동기화를 위해 한 번 sync 시킨다 (등록 자체가 _sync_total 호출).
-    svc.mark_defective(
+    svc._mark_defective(
         db_session, item.item_id, D("5"),
         DefectSource(kind="production", target_dept=ASSEMBLY, source_dept=ASSEMBLY),
     )
@@ -210,7 +210,7 @@ def test_mark_defective_production_cross_dept_source(make_item, make_location, d
     make_location(item.item_id, department=TUBE,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("6"))
 
-    svc.mark_defective(
+    svc._mark_defective(
         db_session, item.item_id, D("2"),
         DefectSource(kind="production", target_dept=ASSEMBLY, source_dept=TUBE),
     )
@@ -223,7 +223,7 @@ def test_mark_defective_production_cross_dept_source(make_item, make_location, d
 def test_mark_defective_sets_defective_at(make_item, db_session):
     """등록 시 defective_at 타임스탬프가 채워진다."""
     item = make_item(warehouse_qty=D("4"))
-    svc.mark_defective(
+    svc._mark_defective(
         db_session, item.item_id, D("1"),
         DefectSource(kind="warehouse", target_dept=ASSEMBLY),
     )
@@ -235,7 +235,7 @@ def test_mark_defective_sets_defective_at(make_item, db_session):
 def test_mark_defective_qty_zero_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("5"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.mark_defective(
+        svc._mark_defective(
             db_session, item.item_id, D("0"),
             DefectSource(kind="warehouse", target_dept=ASSEMBLY),
         )
@@ -245,7 +245,7 @@ def test_mark_defective_production_missing_source_dept_raises(make_item, db_sess
     """source=production 인데 source_dept 누락 → ValueError."""
     item = make_item(warehouse_qty=D("5"))
     with pytest.raises(ValueError, match="source_dept"):
-        svc.mark_defective(
+        svc._mark_defective(
             db_session, item.item_id, D("1"),
             DefectSource(kind="production", target_dept=ASSEMBLY, source_dept=None),
         )
@@ -254,7 +254,7 @@ def test_mark_defective_production_missing_source_dept_raises(make_item, db_sess
 def test_mark_defective_unknown_source_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("5"))
     with pytest.raises(ValueError, match="source"):
-        svc.mark_defective(
+        svc._mark_defective(
             db_session, item.item_id, D("1"),
             DefectSource(kind="floor", target_dept=ASSEMBLY),
         )
@@ -264,7 +264,7 @@ def test_mark_defective_warehouse_insufficient_raises(make_item, db_session):
     """창고 가용 재고 부족 (pending 고려) → ValueError, 변동 없음."""
     item = make_item(warehouse_qty=D("3"))
     with pytest.raises(ValueError, match="부족"):
-        svc.mark_defective(
+        svc._mark_defective(
             db_session, item.item_id, D("5"),
             DefectSource(kind="warehouse", target_dept=ASSEMBLY),
         )
@@ -280,7 +280,7 @@ def test_unmark_defective_total_invariant(make_item, make_location, db_session):
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("2"))
 
-    svc.unmark_defective(
+    svc._unmark_defective(
         db_session, item.item_id, D("3"), ASSEMBLY,
         ReasonContext(category="오판정", memo="재검사 정상", actor="홍길동"),
     )
@@ -299,7 +299,7 @@ def test_unmark_defective_clears_defective_at(make_item, make_location, db_sessi
     loc.defective_at = datetime.utcnow()
     db_session.flush()
 
-    svc.unmark_defective(
+    svc._unmark_defective(
         db_session, item.item_id, D("4"), ASSEMBLY,
         ReasonContext(category="오판정", memo="m", actor="a"),
     )
@@ -309,7 +309,7 @@ def test_unmark_defective_clears_defective_at(make_item, make_location, db_sessi
 def test_unmark_defective_qty_zero_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("0"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.unmark_defective(
+        svc._unmark_defective(
             db_session, item.item_id, D("0"), ASSEMBLY,
             ReasonContext(category="x", memo="m", actor="a"),
         )
@@ -320,7 +320,7 @@ def test_unmark_defective_insufficient_raises(make_item, make_location, db_sessi
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.DEFECTIVE, quantity=D("2"))
     with pytest.raises(ValueError, match="부족"):
-        svc.unmark_defective(
+        svc._unmark_defective(
             db_session, item.item_id, D("5"), ASSEMBLY,
             ReasonContext(category="오판정", memo="m", actor="a"),
         )
@@ -334,7 +334,7 @@ def test_scrap_defective_total_decreases(make_item, make_location, db_session):
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.DEFECTIVE, quantity=D("6"))
     # 등록을 통해 총량 동기화 효과를 만들기 위해 scrap 호출 (scrap 이 _sync_total).
-    svc.scrap_defective(
+    svc._scrap_defective(
         db_session, item.item_id, D("4"), ASSEMBLY,
         ReasonContext(category="폐기", memo="파손", actor="홍길동"),
     )
@@ -346,7 +346,7 @@ def test_scrap_defective_total_decreases(make_item, make_location, db_session):
 def test_scrap_defective_qty_zero_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("0"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.scrap_defective(
+        svc._scrap_defective(
             db_session, item.item_id, D("0"), ASSEMBLY,
             ReasonContext(category="x", memo="m", actor="a"),
         )
@@ -358,7 +358,7 @@ def test_scrap_defective_insufficient_raises(make_item, make_location, db_sessio
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.DEFECTIVE, quantity=D("1"))
     with pytest.raises(ValueError, match="부족"):
-        svc.scrap_defective(
+        svc._scrap_defective(
             db_session, item.item_id, D("5"), ASSEMBLY,
             ReasonContext(category="폐기", memo="m", actor="a"),
         )
@@ -372,7 +372,7 @@ def test_return_to_supplier_total_decreases(make_item, make_location, db_session
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.DEFECTIVE, quantity=D("7"))
 
-    svc.return_to_supplier(db_session, item.item_id, D("3"), ASSEMBLY)
+    svc._return_to_supplier(db_session, item.item_id, D("3"), ASSEMBLY)
 
     assert _defective(db_session, item.item_id) == D("4")  # 7 - 3
     assert _total(db_session, item.item_id) == D("4")       # 총량 감소
@@ -381,7 +381,7 @@ def test_return_to_supplier_total_decreases(make_item, make_location, db_session
 def test_return_to_supplier_qty_zero_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("0"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.return_to_supplier(db_session, item.item_id, D("0"), ASSEMBLY)
+        svc._return_to_supplier(db_session, item.item_id, D("0"), ASSEMBLY)
 
 
 def test_return_to_supplier_insufficient_raises(make_item, make_location, db_session):
@@ -389,7 +389,7 @@ def test_return_to_supplier_insufficient_raises(make_item, make_location, db_ses
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.DEFECTIVE, quantity=D("2"))
     with pytest.raises(ValueError, match="부족"):
-        svc.return_to_supplier(db_session, item.item_id, D("5"), ASSEMBLY)
+        svc._return_to_supplier(db_session, item.item_id, D("5"), ASSEMBLY)
 
 
 # ──────────────────────────── scrap_normal ────────────────────────────
@@ -397,7 +397,7 @@ def test_return_to_supplier_insufficient_raises(make_item, make_location, db_ses
 def test_scrap_normal_warehouse_total_decreases(make_item, db_session):
     """정상 창고 폐기: warehouse_qty 차감 + 총량 감소."""
     item = make_item(warehouse_qty=D("10"))
-    svc.scrap_normal(
+    svc._scrap_normal(
         db_session, item.item_id, D("4"),
         NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY),
         ReasonContext(category="폐기", memo="불용", actor="a"),
@@ -411,7 +411,7 @@ def test_scrap_normal_production_total_decreases(make_item, make_location, db_se
     item = make_item(warehouse_qty=D("0"))
     make_location(item.item_id, department=TUBE,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("9"))
-    svc.scrap_normal(
+    svc._scrap_normal(
         db_session, item.item_id, D("5"),
         NormalSource(kind="production", dept_or_warehouse=TUBE),
         ReasonContext(category="폐기", memo="불용", actor="a"),
@@ -423,7 +423,7 @@ def test_scrap_normal_production_total_decreases(make_item, make_location, db_se
 def test_scrap_normal_qty_zero_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("10"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.scrap_normal(
+        svc._scrap_normal(
             db_session, item.item_id, D("0"),
             NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY),
             ReasonContext(category="폐기", memo="m", actor="a"),
@@ -433,7 +433,7 @@ def test_scrap_normal_qty_zero_raises(make_item, db_session):
 def test_scrap_normal_unknown_source_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("10"))
     with pytest.raises(ValueError, match="source"):
-        svc.scrap_normal(
+        svc._scrap_normal(
             db_session, item.item_id, D("1"),
             NormalSource(kind="floor", dept_or_warehouse=ASSEMBLY),
             ReasonContext(category="폐기", memo="m", actor="a"),
@@ -443,7 +443,7 @@ def test_scrap_normal_unknown_source_raises(make_item, db_session):
 def test_scrap_normal_warehouse_insufficient_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("3"))
     with pytest.raises(ValueError, match="부족"):
-        svc.scrap_normal(
+        svc._scrap_normal(
             db_session, item.item_id, D("5"),
             NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY),
             ReasonContext(category="폐기", memo="m", actor="a"),
@@ -455,7 +455,7 @@ def test_scrap_normal_production_insufficient_raises(make_item, make_location, d
     make_location(item.item_id, department=TUBE,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("1"))
     with pytest.raises(ValueError, match="부족"):
-        svc.scrap_normal(
+        svc._scrap_normal(
             db_session, item.item_id, D("5"),
             NormalSource(kind="production", dept_or_warehouse=TUBE),
             ReasonContext(category="폐기", memo="m", actor="a"),
@@ -467,7 +467,7 @@ def test_scrap_normal_production_insufficient_raises(make_item, make_location, d
 def test_return_from_normal_warehouse_total_decreases(make_item, db_session):
     """정상 창고 직접 반품: warehouse_qty 차감 + 총량 감소."""
     item = make_item(warehouse_qty=D("8"))
-    svc.return_to_supplier_from_normal(
+    svc._return_to_supplier_from_normal(
         db_session, item.item_id, D("3"),
         NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY, supplier_name="공급사"),
         ReasonContext(category="반품", memo="m", actor="a"),
@@ -481,7 +481,7 @@ def test_return_from_normal_production_total_decreases(make_item, make_location,
     item = make_item(warehouse_qty=D("0"))
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("6"))
-    svc.return_to_supplier_from_normal(
+    svc._return_to_supplier_from_normal(
         db_session, item.item_id, D("2"),
         NormalSource(kind="production", dept_or_warehouse=ASSEMBLY, supplier_name="공급사"),
         ReasonContext(category="반품", memo="m", actor="a"),
@@ -493,7 +493,7 @@ def test_return_from_normal_production_total_decreases(make_item, make_location,
 def test_return_from_normal_qty_zero_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("8"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.return_to_supplier_from_normal(
+        svc._return_to_supplier_from_normal(
             db_session, item.item_id, D("0"),
             NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY, supplier_name="s"),
             ReasonContext(category="반품", memo="m", actor="a"),
@@ -503,7 +503,7 @@ def test_return_from_normal_qty_zero_raises(make_item, db_session):
 def test_return_from_normal_unknown_source_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("8"))
     with pytest.raises(ValueError, match="source"):
-        svc.return_to_supplier_from_normal(
+        svc._return_to_supplier_from_normal(
             db_session, item.item_id, D("1"),
             NormalSource(kind="floor", dept_or_warehouse=ASSEMBLY, supplier_name="s"),
             ReasonContext(category="반품", memo="m", actor="a"),
@@ -513,7 +513,7 @@ def test_return_from_normal_unknown_source_raises(make_item, db_session):
 def test_return_from_normal_warehouse_insufficient_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("2"))
     with pytest.raises(ValueError, match="부족"):
-        svc.return_to_supplier_from_normal(
+        svc._return_to_supplier_from_normal(
             db_session, item.item_id, D("5"),
             NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY, supplier_name="s"),
             ReasonContext(category="반품", memo="m", actor="a"),

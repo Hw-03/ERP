@@ -426,7 +426,20 @@ def test_employee_login_notification_popup_setting_round_trips(db_session, clien
     emp = next(e for e in list_resp.json() if e["employee_id"] == emp_id)
     assert emp["login_notification_popup_enabled"] is False
 
-    login_resp = client.post(f"/api/employees/{emp_id}/verify-pin", json={"pin": "0000"})
+    challenged = client.post(
+        f"/api/employees/{emp_id}/verify-pin",
+        json={"pin": "0000"},
+    )
+    assert challenged.status_code == 409, challenged.text
+    changed = client.post(
+        "/api/operator-session/complete-pin-change",
+        json={"employee_id": emp_id, "new_pin": "2468"},
+    )
+    assert changed.status_code == 204, changed.text
+    login_resp = client.post(
+        f"/api/employees/{emp_id}/verify-pin",
+        json={"pin": "2468"},
+    )
     assert login_resp.status_code == 200, login_resp.text
     assert login_resp.json()["login_notification_popup_enabled"] is False
 

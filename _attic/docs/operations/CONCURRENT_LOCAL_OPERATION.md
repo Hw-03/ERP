@@ -69,7 +69,7 @@ python bootstrap_db.py
 - [ ] PostgreSQL 실행 확인: `docker ps | grep postgres`
 - [ ] `DATABASE_URL` 환경변수 설정 확인
 - [ ] `python bootstrap_db.py` — 마이그레이션 완료 확인
-- [ ] 서버 시작: `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
+- [ ] 서버 시작: `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --no-proxy-headers`
 - [ ] 접속 확인: `http://<서버IP>:8000/health` → `{"status": "ok"}`
 
 ### SQLite로 운영 시 (10명 이하)

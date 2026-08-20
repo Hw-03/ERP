@@ -16,7 +16,7 @@ test.describe("불량 — 격리 / 해제", () => {
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
     await page.goto("/mes?tab=defect");
-    // hub 3장 카드 진입 화면 확인 — cold next dev 라우트 컴파일 흡수를 위해 첫 단언만 넉넉히.
+    // hub 3장 카드 진입 화면 확인 — cold custom Next dev 컴파일 흡수를 위해 첫 단언만 넉넉히.
     await expect(page.getByRole("button").filter({ hasText: "불량 격리" })).toBeVisible({ timeout: 30_000 });
 
     // ── 격리 ──────────────────────────────────────────────

@@ -1,11 +1,8 @@
 /**
  * e2e 공용 헬퍼.
  *
- * loginAsOperator — MesLoginGate 우회. 게이트는 3중 검증을 하므로 고정값 inject 로는 부족하다:
- *   1) sessionStorage.dexcowin_mes_operator (employee_id·name 필수)
- *   2) sessionStorage.dexcowin_mes_boot_id == GET /api/app-session 의 boot_id
- *   3) employee_id ∈ GET /api/employees?active_only=true (실재 활성 직원)
- * → 런타임에 두 API 를 조회해 실재 직원 + 현재 boot_id 를 inject 한다.
+ * loginAsOperator — globalSetup이 실제 발급한 HttpOnly cookie 세션을 새 browser context에 복제한다.
+ * MesLoginGate는 이후 GET /api/operator-session 응답을 정본으로 화면 cache를 복원한다.
  */
 import { expect, type Page } from "@playwright/test";
 
@@ -19,6 +16,28 @@ export interface OperatorLike {
   department_role: string;
   theme: string | null;
   assigned_model_slots: number[];
+}
+
+interface StoredOperatorCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: number;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: "Strict" | "Lax" | "None";
+}
+
+interface E2ESeed {
+  rawItem: any;
+  parentItem: any;
+  warehouseEmployee: any;
+  departmentEmployee: any;
+  plainEmployee: any;
+  defaultPinEmployee: any;
+  operatorPin: string;
+  operatorAuth: Record<string, StoredOperatorCookie>;
 }
 
 function toOperator(emp: any): OperatorLike {
@@ -36,39 +55,39 @@ function toOperator(emp: any): OperatorLike {
 }
 
 /**
- * 로그인 게이트를 통과하도록 sessionStorage 를 inject 한다. page.goto 전에 호출할 것.
- * @param opts.role "warehouse" | "department" — 해당 역할 primary(없으면 deputy) 직원 우선 선택.
+ * 테스트별 browser context의 cookie jar에 setup이 실제 발급한 작업자 세션을 복제한다.
+ * @param opts.role "warehouse" | "department" — globalSetup이 지정한 역할 직원 선택.
  * @param opts.code 특정 employee_code 직원으로 로그인(2-세션 결재 테스트용). role 보다 우선.
  */
 export async function loginAsOperator(
   page: Page,
   opts: { role?: "warehouse" | "department"; code?: string } = {},
 ): Promise<OperatorLike> {
-  const session = await (await page.request.get("/api/app-session")).json();
-  const emps: any[] = await (await page.request.get("/api/employees?active_only=true")).json();
-
-  const roleKey =
-    opts.role === "warehouse"
-      ? "warehouse_role"
-      : opts.role === "department"
-        ? "department_role"
-        : null;
+  const seed = readSeed();
+  const preparedEmployees = [seed.warehouseEmployee, seed.departmentEmployee, seed.plainEmployee];
   const emp =
-    (opts.code && emps.find((e) => e.employee_code === opts.code)) ||
-    (roleKey &&
-      (emps.find((e) => e[roleKey] === "primary") || emps.find((e) => e[roleKey] === "deputy"))) ||
-    emps[0];
-  if (!emp) throw new Error("활성 직원이 없습니다 — globalSetup 시드 확인 필요");
+    (opts.code && preparedEmployees.find((employee) => employee.employee_code === opts.code)) ||
+    (opts.role === "warehouse" && seed.warehouseEmployee) ||
+    (opts.role === "department" && seed.departmentEmployee) ||
+    (!opts.code && !opts.role && seed.plainEmployee);
+  if (!emp) throw new Error("요청한 E2E 작업자의 준비된 세션이 없습니다 — globalSetup 시드 확인 필요");
 
-  const op = toOperator(emp);
-  await page.addInitScript(
-    ([o, bootId]) => {
-      sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify(o));
-      sessionStorage.setItem("dexcowin_mes_boot_id", bootId as string);
-    },
-    [op, session.boot_id] as [OperatorLike, string],
-  );
-  return op;
+  const authCookie = seed.operatorAuth[emp.employee_id];
+  if (!authCookie || !authCookie.httpOnly || authCookie.name !== "dexcowin_operator_session") {
+    throw new Error(`E2E 작업자 ${emp.employee_code}의 HttpOnly operator cookie가 없습니다.`);
+  }
+
+  await page.context().clearCookies({
+    name: /^dexcowin_(operator_session|pin_change_challenge)$/,
+  });
+  await page.context().addCookies([authCookie]);
+
+  const restored = await page.request.get("/api/operator-session");
+  const body = await restored.text();
+  expect(restored.status(), body).toBe(200);
+  const session = JSON.parse(body) as { employee: any };
+  expect(session.employee.employee_id).toBe(emp.employee_id);
+  return toOperator(session.employee);
 }
 
 /**
@@ -111,14 +130,7 @@ export async function advanceToQuantityStep(page: Page): Promise<void> {
 }
 
 /** globalSetup 이 저장한 시드(.e2e-seed.json) 를 읽어 테스트에서 품목/직원 식별자에 접근. */
-export function readSeed(): {
-  rawItem: any;
-  parentItem: any;
-  warehouseEmployee: any;
-  departmentEmployee: any;
-  plainEmployee: any;
-} {
+export function readSeed(): E2ESeed {
   // require 로 읽으면 Playwright 워커마다 캐시됨 — 정적 시드라 무방.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require("./.e2e-seed.json");
 }

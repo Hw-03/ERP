@@ -23,7 +23,7 @@ from app.models import WarehouseBox, WarehouseBoxItem
 from app.routers.warehouse_map import boxes as boxes_router
 from app.schemas import WarehouseBoxMove
 from app.services import warehouse_map as warehouse_map_service
-from app.services.inventory import consume_warehouse
+from app.services.inventory import _consume_warehouse
 
 
 TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL")
@@ -250,7 +250,7 @@ def test_direct_deplete_locks_inventory_boxes_and_contents_before_r1_depletion()
         depletion_rows=[content],
     )
 
-    warehouse_map_service.deplete_boxes_by_order(session, item_id, 1)
+    warehouse_map_service._deplete_boxes_by_order(session, item_id, 1)
 
     statements = _locking_statements(session)
     assert [
@@ -688,7 +688,7 @@ def test_postgres_outbound_blocks_actual_admin_move_until_commit(monkeypatch):
             session_b.execute(text("SELECT pg_backend_pid()")).scalar_one()
         )
 
-        consume_warehouse(session_a, item_id, 1)
+        _consume_warehouse(session_a, item_id, 1)
         assert (
             session_a.query(WarehouseBoxItem.quantity)
             .filter(WarehouseBoxItem.box_id == box_id)

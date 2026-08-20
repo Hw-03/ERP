@@ -2,11 +2,12 @@
 
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, status
+from fastapi import Depends, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.warehouse_manager import require_warehouse_manager
 from app.models import (
     Employee,
@@ -25,7 +26,7 @@ from app.schemas import (
 )
 from app.services import warehouse_map as wm_service
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 def _validate_items(db: Session, items: List[WarehouseBoxItemPayload]) -> None:

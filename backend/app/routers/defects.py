@@ -14,17 +14,21 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import Depends, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+)
 from app.models import (
     BOM,
     DepartmentEnum,
-    Employee,
     InventoryLocation,
     Item,
     LocationStatusEnum,
@@ -34,10 +38,9 @@ from app.models import (
 from app.routers._errors import ErrorCode, http_error
 from app.services import defect_actions as defect_actions_svc
 from app._evt import emit as _evt_emit
-from app._actor import set_actor
 from app.repositories import item_repository
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 # ---------------------------------------------------------------------------
@@ -298,8 +301,16 @@ def get_defect_kpi(db: Session = Depends(get_db)):
 
 
 @router.post("/quarantine", response_model=DefectActionResult)
-def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
+def quarantine(
+    payload: QuarantineRequest,
+    http_request: Request,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
+    payload = payload.model_copy(update={"actor_employee_id": actor.employee_id})
+
     # 멱등성: 동일 키뿐 아니라 같은 격리 명령임이 확인될 때만 성공으로 재사용한다.
     if payload.client_request_id:
         existing = _find_client_request_log(db, payload.client_request_id)
@@ -307,11 +318,6 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             if _matches_quarantine_request(existing, payload):
                 return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
             raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
-
-    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    set_actor(http_request, actor)
 
     item = item_repository.get(db, payload.item_id)
     if item is None:
@@ -369,12 +375,15 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
 
 
 @router.post("/unquarantine", response_model=DefectActionResult)
-def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Session = Depends(get_db)):
+def unquarantine(
+    payload: UnquarantineRequest,
+    http_request: Request,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+):
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
-    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    set_actor(http_request, actor)
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
+    payload = payload.model_copy(update={"actor_employee_id": actor.employee_id})
 
     item = item_repository.get(db, payload.item_id)
     if item is None:

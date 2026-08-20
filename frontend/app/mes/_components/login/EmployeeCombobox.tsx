@@ -117,8 +117,8 @@ export function EmployeeCombobox({
         setActive(Math.max(filtered.length - 1, 0));
       }
     } else if (e.key === "Enter") {
+      e.preventDefault();
       if (open && filtered[active]) {
-        e.preventDefault();
         commit(filtered[active]);
       }
     } else if (e.key === "Tab") {

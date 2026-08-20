@@ -9,12 +9,18 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import Depends, Query, status
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, aliased
 
-from app._actor import get_actor_emp, set_actor
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    CurrentActor,
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+    ensure_actor_employee_name,
+)
 from app.models import (
     DepartmentEnum,
     Employee,
@@ -55,7 +61,7 @@ from app.services.shipping import ShippingConflictError, ShippingError
 from app.utils.search import build_normalized_search_filter
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 _COMPONENT_CHANGE_DEPARTMENTS = {
     DepartmentEnum.ASSEMBLY.value,
@@ -263,7 +269,7 @@ def _to_response(
         ],
         stock_shortages=[
             ShippingStockShortageResponse(**shortage)
-            for shortage in shipping_svc.prepare_stock_shortages(db, req)
+            for shortage in shipping_svc._prepare_stock_shortages(db, req)
         ],
         transaction_count=len(tx_rows),
     )
@@ -312,31 +318,6 @@ def _load_component_change_requester(
     return requester
 
 
-def _load_component_change_actor(http_request: Request, db: Session) -> Employee:
-    employee_code = get_actor_emp(http_request)
-    if employee_code == "-":
-        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "작업자 사번 헤더가 필요합니다.")
-    requester = db.query(Employee).filter(Employee.employee_code == employee_code).first()
-    if requester is None:
-        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자(직원)를 찾을 수 없습니다.")
-    _validate_component_change_actor(requester)
-    set_actor(http_request, requester)
-    return requester
-
-
-def _load_shipping_actor(http_request: Request, db: Session) -> Employee:
-    employee_code = get_actor_emp(http_request)
-    if employee_code == "-":
-        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "작업자 사번 헤더가 필요합니다.")
-    actor = db.query(Employee).filter(Employee.employee_code == employee_code).first()
-    if actor is None:
-        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자 직원을 찾을 수 없습니다.")
-    if not bool(actor.is_active):
-        raise http_error(status.HTTP_403_FORBIDDEN, ErrorCode.FORBIDDEN, "비활성 직원은 출하 요청을 수정할 수 없습니다.")
-    set_actor(http_request, actor)
-    return actor
-
-
 @router.get("/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
 def component_change_preview_independent(
     requester_employee_id: uuid.UUID = Query(...),
@@ -362,10 +343,10 @@ def component_change_preview_independent(
 @router.post("/component-change", response_model=ShippingComponentChangeResultResponse)
 def component_change_independent(
     payload: ShippingComponentChangeExecuteRequest,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    requester = _load_component_change_actor(http_request, db)
+    _validate_component_change_actor(actor)
 
     if payload.target_pa_item_id is None:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, "대상 PA를 선택해야 합니다.")
@@ -377,8 +358,7 @@ def component_change_independent(
             payload.quantity,
             payload.memo,
             payload.requested_mode,
-            requester_name=requester.name,
-            requester_employee_id=requester.employee_id,
+            actor=actor,
         )
         return ShippingComponentChangeResultResponse(
             **{key: value for key, value in result.items() if key != "transactions"},
@@ -416,8 +396,10 @@ def get_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.post("/requests", response_model=ShippingRequestResponse, status_code=status.HTTP_201_CREATED)
 def create_request(
     payload: ShippingRequestCreate,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
+    ensure_actor_employee_name(actor, payload.requested_by_name)
     req = _action_or_422(
         db,
         shipping_actions_svc.create_request,
@@ -425,7 +407,7 @@ def create_request(
             "base_pf_item_id": payload.base_pf_item_id,
             "finalization_mode": payload.finalization_mode,
             "reuse_pf_item_id": payload.reuse_pf_item_id,
-            "requested_by_name": payload.requested_by_name,
+            "requested_by_name": actor.name,
             "request_quantity": payload.request_quantity,
             "custom_pa_name": payload.custom_pa_name,
             "custom_pf_name": payload.custom_pf_name,
@@ -434,6 +416,7 @@ def create_request(
             "bom_lines": _line_payload(payload.bom_lines),
             "companion_lines": _companion_payload(payload.companion_lines),
         },
+        actor,
     )
     return _to_response(db, req)
 
@@ -442,11 +425,13 @@ def create_request(
 def update_request(
     request_id: uuid.UUID,
     payload: ShippingRequestUpdate,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
+    ensure_actor_employee_name(actor, payload.requested_by_name)
     update = payload.model_dump(exclude_unset=True)
+    if "requested_by_name" in update:
+        update["requested_by_name"] = actor.name
     if "bom_lines" in update:
         update["bom_lines"] = _line_payload(payload.bom_lines)
     if "companion_lines" in update:
@@ -456,8 +441,7 @@ def update_request(
 
 
 @router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_request(request_id: uuid.UUID, http_request: Request, db: Session = Depends(get_db)):
-    actor = _load_shipping_actor(http_request, db)
+def delete_request(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
     _action_or_422(db, shipping_actions_svc.delete_request, request_id, actor)
     return None
 
@@ -466,10 +450,9 @@ def delete_request(request_id: uuid.UUID, http_request: Request, db: Session = D
 def update_invoice(
     request_id: uuid.UUID,
     payload: ShippingInvoiceUpdate,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
     req = _action_or_422(
         db,
         shipping_actions_svc.update_invoice,
@@ -492,48 +475,55 @@ def list_revisions(request_id: uuid.UUID, db: Session = Depends(get_db)):
     return [_revision_response(row) for row in rows]
 
 @router.post("/requests/{request_id}/send-to-prep", response_model=ShippingRequestResponse)
-def send_to_prep(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.send_to_prep, request_id)
+def send_to_prep(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
+    req = _action_or_422(db, shipping_actions_svc.send_to_prep, request_id, actor)
     return _to_response(db, req)
 
 
 @router.patch("/requests/{request_id}/checklist", response_model=ShippingRequestResponse)
-def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, db: Session = Depends(get_db)):
+def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, actor: VerifiedActor, db: Session = Depends(get_db)):
     checks = {line.item_id: line.checked for line in payload.checks}
-    req = _action_or_422(db, shipping_actions_svc.update_checklist, request_id, checks)
+    req = _action_or_422(db, shipping_actions_svc.update_checklist, request_id, checks, actor)
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/checklist/clear", response_model=ShippingRequestResponse)
-def clear_checklist(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.clear_checklist, request_id)
+def clear_checklist(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
+    req = _action_or_422(db, shipping_actions_svc.clear_checklist, request_id, actor)
     return _to_response(db, req)
 
 
 @router.get("/requests/{request_id}/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
 def component_change_preview(
     request_id: uuid.UUID,
-    requester_employee_id: uuid.UUID = Query(...),
+    actor: CurrentActor,
     source_pa_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
+    requester_employee_id: uuid.UUID | None = Query(None),
     requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
-    _load_component_change_requester(requester_employee_id, db)
-    try:
-        return shipping_svc.component_change_preview(db, request_id, source_pa_item_id, quantity, requested_mode)
-    except ShippingError as exc:
-        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
+    _validate_component_change_actor(actor)
+    ensure_actor_employee_id(actor, requester_employee_id)
+    return _action_or_422(
+        db,
+        shipping_actions_svc.component_change_preview,
+        request_id,
+        source_pa_item_id,
+        quantity,
+        requested_mode,
+        actor=actor,
+    )
 
 
 @router.post("/requests/{request_id}/component-change", response_model=ShippingRequestResponse)
 def component_change(
     request_id: uuid.UUID,
     payload: ShippingComponentChangeExecuteRequest,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    requester = _load_component_change_actor(http_request, db)
+    _validate_component_change_actor(actor)
     req = _action_or_422(
         db,
         shipping_actions_svc.execute_component_change,
@@ -542,8 +532,7 @@ def component_change(
         payload.quantity,
         payload.requested_mode,
         payload.memo,
-        requester_name=requester.name,
-        requester_employee_id=requester.employee_id,
+        actor=actor,
     )
     return _to_response(db, req)
 
@@ -552,36 +541,40 @@ def component_change(
 def prepare_complete(
     request_id: uuid.UUID,
     payload: ShippingPrepareCompleteRequest,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
     req = _action_or_422(
         db,
         shipping_actions_svc.prepare_complete,
         request_id,
         payload.serial_numbers,
-        prepared_by_employee_id=actor.employee_id,
-        prepared_by_name=actor.name,
+        actor=actor,
     )
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/prepare-cancel", response_model=ShippingRequestResponse)
-def prepare_cancel(request_id: uuid.UUID, payload: ShippingPrepareCancelRequest, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.prepare_cancel, request_id, payload.reason)
+def prepare_cancel(request_id: uuid.UUID, payload: ShippingPrepareCancelRequest, actor: VerifiedActor, db: Session = Depends(get_db)):
+    req = _action_or_422(
+        db,
+        shipping_actions_svc.prepare_cancel,
+        request_id,
+        payload.reason,
+        actor=actor,
+    )
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/pickup-complete", response_model=ShippingRequestResponse)
-def pickup_complete(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.pickup_complete, request_id)
+def pickup_complete(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
+    req = _action_or_422(db, shipping_actions_svc.pickup_complete, request_id, actor)
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/pickup-cancel", response_model=ShippingRequestResponse)
-def pickup_cancel(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.pickup_cancel, request_id)
+def pickup_cancel(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
+    req = _action_or_422(db, shipping_actions_svc.pickup_cancel, request_id, actor)
     return _to_response(db, req)
 
 

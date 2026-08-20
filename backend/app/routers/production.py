@@ -5,10 +5,16 @@ import uuid
 from decimal import Decimal
 from typing import List, Tuple
 
-from fastapi import APIRouter, Depends, status
+from fastapi import Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_code,
+    ensure_actor_employee_name,
+)
 from app.models import Item
 from app.schemas import (
     BomCheckResponse,
@@ -28,11 +34,10 @@ from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.services.production_capacity import compute_capacity
 from app.routers._errors import ErrorCode, http_error
-from app.routers.inventory._tx_helper import resolve_producer
 from app.repositories import item_repository
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 logger = logging.getLogger("mes")
 
@@ -45,17 +50,28 @@ logger = logging.getLogger("mes")
 )
 def production_receipt(
     payload: ProductionReceiptRequest,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
+    ensure_actor_employee_code(actor, payload.producer_employee_code)
+    ensure_actor_employee_name(actor, payload.produced_by)
+    payload = payload.model_copy(
+        update={
+            "producer_employee_code": actor.employee_code,
+            "produced_by": actor.name,
+        }
+    )
+
     produced_item = item_repository.get(db, payload.item_id)
     if not produced_item:
         raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
 
-    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
-
     try:
         result = production_receipt_svc.execute_production_receipt(
-            db, payload, produced_item, producer_name, producer_id,
+            db,
+            payload,
+            produced_item,
+            actor=actor,
         )
     except ProductionItemNotFound as exc:
         raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, str(exc))

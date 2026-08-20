@@ -136,10 +136,10 @@ function Test-ServiceProcessOwned {
 
     $frontendRoot = [regex]::Escape(([System.IO.Path]::GetFullPath((Join-Path $RepoRoot "frontend"))).TrimEnd('\'))
     $nodeExecutable = '(?:"[^"\r\n]*[\\/]node\.exe"|node(?:\.exe)?)'
-    $nextScript = $frontendRoot +
-        '[\\/]node_modules[\\/](?:\.pnpm[\\/][^\\/"\s]+[\\/]node_modules[\\/])?' +
-        'next[\\/]dist[\\/]server[\\/]lib[\\/]start-server\.js'
-    $frontendPattern = '^\s*' + $nodeExecutable + '\s+"?' + $nextScript + '"?\s*$'
+    $nextScript = $frontendRoot + '[\\/]scripts[\\/]next-server\.js'
+    $frontendPattern = '^\s*' + $nodeExecutable + '\s+"?' + $nextScript +
+        '"?\s+(?:dev|start)\s+--hostname\s+[^\s"]+\s+--port\s+' +
+        [regex]::Escape([string] $Port) + '\s*$'
     return $CommandLine -match $frontendPattern
 }
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import hashlib
 from typing import Any
 
 import pytest
@@ -15,6 +16,8 @@ from app.database import Base
 from app.main import app
 from app.models import (
     AdminAuditLog,
+    Employee,
+    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     Item,
@@ -22,6 +25,8 @@ from app.models import (
     ProcessType,
     SystemSetting,
 )
+from app.runtime_identity import current_boot_id
+from app.services.operator_session import OPERATOR_SESSION_COOKIE, create_session
 from app.services.pin_auth import hash_pin
 
 
@@ -147,6 +152,24 @@ def integrity_request_db(tmp_path, monkeypatch):
     )
 
     with request_sessions() as setup:
+        actor = Employee(
+            employee_code="INTEGRITY-ADMIN",
+            name="Integrity admin",
+            role="admin",
+            department="관리",
+            level=EmployeeLevelEnum.ADMIN,
+            is_active=True,
+            pin_hash=hash_pin("2468"),
+            pin_requires_change=False,
+        )
+        setup.add(actor)
+        setup.flush()
+        issued = create_session(
+            setup,
+            employee_id=actor.employee_id,
+            purpose="operator",
+            boot_id=current_boot_id(),
+        )
         setup.add(ProcessType(code="TR", prefix="T", suffix="R", stage_order=10))
         setup.add(SystemSetting(setting_key="admin_pin", setting_value=hash_pin("0000")))
         for serial_no, recorded, warehouse, location in (
@@ -194,6 +217,7 @@ def integrity_request_db(tmp_path, monkeypatch):
     monkeypatch.setattr(database, "SessionLocal", request_sessions)
     app.dependency_overrides.pop(database.get_db, None)
     with TestClient(app, raise_server_exceptions=False) as request_client:
+        request_client.cookies.set(OPERATOR_SESSION_COOKIE, issued.token)
         yield request_client, engine, observer
 
     Base.metadata.drop_all(bind=engine)
@@ -236,7 +260,8 @@ def test_integrity_inventory_get_authenticates_without_persisting_pin_changes(
     response = request_client.request(
         "GET",
         "/api/settings/integrity/inventory",
-        params={"pin": "0000", "limit": 50},
+        headers={"X-Admin-Pin": "0000"},
+        params={"limit": 50},
     )
 
     assert response.status_code == 200, response.text
@@ -255,14 +280,11 @@ def test_integrity_inventory_post_rejects_wrong_pin(client):
     assert resp.status_code == 403
 
 
-def test_integrity_inventory_get_compatibility_is_kept(client, make_item):
-    make_item(name="정합성 GET 호환", warehouse_qty=Decimal("2"))
+def test_integrity_inventory_get_rejects_query_pin(client, make_item):
+    make_item(name="정합성 GET query 거부", warehouse_qty=Decimal("2"))
 
     resp = client.get("/api/settings/integrity/inventory", params={"pin": "0000", "limit": 10})
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["checked"] == 1
-    assert body["mismatched_count"] == 0
+    assert resp.status_code == 400, resp.text
 
 
 
@@ -376,8 +398,152 @@ def test_integrity_repair_migrates_legacy_pin_in_the_single_final_commit(
     assert _audit_rows(engine) == [
         ("settings.integrity_repair", "settings", "inventory", "repaired 2 rows")
     ]
-    assert _admin_pin_value(engine) == hash_pin("0000")
+    assert _admin_pin_value(engine) == hashlib.sha256(b"0000").hexdigest()
     assert observer["commits"] == 1
+
+
+@pytest.mark.parametrize("pin_state", ["legacy", "missing"])
+def test_admin_pin_update_persists_in_the_single_final_commit(
+    integrity_request_db,
+    pin_state,
+):
+    request_client, engine, observer = integrity_request_db
+    with engine.begin() as connection:
+        if pin_state == "legacy":
+            connection.execute(
+                text(
+                    "UPDATE system_settings SET setting_value = '0000' "
+                    "WHERE setting_key = 'admin_pin'"
+                )
+            )
+        else:
+            connection.execute(
+                text("DELETE FROM system_settings WHERE setting_key = 'admin_pin'")
+            )
+
+    response = request_client.put(
+        "/api/settings/admin-pin",
+        json={"current_pin": "0000", "new_pin": "1357"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert _admin_pin_value(engine) == hashlib.sha256(b"1357").hexdigest()
+    assert observer["commits"] == 1
+    assert observer["audit_adds"] == 1
+
+
+def test_admin_pin_update_requests_exclusive_admin_setting_lock(
+    integrity_request_db,
+    monkeypatch,
+):
+    from app.routers import settings
+
+    request_client, _engine, _observer = integrity_request_db
+    real_ensure_admin_pin = settings.ensure_admin_pin
+    lock_requests: list[bool] = []
+
+    def _ensure_admin_pin(
+        db,
+        *,
+        commit_if_created: bool = True,
+        lock_for_update: bool = False,
+    ):
+        lock_requests.append(lock_for_update)
+        return real_ensure_admin_pin(
+            db,
+            commit_if_created=commit_if_created,
+            lock_for_update=lock_for_update,
+        )
+
+    monkeypatch.setattr(settings, "ensure_admin_pin", _ensure_admin_pin)
+
+    response = request_client.put(
+        "/api/settings/admin-pin",
+        json={"current_pin": "0000", "new_pin": "1357"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert lock_requests == [True]
+
+
+def test_admin_pin_verify_requests_exclusive_admin_setting_lock(
+    integrity_request_db,
+    monkeypatch,
+):
+    from app.routers import settings
+
+    request_client, _engine, _observer = integrity_request_db
+    real_ensure_admin_pin = settings.ensure_admin_pin
+    lock_requests: list[bool] = []
+
+    def tracked_ensure_admin_pin(
+        db,
+        *,
+        commit_if_created: bool = True,
+        lock_for_update: bool = False,
+    ):
+        lock_requests.append(lock_for_update)
+        return real_ensure_admin_pin(
+            db,
+            commit_if_created=commit_if_created,
+            lock_for_update=lock_for_update,
+        )
+
+    monkeypatch.setattr(settings, "ensure_admin_pin", tracked_ensure_admin_pin)
+
+    response = request_client.post(
+        "/api/settings/verify-pin",
+        json={"pin": "0000"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert lock_requests == [True]
+
+
+def test_settings_admin_pin_failures_share_dependency_rate_limit(
+    integrity_request_db,
+):
+    request_client, _engine, _observer = integrity_request_db
+
+    failed_attempts = [
+        ("POST", "/api/settings/verify-pin", {"json": {"pin": "9999"}}),
+        (
+            "PUT",
+            "/api/settings/admin-pin",
+            {"json": {"current_pin": "9999", "new_pin": "1357"}},
+        ),
+        (
+            "GET",
+            "/api/settings/integrity/inventory",
+            {
+                "headers": {"X-Admin-Pin": "9999"},
+                "params": {"limit": 1},
+            },
+        ),
+        (
+            "POST",
+            "/api/settings/integrity/inventory",
+            {"json": {"pin": "9999", "limit": 1}},
+        ),
+        (
+            "POST",
+            "/api/settings/integrity/repair",
+            {"json": {"pin": "9999", "dry_run": True}},
+        ),
+    ]
+
+    for _ in range(2):
+        for method, path, kwargs in failed_attempts:
+            response = request_client.request(method, path, **kwargs)
+            assert response.status_code == 403, response.text
+
+    blocked = request_client.get(
+        "/api/admin/audit-logs",
+        headers={"X-Admin-Pin": "0000"},
+    )
+
+    assert blocked.status_code == 429, blocked.text
+    assert blocked.json()["detail"]["code"] == "TOO_MANY_REQUESTS"
 
 
 def test_integrity_repair_dry_run_does_not_create_missing_admin_pin(
@@ -423,7 +589,7 @@ def test_integrity_repair_creates_missing_admin_pin_in_the_single_final_commit(
         ("settings.integrity_repair", "settings", "inventory", "repaired 2 rows")
     ]
     assert _admin_pin_count(engine) == 1
-    assert _admin_pin_value(engine) == hash_pin("0000")
+    assert _admin_pin_value(engine) == hashlib.sha256(b"0000").hexdigest()
     assert observer["commits"] == 1
 
 

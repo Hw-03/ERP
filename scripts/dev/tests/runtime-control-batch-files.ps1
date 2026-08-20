@@ -199,7 +199,7 @@ Assert-ContentMatch $RuntimeControlScript 'terminatedPids\s*=\s*@\(\$terminatedP
 Assert-ContentMatch $RuntimeControlScript '(?s)state\.status\s+-eq\s+"crash_loop".*?Recover-CrashLoopPortListeners.*?restart-reset' "crash-loop supervisors must recover an owned listener conflict before a restart reset."
 Assert-ContentMatch $RuntimeControlScript '(?s)port_conflict.*crash_loop' "runtime-control.ps1 must record crash-loop listener ownership conflicts."
 Assert-ContentMatch $RuntimeControlScript 'MES_SUPERVISED_FRONTEND\s*=\s*"1"' "runtime-control.ps1 must mark the supervised frontend child."
-Assert-ContentMatch $RuntimeControlScript '(?s)\$frontendMode\s*=\s*if.*?Profile\.Name.*?employee.*?start.*?dev.*?MES_FRONTEND_MODE\s*=\s*\$frontendMode' "runtime-control.ps1 must run only the employee frontend with next start."
+Assert-ContentMatch $RuntimeControlScript '(?s)\$frontendMode\s*=\s*if.*?Profile\.Name.*?employee.*?start.*?dev.*?MES_FRONTEND_MODE\s*=\s*\$frontendMode' "runtime-control.ps1 must run only the employee frontend in production mode."
 Assert-ContentMatch $RuntimeControlScript 'BACKEND_INTERNAL_URL' "runtime-control.ps1 must pass the profile backend URL to the frontend child."
 Assert-ContentMatch $RuntimeControlScript 'health/live' "runtime-control.ps1 must verify direct backend health before starting the frontend."
 Assert-ContentMatch $RuntimeControlScript 'backend_proxy_mismatch' "runtime-control.ps1 must record a backend proxy boot-id mismatch."
@@ -210,7 +210,7 @@ Assert-ContentMatch $RuntimeControlScript '(?s)function\s+Invoke-ProfileFrontend
 Assert-ContentMatch $RuntimeControlScript '(?s)frontend-startup.*?System\.Threading\.Mutex|System\.Threading\.Mutex.*?frontend-startup' "frontend startup orchestration must serialize each profile with a dedicated mutex."
 Assert-ContentMatch $RuntimeControlScript '(?s)attempt\s*=\s*2.*?Stop-SupervisedService.*?persistent-proxy-mismatch.*?throw' "a persistent proxy mismatch must stop the stale frontend before failing."
 Assert-ContentMatch $RuntimeControlScript '\$frontendPattern\s*=\s*''\^\\s\*''' "frontend listener ownership must anchor the complete command line."
-Assert-ContentMatch $RuntimeControlScript 'start-server\\\.js' "frontend listener ownership must require Next start-server.js."
+Assert-ContentMatch $RuntimeControlScript 'scripts.*next-server\\\.js' "frontend listener ownership must require the repository custom Next server."
 Assert-ContentMatch $RuntimeControlScript '(?s)function\s+Test-ServiceProcessOwned.*?TrustedAncestorPids.*?Test-ProcessDescendsFrom' "backend listener ownership must require trusted supervisor ancestry."
 Assert-ContentMatch $RuntimeControlScript '(?s)candidateExpectedStarts.*Test-ProcessStartMatches.*Stop-ProcessTree' "runtime-control.ps1 must revalidate orphan PID creation time immediately before stopping it."
 Assert-ContentMatch $RuntimeControlScript '(?s)candidateToleranceSeconds.*0\.25.*Test-ProcessStartMatches.*ToleranceSeconds' "runtime-control.ps1 must preserve the legacy PID tolerance during final ownership validation."
@@ -230,8 +230,8 @@ $currentStartedAt = (Get-Process -Id $PID).StartTime.ToString("o")
 if (-not $currentCommandLine -or $currentCommandLine -notmatch 'powershell') {
     throw "runtime-control.ps1 must return the current process command line on Windows PowerShell 5.1."
 }
-$devNextCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\node_modules\next\dist\server\lib\start-server.js'
-$employeeNextCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP-dev\frontend\node_modules\next\dist\server\lib\start-server.js'
+$devNextCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\scripts\next-server.js dev --hostname 0.0.0.0 --port 3001'
+$employeeNextCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP-dev\frontend\scripts\next-server.js start --hostname 0.0.0.0 --port 3000'
 if (-not (Test-ServiceProcessOwned -Service "frontend" -Port 3001 -RepoRoot "C:\ERP" -CommandLine $devNextCommand)) {
     throw "runtime-control.ps1 must recognize the current profile's Next.js listener."
 }

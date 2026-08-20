@@ -4,9 +4,9 @@
  * 창고 지도 탭 — 보기(전 직원) + 편집(창고 정/부 관리자 전용).
  *
  * 일반 직원: 읽기 전용 지도(DesktopWarehouseMapView)만.
- * 창고 정/부 관리자(warehouse_role primary/deputy): "편집 모드" 토글 → 본인 PIN 확인 →
+ * 창고 정/부 관리자(warehouse_role primary/deputy): "편집 모드" 토글 → 본인 PIN 입력 →
  *   박스 관리(이동·넣기·빼기·편집) / 구조 편집 노출. 편집 쓰기는 X-Employee-Code + X-Operator-Pin 으로
- *   백엔드 require_warehouse_manager 가 검증(api-core operator 자격증명 주입).
+ *   현재 세션 actor를 백엔드 require_warehouse_manager 가 step-up 검증(api-core mutation 전용 주입).
  *
  * "박스 관리"는 DesktopWarehouseMapView(editable)에서 드래그 이동 + 칸 패널 박스 넣기/빼기를
  *   한 화면에 통합한다. "구조 편집"(AdminWarehouseStructureSection)은 앵글·통로·PL 구조물 단위라 분리 유지.
@@ -15,7 +15,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Eye, Pencil, ShieldCheck } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { employeesApi } from "@/lib/api/employees";
 import { itemsApi } from "@/lib/api/items";
 import { warehouseMapApi, type ReconcileRow } from "@/lib/api/warehouse-map";
 import { registerOperatorCredsProvider } from "@/lib/api-core";
@@ -47,8 +46,6 @@ export function DesktopWarehouseMapTab({
   const [editMode, setEditMode] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [pin, setPin] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [pinError, setPinError] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [editorTab, setEditorTab] = useState<"map" | "structure">("map");
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -128,24 +125,21 @@ export function DesktopWarehouseMapTab({
     };
   }, []);
 
-  async function confirmPin() {
+  function confirmPin() {
     if (!operator || !pin) return;
-    setVerifying(true);
-    setPinError(null);
-    try {
-      await employeesApi.verifyEmployeePin(operator.employee_id, pin);
-      credsRef.current = { code: operator.employee_code, pin };
-      await refreshItems();
-      void refreshMismatches();
-      setEditMode(true);
-      setPinOpen(false);
-      setPin("");
-      onStatusChange?.("창고 지도 편집 모드");
-    } catch (e) {
-      setPinError(e instanceof Error ? e.message : "PIN 확인에 실패했습니다.");
-    } finally {
-      setVerifying(false);
-    }
+    credsRef.current = { code: operator.employee_code, pin };
+    editModeRef.current = true;
+    const requestRevision = currentRevisionRef.current;
+    appliedItemsRevisionRef.current = requestRevision;
+    appliedReconcileRevisionRef.current = requestRevision;
+    setEditMode(true);
+    setPinOpen(false);
+    setPin("");
+    void refreshItems(requestRevision).catch((error: unknown) => {
+      setEditorError(error instanceof Error ? error.message : "품목 조회에 실패했습니다.");
+    });
+    void refreshMismatches(requestRevision);
+    onStatusChange?.("창고 지도 편집 모드");
   }
 
   function exitEditMode() {
@@ -207,7 +201,6 @@ export function DesktopWarehouseMapTab({
                   if (e.key === "Escape") {
                     setPinOpen(false);
                     setPin("");
-                    setPinError(null);
                   }
                 }}
                 placeholder="본인 PIN"
@@ -217,24 +210,18 @@ export function DesktopWarehouseMapTab({
               <button
                 type="button"
                 onClick={() => void confirmPin()}
-                disabled={verifying || !pin}
+                disabled={!pin}
                 className="rounded-[12px] px-3 py-2 text-[13px] font-bold text-white transition-colors disabled:opacity-50"
                 style={{ background: LEGACY_COLORS.blueSolid }}
               >
-                {verifying ? "확인 중…" : "편집 시작"}
+                편집 시작
               </button>
-              {pinError && (
-                <span className="text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>
-                  {pinError}
-                </span>
-              )}
             </div>
           ) : (
             <button
               type="button"
               onClick={() => {
                 setPinOpen(true);
-                setPinError(null);
               }}
               className="flex items-center gap-1.5 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-[1.04]"
               style={{ background: LEGACY_COLORS.blueSolid }}

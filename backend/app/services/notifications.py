@@ -113,7 +113,7 @@ def _add(
     )
 
 
-def notify_request_arrived(db: Session, request: StockRequest) -> None:
+def _notify_request_arrived(db: Session, request: StockRequest) -> None:
     """결재 요청 도착 → 승인 담당자(들) 에게 알림. 요청자 본인은 제외.
 
     호출 안전 — 결재 대기 상태가 아니거나(자가승인 즉시완료 등) 이미 승인된
@@ -162,7 +162,7 @@ def recipients_for_handover(db: Session, to_department: str | None) -> list[Empl
     return [e for e in _active_employees(db) if (e.department or "").strip() == target]
 
 
-def notify_handover_arrived(db: Session, doc: HandoverDoc) -> None:
+def _notify_handover_arrived(db: Session, doc: HandoverDoc) -> None:
     """인수인계 제출 → 받는 부서 인수 담당자에게 알림. 작성자 본인 제외. 세션 add 만."""
     if doc.status != HandoverStatusEnum.SUBMITTED:
         return
@@ -183,7 +183,7 @@ def notify_handover_arrived(db: Session, doc: HandoverDoc) -> None:
         )
 
 
-def notify_request_decided(db: Session, request: StockRequest, *, decision: str) -> None:
+def _notify_request_decided(db: Session, request: StockRequest, *, decision: str) -> None:
     """승인/반려 결과 → 요청자 에게 알림. decision in ('approved', 'rejected')."""
     if decision == "approved":
         ntype = NotificationTypeEnum.APPROVAL_APPROVED

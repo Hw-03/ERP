@@ -142,6 +142,9 @@ export interface ShippingEvent {
   event_id: string;
   event_type: string;
   message: string | null;
+  actor_employee_id: string | null;
+  actor_employee_code: string | null;
+  actor_name: string | null;
   created_at: string;
 }
 

@@ -2,11 +2,12 @@
 
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, status
+from fastapi import Depends, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
 from app.dependencies.warehouse_manager import require_warehouse_manager
 from app.models import (
@@ -31,7 +32,7 @@ from app.schemas import (
 from app.services import warehouse_map as wm_service
 from app.services.warehouse_map import JARI_CAPACITY, SIZE_UNIT
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 @router.put("/box-tracking", response_model=BoxTrackingResponse)
@@ -44,7 +45,7 @@ def set_box_tracking(
 
     켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.
     """
-    wm_service.set_box_tracking_enabled(db, payload.enabled)
+    wm_service._set_box_tracking_enabled(db, payload.enabled)
     db.commit()
     return BoxTrackingResponse(enabled=wm_service.is_box_tracking_enabled(db))
 

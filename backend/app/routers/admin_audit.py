@@ -25,6 +25,7 @@ router = APIRouter()
 class AdminAuditLogResponse(BaseModel):
     audit_id: uuid.UUID
     actor_pin_role: str
+    bootstrap_employee_id: Optional[str] = None
     action: str
     target_type: str
     target_id: Optional[str] = None
@@ -43,7 +44,7 @@ def list_audit_logs(
     target_type: Optional[str] = Query(None),
     since: Optional[datetime] = Query(None, description="이 시각 이후만 (UTC)"),
 ):
-    """최근 감사로그 조회. 관리자 PIN 잠금 화면에서만 호출 (현재 별도 인증 미적용)."""
+    """서버의 관리자 PIN 인증을 거쳐 최근 감사로그를 조회한다."""
     q = db.query(AdminAuditLog).order_by(AdminAuditLog.created_at.desc())
     if action:
         if action.endswith("."):

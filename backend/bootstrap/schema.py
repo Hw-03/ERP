@@ -382,7 +382,24 @@ def _compiled_sql(expression: object, connection: Connection) -> str | None:
 def _compiled_default(column: sa.Column, connection: Connection) -> str | None:
     if column.server_default is None or isinstance(column.server_default, sa.Computed):
         return None
-    return _compiled_sql(column.server_default.arg, connection)
+    return _normalize_server_default(column.server_default.arg, column, connection)
+
+
+def _normalize_server_default(
+    value: object | None,
+    column: sa.Column,
+    connection: Connection,
+) -> str | None:
+    """Treat SQLite Boolean literal spellings as equivalent without hiding polarity."""
+    normalized = _compiled_sql(value, connection)
+    if connection.dialect.name == "sqlite" and isinstance(column.type, sa.Boolean):
+        return {
+            "0": "false",
+            "1": "true",
+            "false": "false",
+            "true": "true",
+        }.get(normalized, normalized)
+    return normalized
 
 
 def _sqlite_computed_sql(
@@ -576,7 +593,11 @@ def schema_differences(connection: Connection) -> tuple[str, ...]:
                 continue
             if connection.dialect.name != "postgresql":
                 expected_default = _compiled_default(column, connection)
-                actual_default = _normalize_sql(actual.get("default"))
+                actual_default = _normalize_server_default(
+                    actual.get("default"),
+                    column,
+                    connection,
+                )
                 if expected_default != actual_default:
                     differences.append(
                         f"server default mismatch: {table_name}.{column.name} "

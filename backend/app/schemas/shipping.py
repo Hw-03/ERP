@@ -203,6 +203,9 @@ class ShippingEventResponse(BaseModel):
     event_id: uuid.UUID
     event_type: str
     message: Optional[str] = None
+    actor_employee_id: Optional[uuid.UUID] = None
+    actor_employee_code: Optional[str] = None
+    actor_name: Optional[str] = None
     created_at: UtcDatetime
 
 

@@ -20,9 +20,15 @@ from app.models import (
     WarehouseBox,
     WarehouseBoxItem,
 )
-from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.services.pin_auth import hash_pin
 from app.services import sr_execution as sr_execution_svc
 from app.services import warehouse_map as warehouse_map_svc
+
+
+@pytest.fixture()
+def client(auth_client):
+    """HTTP 트랜잭션 테스트도 실제 operator session으로 실행한다."""
+    return auth_client
 
 
 def _employee(
@@ -43,11 +49,22 @@ def _employee(
         department_role=department_role,
         display_order=0,
         is_active="true",
-        pin_hash=DEFAULT_PIN_HASH,
+        pin_hash=hash_pin("2468"),
+        pin_requires_change=False,
     )
     db_session.add(employee)
     db_session.flush()
     return employee
+
+
+def _login(client, employee: Employee) -> None:
+    logout = client.delete("/api/operator-session")
+    assert logout.status_code == 204, logout.text
+    response = client.post(
+        "/api/operator-session",
+        json={"employee_id": str(employee.employee_id), "pin": "2468"},
+    )
+    assert response.status_code == 200, response.text
 
 
 def _warehouse_box(db_session, *, item_id, quantity: int) -> WarehouseBox:
@@ -89,12 +106,13 @@ def test_create_rolls_back_request_lines_and_pending_when_notification_fails(
     item = make_item(name="StockRequest create rollback", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-ACT-CREATE", name="요청자")
     db_session.commit()
+    _login(client, requester)
 
     def fail_notification(*_args, **_kwargs) -> None:
         raise RuntimeError("notification failure")
 
     monkeypatch.setattr(
-        "app.routers.stock_requests.notif_svc.notify_request_arrived",
+        "app.routers.stock_requests.notif_svc._notify_request_arrived",
         fail_notification,
     )
 
@@ -130,7 +148,7 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
     make_item,
     monkeypatch,
 ) -> None:
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     item = make_item(name="StockRequest approve rollback", warehouse_qty=Decimal("10"))
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=10)
     requester = _employee(db_session, code="SR-ACT-APP-RQ", name="요청자")
@@ -141,6 +159,7 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
         warehouse_role="primary",
     )
     db_session.commit()
+    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -167,14 +186,15 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
         raise RuntimeError("approval notification failure")
 
     monkeypatch.setattr(
-        "app.routers.stock_requests.notif_svc.notify_request_decided",
+        "app.routers.stock_requests.notif_svc._notify_request_decided",
         fail_notification,
     )
+    _login(client, approver)
 
     with pytest.raises(RuntimeError, match="approval notification failure"):
         client.post(
             f"/api/stock-requests/{request_id}/approve",
-            json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+            json={"actor_employee_id": str(approver.employee_id), "pin": "2468"},
         )
 
     db_session.expire_all()
@@ -195,7 +215,7 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
     make_item,
     monkeypatch,
 ) -> None:
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     item = make_item(name="Department approve rollback", warehouse_qty=Decimal("10"))
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=10)
     requester = _employee(db_session, code="SR-ACT-DEPT-RQ", name="요청자")
@@ -212,6 +232,7 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
         department_role="primary",
     )
     db_session.commit()
+    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -234,10 +255,11 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
     request = db_session.query(StockRequest).filter(StockRequest.request_id == request_id).one()
     request.requires_department_approval = True
     db_session.commit()
+    _login(client, warehouse_approver)
 
     warehouse_approved = client.post(
         f"/api/stock-requests/{request_id}/approve",
-        json={"actor_employee_id": str(warehouse_approver.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(warehouse_approver.employee_id), "pin": "2468"},
     )
     assert warehouse_approved.status_code == 200, warehouse_approved.text
     assert warehouse_approved.json()["status"] == "reserved"
@@ -247,14 +269,15 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
         raise RuntimeError("department approval notification failure")
 
     monkeypatch.setattr(
-        "app.routers.stock_requests.notif_svc.notify_request_decided",
+        "app.routers.stock_requests.notif_svc._notify_request_decided",
         fail_notification,
     )
+    _login(client, department_approver)
 
     with pytest.raises(RuntimeError, match="department approval notification failure"):
         client.post(
             f"/api/stock-requests/{request_id}/department-approve",
-            json={"actor_employee_id": str(department_approver.employee_id), "pin": "0000"},
+            json={"actor_employee_id": str(department_approver.employee_id), "pin": "2468"},
         )
 
     db_session.expire_all()
@@ -279,6 +302,7 @@ def test_cancel_rolls_back_pending_and_status_when_batch_sync_fails(
     item = make_item(name="StockRequest cancel rollback", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-ACT-CANCEL", name="요청자")
     db_session.commit()
+    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -318,14 +342,14 @@ def test_cancel_rolls_back_pending_and_status_when_batch_sync_fails(
         raise RuntimeError("batch sync failure")
 
     monkeypatch.setattr(
-        "app.services.sr_approval.sync_batch_from_stock_request",
+        "app.services.sr_approval._sync_batch_from_stock_request",
         fail_batch_sync,
     )
 
     with pytest.raises(RuntimeError, match="batch sync failure"):
         client.post(
             f"/api/stock-requests/{request_id}/cancel",
-            json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+            json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
         )
 
     db_session.expire_all()
@@ -353,6 +377,7 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
         warehouse_role="primary",
     )
     db_session.commit()
+    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -373,9 +398,10 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
     assert created.status_code == 201, created.text
     request_id = created.json()["request_id"]
 
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=1)
     db_session.commit()
+    _login(client, approver)
 
     boundaries = {"commit": 0, "rollback": 0}
     original_commit = db_session.commit
@@ -394,7 +420,7 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
 
     response = client.post(
         f"/api/stock-requests/{request_id}/approve",
-        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(approver.employee_id), "pin": "2468"},
     )
 
     assert response.status_code == 409, response.text
@@ -422,7 +448,7 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
     make_item,
     monkeypatch,
 ) -> None:
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     first_item = make_item(
         name="StockRequest multiline first",
         warehouse_qty=Decimal("10"),
@@ -441,6 +467,7 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
         warehouse_role="primary",
     )
     db_session.commit()
+    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -467,8 +494,9 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
     )
     assert created.status_code == 201, created.text
     request_id = created.json()["request_id"]
+    _login(client, approver)
 
-    original_capture_effect = sr_execution_svc.inv_effect.capture_effect
+    original__capture_effect = sr_execution_svc.inv_effect._capture_effect
     capture_calls = 0
     observed_first_line: dict[str, object] = {}
 
@@ -496,18 +524,18 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
                 ),
             )
             raise RuntimeError("second line capture failure")
-        return original_capture_effect(db, item_id, cells_before)
+        return original__capture_effect(db, item_id, cells_before)
 
     monkeypatch.setattr(
         sr_execution_svc.inv_effect,
-        "capture_effect",
+        "_capture_effect",
         fail_during_second_line_capture,
     )
 
     with pytest.raises(RuntimeError, match="second line capture failure"):
         client.post(
             f"/api/stock-requests/{request_id}/approve",
-            json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+            json={"actor_employee_id": str(approver.employee_id), "pin": "2468"},
         )
 
     assert observed_first_line == {

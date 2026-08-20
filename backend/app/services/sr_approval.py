@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import Request
 from sqlalchemy.orm import Session
 
-from app._actor import set_actor
+from app._actor import set_actor as _set_actor
 from app.models import (
     Employee,
     StockRequest,
@@ -17,13 +17,16 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services import inventory as inventory_svc
-from app.services.dept_hierarchy import can_approve_department
-from app.services.io_persist import ensure_stock_request_batch_is_mutable, sync_batch_from_stock_request
-from app.services.pin_auth import verify_pin
+from app.services import rate_limit
+from app.services.dept_hierarchy import can_approve_department as _can_approve_department
+from app.services.io_persist import (
+    ensure_stock_request_batch_is_mutable as _ensure_stock_request_batch_is_mutable,
+    _sync_batch_from_stock_request,
+)
 from app.services.sr_execution import (
     _execute_all_lines,
     _request_inventory_item_ids,
-    release_reservation,
+    release_reservation as _release_reservation,
 )
 
 # 주의: io_dispatch.execute_batch_after_dept_approval 만 함수 내부 지연 import 한다.
@@ -54,10 +57,10 @@ def approve_request(
     role = (approver.warehouse_role or "none").lower()
     if role not in ("primary", "deputy"):
         raise PermissionError("창고 담당자만 승인할 수 있습니다.")
-    if not verify_pin(approver.pin_hash, pin):
+    if not rate_limit.verify_operator_pin(approver, pin, http_request):
         raise PermissionError("PIN이 일치하지 않습니다.")
-    set_actor(http_request, approver)
-    ensure_stock_request_batch_is_mutable(db, request)
+    _set_actor(http_request, approver)
+    _ensure_stock_request_batch_is_mutable(db, request)
 
     # 이미 완료된 경우 멱등 반환 (중복 승인 클릭 / 동시 승인 2번째 요청)
     if request.status == StockRequestStatusEnum.COMPLETED:
@@ -81,7 +84,7 @@ def approve_request(
         return request
 
     try:
-        release_reservation(db, request)
+        _release_reservation(db, request, actor=approver)
         _execute_all_lines(
             db,
             request,
@@ -102,7 +105,7 @@ def approve_request(
     for line in request.lines:
         line.status = StockRequestStatusEnum.COMPLETED
 
-    sync_batch_from_stock_request(db, request)
+    _sync_batch_from_stock_request(db, request)
 
     return request
 
@@ -129,14 +132,14 @@ def approve_request_department(
     #   - 창고 정/부: 모든 부서 결재
     #   - admin level 단독: 결재 권한 없음
     # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
-    if not can_approve_department(approver, request.requester_department):
+    if not _can_approve_department(approver, request.requester_department):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )
-    if not verify_pin(approver.pin_hash, pin):
+    if not rate_limit.verify_operator_pin(approver, pin, http_request):
         raise PermissionError("PIN이 일치하지 않습니다.")
-    set_actor(http_request, approver)
-    ensure_stock_request_batch_is_mutable(db, request)
+    _set_actor(http_request, approver)
+    _ensure_stock_request_batch_is_mutable(db, request)
 
     if request.status == StockRequestStatusEnum.COMPLETED:
         return request
@@ -163,7 +166,7 @@ def approve_request_department(
     from app.services.io_dispatch import execute_batch_after_dept_approval
 
     try:
-        release_reservation(db, request)
+        _release_reservation(db, request, actor=approver)
         if request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT:
             # io_dispatch 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
             execute_batch_after_dept_approval(db, request=request, approver=approver)
@@ -185,7 +188,7 @@ def approve_request_department(
     for line in request.lines:
         line.status = StockRequestStatusEnum.COMPLETED
 
-    sync_batch_from_stock_request(db, request)
+    _sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -197,7 +200,7 @@ def _release_pending_best_effort(db: Session, request: StockRequest) -> None:
     """
     from app.services import sr_reservation
 
-    sr_reservation.release_lines_best_effort(
+    sr_reservation._release_lines_best_effort(
         db,
         request.lines,
         request_id=request.request_id,
@@ -227,7 +230,7 @@ def mark_failed_approval(
     request.rejected_reason = f"승인 실패: {reason}"
     for line in request.lines:
         line.status = StockRequestStatusEnum.FAILED_APPROVAL
-    sync_batch_from_stock_request(db, request)
+    _sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -243,10 +246,10 @@ def reject_request(
     role = (approver.warehouse_role or "none").lower()
     if role not in ("primary", "deputy"):
         raise PermissionError("창고 담당자만 반려할 수 있습니다.")
-    if not verify_pin(approver.pin_hash, pin):
+    if not rate_limit.verify_operator_pin(approver, pin, http_request):
         raise PermissionError("PIN이 일치하지 않습니다.")
-    set_actor(http_request, approver)
-    ensure_stock_request_batch_is_mutable(db, request)
+    _set_actor(http_request, approver)
+    _ensure_stock_request_batch_is_mutable(db, request)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
     # 이미 반려된 경우 멱등 반환
@@ -255,7 +258,7 @@ def reject_request(
     if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
         raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
 
-    release_reservation(db, request)
+    _release_reservation(db, request, actor=approver)
 
     now = datetime.utcnow()
     request.status = StockRequestStatusEnum.REJECTED
@@ -265,7 +268,7 @@ def reject_request(
     request.rejected_reason = reason.strip()
     for line in request.lines:
         line.status = StockRequestStatusEnum.REJECTED
-    sync_batch_from_stock_request(db, request)
+    _sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -285,14 +288,14 @@ def reject_request_department(
     if not request.requires_department_approval:
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
-    if not can_approve_department(approver, request.requester_department):
+    if not _can_approve_department(approver, request.requester_department):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )
-    if not verify_pin(approver.pin_hash, pin):
+    if not rate_limit.verify_operator_pin(approver, pin, http_request):
         raise PermissionError("PIN이 일치하지 않습니다.")
-    set_actor(http_request, approver)
-    ensure_stock_request_batch_is_mutable(db, request)
+    _set_actor(http_request, approver)
+    _ensure_stock_request_batch_is_mutable(db, request)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
 
@@ -302,7 +305,7 @@ def reject_request_department(
         raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
 
     # source-aware RESERVED 라인의 창고/부서 위치 점유를 원복한다.
-    release_reservation(db, request)
+    _release_reservation(db, request, actor=approver)
 
     now = datetime.utcnow()
     request.status = StockRequestStatusEnum.REJECTED
@@ -312,7 +315,7 @@ def reject_request_department(
     request.rejected_reason = reason.strip()
     for line in request.lines:
         line.status = StockRequestStatusEnum.REJECTED
-    sync_batch_from_stock_request(db, request)
+    _sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -332,10 +335,10 @@ def cancel_request(
     )
     if not (is_self or is_approver):
         raise PermissionError("본인 요청 또는 결재 권한자만 취소할 수 있습니다.")
-    if not verify_pin(requester.pin_hash, pin):
+    if not rate_limit.verify_operator_pin(requester, pin, http_request):
         raise PermissionError("PIN이 일치하지 않습니다.")
-    set_actor(http_request, requester)
-    ensure_stock_request_batch_is_mutable(db, request)
+    _set_actor(http_request, requester)
+    _ensure_stock_request_batch_is_mutable(db, request)
     # 이미 취소된 경우 멱등 반환
     if request.status == StockRequestStatusEnum.CANCELLED:
         return request
@@ -346,18 +349,18 @@ def cancel_request(
     ):
         raise ValueError(f"취소할 수 없는 상태입니다: {request.status.value}")
 
-    release_reservation(db, request)
+    _release_reservation(db, request, actor=requester)
 
     now = datetime.utcnow()
     request.status = StockRequestStatusEnum.CANCELLED
     request.cancelled_at = now
     for line in request.lines:
         line.status = StockRequestStatusEnum.CANCELLED
-    sync_batch_from_stock_request(db, request)
+    _sync_batch_from_stock_request(db, request)
     return request
 
 
-def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
+def _cancel_open_stock_requests(db: Session, *, reason: str) -> int:
     """RESERVED/SUBMITTED 상태인 미결 요청을 모두 CANCELLED로 일괄 전이.
 
     권한·PIN 검증 없는 시스템 정리 전용. 재고 리셋/재적재 직전에 호출해
@@ -383,7 +386,7 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
         .all()
     )
     for req in open_requests:
-        ensure_stock_request_batch_is_mutable(db, req)
+        _ensure_stock_request_batch_is_mutable(db, req)
 
     all_item_ids: set[uuid.UUID] = set()
     for req in open_requests:
@@ -392,7 +395,7 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
                 _request_inventory_item_ids(db, req, list(req.lines))
             )
     if all_item_ids:
-        inventory_svc.ensure_and_lock_inventories(db, sorted(all_item_ids))
+        inventory_svc._ensure_and_lock_inventories(db, sorted(all_item_ids))
 
     now = datetime.utcnow()
     for req in open_requests:
@@ -402,7 +405,7 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
         req.cancelled_at = now
         for line in req.lines:
             line.status = StockRequestStatusEnum.CANCELLED
-        sync_batch_from_stock_request(db, req)
+        _sync_batch_from_stock_request(db, req)
         # SessionLocal은 autoflush=False다. 다음 요청의 reconciliation이 방금 취소한
         # 요청을 활성 예약으로 다시 보호하지 않도록 요청별 전이를 먼저 반영한다.
         db.flush()

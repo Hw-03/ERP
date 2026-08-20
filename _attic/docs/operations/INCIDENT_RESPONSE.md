@@ -59,8 +59,8 @@ UPDATE inventory SET quantity = warehouse_qty + (
 | 패턴 | 원인 | 조치 |
 |------|------|------|
 | SQLite 사용 중, 동시 사용자 10명 초과 | `database is locked` busy_timeout 초과 | PostgreSQL 전환 (필수) |
-| PostgreSQL 사용 중, 503 발생 | 서버 과부하 또는 connection pool 고갈 | workers 수 증가, pool_size 확인 |
-| 간헐적 (10분에 1~2건) | 순간 부하 집중 | 무시 or --workers 증가 |
+| PostgreSQL 사용 중, 503 발생 | 서버 과부하 또는 connection pool 고갈 | pool_size와 장기 실행 쿼리 확인 (worker 증설 금지) |
+| 간헐적 (10분에 1~2건) | 순간 부하 집중 | 요청 로그와 DB pool 사용량 확인 (worker 증설 금지) |
 
 ### SQLite → PostgreSQL 전환 (긴급)
 
@@ -75,8 +75,9 @@ echo "DATABASE_URL=postgresql://mes_user:mes_pass@localhost:5432/mes_db" >> back
 # 4. 마이그레이션
 cd backend && python bootstrap_db.py
 
-# 5. 서버 재시작
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2
+# 5. 저장소 루트에서 서버 재시작 (단일 worker 강제)
+cd <DEXCOWIN-MES 저장소 루트>
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 
 # 6. preflight
 python scripts/ops/preflight_30_users.py --url http://localhost:8010
@@ -104,9 +105,9 @@ docker compose -f docker/docker-compose.yml ps postgres
 docker compose -f docker/docker-compose.yml restart postgres
 # 30초 대기
 
-# 4. 서버 재시작
-cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2
+# 4. 저장소 루트에서 서버 재시작 (단일 worker 강제)
+cd <DEXCOWIN-MES 저장소 루트>
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 
 # 5. 확인
 curl http://localhost:8010/health

@@ -64,7 +64,7 @@ export const employeesApi = {
   deleteEmployee: (employeeId: string) =>
     deleteJson<{ result: "deleted" | "deactivated" }>(toApiUrl(`/api/employees/${employeeId}`)),
 
-  // 작업자 식별용 PIN 검증 — 실제 보안 인증이 아님
+  // 한 릴리스 호환용 작업자 세션 로그인 alias. 신규 호출은 operatorSessionApi를 사용한다.
   verifyEmployeePin: (employeeId: string, pin: string) =>
     postJson<Employee>(toApiUrl(`/api/employees/${employeeId}/verify-pin`), { pin }),
 

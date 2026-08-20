@@ -32,7 +32,7 @@ from app.models import (
 _WAREHOUSE_KEY = ("warehouse", None, None)
 
 
-def snapshot_cells(db: Session, item_id: uuid.UUID) -> dict[tuple, int]:
+def _snapshot_cells(db: Session, item_id: uuid.UUID) -> dict[tuple, int]:
     """품목의 모든 재고 셀(창고 + 부서×상태)을 신선하게 읽어 dict 로 반환.
 
     SessionLocal 이 autoflush=False 이고 일부 mutation 이 db.execute(update) 로
@@ -96,12 +96,12 @@ def effect_diff(before: dict[tuple, int], after: dict[tuple, int]) -> list[dict]
     return out
 
 
-def capture_effect(db: Session, item_id: uuid.UUID, before: dict[tuple, int]) -> list[dict]:
+def _capture_effect(db: Session, item_id: uuid.UUID, before: dict[tuple, int]) -> list[dict]:
     """mutation 직후 호출 — before 스냅샷과 현재 상태 차이를 효과로 반환."""
-    return effect_diff(before, snapshot_cells(db, item_id))
+    return effect_diff(before, _snapshot_cells(db, item_id))
 
 
-def apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | None) -> None:
+def _apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | None) -> None:
     """효과를 부호 반전해 재고에 적용(취소 역재생). 적용 후 음수면 ValueError.
 
     창고는 Inventory.warehouse_qty, location 은 (dept,status) 행을 ORM 속성으로 갱신한다.

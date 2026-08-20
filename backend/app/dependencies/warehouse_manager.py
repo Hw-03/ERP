@@ -23,34 +23,39 @@
 
 from typing import Annotated, Optional
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActor, ensure_actor_employee_code
 from app.models import Employee
 from app.routers._errors import ErrorCode, http_error
-from app.services.pin_auth import verify_pin
+from app.services import rate_limit
 
 _MANAGER_ROLES = ("primary", "deputy")
 
 
 def require_warehouse_manager(
+    actor: VerifiedActor,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
     x_employee_code: Annotated[Optional[str], Header(alias="X-Employee-Code")] = None,
     x_operator_pin: Annotated[Optional[str], Header(alias="X-Operator-Pin")] = None,
 ) -> Employee:
-    """창고 정/부 관리자 + 본인 PIN 검증. 실패 시 403. 통과 시 Employee 반환."""
-    if not x_employee_code or not x_operator_pin:
+    """검증된 session actor의 창고 역할과 본인 PIN step-up을 확인한다."""
+    if not x_operator_pin:
         raise http_error(403, ErrorCode.FORBIDDEN, "창고 관리자 인증이 필요합니다.")
-    emp = (
-        db.query(Employee)
-        .filter(Employee.employee_code == x_employee_code)
-        .first()
-    )
-    if emp is None or not bool(emp.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "유효한 직원이 아닙니다.")
-    if not verify_pin(emp.pin_hash, x_operator_pin):
+    ensure_actor_employee_code(actor, x_employee_code)
+    try:
+        pin_is_valid = rate_limit.verify_operator_pin(actor, x_operator_pin, request)
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        raise http_error(
+            429,
+            ErrorCode.TOO_MANY_REQUESTS,
+            str(exc),
+        )
+    if not pin_is_valid:
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    if (getattr(emp, "warehouse_role", None) or "none").lower() not in _MANAGER_ROLES:
+    if (getattr(actor, "warehouse_role", None) or "none").lower() not in _MANAGER_ROLES:
         raise http_error(403, ErrorCode.FORBIDDEN, "창고 정/부 관리자만 편집할 수 있습니다.")
-    return emp
+    return actor

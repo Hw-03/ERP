@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.models import Department
-from app.services.reorder import reorder_by_display_order
+from app.services.reorder import _reorder_by_display_order
 
 
 def _make_dept(db, name: str, display_order: int = 0) -> Department:
@@ -23,7 +23,7 @@ def test_valid_reorder(db_session):
     d3 = _make_dept(db_session, "부서C", 2)
     db_session.commit()
 
-    updated = reorder_by_display_order(
+    updated = _reorder_by_display_order(
         db_session,
         Department,
         "id",
@@ -46,7 +46,7 @@ def test_duplicate_key_rejected(db_session):
     db_session.commit()
 
     with pytest.raises(HTTPException) as exc_info:
-        reorder_by_display_order(
+        _reorder_by_display_order(
             db_session,
             Department,
             "id",
@@ -62,7 +62,7 @@ def test_negative_display_order_rejected(db_session):
     db_session.commit()
 
     with pytest.raises(HTTPException) as exc_info:
-        reorder_by_display_order(
+        _reorder_by_display_order(
             db_session,
             Department,
             "id",
@@ -77,7 +77,7 @@ def test_nonexistent_key_silent_skip(db_session):
     d1 = _make_dept(db_session, "부서A", 0)
     db_session.commit()
 
-    updated = reorder_by_display_order(
+    updated = _reorder_by_display_order(
         db_session,
         Department,
         "id",
@@ -96,7 +96,7 @@ def test_custom_order_field(db_session, make_item):
     i2 = make_item(name="품목2")
     db_session.commit()
 
-    updated = reorder_by_display_order(
+    updated = _reorder_by_display_order(
         db_session,
         type(i1),
         "item_id",

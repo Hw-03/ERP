@@ -25,7 +25,9 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $childCommand = @(
     "py", "-m", "uvicorn", "app.main:app",
     "--host", "0.0.0.0",
-    "--port", [string] $Profile.BackendPort
+    "--port", [string] $Profile.BackendPort,
+    "--workers", "1",
+    "--no-proxy-headers"
 )
 if (-not $NoReload) { $childCommand += "--reload" }
 

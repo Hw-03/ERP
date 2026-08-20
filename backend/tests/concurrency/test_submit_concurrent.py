@@ -16,7 +16,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.models import (
+from app.models import (  # noqa: E402
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -28,7 +28,7 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
-from app.services import stock_requests as svc
+from app.services import stock_requests as svc  # noqa: E402
 
 
 def _setup(make_session):
@@ -112,10 +112,12 @@ def test_submit_draft_concurrent(concurrent_engine, make_session):
     def try_submit():
         session = make_session()
         try:
+            requester = session.get(Employee, emp_id)
+            assert requester is not None
             svc.submit_draft_request(
                 session,
                 request_id=req_id,
-                requester_employee_id=emp_id,
+                requester=requester,
             )
             session.commit()
             successes.append("ok")

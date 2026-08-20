@@ -7,12 +7,17 @@ from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from sqlalchemy import case, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+)
 from app.models import DailyWorkReport, Employee, IoBatch, Item, TransactionLog, TransactionTypeEnum
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_filters import (
@@ -30,7 +35,7 @@ from app.services._tx import commit_and_refresh
 from app.services.transaction_display_groups import build_display_groups
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 KST = ZoneInfo("Asia/Seoul")
 
@@ -172,11 +177,12 @@ def upsert_daily_work_report(
     employee_id: uuid.UUID,
     work_date: date,
     payload: DailyWorkReportUpsertRequest,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """본인만 오늘 또는 과거 일지를 작성·수정한다."""
-    if payload.actor_employee_id != employee_id:
-        raise http_error(403, ErrorCode.FORBIDDEN, "본인 일보만 작성할 수 있습니다.")
+    ensure_actor_employee_id(actor, employee_id)
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
     if work_date > datetime.now(KST).date():
         raise http_error(422, ErrorCode.BUSINESS_RULE, "미래 날짜의 일보는 작성할 수 없습니다.")
     content = payload.content.strip()
@@ -185,11 +191,7 @@ def upsert_daily_work_report(
     if len(content) > 5000:
         raise http_error(422, ErrorCode.UNPROCESSABLE, "일보 내용은 5,000자 이하여야 합니다.")
 
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    if not employee.is_active:
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 일보를 작성할 수 없습니다.")
+    employee = actor
 
     report = (
         db.query(DailyWorkReport)

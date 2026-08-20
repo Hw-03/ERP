@@ -5,6 +5,8 @@
 생성 로그에는 ``[HISTORY-DEMO]`` 표식을 남겨 입출고 내역에서 검색할 수 있다.
 """
 
+# ruff: noqa: E402 - 독립 실행 시 backend를 import path에 먼저 추가한다.
+
 from __future__ import annotations
 
 import argparse
@@ -36,10 +38,16 @@ from app.models import (
     StockRequest,
     StockRequestTypeEnum,
     TransactionLog,
-    TransactionTypeEnum,
 )
 from app.schemas import ProductionReceiptRequest
-from app.services import inv_effect, inventory as inventory_svc, shipping as shipping_svc, stock_requests
+from app.services import (
+    defect_actions as defect_actions_svc,
+    inv_effect,
+    inventory as inventory_svc,
+    shipping as shipping_svc,
+    shipping_actions as shipping_actions_svc,
+    stock_requests,
+)
 from app.services import io_dispatch
 from app.services._tx import transactional
 from app.services.bom import explode_bom, merge_requirements
@@ -292,28 +300,26 @@ def _run_production(db, plan: ShowcasePlan, marker: str) -> None:
             notes=f"{marker} BOM 생산",
         ),
         plan.production_parent,
-        plan.actor.name,
-        plan.actor.employee_id,
+        actor=plan.actor,
     )
 
 
 def _run_conversion(db, plan: ShowcasePlan, marker: str) -> None:
-    result = shipping_svc.execute_component_change_independent(
+    result = shipping_actions_svc.execute_component_change_independent(
         db,
         plan.conversion_source.item_id,
         plan.conversion_target.item_id,
         1,
         memo=f"{marker} 품목 전환",
         requested_mode="BOM",
-        requester_name=plan.actor.name,
-        requester_employee_id=plan.actor.employee_id,
+        actor=plan.actor,
     )
     for log in result["transactions"]:
         log.notes = f"{log.notes or ''} {marker}".strip()
 
 
 def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
-    request = shipping_svc.create_request(
+    request = shipping_actions_svc.create_request(
         db,
         {
             "base_pf_item_id": plan.shipping_pf.item_id,
@@ -322,9 +328,14 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
             "notes": f"{marker} 출하",
             "invoice_number": f"HISTORY-{uuid.uuid4().hex[:12].upper()}",
         },
+        plan.actor,
     )
-    shipping_svc.send_to_prep(db, request.request_id)
-    _final_pa, final_pf = shipping_svc._require_final_items(db, request)
+    request = shipping_actions_svc.send_to_prep(db, request.request_id, plan.actor)
+    if request.final_pf_item_id is None:
+        raise RuntimeError("출하 준비 전환 결과에 최종 PF 품목이 없습니다.")
+    final_pf = db.get(Item, request.final_pf_item_id)
+    if final_pf is None:
+        raise RuntimeError("출하 준비 전환의 최종 PF 품목을 찾을 수 없습니다.")
     batch, bundle = _new_batch(db, plan, marker, "shipping_prepare_produce", final_pf)
     batch.work_type = "process"
     batch.sub_type = "produce"
@@ -347,14 +358,13 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
     batch.status = "completed"
     batch.completed_at = datetime.now(UTC).replace(tzinfo=None)
     db.flush()
-    shipping_svc.prepare_complete(
+    shipping_actions_svc.prepare_complete(
         db,
         request.request_id,
         f"DEMO-SN-{request.request_id.hex[:8].upper()}",
-        prepared_by_employee_id=plan.actor.employee_id,
-        prepared_by_name=plan.actor.name,
+        actor=plan.actor,
     )
-    shipping_svc.pickup_complete(db, request.request_id)
+    shipping_actions_svc.pickup_complete(db, request.request_id, plan.actor)
     logs = db.query(TransactionLog).filter(TransactionLog.shipping_request_id == request.request_id).all()
     for log in logs:
         log.notes = f"{log.notes or ''} {marker}".strip()
@@ -396,33 +406,14 @@ def _run_stock_request(
 
 
 def _run_unquarantine(db, plan: ShowcasePlan, marker: str, item: Item, department: DepartmentEnum) -> None:
-    cells_before = inv_effect.snapshot_cells(db, item.item_id)
-    before = inventory_svc.get_or_create_inventory(db, item.item_id).quantity
-    inventory_svc.unmark_defective(
+    defect_actions_svc.unquarantine_inventory(
         db,
-        item.item_id,
-        DEMO_QUANTITY,
-        department,
-        inventory_svc.ReasonContext(category=DEMO_REASON_CATEGORY, memo=marker, actor=plan.actor.name),
-    )
-    db.flush()
-    after = inventory_svc.get_or_create_inventory(db, item.item_id).quantity
-    db.add(
-        TransactionLog(
-            item_id=item.item_id,
-            transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
-            quantity_change=Decimal("0"),
-            quantity_before=before,
-            quantity_after=after,
-            produced_by=plan.actor.name,
-            producer_employee_id=plan.actor.employee_id,
-            reference_no=marker,
-            notes=f"{marker} 정상 복귀",
-            reason_category=DEMO_REASON_CATEGORY,
-            reason_memo=marker,
-            department=department.value,
-            inventory_effect=inv_effect.capture_effect(db, item.item_id, cells_before),
-        )
+        item_id=item.item_id,
+        qty=DEMO_QUANTITY,
+        dept=department,
+        actor=plan.actor,
+        reason_category=DEMO_REASON_CATEGORY,
+        reason_memo=marker,
     )
     db.flush()
 
@@ -454,8 +445,7 @@ def _run_defects(db, plan: ShowcasePlan, marker: str) -> None:
         child_decisions,
         reason_category=DEMO_REASON_CATEGORY,
         reason_memo=marker,
-        actor=plan.actor.name,
-        actor_employee_id=plan.actor.employee_id,
+        actor=plan.actor,
     )
 
 
@@ -574,7 +564,7 @@ def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
 
     effects, location_cells = _combined_effects(logs)
     for item_id, effect in effects.items():
-        inv_effect.apply_effect_reverse(db, item_id, effect)
+        inv_effect._apply_effect_reverse(db, item_id, effect)
     db.flush()
     for item_id, department, status in location_cells:
         location = (

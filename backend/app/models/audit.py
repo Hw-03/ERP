@@ -22,7 +22,9 @@ class AdminAuditLog(Base):
     actor_pin_role = Column(String(32), nullable=False, default="admin")
     # 사번 — request.state.actor_emp 가 PIN 검증 후 박힌 직원 코드 (PR-C).
     # NULL = 사번 부착 없이 admin PIN 만으로 실행된 액션 (예: 백필 스크립트).
-    actor_employee_code = Column(String(16), nullable=True, index=True)
+    actor_employee_code = Column(String(30), nullable=True, index=True)
+    # 공개 초기 PIN challenge는 verified actor가 아니므로 대상 직원 식별자를 분리한다.
+    bootstrap_employee_id = Column(String(32), nullable=True, index=True)
     action = Column(String(64), nullable=False, index=True)
     target_type = Column(String(64), nullable=False, index=True)
     target_id = Column(String(64), nullable=True)

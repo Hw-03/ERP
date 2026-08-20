@@ -82,7 +82,7 @@ def test_concurrent_transfer_to_production_no_negative(concurrent_engine, make_s
     def try_transfer():
         session = make_session()
         try:
-            inventory_svc.transfer_to_production(session, item_id, Decimal("1"), dept)
+            inventory_svc._transfer_to_production(session, item_id, Decimal("1"), dept)
             session.commit()
             successes.append("ok")
         except ValueError as e:
@@ -133,7 +133,7 @@ def test_concurrent_transfer_to_warehouse_no_negative(concurrent_engine, make_se
     def try_transfer():
         session = make_session()
         try:
-            inventory_svc.transfer_to_warehouse(session, item_id, Decimal("1"), dept)
+            inventory_svc._transfer_to_warehouse(session, item_id, Decimal("1"), dept)
             session.commit()
             successes.append("ok")
         except ValueError as e:

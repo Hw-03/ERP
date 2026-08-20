@@ -63,7 +63,7 @@ def is_box_tracking_enabled(db: Session) -> bool:
     return bool(setting and setting.setting_value == "true")
 
 
-def set_box_tracking_enabled(db: Session, enabled: bool) -> None:
+def _set_box_tracking_enabled(db: Session, enabled: bool) -> None:
     """박스 추적 플래그 설정. 호출 측에서 commit 책임."""
     value = "true" if enabled else "false"
     setting = (
@@ -180,7 +180,7 @@ def lock_warehouse_map_rows(
     ).scalars().all()
 
 
-def deplete_boxes_by_order(db: Session, item_id, qty) -> None:
+def _deplete_boxes_by_order(db: Session, item_id, qty) -> None:
     """창고 출고(warehouse_qty 감소)에 맞춰 박스 수량을 R1 순서로 차감.
 
     정렬(R1): 층↓(layer_no DESC) → 줄↑(row_no ASC) → 자리↑(jari_index ASC)

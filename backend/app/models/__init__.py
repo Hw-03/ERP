@@ -41,6 +41,7 @@ from app.models.notification import (
     Notification,
     NotificationTypeEnum,
 )
+from app.models.operator_session import OperatorSession
 from app.models.item import (
     BOM,
     Item,
@@ -138,6 +139,7 @@ __all__ = [
     # notifications
     "Notification",
     "NotificationTypeEnum",
+    "OperatorSession",
     # system / audit
     "SystemSetting",
     "DataRevision",

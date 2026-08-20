@@ -23,6 +23,7 @@ from typing import Any, Callable
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import pytest
+from fastapi import Request
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Connection, Engine, Transaction
 from sqlalchemy.orm import Session
@@ -83,13 +84,19 @@ def _worker_db_engine() -> Generator[Engine, None, None]:
         connection.exec_driver_sql("BEGIN")
 
     Base.metadata.create_all(bind=engine)
-    from app.models import ProcessType
+    from app.models import ProcessType, SystemSetting
 
     with Session(engine) as seed_session:
         for code, prefix, suffix, order in _PROCESS_TYPE_SEED:
             seed_session.add(
                 ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order)
             )
+        seed_session.add(
+            SystemSetting(
+                setting_key="security.bom_auto_token_secret",
+                setting_value="test-bom-auto-token-secret",
+            )
+        )
         seed_session.commit()
 
     try:
@@ -145,8 +152,8 @@ def db_session(
 
 
 @pytest.fixture()
-def client(db_session):
-    """FastAPI TestClient. get_db 의존성을 db_session 으로 override."""
+def auth_client(db_session):
+    """실제 인증 dependency를 그대로 쓰는 보안·세션 계약용 TestClient."""
     from fastapi.testclient import TestClient
     from app.main import app
     from app.database import get_db
@@ -160,6 +167,146 @@ def client(db_session):
     app.dependency_overrides[get_db] = _override_get_db
     with TestClient(app) as c:
         yield c
+    app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture()
+def client(db_session):
+    """기존 도메인 회귀가 actor fixture에 집중하도록 인증 경계만 대체한다.
+
+    IC-01 자체는 ``auth_client``를 사용하는 보안 테스트에서 실제 DB cookie
+    session으로 검증한다. 이 override는 테스트 앱에만 존재하며 운영 코드에는
+    우회 경로를 만들지 않는다.
+    """
+    import uuid
+
+    from fastapi.testclient import TestClient
+
+    from app._actor import set_actor
+    from app.database import get_db
+    from app.dependencies.verified_actor import require_current_actor, require_verified_actor
+    from app.main import app
+    from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
+    from app.routers._errors import ErrorCode, http_error
+    from app.services.pin_auth import hash_pin
+
+    actor_id_keys = (
+        "actor_employee_id",
+        "author_employee_id",
+        "requester_employee_id",
+        "edited_by_employee_id",
+        "employee_id",
+        "recipient_employee_id",
+    )
+    actor_code_keys = (
+        "producer_employee_code",
+        "operator_employee_code",
+        "employee_code",
+    )
+
+    def _override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    async def _compat_actor(request: Request) -> Employee:
+        body: dict[str, Any] = {}
+        try:
+            parsed = await request.json()
+            if isinstance(parsed, dict):
+                body = parsed
+        except Exception:
+            pass
+
+        id_candidates = [
+            request.headers.get("X-Actor-Employee-Id"),
+            *(body.get(key) for key in actor_id_keys),
+            *(request.query_params.get(key) for key in actor_id_keys),
+        ]
+        has_actor_claim = any(candidate for candidate in id_candidates)
+        employee = None
+        for candidate in id_candidates:
+            if not candidate:
+                continue
+            try:
+                employee = db_session.get(Employee, uuid.UUID(str(candidate)))
+            except (TypeError, ValueError):
+                employee = None
+            if employee is not None:
+                break
+
+        if employee is None:
+            code_candidates = [
+                request.headers.get("X-MES-Employee-Code"),
+                request.headers.get("X-Employee-Code"),
+                *(body.get(key) for key in actor_code_keys),
+            ]
+            has_actor_claim = has_actor_claim or any(
+                candidate for candidate in code_candidates
+            )
+            for candidate in code_candidates:
+                if not candidate:
+                    continue
+                employee = (
+                    db_session.query(Employee)
+                    .filter(Employee.employee_code == str(candidate))
+                    .first()
+                )
+                if employee is not None:
+                    break
+
+        if employee is None and has_actor_claim:
+            raise http_error(
+                403,
+                ErrorCode.ACTOR_MISMATCH,
+                "세션 작업자와 요청 작업자가 다릅니다.",
+            )
+
+        if employee is None:
+            employee = (
+                db_session.query(Employee)
+                .filter(Employee.is_active == "true")
+                .order_by(Employee.created_at, Employee.employee_code)
+                .first()
+            )
+        if employee is None:
+            employee = Employee(
+                employee_id=uuid.uuid4(),
+                employee_code="TEST-COMPAT-ACTOR",
+                name="테스트 호환 작업자",
+                role="테스트",
+                department=DepartmentEnum.ASSEMBLY,
+                level=EmployeeLevelEnum.STAFF,
+                is_active=True,
+                pin_hash=hash_pin("0000"),
+                pin_requires_change=False,
+            )
+        if not bool(employee.is_active):
+            raise http_error(403, ErrorCode.EMPLOYEE_INACTIVE, "비활성 직원입니다.")
+
+        set_actor(request, employee)
+        request.state.verified_actor = employee
+        endpoint = request.scope.get("endpoint")
+        if getattr(endpoint, "__dexcowin_lifecycle_target_employee__", False):
+            raw_target = request.path_params.get("employee_id")
+            try:
+                target_id = uuid.UUID(str(raw_target))
+            except (TypeError, ValueError):
+                target_id = None
+            request.state.verified_lifecycle_target_employee_id = target_id
+            request.state.verified_lifecycle_target_employee = (
+                db_session.get(Employee, target_id) if target_id is not None else None
+            )
+        return employee
+
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[require_verified_actor] = _compat_actor
+    app.dependency_overrides[require_current_actor] = _compat_actor
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.pop(require_current_actor, None)
+    app.dependency_overrides.pop(require_verified_actor, None)
     app.dependency_overrides.pop(get_db, None)
 
 

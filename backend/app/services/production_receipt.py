@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models import Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import Employee, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
@@ -78,7 +78,7 @@ def _preload_components(
     """
     comp_ids = list(merged.keys())
     items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
-    invs_map = inventory_svc.ensure_and_lock_inventories(
+    invs_map = inventory_svc._ensure_and_lock_inventories(
         db,
         sorted({*comp_ids, produced_item_id}),
     )
@@ -139,8 +139,8 @@ def _backflush_components(
     produced_item: Item,
     merged: Dict[uuid.UUID, Decimal],
     items_map: Dict[uuid.UUID, Item],
-    producer_name: str | None,
-    producer_id,
+    producer_name: str,
+    producer_id: uuid.UUID,
     transaction_ids: List[uuid.UUID],
     backflushed: List[BackflushDetail],
 ) -> None:
@@ -151,8 +151,8 @@ def _backflush_components(
             raise ProductionItemNotFound(f"부품 {comp_item_id} 을 찾을 수 없습니다.")
 
         # 재고 변경은 서비스 레이어로 위임 (창고 차감 + _sync_total 은 내부 책임)
-        comp_cells_before = inv_effect.snapshot_cells(db, comp_item_id)
-        inv, qty_before, dept = inventory_svc.consume_from_item_department(db, comp_item, required_qty)
+        comp_cells_before = inv_effect._snapshot_cells(db, comp_item_id)
+        inv, qty_before, dept = inventory_svc._consume_from_item_department(db, comp_item, required_qty)
 
         log = TransactionLog(
             item_id=comp_item_id,
@@ -161,11 +161,11 @@ def _backflush_components(
             quantity_before=qty_before,
             quantity_after=inv.quantity,
             reference_no=payload.reference_no,
-            produced_by=producer_name or payload.produced_by,
+            produced_by=producer_name,
             producer_employee_id=producer_id,
             department=dept.value,
             notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
-            inventory_effect=inv_effect.capture_effect(db, comp_item_id, comp_cells_before),
+            inventory_effect=inv_effect._capture_effect(db, comp_item_id, comp_cells_before),
         )
         db.add(log)
         db.flush()
@@ -188,13 +188,13 @@ def _record_production(
     db: Session,
     payload: ProductionReceiptRequest,
     produced_item: Item,
-    producer_name: str | None,
-    producer_id,
+    producer_name: str,
+    producer_id: uuid.UUID,
     transaction_ids: List[uuid.UUID],
 ) -> None:
     """Receive produced item into its process-code PRODUCTION location and log PRODUCE."""
-    prod_cells_before = inv_effect.snapshot_cells(db, payload.item_id)
-    produced_inv, prod_qty_before, dept = inventory_svc.receive_to_item_department(
+    prod_cells_before = inv_effect._snapshot_cells(db, payload.item_id)
+    produced_inv, prod_qty_before, dept = inventory_svc._receive_to_item_department(
         db, produced_item, payload.quantity
     )
 
@@ -205,11 +205,11 @@ def _record_production(
         quantity_before=prod_qty_before,
         quantity_after=produced_inv.quantity,
         reference_no=payload.reference_no,
-        produced_by=producer_name or payload.produced_by,
+        produced_by=producer_name,
         producer_employee_id=producer_id,
         department=dept.value,
         notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
-        inventory_effect=inv_effect.capture_effect(db, payload.item_id, prod_cells_before),
+        inventory_effect=inv_effect._capture_effect(db, payload.item_id, prod_cells_before),
     )
     db.add(produce_log)
     db.flush()
@@ -220,8 +220,8 @@ def _execute_production_receipt(
     db: Session,
     payload: ProductionReceiptRequest,
     produced_item: Item,
-    producer_name: str | None,
-    producer_id,
+    producer_name: str,
+    producer_id: uuid.UUID,
 ) -> dict:
     """생산 입고 변경을 현재 트랜잭션에 적용한다.
 
@@ -252,11 +252,17 @@ def execute_production_receipt(
     db: Session,
     payload: ProductionReceiptRequest,
     produced_item: Item,
-    producer_name: str | None,
-    producer_id,
+    *,
+    actor: Employee,
 ) -> dict:
-    """생산 입고의 재고·원장 변경을 하나의 트랜잭션으로 처리한다."""
+    """서버가 검증한 작업자로 생산 입고의 재고·원장 변경을 확정한다."""
+    if not isinstance(actor, Employee):
+        raise TypeError("actor must be an Employee")
     with transactional(db):
         return _execute_production_receipt(
-            db, payload, produced_item, producer_name, producer_id,
+            db,
+            payload,
+            produced_item,
+            actor.name,
+            actor.employee_id,
         )

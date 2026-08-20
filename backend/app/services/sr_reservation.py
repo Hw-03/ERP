@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, cast
 import uuid
 
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Employee,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
@@ -92,7 +93,7 @@ def _prelock_inventories(
 ) -> None:
     """Ensure then lock every source item's Inventory before any source mutation."""
     item_ids = sorted({group.item_id for group in groups})
-    inventory_svc.ensure_and_lock_inventories(db, item_ids)
+    inventory_svc._ensure_and_lock_inventories(db, item_ids)
 
 
 def _group_key(
@@ -151,14 +152,14 @@ def _release_group(
     quantity: Decimal,
 ) -> None:
     if group.bucket == RequestBucketEnum.WAREHOUSE:
-        inventory_svc.release(db, group.item_id, quantity)
+        inventory_svc._release(db, group.item_id, quantity)
     else:
-        inventory_svc.release_location(
+        inventory_svc._release_location(
             db,
             group.item_id,
             quantity,
-            department=group.department,
-            status=group.status,
+            department=cast(str, group.department),
+            status=cast(LocationStatusEnum, group.status),
         )
 
 
@@ -176,7 +177,14 @@ def _reconciled_release_quantity(
     return min(group.quantity, max(Decimal("0"), current - protected))
 
 
-def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
+def reserve_lines(
+    db: Session,
+    lines: Iterable,
+    *,
+    employee: Employee,
+) -> None:
+    if not isinstance(employee, Employee):
+        raise TypeError("employee must be an Employee")
     groups = aggregate_reservations(lines)
     _prelock_inventories(db, groups)
     for group in groups:
@@ -188,16 +196,16 @@ def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
                 employee=employee,
             )
         else:
-            inventory_svc.reserve_location(
+            inventory_svc._reserve_location(
                 db,
                 group.item_id,
                 group.quantity,
-                department=group.department,
-                status=group.status,
+                department=cast(str, group.department),
+                status=cast(LocationStatusEnum, group.status),
             )
 
 
-def release_lines(
+def _release_lines(
     db: Session,
     lines: Iterable,
     *,
@@ -220,7 +228,7 @@ def release_lines(
             _release_group(db, group, quantity)
 
 
-def release_lines_best_effort(
+def _release_lines_best_effort(
     db: Session,
     lines: Iterable,
     *,

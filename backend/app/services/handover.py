@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -25,7 +26,7 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
-from app.services.pin_auth import verify_pin
+from app.services import rate_limit
 from app.services._tx import transactional
 
 _FROM_DEPARTMENT = "튜브"
@@ -178,29 +179,36 @@ def submit_handover(db: Session, doc: HandoverDoc, *, author: Employee) -> Hando
     return doc
 
 
-def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
+def _receive_handover(
+    db: Session,
+    doc: HandoverDoc,
+    *,
+    actor: Employee,
+    pin: str,
+    http_request: Request | None,
+) -> HandoverDoc:
     """인수 확인 변경을 현재 트랜잭션에 적용한다."""
+    if not rate_limit.verify_operator_pin(actor, pin, http_request):
+        raise PermissionError("PIN이 올바르지 않습니다.")
+    if not can_receive(actor, doc.to_department):
+        raise PermissionError("해당 부서의 인수 확인 권한이 없습니다.")
     if doc.status == HandoverStatusEnum.RECEIVED:
         return doc  # 멱등 — 이중 이동 방지
     if doc.status != HandoverStatusEnum.SUBMITTED:
         raise ValueError("제출된 인수인계서만 인수할 수 있습니다.")
-    if not verify_pin(actor.pin_hash, pin):
-        raise PermissionError("PIN이 올바르지 않습니다.")
-    if not can_receive(actor, doc.to_department):
-        raise PermissionError("해당 부서의 인수 확인 권한이 없습니다.")
 
     from_dept = DepartmentEnum(doc.from_department)
     to_dept = DepartmentEnum(doc.to_department)
 
     item_ids = sorted({line.item_id for line in doc.lines})
-    inventory_svc.ensure_and_lock_inventories(db, item_ids)
+    inventory_svc._ensure_and_lock_inventories(db, item_ids)
     for line in doc.lines:
         qty = Decimal(line.quantity)
-        inv = inventory_svc.get_or_create_inventory(db, line.item_id)
+        inv = inventory_svc._get_or_create_inventory(db, line.item_id)
         qty_before = inv.quantity or Decimal("0")
-        cells_before = inv_effect.snapshot_cells(db, line.item_id)
+        cells_before = inv_effect._snapshot_cells(db, line.item_id)
         # 튜브 PRODUCTION 부족 시 ValueError → 라우터가 422 변환(상태 불변).
-        inventory_svc.transfer_between_departments(db, line.item_id, qty, from_dept, to_dept)
+        inventory_svc._transfer_between_departments(db, line.item_id, qty, from_dept, to_dept)
         db.add(
             TransactionLog(
                 item_id=line.item_id,
@@ -214,7 +222,7 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
                 department=doc.to_department,
                 reference_no=doc.handover_code,
                 notes=f"인수인계 {doc.from_department}→{doc.to_department}",
-                inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
+                inventory_effect=inv_effect._capture_effect(db, line.item_id, cells_before),
             )
         )
 
@@ -226,7 +234,20 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
     return doc
 
 
-def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
+def receive_handover(
+    db: Session,
+    doc: HandoverDoc,
+    *,
+    actor: Employee,
+    pin: str,
+    http_request: Request | None = None,
+) -> HandoverDoc:
     """PIN 검증, 재고 이동, 원장과 인수 상태를 원자적으로 확정한다."""
     with transactional(db):
-        return _receive_handover(db, doc, actor=actor, pin=pin)
+        return _receive_handover(
+            db,
+            doc,
+            actor=actor,
+            pin=pin,
+            http_request=http_request,
+        )

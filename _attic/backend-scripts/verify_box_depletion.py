@@ -1,6 +1,6 @@
 """창고 박스 자동 차감 실DB 검증 (비파괴).
 
-플래그 ON 상태에서 분산 배치된 품목으로 실제 출고 경로(consume_warehouse)를 타,
+플래그 ON 상태에서 분산 배치된 품목으로 actor-required RAW_SHIP 경로를 타,
   1) R1 차감 순서(층↓→줄↑→자리↑→스택↓)
   2) R6 취소 원복(inventory_effect warehouse_box scope 역재생)
   3) R5 박스 합 초과 출고 차단(ValueError)
@@ -11,14 +11,24 @@
   python ../_attic/backend-scripts/verify_box_depletion.py
 """
 import sys
+import uuid
 sys.path.insert(0, ".")
 
 from decimal import Decimal
 from app.database import SessionLocal
-from app.models import WarehouseBox, WarehouseBoxItem, Item, Inventory
+from app.models import (
+    Employee,
+    Inventory,
+    Item,
+    RequestBucketEnum,
+    StockRequestTypeEnum,
+    WarehouseBox,
+    WarehouseBoxItem,
+)
 from app.services import warehouse_map as wm
-from app.services import inv_transfer as invsvc
 from app.services import inv_effect
+from app.services import stock_requests
+from app.services.sr_validation import LineInput
 
 TARGET_CODE = "9-HR-0057"  # distribute 로 4박스 분산된 품목
 
@@ -36,6 +46,11 @@ if item is None:
     print(f"대상 품목 {TARGET_CODE} 없음 — distribute 스크립트 먼저 실행 필요")
     sys.exit(1)
 iid = item.item_id
+actor = db.query(Employee).filter(Employee.is_active == "true").order_by(Employee.employee_code).first()
+if actor is None:
+    print("활성 작업자 없음 — bootstrap_db.py --all 먼저 실행 필요")
+    sys.exit(1)
+actor.warehouse_role = "primary"
 
 print(f"플래그 ON?: {wm.is_box_tracking_enabled(db)}")
 print(f"대상: {TARGET_CODE}\n")
@@ -63,14 +78,33 @@ def fmt(rows):
     return [(f"L{r[0]}r{r[1]}j{r[2]}", int(r[4])) for r in rows]
 
 
+def ship_from_warehouse(qty):
+    return stock_requests.create_request(
+        db,
+        requester=actor,
+        request_type=StockRequestTypeEnum.RAW_SHIP,
+        lines_input=[
+            LineInput(
+                item_id=iid,
+                quantity=Decimal(qty),
+                from_bucket=RequestBucketEnum.WAREHOUSE,
+                to_bucket=RequestBucketEnum.NONE,
+            )
+        ],
+        reference_no="BOX-DEPLETION-VERIFY",
+        notes="비파괴 박스 차감 검증",
+        client_request_id=f"box-depletion-verify-{uuid.uuid4()}",
+    )
+
+
 # ── 1) R1 차감 순서 ──────────────────────────────────────────────────────
 print("=== 1) R1 차감 순서 ===")
 before = box_state()
 wq0 = wq()
 print("  차감 전:", fmt(before))
 OUT = 600  # R1 1순위 박스(500) 다 비우고 다음 박스에서 100
-snap_before = inv_effect.snapshot_cells(db, iid)
-invsvc.consume_warehouse(db, iid, Decimal(OUT))
+snap_before = inv_effect._snapshot_cells(db, iid)
+ship_from_warehouse(OUT)
 after = box_state()
 print(f"  {OUT} 출고 후:", fmt(after))
 check("R1 1순위 박스부터 0으로 비워짐", int(after[0][4]) == 0)
@@ -81,12 +115,12 @@ check(f"박스 차감 총합 == {OUT}", sum(int(b[4]) for b in before) - sum(int
 
 # ── 2) R6 취소 원복 ──────────────────────────────────────────────────────
 print("=== 2) R6 취소 원복 ===")
-snap_after = inv_effect.snapshot_cells(db, iid)
+snap_after = inv_effect._snapshot_cells(db, iid)
 effect = inv_effect.effect_diff(snap_before, snap_after)
 scopes = {e["scope"] for e in effect}
 print("  기록된 효과 scope:", scopes)
 check("inventory_effect 에 warehouse_box scope 기록됨", "warehouse_box" in scopes)
-inv_effect.apply_effect_reverse(db, iid, effect)
+inv_effect._apply_effect_reverse(db, iid, effect)
 db.flush()  # SessionLocal autoflush=False — pending 원복을 DB에 반영해야 컬럼 쿼리가 실값을 읽음
 restored = box_state()
 print("  원복 후:", fmt(restored))
@@ -97,7 +131,7 @@ check("warehouse_qty 원복", wq() == wq0)
 print("=== 3) R5 초과 출고 차단 ===")
 total = sum(int(b[4]) for b in box_state())
 try:
-    invsvc.consume_warehouse(db, iid, Decimal(total + 1))
+    ship_from_warehouse(total + 1)
     check("박스 합 초과 출고 시 ValueError", False)
 except ValueError as e:
     print("  차단 메시지:", str(e)[:60])

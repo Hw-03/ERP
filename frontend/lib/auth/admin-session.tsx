@@ -10,8 +10,8 @@
  * 설계 결정:
  * - **in-memory only**: sessionStorage / localStorage 사용 금지.
  *   새로고침 시 PIN 재입력은 의도된 데모/보안 안전 동작.
- * - **호출자 코드 변경 최소**: 기존 payload.pin / query.pin 흐름은 그대로.
- *   백엔드 (W3-A) 의 PIN 추출 우선순위는 X-Admin-Pin → body.pin → query.pin.
+ * - **호출자 코드 변경 최소**: 기존 payload.pin 흐름은 그대로.
+ *   백엔드 (W3-A) 의 PIN 추출 우선순위는 X-Admin-Pin → body.pin.
  * - **인터페이스 깊이**: Provider + 1 hook (2 메소드) + 1 register = 4 ≤ 6.
  */
 
@@ -25,7 +25,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { registerAdminPinProvider } from "@/lib/api-core";
+import {
+  AUTH_REQUIRED_EVENT,
+  registerAdminPinProvider,
+} from "@/lib/api-core";
 
 export interface AdminSessionValue {
   pin: string | null;
@@ -42,8 +45,14 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
   pinRef.current = pin;
 
   useEffect(() => {
+    const clearPinForOperatorBoundary = () => {
+      pinRef.current = null;
+      setPinState(null);
+    };
     registerAdminPinProvider(() => pinRef.current);
+    window.addEventListener(AUTH_REQUIRED_EVENT, clearPinForOperatorBoundary);
     return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, clearPinForOperatorBoundary);
       registerAdminPinProvider(() => null);
     };
   }, []);

@@ -10,7 +10,7 @@ test.describe("출하 — 요청을 준비 중으로 전환", () => {
       shippingItem: { item_id: string };
     };
 
-    const requester = `E2E 출하 ${Date.now()}`;
+    const requester = operator.name;
     const createResponse = await page.request.post("/api/shipping/requests", {
       data: {
         base_pf_item_id: basePf.item_id,
@@ -26,7 +26,7 @@ test.describe("출하 — 요청을 준비 중으로 전환", () => {
 
     await page.goto("/mes?tab=shipping");
     await page.getByRole("button", { name: /출하 관리/ }).filter({ visible: true }).click();
-    await page.getByRole("button", { name: new RegExp(requester) }).click();
+    await page.locator(`[data-shipping-request-id="${created.request_id}"]`).click();
 
     const transitionResponse = page.waitForResponse((response) => (
       response.request().method() === "POST"

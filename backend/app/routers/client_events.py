@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app._evt import emit
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActor
 from app.services import activity_audit
 from app.services.realtime import suppress_realtime_revision
 from app.services.audit_actor_session import clear_audit_actor_cookie
@@ -60,6 +61,7 @@ def _clean_field(value: Any, *, max_length: int = MAX_FIELD_LENGTH) -> str | Non
 def client_event(
     response: Response,
     request: Request,
+    _actor: VerifiedActor,
     payload: dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
 ) -> Response:

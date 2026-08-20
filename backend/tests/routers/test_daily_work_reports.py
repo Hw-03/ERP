@@ -134,9 +134,9 @@ def test_daily_work_report_put_rejects_impersonation_inactive_and_invalid_conten
     too_long = _put(client, employee, "x" * 5001)
 
     assert impersonation.status_code == 403
-    assert impersonation.json()["detail"]["message"] == "본인 일보만 작성할 수 있습니다."
+    assert impersonation.json()["detail"]["code"] == "ACTOR_MISMATCH"
     assert inactive_response.status_code == 403
-    assert inactive_response.json()["detail"]["message"] == "비활성 직원은 일보를 작성할 수 없습니다."
+    assert inactive_response.json()["detail"]["code"] == "EMPLOYEE_INACTIVE"
     assert blank.status_code == 422
     assert blank.json()["detail"]["message"] == "일보 내용을 입력해 주세요."
     assert too_long.status_code == 422

@@ -4,11 +4,11 @@
  * 라이브 정책(2026-06-04 확인):
  *  - 창고 정/부가 창고-결재 요청을 제출하면 **자가승인되어 즉시 반영**(큐 미적재).
  *    → 풀사이클 검증은 제출자=일반직원(E01), 승인자=창고 정(E22) 으로 분리해야 한다.
- *  - 승인은 "승인" → 승인 PIN(기본 0000) → "승인 확정" 2단계.
+ *  - 승인은 "승인" → 격리 E2E 작업자 PIN → "승인 확정" 2단계.
  *  - 창고 승인함에는 E01 의 warehouse_to_dept 요청만 적재됨(다른 spec 은 E22 자가승인) → 큐 소멸 검증 안전.
  */
 import { expect, test } from "@playwright/test";
-import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType, readSeed } from "./_helpers";
 
 test.describe("결재 풀사이클 — 창고 승인", () => {
   test("E01 제출(창고→부서) → E22 창고 승인함 PIN 승인 → 큐 소멸", async ({ browser }) => {
@@ -43,9 +43,9 @@ test.describe("결재 풀사이클 — 창고 승인", () => {
     await expect(b.getByText("창고 → 부서")).toBeVisible();
     await expect(b.getByText(/김민재/)).toBeVisible();
 
-    // 승인 → PIN 0000 → 승인 확정
+    // 승인 → 격리 E2E PIN → 승인 확정
     await b.getByRole("button", { name: "승인", exact: true }).click();
-    await b.getByRole("textbox", { name: "0000" }).fill("0000");
+    await b.getByRole("textbox", { name: "0000" }).fill(readSeed().operatorPin);
     await b.getByRole("button", { name: "승인 확정" }).click();
 
     // 승인 반영 → 창고 승인함 비워짐

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import inspect
+from typing import get_type_hints
 
 import pytest
 from sqlalchemy import event
 
 from app.models import (
     DepartmentEnum,
+    Employee,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
@@ -37,11 +40,124 @@ def _line(
     )
 
 
+def _employee(db_session, *, code: str = "RESERVE-ACTOR") -> Employee:
+    employee = Employee(
+        employee_code=code,
+        name="예약 작업자",
+        role="테스트",
+        department=ASSEMBLY,
+        display_order=1,
+        is_active="true",
+    )
+    db_session.add(employee)
+    db_session.flush()
+    return employee
+
+
+def test_reserve_lines_requires_keyword_only_employee_actor() -> None:
+    from app.services import sr_reservation
+
+    parameter = inspect.signature(sr_reservation.reserve_lines).parameters["employee"]
+
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameter.default is inspect.Parameter.empty
+    assert get_type_hints(sr_reservation.reserve_lines)["employee"] is Employee
+
+
+def test_reserve_lines_rejects_non_employee_before_location_mutation(
+    make_item,
+    make_location,
+    db_session,
+) -> None:
+    from app.services import sr_reservation
+
+    item = make_item(name="actor-required-location")
+    location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    lines = [_line(item.item_id, 1, RequestBucketEnum.PRODUCTION, ASSEMBLY)]
+
+    for invalid_actor in (None, object()):
+        with pytest.raises(TypeError, match="employee must be an Employee"):
+            sr_reservation.reserve_lines(
+                db_session,
+                lines,
+                employee=invalid_actor,
+            )
+        db_session.refresh(location)
+        assert location.pending_quantity == D("0")
+
+
+def test_warehouse_reserve_rejects_primitive_actor_before_mutation(
+    make_item,
+    db_session,
+) -> None:
+    item = make_item(name="primitive-reserver", warehouse_qty=D("5"))
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+
+    with pytest.raises(TypeError, match="employee must be an Employee"):
+        inventory_svc.reserve(
+            db_session,
+            item.item_id,
+            D("1"),
+            employee=object(),
+        )
+
+    db_session.refresh(inventory)
+    assert inventory.pending_quantity == D("0")
+    assert inventory.last_reserver_employee_id is None
+    assert inventory.last_reserver_name is None
+
+
+def test_warehouse_reserve_rejects_employee_name_spoof_argument(
+    make_item,
+    db_session,
+) -> None:
+    item = make_item(name="spoof-reserver", warehouse_qty=D("5"))
+    employee = _employee(db_session, code="RESERVE-SPOOF-ACTOR")
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+
+    with pytest.raises(TypeError):
+        inventory_svc.reserve(
+            db_session,
+            item.item_id,
+            D("1"),
+            employee=employee,
+            employee_name="위조 작업자",
+        )
+
+    db_session.refresh(inventory)
+    assert inventory.pending_quantity == D("0")
+    assert inventory.last_reserver_employee_id is None
+    assert inventory.last_reserver_name is None
+
+
+def test_warehouse_reserve_snapshots_verified_employee(
+    make_item,
+    db_session,
+) -> None:
+    item = make_item(name="verified-reserver", warehouse_qty=D("5"))
+    employee = _employee(db_session)
+
+    inventory = inventory_svc.reserve(
+        db_session,
+        item.item_id,
+        D("1"),
+        employee=employee,
+    )
+
+    assert inventory.pending_quantity == D("1")
+    assert inventory.last_reserver_employee_id == employee.employee_id
+    assert inventory.last_reserver_name == employee.name
+
+
 def test_location_reserve_and_release_are_atomic(make_item, make_location, db_session):
     item = make_item()
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
 
-    inventory_svc.reserve_location(
+    inventory_svc._reserve_location(
         db_session,
         item.item_id,
         D("4"),
@@ -49,7 +165,7 @@ def test_location_reserve_and_release_are_atomic(make_item, make_location, db_se
         status=LocationStatusEnum.PRODUCTION,
     )
     with pytest.raises(ValueError):
-        inventory_svc.reserve_location(
+        inventory_svc._reserve_location(
             db_session,
             item.item_id,
             D("2"),
@@ -59,7 +175,7 @@ def test_location_reserve_and_release_are_atomic(make_item, make_location, db_se
 
     db_session.refresh(location)
     assert location.pending_quantity == D("4")
-    inventory_svc.release_location(
+    inventory_svc._release_location(
         db_session,
         item.item_id,
         D("4"),
@@ -92,7 +208,7 @@ def test_ensure_and_lock_inventories_uses_bounded_bulk_queries(
 
     event.listen(bind, "before_cursor_execute", record_inventory_sql)
     try:
-        locked = inventory_svc.ensure_and_lock_inventories(
+        locked = inventory_svc._ensure_and_lock_inventories(
             db_session,
             [item.item_id for item in reversed(items)] + [items[0].item_id],
         )
@@ -138,7 +254,7 @@ def test_ensure_and_lock_inventories_tolerates_concurrent_insert_winner(
 
     monkeypatch.setattr(inventory_svc, "lock_inventories", lock_with_concurrent_winner)
 
-    locked = inventory_svc.ensure_and_lock_inventories(db_session, [item.item_id])
+    locked = inventory_svc._ensure_and_lock_inventories(db_session, [item.item_id])
 
     assert set(locked) == {item.item_id}
     assert db_session.query(Inventory).filter(
@@ -146,13 +262,13 @@ def test_ensure_and_lock_inventories_tolerates_concurrent_insert_winner(
     ).count() == 1
 
 
-@pytest.mark.parametrize("operation", ["reserve_location", "release_location"])
+@pytest.mark.parametrize("operation", ["_reserve_location", "_release_location"])
 def test_location_reservation_mutation_prelocks_parent_inventory(
     make_item, make_location, db_session, monkeypatch, operation
 ):
     item = make_item(name=f"{operation}-parent-lock")
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
-    if operation == "release_location":
+    if operation == "_release_location":
         location.pending_quantity = D("1")
         db_session.flush()
     calls = []
@@ -180,6 +296,7 @@ def test_source_aware_reservation_aggregates_and_sorts_all_outgoing_sources(
 ):
     from app.services import sr_reservation
 
+    employee = _employee(db_session, code="RESERVE-SOURCE-ACTOR")
     first = make_item(name="first", warehouse_qty=D("10"))
     second = make_item(name="second")
     production = make_location(second.item_id, department=ASSEMBLY, quantity=D("8"))
@@ -199,7 +316,7 @@ def test_source_aware_reservation_aggregates_and_sorts_all_outgoing_sources(
 
     groups = sr_reservation.aggregate_reservations(lines)
     assert groups == sorted(groups, key=lambda group: group.sort_key)
-    sr_reservation.reserve_lines(db_session, lines)
+    sr_reservation.reserve_lines(db_session, lines, employee=employee)
 
     warehouse = db_session.query(Inventory).filter(Inventory.item_id == first.item_id).one()
     db_session.refresh(production)
@@ -208,7 +325,7 @@ def test_source_aware_reservation_aggregates_and_sorts_all_outgoing_sources(
     assert production.pending_quantity == D("3")
     assert defective.pending_quantity == D("4")
 
-    sr_reservation.release_lines(db_session, lines)
+    sr_reservation._release_lines(db_session, lines)
     db_session.refresh(warehouse)
     db_session.refresh(production)
     db_session.refresh(defective)
@@ -219,13 +336,14 @@ def test_source_aware_reservation_aggregates_and_sorts_all_outgoing_sources(
 
 @pytest.mark.parametrize(
     "operation",
-    ["reserve_lines", "release_lines", "release_lines_best_effort"],
+    ["reserve_lines", "_release_lines", "_release_lines_best_effort"],
 )
 def test_source_mutations_prelock_sorted_unique_inventories(
     make_item, db_session, monkeypatch, operation
 ):
     from app.services import sr_reservation
 
+    employee = _employee(db_session, code=f"RESERVE-PRELOCK-{operation}")
     first = make_item(name=f"{operation}-first", warehouse_qty=D("10"))
     second = make_item(name=f"{operation}-second")
     lines = [
@@ -253,7 +371,7 @@ def test_source_mutations_prelock_sorted_unique_inventories(
     if operation == "reserve_lines":
         monkeypatch.setattr(
             sr_reservation.inventory_svc,
-            "reserve_location",
+            "_reserve_location",
             mutate_location,
         )
         monkeypatch.setattr(
@@ -264,16 +382,17 @@ def test_source_mutations_prelock_sorted_unique_inventories(
     else:
         monkeypatch.setattr(
             sr_reservation.inventory_svc,
-            "release_location",
+            "_release_location",
             mutate_location,
         )
         monkeypatch.setattr(
             sr_reservation.inventory_svc,
-            "release",
+            "_release",
             mutate_warehouse,
         )
 
-    getattr(sr_reservation, operation)(db_session, lines)
+    kwargs = {"employee": employee} if operation == "reserve_lines" else {}
+    getattr(sr_reservation, operation)(db_session, lines, **kwargs)
 
     assert events == [
         ("lock", sorted({first.item_id, second.item_id})),
@@ -287,6 +406,7 @@ def test_reserve_lines_keeps_warehouse_inventory_creation_for_missing_row(
 ):
     from app.services import sr_reservation
 
+    employee = _employee(db_session, code="RESERVE-MISSING-ACTOR")
     item = make_item(name="missing-inventory-reservation")
     inventory = db_session.query(Inventory).filter(
         Inventory.item_id == item.item_id
@@ -298,6 +418,7 @@ def test_reserve_lines_keeps_warehouse_inventory_creation_for_missing_row(
         sr_reservation.reserve_lines(
             db_session,
             [_line(item.item_id, 1, RequestBucketEnum.WAREHOUSE)],
+            employee=employee,
         )
 
     assert db_session.query(Inventory).filter(
@@ -310,6 +431,7 @@ def test_same_item_different_departments_reserve_independently(
 ):
     from app.services import sr_reservation
 
+    employee = _employee(db_session, code="RESERVE-DEPT-ACTOR")
     item = make_item()
     assembly = make_location(item.item_id, department=ASSEMBLY, quantity=D("2"))
     tube = make_location(item.item_id, department=TUBE, quantity=D("5"))
@@ -322,6 +444,7 @@ def test_same_item_different_departments_reserve_independently(
                 _line(item.item_id, 3, RequestBucketEnum.PRODUCTION, ASSEMBLY),
                 _line(item.item_id, 3, RequestBucketEnum.PRODUCTION, TUBE),
             ],
+            employee=employee,
         )
 
     db_session.rollback()

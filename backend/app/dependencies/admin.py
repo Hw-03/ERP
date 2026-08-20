@@ -3,7 +3,6 @@
 다중 adapter:
   - HTTP header X-Admin-Pin (선호)
   - body의 pin 필드 (기존 호환)
-  - query parameter pin (deprecated)
 
 사용법:
     from app.dependencies.admin import require_admin_pin
@@ -21,27 +20,23 @@
 
 from typing import Annotated, Optional
 
-from fastapi import Depends, Header, Query, Request
+from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import CurrentActor
 from app.routers._errors import ErrorCode, http_error
 from app.routers.settings import require_admin, require_admin_readonly
+from app.services import rate_limit
 
 
 async def extract_admin_pin(
     request: Request,
     x_admin_pin: Annotated[Optional[str], Header(alias="X-Admin-Pin")] = None,
-    pin: Annotated[
-        Optional[str],
-        Query(description="관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)", deprecated=True),
-    ] = None,
 ) -> str:
-    """다중 source에서 PIN 추출. 우선순위: 헤더 → query → body."""
+    """로그에 남지 않는 source에서 PIN 추출. 우선순위: 헤더 → body."""
     if x_admin_pin:
         return x_admin_pin
-    if pin:
-        return pin
     # body의 pin 필드 — Pydantic 모델이 미리 parse 되어 있을 수 있어 request.json() 사용.
     # GET/DELETE처럼 body 없으면 예외 없이 빈 dict 처리.
     try:
@@ -55,13 +50,22 @@ async def extract_admin_pin(
 
 def require_admin_pin(
     request: Request,
+    actor: CurrentActor,
     pin_value: Annotated[str, Depends(extract_admin_pin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
     """모든 admin 엔드포인트 시그니처에 추가:
         _admin: Annotated[None, Depends(require_admin_pin)]
     """
+    rate_key = rate_limit.admin_credential_key(request, actor.employee_id)
+    if not rate_limit.admit_attempt(rate_key):
+        raise http_error(
+            429,
+            ErrorCode.TOO_MANY_REQUESTS,
+            "관리자 PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        )
     if request.method in {"GET", "HEAD"}:
         require_admin_readonly(db, pin_value)
     else:
-        require_admin(db, pin_value)
+        require_admin(db, pin_value, commit_lazy_changes=False)
+    rate_limit.record_success(rate_key)

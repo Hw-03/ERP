@@ -7,11 +7,11 @@
 - 원 감사 기준일·SHA: 2026-08-13 KST, `71d6a34faf27ef736fe7dc64a5084ff2a7f46893`
 - 첫 개선 체크포인트 기준 SHA: `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`
 - 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
-- 최신 `main` 동기화 SHA: `dcf5835e83def3885d460beba428af354b7685cf`
+- 최신 `main` 동기화 SHA: `c01034a3b923ed2b96a75dd30f825eab9d0eb3a8`
 - 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
-- Git 상태: 로컬 전용 브랜치 `codex/full-code-quality-improvement`. 체크포인트 2 구현 `3c75558c`, 최신 `main` 병합, 설계 문서와 PostgreSQL 실증 보강을 거친 최신 구현 커밋 `e6db237b`; 원격 push·upstream·`main` 역병합 없음
-- 실행 진척: 체크포인트 1 완료. 체크포인트 2의 `IC-04`·`IC-20` 저장소 구현·이중 리뷰·로컬 커밋과 최신 `main` 동기화를 완료했다. 이후 공식 EDB PostgreSQL 16의 폐기 가능한 로컬 cluster에서 clean base→head, schema check, 공통 두 연결 경합 4행을 skip 없이 통과했다. 사용자의 로컬 전용 운영 결정에 따라 GitHub CI와 required-check 적용만 최종 통합 전까지 보류한다.
-- 잔여 작업: 엄격한 완료 판정상 `IC` 24개 중 `IC-04`·`IC-20`은 외부 증거 대기, 나머지 22개는 미착수다. 최종 closeout은 `DOC-01`, `AT-01`, `AT-02`다.
+- Git 상태: 로컬 전용 브랜치 `codex/full-code-quality-improvement`, 현재 HEAD `27da6e25718453378160fb9b930d8ed9cff8b622`. 최신 `main` `c01034a3` 병합 뒤의 working diff로 체크포인트 3을 구현했으며, 원격 push·upstream 변경·`main` 역병합·체크포인트 3 commit은 없음
+- 실행 진척: 체크포인트 1 완료. 체크포인트 2의 `IC-04`·`IC-20`은 로컬 구현·PostgreSQL 실증을 완료했지만 GitHub CI·required-check 증거를 보류한다. 체크포인트 3의 `IC-01`은 승인 설계에 따라 구현하고 SQLite·Node 20·Playwright 통합 gate를 통과했다. 이번 환경에는 `TEST_POSTGRES_URL`이 없어 체크포인트 3 전용 PostgreSQL 폐기 경합은 `NOT_VERIFIED`다.
+- 잔여 작업: 엄격한 완료 판정상 `IC` 23개가 남는다. 이 중 `IC-04`·`IC-20`은 외부 증거 대기이고, 체크포인트 4 이후 21개는 미착수다. 최종 closeout은 `DOC-01`, `AT-01`, `AT-02`다.
 - 최종 판정: **조건부 사용 가능**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
@@ -85,7 +85,7 @@
 1. 첫 체크포인트에서 서버 시작 DB 보호 경계를 read-only로 되돌렸다(`IC-27` 완료).
 2. 부서조정 `scrap` 무음 성공을 막고 무결성 복구·감사 로그를 한 transaction으로 묶었다(`IC-02`, `IC-05` 완료).
 3. 체크포인트 2에서 필수 PostgreSQL·E2E·type gate를 먼저 완성하고, 재고를 다시 바꿀 수 있는 기존 출하가 있으면 cutover를 fail-closed한다(`IC-20`, `IC-04`).
-4. 체크포인트 3에서 session 발급 자격을 먼저 결정한 뒤 서버 검증 직원 session과 공통 actor 경계를 단독 구현한다(`IC-01`). 이후 mutation API 카드는 이 경계 뒤에 배포한다.
+4. 체크포인트 3에서 session 발급 자격을 결정하고 서버 검증 직원 session과 공통 actor 경계를 구현했다(`IC-01` 완료). 이후 mutation API 카드는 이 경계 뒤에서만 배포한다.
 5. 일반 correction/cancel 안전 차단과 멱등성·조건부 전이를 거쳐 `박스+특수구역+미배치=창고`, 예약·출하 상태기계, blocking integrity 순으로 진행한다(`IC-03`, `IC-06`~`IC-10`, `IC-17`~`IC-19`).
 
 후속 실행의 단일 순서와 각 정지 조건은 8.9절의 체크포인트 2~7을 따른다. 한 체크포인트가 통합·검증·리뷰를 모두 통과하기 전에는 다음 체크포인트를 시작하지 않는다.
@@ -613,10 +613,10 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | QP | 현 상태 | 현재 근거와 판단 | 이번 successor |
 |---|---|---|---|
 | `QP-001` 결과 불명·semantic idempotency | **미해결** | frontend timeout은 abort/key 보존이 없고 IO/StockRequest는 fingerprint가 없다. defect의 semantic 409 패턴만 참고 자산이다. `api-core.ts:210-235`, `useIoSubmit.ts:20-44`, `io.py:257-267` | `IC-09` |
-| `QP-002` 행위자 위조 차단 | **미해결** | 공통 VerifiedActor 없이 body/header ID, 일부 익명/비활성 actor mutation이 남는다. | `IC-01` |
+| `QP-002` 행위자 위조 차단 | **해결** | `VerifiedActorRouter`가 등록된 모든 mutation을 기본 보호하고, 양방향 route/service manifest가 예외와 actor consumer의 차집합 0을 검사한다. body/header 식별값 불일치는 쓰기 전에 `ACTOR_MISMATCH`로 거부한다. | `IC-01` 완료 |
 | `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock이 있고 `IC-27`로 startup check의 DB identity 분리는 해소됐다. 체크포인트 2 로컬 커밋에 Alembic-head PostgreSQL 2-connection 공통 runner와 필수 CI job을 추가했고, 폐기 가능한 로컬 PostgreSQL 16에서 clean migration과 4개 잠금 행을 실제 실행했다. GitHub 필수 job과 후속 업무별 경합은 남는다. | `IC-08`, `IC-18`; `IC-20` GitHub 증거 대기, `IC-27` 완료 |
 | `QP-004` 승인 정책 단일 진실 | **부분 해결** | 입출고 subtype 상수와 drift test는 생겼지만 role/self/admin/list/count/button 판정은 같은 policy를 쓰지 않는다. `approval_rules.py:1-29`, `sr_execution.py:453-483` | `IC-24`; IO defect 표시/실행은 별도 `RV-007` 결정 |
-| `QP-005` 불량 idempotency·actor | **부분 해결** | same-key/different-payload semantic matcher와 중복 race는 해결. actor 검증은 공통 경계가 없어 미해결. `defects.py:135-167,293-342`, `test_defect_flow.py:323-472` | `IC-01` |
+| `QP-005` 불량 idempotency·actor | **해결** | 기존 same-key/different-payload semantic matcher·중복 race 보호에 더해, 불량 격리·해제·재작업이 세션 `Employee` actor만 서비스와 원장에 전달하고 위조 요청은 delta 0으로 거부한다. | `IC-01` 완료 |
 | `QP-006` 출하 원자 상태 전이 | **미해결** | action transaction은 생겼지만 request/allocation 상태 직렬화, command receipt, 공통 예약은 없다. | `IC-07`, `IC-08` |
 | `QP-007` 거래 정정·취소 수명주기 | **미해결** | 서비스 위임은 개선됐지만 복합 생산/출하의 업무 상태를 일반 effect 취소가 함께 되돌리지 않고 SHIP correction wrong-bucket도 있다. | `IC-03`, `IC-10` |
 | `QP-008` integrity repair 단일 commit | **해결** | `IC-05`에서 service 내부 commit을 제거하고 router가 repair→audit flush→한 commit을 소유한다. audit summary는 `report.repaired`를 사용하며 audit/flush/commit 실패가 재고·audit를 함께 rollback함을 독립 SQL로 증명했다. | `IC-05` 완료 |
@@ -624,8 +624,8 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `QP-010` 부서 dirty/save Promise | **미해결** | parent dirty false 고정과 void save가 남는다. | `IC-12` |
 | `QP-011` 출하 BOM race·dirty 의미 | **미해결** | dirty는 view 기반으로 확정 drift, BOM match는 generation/abort 없이 경쟁 가능하다. step 5 frozen layout을 건드리지 않고 hook/baseline만 고친다. | `IC-13` |
 | `QP-012` 필수 E2E gate | **부분 해결** | Gate 0의 selector/lifecycle 복구에 이어 체크포인트 2 로컬 커밋에서 E2E `continue-on-error`를 제거하고 Node 20 blocking job과 실제 출하 REQUESTED→PREPARING UI smoke를 추가했다. 로컬 E2E와 계약은 통과했으며 새 CI 실행·required-check 적용은 최종 push 전까지 보류한다. | `IC-20` 외부 증거 대기 |
-| `QP-013A` 공통 식별 경계 | **미해결** | VerifiedActor, mutation rate/identity boundary가 없다. PIN rate limiter는 일부 employee 경로뿐이다. | `IC-01` |
-| `QP-013B` PIN 보안 이행 | **대체** | 현재 SHA256/default PIN은 식별용이라는 정책이 유지된다. 인증 수단으로 격상할지는 별도 제품·운영 결정이며 이번 재고 카드에 몰아넣지 않는다. `pin_auth.py:1-29` | 결정 시 독립 security plan |
+| `QP-013A` 공통 식별 경계 | **해결** | DB-backed opaque session, 공통 `VerifiedActor`, bootstrap/system 예외 manifest, 로그인·최초 변경·일반 변경 공통 rate-limit 계약을 적용했다. | `IC-01` 완료 |
+| `QP-013B` PIN 보안 이행 | **해결** | 승인 설계로 PIN을 mutation credential로 격상했다. 신규 hash는 PBKDF2-HMAC-SHA256 600,000회·무작위 salt를 사용하고 legacy SHA-256은 성공 검증 transaction에서만 승격한다. 기본/미설정 PIN은 10분 active challenge 행의 opaque token을 원자 회전해 호출자에게 다시 전달하고, credential 예산 안에서만 새 PIN 설정을 허용하며 그 전에는 작업 세션을 발급하지 않는다. | `IC-01` 완료; HTTPS는 후속 `SEC-01` |
 | `QP-014` backend 품질 gate | **부분 해결** | 체크포인트 2 working diff에 필수 PostgreSQL job과 Ruff 3파일·mypy 2파일의 0-error blocking 범위를 추가했다. 로컬 PostgreSQL runner는 실제 엔진에서 통과했지만 전체 backend Ruff 사전 부채 184건, Python matrix 확대와 GitHub job 실행은 남는다. | `IC-20` GitHub 증거 대기, 이후 범위 확대 |
 | `QP-015` frontend test type·coverage | **부분 해결** | product typecheck에 더해 unit test 247파일 manifest/baseline과 E2E zero-error typecheck를 blocking gate로 추가했다. unit test 기존 진단 409건과 위험 module coverage 확대는 남는다. | `IC-20` 외부 증거 대기, 이후 baseline 감축 |
 | `QP-016` 접근성 공통 계약 | **미해결** | 일부 화면 테스트는 있으나 공통 focus/error/live-region 계약과 필수 a11y gate는 없다. frozen nav styling은 제외한다. | `IC-23` |
@@ -641,10 +641,10 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 | 상태 | 수 |
 |---|---:|
-| 해결 | 2 |
-| 부분 해결 | 9 |
-| 미해결 | 11 |
-| 대체 | 1 |
+| 해결 | 6 |
+| 부분 해결 | 8 |
+| 미해결 | 9 |
+| 대체 | 0 |
 | 근거 부족 | 1 |
 
 `QP-013`을 A/B 두 결정으로 나눠 세었기 때문에 표의 판정 행은 24개지만 원래 QP 번호는 23개 모두 정확히 한 번 이상 판정했다.
@@ -681,13 +681,15 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-01` 서버 검증 직원 세션과 VerifiedActor mutation 경계
 
+- **체크포인트 상태:** `완료`. 승인 설계, TDD 구현, 카드별 focused 검증, SQLite 전체 gate, Node 20 frontend 정본 gate와 Playwright 16/16을 통과했다. 체크포인트 3 전용 PostgreSQL 폐기 경합은 URL 부재로 `NOT_VERIFIED`이며 통과로 계산하지 않는다.
 - **작업자 영향:** 누가 수량을 바꿨는지 믿을 수 없으면 수량이 맞아도 원장과 책임 추적을 믿을 수 없다.
 - **근거/근본 원인:** `CQ-001`. router마다 body UUID, 사번 header, 이름 문자열, 무입력을 다르게 신뢰한다.
-- **수정 경계:** 로그인 성공 시 backend가 무작위 opaque token의 SHA-256만 DB session table에 저장하고, 브라우저에는 HttpOnly·SameSite=Lax session cookie를 발급한다. 절대 만료는 12시간이며 로그아웃, PIN 변경·초기화, 직원 비활성화·삭제, backend `boot_id` 변경에서 즉시 폐기한다. `backend/app/dependencies/verified_actor.py`는 이 서버 검증 identity에서 actor를 만들며 StockRequest, IO, defect, production, shipping, dept-adjustment mutation router가 동일 actor object만 service에 전달한다. `_actor.py`는 request context adapter로 축소하고 frontend `sessionStorage` 값은 표시 편의일 뿐 권한 source로 쓰지 않는다.
-- **API/type/schema:** `POST /api/operator-session/login`, `GET /api/operator-session`, `DELETE /api/operator-session`을 추가하고 기존 PIN 확인 endpoint는 한 release 동안 같은 cookie를 발급하는 호환 alias로 둔다. 기존 header/body 직원 값은 표시/요청 대상 값으로만 받고 verified session actor와 다르면 403이다. active 직원, endpoint별 부서/role을 서버에서 검증한다. 기존 audit UUID/code는 유지한다.
-- **실패·취소·경합 정책:** actor 검증 실패는 mutation 전에 401/403으로 끝나며 재고·요청·로그·event가 0이어야 한다. actor는 transaction 중간에 다시 body 값으로 교체할 수 없다.
-- **테스트:** 정상 session, 무서명/변조/만료/revoked session, sessionStorage/header/body만 피해자 값으로 맞춘 위장, 비활성 actor, 다른 body/header, 타 부서 actor matrix. 픽업·생산·불량의 실제 delta와 audit actor까지 확인한다.
-- **합격 조건:** 공통 dependency를 우회하는 활성 재고 mutation router가 0이고, 피해자 ID/header만 아는 client가 피해자로 mutation할 수 없으며 모든 mismatch가 mutation 0을 증명한다.
+- **수정 경계:** 로그인 성공 시 backend가 CSPRNG opaque token의 SHA-256 digest만 `operator_sessions`에 저장하고 브라우저에는 HttpOnly·SameSite=Lax cookie를 발급한다. 절대 만료는 12시간이며 로그아웃, PIN 변경·초기화, 직원 비활성화·삭제, backend `boot_id` 변경에서 즉시 폐기한다. `VerifiedActorRouter`는 등록된 모든 POST/PUT/PATCH/DELETE를 기본 보호하고, IO·StockRequest·불량·생산·출하·부서조정·거래 정정/취소·인수인계·창고지도·설정/관리자 복구까지 동일한 서버 `Employee` actor만 service에 전달한다. `_actor.py`와 감사 계층은 request state adapter로 축소했으며 frontend cache와 식별 header는 권한 source가 아니다.
+- **API/type/schema:** additive migration `20260819_0023`이 `employees.pin_requires_change`, `operator_sessions`, `admin_audit_logs.bootstrap_employee_id`와 인덱스를 추가하고 legacy null/default/custom PIN을 backfill한다. `POST /api/operator-session`, `GET /api/operator-session`, `DELETE /api/operator-session`, `POST /api/operator-session/complete-pin-change`를 추가했다. 기존 `POST /api/employees/{employee_id}/verify-pin`은 한 release 동안 canonical service를 호출하는 alias다. body/header 직원 claim이 session actor와 다르면 403이며, default/미설정 PIN은 409 challenge만 만들고 작업 세션을 발급하지 않는다.
+- **PIN·감사 정책:** 신규 PIN은 PBKDF2-HMAC-SHA256 600,000회·무작위 salt의 버전형 문자열로 저장하고, legacy 비기본 SHA-256은 로그인 성공 transaction에서만 승격한다. 기본 PIN challenge는 `verified_actor`가 아니며 `bootstrap_employee_id`와 request ID로 별도 감사한다. 관리자 PIN의 기존 결정론적 hash 계약은 직원 PBKDF2 helper와 분리해 유지한다.
+- **실패·취소·경합 정책:** actor 검증 실패는 mutation 전에 401/403으로 끝나며 재고·요청·로그·event가 0이다. mutation dependency는 session·employee 행을 잠그고, 폐기와 경합할 때 SQLite `BEGIN IMMEDIATE` 또는 PostgreSQL `FOR UPDATE`의 한 순서만 성공할 수 있게 한다. actor는 transaction 중간에 body 값으로 교체할 수 없다.
+- **테스트:** migration upgrade/forward-compatible 재실행, null/default/custom PIN, 정상·변조·만료·revoke·restart·비활성·삭제 cascade, 기본 PIN mutation 0, spoof·rollback, route/service manifest 양방향 차집합 0, 실제 IO·StockRequest·불량·생산·출하·부서조정·거래·인수인계·창고지도·설정 경계를 검증했다. frontend는 로그인·최초 변경·reload 복원·logout·401 복귀와 실제 쿠키 E2E를 검증했다.
+- **합격 조건:** 등록된 공통 dependency 우회 mutation router 0, manifest 미분류/중복 0, 피해자 ID/header만 아는 client의 피해자 mutation 0, default/미설정 PIN의 새 PIN 설정 전 mutation 0을 충족했다. SQLite 경합은 통과했고 PostgreSQL 경합은 `TEST_POSTGRES_URL` 부재로 `NOT_VERIFIED`다.
 - **의존성/롤백:** `IC-02`·`IC-05`의 국소 데이터 수정과 병렬 설계할 수 있으나, 나머지 mutation API 카드는 이 경계 이후 배포한다. rollback은 서버 session 발급/검증을 한 release 호환 mode로 유지하되 무검증 header 신뢰로 되돌아가지 않고 mutation을 fail-closed한다.
 
 #### `IC-02` 부서조정 `scrap` 무음 성공 제거
@@ -1072,21 +1074,21 @@ flowchart LR
 >
 > **추천 실행 형태: 부모 통합 + 경계가 겹치지 않는 카드별 하위 에이전트** - 구현 파일 소유권을 분리하고 최종 통합·검증·상태 갱신은 부모가 맡습니다.
 
-**남은 실행 GOAL:** DB-backed 12시간 작업자 세션과 추적 재고 불변식을 기반으로 남은 24개 IC 카드를 의존 순서대로 구현해 권한 위장, 잘못된 취소, 중복 반영, 예약 선점, 운영 false-green을 제거한다.
+**남은 실행 GOAL:** 체크포인트 3에서 확립한 DB-backed 12시간 작업자 세션과 추적 재고 불변식을 기반으로 남은 23개 IC 카드를 의존 순서대로 구현해 잘못된 취소, 중복 반영, 예약 선점, 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현이 끝났지만 GitHub 외부 증거 대기 상태이므로 이 수에 포함한다.
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`을 완료했다. 체크포인트 2에서는 `IC-04`와 `IC-20`의 저장소 구현·이중 리뷰·로컬 커밋과 폐기 가능한 PostgreSQL 16 실증까지 끝냈지만, GitHub 필수 job과 required-check 증거가 없으므로 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 24개**이며, 외부 증거가 확보되는 즉시 22개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 24개에 포함하지 않고 마지막 closeout으로 수행한다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`을 완료했다. 체크포인트 2에서는 `IC-04`와 `IC-20`의 저장소 구현·이중 리뷰·로컬 커밋과 폐기 가능한 PostgreSQL 16 실증까지 끝냈지만, GitHub 필수 job과 required-check 증거가 없으므로 엄격한 완료 상태로 올리지 않는다. 체크포인트 3에서 `IC-01`을 완료했으므로 **남은 IC는 23개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 21개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
 | 체크포인트 1 | `완료` | `IC-02`, `IC-05`, `IC-27`; `IC-20` 일부 | 24 |
 | 체크포인트 2 | `로컬 구현·리뷰·커밋·PostgreSQL 실증 완료 / GitHub 증거 보류` | `IC-04`, `IC-20` | 외부 증거 전 24, 통과 후 22 |
-| 체크포인트 3 | `대기` | `IC-01` | 21 |
-| 체크포인트 4 | `대기` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 안전 차단까지만 | 18 |
-| 체크포인트 5 | `대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 11 |
-| 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 4 |
-| 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 0 |
+| 체크포인트 3 | `완료 / PostgreSQL 경합 NOT_VERIFIED` | `IC-01` | 외부 증거 전 23, 통과 후 21 |
+| 체크포인트 4 | `대기` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 안전 차단까지만 | 외부 증거 전 20, 통과 후 18 |
+| 체크포인트 5 | `대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
+| 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
+| 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
 
 체크포인트를 합치지 않는다. 특히 2는 후속 동시성 증거와 cutover kill-switch, 3은 actor trust root, 4는 일반 command의 안전 차단·멱등·경합, 5는 물리 원장부터 운영 readiness까지의 엄격한 직렬 chain이다. 6과 7도 화면 행동과 계약·정리 작업을 분리해 행동 변경과 물리 이동을 같은 diff에 섞지 않는다.
 
@@ -1130,21 +1132,21 @@ flowchart LR
 
 **GOAL:** 세션 발급 자격을 명시적으로 결정하고 DB-backed 12시간 서버 세션을 모든 재고 mutation의 단일 VerifiedActor 경계로 만든다.
 
-- [ ] **인증 bootstrap 결정:** 서버 session을 누구에게 발급할지, 기존 직원 PIN이 단순 식별에서 인증 credential로 격상되는지, 격상한다면 hash·rate limit·lockout·초기 PIN 이행을 어떻게 할지 별도 ADR과 사용자 승인으로 고정한다.
-- [ ] **`IC-01` session core:** 무작위 opaque token의 hash만 DB에 저장하고 HttpOnly·SameSite=Lax cookie, 12시간 절대 만료, logout·credential 변경·직원 비활성화/삭제·`boot_id` 변경 revoke를 적용한다.
-- [ ] **mutation surface manifest:** FastAPI의 모든 POST/PUT/PATCH/DELETE와 실제 service consumer를 manifest로 만들고 `inventory`, IO, StockRequest, defect, production, shipping, dept-adjustment, transaction correction/cancel, handover receive, warehouse-map, settings/admin repair 등 재고·업무 상태 변경 표면을 분류한다. actor가 필요 없는 표면은 서버 검증 근거와 의도적 예외 이유를 명시한다.
-- [ ] **`VerifiedActor` 전환:** 위 manifest의 활성 재고·업무 mutation은 공통 dependency가 만든 actor만 service에 전달한다. header/body/sessionStorage 값은 권한 source가 아니다.
-- [ ] **호환 경계:** 기존 PIN 확인 alias가 무검증 actor나 무자격 session을 발급하지 않게 하고, session actor와 body/header 대상 직원이 다르면 mutation 전에 401/403으로 끝낸다.
+- [x] **인증 bootstrap 결정:** 승인 설계 `docs/superpowers/specs/2026-08-19-verified-operator-session-design.md`에서 PIN의 mutation credential 격상, PBKDF2 600,000회, rate-limit, default/미설정 PIN의 대면 최초 변경 절차와 1회 challenge를 고정했다.
+- [x] **`IC-01` session core:** 무작위 opaque token의 hash만 DB에 저장하고 HttpOnly·SameSite=Lax cookie, 12시간 절대 만료, logout·credential 변경·직원 비활성화/삭제·`boot_id` 변경 revoke를 적용했다.
+- [x] **mutation surface manifest:** FastAPI의 모든 POST/PUT/PATCH/DELETE와 실제 service actor consumer를 양방향 manifest로 고정했다. bootstrap/system 예외는 이유 map과 정확히 일치하며 신규 미분류 route는 test에서 실패한다.
+- [x] **`VerifiedActor` 전환:** IO, StockRequest, defect, production, shipping, dept-adjustment, transaction correction/cancel, handover, warehouse-map, settings/admin repair를 포함한 활성 mutation은 공통 dependency의 `Employee`만 service에 전달한다.
+- [x] **호환 경계:** 기존 PIN 확인 alias는 canonical session service를 사용하고, 무자격/default actor는 작업 세션을 받지 못한다. session actor와 body/header claim이 다르면 mutation 전에 401/403으로 끝난다.
 
 이 체크포인트는 단독 실행한다. 인증과 mutation router를 여러 구현 에이전트가 동시에 고치면 호환 alias·cookie·actor audit 경계가 갈라질 수 있으므로 characterization 조사만 병렬화하고 production diff는 한 owner가 순차 소유한다.
 
-**확정된 것과 미결정인 것:** DB-backed opaque server session과 12시간 절대 만료는 확정됐다. 하지만 현재 문서의 “PIN은 식별 수단” 정책과 session 발급 credential은 아직 양립 방법이 정해지지 않았다. 이 모순을 해결하기 전에는 코드를 쓰지 않는다.
+**결정 결과:** PIN을 mutation credential로 격상하되 4자리 PIN의 한계를 인정하고, PBKDF2·rate-limit·기본 PIN 최초 변경·세션 revoke를 함께 적용했다. 기본 PIN challenge는 강한 본인 확인이 아니므로 관리자 대면 설정을 운영 절차로 고정하고, HTTP 전송 구간 위험과 `Secure` cookie 강제는 후속 `SEC-01`로 남긴다.
 
-**비범위:** 부서별 권한 matrix 재설계, responsive login UI 개편, 직원 환경 배포. credential 정책이 PIN 보안 격상을 요구하면 `QP-013B`를 대체 상태에서 다시 열고 이 체크포인트 범위·테스트를 사용자에게 재승인받는다.
+**비범위:** 부서별 권한 matrix 재설계, responsive login UI 개편, 직원 환경 배포, 회사 도메인·DNS·HTTPS·인증서·Caddy. 후속 `SEC-01` 전에는 신뢰할 수 없는 네트워크나 인터넷 공개에 안전하다고 판정하지 않는다.
 
 **필수 검증:** session migration upgrade/forward recovery, 정상 발급, 변조·만료·revoke·restart, 비활성 actor, 다른 body/header, 피해자 식별값 위장, mutation surface manifest 양방향 차집합 0, transaction/handover/warehouse-map/settings를 포함한 우회 scan, 실제 pickup·production·defect·correction·handover의 SQL delta와 audit actor, frontend login/logout/reload E2E.
 
-**완료·정지 조건:** session 발급 credential 모순 0, 공통 dependency 우회 mutation router 0, actor 불일치·무자격 session의 inventory/request/log/event 0. `IC-01`만 완료하고 멈춘다.
+**완료·정지 조건:** session 발급 credential 모순 0, 공통 dependency 우회 mutation router 0, actor 불일치·무자격 session의 inventory/request/log/event 0을 SQLite·HTTP·브라우저에서 충족했다. PostgreSQL 전용 폐기 경합은 `NOT_VERIFIED`로 남기되 사용자의 환경 부재 예외에 따라 `IC-01`과 체크포인트 3을 완료 처리하고, 체크포인트 4를 시작하지 않고 멈춘다.
 
 #### 8.9.5 체크포인트 4 — 일반 취소 차단·멱등·조건부 command `[GPT-5.6 Sol] [부분 병렬]`
 
@@ -1237,7 +1239,7 @@ flowchart LR
 ```mermaid
 flowchart LR
   C1["체크포인트 1 완료: IC-02·05·27"] --> C2["2: 필수 gate·cutover kill-switch"]
-  C2 --> C3["3: VerifiedActor"]
+  C2 --> C3["3 완료: IC-01 VerifiedActor"]
   C3 --> C4["4: 취소 차단·멱등·조건부 command"]
   C4 --> C5["5: 위치·예약·integrity·운영 진실"]
   C5 --> C6["6: 화면 freshness"]
@@ -1245,7 +1247,7 @@ flowchart LR
   C6 --> C7
 ```
 
-다음 제품 구현 시작점은 체크포인트 3이다. 체크포인트 2의 로컬 PostgreSQL 증거는 확보했지만 GitHub CI·required-check 증거는 사용자의 로컬 전용 브랜치 운영 결정에 따라 최종 push 전까지 보류되며, 이 외부 미검증 경계를 완료로 오인하지 않는다. 각 체크포인트 종료 시 품질 브랜치에 로컬 커밋한 뒤 최신 `origin/main`을 품질 브랜치로만 병합하고, 변경분 재감사와 통합 검증을 통과해야 다음 구현을 시작한다.
+다음 제품 구현 시작점은 체크포인트 4다. 이번 작업은 체크포인트 3에서 정지하며 체크포인트 4의 `IC-03-A`, `IC-09`, `IC-10`, `IC-11`을 시작하지 않았다. 체크포인트 2의 로컬 PostgreSQL 증거는 확보했지만 GitHub CI·required-check 증거는 사용자의 로컬 전용 브랜치 운영 결정에 따라 최종 push 전까지 보류되며, 이 외부 미검증 경계를 완료로 오인하지 않는다. 브랜치·commit·push·최신 `origin/main` 재병합은 별도 사용자 승인 전 수행하지 않는다.
 
 ---
 ## 9. 테스트·운영 검증 보강안
@@ -1812,5 +1814,18 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 - **전체 정본 gate:** Node 20과 위 전용 PostgreSQL URL을 명시한 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`가 exit 0이었다. backend Ruff/mypy/PostgreSQL/full pytest/OpenAPI, frontend lint/app·unit·E2E type/coverage/build/bundle, docs, worktree DB read-only, Playwright **15/15**가 모두 통과했다. 그 뒤 계산식 의미 괄호를 보존하는 좁은 fail-closed guard를 추가한 최종 코드에는 staged smart backend gate를 다시 실행해 Ruff/mypy/PostgreSQL 4행/full pytest/OpenAPI가 모두 exit 0임을 확인했다. worktree `backend/mes.db` SHA-256은 전후 `F427E7E53BFABEA900D6D6A6A18385BE09734966DC89F182FFA33C2DC53061B5`로 같았다.
 - **잔존·정리:** runner 종료 뒤 임시 schema와 public의 item/inventory/box/shipping/log 테스트 row가 모두 0임을 SQL로 확인했다. `test_dexcowin_ci`를 삭제하고 전용 cluster를 정상 종료했으며 `pg_ctl status=3`, `pg_isready=2`로 비실행을 확인했다. 원본 로그는 `_attic/runtime/code-quality-improvement/20260819-cp2-postgres-evidence/`에 보존한다.
 - **남은 외부 경계:** GitHub에 push하지 않았으므로 새 E2E·PostgreSQL workflow의 원격 성공과 required-check 적용은 아직 증명되지 않았다. 회사 도메인·DNS·홈페이지·인증서와 직원 환경은 이번 실증 범위 밖이며 변경하지 않는다.
+
+### 12.13 체크포인트 3 `IC-01` 검증된 작업자 세션 결과 (working diff)
+
+- **기준·격리:** `27da6e25718453378160fb9b930d8ed9cff8b622` 위 로컬 품질 브랜치 working diff에서만 구현했다. `C:\ERP` 메인 워크트리는 `AGENTS.md` 읽기 외 수정·복사·stash·reset·commit을 하지 않았고, `C:\ERP-dev`의 파일·해시·검색·DB·process·port에는 접근하지 않았다. branch 전환·commit·push·PR과 체크포인트 4 이후 카드는 0이다.
+- **migration·PIN:** additive `20260819_0023`은 정상 `0022→0023` upgrade에서 legacy/null/default/custom PIN의 `pin_requires_change`를 backfill하고 `operator_sessions`와 bootstrap audit actor 필드를 추가한다. 부분 배포 재실행은 기존 column/table/index의 정확한 형상을 검증·복구하되, 이미 존재하는 `pin_requires_change=true`는 custom legacy hash라도 보수적으로 유지해 새 PIN 변경을 요구한다. 신규 직원 PIN은 PBKDF2-HMAC-SHA256 600,000회·무작위 salt이며, legacy 비기본 SHA-256은 성공 로그인 transaction에서만 승격한다. 기본/미설정 PIN은 10분 active challenge 행의 opaque token을 원자 회전해 호출자에게 usable cookie를 다시 발급하고, credential 예산 10회 안에서만 허용한다. 새 PIN 설정·재로그인 전 operator session과 mutation은 0이며 challenge 이력은 삭제하지 않는다.
+- **session·폐기:** DB에는 CSPRNG token의 SHA-256 digest만 저장하고 브라우저에는 HttpOnly·SameSite=Lax cookie를 둔다. 절대 12시간·sliding 0이며 logout, 일반 PIN 변경, 관리자 초기화, 비활성화, hard delete cascade, `boot_id` 변경에서 기존 세션이 무효화된다. 로그인 KDF는 검증된 client IP별 60회/5분, 새 세션 발급은 직원+IP별 10회/5분이며 성공에도 resource 예산을 reset하지 않는다. 같은 유효 cookie는 기존 행을 재사용하고 직원별 현재 boot active operator session은 32행으로 제한한다. HTTP LAN에서는 `Secure`를 강제하지 못하는 전송 위험을 운영 문서에 남겼고 HTTPS·인증서는 후속 `SEC-01`로 분리했다.
+- **actor manifest:** 실제 등록된 모든 HTTP mutation은 `VERIFIED_ACTOR`, `AUTH_BOOTSTRAP`, `SYSTEM_EXCEPTION` 중 정확히 하나이며 bootstrap/system 예외는 이유 map과 일치한다. Employee-annotated service actor consumer도 독립 discovery와 선언 manifest의 양방향 차집합이 0이다. IO, StockRequest, 불량, 생산, 출하, 부서조정, 거래 정정·취소, 인수인계, 창고지도, 설정·관리자 복구와 히스토리 showcase service caller까지 서버 `Employee` actor로 전환했다.
+- **spoof·rollback·SQLite:** header/body 피해자 claim, 기본 PIN, 비활성·만료·revoke·restart·삭제·malformed cookie는 mutation 전에 401/403/409로 끝나며 inventory/request/log/event delta 0을 검증했다. SQLite session-vs-revoke 양 순서와 mutation 동시성, migration forward recovery, hard-delete cascade를 포함한 backend 전체 수집 1,898건 중 **1,882 PASS, 환경 전용 16 SKIP, 실패 0**이었다.
+- **PostgreSQL:** `tests/concurrency/test_operator_session_postgres.py`를 공통 PostgreSQL runner와 필수 계약 test에 연결해 mutation-first/revoke-first 두 잠금 순서를 정의했다. 그러나 이번 실행 환경의 `TEST_POSTGRES_URL`은 미설정이므로 이 실제 두 연결 행은 **`NOT_VERIFIED`**이며 skip을 PASS로 계산하지 않는다. 사용자 지시의 환경 부재 예외에 따라 이 항목을 잔존 증거로 명시하고 CP3 완료를 막는 거짓 blocker로 만들지 않는다.
+- **frontend·브라우저:** Node 20.20.2 정본 frontend gate에서 strict lint, app/unit/E2E type, 테스트 계약 16/16, 254개 test manifest, 기존 test 진단 386개 대비 신규 종류·증가 0, Vitest **250파일/2,075테스트 PASS**, statement coverage 93.65%·branch 88.22%·function 90%, production build, bundle **2,431,128 bytes / 2,432,696.32 bytes 한도**를 통과했다. 전용 `mes_e2e.db`, 8021/3100만 사용한 Playwright는 **16/16 PASS**였고, E01/E22/E04의 실제 HttpOnly session을 setup에서 1회씩 발급한 뒤 각 새 context가 cookie와 `GET /api/operator-session`으로 actor를 재검증해 운영 발급 상한을 우회하지 않았다. teardown은 실제 `backend/mes.db` SHA-256 `F427E7E53BFABEA900D6D6A6A18385BE09734966DC89F182FFA33C2DC53061B5` 불변, listener 0, 임시 DB·seed·결과물 0을 확인했다.
+- **OpenAPI·운영:** `_dev/baselines/openapi.json`은 현재 `app.openapi()`와 구조 일치하고, 운영 문서는 대면 최초 PIN 설정, 12시간·폐기·단일 worker `boot_id`, 실패 코드·rate-limit, 90일 이상 보존·batch cleanup, token/PIN 비로그, HTTP 위험을 설명한다. frozen 주간보고, 모바일 하단 tab 디자인, desktop shipping step 5 크기는 변경하지 않았다.
+- **정적·통합 gate:** backend Ruff 전체, mypy blocking baseline, OpenAPI exact 비교, frontend strict lint·app/test/E2E type·coverage·build·bundle, maintained Markdown link checker와 `git diff --check`가 통과했다. 별도 명세 리뷰와 코드 품질 리뷰는 최종 트리에서 **Critical 0 / Important 0 / Minor 0**으로 판정했다. PostgreSQL runner는 `TEST_POSTGRES_URL` 부재를 `NOT_VERIFIED`로 종료했으며 PASS로 기록하지 않았다.
+- **기존 변경 보존:** 시작 시 이미 미커밋이던 frontend 6파일(`CapacityDetailModal`, `DesktopHistoryView.state`, `useHistoryData`, `MobileHistoryScreen.history-data`, bundle-size script/test)과 operator handoff 문서는 되돌리거나 CP3 단독 변경으로 오인하지 않았다.
 
 ---

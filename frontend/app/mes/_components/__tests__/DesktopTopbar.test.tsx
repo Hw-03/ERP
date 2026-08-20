@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DailyWorkDatePicker } from "../_daily_report/DailyWorkDatePicker";
@@ -8,11 +8,21 @@ import { DesktopTopbar } from "../DesktopTopbar";
 const notificationBellState = vi.hoisted(() => ({
   loginDialogEnabled: undefined as boolean | undefined,
   operator: null as null | { employee_id: string; name: string; department: string; warehouse_role: string; department_role: string },
+  clearCurrentOperator: vi.fn(),
+  logoutCurrentOperator: vi.fn(),
+  returnToOperatorLogin: vi.fn(),
+  changeMyPin: vi.fn(),
 }));
 
 vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => notificationBellState.operator,
-  clearCurrentOperator: vi.fn(),
+  clearCurrentOperator: notificationBellState.clearCurrentOperator,
+  logoutCurrentOperator: notificationBellState.logoutCurrentOperator,
+  returnToOperatorLogin: notificationBellState.returnToOperatorLogin,
+}));
+
+vi.mock("@/lib/api", () => ({
+  api: { changeMyPin: notificationBellState.changeMyPin },
 }));
 
 vi.mock("../notifications/NotificationBell", () => ({
@@ -23,6 +33,14 @@ vi.mock("../notifications/NotificationBell", () => ({
 }));
 
 describe("DesktopTopbar", () => {
+  beforeEach(() => {
+    notificationBellState.clearCurrentOperator.mockReset();
+    notificationBellState.logoutCurrentOperator.mockReset();
+    notificationBellState.logoutCurrentOperator.mockResolvedValue(undefined);
+    notificationBellState.returnToOperatorLogin.mockReset();
+    notificationBellState.changeMyPin.mockReset();
+    notificationBellState.changeMyPin.mockResolvedValue(undefined);
+  });
   it("uses the active tab color for the leading icon", () => {
     const { container } = render(
       <DesktopTopbar
@@ -100,5 +118,38 @@ describe("DesktopTopbar", () => {
       background: "var(--c-popup-bg)",
       boxShadow: "var(--c-popup-shadow)",
     });
+  });
+
+  it("revokes the server session when logout is confirmed", async () => {
+    notificationBellState.operator = {
+      employee_id: "emp-1", name: "김현우", department: "조립", warehouse_role: "none", department_role: "none",
+    };
+    render(<DesktopTopbar title="대시보드" onRefresh={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /김현우/ }));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    const dialog = await screen.findByRole("dialog", { name: "로그아웃" });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "로그아웃" }));
+
+    await waitFor(() => expect(notificationBellState.logoutCurrentOperator).toHaveBeenCalledTimes(1));
+  });
+
+  it("returns to login after a successful PIN change revokes the session", async () => {
+    notificationBellState.operator = {
+      employee_id: "emp-1", name: "김현우", department: "조립", warehouse_role: "none", department_role: "none",
+    };
+    render(<DesktopTopbar title="대시보드" onRefresh={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /김현우/ }));
+    fireEvent.click(screen.getByRole("button", { name: "PIN 변경" }));
+    const dialog = await screen.findByRole("dialog", { name: "PIN 변경" });
+    const inputs = dialog.querySelectorAll("input");
+    fireEvent.change(inputs[0], { target: { value: "1234" } });
+    fireEvent.change(inputs[1], { target: { value: "5678" } });
+    fireEvent.change(inputs[2], { target: { value: "5678" } });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "변경" }));
+
+    await waitFor(() => expect(notificationBellState.changeMyPin).toHaveBeenCalledWith("emp-1", "1234", "5678"));
+    expect(notificationBellState.returnToOperatorLogin).toHaveBeenCalledTimes(1);
   });
 });

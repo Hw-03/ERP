@@ -1,4 +1,4 @@
-"""동시성 테스트: mark_defective() — 창고/부서에서 불량 격리 시 음수 재고 없음."""
+"""동시성 테스트: _mark_defective() — 창고/부서에서 불량 격리 시 음수 재고 없음."""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ def test_concurrent_mark_defective_from_warehouse(concurrent_engine, make_sessio
     def try_defective():
         session = make_session()
         try:
-            inventory_svc.mark_defective(
+            inventory_svc._mark_defective(
                 session, item_id, Decimal("1"),
                 inventory_svc.DefectSource(kind="warehouse", target_dept=dept),
             )
@@ -133,7 +133,7 @@ def test_concurrent_mark_defective_from_production(concurrent_engine, make_sessi
     def try_defective():
         session = make_session()
         try:
-            inventory_svc.mark_defective(
+            inventory_svc._mark_defective(
                 session, item_id, Decimal("1"),
                 inventory_svc.DefectSource(kind="production", target_dept=dept, source_dept=dept),
             )

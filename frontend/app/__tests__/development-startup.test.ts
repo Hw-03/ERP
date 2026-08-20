@@ -48,13 +48,18 @@ describe("개발 서버 실행 경로", () => {
     expect(packageScripts().dev).toMatch(/scripts[\\\\/]dev[\\\\/]start-frontend\.ps1/);
   });
 
-  it("dev:raw는 내부와 E2E에서 쓰는 직접 Next 실행 명령을 유지한다", () => {
-    expect(packageScripts()["dev:raw"]).toBe("next dev --hostname 0.0.0.0");
+  it("dev:raw와 start는 raw socket 경계를 가진 custom Next server를 사용한다", () => {
+    expect(packageScripts()["dev:raw"]).toBe(
+      "node scripts/next-server.js dev --hostname 0.0.0.0",
+    );
+    expect(packageScripts().start).toBe(
+      "node scripts/next-server.js start --hostname 0.0.0.0",
+    );
   });
 
   it.each([
-    ["dev", "Usage: next dev"],
-    ["start", "Usage: next start"],
+    ["dev", "Usage: node scripts/next-server.js dev"],
+    ["start", "Usage: node scripts/next-server.js start"],
   ])("supervised frontend mode %s selects the matching Next command", (runMode, expectedUsage) => {
     const result = spawnSync(process.execPath, ["scripts/dev.js", "--help"], {
       cwd: FRONTEND_ROOT,

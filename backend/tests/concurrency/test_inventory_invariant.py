@@ -72,9 +72,9 @@ def test_inventory_invariant_after_concurrent_ops(concurrent_engine, make_sessio
         session = make_session()
         try:
             if op == "tp":
-                inventory_svc.transfer_to_production(session, item_id, Decimal("1"), dept)
+                inventory_svc._transfer_to_production(session, item_id, Decimal("1"), dept)
             else:
-                inventory_svc.transfer_to_warehouse(session, item_id, Decimal("1"), dept)
+                inventory_svc._transfer_to_warehouse(session, item_id, Decimal("1"), dept)
             session.commit()
         except ValueError:
             try:

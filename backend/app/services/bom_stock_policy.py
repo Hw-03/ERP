@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import secrets
 import uuid
 from decimal import Decimal
 from typing import Mapping, Protocol
@@ -56,32 +55,24 @@ def _token_payload(*, flow: str, claims: Mapping[str, object]) -> bytes:
     ).encode("utf-8")
 
 
-def _bom_auto_token_secret(db: Session, *, create: bool) -> bytes | None:
-    """DB별 서명 키를 읽고, 쓰기 경로에서만 최초 생성한다."""
+def _read_bom_auto_token_secret(db: Session) -> bytes | None:
+    """DB별 서명 키를 부수 효과 없이 읽는다."""
     setting = db.query(SystemSetting).filter(
         SystemSetting.setting_key == BOM_AUTO_TOKEN_SETTING_KEY
     ).first()
-    if setting is None:
-        if not create:
-            return None
-        setting = SystemSetting(
-            setting_key=BOM_AUTO_TOKEN_SETTING_KEY,
-            setting_value=secrets.token_urlsafe(48),
-        )
-        db.add(setting)
-        db.flush()
-    return setting.setting_value.encode("utf-8")
+    return setting.setting_value.encode("utf-8") if setting is not None else None
 
 
-def issue_bom_auto_token(
+def _issue_bom_auto_token(
     db: Session,
     *,
     flow: str,
     claims: Mapping[str, object],
 ) -> str:
     """서버가 전개한 BOM 자동 라인에만 재사용 가능한 근거 토큰을 발급한다."""
-    secret = _bom_auto_token_secret(db, create=True)
-    assert secret is not None
+    secret = _read_bom_auto_token_secret(db)
+    if secret is None:
+        raise RuntimeError("BOM auto token secret missing; run bootstrap.")
     return hmac.new(secret, _token_payload(flow=flow, claims=claims), hashlib.sha256).hexdigest()
 
 
@@ -95,7 +86,7 @@ def has_valid_bom_auto_token(
     """전달된 자동 BOM 근거가 현재 DB의 서버 발급 값과 일치하는지 확인한다."""
     if not isinstance(token, str):
         return False
-    secret = _bom_auto_token_secret(db, create=False)
+    secret = _read_bom_auto_token_secret(db)
     if secret is None:
         return False
     expected = hmac.new(secret, _token_payload(flow=flow, claims=claims), hashlib.sha256).hexdigest()

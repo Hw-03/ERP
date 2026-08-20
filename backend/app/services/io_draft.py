@@ -1,6 +1,6 @@
 """임시저장(draft) CRUD + 멱등 재제출 응답.
 
-io_persist 의 _load_requester / _persist_batch / _batch_to_payload 를 재사용한다.
+io_persist 의 영속화·응답 헬퍼를 재사용한다.
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from datetime import datetime
 
-from app.models import IoBatch
+from app.models import Employee, IoBatch
+from app.schemas import IoDraftUpsert
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     _bucket_available,
@@ -29,9 +30,8 @@ from app.services.io_persist import (
     _add_bundles_and_lines,
     _batch_to_payload,
     ensure_batch_is_mutable,
-    _load_requester,
     _persist_batch,
-    normalize_payload_bom_stock_exempt,
+    _normalize_payload_bom_stock_exempt,
 )
 
 
@@ -53,18 +53,24 @@ def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
     return payload
 
 
-def save_draft(db: Session, payload) -> dict:
+def save_draft(
+    db: Session,
+    payload: IoDraftUpsert,
+    *,
+    requester: Employee,
+) -> dict:
     """임시저장. batch_id 가 오면 해당 draft 를 제자리 갱신, 없으면 새 슬롯 누적.
 
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
-    normalize_payload_bom_stock_exempt(db, payload)
+    if not bool(requester.is_active):
+        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    _normalize_payload_bom_stock_exempt(db, payload)
     validate_operation_sources(
         payload.sub_type,
         (bundle.source_kind for bundle in payload.bundles),
     )
-    requester = _load_requester(db, payload.requester_employee_id)
     validate_internal_use_requester(
         requester,
         work_type=payload.work_type,
@@ -158,11 +164,11 @@ def list_drafts(db: Session, *, requester_employee_id: uuid.UUID) -> list[dict]:
     return [_draft_to_current_stock_payload(db, row) for row in rows]
 
 
-def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uuid.UUID) -> None:
+def delete_draft(db: Session, *, batch_id: uuid.UUID, requester: Employee) -> None:
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("임시저장 작업을 찾을 수 없습니다.")
-    if batch.requester_employee_id != requester_employee_id:
+    if batch.requester_employee_id != requester.employee_id:
         raise PermissionError("본인 임시저장 작업만 삭제할 수 있습니다.")
     if batch.status != "draft":
         raise ValueError("임시저장 상태가 아닙니다.")
@@ -171,11 +177,19 @@ def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uui
     db.flush()
 
 
-def find_by_client_request_id(db: Session, client_request_id: str) -> Optional[IoBatch]:
+def find_by_client_request_id(
+    db: Session,
+    client_request_id: str,
+    *,
+    requester: Employee,
+) -> Optional[IoBatch]:
     """멱등 retry 시 기존 batch 조회. submit IntegrityError 후 라우터가 사용."""
     return (
         db.query(IoBatch)
-        .filter(IoBatch.client_request_id == client_request_id)
+        .filter(
+            IoBatch.client_request_id == client_request_id,
+            IoBatch.requester_employee_id == requester.employee_id,
+        )
         .first()
     )
 

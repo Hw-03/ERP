@@ -39,11 +39,11 @@ def quarantine_inventory(
 ) -> Inventory:
     """재고 격리와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
-        inv = inventory_svc.get_or_create_inventory(db, item_id)
+        inv = inventory_svc._get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
-        cells_before = inv_effect.snapshot_cells(db, item_id)
+        cells_before = inv_effect._snapshot_cells(db, item_id)
 
-        inventory_svc.mark_defective(
+        inventory_svc._mark_defective(
             db,
             item_id,
             qty,
@@ -62,7 +62,7 @@ def quarantine_inventory(
             .execution_options(synchronize_session=False)
         )
         db.flush()
-        inv = inventory_svc.get_or_create_inventory(db, item_id)
+        inv = inventory_svc._get_or_create_inventory(db, item_id)
         db.add(
             TransactionLog(
                 item_id=item_id,
@@ -77,7 +77,7 @@ def quarantine_inventory(
                 reason_memo=reason_memo or None,
                 client_request_id=client_request_id,
                 department=target_dept.value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+                inventory_effect=inv_effect._capture_effect(db, item_id, cells_before),
             )
         )
     return inv
@@ -95,11 +95,11 @@ def unquarantine_inventory(
 ) -> Inventory:
     """정상 복귀와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
-        inv = inventory_svc.get_or_create_inventory(db, item_id)
+        inv = inventory_svc._get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
-        cells_before = inv_effect.snapshot_cells(db, item_id)
+        cells_before = inv_effect._snapshot_cells(db, item_id)
 
-        inventory_svc.unmark_defective(
+        inventory_svc._unmark_defective(
             db,
             item_id,
             qty,
@@ -111,7 +111,7 @@ def unquarantine_inventory(
             ),
         )
         db.flush()
-        inv = inventory_svc.get_or_create_inventory(db, item_id)
+        inv = inventory_svc._get_or_create_inventory(db, item_id)
         db.add(
             TransactionLog(
                 item_id=item_id,
@@ -125,7 +125,7 @@ def unquarantine_inventory(
                 reason_category=reason_category,
                 reason_memo=reason_memo or None,
                 department=dept.value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+                inventory_effect=inv_effect._capture_effect(db, item_id, cells_before),
             )
         )
     return inv

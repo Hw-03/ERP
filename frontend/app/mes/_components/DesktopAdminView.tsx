@@ -75,6 +75,7 @@ export function DesktopAdminView({
   } = useAdminSettings({
     onStatusChange,
     onError: setMessage,
+    onPinChanged: unlock,
   });
 
   // message / saveMessage → toast 동기화. inline 박스 제거하고 우상단 토스트로 통일.

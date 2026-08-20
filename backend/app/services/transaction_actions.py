@@ -139,8 +139,8 @@ def correct_transaction_quantity(
 ) -> TransactionLog:
     """재고 보정과 보정 원장·수정 이력·감사를 원자적으로 확정한다."""
     with transactional(db):
-        cells_before = inv_effect.snapshot_cells(db, log.item_id)
-        adjusted_inv, qty_before, _applied_delta = inventory_svc.adjust_warehouse(
+        cells_before = inv_effect._snapshot_cells(db, log.item_id)
+        adjusted_inv, qty_before, _applied_delta = inventory_svc._adjust_warehouse(
             db, log.item_id, new_warehouse
         )
         correction_log = TransactionLog(
@@ -154,7 +154,7 @@ def correct_transaction_quantity(
             produced_by=editor.name,
             producer_employee_id=editor.employee_id,
             department="창고",
-            inventory_effect=inv_effect.capture_effect(db, log.item_id, cells_before),
+            inventory_effect=inv_effect._capture_effect(db, log.item_id, cells_before),
         )
         db.add(correction_log)
         db.flush()
@@ -241,7 +241,7 @@ def _cancel_one_log(db: Session, log: TransactionLog) -> None:
         has_nonzero_delta = False
     if not has_nonzero_delta:
         raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
-    inv_effect.apply_effect_reverse(db, log.item_id, effect)
+    inv_effect._apply_effect_reverse(db, log.item_id, effect)
 
 
 def cancel_transaction(

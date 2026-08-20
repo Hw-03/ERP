@@ -1,228 +1,279 @@
 "use client";
 
-/**
- * 작업자 식별용 PIN 로그인 카드 — 단일 카드 구조.
- *
- * 로그인된 작업자 정보는 입출고/수정 작업의 produced_by 기본값으로 사용된다.
- * 실제 보안 인증이 아닌 식별용.
- */
-
-import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+import { useRef, useState } from "react";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
-import { api, type Employee } from "@/lib/api";
+import type { Employee, OperatorSessionResponse } from "@/lib/api";
+import { operatorSessionApi } from "@/lib/api/operator-session";
+import { ApiError } from "@/lib/api-core";
 import { PIN_LENGTH } from "@/lib/auth/constants";
-import { normalizeSidebarMode } from "@/lib/sidebar-mode";
-import { markLoginNotificationPopupPending, setCurrentOperator, type Operator } from "./useCurrentOperator";
+import {
+  markLoginNotificationPopupPending,
+  operatorFromEmployee,
+  setCurrentOperator,
+} from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
 import { EmployeeCombobox } from "./EmployeeCombobox";
+import styles from "./OperatorLoginCard.module.css";
 
 interface OperatorLoginCardProps {
   onLogin: () => void;
+  logoutPending?: boolean;
+  logoutRetrying?: boolean;
+  onRetryLogout?: () => void;
 }
 
-export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
+export function OperatorLoginCard({
+  onLogin,
+  logoutPending = false,
+  logoutRetrying = false,
+  onRetryLogout,
+}: OperatorLoginCardProps) {
   const employees = useLoginEmployees();
   const [selected, setSelected] = useState<Employee | null>(null);
+  const [changingPin, setChangingPin] = useState(false);
   const [pin, setPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const pinInputRef = useRef<HTMLInputElement>(null);
 
-  const canSubmit = !!selected && pin.length === PIN_LENGTH && !loading;
+  const disabled = loading || logoutPending;
+  const canSubmit = !!selected && !disabled && (
+    changingPin
+      ? newPin.length === PIN_LENGTH && confirmPin.length === PIN_LENGTH
+      : pin.length === PIN_LENGTH
+  );
 
-  const handlePinChange = (raw: string) => {
-    const digits = raw.replace(/\D/g, "").slice(0, PIN_LENGTH);
-    setPin(digits);
+  const handlePinChange = (raw: string, setter: (value: string) => void) => {
+    setter(raw.replace(/\D/g, "").slice(0, PIN_LENGTH));
     if (error) setError("");
   };
 
-  const submit = useCallback(async () => {
-    if (!selected || pin.length !== PIN_LENGTH || loading) return;
+  const finishLogin = (session: OperatorSessionResponse) => {
+    const operator = operatorFromEmployee(session.employee);
+    if (operator.theme) {
+      document.documentElement.classList.toggle("dark", operator.theme === "dark");
+    }
+    if (operator.loginPopupEnabled) {
+      markLoginNotificationPopupPending(operator.employee_id);
+    }
+    setCurrentOperator(operator, session.boot_id);
+    onLogin();
+  };
+
+  const returnToLogin = (message = "") => {
+    setChangingPin(false);
+    setPin("");
+    setNewPin("");
+    setConfirmPin("");
+    setError(message);
+    requestAnimationFrame(() => pinInputRef.current?.focus());
+  };
+
+  const revokeChallengeAndReturn = async (message = "") => {
+    if (!selected) return;
+    try {
+      await operatorSessionApi.cancelPinChangeChallenge(selected.employee_id);
+    } catch {
+      setError("PIN 변경 취소를 서버에 반영하지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+    returnToLogin(message);
+  };
+
+  const cancelPinChange = async () => {
+    if (loading) return;
     setLoading(true);
     setError("");
     try {
-      const emp = await api.verifyEmployeePin(selected.employee_id, pin);
-      const op: Operator = {
-        employee_id: emp.employee_id,
-        name: emp.name,
-        role: emp.role,
-        department: emp.department,
-        level: emp.level,
-        employee_code: emp.employee_code,
-        warehouse_role: emp.warehouse_role ?? "none",
-        department_role: emp.department_role ?? "none",
-        theme: emp.theme ?? null,
-        sidebar_mode: normalizeSidebarMode(emp.sidebar_mode) ?? "hover",
-        assigned_model_slots: emp.assigned_model_slots ?? [],
-        io_enabled: emp.io_enabled ?? true,
-        hidden_sidebar_tabs: emp.hidden_sidebar_tabs ?? [],
-        loginPopupEnabled: emp.login_notification_popup_enabled ?? true,
-      };
-
-      // 백엔드에서 받은 theme을 DOM과 localStorage에 적용
-      if (op.theme && typeof document !== "undefined") {
-        if (op.theme === "dark") {
-          document.documentElement.classList.add("dark");
-        } else if (op.theme === "light") {
-          document.documentElement.classList.remove("dark");
-        }
-      }
-
-      if (op.loginPopupEnabled) {
-        markLoginNotificationPopupPending(op.employee_id);
-      }
-
-      try {
-        const session = await api.getAppSession();
-        setCurrentOperator(op, session.boot_id);
-      } catch {
-        setCurrentOperator(op);
-      }
-      onLogin();
-    } catch {
-      setError("PIN 번호가 올바르지 않습니다.");
-      setPin("");
+      await revokeChallengeAndReturn();
     } finally {
       setLoading(false);
     }
-  }, [selected, pin, loading, onLogin]);
+  };
 
-  const handlePinKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && canSubmit) {
-      e.preventDefault();
-      void submit();
+  const submit = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+    setError("");
+    try {
+      if (!changingPin) {
+        try {
+          finishLogin(
+            await operatorSessionApi.createOperatorSession(selected!.employee_id, pin),
+          );
+        } catch (failure) {
+          if (failure instanceof ApiError && failure.code === "PIN_CHANGE_REQUIRED") {
+            setChangingPin(true);
+            setError("");
+          } else {
+            setError(failure instanceof Error ? failure.message : "로그인에 실패했습니다.");
+          }
+          setPin("");
+        }
+        return;
+      }
+      if (newPin !== confirmPin) {
+        setError("새 PIN과 확인 PIN이 일치하지 않습니다.");
+        return;
+      }
+      let changed = false;
+      try {
+        await operatorSessionApi.completeOperatorPinChange(selected!.employee_id, newPin);
+        changed = true;
+        finishLogin(
+          await operatorSessionApi.createOperatorSession(selected!.employee_id, newPin),
+        );
+      } catch (failure) {
+        if (changed) {
+          await revokeChallengeAndReturn(
+            "PIN은 변경되었습니다. 새 PIN으로 다시 로그인해 주세요.",
+          );
+        } else if (failure instanceof ApiError && failure.status === 422) {
+          setError(failure.message);
+        } else {
+          await revokeChallengeAndReturn(
+            "PIN 설정을 완료하지 못했습니다. 로그인부터 다시 시도해 주세요.",
+          );
+        }
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  const pinFields: Array<{
+    id: string;
+    label: string;
+    value: string;
+    setter: (value: string) => void;
+    inputRef?: typeof pinInputRef;
+    autoComplete?: string;
+  }> = changingPin
+    ? [
+        { id: "mes-new-pin", label: "새 PIN", value: newPin, setter: setNewPin },
+        { id: "mes-confirm-pin", label: "새 PIN 확인", value: confirmPin, setter: setConfirmPin },
+      ]
+    : [{
+        id: "mes-login-pin",
+        label: "PIN 번호",
+        value: pin,
+        setter: setPin,
+        inputRef: pinInputRef,
+        autoComplete: "off",
+      }];
+
   return (
-    <div className="mx-auto w-full" style={{ maxWidth: 440, padding: "0 16px" }}>
-      <div
-        className="relative flex w-full flex-col rounded-[24px] border"
-        style={{
-          background: "var(--c-s1)",
-          borderColor: "var(--c-border)",
-          boxShadow: "var(--c-card-shadow)",
-          padding: "40px 36px 32px",
+    <div className={styles.root}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
         }}
+        className={styles.card}
       >
-        {/* 직원 선택 — 드롭다운이 형제 필드들 위에 오도록 stacking 보장 */}
-        <div
-          style={{
-            animation: "mes-field-rise 0.5s 0.05s ease both",
-            position: "relative",
-            zIndex: 30,
-          }}
-        >
+        {logoutPending && (
+          <div className={styles.pending}>
+            <p role="alert">
+              로그아웃을 서버에 반영하지 못했습니다. 재시도 전에는 로그인할 수 없습니다.
+            </p>
+            <button
+              type="button"
+              onClick={onRetryLogout}
+              disabled={logoutRetrying}
+              className={styles.link}
+              data-loading={logoutRetrying}
+            >
+              {logoutRetrying ? "로그아웃 확인 중..." : "로그아웃 재시도"}
+            </button>
+          </div>
+        )}
+        <div className={styles.employee}>
           <EmployeeCombobox
             employees={employees}
             value={selected}
-            onChange={(emp) => {
-              setSelected(emp);
-              setPin("");
-              setError("");
-              // 직원 선택 직후 PIN 입력으로 흐름 자동 연결
-              requestAnimationFrame(() => pinInputRef.current?.focus());
+            onChange={(employee) => {
+              setSelected(employee);
+              returnToLogin();
             }}
             autoFocus
-            disabled={loading}
+            disabled={disabled || changingPin}
           />
         </div>
 
-        {/* PIN 입력 */}
         <div
-          className="mt-5"
-          style={{ animation: "mes-field-rise 0.5s 0.15s ease both" }}
+          className={styles.fields}
+          data-changing={changingPin}
         >
-          <label
-            htmlFor="mes-login-pin"
-            className="mb-2 block text-sm font-semibold"
-            style={{ color: "var(--c-text)" }}
-          >
-            PIN 번호
-          </label>
-          <div
-            className="flex items-center gap-3 rounded-[14px] border px-4 py-3.5 transition-colors focus-within:border-[var(--c-blue)]"
-            style={{
-              background: "var(--c-s2)",
-              borderColor: error ? "var(--c-red)" : "var(--c-border)",
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            <Lock size={16} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
-            <input
-              id="mes-login-pin"
-              ref={pinInputRef}
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={PIN_LENGTH}
-              placeholder="숫자 4자리"
-              value={pin}
-              onChange={(e) => handlePinChange(e.target.value)}
-              onKeyDown={handlePinKey}
-              disabled={loading}
-              className="min-w-0 flex-1 bg-transparent text-base tracking-[0.4em] outline-none placeholder:tracking-normal placeholder:text-[var(--c-muted)]"
-              style={{ color: "var(--c-text)" }}
-            />
-          </div>
-          {error && (
-            <p
-              className="mt-2 text-sm"
-              role="alert"
-              style={{ color: "var(--c-red)" }}
-            >
-              {error}
+          {changingPin && (
+            <p>
+              기본 PIN 대신 사용할 새 PIN을 설정해 주세요.
             </p>
+          )}
+          {pinFields.map(({ id, label, value, setter, inputRef, autoComplete }) => (
+            <div className={styles.field} key={id}>
+              <label htmlFor={id}>
+                {label}
+              </label>
+              <div
+                className={styles.inputShell}
+                data-error={!!error}
+                data-loading={loading}
+              >
+                <Lock size={16} />
+                <input
+                  id={id}
+                  ref={inputRef}
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete={autoComplete ?? "new-password"}
+                  maxLength={PIN_LENGTH}
+                  placeholder="숫자 4자리"
+                  value={value}
+                  onChange={(event) => handlePinChange(event.target.value, setter)}
+                  disabled={disabled}
+                />
+              </div>
+            </div>
+          ))}
+          {changingPin && (
+            <button
+              type="button"
+              onClick={() => void cancelPinChange()}
+              disabled={disabled}
+              className={`${styles.link} ${styles.cancel}`}
+              data-loading={loading}
+            >
+              로그인으로 돌아가기
+            </button>
           )}
         </div>
 
-        {/* 로그인 버튼 — wrapper 가 애니메이션, 버튼 inline opacity 보존 */}
-        <div
-          className="mt-6"
-          style={{ animation: "mes-field-rise 0.5s 0.25s ease both" }}
-        >
+        {error && <p className={styles.error} role="alert">{error}</p>}
+
+        <div className={styles.submitWrap}>
           <button
-            type="button"
-            onClick={() => void submit()}
+            type="submit"
             disabled={!canSubmit}
-            className="flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-base font-semibold text-white transition-all"
-            style={{
-              background: "var(--c-blue)",
-              opacity: canSubmit ? 1 : 0.45,
-              cursor: canSubmit ? "pointer" : "not-allowed",
-            }}
+            className={styles.submit}
+            data-enabled={canSubmit}
           >
             {loading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                확인 중...
-              </>
+              <><Loader2 size={18} className="animate-spin" />확인 중...</>
             ) : (
-              <>
-                로그인
-                <ArrowRight size={18} />
-              </>
+              <>{changingPin ? "PIN 설정 및 로그인" : "로그인"}<ArrowRight size={18} /></>
             )}
           </button>
         </div>
 
-        {/* 하단 보안 안내 */}
-        <div
-          className="mt-7 border-t pt-5"
-          style={{
-            borderColor: "var(--c-border)",
-            animation: "mes-field-rise 0.5s 0.35s ease both",
-          }}
-        >
-          <div
-            className="text-center text-xs leading-relaxed"
-            style={{ color: "var(--c-muted)" }}
-          >
+        <div className={styles.footer}>
+          <div>
             <p>사내 승인된 직원만 접근할 수 있습니다.</p>
             <p>모든 접속은 보안 정책에 따라 기록 및 관리됩니다.</p>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

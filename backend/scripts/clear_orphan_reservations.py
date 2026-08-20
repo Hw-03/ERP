@@ -18,7 +18,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from app.database import SessionLocal  # noqa: E402
 from app.models import StockRequest, StockRequestStatusEnum  # noqa: E402
-from app.services.sr_approval import cancel_open_stock_requests  # noqa: E402
+from app.services.sr_approval import _cancel_open_stock_requests  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,7 +67,7 @@ def main() -> int:
                 print("취소.")
                 return 1
 
-        count = cancel_open_stock_requests(db, reason="고아 예약 정리 (일회성)")
+        count = _cancel_open_stock_requests(db, reason="고아 예약 정리 (일회성)")
         db.commit()
         print(f"[commit] {count}건을 CANCELLED 처리했습니다.")
         return 0

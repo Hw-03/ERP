@@ -2,7 +2,8 @@
  * 창고 지도 도메인 API — `@/lib/api/warehouse-map`.
  *
  * 보기(GET)는 공개. 박스·구조 편집은 창고 정/부 관리자(warehouse_role) 인증
- * — api-core 가 X-Employee-Code + X-Operator-Pin 자동 주입(편집 모드 진입 시 등록).
+ * — api-core 가 mutation 요청에만 현재 session actor의 X-Employee-Code +
+ *   X-Operator-Pin step-up 자격증명을 자동 주입(편집 모드 진입 시 등록).
  * box-tracking 토글만 admin PIN.
  */
 

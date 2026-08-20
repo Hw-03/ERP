@@ -45,7 +45,7 @@ from app.models import (  # noqa: E402
     StockRequestStatusEnum,
 )
 from app.services.inventory import PROCESS_TYPE_TO_DEPT  # noqa: E402
-from app.services.sr_approval import cancel_open_stock_requests  # noqa: E402
+from app.services.sr_approval import _cancel_open_stock_requests  # noqa: E402
 
 
 # R 시리즈는 PROCESS_TYPE_TO_DEPT 에 의도적으로 빠져 있다(원자재는 창고 폴백).
@@ -133,7 +133,7 @@ def main() -> int:
                 return 1
 
         # 0. 미결 stock_request 정리 — pending 리셋 전에 먼저 취소
-        cancelled = cancel_open_stock_requests(db, reason="재고 재분배(rebalance_test_stock) 전 자동 취소")
+        cancelled = _cancel_open_stock_requests(db, reason="재고 재분배(rebalance_test_stock) 전 자동 취소")
         if cancelled:
             print(f"  미결 요청 자동 취소       : {cancelled} 건")
         db.flush()

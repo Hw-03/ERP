@@ -16,7 +16,7 @@ import uuid
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Inventory, InventoryLocation, Item
+from app.models import Employee, Inventory, InventoryLocation, Item
 from app.repositories import item_repository
 
 
@@ -42,7 +42,6 @@ class InventoryMismatch:
     def to_dict(self) -> dict:
         return {
             "item_id": str(self.item_id),
-            "mes_code": self.mes_code,
             "item_name": self.item_name,
             "mes_code": self.mes_code,
             "recorded_total": float(self.recorded_total),
@@ -118,11 +117,19 @@ def check_inventory_consistency(db: Session) -> list[InventoryMismatch]:
     return mismatches
 
 
-def repair_inventory_totals(db: Session, *, dry_run: bool = True) -> RepairReport:
+def repair_inventory_totals(
+    db: Session,
+    *,
+    actor: Employee,
+    dry_run: bool = True,
+) -> RepairReport:
     """quantity 를 warehouse + loc_sum 으로 재계산해 덮어쓴다.
 
-    dry_run=True (기본) 이면 DB 에 쓰지 않고 리포트만.
+    actor는 인증된 관리자 step-up의 직원 정본이다. dry_run=True (기본)이면
+    DB 에 쓰지 않고 리포트만 반환한다.
     """
+    if actor.employee_id is None or not bool(actor.is_active):
+        raise ValueError("활성 작업자만 재고 무결성을 복구할 수 있습니다.")
     loc_sums = _location_sum_map(db)
     inventories = db.query(Inventory).all()
 

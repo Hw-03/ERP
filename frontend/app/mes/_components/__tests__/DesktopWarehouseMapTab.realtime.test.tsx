@@ -7,6 +7,7 @@ const testState = vi.hoisted(() => ({
   getItems: vi.fn(),
   reconcile: vi.fn(),
   verifyPin: vi.fn(),
+  registerOperatorCredsProvider: vi.fn(),
 }));
 
 vi.mock("@/lib/queries/realtime", () => ({
@@ -26,7 +27,7 @@ vi.mock("@/lib/api/warehouse-map", () => ({
 }));
 
 vi.mock("@/lib/api-core", () => ({
-  registerOperatorCredsProvider: vi.fn(),
+  registerOperatorCredsProvider: testState.registerOperatorCredsProvider,
 }));
 
 vi.mock("../login/useCurrentOperator", () => ({
@@ -82,6 +83,18 @@ function deferred<T>() {
 }
 
 describe("DesktopWarehouseMapTab realtime refresh", () => {
+  it("uses the current session actor for mutation step-up without a second login request", async () => {
+    render(<DesktopWarehouseMapTab />);
+
+    await enterEditMode();
+
+    expect(testState.verifyPin).not.toHaveBeenCalled();
+    const provider = testState.registerOperatorCredsProvider.mock.calls[0]?.[0] as
+      | (() => { code: string; pin: string } | null)
+      | undefined;
+    expect(provider?.()).toEqual({ code: "E001", pin: "1234" });
+  });
+
   it("applies reconcile results when the concurrent item refresh fails", async () => {
     const { rerender } = render(<DesktopWarehouseMapTab />);
     await enterEditMode();

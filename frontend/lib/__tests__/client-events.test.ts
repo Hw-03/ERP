@@ -12,7 +12,7 @@ describe("client event logging", () => {
     window.sessionStorage.clear();
   });
 
-  it("sends allowed UI events with the current employee code", () => {
+  it("sends the current tab employee code as a claim with the session cookie", () => {
     window.sessionStorage.setItem(
       "dexcowin_mes_operator",
       JSON.stringify({ employee_id: "emp-1", name: "Kim", employee_code: "E22" }),
@@ -31,6 +31,7 @@ describe("client event logging", () => {
       "Content-Type": "application/json",
       "X-MES-Employee-Code": "E22",
     });
+    expect(init.credentials).toBe("include");
     expect(JSON.parse(init.body as string)).toMatchObject({
       event: "ui_nav",
       from: "dashboard",

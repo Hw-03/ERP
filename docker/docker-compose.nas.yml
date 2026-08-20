@@ -8,6 +8,8 @@ services:
     environment:
       DATABASE_URL: sqlite:////app/mes.db
       MES_RUNTIME_ROOT: /runtime
+      # frontend와 같은 shell-provided 32-byte 이상 비밀. 저장소에 실제 값 기록 금지.
+      MES_PROXY_SHARED_SECRET: ${MES_PROXY_SHARED_SECRET:?MES_PROXY_SHARED_SECRET must be set}
     ports:
       - "8010:8010"
     volumes:
@@ -21,6 +23,8 @@ services:
     restart: unless-stopped
     environment:
       BACKEND_INTERNAL_URL: http://backend:8010
+      # backend와 같은 값으로 custom Next server assertion을 서명한다.
+      MES_PROXY_SHARED_SECRET: ${MES_PROXY_SHARED_SECRET:?MES_PROXY_SHARED_SECRET must be set}
     ports:
       - "3000:3000"
     depends_on:

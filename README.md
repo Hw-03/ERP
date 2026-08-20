@@ -49,7 +49,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 
 ```bash
 cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload --workers 1 --no-proxy-headers
 ```
 
 프론트엔드 (dev — `npm run dev` 가 PORT=3001 기본 사용):
@@ -58,6 +58,8 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
 cd frontend
 npm run dev
 ```
+
+프론트는 `scripts/next-server.js`의 raw socket 경계를 거쳐 기존 Next `/api` rewrite를 사용한다. 이 경계를 우회하는 직접 `next dev`/`next start` 실행은 client-IP 기반 PIN 시도 제한을 무력화하므로 사용하지 않는다.
 
 대표 접속 (dev):
 

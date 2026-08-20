@@ -18,19 +18,18 @@ from app.models import (
     WarehouseBoxItem,
 )
 from app.services import warehouse_map as warehouse_map_service
-from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.services.pin_auth import hash_pin
 
 D = Decimal
 # 편집(박스·앵글 CRUD)은 창고 정/부 관리자(warehouse_role) + 본인 PIN 으로 보호.
-MGR = {"X-Employee-Code": "WM001", "X-Operator-Pin": "0000"}
+MGR = {"X-Employee-Code": "WM001", "X-Operator-Pin": "2468"}
 BASE = "/api/warehouse-map"
 
 
 @pytest.fixture(autouse=True)
-def _seed_warehouse_manager(db_session):
-    """창고 편집 권한자(warehouse_role=primary, PIN 0000) 1명 시드."""
-    db_session.add(
-        Employee(
+def _seed_warehouse_manager(db_session, client):
+    """창고 편집 권한자 session과 본인 PIN step-up을 준비한다."""
+    manager = Employee(
             employee_code="WM001",
             name="창고장",
             role="조립/창고장",
@@ -40,10 +39,16 @@ def _seed_warehouse_manager(db_session):
             department_role="none",
             display_order=0,
             is_active="true",
-            pin_hash=DEFAULT_PIN_HASH,
+            pin_hash=hash_pin("2468"),
+            pin_requires_change=False,
         )
-    )
+    db_session.add(manager)
     db_session.flush()
+    login = client.post(
+        "/api/operator-session",
+        json={"employee_id": str(manager.employee_id), "pin": "2468"},
+    )
+    assert login.status_code == 200, login.text
 
 
 def _make_angle(client, *, label="A열", rows=2, layers=2, jaris=3):
@@ -105,7 +110,7 @@ def test_create_angle_rejects_non_manager(client, db_session):
             employee_code="ST001", name="일반사원", role="조립/사원",
             department=DepartmentEnum.ASSEMBLY.value, level=EmployeeLevelEnum.STAFF,
             warehouse_role="none", department_role="none", display_order=0,
-            is_active="true", pin_hash=DEFAULT_PIN_HASH,
+            is_active="true", pin_hash=hash_pin("0000"),
         )
     )
     db_session.flush()

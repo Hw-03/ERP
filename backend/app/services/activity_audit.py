@@ -8,7 +8,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.models import ActivityAuditLog, AuditTerminal, Employee
-from app.services.audit_actor_session import get_verified_audit_actor_code
+from app._actor import get_actor_emp
 
 
 UNREGISTERED_TERMINAL_NAME = "미등록 단말"
@@ -32,7 +32,8 @@ def record(
     request_id: Optional[str] = None,
 ) -> ActivityAuditLog:
     """현재 요청의 직원·단말 정보를 변경 불가능한 문자열로 복사한다."""
-    employee_code = actor_employee_code or get_verified_audit_actor_code(request)
+    request_actor = get_actor_emp(request)
+    employee_code = actor_employee_code or (request_actor if request_actor != "-" else None)
     employee = (
         db.query(Employee).filter(Employee.employee_code == employee_code).first()
         if employee_code

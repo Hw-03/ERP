@@ -24,7 +24,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
-from app.services import shipping as shipping_svc
+from app.services import shipping_actions as shipping_actions_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -177,14 +177,15 @@ def test_shipping_request_id_is_rejected_for_new_io_submission_and_draft(
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     requester = _make_employee(db_session, code="SHIP-LINKED-IO")
-    request = shipping_svc.create_request(
+    request = shipping_actions_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
             "invoice_number": "SHIP-LINKED-IO-001",
         },
+        requester,
     )
-    shipping_svc.send_to_prep(db_session, request.request_id)
+    shipping_actions_svc.send_to_prep(db_session, request.request_id, requester)
     db_session.commit()
 
     preview = client.post(
@@ -234,12 +235,13 @@ def test_shipping_request_id_is_rejected_regardless_of_request_status(
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     requester = _make_employee(db_session, code="SHIP-CONTEXT-STATE")
-    request = shipping_svc.create_request(
+    request = shipping_actions_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
             "invoice_number": "SHIP-CONTEXT-STATE-001",
         },
+        requester,
     )
     db_session.commit()
 

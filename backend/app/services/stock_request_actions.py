@@ -45,7 +45,7 @@ def create_request(
             reason_category=reason_category,
             reason_memo=reason_memo,
         )
-        notification_svc.notify_request_arrived(db, request)
+        notification_svc._notify_request_arrived(db, request)
     return request
 
 
@@ -98,7 +98,7 @@ def approve_warehouse_request(
                 request.status == StockRequestStatusEnum.COMPLETED
                 and previous_status != StockRequestStatusEnum.COMPLETED
             ):
-                notification_svc.notify_request_decided(
+                notification_svc._notify_request_decided(
                     db,
                     request,
                     decision="approved",
@@ -139,7 +139,7 @@ def approve_department_request(
                 request.status == StockRequestStatusEnum.COMPLETED
                 and previous_status != StockRequestStatusEnum.COMPLETED
             ):
-                notification_svc.notify_request_decided(
+                notification_svc._notify_request_decided(
                     db,
                     request,
                     decision="approved",

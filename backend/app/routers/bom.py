@@ -4,10 +4,11 @@ import uuid
 from decimal import Decimal
 from typing import Annotated, List, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
 from app.models import BOM, Item
 from app.routers._errors import ErrorCode, http_error
@@ -19,7 +20,7 @@ from app.services.bom import BomCache, bom_child_item_ordering, bom_modal_tree_c
 from app.services.production_capacity import is_production_capacity_ignored
 from app.repositories import item_repository
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 def _require_editable_bom_parent(db: Session, parent_item_id: uuid.UUID) -> Item:

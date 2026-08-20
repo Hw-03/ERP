@@ -20,7 +20,7 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services import notifications as notif_svc
-from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.services.pin_auth import hash_pin
 
 
 def _make_employee(
@@ -43,7 +43,8 @@ def _make_employee(
         department_role=department_role,
         display_order=0,
         is_active="true",
-        pin_hash=DEFAULT_PIN_HASH,
+        pin_hash=hash_pin("2468"),
+        pin_requires_change=False,
     )
     db_session.add(emp)
     db_session.flush()
@@ -119,8 +120,8 @@ def _unread(client, emp) -> int:
 
 
 def test_warehouse_recipients_are_warehouse_roles(db_session):
-    wp = _make_employee(db_session, code="WP", warehouse_role="primary")
-    wd = _make_employee(db_session, code="WD", warehouse_role="deputy")
+    _make_employee(db_session, code="WP", warehouse_role="primary")
+    _make_employee(db_session, code="WD", warehouse_role="deputy")
     _make_employee(db_session, code="DP", department_role="primary")
     _make_employee(db_session, code="PL")
     db_session.commit()
@@ -182,7 +183,7 @@ def test_approve_notifies_requester(client, db_session, make_item):
 
     approve = client.post(
         f"/api/stock-requests/{sr_id}/approve",
-        json={"actor_employee_id": str(wh_primary.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(wh_primary.employee_id), "pin": "2468"},
     )
     assert approve.status_code == 200, approve.json()
     assert approve.json()["status"] == "completed"
@@ -205,7 +206,7 @@ def test_reject_notifies_requester(client, db_session, make_item):
 
     reject = client.post(
         f"/api/stock-requests/{sr_id}/reject",
-        json={"actor_employee_id": str(wh_primary.employee_id), "pin": "0000", "reason": "재고 확인 필요"},
+        json={"actor_employee_id": str(wh_primary.employee_id), "pin": "2468", "reason": "재고 확인 필요"},
     )
     assert reject.status_code == 200, reject.json()
 
@@ -246,63 +247,74 @@ def test_mark_read_only_affects_owner(client, db_session, make_item):
 
 
 
-def test_notification_query_requires_matching_actor_header(client, db_session, make_item):
-    item = make_item(name="W006", warehouse_qty=Decimal("10"))
-    requester = _make_employee(db_session, code="REQ6", name="Requester6")
+def test_notification_query_requires_matching_session_actor(auth_client, db_session):
     wh_primary = _make_employee(db_session, code="WHP6", name="Warehouse6", warehouse_role="primary")
     wh_deputy = _make_employee(db_session, code="WHD6", name="Deputy6", warehouse_role="deputy")
+    db_session.add(
+        Notification(
+            recipient_employee_id=wh_deputy.employee_id,
+            type="approval_request",
+            title="테스트 알림",
+            body="세션 소유자 검증",
+        )
+    )
     db_session.commit()
 
-    _w2d_request(client, requester, item)
+    missing = auth_client.get(f"/api/notifications?recipient_employee_id={wh_deputy.employee_id}")
+    assert missing.status_code == 401
 
-    missing = client.get(f"/api/notifications?recipient_employee_id={wh_deputy.employee_id}")
-    assert missing.status_code == 400
-
-    mismatch = client.get(
+    assert auth_client.post(
+        "/api/operator-session",
+        json={"employee_id": str(wh_primary.employee_id), "pin": "2468"},
+    ).status_code == 200
+    mismatch = auth_client.get(
         f"/api/notifications?recipient_employee_id={wh_deputy.employee_id}",
-        headers=_actor_headers(wh_primary),
     )
     assert mismatch.status_code == 403
 
-    own = client.get(
+    logout = auth_client.delete("/api/operator-session")
+    assert logout.status_code == 204, logout.text
+    assert auth_client.post(
+        "/api/operator-session",
+        json={"employee_id": str(wh_deputy.employee_id), "pin": "2468"},
+    ).status_code == 200
+    own = auth_client.get(
         f"/api/notifications?recipient_employee_id={wh_deputy.employee_id}",
-        headers=_actor_headers(wh_deputy),
     )
     assert own.status_code == 200
     assert own.json()["unread_count"] == 1
 
 
-def test_notification_mutations_require_matching_actor_header(client, db_session, make_item):
-    item = make_item(name="W007", warehouse_qty=Decimal("10"))
-    requester = _make_employee(db_session, code="REQ7", name="Requester7")
+def test_notification_mutations_require_matching_session_actor(auth_client, db_session):
     wh_primary = _make_employee(db_session, code="WHP7", name="Warehouse7", warehouse_role="primary")
     wh_deputy = _make_employee(db_session, code="WHD7", name="Deputy7", warehouse_role="deputy")
+    note = Notification(
+        recipient_employee_id=wh_deputy.employee_id,
+        type="approval_request",
+        title="테스트 알림",
+        body="세션 소유자 검증",
+    )
+    db_session.add(note)
     db_session.commit()
 
-    _w2d_request(client, requester, item)
-    note = (
-        db_session.query(Notification)
-        .filter(Notification.recipient_employee_id == wh_deputy.employee_id)
-        .first()
-    )
-    assert note is not None
+    assert auth_client.post(
+        "/api/operator-session",
+        json={"employee_id": str(wh_primary.employee_id), "pin": "2468"},
+    ).status_code == 200
 
-    mark = client.post(
+    mark = auth_client.post(
         "/api/notifications/mark-read",
-        headers=_actor_headers(wh_primary),
         json={"recipient_employee_id": str(wh_deputy.employee_id)},
     )
     assert mark.status_code == 403
 
-    delete_read = client.delete(
+    delete_read = auth_client.delete(
         f"/api/notifications/read?recipient_employee_id={wh_deputy.employee_id}",
-        headers=_actor_headers(wh_primary),
     )
     assert delete_read.status_code == 403
 
-    delete_one = client.delete(
+    delete_one = auth_client.delete(
         f"/api/notifications/{note.notification_id}?recipient_employee_id={wh_deputy.employee_id}",
-        headers=_actor_headers(wh_primary),
     )
     assert delete_one.status_code == 403
 
@@ -311,7 +323,7 @@ def test_arrived_notification_rolls_back_with_request(client, db_session, make_i
     # 재고 부족으로 제출 실패 시키기 — 알림이 커밋되지 않아야 함
     item = make_item(name="W005", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session, code="REQ5", name="요청자5")
-    wh_primary = _make_employee(db_session, code="WHP5", name="창고정5", warehouse_role="primary")
+    _make_employee(db_session, code="WHP5", name="창고정5", warehouse_role="primary")
     db_session.commit()
 
     preview = client.post(

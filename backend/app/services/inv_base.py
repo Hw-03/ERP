@@ -52,7 +52,7 @@ def dept_for_process_type(process_type_code: Optional[str]) -> Optional[Departme
     return PROCESS_TYPE_TO_DEPT.get(process_type_code)
 
 
-def get_or_create_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
+def _get_or_create_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
     """읽기 전용 경로용 — 락 없이 조회/생성."""
     inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
     if inv is None:

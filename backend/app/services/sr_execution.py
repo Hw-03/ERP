@@ -21,7 +21,7 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
-from app.services.dept_hierarchy import can_approve_department
+from app.services.dept_hierarchy import can_approve_department as _can_approve_department
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
 )
@@ -32,19 +32,26 @@ from app.services.sr_validation import (
 # ---------------------------------------------------------------------------
 
 
-def release_reservation(db: Session, request: StockRequest) -> None:
+def release_reservation(
+    db: Session,
+    request: StockRequest,
+    *,
+    actor: Employee,
+) -> None:
     """RESERVED 상태 라인의 pending 원복. 이미 release 된 라인은 건너뜀."""
+    if not isinstance(actor, Employee):
+        raise TypeError("actor must be an Employee")
     if request.status != StockRequestStatusEnum.RESERVED:
         return
     from app.services import sr_reservation
 
     lines = list(request.lines)
     if not _is_sqlite:
-        inventory_svc.ensure_and_lock_inventories(
+        inventory_svc._ensure_and_lock_inventories(
             db,
             _request_inventory_item_ids(db, request, lines),
         )
-    sr_reservation.release_lines(db, lines, request_id=request.request_id)
+    sr_reservation._release_lines(db, lines, request_id=request.request_id)
 
 
 # ---------------------------------------------------------------------------
@@ -78,33 +85,33 @@ def _source_from_bucket(line: StockRequestLine) -> str:
 
 
 def _handle_raw_receive(db, request, line, approver, qty, item_id) -> Decimal:
-    inventory_svc.receive_confirmed(db, item_id, qty, bucket="warehouse")
+    inventory_svc._receive_confirmed(db, item_id, qty, bucket="warehouse")
     return qty
 
 
 def _handle_raw_ship(db, request, line, approver, qty, item_id) -> Decimal:
-    inventory_svc.consume_warehouse(db, item_id, qty)
+    inventory_svc._consume_warehouse(db, item_id, qty)
     return -qty
 
 
 def _handle_warehouse_to_dept(db, request, line, approver, qty, item_id) -> Decimal:
     if line.to_department is None:
         raise ValueError("창고→부서 이동은 도착 부서가 필요합니다.")
-    inventory_svc.transfer_to_production(db, item_id, qty, line.to_department)
+    inventory_svc._transfer_to_production(db, item_id, qty, line.to_department)
     return _NO_QTY_CHANGE
 
 
 def _handle_dept_to_warehouse(db, request, line, approver, qty, item_id) -> Decimal:
     if line.from_department is None:
         raise ValueError("부서→창고 복귀는 출발 부서가 필요합니다.")
-    inventory_svc.transfer_to_warehouse(db, item_id, qty, line.from_department)
+    inventory_svc._transfer_to_warehouse(db, item_id, qty, line.from_department)
     return _NO_QTY_CHANGE
 
 
 def _handle_dept_internal(db, request, line, approver, qty, item_id) -> Decimal:
     if line.from_department is None or line.to_department is None:
         raise ValueError("부서 내부 이동은 출발/도착 부서가 모두 필요합니다.")
-    inventory_svc.transfer_between_departments(
+    inventory_svc._transfer_between_departments(
         db, item_id, qty, line.from_department, line.to_department
     )
     return _NO_QTY_CHANGE
@@ -113,7 +120,7 @@ def _handle_dept_internal(db, request, line, approver, qty, item_id) -> Decimal:
 def _handle_mark_defective_wh(db, request, line, approver, qty, item_id) -> Decimal:
     if line.to_department is None:
         raise ValueError("창고발 불량 등록은 격리 부서가 필요합니다.")
-    inventory_svc.mark_defective(
+    inventory_svc._mark_defective(
         db, item_id, qty,
         inventory_svc.DefectSource(kind="warehouse", target_dept=line.to_department),
     )
@@ -123,7 +130,7 @@ def _handle_mark_defective_wh(db, request, line, approver, qty, item_id) -> Deci
 def _handle_mark_defective_prod(db, request, line, approver, qty, item_id) -> Decimal:
     if line.from_department is None or line.to_department is None:
         raise ValueError("생산발 불량 등록은 출발/격리 부서가 필요합니다.")
-    inventory_svc.mark_defective(
+    inventory_svc._mark_defective(
         db,
         item_id,
         qty,
@@ -139,13 +146,13 @@ def _handle_mark_defective_prod(db, request, line, approver, qty, item_id) -> De
 def _handle_supplier_return(db, request, line, approver, qty, item_id) -> Decimal:
     if line.from_department is None:
         raise ValueError("공급업체 반품은 출발 부서가 필요합니다.")
-    inventory_svc.return_to_supplier(db, item_id, qty, line.from_department)
+    inventory_svc._return_to_supplier(db, item_id, qty, line.from_department)
     return -qty
 
 
 def _handle_package_out(db, request, line, approver, qty, item_id) -> Decimal:
     # 라인별로 창고에서 출고
-    inventory_svc.consume_warehouse(db, item_id, qty)
+    inventory_svc._consume_warehouse(db, item_id, qty)
     return -qty
 
 
@@ -158,11 +165,11 @@ def _handle_internal_use(
     item_id: uuid.UUID,
 ) -> Decimal:
     if line.from_bucket == RequestBucketEnum.WAREHOUSE:
-        inventory_svc.consume_warehouse(db, item_id, qty)
+        inventory_svc._consume_warehouse(db, item_id, qty)
     elif line.from_bucket == RequestBucketEnum.PRODUCTION:
         if line.from_department is None:
             raise ValueError("부서 원본 사용출고는 출발 부서가 필요합니다.")
-        inventory_svc.consume_from_department(db, item_id, qty, line.from_department)
+        inventory_svc._consume_from_department(db, item_id, qty, line.from_department)
     else:
         raise ValueError("사용출고 원본은 창고 또는 생산부서만 허용됩니다.")
     return -qty
@@ -175,7 +182,7 @@ def _handle_defect_scrap(db, request, line, approver, qty, item_id) -> Decimal:
     reason_cat = request.reason_category or ""
     reason_memo = request.reason_memo or (request.notes or "")
     actor_name = approver.name
-    inventory_svc.scrap_defective(
+    inventory_svc._scrap_defective(
         db, item_id, qty, line.from_department,
         inventory_svc.ReasonContext(
             category=reason_cat or _DEFAULT_REASON_CATEGORY,
@@ -190,17 +197,14 @@ def _handle_defect_return(db, request, line, approver, qty, item_id) -> Decimal:
     # 격리 항목 공급처 반품 — from_department 에서 DEFECTIVE 차감
     if line.from_department is None:
         raise ValueError("격리 항목 공급처 반품은 from_department 가 필요합니다.")
-    reason_cat = request.reason_category or ""
-    reason_memo_val = request.reason_memo or (request.notes or "")
-    actor_name = approver.name
-    inventory_svc.return_to_supplier(db, item_id, qty, line.from_department)
+    inventory_svc._return_to_supplier(db, item_id, qty, line.from_department)
     return -qty
 
 
 def _handle_scrap_normal(db, request, line, approver, qty, item_id) -> Decimal:
     # R 정상 재고 바로 폐기 — 격리 미경유. 창고면 warehouse, 부서면 PRODUCTION 차감.
     source = _source_from_bucket(line)
-    inventory_svc.scrap_normal(
+    inventory_svc._scrap_normal(
         db, item_id, qty,
         inventory_svc.NormalSource(kind=source, dept_or_warehouse=line.from_department),
         inventory_svc.ReasonContext(
@@ -215,7 +219,7 @@ def _handle_scrap_normal(db, request, line, approver, qty, item_id) -> Decimal:
 def _handle_return_normal(db, request, line, approver, qty, item_id) -> Decimal:
     # R 정상 재고 바로 공급처 반품 — 격리 미경유.
     source = _source_from_bucket(line)
-    inventory_svc.return_to_supplier_from_normal(
+    inventory_svc._return_to_supplier_from_normal(
         db, item_id, qty,
         inventory_svc.NormalSource(
             kind=source, dept_or_warehouse=line.from_department, supplier_name=""
@@ -297,8 +301,7 @@ def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Dec
         child_decisions,
         reason_category=reason_cat,
         reason_memo=reason_memo_val,
-        actor=approver.name,
-        actor_employee_id=approver.employee_id,
+        actor=approver,
     )
     return -qty
 
@@ -322,8 +325,7 @@ def _handle_rework_normal(db, request, line, approver, qty, item_id) -> Decimal:
         child_decisions,
         reason_category=request.reason_category or _DEFAULT_REASON_CATEGORY,
         reason_memo=request.reason_memo or "",
-        actor=approver.name,
-        actor_employee_id=approver.employee_id,
+        actor=approver,
     )
     return -qty
 
@@ -367,10 +369,10 @@ def _execute_line(
     rt = request.request_type
 
     # 이동 전 수량과 위치 셀을 기록한다.
-    inv = inventory_svc.get_or_create_inventory(db, item_id)
+    inv = inventory_svc._get_or_create_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
     warehouse_qty_before = inv.warehouse_qty or Decimal("0")
-    cells_before = inv_effect.snapshot_cells(db, item_id)
+    cells_before = inv_effect._snapshot_cells(db, item_id)
 
     handler = _LINE_HANDLERS.get(rt)
     if handler is None:
@@ -378,7 +380,7 @@ def _execute_line(
     quantity_change: Decimal = handler(db, request, line, approver, qty, item_id)
 
     db.flush()
-    inv = inventory_svc.get_or_create_inventory(db, item_id)
+    inv = inventory_svc._get_or_create_inventory(db, item_id)
     qty_after = inv.quantity or Decimal("0")
     warehouse_qty_after = inv.warehouse_qty or Decimal("0")
 
@@ -423,7 +425,7 @@ def _execute_line(
             reason_memo=request.reason_memo,
             operation_batch_id=getattr(request, "operation_batch_id", None),
             department=str(department) if department else None,
-            inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+            inventory_effect=inv_effect._capture_effect(db, item_id, cells_before),
         )
     )
 
@@ -441,7 +443,7 @@ def _execute_all_lines(
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
     if not _is_sqlite:
         all_item_ids = _request_inventory_item_ids(db, request, lines)
-        inventory_svc.ensure_and_lock_inventories(db, all_item_ids)
+        inventory_svc._ensure_and_lock_inventories(db, all_item_ids)
     for line in lines:
         _execute_line(db, request, line, approver=approver, is_approval=is_approval)
 
@@ -470,7 +472,7 @@ def _finalize_submission(
     requester_role = (requester.warehouse_role or "none").lower()
     requester_level = getattr(getattr(requester, "level", None), "value", requester.level)
     is_admin = requester_level == "admin"
-    can_self_approve_department = can_approve_department(
+    can_self_approve_department = _can_approve_department(
         requester,
         request.requester_department,
     )

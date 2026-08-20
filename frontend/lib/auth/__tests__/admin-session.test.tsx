@@ -3,7 +3,14 @@ import { act, render, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 import { AdminSessionProvider, useAdminSession } from "../admin-session";
-import { deleteJson, fetcher, patchJson, postJson, putJson } from "@/lib/api-core";
+import {
+  AUTH_REQUIRED_EVENT,
+  deleteJson,
+  fetcher,
+  patchJson,
+  postJson,
+  putJson,
+} from "@/lib/api-core";
 
 // Helper: 표준 Response mock --------------------------------------
 
@@ -125,6 +132,28 @@ describe("AdminSessionProvider × api-core PIN injection", () => {
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     const headers = (init.headers ?? {}) as Record<string, string>;
     expect(headers["X-Admin-Pin"]).toBeUndefined();
+  });
+
+  it("drops operator A admin PIN before operator B uses the same mounted page", async () => {
+    const { result } = renderHook(() => useAdminSession(), { wrapper });
+    act(() => {
+      result.current.setPin("8642");
+    });
+
+    await postJson("/api/operator-a", { action: "admin" });
+    act(() => {
+      window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+    });
+    await postJson("/api/operator-b", { action: "normal" });
+
+    const fetchSpy = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const firstHeaders = (fetchSpy.mock.calls[0][1] as RequestInit)
+      .headers as Record<string, string>;
+    const secondHeaders = (fetchSpy.mock.calls[1][1] as RequestInit)
+      .headers as Record<string, string>;
+    expect(firstHeaders["X-Admin-Pin"]).toBe("8642");
+    expect(result.current.pin).toBeNull();
+    expect(secondHeaders["X-Admin-Pin"]).toBeUndefined();
   });
 
   it("Provider renders children without throwing", () => {

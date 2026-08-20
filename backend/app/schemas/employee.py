@@ -11,8 +11,8 @@ from app.schemas.common import UtcDatetime
 
 
 class PinVerifyRequest(BaseModel):
-    # 작업자 식별용 PIN 검증 요청 — 실제 보안 인증이 아님
-    pin: str = Field(..., min_length=1, max_length=20)
+    # 한 릴리스 호환용 작업자 세션 로그인 alias. 신규 호출은 operator-session API를 사용한다.
+    pin: str = Field(..., min_length=4, max_length=4, pattern=r"^[0-9]{4}$")
 
 
 class EmployeePinResetRequest(BaseModel):
@@ -22,8 +22,8 @@ class EmployeePinResetRequest(BaseModel):
 
 class EmployeePinChangeRequest(BaseModel):
     # 본인 PIN 변경 — 현재 PIN 검증 필요
-    current_pin: str = Field(..., min_length=1, max_length=4)
-    new_pin: str = Field(..., min_length=4, max_length=4)
+    current_pin: str = Field(..., min_length=4, max_length=4, pattern=r"^[0-9]{4}$")
+    new_pin: str = Field(..., min_length=4, max_length=4, pattern=r"^[0-9]{4}$")
 
 
 class EmployeeCreate(BaseModel):

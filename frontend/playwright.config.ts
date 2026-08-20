@@ -12,7 +12,7 @@
  *   npm run test:e2e:ui       # UI 모드
  *
  * 전용 DB·전용 백엔드(포트 8021)·시드는 globalSetup 이 자동 처리한다(실 mes.db 미접촉).
- * 프론트는 전용 포트 3100 에서 next dev 로 띄우고, /api/* 는 BACKEND_INTERNAL_URL 로 8021 에 프록시.
+ * 프론트는 전용 포트 3100의 custom Next server로 띄우고, /api/* 는 BACKEND_INTERNAL_URL로 8021에 프록시.
  */
 import { defineConfig, devices } from "@playwright/test";
 import { assertSupportedNodeVersion } from "./scripts/require-node-20.cjs";
@@ -31,7 +31,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
-  // CI 러너 부하 + next dev 라우트 컴파일 + SQLite 경합으로 기본 타임아웃이 가끔 초과돼
+  // CI 러너 부하 + custom Next dev 라우트 컴파일 + SQLite 경합으로 기본 타임아웃이 가끔 초과돼
   // flaky 발생 → per-test·assertion 타임아웃을 넉넉히 상향해 완충.
   timeout: 60_000,
   expect: { timeout: 10_000 },
@@ -44,8 +44,8 @@ export default defineConfig({
     timezoneId: "Asia/Seoul",
   },
   webServer: {
-    // 전용 프론트(3100, next dev — 현재 코드 보장). /api/* → 전용 백엔드(8021) 프록시.
-    command: `npx next dev -p ${FRONT_PORT}`,
+    // 전용 custom Next server(3100). /api/* → 전용 백엔드(8021) 프록시.
+    command: `node scripts/next-server.js dev --hostname 127.0.0.1 --port ${FRONT_PORT}`,
     url: `http://127.0.0.1:${FRONT_PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,

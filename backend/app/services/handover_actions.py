@@ -22,7 +22,7 @@ def create_handover(
     """문서·라인·도착 알림을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
         doc = handover_svc.create_handover(db, author=author, payload=payload)
-        notifications_svc.notify_handover_arrived(db, doc)
+        notifications_svc._notify_handover_arrived(db, doc)
     return doc
 
 
@@ -46,7 +46,7 @@ def submit_handover(
     """draft 제출 상태와 도착 알림을 원자적으로 확정한다."""
     with transactional(db):
         result = handover_svc.submit_handover(db, doc, author=author)
-        notifications_svc.notify_handover_arrived(db, result)
+        notifications_svc._notify_handover_arrived(db, result)
     return result
 
 
@@ -54,7 +54,7 @@ def delete_handover_draft(
     db: Session,
     *,
     handover_id: uuid.UUID,
-    author_employee_id: uuid.UUID,
+    author: Employee,
 ) -> bool:
     """본인 draft와 소속 라인을 원자적으로 삭제하며, 부재 시 멱등 성공한다."""
     with transactional(db):
@@ -65,7 +65,7 @@ def delete_handover_draft(
         )
         if doc is None:
             return False
-        if doc.author_employee_id != author_employee_id:
+        if doc.author_employee_id != author.employee_id:
             raise PermissionError("본인 임시저장만 삭제할 수 있습니다.")
         if doc.status != HandoverStatusEnum.DRAFT:
             raise ValueError("임시저장 상태만 삭제할 수 있습니다.")

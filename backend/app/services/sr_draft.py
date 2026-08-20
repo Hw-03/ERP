@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import List, Optional, Sequence
 
 from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
-    Item,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -163,7 +161,7 @@ def delete_draft_request(
     db: Session,
     *,
     request_id: uuid.UUID,
-    requester_employee_id: uuid.UUID,
+    requester: Employee,
 ) -> None:
     """DRAFT 삭제. cascade 의존하지 않고 lines 명시 삭제 후 request 삭제."""
     request = (
@@ -171,7 +169,7 @@ def delete_draft_request(
     )
     if request is None:
         raise ValueError("장바구니를 찾을 수 없습니다.")
-    if request.requester_employee_id != requester_employee_id:
+    if request.requester_employee_id != requester.employee_id:
         raise PermissionError("본인 장바구니만 삭제할 수 있습니다.")
     if request.status != StockRequestStatusEnum.DRAFT:
         raise ValueError("장바구니(DRAFT) 상태가 아닙니다.")
@@ -191,7 +189,7 @@ def submit_draft_request(
     db: Session,
     *,
     request_id: uuid.UUID,
-    requester_employee_id: uuid.UUID,
+    requester: Employee,
 ) -> StockRequest:
     """DRAFT 제출. 본인 검증 → shape 재검증 → request_code 발급 → _finalize_submission."""
     request = (
@@ -199,18 +197,11 @@ def submit_draft_request(
     )
     if request is None:
         raise RequestNotFoundError("요청을 찾을 수 없습니다.")
-    if request.requester_employee_id != requester_employee_id:
+    if request.requester_employee_id != requester.employee_id:
         raise PermissionError("본인 장바구니만 제출할 수 있습니다.")
     if request.status != StockRequestStatusEnum.DRAFT:
         raise ValueError("장바구니(DRAFT) 상태가 아닙니다.")
 
-    requester = (
-        db.query(Employee)
-        .filter(Employee.employee_id == request.requester_employee_id)
-        .first()
-    )
-    if requester is None:
-        raise ValueError("요청자(직원) 정보가 없습니다.")
     if not bool(requester.is_active):
         raise ValueError("비활성 직원의 장바구니는 제출할 수 없습니다.")
 

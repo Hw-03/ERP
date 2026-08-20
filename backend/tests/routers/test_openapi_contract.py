@@ -7,11 +7,10 @@ import json
 from app.main import app
 
 
-def _query_parameter(operation: dict, name: str) -> dict:
-    return next(
-        parameter
-        for parameter in operation["parameters"]
-        if parameter["in"] == "query" and parameter["name"] == name
+def _has_query_parameter(operation: dict, name: str) -> bool:
+    return any(
+        parameter["in"] == "query" and parameter["name"] == name
+        for parameter in operation.get("parameters", [])
     )
 
 
@@ -41,16 +40,16 @@ def test_openapi_tag_metadata_matches_router_tags():
     assert "Variance" not in declared_tags
 
 
-def test_legacy_integrity_operation_and_pin_query_parameters_are_deprecated():
+def test_admin_pin_is_never_advertised_in_query_and_delete_bodies_remain():
     schema = app.openapi()
     integrity_get = schema["paths"]["/api/settings/integrity/inventory"]["get"]
     department_delete = schema["paths"]["/api/departments/{dept_id}"]["delete"]
     model_delete = schema["paths"]["/api/models/{slot}"]["delete"]
 
     assert integrity_get["deprecated"] is True
-    assert _query_parameter(integrity_get, "pin")["deprecated"] is True
-    assert _query_parameter(department_delete, "pin")["deprecated"] is True
-    assert _query_parameter(model_delete, "pin")["deprecated"] is True
+    for operation in (integrity_get, department_delete, model_delete):
+        assert _has_query_parameter(operation, "pin") is False
+        assert "requestBody" in operation
 
 
 def test_capacity_is_canonical_and_possible_is_deprecated_compatibility_alias(client):
@@ -98,3 +97,19 @@ def test_process_type_descriptions_use_dynamic_code_source_without_fixed_count()
     assert "GET /api/codes/process-types" in item_update["description"]
     assert "GET /api/codes/process-types" in item_filter["description"]
     assert "GET /api/codes/process-types" in inventory_summary["description"]
+
+
+def test_operator_session_delete_advertises_scoped_pin_change_cancellation():
+    operation = app.openapi()["paths"]["/api/operator-session"]["delete"]
+    parameter = next(
+        item
+        for item in operation["parameters"]
+        if item["name"] == "pin_change_employee_id"
+    )
+
+    assert parameter["in"] == "query"
+    assert parameter["required"] is False
+    assert {item.get("format") for item in parameter["schema"]["anyOf"]} == {
+        "uuid",
+        None,
+    }

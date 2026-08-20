@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import ast
 from decimal import Decimal
+import inspect
+from typing import get_type_hints
 
 import pytest
 from sqlalchemy.orm import Session
@@ -30,6 +33,72 @@ from app.services import io_actions as io_actions_svc
 from app.schemas.io import IoPreviewTarget, IoSubmitRequest
 
 
+EXPECTED_ACTOR_EVENT_TYPES = {
+    "CANCELLED",
+    "COMPONENT_CHANGED",
+    "INVOICE_UPDATED",
+    "PICKED_UP",
+    "PICKUP_CANCELLED",
+    "PREPARED",
+    "PREPARE_CANCELLED",
+    "REQUEST_CREATED",
+    "REQUEST_UPDATED",
+    "SENT_TO_PREP",
+}
+
+
+def test_component_change_preview_public_boundary_requires_actor() -> None:
+    assert not hasattr(shipping_svc, "component_change_preview")
+    facade = getattr(shipping_actions_svc, "component_change_preview", None)
+    assert facade is not None
+    signature = inspect.signature(facade)
+    assert signature.parameters["actor"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert get_type_hints(facade)["actor"] is Employee
+    with pytest.raises(TypeError):
+        signature.bind(object(), object(), object(), 1)
+
+
+def test_shipping_event_actor_columns_are_nullable_for_legacy_rows() -> None:
+    columns = ShippingRequestEvent.__table__.columns
+
+    assert columns["actor_employee_id"].nullable is True
+    assert columns["actor_employee_code"].nullable is True
+    assert columns["actor_name"].nullable is True
+    actor_fk = next(iter(columns["actor_employee_id"].foreign_keys))
+    assert actor_fk.target_fullname == "employees.employee_id"
+    assert actor_fk.ondelete == "SET NULL"
+
+
+def test_every_shipping_mutation_event_passes_required_employee_actor() -> None:
+    signature = inspect.signature(shipping_svc._record_event)
+    with pytest.raises(TypeError):
+        signature.bind(object(), object(), "EVENT")
+
+    tree = ast.parse(inspect.getsource(shipping_svc))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_record_event"
+    ]
+    event_types = {
+        node.args[2].value
+        for node in calls
+        if len(node.args) >= 3
+        and isinstance(node.args[2], ast.Constant)
+        and isinstance(node.args[2].value, str)
+    }
+
+    assert event_types == EXPECTED_ACTOR_EVENT_TYPES
+    assert len(calls) == len(EXPECTED_ACTOR_EVENT_TYPES)
+    for node in calls:
+        actor_keywords = [kw for kw in node.keywords if kw.arg == "actor"]
+        assert len(actor_keywords) == 1
+        assert isinstance(actor_keywords[0].value, ast.Name)
+        assert actor_keywords[0].value.id == "actor"
+
+
 def _location_qty(db_session, item_id, department: DepartmentEnum) -> Decimal:
     row = (
         db_session.query(InventoryLocation)
@@ -44,6 +113,13 @@ def _location_qty(db_session, item_id, department: DepartmentEnum) -> Decimal:
 
 
 def _active_shipping_actor(db_session) -> Employee:
+    existing = (
+        db_session.query(Employee)
+        .filter(Employee.employee_code == "SHIPPING-ACTIONS-ACTOR")
+        .first()
+    )
+    if existing is not None:
+        return existing
     actor = Employee(
         employee_code="SHIPPING-ACTIONS-ACTOR",
         name="Shipping actions actor",
@@ -88,6 +164,7 @@ def _submit_final_pf_production(
             to_department=DepartmentEnum.SHIPPING.value,
             bundles=preview["bundles"],
         ),
+        requester=actor,
     )
 
 
@@ -370,6 +447,7 @@ def _make_prepared_request(
         quantity=Decimal("2"),
     )
     db_session.commit()
+    actor = _active_shipping_actor(db_session)
 
     request = shipping_actions_svc.create_request(
         db_session,
@@ -381,14 +459,20 @@ def _make_prepared_request(
                 {"item_id": companion.item_id, "quantity": 1, "unit": "EA"}
             ],
         },
+        actor,
     )
-    shipping_actions_svc.send_to_prep(db_session, request.request_id)
+    shipping_actions_svc.send_to_prep(db_session, request.request_id, actor)
     _submit_final_pf_production(
         db_session,
         request=request,
-        actor=_active_shipping_actor(db_session),
+        actor=actor,
     )
-    shipping_actions_svc.prepare_complete(db_session, request.request_id, "SN-001")
+    shipping_actions_svc.prepare_complete(
+        db_session,
+        request.request_id,
+        "SN-001",
+        actor=actor,
+    )
     return (
         request.request_id,
         final_pa.item_id,
@@ -440,6 +524,7 @@ def test_create_request_rolls_back_full_graph_when_event_fails(
         raise RuntimeError("create event failure")
 
     monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
+    actor = _active_shipping_actor(db_session)
 
     with pytest.raises(RuntimeError, match="create event failure"):
         shipping_actions_svc.create_request(
@@ -470,6 +555,7 @@ def test_create_request_rolls_back_full_graph_when_event_fails(
                     },
                 ],
                 },
+                actor,
             )
 
     db_session.expire_all()
@@ -528,6 +614,7 @@ def test_update_request_restores_graph_and_owned_item_boms_when_event_fails(
     make_bom(base_pa.item_id, component.item_id, Decimal("1"))
     make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
     db_session.commit()
+    actor = _active_shipping_actor(db_session)
 
     request = shipping_actions_svc.create_request(
         db_session,
@@ -558,6 +645,7 @@ def test_update_request_restores_graph_and_owned_item_boms_when_event_fails(
                 },
             ],
         },
+        actor,
     )
     request_id = request.request_id
     final_item_ids = (request.final_pa_item_id, request.final_pf_item_id)
@@ -565,8 +653,6 @@ def test_update_request_restores_graph_and_owned_item_boms_when_event_fails(
         before = _request_graph_state(verify_db, request_id, final_item_ids)
 
     boundaries = _count_session_boundaries(db_session, monkeypatch)
-
-    actor = _active_shipping_actor(db_session)
 
     def fail_event(*_args, **_kwargs):
         raise RuntimeError("update event failure")
@@ -623,6 +709,7 @@ def test_prepare_cancel_restores_inventory_logs_allocation_and_status_when_event
         make_location,
     )
     item_ids = (final_pa_id, final_pf_id, companion_id)
+    actor = _active_shipping_actor(db_session)
     with Session(bind=db_session.get_bind()) as verify_db:
         before = _prepared_request_state(verify_db, request_id, item_ids)
     assert before["request"][0] == ShippingRequestStatusEnum.PREPARED
@@ -637,7 +724,12 @@ def test_prepare_cancel_restores_inventory_logs_allocation_and_status_when_event
     monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
 
     with pytest.raises(RuntimeError, match="prepare cancel event failure"):
-        shipping_actions_svc.prepare_cancel(db_session, request_id, "late failure")
+        shipping_actions_svc.prepare_cancel(
+            db_session,
+            request_id,
+            "late failure",
+            actor=actor,
+        )
 
     db_session.expire_all()
     with Session(bind=db_session.get_bind()) as verify_db:
@@ -659,6 +751,7 @@ def test_pickup_complete_restores_inventory_logs_allocation_and_status_when_even
         make_location,
     )
     item_ids = (final_pa_id, final_pf_id, companion_id)
+    actor = _active_shipping_actor(db_session)
     with Session(bind=db_session.get_bind()) as verify_db:
         before = _prepared_request_state(verify_db, request_id, item_ids)
     assert before["request"][0] == ShippingRequestStatusEnum.PREPARED
@@ -673,7 +766,7 @@ def test_pickup_complete_restores_inventory_logs_allocation_and_status_when_even
     monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
 
     with pytest.raises(RuntimeError, match="pickup event failure"):
-        shipping_actions_svc.pickup_complete(db_session, request_id)
+        shipping_actions_svc.pickup_complete(db_session, request_id, actor)
 
     db_session.expire_all()
     with Session(bind=db_session.get_bind()) as verify_db:
@@ -698,10 +791,11 @@ def test_pickup_cancel_restores_inventory_allocations_and_prepared_state(
     companion = db_session.get(Item, companion_id)
     assert final_pf is not None
     assert companion is not None
+    actor = _active_shipping_actor(db_session)
     prepared_final_pf_qty = _location_qty(db_session, final_pf_id, DepartmentEnum.SHIPPING)
     prepared_companion_qty = _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING)
 
-    shipping_actions_svc.pickup_complete(db_session, request_id)
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor)
     pickup_item_ids = sorted(
         {
             log.item_id
@@ -722,7 +816,7 @@ def test_pickup_cancel_restores_inventory_allocations_and_prepared_state(
         "lock_inventories",
         lock_inventories,
     )
-    cancelled = shipping_actions_svc.pickup_cancel(db_session, request_id)
+    cancelled = shipping_actions_svc.pickup_cancel(db_session, request_id, actor)
 
     assert lock_calls == [pickup_item_ids]
     assert cancelled.status == ShippingRequestStatusEnum.PREPARED
@@ -745,6 +839,96 @@ def test_pickup_cancel_restores_inventory_allocations_and_prepared_state(
     assert any(event.event_type == "PICKUP_CANCELLED" for event in cancelled.events)
 
 
+def test_pickup_and_cancel_logs_use_current_actor_not_preparer(
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+) -> None:
+    request_id, _final_pa_id, _final_pf_id, _companion_id = _make_prepared_request(
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+    preparer = _active_shipping_actor(db_session)
+    picker = Employee(
+        employee_code="SHIPPING-PICKER-B",
+        name="Shipping picker B",
+        role="worker",
+        department=DepartmentEnum.SHIPPING.value,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active=True,
+    )
+    db_session.add(picker)
+    db_session.commit()
+    request = db_session.get(ShippingRequest, request_id)
+    assert request is not None
+
+    with pytest.raises(TypeError):
+        shipping_actions_svc.pickup_complete(
+            db_session,
+            request_id,
+            actor=picker,
+            prepared_by_name="spoofed primitive",
+        )
+    with pytest.raises(TypeError, match="Employee"):
+        shipping_svc._record_event(
+            db_session,
+            request,
+            "SPOOFED_EVENT",
+            actor=object(),
+        )
+
+    shipping_actions_svc.pickup_complete(db_session, request_id, picker)
+    pickup_logs = (
+        db_session.query(TransactionLog)
+        .filter_by(shipping_request_id=request_id, shipping_phase="PICKUP")
+        .all()
+    )
+    assert pickup_logs
+    assert {row.producer_employee_id for row in pickup_logs} == {picker.employee_id}
+    assert {row.produced_by for row in pickup_logs} == {picker.name}
+    assert preparer.employee_id not in {row.producer_employee_id for row in pickup_logs}
+    logged_picker = db_session.get(Employee, pickup_logs[0].producer_employee_id)
+    assert logged_picker is not None
+    assert (logged_picker.employee_code, logged_picker.name) == (
+        picker.employee_code,
+        picker.name,
+    )
+
+    shipping_actions_svc.pickup_cancel(db_session, request_id, picker)
+    assert {row.cancelled_by for row in pickup_logs} == {picker.employee_id}
+    cancelled_by = db_session.get(Employee, pickup_logs[0].cancelled_by)
+    assert cancelled_by is not None
+    assert (cancelled_by.employee_code, cancelled_by.name) == (
+        picker.employee_code,
+        picker.name,
+    )
+    pickup_event = next(
+        event for event in request.events if event.event_type == "PICKED_UP"
+    )
+    cancel_event = next(
+        event for event in request.events if event.event_type == "PICKUP_CANCELLED"
+    )
+    for event in (pickup_event, cancel_event):
+        assert event.actor_employee_id == picker.employee_id
+        assert event.actor_employee_code == picker.employee_code
+        assert event.actor_name == picker.name
+
+    legacy_event = ShippingRequestEvent(
+        request_id=request_id,
+        event_type="LEGACY_EVENT",
+        message="pre-CP3 compatible",
+    )
+    db_session.add(legacy_event)
+    db_session.commit()
+    assert legacy_event.actor_employee_id is None
+    assert legacy_event.actor_employee_code is None
+    assert legacy_event.actor_name is None
+
+
 def test_pickup_cancel_rolls_back_when_event_recording_fails(
     db_session,
     make_item,
@@ -759,7 +943,8 @@ def test_pickup_cancel_rolls_back_when_event_recording_fails(
         make_location,
     )
     item_ids = (final_pa_id, final_pf_id, companion_id)
-    shipping_actions_svc.pickup_complete(db_session, request_id)
+    actor = _active_shipping_actor(db_session)
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor)
     with Session(bind=db_session.get_bind()) as verify_db:
         before = _prepared_request_state(verify_db, request_id, item_ids)
     assert before["request"][0] == ShippingRequestStatusEnum.PICKED_UP
@@ -773,7 +958,7 @@ def test_pickup_cancel_rolls_back_when_event_recording_fails(
     monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
 
     with pytest.raises(RuntimeError, match="pickup cancel event failure"):
-        shipping_actions_svc.pickup_cancel(db_session, request_id)
+        shipping_actions_svc.pickup_cancel(db_session, request_id, actor)
 
     db_session.expire_all()
     with Session(bind=db_session.get_bind()) as verify_db:
@@ -784,7 +969,7 @@ def test_pickup_cancel_rolls_back_when_event_recording_fails(
 def test_independent_component_change_wrapper_rolls_back_inventory_and_logs_on_late_failure(
     db_session, make_item, make_bom, make_location, monkeypatch
 ) -> None:
-    _requester, source, target = _spec_conversion_case(
+    requester, source, target = _spec_conversion_case(
         db_session, make_item, make_bom, make_location
     )
     boundaries = _count_session_boundaries(db_session, monkeypatch)
@@ -801,6 +986,7 @@ def test_independent_component_change_wrapper_rolls_back_inventory_and_logs_on_l
             target.item_id,
             1,
             requested_mode="SPEC",
+            actor=requester,
         )
 
     db_session.expire_all()
@@ -853,6 +1039,7 @@ def test_requested_component_change_rolls_back_inventory_logs_request_and_events
         quantity=Decimal("1"),
     )
     db_session.commit()
+    actor = _active_shipping_actor(db_session)
 
     request = shipping_actions_svc.create_request(
         db_session,
@@ -876,12 +1063,13 @@ def test_requested_component_change_rolls_back_inventory_logs_request_and_events
                 },
             ],
         },
+        actor,
     )
     request_id = request.request_id
     target_id = request.final_pa_item_id
     source_id = source.item_id
     extra_id = extra.item_id
-    shipping_actions_svc.send_to_prep(db_session, request_id)
+    shipping_actions_svc.send_to_prep(db_session, request_id, actor)
 
     item_ids = (source_id, target_id, extra_id)
     with Session(bind=db_session.get_bind()) as verify_db:
@@ -926,6 +1114,7 @@ def test_requested_component_change_rolls_back_inventory_logs_request_and_events
             source_id,
             1,
             memo="requested component rollback",
+            actor=actor,
         )
 
     assert late_state == {
@@ -1017,15 +1206,16 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
     db_session.add(actor)
     db_session.commit()
 
-    request = shipping_svc.create_request(
+    request = shipping_actions_svc.create_request(
         db_session,
         {
             "base_pf_item_id": final_pf.item_id,
             "requested_by_name": "shipping-user",
             "invoice_number": "ACTIONS-INV-ATOMIC",
         },
+        actor,
     )
-    shipping_svc.send_to_prep(db_session, request.request_id)
+    shipping_actions_svc.send_to_prep(db_session, request.request_id, actor)
     db_session.commit()
 
     _submit_final_pf_production(

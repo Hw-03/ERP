@@ -22,11 +22,11 @@ from app.models import (
 )
 from app.services.inv_base import (
     _lock_location,
-    get_or_create_inventory,
+    _get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
 from app.repositories import inventory_repository
-from app.services.inv_transfer import consume_warehouse
+from app.services.inv_transfer import _consume_warehouse
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class NormalSource:
     supplier_name: str = ""
 
 
-def mark_defective(
+def _mark_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -93,7 +93,7 @@ def mark_defective(
     if kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {kind} (warehouse 또는 production)")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     locations = [(target_dept, LocationStatusEnum.DEFECTIVE)]
     if kind == "production":
         locations.append((source_dept, LocationStatusEnum.PRODUCTION))
@@ -167,7 +167,7 @@ def mark_defective(
     return inv
 
 
-def return_to_supplier(
+def _return_to_supplier(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -176,7 +176,7 @@ def return_to_supplier(
     """공급업체 반품: 부서별 DEFECTIVE 차감, 총량 감소."""
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, from_dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
 
@@ -209,7 +209,7 @@ def return_to_supplier(
     return inv
 
 
-def unmark_defective(
+def _unmark_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -223,7 +223,7 @@ def unmark_defective(
     if qty <= 0:
         raise ValueError("복귀 수량은 0보다 커야 합니다.")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
@@ -261,7 +261,7 @@ def unmark_defective(
     return inv
 
 
-def scrap_defective(
+def _scrap_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -272,7 +272,7 @@ def scrap_defective(
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
 
@@ -301,7 +301,7 @@ def scrap_defective(
     return inv
 
 
-def receive_defective(
+def _receive_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -318,7 +318,7 @@ def receive_defective(
     if qty <= 0:
         raise ValueError("격리 수량은 0보다 커야 합니다.")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
 
@@ -354,7 +354,7 @@ def _consume_normal_source(
     scrap_normal / return_to_supplier_from_normal 공통 본문.
     """
     if source == "warehouse":
-        consume_warehouse(db, item_id, qty)
+        _consume_warehouse(db, item_id, qty)
     else:
         _lock_location(db, item_id, dept_or_warehouse, LocationStatusEnum.PRODUCTION)
         db.flush()
@@ -389,7 +389,7 @@ def _consume_normal_source(
     return inv
 
 
-def scrap_normal(
+def _scrap_normal(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -406,11 +406,11 @@ def scrap_normal(
     if source.kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)
 
 
-def return_to_supplier_from_normal(
+def _return_to_supplier_from_normal(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -427,5 +427,5 @@ def return_to_supplier_from_normal(
     if source.kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)

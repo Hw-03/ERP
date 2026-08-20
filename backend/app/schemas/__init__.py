@@ -11,6 +11,7 @@ from app.schemas.weekly import *  # noqa: F401,F403
 from app.schemas.inventory import *  # noqa: F401,F403
 from app.schemas.item import *  # noqa: F401,F403
 from app.schemas.employee import *  # noqa: F401,F403
+from app.schemas.operator_session import *  # noqa: F401,F403
 from app.schemas.transaction import *  # noqa: F401,F403
 from app.schemas.stock_request import *  # noqa: F401,F403
 from app.schemas.notification import *  # noqa: F401,F403

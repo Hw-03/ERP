@@ -7,6 +7,7 @@ import uuid
 import pytest
 
 from app.models import Employee, EmployeeLevelEnum
+from app.services.pin_auth import hash_pin
 
 
 def _employee(db_session) -> Employee:
@@ -17,6 +18,8 @@ def _employee(db_session) -> Employee:
         role="조립/사원",
         department="조립",
         level=EmployeeLevelEnum.STAFF,
+        pin_hash=hash_pin("2468"),
+        pin_requires_change=False,
     )
     db_session.add(employee)
     db_session.commit()
@@ -49,13 +52,14 @@ def test_update_employee_sidebar_mode_rejects_unknown_value(db_session, client):
     assert response.status_code == 422, response.text
 
 
-def test_update_employee_sidebar_mode_returns_not_found(client):
+def test_update_employee_sidebar_mode_rejects_another_employee_path(client):
     response = client.put(
         f"/api/employees/{uuid.uuid4()}/sidebar-mode",
         json={"sidebar_mode": "collapsed"},
     )
 
-    assert response.status_code == 404, response.text
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"]["code"] == "ACTOR_MISMATCH"
 
 
 def test_employee_response_defaults_sidebar_mode_to_hover(db_session, client):
@@ -63,7 +67,7 @@ def test_employee_response_defaults_sidebar_mode_to_hover(db_session, client):
 
     response = client.post(
         f"/api/employees/{employee.employee_id}/verify-pin",
-        json={"pin": "0000"},
+        json={"pin": "2468"},
     )
 
     assert response.status_code == 200, response.text

@@ -22,7 +22,7 @@ from app.models import (
 from app.services.inv_base import (
     _lock_inventory,
     _lock_location,
-    get_or_create_inventory,
+    _get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
 from app.repositories import inventory_repository
@@ -37,10 +37,10 @@ def _deplete_boxes_if_tracking(db: Session, item_id: uuid.UUID, qty: Decimal) ->
     from app.services import warehouse_map as _wm
 
     if _wm.is_box_tracking_enabled(db):
-        _wm.deplete_boxes_by_order(db, item_id, qty)
+        _wm._deplete_boxes_by_order(db, item_id, qty)
 
 
-def receive_confirmed(
+def _receive_confirmed(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -66,7 +66,7 @@ def receive_confirmed(
     return inv
 
 
-def transfer_to_production(
+def _transfer_to_production(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -75,7 +75,7 @@ def transfer_to_production(
     """창고 → 부서 PRODUCTION 이동. 총량 변동 없음."""
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
 
@@ -113,7 +113,7 @@ def transfer_to_production(
     return inv
 
 
-def transfer_to_warehouse(
+def _transfer_to_warehouse(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -122,7 +122,7 @@ def transfer_to_warehouse(
     """부서 PRODUCTION → 창고 복귀. 총량 변동 없음."""
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
 
@@ -163,7 +163,7 @@ def transfer_to_warehouse(
     return inv
 
 
-def transfer_between_departments(
+def _transfer_between_departments(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -175,7 +175,7 @@ def transfer_between_departments(
         raise ValueError("이동 수량은 0보다 커야 합니다.")
     if from_dept == to_dept:
         raise ValueError("출발/도착 부서가 동일합니다.")
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     for d in sorted([from_dept, to_dept], key=lambda x: x.value if hasattr(x, "value") else str(x)):
         _lock_location(db, item_id, d, LocationStatusEnum.PRODUCTION)
     db.flush()
@@ -253,26 +253,26 @@ def format_item_location_shortage(item: Item, dept: DepartmentEnum, current: Dec
     )
 
 
-def consume_from_item_department(db: Session, item: Item, qty: Decimal) -> tuple[Inventory, Decimal, DepartmentEnum]:
+def _consume_from_item_department(db: Session, item: Item, qty: Decimal) -> tuple[Inventory, Decimal, DepartmentEnum]:
     """Consume from the item's process-code PRODUCTION location only."""
     dept, current = item_department_stock(db, item)
     if current < qty:
         raise ValueError(format_item_location_shortage(item, dept, current, qty))
-    inv_before = get_or_create_inventory(db, item.item_id)
+    inv_before = _get_or_create_inventory(db, item.item_id)
     qty_before = inv_before.quantity or Decimal("0")
-    inv = consume_from_department(db, item.item_id, qty, dept)
+    inv = _consume_from_department(db, item.item_id, qty, dept)
     return inv, qty_before, dept
 
 
-def receive_to_item_department(db: Session, item: Item, qty: Decimal) -> tuple[Inventory, Decimal, DepartmentEnum]:
+def _receive_to_item_department(db: Session, item: Item, qty: Decimal) -> tuple[Inventory, Decimal, DepartmentEnum]:
     """Receive into the item's process-code PRODUCTION location only."""
     dept = department_for_item(item)
-    inv_before = get_or_create_inventory(db, item.item_id)
+    inv_before = _get_or_create_inventory(db, item.item_id)
     qty_before = inv_before.quantity or Decimal("0")
-    inv = receive_confirmed(db, item.item_id, qty, bucket="production", dept=dept)
+    inv = _receive_confirmed(db, item.item_id, qty, bucket="production", dept=dept)
     return inv, qty_before, dept
 
-def consume_warehouse(
+def _consume_warehouse(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -285,7 +285,7 @@ def consume_warehouse(
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     db.flush()
 
     available_expr = Inventory.warehouse_qty - func.coalesce(
@@ -318,7 +318,7 @@ def consume_warehouse(
     return inv, qty_before
 
 
-def consume_from_department(
+def _consume_from_department(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,

@@ -1,0 +1,130 @@
+.root {
+  @apply mx-auto w-full;
+  max-width: 440px;
+  padding: 0 16px;
+}
+
+.card {
+  @apply relative flex w-full flex-col rounded-[24px] border;
+  background: var(--c-s1);
+  border-color: var(--c-border);
+  box-shadow: var(--c-card-shadow);
+  padding: 40px 36px 32px;
+}
+
+.pending {
+  @apply mb-5 rounded-[14px] border p-4;
+  background: var(--c-s2);
+  border-color: var(--c-red);
+}
+
+.pending p,
+.error {
+  @apply text-sm;
+  color: var(--c-red);
+}
+
+.link {
+  @apply text-sm font-semibold underline underline-offset-4;
+  color: var(--c-blue);
+}
+
+.pending .link {
+  @apply mt-3;
+}
+
+.link[data-loading="true"] {
+  opacity: 0.6;
+}
+
+.employee {
+  position: relative;
+  z-index: 30;
+  animation: mes-field-rise 0.5s 0.05s ease both;
+}
+
+.fields {
+  @apply mt-5;
+  animation: mes-field-rise 0.5s 0.15s ease both;
+}
+
+.fields[data-changing="true"] {
+  @apply flex flex-col gap-4;
+}
+
+.fields > p {
+  @apply text-sm;
+  color: var(--c-muted);
+}
+
+.field label {
+  @apply mb-2 block text-sm font-semibold;
+  color: var(--c-text);
+}
+
+.inputShell {
+  @apply flex items-center gap-3 rounded-[14px] border px-4 py-3.5 transition-colors;
+  background: var(--c-s2);
+  border-color: var(--c-border);
+}
+
+.inputShell[data-error="true"] {
+  border-color: var(--c-red);
+}
+
+.inputShell[data-loading="true"] {
+  opacity: 0.6;
+}
+
+.inputShell:focus-within {
+  border-color: var(--c-blue);
+}
+
+.inputShell svg {
+  flex-shrink: 0;
+  color: var(--c-muted);
+}
+
+.inputShell input {
+  @apply min-w-0 flex-1 bg-transparent text-base tracking-[0.4em] outline-none;
+  color: var(--c-text);
+}
+
+.inputShell input::placeholder {
+  @apply tracking-normal;
+  color: var(--c-muted);
+}
+
+.cancel {
+  @apply self-start;
+}
+
+.error {
+  @apply mt-2;
+}
+
+.submitWrap {
+  @apply mt-6;
+  animation: mes-field-rise 0.5s 0.25s ease both;
+}
+
+.submit {
+  @apply flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-base font-semibold text-white transition-all;
+  background: var(--c-blue);
+}
+
+.submit[data-enabled="false"] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.footer {
+  @apply mt-7 border-t pt-5;
+  border-color: var(--c-border);
+  animation: mes-field-rise 0.5s 0.35s ease both;
+}
+
+.footer div {
+  @apply text-center text-xs leading-relaxed;
+  color: var(--c-muted);
+}

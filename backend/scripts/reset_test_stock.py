@@ -42,7 +42,7 @@ from app.models import (  # noqa: E402
     TransactionLog,
 )
 from app.services.inventory import PROCESS_TYPE_TO_DEPT  # noqa: E402
-from app.services.sr_approval import cancel_open_stock_requests  # noqa: E402
+from app.services.sr_approval import _cancel_open_stock_requests  # noqa: E402
 
 
 R_CODES = {"TR", "HR", "VR", "NR", "AR", "PR"}
@@ -89,7 +89,7 @@ def main() -> int:
 
         # 0. 미결 stock_request 정리 — inventory pending 리셋 전에 먼저 취소해야
         #    "요청은 있는데 예약 장부는 0"인 고아 상태가 생기지 않는다.
-        cancelled = cancel_open_stock_requests(db, reason="재고 리셋(reset_test_stock) 전 자동 취소")
+        cancelled = _cancel_open_stock_requests(db, reason="재고 리셋(reset_test_stock) 전 자동 취소")
         if cancelled:
             print(f"  미결 요청 자동 취소       : {cancelled} 건")
         db.flush()

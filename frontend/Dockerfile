@@ -16,5 +16,5 @@ RUN npm run build
 
 EXPOSE 3000
 
-# 운영용: next dev 금지. build 산출물을 next start 로 서빙.
+# 운영용: next dev 금지. raw socket 경계를 가진 custom server로 build 산출물 서빙.
 CMD ["npm", "run", "start"]

@@ -25,7 +25,6 @@ from app.models import (
     IoLine,
     LocationStatusEnum,
     StockRequest,
-    StockRequestLine,
     StockRequestStatusEnum,
     ShippingRequest,
     ShippingRequestStatusEnum,
@@ -33,7 +32,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import io_dispatch as svc
-from app.services.bom_stock_policy import io_bom_auto_claims, issue_bom_auto_token
+from app.services.bom_stock_policy import _issue_bom_auto_token, io_bom_auto_claims
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.routers.inventory._tx_filters import _batch_name_map
 
@@ -156,10 +155,10 @@ def _prod_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
     return loc.quantity if loc else D("0")
 
 
-def _issue_bom_auto_token(db_session, batch: IoBatch, line: IoLine) -> None:
+def _assign_bom_auto_token(db_session, batch: IoBatch, line: IoLine) -> None:
     """미리보기에서 받은 자동 BOM 행을 서비스 단위 테스트에 재현한다."""
     bundle = line.bundle
-    line.bom_auto_token = issue_bom_auto_token(
+    line.bom_auto_token = _issue_bom_auto_token(
         db_session,
         flow="io",
         claims=io_bom_auto_claims(
@@ -474,8 +473,8 @@ def test_apply_line_adjust_in_and_out(make_item, make_location, db_session):
 
     logs = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
     assert len(logs) == 2
-    assert all(l.transaction_type == TransactionTypeEnum.ADJUST for l in logs)
-    changes = sorted(l.quantity_change for l in logs)
+    assert all(log.transaction_type == TransactionTypeEnum.ADJUST for log in logs)
+    changes = sorted(log.quantity_change for log in logs)
     assert changes == [D("-1"), D("4")]
 
 
@@ -1124,7 +1123,7 @@ def test_execute_submission_skips_flagged_bom_component_but_keeps_result_invento
             },
         ],
     )
-    _issue_bom_auto_token(
+    _assign_bom_auto_token(
         db_session,
         batch,
         next(line for line in batch.bundles[0].lines if line.item_id == component.item_id),
@@ -1315,7 +1314,7 @@ def test_execute_batch_after_dept_approval_preserves_bom_stock_exempt_snapshot(
     )
     component_line.bom_stock_exempt = True
     component_line.exclusion_note = "BOM 재고 미반영"
-    _issue_bom_auto_token(db_session, batch, component_line)
+    _assign_bom_auto_token(db_session, batch, component_line)
     request = StockRequest(
         request_id=uuid.uuid4(),
         requester_employee_id=requester.employee_id,
@@ -1455,7 +1454,7 @@ def test_submit_existing_draft_completes_immediate(make_item, db_session):
     result = svc.submit_existing_draft(
         db_session,
         batch_id=batch.batch_id,
-        requester_employee_id=requester.employee_id,
+        requester=requester,
     )
 
     assert result["status"] == "completed"
@@ -1490,14 +1489,14 @@ def test_submit_existing_draft_applies_current_bom_stock_exempt_setting(
             }
         ],
     )
-    _issue_bom_auto_token(db_session, batch, _single_line(batch))
+    _assign_bom_auto_token(db_session, batch, _single_line(batch))
     component.bom_stock_exempt = True
     db_session.flush()
 
     result = svc.submit_existing_draft(
         db_session,
         batch_id=batch.batch_id,
-        requester_employee_id=requester.employee_id,
+        requester=requester,
     )
 
     line = _single_line(batch)
@@ -1529,7 +1528,7 @@ def test_submit_existing_draft_wrong_owner_raises(make_item, db_session):
         svc.submit_existing_draft(
             db_session,
             batch_id=batch.batch_id,
-            requester_employee_id=other.employee_id,
+            requester=other,
         )
 
 
@@ -1551,5 +1550,5 @@ def test_submit_existing_draft_non_draft_status_raises(make_item, db_session):
         svc.submit_existing_draft(
             db_session,
             batch_id=batch.batch_id,
-            requester_employee_id=requester.employee_id,
+            requester=requester,
         )

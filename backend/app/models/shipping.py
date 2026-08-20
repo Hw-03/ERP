@@ -233,6 +233,14 @@ class ShippingRequestEvent(Base):
     request_id = Column(UUIDString, ForeignKey("shipping_requests.request_id", ondelete="CASCADE"), nullable=False, index=True)
     event_type = Column(String(40), nullable=False, index=True)
     message = Column(Text, nullable=True)
+    actor_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    actor_employee_code = Column(String(30), nullable=True)
+    actor_name = Column(String(100), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
 
     request = relationship("ShippingRequest", back_populates="events")

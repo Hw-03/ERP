@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 import uuid
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -20,18 +20,25 @@ from app.schemas import (
     EmployeeSidebarModeUpdate,
     EmployeeThemeUpdate,
     EmployeeUpdate,
+    OperatorSessionLoginRequest,
     PinVerifyRequest,
 )
 from app.dependencies.admin import require_admin_pin
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+    lifecycle_target_employee,
+)
 from app.routers.settings import require_admin
-from app.services import rate_limit
-from app.services.audit_actor_session import set_audit_actor_cookie
-from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, validate_pin, verify_pin
-from app.services import audit
+from app.services.operator_session import revoke_employee_sessions
+from app.services.pin_auth import DEFAULT_PIN, hash_pin, validate_pin
+from app.services import audit, rate_limit
 from app.services._tx import commit_and_refresh, commit_only
-from app._actor import set_actor
+from app.routers.operator_sessions import create_operator_session
 
-router = APIRouter()
+router = VerifiedActorRouter()
+bootstrap_router = APIRouter()
 
 SIDEBAR_TAB_IDS: tuple[str, ...] = (
     "dashboard",
@@ -253,6 +260,28 @@ def _auto_employee_code(db: Session) -> str:
     return f"E{max(nums, default=0) + 1}"
 
 
+def _locked_lifecycle_target(
+    request: Request,
+    employee_id: uuid.UUID,
+) -> Employee | None:
+    """VerifiedActor dependency가 actor와 함께 잠근 lifecycle 대상만 반환한다."""
+    locked_id = getattr(
+        request.state,
+        "verified_lifecycle_target_employee_id",
+        None,
+    )
+    if locked_id != employee_id:
+        return None
+    employee = getattr(
+        request.state,
+        "verified_lifecycle_target_employee",
+        None,
+    )
+    if employee is not None and employee.employee_id != employee_id:
+        return None
+    return employee
+
+
 @router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
 def create_employee(
     payload: EmployeeCreate,
@@ -308,6 +337,8 @@ def create_employee(
         login_notification_popup_enabled=bool(payload.login_notification_popup_enabled),
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
+        pin_hash=hash_pin(DEFAULT_PIN),
+        pin_requires_change=True,
     )
     db.add(employee)
     db.flush()
@@ -329,6 +360,7 @@ def create_employee(
 
 
 @router.put("/{employee_id}", response_model=EmployeeResponse)
+@lifecycle_target_employee
 def update_employee(
     employee_id: uuid.UUID,
     payload: EmployeeUpdate,
@@ -336,7 +368,7 @@ def update_employee(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    employee = _locked_lifecycle_target(request, employee_id)
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     candidate_hidden_tabs = _parse_hidden_sidebar_tabs(
@@ -369,15 +401,20 @@ def update_employee(
     )
     changed: list[str] = []
     if payload.name is not None and employee.name != payload.name:
-        employee.name = payload.name; changed.append("name")
+        employee.name = payload.name
+        changed.append("name")
     if payload.role is not None and employee.role != payload.role:
-        employee.role = payload.role; changed.append("role")
+        employee.role = payload.role
+        changed.append("role")
     if payload.phone is not None and employee.phone != payload.phone:
-        employee.phone = payload.phone; changed.append("phone")
+        employee.phone = payload.phone
+        changed.append("phone")
     if payload.department is not None and employee.department != payload.department:
-        employee.department = payload.department; changed.append("department")
+        employee.department = payload.department
+        changed.append("department")
     if payload.level is not None and employee.level != payload.level:
-        employee.level = payload.level; changed.append("level")
+        employee.level = payload.level
+        changed.append("level")
     if payload.warehouse_role is not None:
         new_role = payload.warehouse_role.lower()
         if new_role not in ("none", "primary", "deputy"):
@@ -401,10 +438,15 @@ def update_employee(
             employee.department_role = new_dept_role
             changed.append("department_role")
     if payload.display_order is not None and employee.display_order != payload.display_order:
-        employee.display_order = payload.display_order; changed.append("display_order")
+        employee.display_order = payload.display_order
+        changed.append("display_order")
+    was_active = _is_active_value(employee.is_active)
     if payload.is_active is not None:
         if employee.is_active != payload.is_active:
-            employee.is_active = payload.is_active; changed.append("is_active")
+            if was_active and not bool(payload.is_active):
+                revoke_employee_sessions(db, employee.employee_id)
+            employee.is_active = payload.is_active
+            changed.append("is_active")
     if bool(employee.io_enabled) != candidate_io_enabled:
         employee.io_enabled = candidate_io_enabled
         changed.append("io_enabled")
@@ -443,15 +485,18 @@ def update_employee(
 
 
 @router.delete("/{employee_id}")
+@lifecycle_target_employee
 def delete_employee(
     employee_id: uuid.UUID,
     request: Request,
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    employee = _locked_lifecycle_target(request, employee_id)
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    revoke_employee_sessions(db, employee.employee_id)
 
     has_requests = db.query(StockRequest).filter(
         StockRequest.requester_employee_id == employee_id
@@ -487,7 +532,7 @@ def delete_employee(
         return JSONResponse(status_code=200, content={"result": "deleted"})
 
 
-@router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
+@bootstrap_router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
 def verify_employee_pin(
     employee_id: uuid.UUID,
     payload: PinVerifyRequest,
@@ -495,34 +540,16 @@ def verify_employee_pin(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    """작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.
-
-    무차별 대입 완화를 위해 (직원ID + 클라이언트 IP) 키로 실패 시도를 제한한다.
-    실패만 카운트하며 성공 시 키를 리셋한다.
-    """
-    client_ip = getattr(getattr(request, "client", None), "host", None) or "unknown"
-    rl_key = f"verify_pin:{employee_id}:{client_ip}"
-
-    if rate_limit.is_blocked(rl_key):
-        raise http_error(
-            429,
-            ErrorCode.TOO_MANY_REQUESTS,
-            "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
-        )
-
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    if not bool(employee.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
-    if not verify_pin(employee.pin_hash, payload.pin):
-        rate_limit.record_failure(rl_key)
-        raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-
-    rate_limit.record_success(rl_key)
-    set_actor(request, employee)
-    set_audit_actor_cookie(response, employee.employee_code)
-    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+    """새 DB 세션 계약을 그대로 사용하는 한 release 호환 alias."""
+    result = create_operator_session(
+        OperatorSessionLoginRequest(employee_id=employee_id, pin=payload.pin),
+        request,
+        response,
+        db,
+    )
+    if isinstance(result, JSONResponse):
+        return result
+    return result.employee
 
 
 @router.post("/{employee_id}/change-pin", status_code=status.HTTP_204_NO_CONTENT)
@@ -530,24 +557,37 @@ def change_employee_pin(
     employee_id: uuid.UUID,
     payload: EmployeePinChangeRequest,
     request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> None:
     """본인 PIN 변경 — 현재 PIN 검증 필요."""
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    if not employee.is_active:
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
-    if not verify_pin(employee.pin_hash, payload.current_pin):
+    ensure_actor_employee_id(actor, employee_id)
+    employee = actor
+    try:
+        pin_is_valid = rate_limit.verify_operator_pin(
+            employee,
+            payload.current_pin,
+            request,
+        )
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        raise http_error(
+            429,
+            ErrorCode.TOO_MANY_REQUESTS,
+            str(exc),
+        )
+    if not pin_is_valid:
         raise http_error(403, ErrorCode.FORBIDDEN, "현재 PIN이 올바르지 않습니다.")
     validate_pin(payload.new_pin)
+    if payload.new_pin == DEFAULT_PIN:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "새 PIN은 기본 PIN과 달라야 합니다.")
     if payload.current_pin == payload.new_pin:
         raise http_error(422, ErrorCode.UNPROCESSABLE, "새 PIN은 현재 PIN과 달라야 합니다.")
 
-    set_actor(request, employee)
     employee.pin_hash = hash_pin(payload.new_pin)
+    employee.pin_requires_change = False
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
+    revoke_employee_sessions(db, employee.employee_id)
 
     audit.record(
         db,
@@ -561,6 +601,7 @@ def change_employee_pin(
 
 
 @router.post("/{employee_id}/reset-pin", status_code=status.HTTP_204_NO_CONTENT)
+@lifecycle_target_employee
 def reset_employee_pin(
     employee_id: uuid.UUID,
     payload: EmployeePinResetRequest,
@@ -569,13 +610,15 @@ def reset_employee_pin(
     db: Session = Depends(get_db),
 ):
     """직원 PIN을 기본값(0000)으로 초기화 — 관리자 PIN 검증 필요."""
-    require_admin(db, payload.pin)
+    require_admin(db, payload.pin, commit_lazy_changes=False)
 
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    employee = _locked_lifecycle_target(request, employee_id)
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
-    employee.pin_hash = DEFAULT_PIN_HASH
+    revoke_employee_sessions(db, employee.employee_id)
+    employee.pin_hash = hash_pin(DEFAULT_PIN)
+    employee.pin_requires_change = True
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
 
@@ -595,12 +638,12 @@ def reset_employee_pin(
 def update_employee_login_notification_popup(
     employee_id: uuid.UUID,
     payload: EmployeeLoginNotificationPopupUpdate,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """직원 로그인 알림 팝업 설정 저장."""
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    ensure_actor_employee_id(actor, employee_id)
+    employee = actor
 
     employee.login_notification_popup_enabled = payload.login_notification_popup_enabled
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
@@ -611,15 +654,15 @@ def update_employee_login_notification_popup(
 def update_employee_theme(
     employee_id: uuid.UUID,
     payload: EmployeeThemeUpdate,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """직원 테마 설정 저장 (light | dark | null)."""
     if payload.theme and payload.theme not in ("light", "dark"):
         raise http_error(422, ErrorCode.UNPROCESSABLE, "테마는 light, dark, 또는 null이어야 합니다.")
 
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    ensure_actor_employee_id(actor, employee_id)
+    employee = actor
 
     employee.theme = payload.theme
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
@@ -631,6 +674,7 @@ def update_employee_theme(
 def update_employee_sidebar_mode(
     employee_id: uuid.UUID,
     payload: EmployeeSidebarModeUpdate,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """직원별 데스크톱 사이드바 동작 모드를 저장한다."""
@@ -641,9 +685,8 @@ def update_employee_sidebar_mode(
             "사이드바 모드는 hover, collapsed, expanded 중 하나여야 합니다.",
         )
 
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    ensure_actor_employee_id(actor, employee_id)
+    employee = actor
 
     employee.sidebar_mode = payload.sidebar_mode
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
@@ -661,8 +704,7 @@ def _effective_hidden_sidebar_tabs(employee: Employee) -> List[str]:
 def _to_response(
     employee: Employee, assigned_model_slots: Optional[List[int]] = None
 ) -> EmployeeResponse:
-    pin_hash = getattr(employee, "pin_hash", None)
-    pin_is_default = pin_hash is None or pin_hash == DEFAULT_PIN_HASH
+    pin_is_default = getattr(employee, "pin_requires_change", None) is not False
     return EmployeeResponse(
         employee_id=employee.employee_id,
         employee_code=employee.employee_code,

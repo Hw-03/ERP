@@ -114,7 +114,7 @@ pbkdf2_sha256$<iterations>$<salt_base64>$<digest_base64>
 
 기존 64자리 SHA-256 해시는 로그인 전환 기간에만 읽는다. 비기본 기존 PIN의 검증이 성공하면 같은 DB transaction 안에서 새 포맷으로 업그레이드하고 세션을 만든다. 역방향 변환이나 평문 PIN 저장은 하지 않는다.
 
-4자리 PIN은 가능한 조합이 적으므로 강한 비밀번호와 동등하지 않다. `(employee_id + client IP)` 기준 현재 5분/10회 실패 제한을 유지하고, 로그인·최초 변경·일반 PIN 변경에 같은 제한 계약을 적용한다. 제한 상태가 프로세스 재시작으로 사라지는 현재 in-memory 구현은 후속 보안 강화 후보로 기록하되 이번 카드에서 분산 rate-limit 저장소까지 도입하지 않는다.
+4자리 PIN은 가능한 조합이 적으므로 강한 비밀번호와 동등하지 않다. `(employee_id + 검증된 실제 client IP)` 기준 현재 5분/10회 실패 제한을 유지하고, 로그인·최초 변경·일반 PIN 변경에 같은 제한 계약을 적용한다. 이 실패 예산과 별개로 직원 존재 여부와 PIN 성공 여부를 포함한 모든 로그인 KDF는 검증된 실제 client IP당 5분/60회 총예산을 공유하며, 성공해도 이 총예산을 초기화하지 않는다. 모든 canonical Next 실행은 raw `socket.remoteAddress`를 읽기 전에 inbound `Forwarded`/`X-Forwarded-For`/`X-Real-IP`/내부 assertion을 폐기하고 실제 peer로 assertion을 다시 만든다. backend는 loopback Next hop 또는 32-byte 이상 Docker 공유 비밀로 서명된 60초 이내 HMAC assertion만 인정하며, assertion 실패·누락과 backend 직접 요청은 TCP peer로 fail-closed한다. 따라서 공격자가 공개 employee UUID별 실패 예산을 공유 proxy peer에서 소진해 전체 직원을 잠그거나 전달 헤더를 회전해 제한을 우회할 수 없어야 한다. 제한 상태가 프로세스 재시작으로 사라지는 현재 in-memory 구현은 후속 보안 강화 후보로 기록하되 이번 카드에서 분산 rate-limit 저장소까지 도입하지 않는다.
 
 ## 7. API 계약
 
@@ -131,9 +131,9 @@ pbkdf2_sha256$<iterations>$<salt_base64>$<digest_base64>
 }
 ```
 
-성공 시 활성 직원의 프로필과 세션 메타데이터를 반환하고 `dexcowin_operator_session` 쿠키를 설정한다. legacy hash 업그레이드와 세션 INSERT를 한 transaction으로 commit한 뒤에만 쿠키를 쓴다.
+성공 시 활성 직원의 프로필과 세션 메타데이터를 반환하고 `dexcowin_operator_session` 쿠키만 설정한다. legacy hash 업그레이드와 세션 INSERT를 한 transaction으로 commit한 뒤에만 쿠키를 쓴다. 새 operator 행 발급은 `(employee_id + 검증된 실제 client IP)`별 5분/10회 비-reset 예산을 적용하고, Employee 행 잠금 아래 현재 boot의 미폐기·미소비·미만료 operator 행을 최대 32개로 제한한다. 예산 또는 hard cap 초과는 `429 TOO_MANY_REQUESTS`이며 cookie와 DB 변경은 0이다. 현재 origin에 유효한 operator 또는 PIN-change cookie가 있고 그 직원이 요청 대상과 다르면 `403 ACTOR_MISMATCH`로 거부한다. 같은 직원의 유효한 cookie로 다시 로그인하면 Employee 행을 잠근 뒤 그 capability를 재검증하고 발급 예산·hard cap을 소비하지 않은 채 기존 절대 만료 시각을 재사용한다. 따라서 logout과 겹친 재로그인이 logout 뒤 새 세션을 남기지 않는다. 작업자 교체는 먼저 명시적 logout을 DB에 commit한 뒤 수행한다.
 
-기본 PIN 또는 `pin_requires_change=true`이면 작업 세션을 발급하지 않는다. 대신 `409 PIN_CHANGE_REQUIRED`와 10분 절대 만료의 1회성 `pin_change_challenge` HttpOnly 쿠키를 발급한다. DB에는 `purpose=pin_change` 세션 행을 만들며, 이 challenge는 해당 직원의 새 PIN 설정 한 번에만 사용할 수 있고 mutation actor가 될 수 없다.
+기본 PIN 또는 `pin_requires_change=true`이면 작업 세션을 발급하지 않는다. 대신 `409 PIN_CHANGE_REQUIRED`와 10분 절대 만료의 1회성 `pin_change_challenge` HttpOnly 쿠키만 발급한다. DB에는 `purpose=pin_change` 세션 행을 만들며, 이 challenge는 해당 직원의 새 PIN 설정 한 번에만 사용할 수 있고 mutation actor가 될 수 없다. 두 성공 응답은 서로 다른 이름의 기존 auth cookie를 삭제하지 않는다. 늦은 응답이 더 최근의 다른 cookie를 지우지 않게 하고, 잔존 cookie는 purpose·직원 일치와 DB의 revoke/consume/expiry 검사로 권한을 얻지 못한다.
 
 #### `GET /api/operator-session`
 
@@ -141,17 +141,17 @@ pbkdf2_sha256$<iterations>$<salt_base64>$<digest_base64>
 
 #### `DELETE /api/operator-session`
 
-현재 세션을 DB에서 폐기하고 쿠키를 삭제한다. 이미 만료·폐기된 세션이어도 쿠키를 지우며 idempotent하게 성공한다.
+일반 logout은 유효한 operator token과 같은 직원의 PIN-change token만 선택해 직원 행을 UUID 순으로 먼저 잠근 뒤 idempotent하게 폐기한다. foreign challenge와 같은 직원의 다른 브라우저 세션은 보존한다. operator 없이 유효한 challenge만 있으면 직원 행과 challenge를 다시 잠가 검증한 뒤 `X-MES-Employee-Code`가 그 직원의 정본 코드와 같은 경우에만 폐기한다. claim 누락·불일치는 `403 ACTOR_MISMATCH`이며 session·AdminAudit·ActivityAudit 변경은 0이다. 공통 HTTP DB 감사는 서버가 검증한 actor가 있는 일반 write만 기록하고, 미검증 bootstrap 실패는 bounded access log에만 남긴다. claim 없는 익명 DELETE의 204 idempotency는 유효한 operator/challenge가 없을 때만 허용한다. 최초 PIN 화면의 명시적 취소는 `pin_change_employee_id` query claim으로 같은 DELETE를 호출해 예상 직원의 challenge만 폐기하며, 함께 실린 foreign operator는 건드리지 않는다. 이 bootstrap 취소는 request actor를 비우고 `bootstrap_employee_id`가 든 별도 AdminAudit 행으로 남긴다. 응답은 `Set-Cookie` 만료를 보내지 않는다. 따라서 늦은 logout 응답이 그 사이 완료된 새 로그인의 cookie를 삭제할 수 없다. 브라우저에 남은 opaque cookie는 이미 DB에서 권한이 없고, 다음 성공 login/challenge가 같은 이름을 덮어쓰거나 절대 만료 시 자연 제거된다. 최초 PIN 화면은 취소 DELETE가 DB commit에 성공한 뒤에만 로그인 화면으로 복귀한다.
 
 ### 최초 PIN 설정과 일반 변경
 
 #### `POST /api/operator-session/complete-pin-change`
 
-`pin_change_challenge`와 `new_pin`을 검증한다. challenge 행을 잠그고 `consumed_at IS NULL`, 만료·boot identity·직원 상태를 확인한다. challenge 직원의 PIN을 새 포맷으로 저장하고 `pin_requires_change=false`로 바꾸며, challenge 소비·해당 직원의 기존 세션 폐기·감사 기록을 한 transaction으로 처리한다. 이 요청 자체는 작업 세션을 발급하지 않는다. 성공 후 프런트엔드는 새 PIN으로 `POST /api/operator-session`을 다시 호출한다.
+`pin_change_challenge`, 요청의 예상 `employee_id`, `new_pin`을 검증한다. 요청에 유효한 operator cookie도 함께 있으면 두 직원 행을 UUID 순으로 잠그고 두 capability를 다시 검증한다. operator 직원과 challenge 직원이 다르면 직원·PIN·challenge·감사 변경 전에 `403 ACTOR_MISMATCH`로 거부한다. challenge 행의 `consumed_at IS NULL`, 만료·boot identity·직원 상태와 예상 `employee_id` 일치도 확인한다. challenge 직원의 PIN을 새 포맷으로 저장하고 `pin_requires_change=false`로 바꾸며, challenge 소비·해당 직원의 기존 세션 폐기·감사 기록을 한 transaction으로 처리한다. 이 요청 자체는 작업 세션을 발급하거나 cookie를 삭제하지 않는다. 성공 후 프런트엔드는 새 PIN으로 `POST /api/operator-session`을 다시 호출한다.
 
 기본 PIN `0000`은 공개된 초기값이므로 최초 변경 challenge만으로 실제 사람의 신원을 강하게 증명하지는 못한다. 신규·초기화 직원은 관리자와 대면 상태에서 즉시 새 PIN을 설정한다는 운영 절차를 적용한다. challenge 단계의 감사 행은 `verified_actor`로 기록하지 않고 `bootstrap_employee_id`와 request ID를 별도 필드로 남긴다. HTTPS 전에는 challenge 탈취 위험도 남는다.
 
-기존 `POST /api/employees/{employee_id}/change-pin`은 로그인된 본인의 일반 PIN 변경 endpoint로 전환한다. 세션 actor와 path 직원이 같아야 하고 현재 PIN을 다시 요구한다. PIN 변경, 전 세션 폐기, 감사 기록은 한 transaction이다.
+기존 `POST /api/employees/{employee_id}/change-pin`은 로그인된 본인의 일반 PIN 변경 endpoint로 전환한다. 세션 actor와 path 직원이 같아야 하고 현재 PIN을 다시 요구한다. PIN 변경, 전 세션 폐기, 감사 기록은 한 transaction이며 응답은 cookie를 삭제하지 않는다. 성공한 프런트엔드 호출자는 즉시 auth boundary를 열어 로그인 화면으로 복귀한다.
 
 관리자 초기화는 기존 step-up을 유지하되 대상 직원의 `pin_requires_change=true` 설정과 전 세션 폐기를 같은 transaction에 포함한다.
 
@@ -168,7 +168,7 @@ pbkdf2_sha256$<iterations>$<salt_base64>$<digest_base64>
 | 403 | `ACTOR_MISMATCH` | 요청이 다른 직원을 행위자로 주장 |
 | 403 | `EMPLOYEE_INACTIVE` | 직원 비활성·삭제 |
 | 409 | `PIN_CHANGE_REQUIRED` | 새 PIN 설정 전 작업 세션 발급 금지 |
-| 429 | `TOO_MANY_REQUESTS` | PIN 실패 제한 초과 |
+| 429 | `TOO_MANY_REQUESTS` | PIN 실패·KDF·새 세션 발급 예산 또는 active session hard cap 초과 |
 
 오류 응답은 기존 공통 error envelope를 사용한다. 로그인 실패는 직원 존재 여부를 과도하게 노출하지 않도록 잘못된 직원·PIN 응답 문구를 통일하되, 비활성 직원은 선택 목록과 운영 진단을 위해 별도 code를 유지한다.
 
@@ -237,11 +237,12 @@ manifest와 실제 route 집합의 양방향 차집합을 테스트해 새 mutat
 3. `401`이면 로그인 카드로 돌아가고 기존 작업자 cache를 지운다.
 4. 로그인에서 `PIN_CHANGE_REQUIRED`가 오면 새 PIN·확인 입력 화면으로 전환한다.
 5. 최초 PIN 설정 성공 후 새 PIN으로 로그인 API를 다시 호출한다.
-6. 로그아웃은 서버 `DELETE` 성공 여부와 관계없이 로컬 표시 cache를 지운다.
+6. 로그아웃 시작 즉시 로컬 표시 cache와 민감 query/admin 상태를 지우고 auth boundary를 연다. 동시에 비민감 `localStorage` pending-revoke 표식에 상태와 원래 표시 사번을 남기고 최초·재시도 DELETE 모두 그 사번을 `X-MES-Employee-Code`로 보낸다. 서버 commit이 204로 확인된 뒤에만 표식을 지우고 새 로그인을 허용한다. DELETE가 실패하면 명시적 오류와 재시도만 노출하고 업무 UI·로그인을 계속 차단한다. 재시도 시 origin cookie가 이미 다른 작업자 B이면 서버의 `403 ACTOR_MISMATCH`를 B mutation 0의 terminal-safe 결과로 처리해 B capability를 폐기하지 않는다.
+7. 앱 시작·새로고침에 pending-revoke 표식이 있으면 `GET /api/operator-session`보다 `DELETE`를 먼저 재시도한다. 204 뒤 표식을 지우고 GET 복원을 진행하며, 재시도 실패 시 HttpOnly cookie가 살아 있을 수 있으므로 operator 복원과 업무 UI를 모두 금지한다.
 
-`sessionStorage`에는 테마·사이드바 같은 화면 편의를 위한 복사본만 둘 수 있다. 직원 ID·역할·권한은 API mutation 결정에 사용하지 않는다. API client는 cookie를 자동 전송하며 `X-MES-Employee-Code`를 authorization 용도로 만들지 않는다.
+`sessionStorage`에는 테마·사이드바 같은 화면 편의를 위한 복사본만 둘 수 있다. `localStorage`의 pending-revoke 표식은 상태와 비민감 사번 claim만 포함하고 직원 UUID·이름·역할·PIN·token은 포함하지 않는다. 직원 ID·역할·권한은 API mutation 결정에 사용하지 않는다. API client는 cookie를 자동 전송하고 탭의 표시 작업자 코드를 `X-MES-Employee-Code` 검증 claim으로 보낸다. 이 값은 authorization 정본이 아니며 서버의 cookie actor와 다르면 mutation 전에 `403 ACTOR_MISMATCH`로 거부한다.
 
-세션이 만료되거나 다른 탭에서 로그아웃된 경우 다음 mutation의 `401`에서 안전하게 로그인 화면으로 이동한다. 작성 중 form은 기존 dirty guard 정책에 따라 로컬 화면에 남길 수 있지만 자동 재전송하지 않는다.
+세션이 만료되거나 다른 탭에서 로그아웃된 경우 다음 mutation의 `401`에서, 다른 탭이 새 작업자로 로그인해 origin cookie가 바뀐 경우 `403 ACTOR_MISMATCH`에서 안전하게 로그인 화면으로 이동한다. 작성 중 form은 기존 dirty guard 정책에 따라 로컬 화면에 남길 수 있지만 자동 재전송하지 않는다.
 
 ## 12. transaction과 폐기 정책
 
@@ -249,7 +250,7 @@ manifest와 실제 route 집합의 양방향 차집합을 테스트해 새 mutat
 - 최초 PIN 설정: PIN 변경 + `pin_requires_change=false` + 기존 session revoke + audit를 한 commit
 - 일반 PIN 변경·관리자 초기화: PIN 변경 + 모든 session revoke + audit를 한 commit
 - 직원 비활성화·삭제: 직원 상태 변경 + 모든 session revoke + audit를 한 commit
-- 로그아웃: 현재 session revoke 한 commit, cookie 삭제는 DB 결과와 무관하게 실행
+- 로그아웃: 요청에 실린 session을 한 commit으로 폐기하고 auth cookie 삭제 응답은 보내지 않음. 늦은 응답이 새 cookie를 지우지 못하며 잔존 token은 DB 검증에서 권한 0
 
 audit insert나 flush, 최종 commit이 실패하면 PIN·직원 상태·session 폐기가 함께 rollback되어야 한다. 실패한 transaction 뒤 cookie를 새로 발급하지 않는다.
 
@@ -308,6 +309,7 @@ rollback은 애플리케이션 버전을 되돌리되 additive table·column은 
 - SQLite focused suite
 - Alembic head의 ephemeral PostgreSQL에서 독립 connection 검증
 - 세션 폐기와 동시에 들어오는 mutation은 정확히 하나의 결과만 허용하고, 폐기 이후 새 mutation 성공 0
+- 필수 PostgreSQL runner는 foreign operator preflight 뒤 cookie 회전, 같은 cookie의 login→logout, logout→login 두 잠금 순서와 직원 lifecycle의 실제 decorator → `VerifiedActor` actor/target 정렬 잠금 → `_locked_lifecycle_target` route 흐름을 실행하며 skip을 성공으로 세지 않는다.
 
 ## 15. 관측과 운영
 

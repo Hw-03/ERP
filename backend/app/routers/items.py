@@ -6,11 +6,11 @@ from io import StringIO
 import uuid
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, Query, Request, status
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
 from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
@@ -30,18 +30,16 @@ from app.utils.mes_code import (
     slots_to_model_symbol,
 )
 from app.utils.search import build_normalized_search_filter
-from app.models import ProductSymbol
 from app.services import audit
-from app.services import inventory as inventory_svc
 from app.services import stock_math
-from app.services.item_display_order import insert_item_at_process_end
+from app.services.item_display_order import _insert_item_at_process_end
 from app.services._tx import commit_and_refresh
 from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
-from app.services.reorder import reorder_by_display_order
+from app.services.reorder import _reorder_by_display_order
 from app.repositories import item_repository, inventory_repository
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 def _build_item_query(db: Session) -> SAQuery:
@@ -188,7 +186,7 @@ def create_item(
     )
     db.add(item)
     db.flush()
-    insert_item_at_process_end(db, item)
+    _insert_item_at_process_end(db, item)
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
     locs = payload.initial_locations or []
@@ -361,7 +359,7 @@ def reorder_items(
             "활성 품목 전체 목록에서만 표시 순서를 변경할 수 있습니다.",
         )
 
-    reorder_by_display_order(
+    _reorder_by_display_order(
         db, Item, "item_id",
         [(item.item_id, item.display_order) for item in payload.items],
         order_field="sort_order",
@@ -419,7 +417,6 @@ def export_items_xlsx(
     db: Session = Depends(get_db),
 ):
     from datetime import date as _date
-    from decimal import Decimal as _D
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     from app.utils.excel import apply_header, auto_width, make_xlsx_response

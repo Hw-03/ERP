@@ -694,7 +694,7 @@ def test_release_then_execute_line_approval_consumes_stock(db_session, make_item
     )
     req.status = StockRequestStatusEnum.RESERVED
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
     svc._execute_line(db_session, req, line, approver=emp, is_approval=True)
     db_session.flush()
 
@@ -1027,7 +1027,7 @@ def test_release_reservation_restores_pending(db_session, make_item):
     )
     db_session.flush()
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
     db_session.flush()
 
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -1047,7 +1047,7 @@ def test_release_reservation_noop_when_not_reserved(db_session, make_item):
     )
     db_session.flush()
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
     db_session.flush()
 
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -1085,14 +1085,14 @@ def test_release_reservation_locks_sorted_unique_inventories_before_source_relea
         events.append(("lock", item_ids))
         return {item_id: object() for item_id in item_ids}
 
-    def release_lines(_db, _lines, **_kwargs):
+    def _release_lines_stub(_db, _lines, **_kwargs):
         events.append(("release", None))
 
     monkeypatch.setattr(svc, "_is_sqlite", False)
     monkeypatch.setattr(svc.inventory_svc, "lock_inventories", lock_inventories)
-    monkeypatch.setattr(sr_reservation, "release_lines", release_lines)
+    monkeypatch.setattr(sr_reservation, "_release_lines", _release_lines_stub)
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
 
     assert events == [
         ("lock", sorted({first.item_id, second.item_id})),
@@ -1169,16 +1169,16 @@ def test_rework_first_prelock_includes_recursive_child_tree(
     monkeypatch.setattr(svc, "_is_sqlite", False)
     monkeypatch.setattr(
         svc.inventory_svc,
-        "ensure_and_lock_inventories",
+        "_ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("lock", item_ids)) or {},
     )
     if operation == "release":
         monkeypatch.setattr(
             sr_reservation,
-            "release_lines",
+            "_release_lines",
             lambda *_args, **_kwargs: events.append(("release", None)),
         )
-        svc.release_reservation(db_session, request)
+        svc.release_reservation(db_session, request, actor=employee)
     else:
         monkeypatch.setattr(
             svc,

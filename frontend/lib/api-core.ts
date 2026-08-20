@@ -10,8 +10,8 @@
  *   - 새로 작성하는 코드는 `@/lib/api-core` 직접 사용을 권장.
  */
 
-import { readCurrentEmployeeCodeForLog } from "./operator-log-context";
 import { getAuditRequestHeaders } from "./activity-audit-context";
+import { readCurrentEmployeeCodeForLog } from "./operator-log-context";
 
 const SERVER_API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}`
@@ -47,6 +47,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code?: string,
+    public readonly extra?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -98,13 +100,68 @@ export function extractErrorMessage(detail: unknown, fallback = "처리 실패")
  * 외부에서 직접 fetch 를 사용하는 도메인 코드가 동일 메시지 포맷을 쓰도록 export.
  */
 export async function parseError(res: Response): Promise<string> {
+  return (await parseApiError(res)).message;
+}
+
+interface ParsedApiError {
+  message: string;
+  code?: string;
+  extra?: unknown;
+}
+
+async function parseApiError(res: Response): Promise<ParsedApiError> {
   const text = await res.text();
   try {
     const json = JSON.parse(text);
-    return extractErrorMessage(json?.detail, text || res.statusText);
+    const detail = json?.detail;
+    const parsed: ParsedApiError = {
+      message: extractErrorMessage(detail, text || res.statusText),
+    };
+    if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+      const record = detail as Record<string, unknown>;
+      if (typeof record.code === "string") parsed.code = record.code;
+      if (record.extra !== undefined) parsed.extra = record.extra;
+    }
+    return parsed;
   } catch {
-    return text || res.statusText;
+    return { message: text || res.statusText };
   }
+}
+
+export const AUTH_REQUIRED_EVENT = "dexcowin_auth_required";
+
+let authGeneration = 0;
+
+/** 현재 탭의 인증 세대. 요청 시작 시 캡처해 지연된 401인지 판별한다. */
+export function captureAuthGeneration(): number {
+  return authGeneration;
+}
+
+/** 서버가 검증한 새 작업자 세션을 화면에 채택했음을 기록한다. */
+export function advanceAuthGeneration(): void {
+  if (typeof window === "undefined") return;
+  authGeneration += 1;
+}
+
+/** 명시적 logout/PIN revoke 경계를 열고 actor-scoped UI 상태를 폐기한다. */
+export function establishAuthRequiredBoundary(): void {
+  if (typeof window === "undefined") return;
+  advanceAuthGeneration();
+  window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+}
+
+export async function apiErrorFromResponse(
+  res: Response,
+  requestAuthGeneration: number,
+): Promise<ApiError> {
+  const parsed = await parseApiError(res);
+  if (
+    (res.status === 401 || (res.status === 403 && parsed.code === "ACTOR_MISMATCH")) &&
+    requestAuthGeneration === authGeneration
+  ) {
+    establishAuthRequiredBoundary();
+  }
+  return new ApiError(parsed.message, res.status, parsed.code, parsed.extra);
 }
 
 /**
@@ -115,7 +172,7 @@ export async function parseError(res: Response): Promise<string> {
  * 존재하면 자동으로 `X-Admin-Pin` 헤더를 주입한다.
  *
  * - 호출자 코드 변경 0 — 기존 body.pin 페이로드도 그대로 동작.
- * - 백엔드 admin 라우터는 `X-Admin-Pin` → `body.pin` → `query.pin` 우선순위로
+ * - 백엔드 admin 라우터는 `X-Admin-Pin` → `body.pin` 우선순위로
  *   PIN 을 추출 (W3-A 완료). 다른 라우터는 헤더 무시.
  * - in-memory only — sessionStorage / localStorage 사용 안 함.
  */
@@ -134,8 +191,9 @@ function adminPinHeaders(): Record<string, string> {
  * 창고 관리자(operator) 자격증명 헤더 주입 — 창고 지도 편집용.
  *
  * 창고 지도 편집 모드 진입 시 `registerOperatorCredsProvider(() => ({code, pin}))`
- * 로 등록한다. warehouse-map 쓰기 엔드포인트는 `X-Employee-Code` + `X-Operator-Pin`
- * 으로 warehouse_role(primary/deputy)을 검증한다. 다른 라우터는 헤더 무시.
+ * 로 등록한다. warehouse-map mutation 엔드포인트는 `X-Employee-Code` +
+ * `X-Operator-Pin` 으로 현재 세션 actor의 warehouse_role(primary/deputy)과 PIN을
+ * 검증한다. PIN은 GET 요청에 보내지 않는다.
  * in-memory only — sessionStorage / localStorage 사용 안 함.
  */
 let getOperatorCreds: () => { code: string; pin: string } | null = () => null;
@@ -146,23 +204,39 @@ export function registerOperatorCredsProvider(
   getOperatorCreds = fn;
 }
 
-function operatorCredsHeaders(): Record<string, string> {
-  const creds = getOperatorCreds();
-  return creds ? { "X-Employee-Code": creds.code, "X-Operator-Pin": creds.pin } : {};
+function apiPathname(url: string): string | null {
+  try {
+    return new URL(url, "http://local.invalid").pathname;
+  } catch {
+    return null;
+  }
 }
 
-function logActorHeaders(): Record<string, string> {
-  const code = readCurrentEmployeeCodeForLog();
-  return code ? { "X-MES-Employee-Code": code } : {};
-}
-
-/** admin PIN + operator 자격증명을 합친 인증 헤더. 둘 다 있으면 둘 다 주입. */
-function authHeaders(): Record<string, string> {
-  return {
-    ...adminPinHeaders(),
-    ...operatorCredsHeaders(),
-    ...logActorHeaders(),
-  };
+/** 해당 mutation 범위에 맞는 in-memory step-up 자격증명만 더한다. */
+function mutationAuthHeaders(
+  url: string,
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
+): Record<string, string> {
+  const pathname = apiPathname(url);
+  const headers = adminPinHeaders();
+  if (
+    pathname !== "/api/operator-session/complete-pin-change" &&
+    !(pathname === "/api/operator-session" && method === "POST")
+  ) {
+    const employeeCode = readCurrentEmployeeCodeForLog();
+    if (employeeCode) headers["X-MES-Employee-Code"] = employeeCode;
+  }
+  if (
+    pathname &&
+    (pathname === "/api/warehouse-map" || pathname.startsWith("/api/warehouse-map/"))
+  ) {
+    const creds = getOperatorCreds();
+    if (creds) {
+      headers["X-Employee-Code"] = creds.code;
+      headers["X-Operator-Pin"] = creds.pin;
+    }
+  }
+  return headers;
 }
 
 function rethrowGetRequestError(error: unknown, url: string): never {
@@ -177,10 +251,15 @@ function rethrowGetRequestError(error: unknown, url: string): never {
 /**
  * 일반 GET 페치 — JSON 응답 반환. AbortSignal 지원.
  */
-export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> {
+async function readResponse<T>(
+  url: string,
+  signal: AbortSignal | undefined,
+  reader: "json" | "blob",
+): Promise<T> {
+  const requestAuthGeneration = captureAuthGeneration();
   let res: Response;
   try {
-    const headers = authHeaders();
+    const headers = adminPinHeaders();
     const init: RequestInit = { signal, credentials: "include" };
     if (Object.keys(headers).length > 0) init.headers = headers;
     res = await fetch(url, init);
@@ -188,26 +267,18 @@ export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> 
     rethrowGetRequestError(error, url);
   }
   if (!res.ok) {
-    throw new ApiError(await parseError(res), res.status);
+    throw await apiErrorFromResponse(res, requestAuthGeneration);
   }
-  return res.json();
+  return res[reader]() as Promise<T>;
+}
+
+export function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> {
+  return readResponse<T>(url, signal, "json");
 }
 
 /** 인증 헤더를 포함해 파일 응답을 Blob 으로 내려받는다. */
-export async function fetchBlob(url: string, signal?: AbortSignal): Promise<Blob> {
-  let res: Response;
-  try {
-    const headers = authHeaders();
-    const init: RequestInit = { signal, credentials: "include" };
-    if (Object.keys(headers).length > 0) init.headers = headers;
-    res = await fetch(url, init);
-  } catch (error) {
-    rethrowGetRequestError(error, url);
-  }
-  if (!res.ok) {
-    throw new ApiError(await parseError(res), res.status);
-  }
-  return res.blob();
+export function fetchBlob(url: string, signal?: AbortSignal): Promise<Blob> {
+  return readResponse<Blob>(url, signal, "blob");
 }
 
 /**
@@ -223,33 +294,71 @@ async function writeJson<T>(
   url: string,
   method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown,
+  callerSignal?: AbortSignal,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
-  const init: RequestInit = { method, credentials: "include" };
-  const pinHeaders = { ...authHeaders(), ...getAuditRequestHeaders() };
+  const requestAuthGeneration = captureAuthGeneration();
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(callerSignal?.reason);
+  if (callerSignal?.aborted) {
+    abortFromCaller();
+  } else {
+    callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
+  const timeoutId = setTimeout(
+    () => controller.abort(new Error("Request timed out")),
+    15_000,
+  );
+  const init: RequestInit = {
+    method,
+    credentials: "include",
+    signal: controller.signal,
+  };
+  const pinHeaders = {
+    ...mutationAuthHeaders(url, method),
+    ...getAuditRequestHeaders(),
+    ...extraHeaders,
+  };
   if (body !== undefined) {
     init.headers = { "Content-Type": "application/json", ...pinHeaders };
     init.body = JSON.stringify(body);
   } else if (Object.keys(pinHeaders).length > 0) {
     init.headers = pinHeaders;
   }
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(reject, 15_000),
-  );
-  const res = await Promise.race([fetch(url, init), timeout]).catch(() => {
+  let res: Response;
+  try {
+    res = await fetch(url, init);
+  } catch {
     throw new ApiConnectionError();
-  });
-  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  } finally {
+    clearTimeout(timeoutId);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+  }
+  if (!res.ok) throw await apiErrorFromResponse(res, requestAuthGeneration);
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   if (!text) return undefined as T;
   return JSON.parse(text) as T;
 }
 
-export const postJson = <T>(url: string, body?: unknown): Promise<T> =>
-  writeJson<T>(url, "POST", body);
-export const putJson = <T>(url: string, body?: unknown): Promise<T> =>
-  writeJson<T>(url, "PUT", body);
-export const patchJson = <T>(url: string, body?: unknown): Promise<T> =>
-  writeJson<T>(url, "PATCH", body);
-export const deleteJson = <T = void>(url: string, body?: unknown): Promise<T> =>
-  writeJson<T>(url, "DELETE", body);
+export const postJson = <T>(
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> => writeJson<T>(url, "POST", body, signal);
+export const putJson = <T>(
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> => writeJson<T>(url, "PUT", body, signal);
+export const patchJson = <T>(
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> => writeJson<T>(url, "PATCH", body, signal);
+export const deleteJson = <T = void>(
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  extraHeaders?: Record<string, string>,
+): Promise<T> => writeJson<T>(url, "DELETE", body, signal, extraHeaders);

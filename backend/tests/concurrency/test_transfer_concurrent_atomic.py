@@ -71,7 +71,7 @@ def _setup_dept(make_session, dept_qty: Decimal, dept: DepartmentEnum):
 
 @pytest.mark.usefixtures("concurrent_engine")
 def test_transfer_to_production_concurrent(concurrent_engine, make_session):
-    """창고 10개, 20스레드 동시 transfer_to_production(1) → 창고 음수 없음, 총량 불변."""
+    """창고 10개, 20스레드 동시 _transfer_to_production(1) → 창고 음수 없음, 총량 불변."""
     from app.services import inventory as inventory_svc
 
     initial_qty = Decimal("10")
@@ -84,7 +84,7 @@ def test_transfer_to_production_concurrent(concurrent_engine, make_session):
     def try_transfer():
         session = make_session()
         try:
-            inventory_svc.transfer_to_production(session, item_id, Decimal("1"), dept)
+            inventory_svc._transfer_to_production(session, item_id, Decimal("1"), dept)
             session.commit()
             successes.append("ok")
         except ValueError as e:
@@ -121,7 +121,7 @@ def test_transfer_to_production_concurrent(concurrent_engine, make_session):
 
 @pytest.mark.usefixtures("concurrent_engine")
 def test_transfer_to_warehouse_concurrent(concurrent_engine, make_session):
-    """부서 10개, 20스레드 동시 transfer_to_warehouse(1) → 부서 음수 없음, 총량 불변."""
+    """부서 10개, 20스레드 동시 _transfer_to_warehouse(1) → 부서 음수 없음, 총량 불변."""
     from app.services import inventory as inventory_svc
 
     initial_qty = Decimal("10")
@@ -134,7 +134,7 @@ def test_transfer_to_warehouse_concurrent(concurrent_engine, make_session):
     def try_transfer():
         session = make_session()
         try:
-            inventory_svc.transfer_to_warehouse(session, item_id, Decimal("1"), dept)
+            inventory_svc._transfer_to_warehouse(session, item_id, Decimal("1"), dept)
             session.commit()
             successes.append("ok")
         except ValueError as e:

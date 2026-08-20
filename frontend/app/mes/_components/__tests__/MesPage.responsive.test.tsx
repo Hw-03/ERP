@@ -7,6 +7,9 @@ import MesPage from "../../page";
 const shellState = vi.hoisted(() => ({
   desktopFlush: vi.fn<() => Promise<void>>(),
   mobileFlush: vi.fn<() => Promise<void>>(),
+  gateAuthed: true,
+  adminMount: vi.fn(),
+  adminUnmount: vi.fn(),
 }));
 
 vi.mock("../mobile/MobileShell", () => ({
@@ -40,7 +43,8 @@ vi.mock("../DesktopMesShell", () => ({
 }));
 
 vi.mock("../login/MesLoginGate", () => ({
-  MesLoginGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  MesLoginGate: ({ children }: { children: React.ReactNode }) =>
+    shellState.gateAuthed ? <>{children}</> : <div>operator-login-boundary</div>,
 }));
 
 vi.mock("../DepartmentsContext", () => ({
@@ -48,7 +52,13 @@ vi.mock("../DepartmentsContext", () => ({
 }));
 
 vi.mock("@/lib/auth/admin-session", () => ({
-  AdminSessionProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AdminSessionProvider: ({ children }: { children: React.ReactNode }) => {
+    useEffect(() => {
+      shellState.adminMount();
+      return () => shellState.adminUnmount();
+    }, []);
+    return <>{children}</>;
+  },
 }));
 
 vi.mock("@/lib/queries/client", () => ({
@@ -79,6 +89,9 @@ describe("MesPage responsive shell", () => {
     window.history.replaceState({}, "", "/mes");
     shellState.desktopFlush.mockReset();
     shellState.mobileFlush.mockReset();
+    shellState.gateAuthed = true;
+    shellState.adminMount.mockReset();
+    shellState.adminUnmount.mockReset();
     shellState.desktopFlush.mockResolvedValue(undefined);
     shellState.mobileFlush.mockResolvedValue(undefined);
     Object.defineProperty(window, "matchMedia", {
@@ -98,6 +111,18 @@ describe("MesPage responsive shell", () => {
         dispatchEvent: vi.fn(),
       })),
     });
+  });
+
+  it("unmounts the admin PIN provider at the operator login boundary", () => {
+    setViewportWidth(1280);
+    const view = render(<MesPage />);
+    expect(shellState.adminMount).toHaveBeenCalledTimes(1);
+
+    shellState.gateAuthed = false;
+    view.rerender(<MesPage />);
+
+    expect(screen.getByText("operator-login-boundary")).toBeInTheDocument();
+    expect(shellState.adminUnmount).toHaveBeenCalledTimes(1);
   });
 
   it("mounts only the desktop shell on desktop viewports", () => {

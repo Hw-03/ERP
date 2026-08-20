@@ -1,7 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
+import { postJson } from "@/lib/api-core";
+import { AdminSessionProvider, useAdminSession } from "@/lib/auth/admin-session";
 import { useAdminSettings } from "../useAdminSettings";
+import { useAdminViewState } from "../useAdminViewState";
 
 vi.mock("@/lib/api", () => ({
   api: { updateAdminPin: vi.fn() },
@@ -16,7 +19,11 @@ describe("useAdminSettings", () => {
     const onStatusChange = vi.fn();
     const onError = vi.fn();
     vi.mocked(api.updateAdminPin).mockResolvedValue({ message: "관리자 비밀번호를 변경했습니다." });
-    const { result } = renderHook(() => useAdminSettings({ onStatusChange, onError }));
+    const { result } = renderHook(() => useAdminSettings({
+      onStatusChange,
+      onError,
+      onPinChanged: vi.fn(),
+    }));
 
     act(() => {
       result.current.setPinForm({ current_pin: "0000", new_pin: "1234", confirm_pin: "1234" });
@@ -33,11 +40,60 @@ describe("useAdminSettings", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it("PIN 변경 성공은 화면과 공통 헤더 credential을 새 PIN으로 함께 바꾼다", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ ok: true }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.mocked(api.updateAdminPin).mockResolvedValue({ message: "관리자 비밀번호를 변경했습니다." });
+
+    const { result, unmount } = renderHook(() => {
+      const view = useAdminViewState();
+      const session = useAdminSession();
+      const settings = useAdminSettings({
+        onStatusChange: vi.fn(),
+        onError: vi.fn(),
+        onPinChanged: view.unlock,
+      });
+      return { view, session, settings };
+    }, {
+      wrapper: AdminSessionProvider,
+    });
+
+    act(() => {
+      result.current.view.unlock("0000");
+      result.current.settings.setPinForm({
+        current_pin: "0000",
+        new_pin: "1234",
+        confirm_pin: "1234",
+      });
+    });
+
+    await act(async () => {
+      await result.current.settings.changePin();
+    });
+
+    expect(result.current.view.adminPin).toBe("1234");
+    expect(result.current.session.pin).toBe("1234");
+
+    await postJson("http://test.local/api/protected", {});
+    const requestHeaders = new Headers(fetchMock.mock.calls.at(-1)?.[1]?.headers);
+    expect(requestHeaders.get("X-Admin-Pin")).toBe("1234");
+
+    unmount();
+    vi.unstubAllGlobals();
+  });
+
   it("API 거부는 오류 콜백으로 전달하고 저장 메시지를 남기지 않는다", async () => {
     const onStatusChange = vi.fn();
     const onError = vi.fn();
     vi.mocked(api.updateAdminPin).mockRejectedValue(new Error("현재 비밀번호가 올바르지 않습니다."));
-    const { result } = renderHook(() => useAdminSettings({ onStatusChange, onError }));
+    const { result } = renderHook(() => useAdminSettings({
+      onStatusChange,
+      onError,
+      onPinChanged: vi.fn(),
+    }));
 
     act(() => {
       result.current.setPinForm({ current_pin: "0000", new_pin: "1234", confirm_pin: "1234" });
@@ -56,7 +112,11 @@ describe("useAdminSettings", () => {
   it("새 PIN 불일치 자체 검증은 API 호출 없이 오류 콜백으로 전달한다", async () => {
     const onStatusChange = vi.fn();
     const onError = vi.fn();
-    const { result } = renderHook(() => useAdminSettings({ onStatusChange, onError }));
+    const { result } = renderHook(() => useAdminSettings({
+      onStatusChange,
+      onError,
+      onPinChanged: vi.fn(),
+    }));
 
     act(() => {
       result.current.setPinForm({ current_pin: "0000", new_pin: "1234", confirm_pin: "5678" });
@@ -75,7 +135,11 @@ describe("useAdminSettings", () => {
   it("4자 미만 PIN 자체 검증은 API 호출 없이 오류 콜백으로 전달한다", async () => {
     const onStatusChange = vi.fn();
     const onError = vi.fn();
-    const { result } = renderHook(() => useAdminSettings({ onStatusChange, onError }));
+    const { result } = renderHook(() => useAdminSettings({
+      onStatusChange,
+      onError,
+      onPinChanged: vi.fn(),
+    }));
 
     act(() => {
       result.current.setPinForm({ current_pin: "123", new_pin: "1234", confirm_pin: "1234" });
@@ -98,7 +162,11 @@ describe("useAdminSettings", () => {
     vi.mocked(api.updateAdminPin).mockImplementation(() => new Promise((resolve) => {
       resolveRequest = resolve;
     }));
-    const { result } = renderHook(() => useAdminSettings({ onStatusChange, onError }));
+    const { result } = renderHook(() => useAdminSettings({
+      onStatusChange,
+      onError,
+      onPinChanged: vi.fn(),
+    }));
 
     act(() => {
       result.current.setPinForm({ current_pin: "0000", new_pin: "1234", confirm_pin: "1234" });
@@ -134,7 +202,11 @@ describe("useAdminSettings", () => {
     const onStatusChange = vi.fn(() => { throw callbackError; });
     const onError = vi.fn();
     vi.mocked(api.updateAdminPin).mockResolvedValue({ message: "관리자 비밀번호를 변경했습니다." });
-    const { result } = renderHook(() => useAdminSettings({ onStatusChange, onError }));
+    const { result } = renderHook(() => useAdminSettings({
+      onStatusChange,
+      onError,
+      onPinChanged: vi.fn(),
+    }));
 
     act(() => {
       result.current.setPinForm({ current_pin: "0000", new_pin: "1234", confirm_pin: "1234" });

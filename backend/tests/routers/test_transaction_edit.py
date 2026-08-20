@@ -12,7 +12,6 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
-    Item,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -494,6 +493,7 @@ def test_reset_pin_requires_admin_pin(client, db_session):
         display_order=1,
         is_active="true",
         pin_hash=hash_pin("9999"),
+        pin_requires_change=False,
     )
     db_session.add(emp)
     db_session.commit()
@@ -515,7 +515,7 @@ def test_reset_pin_requires_admin_pin(client, db_session):
 
 
 def test_reset_pin_with_correct_admin_pin(client, db_session):
-    """올바른 관리자 PIN으로 호출 시 직원 PIN이 0000으로 초기화."""
+    """관리자 초기화 후 기존 PIN은 폐기되고 0000은 최초 변경 challenge만 연다."""
     emp = Employee(
         employee_code="PR02",
         name="초기화대상",
@@ -525,6 +525,7 @@ def test_reset_pin_with_correct_admin_pin(client, db_session):
         display_order=2,
         is_active="true",
         pin_hash=hash_pin("9999"),
+        pin_requires_change=False,
     )
     db_session.add(emp)
     db_session.commit()
@@ -536,6 +537,7 @@ def test_reset_pin_with_correct_admin_pin(client, db_session):
     assert reset.status_code == 204
 
     r1 = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "9999"})
-    assert r1.status_code == 403
+    assert r1.status_code == 401
     r2 = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "0000"})
-    assert r2.status_code == 200
+    assert r2.status_code == 409
+    assert r2.json()["detail"]["code"] == "PIN_CHANGE_REQUIRED"

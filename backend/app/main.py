@@ -8,7 +8,6 @@ Startup 부작용 (create_all / run_migrations / seed / MES 백필) 은 모두
     python bootstrap_db.py --all
 """
 
-import datetime as _dt
 import os
 import uuid
 
@@ -16,7 +15,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, text
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app._access_log import access_log_middleware
@@ -54,6 +53,7 @@ from app.routers import (
     items,
     models as models_router,
     notifications,
+    operator_sessions,
     production,
     realtime,
     settings,
@@ -63,13 +63,10 @@ from app.routers import (
 )
 from app.services import audit_csv as audit_csv_svc
 from app.services import realtime as realtime_svc
+from app.runtime_identity import BOOT_ID, BOOT_STARTED_AT
 
 audit_csv_svc.register_session_listeners()
 realtime_svc.register_session_listeners()
-
-
-_BOOT_ID: str = uuid.uuid4().hex
-_BOOT_STARTED_AT: str = _dt.datetime.utcnow().isoformat()
 
 
 app = FastAPI(
@@ -159,7 +156,7 @@ setup_logging()
 _log = get_logger()
 _log.info(
     "evt=system_startup boot_id=%s started_at=%s version=%s",
-    _BOOT_ID, _BOOT_STARTED_AT, app.version,
+    BOOT_ID, BOOT_STARTED_AT, app.version,
 )
 
 
@@ -186,7 +183,7 @@ def _warm_symbol_cache() -> None:
 
 @app.on_event("shutdown")
 def _log_shutdown() -> None:
-    _log.info("evt=system_shutdown boot_id=%s", _BOOT_ID)
+    _log.info("evt=system_shutdown boot_id=%s", BOOT_ID)
 
 
 @app.on_event("shutdown")
@@ -208,6 +205,30 @@ def _rid(request: Request) -> str:
         or request.headers.get("X-Request-Id")
         or uuid.uuid4().hex[:12]
     )
+
+
+def _log_sqlalchemy_error(request: Request, exc: SQLAlchemyError, *, event: str) -> str:
+    """Record only bounded SQLAlchemy metadata; statements and parameters are secrets."""
+    rid = _rid(request)
+    code = getattr(exc, "code", None)
+    safe_code = (
+        code
+        if isinstance(code, str)
+        and code.isascii()
+        and 1 <= len(code) <= 16
+        and code.replace("-", "").replace("_", "").isalnum()
+        else "-"
+    )
+    _log.error(
+        "evt=%s rid=%s emp=%s path=%s err_type=%s sa_code=%s",
+        event,
+        rid,
+        get_actor_emp(request),
+        request.url.path,
+        type(exc).__name__,
+        safe_code,
+    )
+    return rid
 
 
 @app.exception_handler(ValueError)
@@ -242,9 +263,7 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
 
 @app.exception_handler(IntegrityError)
 def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
-    rid = _rid(request)
-    emp = get_actor_emp(request)
-    _log.error("IntegrityError rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, exc)
+    rid = _log_sqlalchemy_error(request, exc, event="db_integrity_error")
     return JSONResponse(
         status_code=409,
         content=_error_payload(
@@ -257,18 +276,25 @@ def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONRespo
 
 @app.exception_handler(OperationalError)
 def _operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    rid = _rid(request)
-    emp = get_actor_emp(request)
-    # 정상 운영 로그는 short msg 만(SQL/parameters 통째 박지 않음 — 노이즈 방지).
-    # 전체 SQL 은 DEBUG 레벨에서만 노출.
-    short = str(getattr(exc, "orig", None) or exc).splitlines()[0][:200]
-    _log.error("OperationalError rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, short)
-    _log.debug("OperationalError detail rid=%s sql=%s params=%s", rid, getattr(exc, "statement", "-"), getattr(exc, "params", "-"))
+    rid = _log_sqlalchemy_error(request, exc, event="db_operational_error")
     return JSONResponse(
         status_code=503,
         content=_error_payload(
             ErrorCode.DB_UNAVAILABLE,
             "DB 연결 일시 오류",
+            extra={"request_id": rid},
+        ),
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+def _sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    rid = _log_sqlalchemy_error(request, exc, event="db_error")
+    return JSONResponse(
+        status_code=500,
+        content=_error_payload(
+            ErrorCode.INTERNAL,
+            "처리 중 오류가 발생했습니다.",
             extra={"request_id": rid},
         ),
     )
@@ -293,6 +319,8 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
+app.include_router(employees.bootstrap_router, prefix="/api/employees", tags=["Employees"])
+app.include_router(operator_sessions.router, prefix="/api/operator-session", tags=["Employees"])
 app.include_router(daily_work_reports.router, prefix="/api/daily-work-reports", tags=["Daily Work Reports"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(client_events.router, prefix="/api", tags=["Client Events"])
@@ -346,7 +374,7 @@ def health_live(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/api/app-session", tags=["System"])
 def app_session():
-    return {"boot_id": _BOOT_ID, "started_at": _BOOT_STARTED_AT}
+    return {"boot_id": BOOT_ID, "started_at": BOOT_STARTED_AT}
 
 
 def _detailed_health_degraded_response(

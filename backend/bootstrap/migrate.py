@@ -115,7 +115,7 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE inventory ADD COLUMN last_reserver_name VARCHAR(100)",
     # M8: 재고 이원화 — warehouse_qty
     "ALTER TABLE inventory ADD COLUMN warehouse_qty NUMERIC(15,4) NOT NULL DEFAULT 0",
-    # PIN 로그인 — 작업자 식별용 (실제 보안 인증 아님)
+    # 작업자 인증 PIN 저장(현재 로그인은 DB-backed operator session을 발급)
     "ALTER TABLE employees ADD COLUMN pin_hash TEXT",
     # 거래 수정 감사 이력 (3차 메타 수정 + 4차 수량 보정 공유)
     """CREATE TABLE IF NOT EXISTS transaction_edit_logs (

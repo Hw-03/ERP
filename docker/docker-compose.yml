@@ -38,6 +38,8 @@ services:
     environment:
       DATABASE_URL: postgresql://mes_user:mes_pass@postgres:5432/mes_db
       MES_RUNTIME_ROOT: /runtime
+      # frontend와 같은 shell-provided 32-byte 이상 비밀. 저장소에 실제 값 기록 금지.
+      MES_PROXY_SHARED_SECRET: ${MES_PROXY_SHARED_SECRET:?MES_PROXY_SHARED_SECRET must be set}
       # WS2 가드: 운영 표식. SQLite/DATABASE_URL 미설정 시 backend 기동 거부(fail-fast).
       APP_ENV: production
     ports:
@@ -74,6 +76,8 @@ services:
       # next.config.js rewrites(/api/:path*) 의 프록시 타깃.
       # compose 네트워크 내부에서 backend 서비스로 도달 (localhost 아님).
       BACKEND_INTERNAL_URL: http://backend:8010
+      # backend와 같은 값으로 custom Next server assertion을 서명한다.
+      MES_PROXY_SHARED_SECRET: ${MES_PROXY_SHARED_SECRET:?MES_PROXY_SHARED_SECRET must be set}
     ports:
       - "3000:3000"
     depends_on:

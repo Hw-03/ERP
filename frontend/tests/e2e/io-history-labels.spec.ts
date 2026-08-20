@@ -9,7 +9,7 @@
  *  - "원자재 입고"(receive)는 창고 정/부 직원에게만 노출 → 창고 역할로 로그인.
  */
 import { expect, test } from "@playwright/test";
-import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
+import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType, readSeed } from "./_helpers";
 
 // "생산 | 입고" 처럼 정규식 메타문자(|)가 든 단어는 text=/.../ 가 alternation 으로
 // 오해석한다(=오매칭). 정확 일치는 getByText(word,{exact:true}) 로 검증한다.
@@ -103,7 +103,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     await approvePage.goto("/mes?tab=warehouse");
     await approvePage.getByRole("tab", { name: /창고 승인함/ }).click();
     await approvePage.getByRole("button", { name: "승인", exact: true }).click();
-    await approvePage.getByRole("textbox", { name: "0000" }).fill("0000");
+    await approvePage.getByRole("textbox", { name: "0000" }).fill(readSeed().operatorPin);
     await approvePage.getByRole("button", { name: "승인 확정" }).click();
     await expect(approvePage.getByText("승인 대기 중인 요청이 없습니다.")).toBeVisible();
 

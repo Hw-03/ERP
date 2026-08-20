@@ -1,14 +1,10 @@
 /**
  * 모바일 평가 스크립트 공용 — 작업자 세션 시딩.
  *
- * 앱은 sessionStorage 의 작업자 정보(`dexcowin_mes_operator`)가 없으면 로그인
- * 게이트만 렌더한다. 평가(스크린샷/a11y)는 실제 화면을 봐야 하므로,
- * 페이지 로드 전에 백엔드의 실제 직원/boot_id 를 가져와 sessionStorage 에
- * 주입한다(MesLoginGate 의 boot_id 검증 통과용).
+ * 평가 브라우저와 cookie jar를 공유하는 APIRequestContext로 실제 작업자
+ * 세션을 만든다. PIN은 MES_OPERATOR_PIN 환경 변수(기본 0000)를 사용하며,
+ * 최초 PIN 변경이 필요한 계정은 DB를 자동 변경하지 않고 로그인 화면으로 폴백한다.
  */
-
-const OPERATOR_KEY = "dexcowin_mes_operator";
-const BOOT_KEY = "dexcowin_mes_boot_id";
 
 /** 모든 탭 도달을 위해 창고 권한(primary>deputy) 우선, 그 다음 admin 레벨 */
 function pickOperator(employees) {
@@ -43,17 +39,13 @@ function toOperator(e) {
  */
 export async function seedOperator(context, baseUrl) {
   try {
-    const [sessionRes, empRes] = await Promise.all([
-      fetch(`${baseUrl}/api/app-session`),
-      fetch(`${baseUrl}/api/employees`),
-    ]);
-    if (!sessionRes.ok || !empRes.ok) {
+    const empRes = await context.request.get(`${baseUrl}/api/employees`);
+    if (!empRes.ok()) {
       console.warn(
-        `  ⚠️  세션 시딩 실패(app-session ${sessionRes.status} / employees ${empRes.status}) — 로그인 화면으로 평가`,
+        `  ⚠️  세션 시딩 실패(employees ${empRes.status()}) — 로그인 화면으로 평가`,
       );
       return null;
     }
-    const session = await sessionRes.json();
     const employees = await empRes.json();
     const list = Array.isArray(employees)
       ? employees
@@ -62,19 +54,19 @@ export async function seedOperator(context, baseUrl) {
       console.warn("  ⚠️  직원 목록 비어있음 — 로그인 화면으로 평가");
       return null;
     }
-    const operator = toOperator(pickOperator(list));
-    await context.addInitScript(
-      ([opKey, bootKey, op, bootId]) => {
-        try {
-          window.sessionStorage.setItem(opKey, JSON.stringify(op));
-          window.sessionStorage.setItem(bootKey, bootId);
-        } catch {
-          /* sessionStorage 불가 환경 무시 */
-        }
+    const employee = pickOperator(list);
+    const login = await context.request.post(`${baseUrl}/api/operator-session`, {
+      data: {
+        employee_id: employee.employee_id,
+        pin: process.env.MES_OPERATOR_PIN ?? "0000",
       },
-      [OPERATOR_KEY, BOOT_KEY, operator, session.boot_id],
-    );
-    return operator;
+    });
+    if (!login.ok()) {
+      console.warn(`  ⚠️  작업자 로그인 실패(${login.status()}) — 로그인 화면으로 평가`);
+      return null;
+    }
+    const session = await login.json();
+    return toOperator(session.employee);
   } catch (err) {
     console.warn(`  ⚠️  세션 시딩 예외: ${err.message} — 로그인 화면으로 평가`);
     return null;

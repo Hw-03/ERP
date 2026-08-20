@@ -54,11 +54,11 @@ def test_location_decrements_do_not_consume_reserved_production_stock(
     make_item, make_location, db_session
 ):
     operations = (
-        lambda item_id: svc.transfer_to_warehouse(db_session, item_id, D("3"), ASSEMBLY),
-        lambda item_id: svc.transfer_between_departments(
+        lambda item_id: svc._transfer_to_warehouse(db_session, item_id, D("3"), ASSEMBLY),
+        lambda item_id: svc._transfer_between_departments(
             db_session, item_id, D("3"), ASSEMBLY, TUBE
         ),
-        lambda item_id: svc.consume_from_department(
+        lambda item_id: svc._consume_from_department(
             db_session, item_id, D("3"), ASSEMBLY
         ),
     )
@@ -93,7 +93,7 @@ def test_location_write_locks_parent_inventory_before_location(
     monkeypatch.setattr(inv_base, "_is_sqlite", False)
     monkeypatch.setattr(Query, "with_for_update", track_with_for_update)
 
-    svc.consume_from_department(db_session, item.item_id, D("1"), ASSEMBLY)
+    svc._consume_from_department(db_session, item.item_id, D("1"), ASSEMBLY)
 
     assert events[:2] == [Inventory, InventoryLocation]
 
@@ -143,7 +143,7 @@ def test_transfer_to_production_basic(make_item, db_session):
     """창고 → 부서: 창고 감소, 부서 생산 증가, 총량 불변."""
     item = make_item(name="X", warehouse_qty=D("10"))
 
-    svc.transfer_to_production(db_session, item.item_id, D("4"), ASSEMBLY)
+    svc._transfer_to_production(db_session, item.item_id, D("4"), ASSEMBLY)
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("6")
@@ -156,7 +156,7 @@ def test_transfer_to_production_full(make_item, db_session):
     """창고 전량 이동 — 경계: 정확히 가용량만큼."""
     item = make_item(name="X", warehouse_qty=D("5"))
 
-    svc.transfer_to_production(db_session, item.item_id, D("5"), ASSEMBLY)
+    svc._transfer_to_production(db_session, item.item_id, D("5"), ASSEMBLY)
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("0")
@@ -170,7 +170,7 @@ def test_transfer_to_production_insufficient_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("3"))
 
     with pytest.raises(ValueError, match="가용 재고 부족"):
-        svc.transfer_to_production(db_session, item.item_id, D("5"), ASSEMBLY)
+        svc._transfer_to_production(db_session, item.item_id, D("5"), ASSEMBLY)
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("3")
@@ -183,10 +183,10 @@ def test_transfer_to_production_pending_reduces_available(make_item, db_session)
 
     # 가용 = 10 - 8 = 2 이므로 3 이동 불가
     with pytest.raises(ValueError, match="가용 재고 부족"):
-        svc.transfer_to_production(db_session, item.item_id, D("3"), ASSEMBLY)
+        svc._transfer_to_production(db_session, item.item_id, D("3"), ASSEMBLY)
 
     # 가용 2 이내(2)는 가능
-    svc.transfer_to_production(db_session, item.item_id, D("2"), ASSEMBLY)
+    svc._transfer_to_production(db_session, item.item_id, D("2"), ASSEMBLY)
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("8")
     assert _loc_qty(db_session, item.item_id, ASSEMBLY) == D("2")
@@ -196,7 +196,7 @@ def test_transfer_to_production_pending_reduces_available(make_item, db_session)
 def test_transfer_to_production_zero_qty_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("10"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.transfer_to_production(db_session, item.item_id, D("0"), ASSEMBLY)
+        svc._transfer_to_production(db_session, item.item_id, D("0"), ASSEMBLY)
 
 
 # ──────────────────────────── transfer_to_warehouse ────────────────────────────
@@ -209,7 +209,7 @@ def test_transfer_to_warehouse_basic(make_item, make_location, db_session):
     from app.services.inv_calc import _sync_total
     _sync_total(db_session, _inv(db_session, item.item_id))
 
-    svc.transfer_to_warehouse(db_session, item.item_id, D("3"), ASSEMBLY)
+    svc._transfer_to_warehouse(db_session, item.item_id, D("3"), ASSEMBLY)
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("5")
@@ -224,7 +224,7 @@ def test_transfer_to_warehouse_insufficient_raises(make_item, make_location, db_
     make_location(item.item_id, department=ASSEMBLY, quantity=D("3"))
 
     with pytest.raises(ValueError, match="생산 재고 부족"):
-        svc.transfer_to_warehouse(db_session, item.item_id, D("5"), ASSEMBLY)
+        svc._transfer_to_warehouse(db_session, item.item_id, D("5"), ASSEMBLY)
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("2")
@@ -239,13 +239,13 @@ def test_transfer_to_warehouse_insufficient_with_string_department_raises_value_
     make_location(item.item_id, department=ASSEMBLY, quantity=D("3"))
 
     with pytest.raises(ValueError, match="생산 재고 부족"):
-        svc.transfer_to_warehouse(db_session, item.item_id, D("5"), ASSEMBLY.value)
+        svc._transfer_to_warehouse(db_session, item.item_id, D("5"), ASSEMBLY.value)
 
 
 def test_transfer_to_warehouse_zero_qty_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("0"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.transfer_to_warehouse(db_session, item.item_id, D("0"), ASSEMBLY)
+        svc._transfer_to_warehouse(db_session, item.item_id, D("0"), ASSEMBLY)
 
 
 # ──────────────────────────── transfer_between_departments ────────────────────────────
@@ -258,7 +258,7 @@ def test_transfer_between_departments_basic(make_item, make_location, db_session
     from app.services.inv_calc import _sync_total
     _sync_total(db_session, _inv(db_session, item.item_id))  # 총량 1+8+2 = 11
 
-    svc.transfer_between_departments(db_session, item.item_id, D("5"), ASSEMBLY, TUBE)
+    svc._transfer_between_departments(db_session, item.item_id, D("5"), ASSEMBLY, TUBE)
 
     inv = _inv(db_session, item.item_id)
     assert _loc_qty(db_session, item.item_id, ASSEMBLY) == D("3")  # 8 - 5
@@ -275,7 +275,7 @@ def test_transfer_between_departments_insufficient_raises(make_item, make_locati
     make_location(item.item_id, department=TUBE, quantity=D("0"))
 
     with pytest.raises(ValueError, match="생산 재고 부족"):
-        svc.transfer_between_departments(db_session, item.item_id, D("5"), ASSEMBLY, TUBE)
+        svc._transfer_between_departments(db_session, item.item_id, D("5"), ASSEMBLY, TUBE)
 
     assert _loc_qty(db_session, item.item_id, ASSEMBLY) == D("2")
     assert _loc_qty(db_session, item.item_id, TUBE) == D("0")
@@ -285,13 +285,13 @@ def test_transfer_between_departments_same_dept_raises(make_item, make_location,
     item = make_item(name="X", warehouse_qty=D("0"))
     make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
     with pytest.raises(ValueError, match="동일"):
-        svc.transfer_between_departments(db_session, item.item_id, D("1"), ASSEMBLY, ASSEMBLY)
+        svc._transfer_between_departments(db_session, item.item_id, D("1"), ASSEMBLY, ASSEMBLY)
 
 
 def test_transfer_between_departments_zero_qty_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("0"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.transfer_between_departments(db_session, item.item_id, D("0"), ASSEMBLY, TUBE)
+        svc._transfer_between_departments(db_session, item.item_id, D("0"), ASSEMBLY, TUBE)
 
 
 # ──────────────────────────── consume_warehouse ────────────────────────────
@@ -300,7 +300,7 @@ def test_consume_warehouse_basic(make_item, db_session):
     """창고 차감: 총량 감소, qty_before 는 차감 전 총량."""
     item = make_item(name="X", warehouse_qty=D("10"))
 
-    inv, qty_before = svc.consume_warehouse(db_session, item.item_id, D("4"))
+    inv, qty_before = svc._consume_warehouse(db_session, item.item_id, D("4"))
 
     assert inv.warehouse_qty == D("6")
     assert inv.quantity == D("6")
@@ -310,7 +310,7 @@ def test_consume_warehouse_basic(make_item, db_session):
 def test_consume_warehouse_insufficient_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("3"))
     with pytest.raises(ValueError, match="창고 가용 재고 부족"):
-        svc.consume_warehouse(db_session, item.item_id, D("5"))
+        svc._consume_warehouse(db_session, item.item_id, D("5"))
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("3")
@@ -323,7 +323,7 @@ def test_consume_warehouse_preserves_other_request_pending(make_item, db_session
     db_session.flush()
 
     with pytest.raises(ValueError):
-        svc.consume_warehouse(db_session, item.item_id, D("3"))
+        svc._consume_warehouse(db_session, item.item_id, D("3"))
 
     db_session.refresh(inv)
     assert inv.warehouse_qty == D("10")
@@ -333,7 +333,7 @@ def test_consume_warehouse_preserves_other_request_pending(make_item, db_session
 def test_consume_warehouse_zero_qty_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("10"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.consume_warehouse(db_session, item.item_id, D("0"))
+        svc._consume_warehouse(db_session, item.item_id, D("0"))
 
 
 # ──────────────────────────── receive_confirmed ────────────────────────────
@@ -342,7 +342,7 @@ def test_receive_confirmed_warehouse(make_item, db_session):
     """창고 입고: warehouse + qty, 총량 증가."""
     item = make_item(name="X", warehouse_qty=D("2"))
 
-    svc.receive_confirmed(db_session, item.item_id, D("5"))
+    svc._receive_confirmed(db_session, item.item_id, D("5"))
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("7")
@@ -353,7 +353,7 @@ def test_receive_confirmed_production(make_item, db_session):
     """생산 입고(bucket=production, dept 지정): 부서 PRODUCTION 적재, 창고 불변."""
     item = make_item(name="X", warehouse_qty=D("2"))
 
-    svc.receive_confirmed(
+    svc._receive_confirmed(
         db_session, item.item_id, D("3"), bucket="production", dept=ASSEMBLY
     )
 
@@ -368,7 +368,7 @@ def test_receive_confirmed_production_without_dept_falls_back_to_warehouse(make_
     """bucket=production 이지만 dept None 이면 창고로 폴백."""
     item = make_item(name="X", warehouse_qty=D("2"))
 
-    svc.receive_confirmed(db_session, item.item_id, D("3"), bucket="production", dept=None)
+    svc._receive_confirmed(db_session, item.item_id, D("3"), bucket="production", dept=None)
 
     inv = _inv(db_session, item.item_id)
     assert inv.warehouse_qty == D("5")  # 창고로 폴백
@@ -379,7 +379,7 @@ def test_receive_confirmed_production_without_dept_falls_back_to_warehouse(make_
 def test_receive_confirmed_zero_qty_raises(make_item, db_session):
     item = make_item(name="X", warehouse_qty=D("0"))
     with pytest.raises(ValueError, match="0보다 커야"):
-        svc.receive_confirmed(db_session, item.item_id, D("0"))
+        svc._receive_confirmed(db_session, item.item_id, D("0"))
 
 
 # ──────────────────────────── 라운드트립 불변식 ────────────────────────────
@@ -388,9 +388,9 @@ def test_roundtrip_preserves_total(make_item, db_session):
     """창고→부서→타부서→창고 왕복 후 총량 불변, 모든 위치 정합."""
     item = make_item(name="X", warehouse_qty=D("20"))
 
-    svc.transfer_to_production(db_session, item.item_id, D("12"), ASSEMBLY)
-    svc.transfer_between_departments(db_session, item.item_id, D("5"), ASSEMBLY, TUBE)
-    svc.transfer_to_warehouse(db_session, item.item_id, D("4"), TUBE)
+    svc._transfer_to_production(db_session, item.item_id, D("12"), ASSEMBLY)
+    svc._transfer_between_departments(db_session, item.item_id, D("5"), ASSEMBLY, TUBE)
+    svc._transfer_to_warehouse(db_session, item.item_id, D("4"), TUBE)
 
     inv = _inv(db_session, item.item_id)
     # 창고: 20 - 12 + 4 = 12

@@ -40,6 +40,8 @@ if str(BACKEND_DIR) not in sys.path:
 from app.models import (
     BOM,
     DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     Item,
@@ -47,6 +49,9 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.runtime_identity import current_boot_id
+from app.services.operator_session import OPERATOR_SESSION_COOKIE, create_session
+from app.services.pin_auth import hash_pin
 
 
 def _setup(make_session, component_wh_qty: Decimal):
@@ -98,8 +103,36 @@ def _setup(make_session, component_wh_qty: Decimal):
             pending_quantity=Decimal("0"),
         )
     )
+    actors = [
+        Employee(
+            employee_code=f"CONCURRENT-PROD-{index}",
+            name=f"동시 생산자 {index}",
+            role="작업자",
+            department=DepartmentEnum.TUBE,
+            level=EmployeeLevelEnum.STAFF,
+            is_active=True,
+            pin_hash=hash_pin("2468"),
+            pin_requires_change=False,
+        )
+        for index in (1, 2)
+    ]
+    session.add_all(actors)
+    session.flush()
+    tokens = [
+        create_session(
+            session,
+            employee_id=actor.employee_id,
+            purpose="operator",
+            boot_id=current_boot_id(),
+        ).token
+        for actor in actors
+    ]
     session.commit()
-    ids = {"parent_id": parent.item_id, "child_id": child.item_id}
+    ids = {
+        "parent_id": parent.item_id,
+        "child_id": child.item_id,
+        "session_tokens": tokens,
+    }
     session.close()
     return ids
 
@@ -196,6 +229,7 @@ def test_concurrent_production_receipt_same_component_real_race(
     ids = _setup(make_session, component_wh_qty=Decimal("1"))
     parent_id = ids["parent_id"]
     child_id = ids["child_id"]
+    session_tokens = ids["session_tokens"]
 
     SessionLocal = sessionmaker(
         autocommit=False, autoflush=False, bind=concurrent_engine
@@ -213,8 +247,9 @@ def test_concurrent_production_receipt_same_component_real_race(
     statuses: list[int] = []
     bodies: list[dict] = []
 
-    def fire():
+    def fire(token):
         with TestClient(app) as c:
+            c.cookies.set(OPERATOR_SESSION_COOKIE, token)
             res = c.post(
                 "/api/production/receipt",
                 json={"item_id": str(parent_id), "quantity": "1"},
@@ -227,7 +262,7 @@ def test_concurrent_production_receipt_same_component_real_race(
 
     try:
         with ThreadPoolExecutor(max_workers=2) as ex:
-            futures = [ex.submit(fire) for _ in range(2)]
+            futures = [ex.submit(fire, token) for token in session_tokens]
             for f in as_completed(futures):
                 f.result()
     finally:
@@ -257,6 +292,7 @@ def test_concurrent_production_receipt_loser_late_value_error(
     ids = _setup(make_session, component_wh_qty=Decimal("1"))
     parent_id = ids["parent_id"]
     child_id = ids["child_id"]
+    session_tokens = ids["session_tokens"]
 
     SessionLocal = sessionmaker(
         autocommit=False, autoflush=False, bind=concurrent_engine
@@ -271,7 +307,7 @@ def test_concurrent_production_receipt_loser_late_value_error(
 
     app.dependency_overrides[get_db] = _override_get_db
 
-    _real_consume = inventory_svc.consume_from_item_department
+    _real_consume = inventory_svc._consume_from_item_department
     fail_once = {"done": False}
 
     def _consume_loses_once(db, item, qty):
@@ -288,13 +324,14 @@ def test_concurrent_production_receipt_loser_late_value_error(
 
     # consume_from_item_department 호출은 production_receipt 서비스가 inventory_svc 를 통해
     # 수행한다. 모듈 속성을 직접 패치하면 호출 위치(라우터/서비스)와 무관하게 적용된다.
-    inventory_svc.consume_from_item_department = _consume_loses_once
+    inventory_svc._consume_from_item_department = _consume_loses_once
 
     statuses: list[int] = []
     bodies: list[dict] = []
 
-    def fire():
+    def fire(token):
         with TestClient(app) as c:
+            c.cookies.set(OPERATOR_SESSION_COOKIE, token)
             res = c.post(
                 "/api/production/receipt",
                 json={"item_id": str(parent_id), "quantity": "1"},
@@ -307,11 +344,11 @@ def test_concurrent_production_receipt_loser_late_value_error(
 
     try:
         # 순차 2건: 1건은 가드 패배 시뮬레이트(loser), 1건은 정상(winner).
-        fire()
-        fire()
+        fire(session_tokens[0])
+        fire(session_tokens[1])
     finally:
         app.dependency_overrides.pop(get_db, None)
-        inventory_svc.consume_from_item_department = _real_consume
+        inventory_svc._consume_from_item_department = _real_consume
 
     _assert_clean_one_winner(statuses, bodies)
     _assert_invariant_and_no_orphans(make_session, parent_id, child_id)

@@ -28,7 +28,7 @@ from app.services.bom_stock_policy import (
     BOM_AUTO_ORIGIN,
     BOM_STOCK_EXEMPT_NOTE,
     io_bom_auto_claims,
-    issue_bom_auto_token,
+    _issue_bom_auto_token,
     should_skip_bom_inventory,
 )
 
@@ -712,7 +712,7 @@ def _issue_bundle_bom_auto_tokens(
     for line in bundle["lines"]:
         if line["origin"] != BOM_AUTO_ORIGIN:
             continue
-        line["bom_auto_token"] = issue_bom_auto_token(
+        line["bom_auto_token"] = _issue_bom_auto_token(
             db,
             flow="io",
             claims=io_bom_auto_claims(

@@ -53,7 +53,7 @@ def default_item_display_order(items: Iterable[Item]) -> list[Item]:
     )
 
 
-def apply_default_item_display_order(db: Session) -> list[Item]:
+def _apply_default_item_display_order(db: Session) -> list[Item]:
     """Reset active items to process-code rank then serial-number order."""
     items = _active_items_in_current_order(db)
     items = default_item_display_order(items)
@@ -61,7 +61,7 @@ def apply_default_item_display_order(db: Session) -> list[Item]:
     return items
 
 
-def insert_item_at_process_end(db: Session, item: Item) -> list[Item]:
+def _insert_item_at_process_end(db: Session, item: Item) -> list[Item]:
     """Insert a new item after its process-code group while retaining custom order."""
     existing = _active_items_in_current_order(db, exclude_item_id=item.item_id)
     matching_indexes = [

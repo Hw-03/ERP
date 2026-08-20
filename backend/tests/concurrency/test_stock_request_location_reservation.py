@@ -70,7 +70,7 @@ def test_concurrent_same_location_cannot_oversubscribe(make_session):
     def reserve() -> bool:
         session = make_session()
         try:
-            inventory_svc.reserve_location(
+            inventory_svc._reserve_location(
                 session,
                 item_id,
                 D("4"),
@@ -104,7 +104,7 @@ def test_concurrent_different_departments_reserve_independently(make_session):
     def reserve(department: DepartmentEnum) -> None:
         session = make_session()
         try:
-            inventory_svc.reserve_location(
+            inventory_svc._reserve_location(
                 session,
                 item_id,
                 D("4"),

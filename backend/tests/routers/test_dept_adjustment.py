@@ -153,7 +153,7 @@ def test_submit_production_api(client, db_session, make_item, make_location):
         "/api/dept-adjustment/submit",
         json={
             "sub_type": "production",
-            "operator_name": "작업자1",
+            "operator_name": operator.name,
             "operator_employee_code": operator.employee_code,
             "lines": [
                 {"item_id": str(comp.item_id),   "direction": "out", "quantity": 2, "department": "조립"},

@@ -183,7 +183,7 @@ def test_legacy_submitted_department_request_can_be_approved_without_reservation
         db_session, code="LEGACY-APP", warehouse_role="primary"
     )
     request = _make_location_reserved_request(db_session, requester, item, qty=D("3"))
-    sr_reservation.release_lines(db_session, request.lines)
+    sr_reservation._release_lines(db_session, request.lines)
     request.status = StockRequestStatusEnum.SUBMITTED
     for line in request.lines:
         line.status = StockRequestStatusEnum.SUBMITTED
@@ -558,7 +558,7 @@ def test_failed_legacy_submitted_request_does_not_release_another_reservation(
     legacy = _make_location_reserved_request(
         db_session, legacy_requester, item, qty=D("1")
     )
-    sr_reservation.release_lines(db_session, legacy.lines)
+    sr_reservation._release_lines(db_session, legacy.lines)
     legacy.status = StockRequestStatusEnum.SUBMITTED
     for line in legacy.lines:
         line.status = StockRequestStatusEnum.SUBMITTED
@@ -629,7 +629,7 @@ def test_cancel_open_releases_location_and_tolerates_legacy_submitted(
     # Simulate a pre-deployment request whose status was submitted without a reservation.
     from app.services import sr_reservation
 
-    sr_reservation.release_lines(db_session, legacy.lines)
+    sr_reservation._release_lines(db_session, legacy.lines)
     legacy.status = StockRequestStatusEnum.SUBMITTED
     for line in legacy.lines:
         line.status = StockRequestStatusEnum.SUBMITTED
@@ -648,7 +648,7 @@ def test_cancel_open_releases_location_and_tolerates_legacy_submitted(
 
     monkeypatch.setattr(svc, "_release_pending_best_effort", track_release)
 
-    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
+    count = svc._cancel_open_stock_requests(db_session, reason="cleanup")
     db_session.flush()
     db_session.refresh(location)
 
@@ -673,7 +673,7 @@ def test_cancel_ghost_reserved_request_preserves_other_request_pending(
     )
     from app.services import sr_reservation
 
-    sr_reservation.release_lines(db_session, ghost.lines)
+    sr_reservation._release_lines(db_session, ghost.lines)
     owner = _make_location_reserved_request(
         db_session,
         requester,
@@ -706,7 +706,7 @@ def test_cancel_ghost_warehouse_request_preserves_other_request_pending(
     ghost = _make_reserved_request(db_session, requester, item, qty=D("2"))
     from app.services import sr_reservation
 
-    sr_reservation.release_lines(db_session, ghost.lines)
+    sr_reservation._release_lines(db_session, ghost.lines)
     owner = _make_reserved_request(db_session, requester, item, qty=D("3"))
     db_session.flush()
     inventory = _inv(db_session, item.item_id)
@@ -740,7 +740,7 @@ def test_cancel_open_reconciles_ghost_reserved_request_without_leak(
     )
     from app.services import sr_reservation
 
-    sr_reservation.release_lines(db_session, ghost.lines)
+    sr_reservation._release_lines(db_session, ghost.lines)
     owner = _make_location_reserved_request(
         db_session,
         requester,
@@ -749,7 +749,7 @@ def test_cancel_open_reconciles_ghost_reserved_request_without_leak(
     )
     db_session.flush()
 
-    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
+    count = svc._cancel_open_stock_requests(db_session, reason="cleanup")
     db_session.flush()
     db_session.refresh(location)
 
@@ -775,7 +775,7 @@ def test_cancel_open_prelocks_all_request_items_in_global_order(
 
     monkeypatch.setattr(
         inventory_svc,
-        "ensure_and_lock_inventories",
+        "_ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("lock", item_ids)) or {},
     )
     monkeypatch.setattr(
@@ -784,7 +784,7 @@ def test_cancel_open_prelocks_all_request_items_in_global_order(
         lambda _db, request: events.append(("release", request.request_id)),
     )
 
-    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
+    count = svc._cancel_open_stock_requests(db_session, reason="cleanup")
 
     assert count == 2
     assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
@@ -810,12 +810,12 @@ def test_cancel_open_locks_requests_before_inventories(
     monkeypatch.setattr(Query, "with_for_update", with_for_update)
     monkeypatch.setattr(
         inventory_svc,
-        "ensure_and_lock_inventories",
+        "_ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("inventory_lock", item_ids)) or {},
     )
     monkeypatch.setattr(svc, "_release_pending_best_effort", lambda *_args: None)
 
-    svc.cancel_open_stock_requests(db_session, reason="cleanup")
+    svc._cancel_open_stock_requests(db_session, reason="cleanup")
 
     assert events[:2] == [
         ("request_lock", None),
@@ -841,7 +841,7 @@ def test_department_reject_rejects_unauthorized(db_session, make_item):
     assert _inv(db_session, item.item_id).pending_quantity == D("3")
 
 
-# ════════════ cancel_open_stock_requests ════════════
+# ════════════ _cancel_open_stock_requests ════════════
 
 
 def test_cancel_open_requests_rejects_legacy_shipping_link_before_any_state_change(
@@ -875,7 +875,7 @@ def test_cancel_open_requests_rejects_legacy_shipping_link_before_any_state_chan
     db_session.flush()
 
     with pytest.raises(ValueError, match="조회만"):
-        svc.cancel_open_stock_requests(db_session, reason="시스템 정리")
+        svc._cancel_open_stock_requests(db_session, reason="시스템 정리")
 
     assert req.status == StockRequestStatusEnum.RESERVED
     assert req.cancelled_at is None
@@ -902,7 +902,7 @@ def test_cancel_open_requests_pending_zero_safe(db_session, make_item):
     _inv(db_session, item.item_id).pending_quantity = D("0")
     db_session.flush()
 
-    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
+    count = svc._cancel_open_stock_requests(db_session, reason="테스트 정리")
     db_session.flush()
 
     assert count >= 1
@@ -922,7 +922,7 @@ def test_cancel_open_requests_normal_pending_released(db_session, make_item):
 
     assert _inv(db_session, item.item_id).pending_quantity == D("7")
 
-    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
+    count = svc._cancel_open_stock_requests(db_session, reason="테스트 정리")
     db_session.flush()
 
     assert count >= 1
@@ -939,12 +939,12 @@ def test_cancel_open_requests_skips_already_cancelled(db_session, make_item):
     db_session.flush()
 
     # 먼저 취소
-    count_first = svc.cancel_open_stock_requests(db_session, reason="1차 정리")
+    count_first = svc._cancel_open_stock_requests(db_session, reason="1차 정리")
     db_session.flush()
     assert req.status == StockRequestStatusEnum.CANCELLED
 
     # 재실행 — 이미 취소된 건은 카운트에 포함되지 않아야 함
-    count_second = svc.cancel_open_stock_requests(db_session, reason="2차 정리")
+    count_second = svc._cancel_open_stock_requests(db_session, reason="2차 정리")
     db_session.flush()
 
     assert count_second == 0
@@ -968,7 +968,7 @@ def test_cancel_open_requests_does_not_touch_completed_rejected(db_session, make
     db_session.flush()
     assert req_rejected.status == StockRequestStatusEnum.REJECTED
 
-    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
+    count = svc._cancel_open_stock_requests(db_session, reason="테스트 정리")
     db_session.flush()
 
     assert count == 0

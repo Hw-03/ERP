@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import json
-import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -290,7 +289,7 @@ def test_quarantine_unrelated_integrity_error_is_not_reported_as_success(
     monkeypatch.setattr(db_session, "rollback", count_rollback)
     monkeypatch.setattr(
         defects_router.defect_actions_svc.inv_effect,
-        "capture_effect",
+        "_capture_effect",
         fail_with_unrelated_integrity_error,
     )
     response = client.post(
@@ -686,7 +685,7 @@ def test_quarantine_then_scrap_preserves_two_audit_logs(
 def test_defect_scrap_via_stock_request(db_session, client, make_item):
     item = make_item(name="R003", process_type_code="TR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="E03", name="발의자C")
-    approver = _make_employee(
+    _make_employee(
         db_session, code="E04", name="결재자D",
         department=DepartmentEnum.ASSEMBLY,
         department_role="primary",
@@ -757,7 +756,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
     make_bom(parent.item_id, child3.item_id, Decimal("1"))
 
     # 부모 DEFECTIVE 재고 설정
-    parent_loc = _make_defective_location(db_session, parent.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"))
+    _make_defective_location(db_session, parent.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"))
     db_session.commit()
 
     from app.services.dept_adjustment import submit_defective_disassemble
@@ -775,8 +774,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
         ],
         reason_category="기능불량",
         reason_memo="분해 처리",
-        actor_employee_id=actor.employee_id,
-        actor="테스터",
+        actor=actor,
     )
     db_session.commit()
 
@@ -800,6 +798,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
     ).first()
     assert disassemble_log is not None
     assert disassemble_log.producer_employee_id == actor.employee_id
+    assert disassemble_log.produced_by == actor.name
 
 
     # keep 자식 → 품목코드 기준 부서(PRODUCTION) 입고 확인
@@ -995,7 +994,7 @@ def test_return_to_supplier_from_normal_production(db_session, make_item):
     db_session.flush()
     qty_before = inv.quantity
 
-    inv_after = inventory_svc.return_to_supplier_from_normal(
+    inv_after = inventory_svc._return_to_supplier_from_normal(
         db_session,
         item.item_id,
         Decimal("3"),
@@ -1020,8 +1019,8 @@ def test_return_to_supplier_from_normal_production(db_session, make_item):
 
 
 def test_kpi_returns_counts(db_session, client, make_item):
-    item = make_item(name="KPITEST", process_type_code="TR", warehouse_qty=Decimal("10"))
-    actor = _make_employee(db_session, code="EKPI", name="KPI작업자")
+    make_item(name="KPITEST", process_type_code="TR", warehouse_qty=Decimal("10"))
+    _make_employee(db_session, code="EKPI", name="KPI작업자")
     db_session.commit()
 
     res = client.get("/api/defects/kpi")

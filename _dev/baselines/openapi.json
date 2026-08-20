@@ -261,6 +261,17 @@
             "title": "Audit Id",
             "type": "string"
           },
+          "bootstrap_employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootstrap Employee Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2347,13 +2358,15 @@
         "properties": {
           "current_pin": {
             "maxLength": 4,
-            "minLength": 1,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
             "title": "Current Pin",
             "type": "string"
           },
           "new_pin": {
             "maxLength": 4,
             "minLength": 4,
+            "pattern": "^[0-9]{4}$",
             "title": "New Pin",
             "type": "string"
           }
@@ -5523,11 +5536,79 @@
         "title": "NotificationResponse",
         "type": "object"
       },
+      "OperatorPinChangeCompleteRequest": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "new_pin": {
+            "maxLength": 4,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
+            "title": "New Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id",
+          "new_pin"
+        ],
+        "title": "OperatorPinChangeCompleteRequest",
+        "type": "object"
+      },
+      "OperatorSessionLoginRequest": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "pin": {
+            "maxLength": 4,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id",
+          "pin"
+        ],
+        "title": "OperatorSessionLoginRequest",
+        "type": "object"
+      },
+      "OperatorSessionResponse": {
+        "properties": {
+          "boot_id": {
+            "title": "Boot Id",
+            "type": "string"
+          },
+          "employee": {
+            "$ref": "#/components/schemas/EmployeeResponse"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee",
+          "expires_at",
+          "boot_id"
+        ],
+        "title": "OperatorSessionResponse",
+        "type": "object"
+      },
       "PinVerifyRequest": {
         "properties": {
           "pin": {
-            "maxLength": 20,
-            "minLength": 1,
+            "maxLength": 4,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
             "title": "Pin",
             "type": "string"
           }
@@ -7383,6 +7464,40 @@
       },
       "ShippingEventResponse": {
         "properties": {
+          "actor_employee_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Employee Code"
+          },
+          "actor_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Employee Id"
+          },
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -11109,26 +11224,6 @@
         "operationId": "list_activity_audit_files_api_admin_activity_audit_files_get",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -11182,26 +11277,6 @@
         "description": "현재 클라이언트 UUID에 관리용 표시 이름을 등록한다.",
         "operationId": "upsert_current_terminal_api_admin_activity_audit_terminals_current_put",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -11271,26 +11346,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -11344,26 +11399,6 @@
             "schema": {
               "title": "Month",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -11425,26 +11460,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -11493,26 +11508,6 @@
       "get": {
         "operationId": "list_files_api_admin_audit_csv_files_get",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -11576,26 +11571,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -11649,26 +11624,6 @@
             "schema": {
               "title": "Month",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -11731,26 +11686,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -11793,7 +11728,7 @@
     },
     "/api/admin/audit-logs": {
       "get": {
-        "description": "최근 감사로그 조회. 관리자 PIN 잠금 화면에서만 호출 (현재 별도 인증 미적용).",
+        "description": "서버의 관리자 PIN 인증을 거쳐 최근 감사로그를 조회한다.",
         "operationId": "list_audit_logs_api_admin_audit_logs_get",
         "parameters": [
           {
@@ -11862,26 +11797,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -11944,26 +11859,6 @@
               "minimum": 2000,
               "title": "Year",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -12582,26 +12477,6 @@
         "operationId": "create_bom_api_bom_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -12720,26 +12595,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -12788,26 +12643,6 @@
               "format": "uuid",
               "title": "Bom Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -13153,26 +12988,6 @@
             "schema": {
               "title": "Slot",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -13674,26 +13489,6 @@
         "operationId": "create_department_api_departments_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -13753,26 +13548,6 @@
         "operationId": "reorder_departments_api_departments_reorder_patch",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -13827,7 +13602,7 @@
     },
     "/api/departments/{dept_id}": {
       "delete": {
-        "description": "관리자 PIN 으로 부서 삭제.\n\nPIN 은 request body(`{\"pin\": \"...\"}`) 로 전달하면 access log 에 남지 않는다.\n하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.",
+        "description": "관리자 PIN 으로 부서 삭제.\n\nPIN은 `X-Admin-Pin` 헤더 또는 request body로만 전달한다.",
         "operationId": "delete_department_api_departments__dept_id__delete",
         "parameters": [
           {
@@ -13837,26 +13612,6 @@
             "schema": {
               "title": "Dept Id",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -13888,7 +13643,7 @@
                     "type": "null"
                   }
                 ],
-                "title": "Body"
+                "title": " Body"
               }
             }
           }
@@ -13923,26 +13678,6 @@
             "schema": {
               "title": "Dept Id",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -14226,26 +13961,6 @@
         "operationId": "create_employee_api_employees_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -14315,26 +14030,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -14387,26 +14082,6 @@
               "format": "uuid",
               "title": "Employee Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -14581,26 +14256,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -14758,7 +14413,7 @@
     },
     "/api/employees/{employee_id}/verify-pin": {
       "post": {
-        "description": "작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.\n\n무차별 대입 완화를 위해 (직원ID + 클라이언트 IP) 키로 실패 시도를 제한한다.\n실패만 카운트하며 성공 시 키를 리셋한다.",
+        "description": "새 DB 세션 계약을 그대로 사용하는 한 release 호환 alias.",
         "operationId": "verify_employee_pin_api_employees__employee_id__verify_pin_post",
         "parameters": [
           {
@@ -16802,7 +16457,7 @@
     },
     "/api/inventory/transactions/{log_id}/quantity-correction": {
       "post": {
-        "description": "RECEIVE/SHIP 수량 보정. 원본은 보존하고 차액만 ADJUST 거래로 보정한다.\n\n- delta = new_quantity_change - original.quantity_change\n- new_warehouse = inventory.warehouse_qty + delta (음수 방지 검증)\n- adjust_warehouse() 서비스 호출로 재고 동기화\n- ADJUST TransactionLog 생성 + TransactionEditLog 기록",
+        "description": "RECEIVE/SHIP 수량 보정. 원본은 보존하고 차액만 ADJUST 거래로 보정한다.\n\n- delta = new_quantity_change - original.quantity_change\n- new_warehouse = inventory.warehouse_qty + delta (음수 방지 검증)\n- _adjust_warehouse() private core 호출로 재고 동기화\n- ADJUST TransactionLog 생성 + TransactionEditLog 기록",
         "operationId": "quantity_correct_transaction_api_inventory_transactions__log_id__quantity_correction_post",
         "parameters": [
           {
@@ -17591,26 +17246,6 @@
         "operationId": "create_item_api_items_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -17885,26 +17520,6 @@
         "operationId": "reorder_items_api_items_reorder_patch",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -18013,26 +17628,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -18100,26 +17695,6 @@
               "format": "uuid",
               "title": "Item Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -18193,26 +17768,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -18270,26 +17825,6 @@
               "format": "uuid",
               "title": "Item Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -18367,26 +17902,6 @@
         "operationId": "create_model_api_models_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -18446,26 +17961,6 @@
         "description": "드래그 reorder 결과를 영구 저장. 부서 reorder 와 동일 패턴.\n\n- PIN 검증 후 payload.items 의 (slot, display_order) 쌍을 일괄 갱신.\n- 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).",
         "operationId": "reorder_models_api_models_reorder_patch",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -18534,26 +18029,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -18582,7 +18057,7 @@
                     "type": "null"
                   }
                 ],
-                "title": "Body"
+                "title": " Body"
               }
             }
           }
@@ -18618,26 +18093,6 @@
             "schema": {
               "title": "Slot",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -18708,23 +18163,6 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
           }
         ],
         "responses": {
@@ -18758,25 +18196,6 @@
     "/api/notifications/mark-read": {
       "post": {
         "operationId": "mark_read_api_notifications_mark_read_post",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -18828,23 +18247,6 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
           }
         ],
         "responses": {
@@ -18885,23 +18287,6 @@
               "format": "uuid",
               "title": "Recipient Employee Id",
               "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
             }
           }
         ],
@@ -18958,23 +18343,6 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
           }
         ],
         "responses": {
@@ -19000,6 +18368,141 @@
         "summary": "Delete Notification",
         "tags": [
           "Notifications"
+        ]
+      }
+    },
+    "/api/operator-session": {
+      "delete": {
+        "operationId": "delete_operator_session_api_operator_session_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin_change_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin Change Employee Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      },
+      "get": {
+        "operationId": "get_operator_session_api_operator_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      },
+      "post": {
+        "operationId": "create_operator_session_api_operator_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorSessionLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/operator-session/complete-pin-change": {
+      "post": {
+        "operationId": "complete_pin_change_api_operator_session_complete_pin_change_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorPinChangeCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Pin Change",
+        "tags": [
+          "Employees"
         ]
       }
     },
@@ -19227,31 +18730,9 @@
     "/api/settings/integrity/inventory": {
       "get": {
         "deprecated": true,
-        "description": "Deprecated compatibility endpoint.\n\nPIN 은 request body(`{\"pin\": \"...\"}`) 로 전달하면 access log 에 남지 않는다.\n하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.",
+        "description": "Deprecated compatibility endpoint.\n\nPIN은 access log에 남지 않는 `X-Admin-Pin` 헤더 또는 request body로만 받는다.",
         "operationId": "check_inventory_integrity_api_settings_integrity_inventory_get",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — body 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 32,
-                  "minLength": 4,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — body 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "query",
             "name": "limit",
@@ -19262,6 +18743,22 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -20185,16 +19682,6 @@
           },
           {
             "in": "query",
-            "name": "requester_employee_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Requester Employee Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "source_pa_item_id",
             "required": true,
             "schema": {
@@ -20211,6 +19698,23 @@
               "exclusiveMinimum": 0,
               "title": "Quantity",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requester Employee Id"
             }
           },
           {
@@ -21867,26 +21371,6 @@
         "description": "창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).\n\n켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.",
         "operationId": "set_box_tracking_api_warehouse_map_box_tracking_put",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",

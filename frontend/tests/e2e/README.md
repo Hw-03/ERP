@@ -10,7 +10,7 @@
 
 - 전용 DB: `backend/mes_e2e.db` (부트스트랩+시드, teardown 삭제)
 - 전용 백엔드: 포트 **8021** (globalSetup 이 `DATABASE_URL` 로 기동)
-- 전용 프론트: 포트 **3100** (`next dev`, `/api/*` → `BACKEND_INTERNAL_URL`=8021 프록시)
+- 전용 프론트: 포트 **3100** (`scripts/next-server.js dev`, `/api/*` → `BACKEND_INTERNAL_URL`=8021 프록시)
 - dev(8011/3001)·prod(8010/3000) 스택과 무충돌.
 
 ```bash
@@ -26,11 +26,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_e2e.ps1
 
 > 첫 설치: `npm install` (이미 `@playwright/test` devDep 포함) + `npx playwright install chromium`.
 
-## 로그인 우회
+## 격리 작업자 로그인
 
-`_helpers.ts` `loginAsOperator(page, { role | code })` — MesLoginGate 3중 검증(operator·
-boot_id·활성직원)을 런타임 조회로 inject. 결재 2-세션 테스트는 `code`(employee_code)로 제출자/
-승인자를 분리한다.
+`global-setup.ts`가 격리 DB의 E2E 직원 PIN을 `E2E_OPERATOR_PIN`(기본 `2468`)으로 설정한다.
+setup은 지정 작업자별 `/api/operator-session`을 한 번 호출해 실제 HttpOnly cookie를 임시 시드에
+보관하고, `_helpers.ts`의 `loginAsOperator(page, { role | code })`는 테스트별 새 browser context에
+해당 cookie를 복제한 뒤 `GET /api/operator-session` 정본으로 actor를 재검증한다. 따라서 브라우저
+상태는 격리하면서 production 세션 발급 예산을 테스트 수만큼 소모하지 않는다. 임시 시드와 cookie는
+global teardown에서 삭제한다. 결재 2-세션 테스트는 `code`(employee_code)로 제출자/승인자를 분리한다.
 
 ## 시나리오
 
@@ -45,13 +48,14 @@ boot_id·활성직원)을 런타임 조회로 inject. 결재 2-세션 테스트�
 | `io-defect.spec.ts` | 불량 격리 → 정상 복귀 | 불량 흐름(즉시 처리) |
 | `io-history-labels.spec.ts` | 같은 작업이 화면에서 같은 라벨로 보임 | P0-1 라벨 회귀 방어 |
 | `shipping-request-to-prep.spec.ts` | 출하 목록 → 요청 상세 → 준비 중 전환 | 실제 출하 화면과 API 상태 전이 smoke |
+| `operator-session-ui.spec.ts` | 기본 PIN challenge → 새 PIN → 재로그인·새로고침·로그아웃·강제 폐기 | 실제 로그인 UI와 401 로그인 복귀 |
 
 ## 작성 원칙
 
 - **user-facing locator** — `getByRole('button', { name })` / `getByText`. data-testid 는 쓰지 않는다
   (실 app 코드 미접촉 원칙). 행 기반은 `getByRole('row', { name }).getByRole('button', { name })`.
 - **결재 정책 주의** — 창고 정/부가 창고-결재를 제출하면 **자가승인 즉시 반영**(큐 미적재). 풀사이클은
-  제출자=일반직원, 승인자=창고/부서 정 으로 분리. 승인은 "승인" → PIN(기본 0000) → "승인 확정".
+  제출자=일반직원, 승인자=창고/부서 정 으로 분리. 승인은 "승인" → E2E 작업자 PIN → "승인 확정".
 - **느린 트랜잭션 견디기** — 필요 시 `expect(...).toBeVisible({ timeout: 10_000 })`.
 
 ## CI

@@ -5,11 +5,16 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import Depends, Query, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+)
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     IoBatchResponse,
@@ -35,7 +40,7 @@ from app.services._tx import commit_only
 from app.models import Employee, TransactionLog
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 def _load_item_conversion_requester(db: Session, employee_id: uuid.UUID) -> Employee:
@@ -104,8 +109,13 @@ def item_conversion_preview(
 
 
 @router.post("/item-conversion", response_model=ShippingComponentChangeResultResponse)
-def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session = Depends(get_db)):
-    requester = _load_item_conversion_requester(db, payload.requester_employee_id)
+def execute_item_conversion(
+    payload: ItemConversionExecuteRequest,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> ShippingComponentChangeResultResponse:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
+    _load_item_conversion_requester(db, actor.employee_id)
 
     try:
         result = shipping_actions_svc.execute_component_change_independent(
@@ -115,8 +125,7 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
             payload.quantity,
             payload.memo,
             payload.requested_mode,
-            requester_name=requester.name,
-            requester_employee_id=requester.employee_id,
+            actor=actor,
         )
         return ShippingComponentChangeResultResponse(
             **{key: value for key, value in result.items() if key != "transactions"},
@@ -129,14 +138,18 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
 
 
 @router.post("/preview", response_model=IoPreviewResponse)
-def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
+def preview_io(
+    payload: IoPreviewRequest,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> dict:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
     try:
         if payload.work_type == "internal_use" or payload.sub_type == "internal_use_out":
             if payload.requester_employee_id is None:
                 raise ValueError("사내 사용 미리보기에는 requester_employee_id가 필요합니다.")
-            requester = io_svc._load_requester(db, payload.requester_employee_id)
             io_svc.validate_internal_use_requester(
-                requester,
+                actor,
                 work_type=payload.work_type,
                 sub_type=payload.sub_type,
             )
@@ -146,9 +159,8 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
         }:
             if payload.requester_employee_id is None:
                 raise ValueError("창고 수량보정 미리보기에는 requester_employee_id가 필요합니다.")
-            requester = io_svc._load_requester(db, payload.requester_employee_id)
             io_svc.validate_warehouse_adjust_requester(
-                requester,
+                actor,
                 work_type=payload.work_type,
                 sub_type=payload.sub_type,
             )
@@ -167,9 +179,15 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
 
 
 @router.put("/draft", response_model=IoBatchResponse)
-def save_io_draft(payload: IoDraftUpsert, http_request: Request, db: Session = Depends(get_db)):
+def save_io_draft(
+    payload: IoDraftUpsert,
+    http_request: Request,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> dict:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
     try:
-        draft = io_svc.save_draft(db, payload)
+        draft = io_svc.save_draft(db, payload, requester=actor)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -212,17 +230,23 @@ def list_io_drafts(
     return io_svc.list_drafts(db, requester_employee_id=requester_employee_id)
 
 
-@router.delete("/draft/{batch_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/draft/{batch_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 def delete_io_draft(
     batch_id: uuid.UUID,
+    actor: VerifiedActor,
     requester_employee_id: uuid.UUID = Query(...),
     db: Session = Depends(get_db),
-):
+) -> None:
+    ensure_actor_employee_id(actor, requester_employee_id)
     try:
         io_svc.delete_draft(
             db,
             batch_id=batch_id,
-            requester_employee_id=requester_employee_id,
+            requester=actor,
         )
     except PermissionError as exc:
         db.rollback()
@@ -235,9 +259,15 @@ def delete_io_draft(
 
 
 @router.post("/submit", response_model=IoSubmitResponse, status_code=status.HTTP_201_CREATED)
-def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Depends(get_db)):
+def submit_io(
+    payload: IoSubmitRequest,
+    http_request: Request,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> dict:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
     try:
-        result = io_actions_svc.submit(db, payload)
+        result = io_actions_svc.submit(db, payload, requester=actor)
         _batch = result.get("batch") or {}
         http_request.state.activity_audit_related_id = str(_batch.get("batch_id") or "")[:120] or None
         http_request.state.activity_audit_target_summary = (
@@ -262,7 +292,11 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
     except IntegrityError as exc:
         # client_request_id 중복 → 기존 batch 멱등 반환 (더블클릭/네트워크 retry 보호)
         if payload.client_request_id and "client_request_id" in str(exc).lower():
-            existing = io_svc.find_by_client_request_id(db, payload.client_request_id)
+            existing = io_svc.find_by_client_request_id(
+                db,
+                payload.client_request_id,
+                requester=actor,
+            )
             if existing is not None:
                 return io_svc.build_idempotent_response(existing)
             raise http_error(
@@ -286,14 +320,16 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
 def submit_io_draft(
     batch_id: uuid.UUID,
     http_request: Request,
+    actor: VerifiedActor,
     requester_employee_id: uuid.UUID = Query(...),
     db: Session = Depends(get_db),
-):
+) -> dict:
+    ensure_actor_employee_id(actor, requester_employee_id)
     try:
         result = io_actions_svc.submit_existing_draft(
             db,
             batch_id=batch_id,
-            requester_employee_id=requester_employee_id,
+            requester=actor,
         )
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))

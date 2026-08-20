@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.routers._errors import ErrorCode, http_error
 
 
-def reorder_by_display_order(
+def _reorder_by_display_order(
     db: Session,
     model_class: Type[Any],
     key_field: str,

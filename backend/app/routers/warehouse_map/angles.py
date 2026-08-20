@@ -2,15 +2,16 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import Depends, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.warehouse_manager import require_warehouse_manager
 from app.models import Employee, WarehouseAngle, WarehouseBox
 from app.routers._errors import ErrorCode, http_error
-from app.services.reorder import reorder_by_display_order
+from app.services.reorder import _reorder_by_display_order
 from app.schemas import (
     WarehouseAngleCreate,
     WarehouseAngleReorderPayload,
@@ -18,7 +19,7 @@ from app.schemas import (
     WarehouseAngleUpdate,
 )
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 @router.post("/angles", response_model=WarehouseAngleResponse, status_code=status.HTTP_201_CREATED)
@@ -56,7 +57,7 @@ def reorder_angles(
     _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
-    reorder_by_display_order(
+    _reorder_by_display_order(
         db, WarehouseAngle, "id",
         [(item.id, item.display_order) for item in payload.items],
     )

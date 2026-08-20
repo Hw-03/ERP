@@ -2,26 +2,26 @@
 
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import Body, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
 from app.models import Item, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     ProductModelCreate,
     ProductModelDeleteRequest,
-    ProductModelReorderItem,
     ProductModelReorderPayload,
     ProductModelResponse,
     ProductModelUpdate,
 )
 from app.services._tx import commit_and_refresh, commit_only
-from app.services.reorder import reorder_by_display_order
+from app.services.reorder import _reorder_by_display_order
 from app.utils.mes_code import refresh_symbol_cache
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 @router.get("", response_model=List[ProductModelResponse], summary="제품 모델 목록 (예약 제외)")
@@ -47,7 +47,7 @@ def reorder_models(
     - PIN 검증 후 payload.items 의 (slot, display_order) 쌍을 일괄 갱신.
     - 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).
     """
-    reorder_by_display_order(
+    _reorder_by_display_order(
         db, ProductSymbol, "slot",
         [(item.slot, item.display_order) for item in payload.items],
     )
@@ -158,12 +158,7 @@ def update_model(
 def delete_model(
     slot: int,
     _admin: Annotated[None, Depends(require_admin_pin)],
-    pin: Optional[str] = Query(
-        None,
-        description="관리자 PIN (deprecated — body 사용 권장)",
-        deprecated=True,
-    ),
-    body: Optional[ProductModelDeleteRequest] = Body(None),
+    _body: Optional[ProductModelDeleteRequest] = Body(None),
     db: Session = Depends(get_db),
 ) -> None:
     """제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부). 관리자 PIN 필요."""

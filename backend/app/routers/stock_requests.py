@@ -10,16 +10,20 @@ from typing import List, Optional
 
 from datetime import datetime as _dt
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import Depends, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db, _is_sqlite
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+)
 from app.models import (
     Employee,
     StockRequest,
-    StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
@@ -38,10 +42,11 @@ from app.services import stock_requests as svc
 from app.services import stock_request_actions as action_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services import notifications as notif_svc
+from app.services import rate_limit
 from app._evt import emit as _evt_emit
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 # ---------------------------------------------------------------------------
@@ -50,16 +55,12 @@ router = APIRouter()
 
 
 @router.post("", response_model=StockRequestResponse, status_code=status.HTTP_201_CREATED)
-def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_db)):
-    requester = (
-        db.query(Employee)
-        .filter(Employee.employee_id == payload.requester_employee_id)
-        .first()
-    )
-    if requester is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
-    if not bool(requester.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+def create_stock_request(
+    payload: StockRequestCreate,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> StockRequest:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
 
     lines_input = [
         svc.LineInput(
@@ -77,7 +78,7 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
         try:
             request = action_svc.create_request(
                 db,
-                requester=requester,
+                requester=actor,
                 request_type=payload.request_type,
                 lines_input=lines_input,
                 reference_no=payload.reference_no,
@@ -288,17 +289,11 @@ def list_item_reservations(
 
 @router.put("/draft", response_model=StockRequestResponse)
 def upsert_stock_request_draft(
-    payload: StockRequestDraftUpsert, db: Session = Depends(get_db)
-):
-    requester = (
-        db.query(Employee)
-        .filter(Employee.employee_id == payload.requester_employee_id)
-        .first()
-    )
-    if requester is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
-    if not bool(requester.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+    payload: StockRequestDraftUpsert,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> StockRequest:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
 
     lines_input = [
         svc.LineInput(
@@ -315,7 +310,7 @@ def upsert_stock_request_draft(
     try:
         request = svc.upsert_draft_request(
             db,
-            requester=requester,
+            requester=actor,
             request_type=payload.request_type,
             lines_input=lines_input,
             reference_no=payload.reference_no,
@@ -357,17 +352,23 @@ def list_stock_request_drafts(
     return svc.list_draft_requests(db, requester_employee_id=requester_employee_id)
 
 
-@router.delete("/draft/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/draft/{request_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 def delete_stock_request_draft(
     request_id: uuid.UUID,
+    actor: VerifiedActor,
     requester_employee_id: uuid.UUID = Query(...),
     db: Session = Depends(get_db),
-):
+) -> None:
+    ensure_actor_employee_id(actor, requester_employee_id)
     try:
         svc.delete_draft_request(
             db,
             request_id=request_id,
-            requester_employee_id=requester_employee_id,
+            requester=actor,
         )
     except PermissionError as exc:
         db.rollback()
@@ -403,13 +404,8 @@ def _load_request_for_action(db: Session, request_id: uuid.UUID) -> StockRequest
     return request
 
 
-def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if employee is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    if not bool(employee.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
-    return employee
+def _raise_pin_rate_limited(exc: Exception) -> None:
+    raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, str(exc))
 
 
 @router.post("/{request_id}/approve", response_model=StockRequestResponse)
@@ -417,19 +413,22 @@ def approve_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
     http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> StockRequest:
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
-    approver = _load_actor(db, payload.actor_employee_id)
 
     try:
         action_svc.approve_warehouse_request(
             db,
             request,
-            approver=approver,
+            approver=actor,
             pin=payload.pin,
             http_request=http_request,
         )
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        _raise_pin_rate_limited(exc)
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except svc.FailedApprovalError as exc:
@@ -440,7 +439,7 @@ def approve_stock_request(
         "sr_approve_warehouse",
         request=http_request,
         req_id=str(request.request_id)[:8],
-        approver_emp=approver.employee_code,
+        approver_emp=actor.employee_code,
         result=request.status.value,
     )
     return request
@@ -451,18 +450,22 @@ def reject_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
     http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> StockRequest:
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
-    approver = _load_actor(db, payload.actor_employee_id)
     if not payload.reason or not payload.reason.strip():
         raise http_error(422, ErrorCode.UNPROCESSABLE, "반려 사유를 입력하세요.")
 
     try:
         svc.reject_request(
-            db, request, approver=approver, pin=payload.pin, reason=payload.reason,
+            db, request, approver=actor, pin=payload.pin, reason=payload.reason,
             http_request=http_request,
         )
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        db.rollback()
+        _raise_pin_rate_limited(exc)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -470,13 +473,13 @@ def reject_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
-    notif_svc.notify_request_decided(db, request, decision="rejected")
+    notif_svc._notify_request_decided(db, request, decision="rejected")
     commit_and_refresh(db, request)
     _evt_emit(
         "sr_reject_warehouse",
         request=http_request,
         req_id=str(request.request_id)[:8],
-        approver_emp=approver.employee_code,
+        approver_emp=actor.employee_code,
     )
     return request
 
@@ -486,20 +489,23 @@ def department_approve_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
     http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> StockRequest:
     """부서 결재 승인 — department_role in (primary/deputy) 또는 admin."""
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
-    approver = _load_actor(db, payload.actor_employee_id)
 
     try:
         action_svc.approve_department_request(
             db,
             request,
-            approver=approver,
+            approver=actor,
             pin=payload.pin,
             http_request=http_request,
         )
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        _raise_pin_rate_limited(exc)
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except svc.FailedApprovalError as exc:
@@ -510,7 +516,7 @@ def department_approve_stock_request(
         "sr_approve_dept",
         request=http_request,
         req_id=str(request.request_id)[:8],
-        approver_emp=approver.employee_code,
+        approver_emp=actor.employee_code,
         result=request.status.value,
     )
     return request
@@ -521,19 +527,23 @@ def department_reject_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
     http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> StockRequest:
     """부서 결재 반려."""
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
-    approver = _load_actor(db, payload.actor_employee_id)
     if not payload.reason or not payload.reason.strip():
         raise http_error(422, ErrorCode.UNPROCESSABLE, "반려 사유를 입력하세요.")
 
     try:
         svc.reject_request_department(
-            db, request, approver=approver, pin=payload.pin, reason=payload.reason,
+            db, request, approver=actor, pin=payload.pin, reason=payload.reason,
             http_request=http_request,
         )
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        db.rollback()
+        _raise_pin_rate_limited(exc)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -541,13 +551,13 @@ def department_reject_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
-    notif_svc.notify_request_decided(db, request, decision="rejected")
+    notif_svc._notify_request_decided(db, request, decision="rejected")
     commit_and_refresh(db, request)
     _evt_emit(
         "sr_reject_dept",
         request=http_request,
         req_id=str(request.request_id)[:8],
-        approver_emp=approver.employee_code,
+        approver_emp=actor.employee_code,
     )
     return request
 
@@ -557,19 +567,22 @@ def cancel_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
     http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> StockRequest:
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
-    requester = _load_actor(db, payload.actor_employee_id)
 
     try:
         action_svc.cancel_request(
             db,
             request,
-            requester=requester,
+            requester=actor,
             pin=payload.pin,
             http_request=http_request,
         )
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        _raise_pin_rate_limited(exc)
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
@@ -578,7 +591,7 @@ def cancel_stock_request(
         "sr_cancel",
         request=http_request,
         req_id=str(request.request_id)[:8],
-        requester_emp=requester.employee_code,
+        requester_emp=actor.employee_code,
     )
     return request
 
@@ -587,17 +600,19 @@ def cancel_stock_request(
 def submit_stock_request_draft(
     request_id: uuid.UUID,
     payload: StockRequestSubmitPayload,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> StockRequest:
     """DRAFT → 제출 전환. status=DRAFT 만 허용, 본인만, 빈 lines 거부."""
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
     for attempt in range(2):
         try:
             request = svc.submit_draft_request(
                 db,
                 request_id=request_id,
-                requester_employee_id=payload.requester_employee_id,
+                requester=actor,
             )
-            notif_svc.notify_request_arrived(db, request)
+            notif_svc._notify_request_arrived(db, request)
             commit_and_refresh(db, request)
             return request
         except IntegrityError as exc:
@@ -621,19 +636,23 @@ def revert_stock_request_to_draft(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
     http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> Response:
     """제출된 요청을 취소하고 연결된 IoBatch를 draft로 복원 — 수정 후 재제출용.
     권한: 요청자 본인만.
     """
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
-    requester = _load_actor(db, payload.actor_employee_id)
 
-    if request.requester_employee_id != requester.employee_id:
+    if request.requester_employee_id != actor.employee_id:
         raise http_error(403, ErrorCode.FORBIDDEN, "본인 요청만 수정할 수 있습니다.")
 
     try:
-        svc.cancel_request(db, request, requester=requester, pin=payload.pin, http_request=http_request)
+        svc.cancel_request(db, request, requester=actor, pin=payload.pin, http_request=http_request)
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        db.rollback()
+        _raise_pin_rate_limited(exc)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -641,7 +660,7 @@ def revert_stock_request_to_draft(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
-    # sync_batch_from_stock_request 가 "cancelled" 로 설정한 것을 "draft" 로 덮어씀
+    # _sync_batch_from_stock_request 가 "cancelled" 로 설정한 것을 "draft" 로 덮어씀
     batch_id = request.operation_batch_id
     if batch_id:
         batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()

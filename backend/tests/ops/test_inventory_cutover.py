@@ -54,6 +54,7 @@ from scripts.ops.inventory_cutover import (  # noqa: E402
 )
 from scripts.ops import inventory_cutover as cutover  # noqa: E402
 from app.services import shipping as shipping_service  # noqa: E402
+from app.services import shipping_actions  # noqa: E402
 
 
 @pytest.fixture
@@ -177,6 +178,22 @@ def _employee(db_session, *, department: str) -> Employee:
     db_session.add(employee)
     db_session.flush()
     return employee
+
+
+def _assert_terminal_shipping_commands_fail(
+    db: Session,
+    request_id: uuid.UUID,
+    actor: Employee,
+) -> None:
+    commands = (
+        lambda: shipping_actions.send_to_prep(db, request_id, actor),
+        lambda: shipping_actions.prepare_cancel(db, request_id, actor=actor),
+        lambda: shipping_actions.pickup_complete(db, request_id, actor),
+        lambda: shipping_actions.pickup_cancel(db, request_id, actor),
+    )
+    for command in commands:
+        with pytest.raises(shipping_service.ShippingError):
+            command()
 
 
 def _seed_operational_state(db_session, item, employee: Employee) -> None:
@@ -338,6 +355,7 @@ def test_persisted_shipping_state_allocation_matrix_is_fail_closed(
     expected_disposition,
 ):
     with cutover_session_factory() as seed:
+        actor = _employee(seed, department="Shipping")
         item = _standalone_item(
             seed,
             name=f"Matrix {status} {allocation_statuses}",
@@ -370,6 +388,7 @@ def test_persisted_shipping_state_allocation_matrix_is_fail_closed(
         item_id = item.item_id
         item_code = item.mes_code
         request_id = request.request_id
+        actor_id = actor.employee_id
         seed.commit()
     before = _raw_cutover_snapshot(cutover_session_factory)
     rows = [CutoverRow(mes_code=item_code, bucket="warehouse", quantity=99, source_row=2)]
@@ -405,14 +424,9 @@ def test_persisted_shipping_state_allocation_matrix_is_fail_closed(
         run_cutover(db, rows, CutoverOptions(apply=True))
     with cutover_session_factory() as verify:
         before_commands = verify.query(Inventory).filter(Inventory.item_id == item_id).one().warehouse_qty
-        for operation in (
-            shipping_service.send_to_prep,
-            shipping_service.prepare_cancel,
-            shipping_service.pickup_complete,
-            shipping_service.pickup_cancel,
-        ):
-            with pytest.raises(shipping_service.ShippingError):
-                operation(verify, request_id)
+        actor = verify.get(Employee, actor_id)
+        assert actor is not None
+        _assert_terminal_shipping_commands_fail(verify, request_id, actor)
         verify.expire_all()
         after_commands = verify.query(Inventory).filter(Inventory.item_id == item_id).one().warehouse_qty
     assert before_commands == after_commands == Decimal("99")
@@ -784,6 +798,7 @@ def test_malformed_persisted_inventory_effect_json_fails_closed_without_decode_e
 
 def test_terminal_safe_shipping_cannot_change_inventory_after_apply(cutover_session_factory, capsys):
     with cutover_session_factory() as seed:
+        actor = _employee(seed, department="Shipping")
         item = _standalone_item(
             seed,
             name="Terminal Shipping",
@@ -822,6 +837,7 @@ def test_terminal_safe_shipping_cannot_change_inventory_after_apply(cutover_sess
         item_id = item.item_id
         item_code = item.mes_code
         request_id = request.request_id
+        actor_id = actor.employee_id
         seed.commit()
 
     with cutover_session_factory() as db:
@@ -862,14 +878,9 @@ def test_terminal_safe_shipping_cannot_change_inventory_after_apply(cutover_sess
             for row in verify.query(ShippingAllocation).filter_by(request_id=request_id).all()
         } == {"RELEASED"}
         before = verify.query(Inventory).filter(Inventory.item_id == item_id).one().warehouse_qty
-        for operation in (
-            shipping_service.send_to_prep,
-            shipping_service.prepare_cancel,
-            shipping_service.pickup_complete,
-            shipping_service.pickup_cancel,
-        ):
-            with pytest.raises(shipping_service.ShippingError):
-                operation(verify, request_id)
+        actor = verify.get(Employee, actor_id)
+        assert actor is not None
+        _assert_terminal_shipping_commands_fail(verify, request_id, actor)
         verify.expire_all()
         after = verify.query(Inventory).filter(Inventory.item_id == item_id).one().warehouse_qty
     assert before == after == Decimal("99")

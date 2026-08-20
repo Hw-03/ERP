@@ -31,7 +31,6 @@ from app._actor import get_actor_emp
 from app._logging import get_logger
 from app.database import SessionLocal, get_db
 from app.services import activity_audit
-from app.services.audit_actor_session import get_verified_audit_actor_code
 from app.services.realtime import suppress_realtime_revision
 
 
@@ -133,13 +132,15 @@ def _build_write_audit_entry(
 ) -> _WriteAuditEntry | None:
     if method not in _WRITE_METHODS or path == _CLIENT_EVENT_PATH:
         return None
+    actor_employee_code = get_actor_emp(request)
+    if actor_employee_code == "-":
+        return None
     action_key, action_label, path_related_id, normalized_path = _write_action_metadata(
         method, path
     )
     source = _clean_header(request, "X-MES-Audit-Source") or "desktop"
     if source not in {"desktop", "mobile"}:
         source = "desktop"
-
     return _WriteAuditEntry(
         method=method,
         path=path,
@@ -152,7 +153,7 @@ def _build_write_audit_entry(
         session_id=_clean_header(request, "X-MES-Audit-Session"),
         screen_key=_clean_header(request, "X-MES-Audit-Screen"),
         screen_label=_clean_header(request, "X-MES-Audit-Screen-Label"),
-        actor_employee_code=get_verified_audit_actor_code(request),
+        actor_employee_code=actor_employee_code,
         request_id=str(getattr(request.state, "request_id", ""))[:64] or None,
         action_key=action_key,
         action_label=action_label,

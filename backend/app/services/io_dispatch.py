@@ -23,6 +23,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.schemas import IoSubmitRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import stock_requests as stock_request_svc
@@ -45,10 +46,9 @@ from app.services.io_preview import (
 from app.services.io_persist import (
     _batch_to_payload,
     ensure_batch_is_mutable,
-    _load_requester,
     _persist_batch,
-    normalize_batch_bom_stock_exempt,
-    sync_batch_from_stock_requests,
+    _normalize_batch_bom_stock_exempt,
+    _sync_batch_from_stock_requests,
 )
 
 
@@ -183,7 +183,7 @@ def _has_manual_line(lines: Iterable[IoLine]) -> bool:
 def _prelock_line_inventories(db: Session, lines: Sequence[IoLine]) -> None:
     """다품목 실행 전에 부모 Inventory를 전역 순서로 잠근다."""
     item_ids = sorted({line.item_id for line in lines})
-    inventory_svc.ensure_and_lock_inventories(db, item_ids)
+    inventory_svc._ensure_and_lock_inventories(db, item_ids)
 
 
 def _submit_internal_use_approvals(
@@ -238,9 +238,9 @@ def _submit_internal_use_approvals(
             update_batch=False,
         )
         requests.append(request)
-        notif_svc.notify_request_arrived(db, request)
+        notif_svc._notify_request_arrived(db, request)
 
-    sync_batch_from_stock_requests(db, batch, requests)
+    _sync_batch_from_stock_requests(db, batch, requests)
 
 
 def _submit_approval(
@@ -277,7 +277,7 @@ def _submit_approval(
     )
     _link_stock_request(db, batch=batch, request=request, lines=lines)
     # 창고 결재 대기 요청 도착 → 창고 정/부에게 알림 (io 라우터가 커밋).
-    notif_svc.notify_request_arrived(db, request)
+    notif_svc._notify_request_arrived(db, request)
 
 
 def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBatch) -> None:
@@ -323,9 +323,9 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
         batch.updated_at = now
         db.flush()
 
-    # 자가승인으로 즉시 완료된 경우엔 notify_request_arrived 가 상태 가드로 아무 것도 안 한다.
+    # 자가승인으로 즉시 완료된 경우엔 _notify_request_arrived 가 상태 가드로 아무 것도 안 한다.
     # 부서 결재 대기로 남은 경우에만 부서 승인자에게 도착 알림 (io 라우터가 커밋).
-    notif_svc.notify_request_arrived(db, request)
+    notif_svc._notify_request_arrived(db, request)
 
 
 def execute_batch_after_dept_approval(
@@ -406,7 +406,7 @@ _BUCKET_NONE = "none"
 
 def _apply_in(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     bucket = _BUCKET_PRODUCTION if line.to_bucket == _BUCKET_PRODUCTION else _BUCKET_WAREHOUSE
-    inventory_svc.receive_confirmed(
+    inventory_svc._receive_confirmed(
         db,
         line.item_id,
         qty,
@@ -421,34 +421,34 @@ def _apply_in(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeE
 
 def _apply_out(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     if line.from_bucket == _BUCKET_WAREHOUSE:
-        inventory_svc.consume_warehouse(db, line.item_id, qty)
+        inventory_svc._consume_warehouse(db, line.item_id, qty)
         tx_type = TransactionTypeEnum.SHIP
     elif line.from_bucket == _BUCKET_DEFECTIVE:
-        inventory_svc.return_to_supplier(db, line.item_id, qty, line.from_department)
+        inventory_svc._return_to_supplier(db, line.item_id, qty, line.from_department)
         tx_type = TransactionTypeEnum.SUPPLIER_RETURN
     else:
-        inventory_svc.consume_from_department(db, line.item_id, qty, line.from_department)
+        inventory_svc._consume_from_department(db, line.item_id, qty, line.from_department)
         tx_type = TransactionTypeEnum.BACKFLUSH
     return tx_type, -qty
 
 
 def _apply_move(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     if line.from_bucket == _BUCKET_PRODUCTION and line.to_bucket == _BUCKET_PRODUCTION:
-        inventory_svc.transfer_between_departments(
+        inventory_svc._transfer_between_departments(
             db, line.item_id, qty, line.from_department, line.to_department
         )
         tx_type = TransactionTypeEnum.TRANSFER_DEPT
     elif line.from_bucket == _BUCKET_WAREHOUSE:
-        inventory_svc.transfer_to_production(db, line.item_id, qty, line.to_department)
+        inventory_svc._transfer_to_production(db, line.item_id, qty, line.to_department)
         tx_type = TransactionTypeEnum.TRANSFER_TO_PROD
     else:
-        inventory_svc.transfer_to_warehouse(db, line.item_id, qty, line.from_department)
+        inventory_svc._transfer_to_warehouse(db, line.item_id, qty, line.from_department)
         tx_type = TransactionTypeEnum.TRANSFER_TO_WH
     return tx_type, Decimal("0")
 
 
 def _apply_defective(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
-    inventory_svc.mark_defective(
+    inventory_svc._mark_defective(
         db,
         line.item_id,
         qty,
@@ -463,7 +463,7 @@ def _apply_defective(db: Session, line: IoLine, qty: Decimal) -> tuple[Transacti
 
 def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     if line.to_bucket == _BUCKET_WAREHOUSE and line.from_bucket == _BUCKET_NONE:
-        inventory_svc.receive_confirmed(
+        inventory_svc._receive_confirmed(
             db,
             line.item_id,
             qty,
@@ -472,10 +472,10 @@ def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionT
         )
         quantity_change = qty
     elif line.from_bucket == _BUCKET_WAREHOUSE and line.to_bucket == _BUCKET_NONE:
-        inventory_svc.consume_warehouse(db, line.item_id, qty)
+        inventory_svc._consume_warehouse(db, line.item_id, qty)
         quantity_change = -qty
     elif line.to_bucket == _BUCKET_PRODUCTION and line.from_bucket == _BUCKET_NONE:
-        inventory_svc.receive_confirmed(
+        inventory_svc._receive_confirmed(
             db,
             line.item_id,
             qty,
@@ -484,7 +484,7 @@ def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionT
         )
         quantity_change = qty
     elif line.from_bucket == _BUCKET_PRODUCTION and line.to_bucket == _BUCKET_NONE:
-        inventory_svc.consume_from_department(
+        inventory_svc._consume_from_department(
             db, line.item_id, qty, line.from_department
         )
         quantity_change = -qty
@@ -521,14 +521,14 @@ def _dept_for_line(line: IoLine, tx_type: TransactionTypeEnum) -> str | None:
 
 def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employee) -> None:
     qty = _d(line.quantity)
-    inv = inventory_svc.get_or_create_inventory(db, line.item_id)
+    inv = inventory_svc._get_or_create_inventory(db, line.item_id)
     before = _d(inv.quantity)
     tracks_warehouse = (
         line.from_bucket == _BUCKET_WAREHOUSE or line.to_bucket == _BUCKET_WAREHOUSE
     )
     wh_before = _d(inv.warehouse_qty) if tracks_warehouse else None
     # 취소 역재생용 — mutation 전 재고 셀 스냅샷.
-    cells_before = inv_effect.snapshot_cells(db, line.item_id)
+    cells_before = inv_effect._snapshot_cells(db, line.item_id)
 
     if line.direction == "in":
         tx_type, quantity_change = _apply_in(db, line, qty)
@@ -544,7 +544,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         raise ValueError(f"지원하지 않는 라인 방향입니다: {line.direction}")
 
     db.flush()
-    inv = inventory_svc.get_or_create_inventory(db, line.item_id)
+    inv = inventory_svc._get_or_create_inventory(db, line.item_id)
     after = _d(inv.quantity)
     wh_after = _d(inv.warehouse_qty) if tracks_warehouse else None
     _log_immediate(
@@ -560,7 +560,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         wh_before=wh_before,
         wh_after=wh_after,
         department=_dept_for_line(line, tx_type),
-        inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
+        inventory_effect=inv_effect._capture_effect(db, line.item_id, cells_before),
     )
 
 
@@ -588,7 +588,7 @@ def _complete_without_inventory(batch: IoBatch) -> None:
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     ensure_batch_is_mutable(batch)
-    normalize_batch_bom_stock_exempt(db, batch)
+    _normalize_batch_bom_stock_exempt(db, batch)
     validate_internal_use_requester(
         requester,
         work_type=batch.work_type,
@@ -661,13 +661,19 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     }
 
 
-def submit(db: Session, payload) -> dict:
+def submit(
+    db: Session,
+    payload: IoSubmitRequest,
+    *,
+    requester: Employee,
+) -> dict:
     _validate_required_memo(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         notes=payload.notes,
     )
-    requester = _load_requester(db, payload.requester_employee_id)
+    if not bool(requester.is_active):
+        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
     batch = _persist_batch(
         db,
         requester=requester,
@@ -682,13 +688,13 @@ def submit_existing_draft(
     db: Session,
     *,
     batch_id: uuid.UUID,
-    requester_employee_id: uuid.UUID,
+    requester: Employee,
 ) -> dict:
     """저장된 draft를 재제출. 새 batch 생성 없이 기존 라인을 그대로 실행."""
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("작업 묶음을 찾을 수 없습니다.")
-    if batch.requester_employee_id != requester_employee_id:
+    if batch.requester_employee_id != requester.employee_id:
         raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
     if batch.status != "draft":
         raise ValueError("임시저장 상태가 아닙니다.")
@@ -698,8 +704,9 @@ def submit_existing_draft(
         sub_type=batch.sub_type,
         notes=batch.notes,
     )
-    requester = _load_requester(db, requester_employee_id)
-    normalize_batch_bom_stock_exempt(db, batch)
+    if not bool(requester.is_active):
+        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    _normalize_batch_bom_stock_exempt(db, batch)
     batch.status = "submitted"
     batch.submitted_at = datetime.utcnow()
     db.flush()

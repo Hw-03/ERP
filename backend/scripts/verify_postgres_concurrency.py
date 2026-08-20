@@ -16,6 +16,16 @@ from sqlalchemy.pool import NullPool
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TEST_DB_ACK = "ALLOW_TEST_DB_MUTATION"
 REQUIRED_TESTS = [
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_foreign_operator_preflight_stays_fail_closed_after_rotation",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_same_cookie_login_then_logout_leaves_no_reissued_session",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_same_cookie_logout_then_login_fails_after_revalidation",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_operator_session_revoke_and_mutation_are_linearized",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_lifecycle_revoke_and_verified_mutation_share_lock_order",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_login_and_pin_change_share_the_employee_row_lock",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_cross_actor_lifecycle_locks_are_deadlock_free",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_admin_pin_change_serializes_the_global_credential",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_admin_mutation_and_pin_change_share_the_credential_lock",
+    "tests/concurrency/test_operator_session_postgres.py::test_postgres_admin_audit_accepts_max_length_employee_code",
     "tests/ops/test_inventory_cutover_postgres_locking.py::test_postgres_cutover_lock_blocks_shipping_writer_until_rollback",
     "tests/services/test_warehouse_map_postgres_locking.py::test_postgres_head_public_tables_serialize_two_connections",
     "tests/services/test_warehouse_map_postgres_locking.py::test_postgres_concurrent_admin_moves_serialize_target_capacity_and_stack_order",

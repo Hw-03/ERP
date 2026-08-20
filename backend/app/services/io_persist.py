@@ -88,7 +88,7 @@ def _normalize_bom_stock_exempt_line(
         line.exclusion_note = None
 
 
-def normalize_payload_bom_stock_exempt(db: Session, payload: object) -> None:
+def _normalize_payload_bom_stock_exempt(db: Session, payload: object) -> None:
     """새 제출·임시저장 payload의 자동 BOM 자재 정책을 서버 기준으로 강제한다."""
     bundle_lines = [
         (bundle, line)
@@ -103,7 +103,7 @@ def normalize_payload_bom_stock_exempt(db: Session, payload: object) -> None:
     )
 
 
-def normalize_batch_bom_stock_exempt(db: Session, batch: IoBatch) -> None:
+def _normalize_batch_bom_stock_exempt(db: Session, batch: IoBatch) -> None:
     """미제출 draft를 제출할 때 현재 품목 설정으로 스냅샷을 다시 계산한다."""
     bundle_lines = [(bundle, line) for bundle in batch.bundles for line in bundle.lines]
     _normalize_bom_stock_exempt_lines(
@@ -370,7 +370,7 @@ def _persist_batch(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
     )
-    normalize_payload_bom_stock_exempt(db, payload)
+    _normalize_payload_bom_stock_exempt(db, payload)
     validate_internal_use_bundles(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
@@ -552,7 +552,7 @@ def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
     return _batch_to_payload(batch, db=db) if batch else None
 
 
-def sync_batch_from_stock_requests(
+def _sync_batch_from_stock_requests(
     db: Session,
     batch: IoBatch,
     requests: Optional[list[StockRequest]] = None,
@@ -612,11 +612,11 @@ def sync_batch_from_stock_requests(
     db.flush()
 
 
-def sync_batch_from_stock_request(db: Session, request: StockRequest) -> None:
+def _sync_batch_from_stock_request(db: Session, request: StockRequest) -> None:
     batch_id = getattr(request, "operation_batch_id", None)
     if not batch_id:
         return
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         return
-    sync_batch_from_stock_requests(db, batch)
+    _sync_batch_from_stock_requests(db, batch)

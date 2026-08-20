@@ -46,7 +46,7 @@ from app.models import (
 from app.services.inv_base import (  # noqa: F401
     PROCESS_TYPE_TO_DEPT,
     dept_for_process_type,
-    get_or_create_inventory,
+    _get_or_create_inventory,
     _lock_inventory,
     _lock_location,
     _get_or_create_location,
@@ -59,33 +59,33 @@ from app.services.inv_calc import (  # noqa: F401
     _sync_total,
 )
 from app.services.inv_transfer import (  # noqa: F401
-    receive_confirmed,
-    transfer_to_production,
-    transfer_to_warehouse,
-    transfer_between_departments,
-    consume_warehouse,
-    consume_from_department,
+    _receive_confirmed,
+    _transfer_to_production,
+    _transfer_to_warehouse,
+    _transfer_between_departments,
+    _consume_warehouse,
+    _consume_from_department,
     department_for_item,
     item_department_stock,
     format_item_location_shortage,
-    consume_from_item_department,
-    receive_to_item_department,
+    _consume_from_item_department,
+    _receive_to_item_department,
 )
 from app.services.inv_defective import (  # noqa: F401
     DefectSource,
     NormalSource,
     ReasonContext,
-    mark_defective,
-    unmark_defective,
-    receive_defective,
-    scrap_defective,
-    scrap_normal,
-    return_to_supplier,
-    return_to_supplier_from_normal,
+    _mark_defective,
+    _unmark_defective,
+    _receive_defective,
+    _scrap_defective,
+    _scrap_normal,
+    _return_to_supplier,
+    _return_to_supplier_from_normal,
 )
 
 
-def ensure_and_lock_inventories(
+def _ensure_and_lock_inventories(
     db: Session,
     item_ids: Iterable[uuid.UUID],
 ) -> dict[uuid.UUID, Inventory]:
@@ -133,17 +133,18 @@ def reserve(
     item_id: uuid.UUID,
     qty: Decimal,
     *,
-    employee: Optional[Employee] = None,
-    employee_name: Optional[str] = None,
+    employee: Employee,
 ) -> Inventory:
     """warehouse_qty 가용분에서 예약(Pending). 부족 시 ValueError.
 
     원자적 조건부 UPDATE를 사용 — SQLite/PostgreSQL 모두 check-then-act 경쟁 없음.
     """
+    if not isinstance(employee, Employee):
+        raise TypeError("employee must be an Employee")
     if qty <= 0:
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
-    get_or_create_inventory(db, item_id)
+    _get_or_create_inventory(db, item_id)
     db.flush()
 
     result = db.execute(
@@ -169,16 +170,12 @@ def reserve(
     db.expire_all()
     inv = inventory_repository.get(db, item_id)
 
-    if employee is not None:
-        inv.last_reserver_employee_id = employee.employee_id
-        inv.last_reserver_name = employee.name
-    elif employee_name:
-        inv.last_reserver_employee_id = None
-        inv.last_reserver_name = employee_name
+    inv.last_reserver_employee_id = employee.employee_id
+    inv.last_reserver_name = employee.name
     return inv
 
 
-def release(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
+def _release(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     """예약 해제 (Pending 차감)."""
     if qty <= 0:
         raise ValueError("해제 수량은 0보다 커야 합니다.")
@@ -192,7 +189,7 @@ def release(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     return inv
 
 
-def reserve_location(
+def _reserve_location(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -247,7 +244,7 @@ def reserve_location(
     )
 
 
-def release_location(
+def _release_location(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -299,7 +296,7 @@ def release_location(
     )
 
 
-def consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
+def _consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     """배치 confirm (OUT): warehouse_qty와 pending_quantity 동시 차감."""
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
@@ -320,7 +317,7 @@ def consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
 # ---------------------------------------------------------------------------
 # 창고 전용 헬퍼 (라우터가 warehouse_qty 를 직접 건드리지 않도록)
 # ---------------------------------------------------------------------------
-def adjust_warehouse(
+def _adjust_warehouse(
     db: Session,
     item_id: uuid.UUID,
     new_warehouse_qty: Decimal,
