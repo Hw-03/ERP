@@ -367,7 +367,7 @@ def _route_for_sub_type(
         return ("out", "production", dept, "none", None)
     if sub_type == "disassemble":
         if role == "result":
-            dept = _default_production_dept(item, from_department or to_department)
+            dept = _default_production_dept(item, to_department or from_department)
             return ("out", "production", dept, "none", None)
         # 회수 부품: 소속 공정으로 복귀.
         dept = _component_source_dept(item, from_department or to_department)

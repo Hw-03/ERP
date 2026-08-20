@@ -45,6 +45,18 @@ def test_route_dept_to_warehouse(make_item):
     assert route == ("move", "production", "조립", "warehouse", None)
 
 
+def test_route_disassemble_result_prefers_selected_to_department(make_item):
+    route = iop._route_for_sub_type(
+        "disassemble",
+        item=make_item(),
+        from_department="출하",
+        to_department="조립",
+        role="result",
+    )
+
+    assert route == ("out", "production", "조립", "none", None)
+
+
 def test_route_internal_use_out_from_warehouse(make_item):
     route = iop._route_for_sub_type(
         "internal_use_out",
@@ -293,7 +305,30 @@ def test_preview_disassemble_recovers_children(db_session, make_item, make_bom):
     recovered = [l for l in lines if l["origin"] == "bom_auto"][0]
     assert result["direction"] == "out"
     assert recovered["direction"] == "in" and recovered["quantity"] == D("8")  # 4*2
+    assert recovered["from_bucket"] == "none"
+    assert recovered["shortage"] == D("0")
     assert recovered["exclusion_note"] == iop.DISASSEMBLE_EXCLUSION_NOTE
+
+
+def test_preview_disassemble_uses_selected_department_for_parent_shortage(
+    db_session, make_item, make_location
+):
+    parent = make_item(name="Disassemble Parent", process_type_code="AF")
+    make_location(parent.item_id, department=DepartmentEnum.ASSEMBLY, quantity=D("6"))
+
+    out = iop.preview(
+        db_session,
+        work_type="process",
+        sub_type="disassemble",
+        targets=[_target(parent.item_id, "13")],
+        from_department=DepartmentEnum.SHIPPING.value,
+        to_department=DepartmentEnum.ASSEMBLY.value,
+    )
+
+    result = out["bundles"][0]["lines"][0]
+    assert result["from_bucket"] == "production"
+    assert result["from_department"] == DepartmentEnum.ASSEMBLY.value
+    assert result["shortage"] == D("7")
 
 
 def test_preview_manual_skips_bom_expansion(db_session, make_item, make_bom):
