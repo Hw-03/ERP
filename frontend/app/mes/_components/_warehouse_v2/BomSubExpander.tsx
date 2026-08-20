@@ -463,11 +463,14 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
   const isCapacityIgnoredZeroStock = node.production_capacity_ignored === true && node.current_stock === 0;
   const tintPercent = MODAL_TREE_MIN_TINT_PERCENT
     + (Math.min(depth, MODAL_TREE_MAX_VISIBLE_DEPTH) - 1) * MODAL_TREE_TINT_STEP;
+  // 깊이 단계 배경은 oklab 로 섞는다 — srgb 혼합은 다크 모드의 어두운 --c-s1 베이스에서
+  // 감마 압축으로 단계 차이가 거의 안 보이는 반면(라이트 모드 대비 체감차 큼), oklab 은
+  // 밝기 축이 지각적으로 균일해 라이트·다크 양쪽에서 동일한 %가 비슷한 체감 차이를 만든다.
   const background = node.current_stock === 0 && !isCapacityIgnoredZeroStock
     ? tint(LEGACY_COLORS.red, 15, "var(--c-s1)")
     : depth === 0
       ? LEGACY_COLORS.s1
-      : `color-mix(in srgb, ${LEGACY_COLORS.blue} ${tintPercent.toFixed(2)}%, var(--c-s1))`;
+      : `color-mix(in oklab, ${LEGACY_COLORS.blue} ${tintPercent.toFixed(2)}%, var(--c-s1))`;
   const cells = (
     <>
       <span
