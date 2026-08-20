@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBatch, IoSubType } from "@/lib/api";
-import { useIoDraftRestore } from "../useIoDraftRestore";
+import { restoreInternalUseBundles, useIoDraftRestore } from "../useIoDraftRestore";
 
 function makeDraft(subType: IoSubType): IoBatch {
   return {
@@ -70,6 +70,52 @@ function Harness({
 }
 
 describe("useIoDraftRestore", () => {
+  it("legacy internal-use BOM draft를 기존 하위만 차감 방식으로 복원한다", () => {
+    const draft = {
+      ...makeDraft("internal_use_out"),
+      work_type: "internal_use" as const,
+      bundles: [
+        {
+          bundle_id: "legacy-bundle",
+          source_kind: "bom_parent" as const,
+          title: "기존 BOM",
+          source_item_id: "parent-1",
+          source_mes_code: null,
+          quantity: 1,
+          expanded_level: 1,
+          lines: [
+            {
+              line_id: "legacy-line",
+              item_id: "child-1",
+              item_name: "기존 하위",
+              mes_code: null,
+              unit: "EA",
+              direction: "out" as const,
+              from_bucket: "production" as const,
+              from_department: "고압",
+              to_bucket: "none" as const,
+              to_department: "연구",
+              quantity: 1,
+              bom_expected: 1,
+              included: true,
+              origin: "bom_auto" as const,
+              edited: false,
+              has_children: false,
+              shortage: 0,
+              exclusion_note: null,
+            },
+          ],
+        },
+      ],
+    };
+
+    const restored = restoreInternalUseBundles(draft);
+
+    expect(restored[0].internal_use_bom_mode).toBe("children_only");
+    expect(restored[0].source_location).toBe("department");
+    expect(restored[0].lines[0].selected).toBe(true);
+  });
+
   it("restores single adjust drafts to the inline item form step", async () => {
     const goTo = vi.fn();
     render(<Harness subType="adjust_out" goTo={goTo} />);

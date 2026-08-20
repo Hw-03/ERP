@@ -4,8 +4,9 @@ import { ClipboardCheck, Save } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
-import type { IoBundle, IoLine, IoSubType, Item } from "./types";
+import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, Item } from "./types";
 import { IoBundleCard } from "./IoBundleCard";
+import { hasUnselectedInternalUseBomMode } from "./internalUseBom";
 
 interface Props {
   bundles: IoBundle[];
@@ -15,6 +16,11 @@ interface Props {
   onToggleLine: (bundleId: string, lineId: string) => void;
   onQuantityChange: (bundleId: string, lineId: string, quantity: number, shortage: number) => void;
   onBundleQuantityChange?: (bundleId: string, quantity: number) => void;
+  onInternalUseBomModeChange?: (
+    bundleId: string,
+    mode: IoInternalUseBomMode,
+  ) => void;
+  internalUseBomBusy?: boolean;
   onRemoveLine: (bundleId: string, lineId: string) => void;
   onRemoveBundle: (bundleId: string) => void;
   onAdvance: () => void;
@@ -39,6 +45,8 @@ export function IoBundleCart({
   onToggleLine,
   onQuantityChange,
   onBundleQuantityChange,
+  onInternalUseBomModeChange,
+  internalUseBomBusy,
   onRemoveLine,
   onRemoveBundle,
   onAdvance,
@@ -52,6 +60,8 @@ export function IoBundleCart({
   pullCount,
 }: Props) {
   const pullSelectedCount = pullSelected?.size ?? 0;
+  const hasMissingInternalUseBomMode =
+    subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);
   const pullButtonLabel =
     pullSelectedCount > 0
       ? `선택한 ${pullSelectedCount}개 가져오기`
@@ -76,7 +86,11 @@ export function IoBundleCart({
         >
           {bundles.map((bundle) => (
             <IoBundleCard
-              key={bundle.bundle_id}
+              key={
+                subType === "internal_use_out" && bundle.source_item_id
+                  ? bundle.source_item_id
+                  : bundle.bundle_id
+              }
               bundle={bundle}
               subType={subType}
               itemMap={itemMap}
@@ -90,6 +104,12 @@ export function IoBundleCart({
                   ? (quantity) => onBundleQuantityChange(bundle.bundle_id, quantity)
                   : undefined
               }
+              onInternalUseBomModeChange={
+                onInternalUseBomModeChange
+                  ? (mode) => onInternalUseBomModeChange(bundle.bundle_id, mode)
+                  : undefined
+              }
+              internalUseBomBusy={internalUseBomBusy}
               onRemoveLine={(lineId) => onRemoveLine(bundle.bundle_id, lineId)}
               onRemoveBundle={() => onRemoveBundle(bundle.bundle_id)}
               pullEnabled={pullEnabled}
@@ -109,10 +129,16 @@ export function IoBundleCart({
               재고가 부족한 항목이 있습니다
             </p>
           )}
+          {!canAdvance && hasMissingInternalUseBomMode && (
+            <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+              각 BOM 묶음의 차감 방식을 선택하세요
+            </p>
+          )}
           {pullEnabled && hasShortage && onPullFromWarehouse && (
             <button
               type="button"
               onClick={onPullFromWarehouse}
+              disabled={internalUseBomBusy}
               className="w-full rounded-[14px] border px-5 py-3 text-sm font-black transition-colors hover:brightness-110"
               style={{
                 background: tint(LEGACY_COLORS.red, 10),
@@ -129,6 +155,7 @@ export function IoBundleCart({
               <button
                 type="button"
                 onClick={onSaveDraft}
+                disabled={internalUseBomBusy}
                 className="flex shrink-0 items-center gap-1.5 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform] active:scale-[0.99]"
                 style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
               >
@@ -138,7 +165,7 @@ export function IoBundleCart({
               <button
                 type="button"
                 onClick={onAdvance}
-                disabled={!canAdvance}
+                disabled={!canAdvance || internalUseBomBusy}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
                 style={{ background: LEGACY_COLORS.blueSolid }}
               >
@@ -150,7 +177,7 @@ export function IoBundleCart({
             <button
               type="button"
               onClick={onAdvance}
-              disabled={!canAdvance}
+              disabled={!canAdvance || internalUseBomBusy}
               className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
               style={{ background: LEGACY_COLORS.blueSolid }}
             >

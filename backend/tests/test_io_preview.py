@@ -16,12 +16,21 @@ from app.services import io_preview as iop
 D = Decimal
 
 
-def _target(item_id, quantity="1", source_kind="direct_item", source_location=None):
+def _target(
+    item_id,
+    quantity="1",
+    source_kind="direct_item",
+    source_location=None,
+    internal_use_bom_mode=None,
+    component_selections=None,
+):
     return SimpleNamespace(
         item_id=item_id,
         quantity=D(quantity),
         source_kind=source_kind,
         source_location=source_location,
+        internal_use_bom_mode=internal_use_bom_mode,
+        component_selections=component_selections or [],
     )
 
 
@@ -109,6 +118,95 @@ def test_preview_internal_use_expands_bom_parent(db_session, make_item, make_bom
             "to_department": "AS",
         }
     ]
+
+
+def test_preview_internal_use_parent_and_children_routes_unselected_child_back_to_department(
+    db_session, make_item, make_bom
+):
+    parent = make_item(name="연구용 조립품", process_type_code="AF", warehouse_qty=D("10"))
+    selected_child = make_item(name="선택 부품", process_type_code="AR", warehouse_qty=D("20"))
+    returned_child = make_item(name="복귀 부품", process_type_code="HF", warehouse_qty=D("20"))
+    make_bom(parent.item_id, selected_child.item_id, D("2"))
+    make_bom(parent.item_id, returned_child.item_id, D("3"))
+    db_session.commit()
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[
+            _target(
+                parent.item_id,
+                "2",
+                source_location="warehouse",
+                internal_use_bom_mode="parent_and_children",
+                component_selections=[
+                    SimpleNamespace(item_id=selected_child.item_id, quantity=D("4"), selected=True),
+                    SimpleNamespace(item_id=returned_child.item_id, quantity=D("6"), selected=False),
+                ],
+            )
+        ],
+        to_department="연구",
+    )
+
+    bundle = result["bundles"][0]
+    assert bundle["internal_use_bom_mode"] == "parent_and_children"
+    assert bundle["source_location"] == "warehouse"
+    parent_line = next(line for line in bundle["lines"] if line["origin"] == "direct")
+    selected_line = next(line for line in bundle["lines"] if line["item_id"] == selected_child.item_id)
+    returned_line = next(line for line in bundle["lines"] if line["item_id"] == returned_child.item_id)
+    assert (parent_line["selected"], parent_line["included"]) == (True, True)
+    assert (
+        parent_line["direction"],
+        parent_line["from_bucket"],
+        parent_line["to_bucket"],
+    ) == ("out", "warehouse", "none")
+    assert (selected_line["selected"], selected_line["included"]) == (True, True)
+    assert (
+        selected_line["direction"],
+        selected_line["from_bucket"],
+        selected_line["to_bucket"],
+    ) == ("out", "warehouse", "none")
+    assert (returned_line["selected"], returned_line["included"]) == (False, True)
+    assert (
+        returned_line["direction"],
+        returned_line["from_bucket"],
+        returned_line["to_bucket"],
+        returned_line["to_department"],
+    ) == ("in", "none", "production", "고압")
+
+
+def test_preview_internal_use_children_only_excludes_unselected_child(
+    db_session, make_item, make_bom
+):
+    parent = make_item(name="하위 전용 조립품", process_type_code="AF")
+    child = make_item(name="제외 부품", process_type_code="AR", warehouse_qty=D("20"))
+    make_bom(parent.item_id, child.item_id, D("2"))
+    db_session.commit()
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[
+            _target(
+                parent.item_id,
+                internal_use_bom_mode="children_only",
+                component_selections=[
+                    SimpleNamespace(item_id=child.item_id, quantity=D("2"), selected=False),
+                ],
+            )
+        ],
+        to_department="AS",
+    )
+
+    bundle = result["bundles"][0]
+    assert bundle["internal_use_bom_mode"] == "children_only"
+    assert all(line["origin"] != "direct" for line in bundle["lines"])
+    child_line = bundle["lines"][0]
+    assert child_line["selected"] is False
+    assert child_line["included"] is False
+    assert child_line["exclusion_note"] == "변동 없음"
 
 
 def test_preview_internal_use_manual_from_code_department(db_session, make_item):

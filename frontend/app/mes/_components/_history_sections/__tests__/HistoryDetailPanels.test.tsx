@@ -486,6 +486,97 @@ describe("desktop history detail panels", () => {
     expect(screen.queryByText("제외된 구성품")).not.toBeInTheDocument();
   });
 
+  it("shows internal-use mode and return effects without treating unchanged lines as exclusions", () => {
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    const batch = makeBatch({
+      work_type: "internal_use",
+      sub_type: "internal_use_out",
+      to_department: "연구",
+    });
+    const parent = {
+      ...batch.bundles[0].lines[0],
+      direction: "out" as const,
+      from_bucket: "warehouse" as const,
+      from_department: null,
+      to_bucket: "none" as const,
+      to_department: null,
+      selected: true,
+    };
+    const returned = {
+      ...batch.bundles[0].lines[1],
+      line_id: "returned-line",
+      item_id: "returned-item",
+      item_name: "재입고 하위",
+      direction: "in" as const,
+      from_bucket: "none" as const,
+      from_department: null,
+      to_bucket: "production" as const,
+      to_department: "가공",
+      selected: false,
+      included: true,
+    };
+    const unchanged = {
+      ...batch.bundles[0].lines[1],
+      line_id: "unchanged-line",
+      item_id: "unchanged-item",
+      item_name: "변동 없는 하위",
+      selected: false,
+      included: false,
+    };
+    batch.bundles[0] = {
+      ...batch.bundles[0],
+      internal_use_bom_mode: "parent_and_children",
+      lines: [parent, returned, unchanged],
+    };
+    const logs = [
+      makeLog({
+        transaction_type: "INTERNAL_USE",
+        operation_batch_id: batch.batch_id,
+        item_id: parent.item_id,
+      }),
+      makeLog({
+        log_id: "return-log",
+        transaction_type: "PRODUCE",
+        operation_batch_id: batch.batch_id,
+        item_id: returned.item_id,
+        item_name: returned.item_name,
+        department: "가공",
+      }),
+    ];
+
+    const { unmount } = render(
+      <HistoryBatchDetailPanel
+        panelOpen
+        batchId={batch.batch_id}
+        logs={logs}
+        batchCache={new Map([[batch.batch_id, batch]])}
+        setBatchCache={() => {}}
+        onBatchCancelled={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("상·하위 차감")).toBeInTheDocument();
+    expect(screen.getByText("재입고 하위")).toBeInTheDocument();
+    expect(screen.getByText("변동 없는 하위")).toBeInTheDocument();
+    expect(screen.getByText("소속 부서 재입고")).toBeInTheDocument();
+    expect(screen.getByText("변동 없음")).toBeInTheDocument();
+    expect(screen.queryByText("목록 외")).not.toBeInTheDocument();
+
+    unmount();
+    render(
+      <HistoryBatchDetailPanel
+        panelOpen
+        batchId={batch.batch_id}
+        logs={logs}
+        batchCache={new Map([[batch.batch_id, batch]])}
+        setBatchCache={() => {}}
+        onBatchCancelled={() => {}}
+        variant="desktop"
+      />,
+    );
+    expect(screen.queryByText("제외 1개")).not.toBeInTheDocument();
+  });
+
   it("does not render a memo card for a rework child system note", () => {
     const { container } = render(<HistoryDetailMemo notes="[rework:scrap_child]" />);
 

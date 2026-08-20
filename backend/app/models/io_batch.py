@@ -101,6 +101,8 @@ class IoBundle(Base):
     title_snapshot = Column(String(220), nullable=False)
     quantity = Column(IntQuantity, nullable=False)
     expanded_level = Column(Integer, nullable=False, default=1)
+    internal_use_bom_mode = Column(String(32), nullable=True)
+    source_location = Column(String(20), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
 
     batch = relationship("IoBatch", back_populates="bundles")
@@ -144,6 +146,7 @@ class IoLine(Base):
     bom_stock_exempt = Column(Boolean, nullable=False, default=False, server_default="0")
     bom_auto_token = Column(String(64), nullable=True)
     included = Column(Boolean, nullable=False, default=True)
+    selected = Column(Boolean, nullable=False, default=True, server_default="1")
     origin = Column(String(24), nullable=False)
     edited = Column(Boolean, nullable=False, default=False)
     has_children_snapshot = Column(Boolean, nullable=False, default=False)

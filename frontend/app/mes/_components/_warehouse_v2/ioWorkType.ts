@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IoBundle, IoEntryIntent, IoLine, IoSourceKind, IoSubType, IoWorkType } from "./types";
+import { lineSelected } from "./internalUseBom";
 import {
   SUB_TYPE_DESCRIPTION,
   SUB_TYPE_LABEL,
@@ -324,7 +325,15 @@ export type LineTagTone = "green" | "red" | "blue" | "purple" | "muted";
 // 라인의 sub_type/origin/direction 조합으로 현장 친화 태그 결정.
 // IoLineRow / IoBundleCard 표시용.
 export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; tone: LineTagTone } {
-  if (subType === "internal_use_out") return { text: "사용출고", tone: "red" };
+  if (subType === "internal_use_out") {
+    if (line.bom_stock_exempt) return { text: "재고 미반영", tone: "purple" };
+    if (!lineSelected(line)) {
+      return line.included && line.direction === "in"
+        ? { text: "소속 부서 재입고", tone: "green" }
+        : { text: "변동 없음", tone: "muted" };
+    }
+    return { text: "출고", tone: "red" };
+  }
   if (subType === "adjust_in" && (line.origin === "direct" || line.origin === "manual")) {
     return { text: "단품 입고", tone: "muted" };
   }

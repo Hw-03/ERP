@@ -597,7 +597,7 @@ describe("internal_use_out 흐름", () => {
     expect(pickerDirectionLabel("internal_use_out")).toBe("사용출고");
     expect(getItemActionMode("internal_use_out")).toBe("bom_or_single");
     expect(lineTagLabel(makeLine({ origin: "direct" }), "internal_use_out")).toEqual({
-      text: "사용출고",
+      text: "출고",
       tone: "red",
     });
   });
@@ -681,6 +681,31 @@ describe("useIoWorkState setWorkType", () => {
     act(() => result.current.setToDepartment("AS"));
     act(() => result.current.setWorkType("process"));
     expect(result.current.toDepartment).toBe("조립");
+  });
+
+  it("internal_use BOM은 차감 방식 선택 전 Step 4 진행을 차단한다", () => {
+    const { result } = renderHook(() => useIoWorkState(undefined, "연구"));
+    act(() => {
+      result.current.setWorkType("internal_use");
+      result.current.setToDepartment("연구");
+      result.current.setBundles([
+        makeBundle({
+          source_kind: "bom_parent",
+          source_item_id: "parent-item",
+          internal_use_bom_mode: null,
+          source_location: "warehouse",
+          lines: [makeLine({ direction: "out", from_bucket: "warehouse" })],
+        }),
+      ]);
+    });
+    expect(result.current.canAdvance[4]).toBe(false);
+
+    act(() => {
+      result.current.setBundles((prev) =>
+        prev.map((bundle) => ({ ...bundle, internal_use_bom_mode: "children_only" })),
+      );
+    });
+    expect(result.current.canAdvance[4]).toBe(true);
   });
 
   it("각 workType → DEFAULT_SUB_TYPE 매칭", () => {

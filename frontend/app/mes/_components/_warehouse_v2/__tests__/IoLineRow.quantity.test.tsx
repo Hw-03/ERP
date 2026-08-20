@@ -143,6 +143,25 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByRole("button", { name: "-1" })).toHaveClass("min-h-[44px]");
   });
 
+  it("uses included for non-internal-use checkbox state even when the server sends selected", () => {
+    render(
+      <IoLineRow
+        line={makeLine({ included: false, selected: true })}
+        subType="warehouse_to_dept"
+        isChild={false}
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "재고 반영 변경" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
   it("aligns stock and remove controls to the BOM header desktop columns", () => {
     render(
       <IoLineRow
@@ -247,6 +266,68 @@ describe("IoLineRow quantity", () => {
       "data-tap-to-expand-name",
       "true",
     );
+  });
+
+  it("연구 사용출고 상태는 배지만 남기고 같은 보조 문구를 반복하지 않는다", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          selected: false,
+          direction: "in",
+          from_bucket: "none",
+          to_bucket: "production",
+          to_department: "조립",
+          included: true,
+        })}
+        subType="internal_use_out"
+        isChild
+        available={0}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getAllByText("소속 부서 재입고")).toHaveLength(1);
+  });
+
+  it("연구 사용출고 재고 미반영 행의 추가 설명은 유지한다", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "production",
+          quantity: 2,
+          origin: "bom_auto",
+          bom_stock_exempt: true,
+          included: false,
+        })}
+        subType="internal_use_out"
+        isChild
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("BOM 자동 처리 시 재고 미반영")).toBeInTheDocument();
+  });
+
+  it("연구 사용출고가 아닌 행의 기존 보조 문구는 유지한다", () => {
+    render(
+      <IoLineRow
+        line={makeLine()}
+        subType="receive_supplier"
+        isChild={false}
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("재고 반영 포함")).toBeInTheDocument();
   });
 
   it("locks an exempt automatic BOM child and shows its no-stock-effect state", () => {

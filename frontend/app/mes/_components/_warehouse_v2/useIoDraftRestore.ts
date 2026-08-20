@@ -8,12 +8,39 @@
  * 공유되므로 IoComposeView 가 소유하고 주입한다.
  */
 import { useEffect, type MutableRefObject } from "react";
-import type { IoBatch } from "@/lib/api";
+import type { IoBatch, IoBundle } from "@/lib/api";
 import { deptIoDirectionOf } from "./ioWorkType";
 import type { useIoWorkState } from "./useIoWorkState";
 import type { IoStep } from "./useIoWorkState";
 
 type IoWorkStateApi = ReturnType<typeof useIoWorkState>;
+
+export function restoreInternalUseBundles(batch: IoBatch): IoBundle[] {
+  if (
+    batch.work_type !== "internal_use" ||
+    batch.sub_type !== "internal_use_out"
+  ) {
+    return batch.bundles;
+  }
+  return batch.bundles.map((bundle) => ({
+    ...bundle,
+    internal_use_bom_mode:
+      bundle.source_kind === "bom_parent" &&
+      bundle.internal_use_bom_mode === undefined
+        ? "children_only"
+        : bundle.internal_use_bom_mode,
+    source_location:
+      bundle.source_location ??
+      (bundle.lines.some((line) => line.from_bucket === "production")
+        ? "department"
+        : "warehouse"),
+    lines: bundle.lines.map((line) => ({
+      ...line,
+      selected:
+        line.selected ?? (line.bom_stock_exempt ? false : line.included),
+    })),
+  }));
+}
 
 export function useIoDraftRestore(params: {
   draftToRestore: IoBatch | null | undefined;
@@ -64,7 +91,7 @@ export function useIoDraftRestore(params: {
     state.setToDepartment(draftToRestore.to_department || state.toDepartment);
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
-    state.setBundles(draftToRestore.bundles);
+    state.setBundles(restoreInternalUseBundles(draftToRestore));
     state.goTo(
       restoreStep
         ?? (draftToRestore.sub_type === "adjust_in"

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBundle, IoSubType, IoWorkType } from "@/lib/api";
 import { IoConfirmStep } from "../IoConfirmStep";
@@ -254,6 +254,96 @@ describe("IoConfirmStep", () => {
 
     expect(screen.getByLabelText("차감 위치: 고압")).toHaveClass("flex-col", "gap-0.5");
     expect(screen.getByLabelText("차감 위치: 튜브")).toHaveClass("flex-col", "gap-0.5");
+  });
+
+  it("internal-use BOM 최종 확인에 차감 방식과 출고·재입고·변동 없음을 모두 표시한다", () => {
+    const outbound = {
+      ...childLine,
+      selected: true,
+      direction: "out" as const,
+      from_bucket: "warehouse" as const,
+      from_department: null,
+      to_bucket: "none" as const,
+      to_department: "연구",
+    };
+    const returned = {
+      ...childLine,
+      line_id: "returned-child",
+      item_id: "returned-item",
+      item_name: "재입고 하위품",
+      selected: false,
+      direction: "in" as const,
+      from_bucket: "none" as const,
+      from_department: null,
+      to_bucket: "production" as const,
+      to_department: "고압",
+      included: true,
+      exclusion_note: "소속 부서 재입고",
+    };
+    const unchanged = {
+      ...childLine,
+      line_id: "unchanged-child",
+      item_id: "unchanged-item",
+      item_name: "변동 없는 하위품",
+      selected: false,
+      direction: "out" as const,
+      from_bucket: "warehouse" as const,
+      from_department: null,
+      to_bucket: "none" as const,
+      to_department: "연구",
+      included: false,
+      exclusion_note: "변동 없음",
+    };
+    const childrenOnlyOutbound = {
+      ...outbound,
+      line_id: "children-only-outbound",
+      item_id: "children-only-outbound-item",
+      item_name: "하위만 출고품",
+    };
+
+    render(
+      <IoConfirmStep
+        workType="internal_use"
+        subType="internal_use_out"
+        bundles={[
+          {
+            ...bundle,
+            internal_use_bom_mode: "parent_and_children",
+            source_location: "warehouse",
+            lines: [parentLine, outbound, returned],
+          },
+          {
+            ...bundle,
+            bundle_id: "children-only-bundle",
+            title: "하위만 묶음",
+            internal_use_bom_mode: "children_only",
+            source_location: "warehouse",
+            lines: [childrenOnlyOutbound, unchanged],
+          },
+        ]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="warehouse"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("상·하위 차감")).toBeInTheDocument();
+    expect(screen.getByText("하위만 차감")).toBeInTheDocument();
+    const childrenOnlyBundle = screen.getByRole("button", { name: /하위만 묶음/ });
+    expect(within(childrenOnlyBundle).queryByText("-1")).not.toBeInTheDocument();
+    expect(within(childrenOnlyBundle).getByText(/상위 변동 없음/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ }));
+    fireEvent.click(childrenOnlyBundle);
+    expect(screen.getAllByText("출고")).toHaveLength(2);
+    expect(screen.getByText("소속 부서 재입고")).toBeInTheDocument();
+    expect(screen.getByText("변동 없음")).toBeInTheDocument();
+    expect(screen.getAllByText("위치별 결재 요청")).toHaveLength(2);
   });
 
   it("uses a full-width row button to expand confirmation bundles", () => {

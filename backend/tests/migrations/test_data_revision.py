@@ -20,7 +20,7 @@ from bootstrap.legacy_profiles import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260818_0022"
+HEAD_REVISION = "20260820_0023"
 
 
 def _config(url: str, *, output_buffer: io.StringIO | None = None) -> Config:

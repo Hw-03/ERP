@@ -27,6 +27,11 @@ import {
   deductionSourceSummary,
   IoDeductionSourceBadge,
 } from "./IoDeductionSourceBadge";
+import {
+  hasUnselectedInternalUseBomMode,
+  internalUseLineEffectLabel,
+  INTERNAL_USE_BOM_MODE_LABEL,
+} from "./internalUseBom";
 
 interface Props {
   workType: IoWorkType;
@@ -188,7 +193,10 @@ export function IoConfirmStep({
   const internalUseHasWarehouse = subType === "internal_use_out" &&
     includedLines.some((line) => line.from_bucket === "warehouse");
   const internalUseHasDepartment = subType === "internal_use_out" &&
-    includedLines.some((line) => line.from_bucket === "production");
+    includedLines.some((line) =>
+      line.from_bucket === "production" ||
+      (line.direction === "in" && line.to_bucket === "production"),
+    );
   const meta = internalUseHasWarehouse && internalUseHasDepartment
     ? MIXED_SOURCE_APPROVAL_META
     : internalUseHasDepartment
@@ -209,13 +217,17 @@ export function IoConfirmStep({
     ? `${headerLabel} · 반영 ${visibleIncludedLines.length}건`
     : `${headerLabel} · BOM · 반영 ${visibleIncludedLines.length}건`;
   const displayBundles = bundles.filter((b) =>
-    b.lines.some((l) => l.included && !bomParentLineIds.has(l.line_id)),
+    subType === "internal_use_out" && b.source_kind === "bom_parent"
+      ? b.lines.some((line) => !bomParentLineIds.has(line.line_id))
+      : b.lines.some((line) => line.included && !bomParentLineIds.has(line.line_id)),
   );
   const memoRequired = requiresMemoForDepartmentSingleAdjustment(workType, subType);
   const memoMissing = memoRequired && !notes.trim();
+  const missingInternalUseBomMode =
+    subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);
 
   const submitDisabled =
-    submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity || memoMissing;
+    submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity || memoMissing || missingInternalUseBomMode;
   const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
   const blockerText = hasShortage
@@ -224,6 +236,8 @@ export function IoConfirmStep({
     ? "0 이하 수량 라인이 있어 제출할 수 없습니다."
     : includedLines.length === 0
     ? "체크된 라인이 없어 제출할 수 없습니다."
+    : missingInternalUseBomMode
+    ? "차감 방식을 선택하지 않은 BOM 묶음이 있습니다. Step 4에서 방식을 선택하세요."
     : null;
 
   return (
@@ -425,18 +439,26 @@ function ConfirmBundleCard({
       ? bundle.lines.find((line) => line.origin === "direct")
       : undefined;
   const visibleLines = bundle.lines.filter(
-    (line) => line.included && !bomParentLineIds.has(line.line_id),
+    (line) =>
+      !bomParentLineIds.has(line.line_id) &&
+      (showDeductionSource ? line.origin === "bom_auto" : line.included),
   );
   const isSingle = bundle.source_kind === "direct_item";
   const isCollapsible = !isSingle && visibleLines.length > 0;
 
   const tone = LEGACY_COLORS.blue;
+  const childrenOnlyBom =
+    showDeductionSource &&
+    bundle.source_kind === "bom_parent" &&
+    bundle.internal_use_bom_mode === "children_only";
   // 헤더 우측 sign + 수량 결정용 대표 라인:
   //   BOM   → 부모 라인 (생산 결과품 등)
+  //   하위만 차감 BOM → 상위 변동이 없으므로 수량을 표시하지 않음
   //   단품  → 그 자체 단일 included 라인
   //   패키지 → 첫 included 라인
-  const headerLine =
-    directParentLine ?? bundle.lines.find((line) => line.included) ?? null;
+  const headerLine = childrenOnlyBom
+    ? null
+    : directParentLine ?? bundle.lines.find((line) => line.included) ?? null;
   const headerDir = headerLine
     ? signFor(headerLine)
     : { sign: null as null, color: LEGACY_COLORS.muted2 };
@@ -525,9 +547,23 @@ function ConfirmBundleCard({
           className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          <span>반영 {visibleLines.length}개</span>
+          {showDeductionSource && bundle.internal_use_bom_mode && (
+            <span
+              className="rounded-full px-2.5 py-1 text-xs font-black"
+              style={{
+                background: tint(LEGACY_COLORS.blue, 14),
+                color: LEGACY_COLORS.blue,
+              }}
+            >
+              {INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]}
+            </span>
+          )}
+          <span>반영 {visibleLines.filter((line) => line.included).length}개</span>
           <span>·</span>
-          <span>BOM 자동 전개 · 상위 1 + 하위 {visibleLines.length}</span>
+          <span>
+            BOM 자동 전개 · {bundle.internal_use_bom_mode === "children_only" ? "상위 변동 없음 · " : ""}
+            하위 {visibleLines.length}
+          </span>
         </div>
       )}
 
@@ -543,6 +579,7 @@ function ConfirmBundleCard({
               line={line}
               isChild={line.origin === "bom_auto" || line.origin === "package_auto"}
               showDeductionSource={showDeductionSource}
+              showInternalUseEffect={showDeductionSource}
             />
           ))}
         </ul>
@@ -555,12 +592,19 @@ function ConfirmLineRow({
   line,
   isChild,
   showDeductionSource,
+  showInternalUseEffect,
 }: {
   line: IoLine;
   isChild: boolean;
   showDeductionSource: boolean;
+  showInternalUseEffect: boolean;
 }) {
-  const dir = signFor(line);
+  const effectLabel = showInternalUseEffect
+    ? internalUseLineEffectLabel(line)
+    : null;
+  const dir = showInternalUseEffect && !line.included
+    ? { sign: null as null, color: LEGACY_COLORS.muted2 }
+    : signFor(line);
   return (
     <li
       className="flex min-h-[64px] items-center justify-between gap-4 px-5 py-3"
@@ -578,6 +622,27 @@ function ConfirmLineRow({
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           <span>{line.mes_code ?? "-"}</span>
+          {effectLabel && (
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-black"
+              style={{
+                background:
+                  effectLabel === "소속 부서 재입고"
+                    ? tint(LEGACY_COLORS.green, 14)
+                    : effectLabel === "출고"
+                      ? tint(LEGACY_COLORS.red, 14)
+                      : tint(LEGACY_COLORS.muted2, 14),
+                color:
+                  effectLabel === "소속 부서 재입고"
+                    ? LEGACY_COLORS.green
+                    : effectLabel === "출고"
+                      ? LEGACY_COLORS.red
+                      : LEGACY_COLORS.muted2,
+              }}
+            >
+              {effectLabel}
+            </span>
+          )}
           {!showDeductionSource && (line.from_department || line.to_department) && (
             <span>
               · {line.from_department ?? "-"}
@@ -587,7 +652,8 @@ function ConfirmLineRow({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-3">
-        {showDeductionSource && (
+        {showDeductionSource &&
+          (line.from_bucket === "warehouse" || line.from_bucket === "production") && (
           <IoDeductionSourceBadge
             sourceName={deductionSourceName(line)}
             variant="field"

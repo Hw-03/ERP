@@ -3740,6 +3740,21 @@
             "title": "Expanded Level",
             "type": "integer"
           },
+          "internal_use_bom_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "parent_and_children",
+                  "children_only"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Use Bom Mode"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/IoLinePayload"
@@ -3767,6 +3782,21 @@
             "title": "Source Kind",
             "type": "string"
           },
+          "source_location": {
+            "anyOf": [
+              {
+                "enum": [
+                  "warehouse",
+                  "department"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Location"
+          },
           "source_mes_code": {
             "anyOf": [
               {
@@ -3790,6 +3820,31 @@
           "quantity"
         ],
         "title": "IoBundlePayload",
+        "type": "object"
+      },
+      "IoComponentSelection": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "selected": {
+            "default": true,
+            "title": "Selected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "item_id",
+          "quantity"
+        ],
+        "title": "IoComponentSelection",
         "type": "object"
       },
       "IoDraftUpsert": {
@@ -4000,6 +4055,11 @@
             "title": "Quantity",
             "type": "integer"
           },
+          "selected": {
+            "default": true,
+            "title": "Selected",
+            "type": "boolean"
+          },
           "shortage": {
             "default": 0,
             "title": "Shortage",
@@ -4133,6 +4193,28 @@
       },
       "IoPreviewTarget": {
         "properties": {
+          "component_selections": {
+            "items": {
+              "$ref": "#/components/schemas/IoComponentSelection"
+            },
+            "title": "Component Selections",
+            "type": "array"
+          },
+          "internal_use_bom_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "parent_and_children",
+                  "children_only"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Use Bom Mode"
+          },
           "item_id": {
             "anyOf": [
               {
@@ -4224,6 +4306,14 @@
               }
             ],
             "title": "From Department"
+          },
+          "operation_line_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Operation Line Ids",
+            "type": "array"
           },
           "request_code": {
             "anyOf": [
@@ -8834,6 +8924,17 @@
       },
       "StockRequestResponse": {
         "properties": {
+          "approval_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Department"
+          },
           "approved_at": {
             "anyOf": [
               {

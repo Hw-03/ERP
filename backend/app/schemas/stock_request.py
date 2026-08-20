@@ -83,6 +83,7 @@ class StockRequestResponse(BaseModel):
     requester_employee_id: uuid.UUID
     requester_name: str
     requester_department: str
+    approval_department: Optional[str] = None
     request_type: StockRequestTypeEnum
     status: StockRequestStatusEnum
     requires_warehouse_approval: bool

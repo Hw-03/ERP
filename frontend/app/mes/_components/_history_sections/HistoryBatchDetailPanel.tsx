@@ -12,12 +12,16 @@ import { transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import {
+  INTERNAL_USE_BOM_MODE_LABEL,
+} from "../_warehouse_v2/internalUseBom";
+import {
   describeBatchFlow,
   getBatchFlowEndpoints,
   getHistoryActor,
   getHistoryBomParentLine,
   getHistoryDisplayLabel,
   getHistoryDisplayTransactionType,
+  getInternalUseHistoryLineEffectLabel,
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
   getHistoryMovementSummary,
@@ -26,6 +30,7 @@ import {
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import {
   FlowBadge,
+  InternalUseEffectBadge,
   MovementSummaryCell,
 } from "./historyTableHelpers";
 import { HistoryDetailMemo } from "./HistoryDetailPanel";
@@ -178,7 +183,7 @@ export function HistoryBatchDetailPanel({
   const summary = cancellationScope.status === "ready"
     ? buildHistoryDetailSummary(cancellationScope.logs, batch)
     : { ...visibleSummary, impactGroups: [] };
-  const excludedLineCount = batch
+  const excludedLineCount = batch && batch.sub_type !== "internal_use_out"
     ? batch.bundles.reduce((count, bundle) => {
       const parent = getHistoryBomParentLine(bundle);
       return count + bundle.lines.filter((line) => line !== parent && !line.included).length;
@@ -506,6 +511,7 @@ function BundleBlock({
   framed?: boolean;
 }) {
   const isBomParent = bundle.source_kind === "bom_parent";
+  const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
   const parentLine = getHistoryBomParentLine(bundle);
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
   const headerSigned = parentLine ? getHistoryLineSignedQuantity(parentLine, batch, bundle) : null;
@@ -547,6 +553,17 @@ function BundleBlock({
           {isBomParent ? <GitBranch className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
           {isBomParent ? "BOM" : "단품"}
         </span>
+        {isInternalUseBom && bundle.internal_use_bom_mode && (
+          <span
+            className="inline-flex shrink-0 items-center rounded-full px-2 py-1 text-[10px] font-bold"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
+              color: LEGACY_COLORS.blue,
+            }}
+          >
+            {INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <TruncatedText className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
             {bundle.title}
@@ -558,10 +575,13 @@ function BundleBlock({
       </div>
 
       <div>
-        {childLines.filter((line) => line.included).map((line) => {
+        {childLines.filter((line) => isInternalUseBom || line.included).map((line) => {
           const clickable = isLineClickable(line);
           const signed = getHistoryLineSignedQuantity(line, batch, bundle);
           const qtyColor = SIGN_TONE_HEX[signed.tone];
+          const internalUseEffect = isInternalUseBom
+            ? getInternalUseHistoryLineEffectLabel(line, batch)
+            : null;
           return (
             <button
               key={line.line_id}
@@ -588,8 +608,13 @@ function BundleBlock({
               <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: qtyColor }}>
                 {signed.label}
               </span>
-              <LineStatusBadge included={line.included} shortage={line.shortage} />
-              {!clickable && (
+              {internalUseEffect
+                ? <InternalUseEffectBadge label={internalUseEffect} />
+                : <LineStatusBadge included={line.included} shortage={line.shortage} />}
+              {internalUseEffect && line.shortage > 0 && (
+                <LineStatusBadge included shortage={line.shortage} />
+              )}
+              {!clickable && (!isInternalUseBom || line.included) && (
                 <span
                   className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                   style={{

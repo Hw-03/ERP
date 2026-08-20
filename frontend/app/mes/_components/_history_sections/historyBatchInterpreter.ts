@@ -5,7 +5,7 @@
  * 소비자는 historyShared 재export 또는 직접 import.
  */
 import type { Department, TransactionType } from "@/lib/api/types/shared";
-import type { IoBatch, IoBundle } from "@/lib/api/types/io";
+import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
 import {
   SUB_TYPE_LABEL as _SUB_LABEL,
@@ -75,10 +75,88 @@ function _internalUseDestination(department: string | null): string {
 }
 
 function _internalUseOperationLabel(
-  log: { department?: string | null },
+  log: { transaction_type: string; department?: string | null; item_id?: string | null },
   batch?: IoBatch | null,
 ): string {
+  const returnLine = _internalUseReturnLine(log, batch);
+  if (returnLine) {
+    const department = _deptName(returnLine.to_department) ?? log.department?.trim() ?? null;
+    return `${_internalUseDestination(department)} 재입고`;
+  }
   return `${_internalUseDestination(_internalUseDepartment(log, batch))} 반출`;
+}
+
+function _internalUseLineForLog(
+  log: { transaction_type: string; item_id?: string | null },
+  batch?: IoBatch | null,
+): IoLine | null {
+  if (batch?.sub_type !== "internal_use_out" || !log.item_id) return null;
+  const matches = batch.bundles.flatMap((bundle) =>
+    bundle.lines.filter((line) => line.included && line.item_id === log.item_id),
+  );
+  if (matches.length === 0) return null;
+  const expectedDirection = log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE"
+    ? "in"
+    : log.transaction_type === "INTERNAL_USE" || log.transaction_type === "BACKFLUSH"
+      ? "out"
+      : null;
+  return matches.find((line) => expectedDirection == null || line.direction === expectedDirection)
+    ?? matches[0];
+}
+
+function _internalUseReturnLine(
+  log: { transaction_type: string; item_id?: string | null },
+  batch?: IoBatch | null,
+): IoLine | null {
+  const line = _internalUseLineForLog(log, batch);
+  return line?.direction === "in"
+    && line.from_bucket === "none"
+    && line.to_bucket === "production"
+    ? line
+    : null;
+}
+
+export type InternalUseHistoryLineResolution =
+  | "applied"
+  | "pending"
+  | "rejected"
+  | "none";
+
+export function getInternalUseHistoryLineResolution(
+  line: IoLine,
+  batch?: IoBatch | null,
+): InternalUseHistoryLineResolution {
+  if (!line.included) return "none";
+  const request = batch?.stock_requests?.find((candidate) =>
+    candidate.operation_line_ids?.includes(line.line_id),
+  );
+  // 과거 배치는 요청별 라인 연결이 없으므로 기존 완료 이력 표시를 유지한다.
+  if (!request) return "applied";
+  const status = request.status.toUpperCase();
+  if (status === "COMPLETED") return "applied";
+  if (status === "RESERVED" || status === "SUBMITTED") return "pending";
+  return "rejected";
+}
+
+export function getInternalUseHistoryLineEffectLabel(
+  line: IoLine,
+  batch?: IoBatch | null,
+): string {
+  if (line.bom_stock_exempt) return "재고 미반영";
+  if (!line.included) return "변동 없음";
+  const isReturn =
+    !(line.selected ?? line.included) &&
+    line.direction === "in" &&
+    line.from_bucket === "none" &&
+    line.to_bucket === "production";
+  const resolution = getInternalUseHistoryLineResolution(line, batch);
+  if (resolution === "pending") {
+    return isReturn ? "재입고 승인 대기" : "출고 승인 대기";
+  }
+  if (resolution === "rejected") {
+    return isReturn ? "재입고 반려/미반영" : "출고 반려/미반영";
+  }
+  return isReturn ? "소속 부서 재입고" : "출고";
 }
 
 export function getHistoryDisplayTransactionType(
@@ -372,7 +450,7 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
 
 /** 작업 의도 라벨. batch.sub_type 우선, 없으면 transaction_type 기반. */
 export function getHistoryOperationLabel(
-  log: { transaction_type: string; department?: string | null },
+  log: { transaction_type: string; department?: string | null; item_id?: string | null },
   batch?: IoBatch | null,
 ): string {
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
@@ -412,7 +490,7 @@ export function getHistoryWorkTypeLabel(workType: string): string {
 
 /** 화면 정본 메인 라벨. 의도 우선. 모든 row/패널이 같은 정책으로 보이도록. */
 export function getHistoryDisplayLabel(
-  log: { transaction_type: string; department?: string | null },
+  log: { transaction_type: string; department?: string | null; item_id?: string | null },
   batch?: IoBatch | null,
 ): string {
   return getHistoryOperationLabel(log, batch);
@@ -420,9 +498,12 @@ export function getHistoryDisplayLabel(
 
 /** 화면 정본 보조문구. 의미문구 우선, 없고 단일 명확한 흐름이면 "{from} → {to}". */
 export function getHistoryDisplaySubLabel(
-  log: { transaction_type: string; department?: string | null },
+  log: { transaction_type: string; department?: string | null; item_id?: string | null },
   batch?: IoBatch | null,
 ): string | undefined {
+  if (_internalUseReturnLine(log, batch)) {
+    return "선택 해제 자재를 소속 부서에 재입고";
+  }
   if (batch?.sub_type) {
     const fromSub = _DISPLAY_SUB_LABEL[_historySubType(batch)];
     if (fromSub) return fromSub;
@@ -438,11 +519,16 @@ export function getHistoryDisplaySubLabel(
 
 /** 작업 흐름 라벨. batch 있고 명확하면 부서/창고/불량/생산 등으로, 그 외 거래 타입 추론. */
 export function getHistoryFlowLabel(
-  log: { transaction_type: string; department?: string | null },
+  log: { transaction_type: string; department?: string | null; item_id?: string | null },
   batch?: IoBatch | null,
 ): string {
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
   if (batchContext) return batchContext;
+  const returnLine = _internalUseReturnLine(log, batch);
+  if (returnLine) {
+    const department = _deptName(returnLine.to_department) ?? log.department?.trim() ?? null;
+    return `사용출고 해제 → ${_internalUseDestination(department)}`;
+  }
   if (batch?.sub_type === "internal_use_out" || log.transaction_type === "INTERNAL_USE") {
     return `창고 → ${_internalUseDestination(_internalUseDepartment(log, batch))}`;
   }
@@ -594,6 +680,8 @@ function _signed(sign: "+" | "-", qty: string, unit?: string | null): string {
 export function getHistoryLineSignedQuantity(
   line: {
     included: boolean;
+    selected?: boolean;
+    bom_stock_exempt?: boolean;
     origin: string;
     direction: string;
     quantity: number | string;
@@ -636,9 +724,12 @@ export function getHistoryLineSignedQuantity(
       break;
     case "receive_supplier": setIncrease(); break;
     case "supplier_return":
-    case "internal_use_out":
     case "defect_quarantine":
     case "adjust_out": setDecrease(); break;
+    case "internal_use_out":
+      if (line.direction === "in") setIncrease();
+      else setDecrease();
+      break;
     case "warehouse_adjust_out": setDecrease(); break;
     case "adjust_in":
     case "warehouse_adjust_in": setIncrease(); break;
@@ -662,8 +753,14 @@ export function getHistoryLineSignedQuantity(
     }
   }
 
-  // 3) 제외 라인은 색만 약하게 (label 형식 유지).
-  if (!line.included) tone = "muted";
+  // 3) 사용출고에서 거래가 생성되지 않은 라인은 감소처럼 보이지 않게 중립 표시한다.
+  if (sub === "internal_use_out" && !line.included) {
+    sign = "";
+    label = _withUnit(qty, unit);
+    tone = "muted";
+  } else if (!line.included) {
+    tone = "muted";
+  }
 
   return { sign, label, tone, isApplied: line.included };
 }
@@ -760,7 +857,23 @@ export function getHistoryMovementSummary(
   const tx = getHistoryDisplayTransactionType(log, batch);
   const parts: MovementSummaryPart[] = [];
 
-  if (sub === "produce" || tx === "PRODUCE" || sub === "disassemble" || tx === "DISASSEMBLE") {
+  if (sub === "internal_use_out" || tx === "INTERNAL_USE") {
+    const applied = included.filter(
+      (line) => getInternalUseHistoryLineResolution(line, batch) === "applied",
+    );
+    const pending = included.filter(
+      (line) => getInternalUseHistoryLineResolution(line, batch) === "pending",
+    );
+    const rejected = included.filter(
+      (line) => getInternalUseHistoryLineResolution(line, batch) === "rejected",
+    );
+    const outbound = applied.filter((line) => line.direction === "out");
+    const returned = applied.filter((line) => line.direction === "in");
+    if (outbound.length > 0) parts.push(_verbItemPart("출고", "danger", outbound));
+    if (returned.length > 0) parts.push(_verbItemPart("재입고", "success", returned));
+    if (pending.length > 0) parts.push(_verbItemPart("승인 대기", "warning", pending));
+    if (rejected.length > 0) parts.push(_verbItemPart("반려/미반영", "muted", rejected));
+  } else if (sub === "produce" || tx === "PRODUCE" || sub === "disassemble" || tx === "DISASSEMBLE") {
     const isRework = sub === "disassemble" || tx === "DISASSEMBLE";
     let topSum = 0, childSum = 0;
     let topUnit: string | null = null, childUnit: string | null = null;
@@ -810,8 +923,6 @@ export function getHistoryMovementSummary(
     parts.push(_verbItemPart("입고", "success", included));
   } else if (tx === "SHIP") {
     parts.push(_verbItemPart("출고", "danger", included));
-  } else if (sub === "internal_use_out" || tx === "INTERNAL_USE") {
-    parts.push(_verbItemPart("반출", "danger", included));
   } else if (sub === "supplier_return" || tx === "SUPPLIER_RETURN") {
     parts.push({ label: `반품 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "defect_quarantine" || tx === "MARK_DEFECTIVE") {

@@ -117,6 +117,7 @@ def _build_request_and_lines(
     client_request_id: Optional[str] = None,
     requires_warehouse_approval_override: Optional[bool] = None,
     requires_department_approval: bool = False,
+    approval_department: Optional[str] = None,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
 ) -> StockRequest:
@@ -137,6 +138,11 @@ def _build_request_and_lines(
         requester_employee_id=requester.employee_id,
         requester_name=requester.name,
         requester_department=requester.department,
+        approval_department=(
+            approval_department or requester.department
+            if requires_department_approval
+            else None
+        ),
         request_type=request_type,
         status=status,
         requires_warehouse_approval=requires_approval,
@@ -254,6 +260,7 @@ def create_manual_adjustment_request(
     reference_no: Optional[str],
     notes: Optional[str],
     client_request_id: Optional[str] = None,
+    approval_department: Optional[str] = None,
 ) -> StockRequest:
     """낱개(manual/adjust) 라인 전용 부서 결재 요청.
 
@@ -284,10 +291,13 @@ def create_manual_adjustment_request(
         client_request_id=client_request_id,
         requires_warehouse_approval_override=False,
         requires_department_approval=True,
+        approval_department=approval_department,
     )
     # 자가승인: 요청자가 부서 결재 권한자라면 dept_approved 즉시 기록.
     # 실제 batch 실행은 호출자(io.py)가 status 보고 진행.
-    if can_approve_department(requester, request.requester_department):
+    if can_approve_department(
+        requester, request.approval_department or request.requester_department
+    ):
         request.department_approved_by_employee_id = requester.employee_id
         request.department_approved_by_name = requester.name
         request.department_approved_at = now
