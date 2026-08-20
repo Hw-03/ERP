@@ -270,10 +270,12 @@ describe("MobileHistoryScreen history data states", () => {
   it("applies two rapid next-month actions without losing either move", async () => {
     renderScreen();
     fireEvent.click(screen.getByRole("button", { name: "select August" }));
+    const nextMonth = testState.nextMonth;
+    if (!nextMonth) throw new Error("calendar next-month action is not configured");
 
     act(() => {
-      testState.nextMonth();
-      testState.nextMonth();
+      nextMonth();
+      nextMonth();
     });
 
     await waitFor(() => expect(testState.historyArgs.at(-1)).toMatchObject({

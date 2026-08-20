@@ -62,7 +62,8 @@ afterEach(() => {
 
 describe("useHistoryData", () => {
   it("uses the shared selected-month range in the mobile list request", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse([])));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     const client = makeClient();
 

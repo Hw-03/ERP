@@ -298,10 +298,12 @@ describe("DesktopHistoryView history state", () => {
   it("applies two rapid next-month actions without losing either move", async () => {
     render(<DesktopHistoryView />);
     fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));
+    const nextMonth = testState.nextMonth;
+    if (!nextMonth) throw new Error("calendar next-month action is not configured");
 
     act(() => {
-      testState.nextMonth();
-      testState.nextMonth();
+      nextMonth();
+      nextMonth();
     });
 
     await waitFor(() => expect(testState.historyArgs).toMatchObject({

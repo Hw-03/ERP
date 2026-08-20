@@ -207,8 +207,10 @@ describe("CapacityDetailModal 데스크톱 PF 작업공간", () => {
         matches: desktopMatches,
         media: query,
         onchange: null,
-        addEventListener: (_type, listener) => mediaListeners.add(listener as (event: MediaQueryListEvent) => void),
-        removeEventListener: (_type, listener) => mediaListeners.delete(listener as (event: MediaQueryListEvent) => void),
+        addEventListener: (_type: string, listener: EventListener) =>
+          mediaListeners.add(listener as (event: MediaQueryListEvent) => void),
+        removeEventListener: (_type: string, listener: EventListener) =>
+          mediaListeners.delete(listener as (event: MediaQueryListEvent) => void),
         addListener: vi.fn(),
         removeListener: vi.fn(),
         dispatchEvent: vi.fn(),
