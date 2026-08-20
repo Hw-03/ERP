@@ -204,9 +204,31 @@ scripts\ops\healthcheck.bat
 ### 파일 로그 (Phase 4 추가)
 - 위치: `_attic/runtime/logs/backend/mes.log`
 - 런타임 stdout/stderr 및 상태 파일: `_attic/runtime/logs/backend/`, `_attic/runtime/logs/frontend/`
+- 프런트 개발 서버 종료 원인 추적 로그: `_attic/runtime/logs/frontend/dev-server.log` — `NEXT_SIGNAL_RECEIVED`가 기록되면 `watch-service.ps1 -Service frontend`가 `[FRONTEND ERROR]`로 강조하며, `NEXT_SIGNAL_PROBE_READY`와 `NEXT_PROCESS_EXIT`는 프로세스 수명 연결에 사용한다.
 - 회전: `ConcurrentRotatingFileHandler` 기반 다중 프로세스 안전 회전, 5MiB × 기본 5 backup (`mes.log.1` ~ `mes.log.5`)
 - 환경 변수: `LOG_LEVEL` (기본 INFO), `LOG_BACKUP_COUNT` (1 이상의 정수, 기본 5; 잘못된 값은 기본값 사용), `MES_RUNTIME_ROOT` (전체 런타임 루트 재정의)
 - 내용: 전역 예외 핸들러가 잡은 ValueError/IntegrityError/Exception + INFO 레벨 메시지
+
+### 프런트 개발 서버 종료 원인 추적
+
+프런트 개발 서버가 예기치 않게 종료되면 먼저 `_attic/runtime/logs/frontend/dev-server.log`의 수명 기록을 확인한다. preload는 `NODE_OPTIONS`를 상속받은 일반 Node 자식에는 기록기나 신호 처리기를 붙이지 않고, 정확한 Next CLI 엔트리(`next/dist/bin/next`)와 `NEXT_PRIVATE_WORKER=1`인 Next worker 엔트리(`next/dist/server/lib/start-server.js`)만 기록한다. `NEXT_SIGNAL_RECEIVED`는 해당 Node 프로세스의 JavaScript 런타임이 `SIGINT` 또는 `SIGTERM`을 실제로 받은 신호 증거다. Windows에서 Next private worker가 JavaScript 신호 처리 없이 강제 종료되면 worker의 종료 기록 자체가 남지 않을 수 있다. 이때 조회 도구는 PID와 PPID가 모두 같은 부모 Next CLI 수명 안에서 기록된 worker의 `NEXT_SIGNAL_PROBE_READY`와 CLI의 `NEXT_PROCESS_EXIT`를 연결하여 CLI 종료 시각을 `worker_exit_without_signal` 후보 기준점으로 사용한다. 해당 CLI나 매핑된 worker의 같은 수명 신호 기록이 하나라도 있으면 신호 결과만 표시하고 fallback은 만들지 않는다. fallback의 `cliUptimeMs`는 CLI 종료 시점의 가동 시간이고, `workerReadyUptimeMs`는 worker가 probe를 붙인 시점의 가동 시간이며 worker의 전체 가동 시간이 아니다. Sysmon 수집기를 설치한 뒤에는 저장소 루트에서 다음처럼 추적 도구를 실행한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\get-frontend-stop-attribution.ps1
+```
+
+Sysmon Event 10(Process access)은 종료 시각에 접근한 프로세스를 좁히는 **후보 접근 증거**일 뿐이며, 그 이벤트만으로 종료 신호의 발신자를 확정할 수 없다. 특히 `worker_exit_without_signal`은 신호 없이 사라진 worker와 부모 CLI 종료의 시간 관계를 보완하는 후보 증거이지, worker가 강제 종료되었다거나 Sysmon 발신 프로세스가 종료시켰음을 단독으로 증명하지 않는다. 개발 서버 로그의 신호·종료 시각, 프로세스 수명, Sysmon 후보를 함께 대조한다.
+
+기본 조회 범위는 최근 2시간과 신호 또는 fallback 기준점 시각 전후 5초이며, `-Since`, `-WindowSeconds`(1~60), `-AsJson`을 선택할 수 있다. Sysmon 이벤트는 이벤트 뷰어의 `Applications and Services Logs > Microsoft > Windows > Sysmon > Operational` (`Microsoft-Windows-Sysmon/Operational`)에서 확인한다. 조회 도구는 그중 Event ID 10만 읽으며, 전역 ProcessCreate/발신 명령줄 수집은 사용하지 않는다. Sysmon 자체 서비스·구성 변화(Event ID 4·16)는 필터할 수 없어 채널에 남을 수 있지만, 후보 분석에는 사용하지 않는다.
+
+현재 Windows 11 개발 호스트에는 Microsoft의 **내장 Sysmon**을 사용한다. standalone `Sysmon64.exe` v15.21이 이 호스트에서 `0xC0000409`로 중단되어, Microsoft가 지원하는 내장 기능으로 전환했다. 내장 Sysmon과 standalone Sysmon은 함께 설치할 수 없다.
+
+```powershell
+Enable-WindowsOptionalFeature -Online -FeatureName Sysmon -All -NoRestart
+C:\Windows\System32\sysmon.exe -accepteula -i C:\ERP\scripts\dev\sysmon-dev-frontend.xml
+```
+
+현재 Operational 채널은 관리자만 읽을 수 있으므로, 후보 조회도 관리자 PowerShell에서 실행한다. `scripts/dev/install-sysmon-dev-frontend-monitor.ps1`와 대응 제거 도구는 **standalone 전용** 대안이며 기존 `Sysmon` 또는 `Sysmon64` 서비스가 있으면 의도적으로 중단한다. 현재 내장 Sysmon이 실행 중인 호스트에서는 이 스크립트를 실행하지 않는다.
 
 ### 관리자 감사로그 (Phase 5.2)
 

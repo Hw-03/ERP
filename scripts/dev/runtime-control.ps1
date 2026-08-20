@@ -456,6 +456,7 @@ function Start-ProfileFrontendSupervisor {
         -ChildCommand @("node", "scripts/dev.js") `
         -Environment @{
             MES_RUNTIME_ROOT = $RuntimeRoot
+            MES_RUNTIME_PROFILE = $Profile.Name
             MES_SUPERVISED_FRONTEND = "1"
             MES_FRONTEND_MODE = $frontendMode
             PORT = [string] $Profile.FrontendPort

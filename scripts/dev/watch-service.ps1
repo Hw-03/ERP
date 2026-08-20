@@ -17,6 +17,7 @@ $BackendOut = Join-Path $BackendLogDir "backend-dev.out.log"
 $BackendErr = Join-Path $BackendLogDir "backend-dev.err.log"
 $FrontendOut = Join-Path $FrontendLogDir "frontend-dev.out.log"
 $FrontendErr = Join-Path $FrontendLogDir "frontend-dev.err.log"
+$FrontendDevServerLog = Join-Path $FrontendLogDir "dev-server.log"
 $BackendEvents = Join-Path $BackendLogDir "backend-runtime-events.jsonl"
 $FrontendEvents = Join-Path $FrontendLogDir "frontend-runtime-events.jsonl"
 $SchemaReadinessScript = Join-Path $PSScriptRoot "ensure-schema-ready.ps1"
@@ -86,10 +87,15 @@ function Watch-LogFiles {
         [string] $Title,
         [string[]] $Paths,
         [string[]] $NoisePatterns,
-        [string[]] $ErrorPatterns = @()
+        [string[]] $ErrorPatterns = @(),
+        [switch] $WatchNewPaths
     )
 
     $existingPaths = Wait-LogPaths $Paths
+    $watchedPaths = @{}
+    foreach ($path in $existingPaths) {
+        $watchedPaths[$path] = $true
+    }
     Write-Host "===== $Title ====="
     foreach ($path in $existingPaths) {
         Write-Host "[log] $path"
@@ -104,6 +110,18 @@ function Watch-LogFiles {
     })
     try {
         while ($true) {
+            if ($WatchNewPaths) {
+                foreach ($path in @($Paths | Where-Object {
+                    (Test-Path -LiteralPath $_) -and -not $watchedPaths.ContainsKey($_)
+                })) {
+                    $tailJobs += Start-Job -ArgumentList $path -ScriptBlock {
+                        param([string] $LogPath)
+                        Get-Content -LiteralPath $LogPath -Tail 80 -Wait -ErrorAction SilentlyContinue
+                    }
+                    $watchedPaths[$path] = $true
+                    Write-Host "[log] $path"
+                }
+            }
             foreach ($job in $tailJobs) {
                 foreach ($line in @(Receive-Job -Job $job -ErrorAction SilentlyContinue)) {
                     $text = [string] $line
@@ -129,6 +147,7 @@ $FrontendStderrNoise = @(
 )
 
 $FrontendErrorPatterns = @(
+    "NEXT_SIGNAL_RECEIVED",
     "Failed to compile",
     "Syntax Error",
     "Import trace for requested module",
@@ -152,5 +171,5 @@ if ($Service -eq "backend") {
     Watch-LogFiles "Backend logs" @($BackendOut, $BackendErr, $BackendEvents) @()
 }
 else {
-    Watch-LogFiles "Frontend logs" @($FrontendOut, $FrontendErr, $FrontendEvents) ($FrontendStdoutNoise + $FrontendStderrNoise) $FrontendErrorPatterns
+    Watch-LogFiles "Frontend logs" @($FrontendOut, $FrontendErr, $FrontendEvents, $FrontendDevServerLog) ($FrontendStdoutNoise + $FrontendStderrNoise) $FrontendErrorPatterns -WatchNewPaths
 }
