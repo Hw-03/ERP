@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
+import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Button } from "@/lib/ui/Button";
 import type { WeeklyProductionModelRow } from "@/lib/api/types/weekly";
 import { useWeeklyReportQuery } from "@/lib/queries/useWeeklyQuery";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
@@ -19,6 +22,8 @@ interface Props {
 
 export function DesktopWeeklyReportView({ weekMon }: Props) {
   const [selectedCode, setSelectedCode] = useState("TF");
+  const [f705Downloading, setF705Downloading] = useState(false);
+  const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
 
   const weekStart = toDateStr(weekMon);
   const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * 86400000));
@@ -56,6 +61,45 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
   const activeDepts = data?.groups.filter((g) => g.produce_qty > 0).length ?? 0;
   const totalDepts = data?.groups.length ?? 0;
 
+  async function handleF705Download(): Promise<void> {
+    if (f705Downloading) return;
+    const year = weekMon.getFullYear();
+    setF705Downloading(true);
+    setF705DownloadError(null);
+    try {
+      const blob = await adminApi.downloadF705ProductionLog(year);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `F705-02 (R01) ${year} 생산일지.xlsx`;
+      try {
+        document.body.appendChild(link);
+        link.click();
+      } finally {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (error) {
+      setF705DownloadError(error instanceof Error ? error.message : "생산일지 다운로드에 실패했습니다.");
+    } finally {
+      setF705Downloading(false);
+    }
+  }
+
+  const f705DownloadButton = (
+    <div data-testid="weekly-f705-download-anchor" className="ml-auto lg:absolute lg:right-4 lg:top-2">
+      <Button
+        size="sm"
+        iconLeft={<Download />}
+        loading={f705Downloading}
+        onClick={() => void handleF705Download()}
+        style={{ background: LEGACY_COLORS.greenSolid, color: LEGACY_COLORS.white }}
+      >
+        {f705Downloading ? "생산일지 생성 중..." : "F705-02 생산일지 다운로드"}
+      </Button>
+    </div>
+  );
+
   return (
     <div className="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col gap-3 py-1 pr-1 lg:overflow-hidden">
       {error && (
@@ -83,25 +127,30 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         if (!hasProduction) {
           return (
             <div
-              className="flex shrink-0 items-center justify-between rounded-[12px] border px-4 py-2"
+              data-testid="weekly-production-card"
+              className="relative shrink-0 rounded-[12px] border px-4 py-2"
               style={cardBase}
             >
-              <span
-                className="text-[11px] font-bold tracking-wide"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                생산 현황
-              </span>
-              <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                이번 주 생산 실적 없음 · 모델별 공정 생산 기록이 없습니다.
-              </span>
+              <div className="flex items-center gap-3">
+                <span
+                  className="text-[11px] font-bold tracking-wide"
+                  style={{ color: LEGACY_COLORS.muted2 }}
+                >
+                  생산 현황
+                </span>
+                <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  이번 주 생산 실적 없음 · 모델별 공정 생산 기록이 없습니다.
+                </span>
+                {f705DownloadButton}
+              </div>
+              {f705DownloadError && <p role="alert" className="mt-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>{f705DownloadError}</p>}
             </div>
           );
         }
         return (
-          <div className="shrink-0 rounded-[18px] border py-3 px-4" style={cardBase}>
+          <div data-testid="weekly-production-card" className="relative shrink-0 rounded-[18px] border py-3 px-4" style={cardBase}>
             {/* 헤더: 타이틀 + KPI 배지 */}
-            <div className="mb-2 flex flex-wrap items-center gap-2 lg:flex-nowrap lg:whitespace-nowrap">
+            <div className="mb-2 flex flex-wrap items-center gap-2 lg:flex-nowrap lg:whitespace-nowrap lg:pr-[220px]">
               <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
                 생산 현황
               </h2>
@@ -126,7 +175,9 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
               >
                 생산 부서 {activeDepts}/{totalDepts}
               </span>
+              {f705DownloadButton}
             </div>
+            {f705DownloadError && <p role="alert" className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>{f705DownloadError}</p>}
             <WeeklyProductionMatrix rows={matrixRows} />
           </div>
         );

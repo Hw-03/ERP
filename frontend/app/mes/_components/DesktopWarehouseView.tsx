@@ -88,6 +88,7 @@ export function DesktopWarehouseView({
   const [restoreNonce, setRestoreNonce] = useState(0);
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
   const [itemConversionFocused, setItemConversionFocused] = useState(false);
+  const [workAreaEmpty, setWorkAreaEmpty] = useState(false);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =
@@ -113,7 +114,10 @@ export function DesktopWarehouseView({
   useEffect(() => {
     const handlePopState = () => {
       const next = normalizeSectionTab(new URLSearchParams(window.location.search).get("section"));
-      if (next !== "compose") setItemConversionFocused(false);
+      if (next !== sectionTab) {
+        if (next !== "compose") setItemConversionFocused(false);
+        setWorkAreaEmpty(false);
+      }
       setSectionTab(next);
     };
     window.addEventListener("popstate", handlePopState);
@@ -225,7 +229,10 @@ export function DesktopWarehouseView({
   }
 
   function handleSectionTabChange(next: WarehouseSectionTab) {
-    if (next !== "compose") setItemConversionFocused(false);
+    if (next !== sectionTab) {
+      if (next !== "compose") setItemConversionFocused(false);
+      setWorkAreaEmpty(false);
+    }
     setSectionTab(next);
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -247,12 +254,13 @@ export function DesktopWarehouseView({
   const isComposeSection = sectionTab === "compose";
   const isWorkAreaSection = sectionTab === "cart" || sectionTab === "queue" || sectionTab === "dept-queue";
   const hideSectionTabs = isComposeSection && itemConversionFocused;
+  const removeWorkAreaBottomSpace = isWorkAreaSection && workAreaEmpty;
 
   return (
     <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-x-hidden">
       <div
         data-testid="desktop-warehouse-content"
-        className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-0 ${isComposeSection ? "pb-0" : "pb-10"}`}
+        className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-0 ${isComposeSection || removeWorkAreaBottomSpace ? "pb-0" : "pb-10"}`}
       >
         <WarehouseHeader loadFailure={loadFailure} />
         <div
@@ -312,6 +320,7 @@ export function DesktopWarehouseView({
                 setCartCount(n);
                 if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
               }}
+              onEmptyStateChange={setWorkAreaEmpty}
               onStartCompose={() => handleSectionTabChange("compose")}
             />
           </div>

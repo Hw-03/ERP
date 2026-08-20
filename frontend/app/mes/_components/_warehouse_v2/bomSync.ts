@@ -17,6 +17,12 @@ function isBomStockExempt(line: IoLine): boolean {
   return line.origin === "bom_auto" && Boolean(line.bom_stock_exempt);
 }
 
+/** 출발 재고를 차감하는 라인만 부족 여부를 계산한다. */
+function shortageForQuantity(line: IoLine, quantity: number, available: number | null): number {
+  if (line.from_bucket === "none" || available === null) return 0;
+  return Math.max(0, quantity - available);
+}
+
 /**
  * 라인 체크 토글. 부모(direct) 토글이면 같은 묶음의 활성 bom_auto 자식도 함께 토글.
  * (IoComposeView onToggleLine 의 setBundles updater 원본)
@@ -51,7 +57,7 @@ export function applyToggleLine(
           ...line,
           included: newIncluded,
           shortage: newIncluded
-            ? Math.max(0, line.quantity - (avail ?? line.quantity))
+            ? shortageForQuantity(line, line.quantity, avail)
             : 0,
           exclusion_note: exclusionNoteFor(subType, line.origin, newIncluded),
         };
@@ -118,9 +124,9 @@ export function applyLineQuantityChange(
             const childAvail = getAvailable(line);
             const childIncluded = childQty > 0;
             const childShortage =
-              !childIncluded || childAvail === null
+              !childIncluded
                 ? 0
-                : Math.max(0, childQty - childAvail);
+                : shortageForQuantity(line, childQty, childAvail);
             return {
               ...line,
               quantity: childQty,
@@ -200,9 +206,9 @@ export function applyBundleQuantityChange(
           const childAvail = getAvailable(line);
           const childIncluded = childQty > 0;
           const childShortage =
-            !childIncluded || childAvail === null
+            !childIncluded
               ? 0
-              : Math.max(0, childQty - childAvail);
+              : shortageForQuantity(line, childQty, childAvail);
           return {
             ...line,
             quantity: childQty,

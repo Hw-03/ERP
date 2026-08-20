@@ -32,6 +32,7 @@ export interface WarehouseDraftPanelTabsProps {
   onSubmitSuccess?: () => void;
   resetDraftTracking: () => void;
   onCartCountChange?: (n: number) => void;
+  onEmptyStateChange?: (empty: boolean) => void;
   onStartCompose?: () => void;
   targetRequestId?: string | null;
 }
@@ -53,6 +54,7 @@ export function WarehouseDraftPanelTabs({
   onSubmitSuccess,
   resetDraftTracking,
   onCartCountChange,
+  onEmptyStateChange,
   onStartCompose,
   targetRequestId,
 }: WarehouseDraftPanelTabsProps) {
@@ -75,6 +77,7 @@ export function WarehouseDraftPanelTabs({
           onSubmitSuccess?.();
         }}
         onCountChange={onCartCountChange}
+        onEmptyStateChange={onEmptyStateChange}
         onStartCompose={onStartCompose}
       />
     );
@@ -100,6 +103,7 @@ export function WarehouseDraftPanelTabs({
           targetRequestId={targetRequestId}
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
+        onEmptyStateChange={onEmptyStateChange}
         onChanged={async () => {
           bumpRefresh();
           try {
@@ -135,6 +139,7 @@ export function WarehouseDraftPanelTabs({
           targetRequestId={targetRequestId}
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
+        onEmptyStateChange={onEmptyStateChange}
         onChanged={async () => {
           bumpRefresh();
           try {

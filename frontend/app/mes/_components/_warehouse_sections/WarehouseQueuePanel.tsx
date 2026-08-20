@@ -16,9 +16,10 @@ interface Props {
   approverEmployeeId: string;
   refreshNonce: number;
   onChanged: () => void;
+  onEmptyStateChange?: (empty: boolean) => void;
 }
 
-export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged, targetRequestId }: Props) {
+export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId }: Props) {
   const { data: items = [], isLoading: loading, error: qError, refetch } = useWarehouseQueueQuery();
   const approveMutation = useApproveStockRequestMutation();
   const rejectMutation = useRejectStockRequestMutation();
@@ -31,6 +32,10 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   const [approvePinFor, setApprovePinFor] = useState<string | null>(null);
   const [approvePin, setApprovePin] = useState("");
   const [approveError, setApproveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onEmptyStateChange?.(!loading && items.length === 0 && !error);
+  }, [error, items.length, loading, onEmptyStateChange]);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거 지원)
   useEffect(() => {

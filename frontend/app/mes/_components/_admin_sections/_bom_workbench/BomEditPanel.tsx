@@ -51,8 +51,9 @@ export function BomEditPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div
-        className="flex min-h-0 flex-1 flex-col rounded-2xl border"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+        data-scrollbar-rail-shell
+        className="relative flex min-h-0 flex-1 flex-col rounded-2xl"
+        style={{ background: LEGACY_COLORS.s1 }}
       >
         <div
           className="flex h-[58px] shrink-0 items-center px-4 text-sm font-black"
@@ -60,27 +61,45 @@ export function BomEditPanel({
         >
           현재 구성 ({bomRows.length}건)
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <BomTableHeader
-            variant="current"
-            gridTemplateColumns={BOM_CURRENT_ROW_GRID_TEMPLATE}
-          />
-          {bomRows.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-              등록된 BOM 이 없습니다. 가운데에서 하위품목을 선택해 추가하세요.
-            </div>
-          ) : (
-            bomRows.map((r) => (
-              <BomRow
-                key={r.bom_id}
-                row={r}
-                childItem={itemMap.get(r.child_item_id)}
-                onSaveQty={onSaveQty}
-                onRequestDelete={onRequestDelete}
-                isLocked={isLocked}
+        <div className="relative min-h-0 flex-1">
+          <div
+            data-scrollbar-rail-viewport
+            className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
+          >
+            <div className="min-h-full min-w-full" style={{ background: LEGACY_COLORS.s1 }}>
+              <BomTableHeader
+                variant="current"
+                gridTemplateColumns={BOM_CURRENT_ROW_GRID_TEMPLATE}
               />
-            ))
-          )}
+              {bomRows.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                  등록된 BOM 이 없습니다. 가운데에서 하위품목을 선택해 추가하세요.
+                </div>
+              ) : (
+                bomRows.map((r) => (
+                  <BomRow
+                    key={r.bom_id}
+                    row={r}
+                    childItem={itemMap.get(r.child_item_id)}
+                    onSaveQty={onSaveQty}
+                    onRequestDelete={onRequestDelete}
+                    isLocked={isLocked}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+        <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border }} />
+        <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+          <div className="flex justify-between">
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+          </div>
+          <div className="flex justify-between">
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+          </div>
         </div>
       </div>
     </div>

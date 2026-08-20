@@ -53,6 +53,7 @@
     --c-border-strong: rgba(70, 122, 222, 0.22);
     --c-blue: #2f74e7;
     --c-blue-solid: var(--c-blue);
+    --c-bom-tree-depth-tone: var(--c-blue);
     --c-green: #179f72;
     --c-green-solid: var(--c-green);
     --c-red: #d95a5a;
@@ -140,6 +141,7 @@
     --c-border-strong: rgba(173, 183, 195, 0.38);
     --c-blue: #6f96bd;
     --c-blue-solid: #335d7f;
+    --c-bom-tree-depth-tone: var(--c-blue-solid);
     --c-green: #69ac8b;
     --c-green-solid: #2e6d58;
     --c-red: #c98588;
@@ -960,6 +962,28 @@
 .bom-detail-modal-grid {
   grid-template-columns: 44px minmax(0, 3.2fr) minmax(120px, 1fr) 200px 112px;
 }
+
+.bom-tree-depth {
+  background: color-mix(in oklab, var(--c-bom-tree-depth-tone) var(--bom-tree-depth-mix), var(--c-s1));
+}
+
+.bom-tree-depth-1 { --bom-tree-depth-mix: 2%; }
+.bom-tree-depth-2 { --bom-tree-depth-mix: 4.57%; }
+.bom-tree-depth-3 { --bom-tree-depth-mix: 7.14%; }
+.bom-tree-depth-4 { --bom-tree-depth-mix: 9.71%; }
+.bom-tree-depth-5 { --bom-tree-depth-mix: 12.29%; }
+.bom-tree-depth-6 { --bom-tree-depth-mix: 14.86%; }
+.bom-tree-depth-7 { --bom-tree-depth-mix: 17.43%; }
+.bom-tree-depth-8 { --bom-tree-depth-mix: 20%; }
+
+:root[data-theme="dark"] .bom-tree-depth-1 { --bom-tree-depth-mix: 10%; }
+:root[data-theme="dark"] .bom-tree-depth-2 { --bom-tree-depth-mix: 20%; }
+:root[data-theme="dark"] .bom-tree-depth-3 { --bom-tree-depth-mix: 30%; }
+:root[data-theme="dark"] .bom-tree-depth-4 { --bom-tree-depth-mix: 40%; }
+:root[data-theme="dark"] .bom-tree-depth-5 { --bom-tree-depth-mix: 50%; }
+:root[data-theme="dark"] .bom-tree-depth-6 { --bom-tree-depth-mix: 60%; }
+:root[data-theme="dark"] .bom-tree-depth-7 { --bom-tree-depth-mix: 70%; }
+:root[data-theme="dark"] .bom-tree-depth-8 { --bom-tree-depth-mix: 80%; }
 
 .bom-modal-toggle {
   display: flex;

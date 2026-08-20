@@ -1172,7 +1172,7 @@ describe("[bomSync] applyToggleLine", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
-        lines: [makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: false, quantity: 10 })],
+        lines: [makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: false, quantity: 10, from_bucket: "production" })],
       }),
     ];
     const next = applyToggleLine(bundles, "B", "C", "produce", availMap({ C: 7 }));
@@ -1236,6 +1236,31 @@ describe("[bomSync] applyLineQuantityChange", () => {
     expect(c.quantity).toBe(15); // 5 * 3, forced 이므로 edited 무시
     expect(c.shortage).toBe(0);
     expect(c.edited).toBe(false);
+  });
+
+  it("상위 변경 → disassemble 회수 자식은 현재 재고와 무관하게 부족이 아니다", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", quantity: 1 }),
+          makeLine({
+            line_id: "R",
+            origin: "bom_auto",
+            bom_expected: 1,
+            included: true,
+            quantity: 1,
+            from_bucket: "none",
+            to_bucket: "production",
+          }),
+        ],
+      }),
+    ];
+
+    const next = applyLineQuantityChange(bundles, "B", "P", 13, 0, "disassemble", availMap({ R: 0 }));
+    const recovered = next[0].lines[1];
+    expect(recovered.quantity).toBe(13);
+    expect(recovered.shortage).toBe(0);
   });
 
   it("상위 변경 → warehouse_to_dept(미강제) edited 자식 보존", () => {
@@ -1320,7 +1345,7 @@ describe("[bomSync] applyBundleQuantityChange", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
-        lines: [makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: true, edited: true })],
+          lines: [makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: true, edited: true, from_bucket: "production" })],
       }),
     ];
     const next = applyBundleQuantityChange(bundles, "B", 5, "produce", availMap({ C: 3 }));

@@ -43,6 +43,9 @@ describe("DesktopHistoryView scrollbar", () => {
     const scroller = screen.getByTestId("history-left-content");
     const historyTable = screen.getByTestId("history-table");
 
+    expect(viewport.parentElement).toHaveClass("lg:pr-1");
+    expect(viewport.parentElement).not.toHaveClass("lg:pr-4");
+
     expect(scroller).toHaveClass(
       "sg",
       "min-h-0",

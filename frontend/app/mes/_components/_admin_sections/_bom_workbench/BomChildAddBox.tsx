@@ -111,8 +111,9 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col rounded-2xl border"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      data-scrollbar-rail-shell
+      className="relative flex min-h-0 flex-1 flex-col rounded-2xl"
+      style={{ background: LEGACY_COLORS.s2 }}
     >
       <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
         <div className="shrink-0 text-xs font-bold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -199,18 +200,20 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
         </div>
       </div>
 
-      <div
-        className="min-h-0 flex-1 overflow-y-auto"
-        style={{ borderTop: `1px solid ${LEGACY_COLORS.border}` }}
-      >
-        <BomTableHeader
-          variant="candidate"
-          gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
-        />
-        {candidates.length === 0 ? (
-          <EmptyState variant="no-search-result" compact />
-        ) : (
-          candidates.map((c) => {
+      <div className="relative min-h-0 flex-1">
+        <div
+          data-scrollbar-rail-viewport
+          className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
+        >
+          <div className="min-h-full min-w-full" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
+            <BomTableHeader
+              variant="candidate"
+              gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
+            />
+            {candidates.length === 0 ? (
+              <EmptyState variant="no-search-result" compact />
+            ) : (
+              candidates.map((c) => {
             const already = childIdSet.has(c.item_id);
             const expanded = expandedId === c.item_id;
             const busy = busyId === c.item_id;
@@ -297,8 +300,21 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                 )}
               </div>
             );
-          })
-        )}
+              })
+            )}
+          </div>
+        </div>
+      </div>
+      <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border }} />
+      <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+        <div className="flex justify-between">
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+        </div>
+        <div className="flex justify-between">
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+        </div>
       </div>
     </div>
   );

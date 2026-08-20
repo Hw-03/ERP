@@ -19,10 +19,10 @@ def _row_layout(worksheet):
     }
 
 
-def test_f705_download_requires_admin_pin(client):
+def test_f705_download_does_not_require_admin_pin(client):
     response = client.get("/api/admin/production-log/f705-02.xlsx?year=2026")
 
-    assert response.status_code == 400
+    assert response.status_code == 200, response.text
 
 
 def test_f705_download_returns_selected_year_template(client):

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toChosung } from "../hangul";
+import { toChosung, toHangul, toQwerty } from "../hangul";
 
 describe("toChosung", () => {
   it("완성형 음절을 초성 자모로 변환", () => {
@@ -24,5 +24,18 @@ describe("toChosung", () => {
 
   it("빈 문자열은 빈 문자열", () => {
     expect(toChosung("")).toBe("");
+  });
+});
+
+describe("두벌식 Shift 자모", () => {
+  it("Shift 키 대문자를 Shift 자모로 조립", () => {
+    expect(toHangul("P O R E Q T W")).toBe("ㅖ ㅒ ㄲ ㄸ ㅃ ㅆ ㅉ");
+    expect(toHangul("rP")).toBe("계");
+  });
+
+  it("Shift 자모가 포함된 한글을 대문자 QWERTY로 역변환", () => {
+    expect(toQwerty("ㅖㅒㄲㄸㅃㅆㅉ")).toBe("POREQTW");
+    expect(toQwerty("계")).toBe("rP");
+    expect(toHangul(toQwerty("계"))).toBe("계");
   });
 });

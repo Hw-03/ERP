@@ -506,7 +506,7 @@ export function DesktopHistoryView() {
   const activeFilterCount = selectedDepts.length + selectedModels.length + selectedOps.length;
 
   return (
-    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
+    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-1">
       {/* ── 좌측: 전체 작업 영역 스크롤 + 바깥 전용 스크롤 바 ── */}
       <div
         data-testid="history-left-viewport"

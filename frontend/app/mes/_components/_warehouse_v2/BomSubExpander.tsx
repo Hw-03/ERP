@@ -16,11 +16,7 @@ const ROW_H = 34; // 일정한 행 높이(px) — 연결선이 정확히 이어�
 const GUIDE_W = 22; // 가이드(레일/엘보) 컬럼 폭(px)
 const MODAL_TREE_DEPTH_INDENT_PX = 48;
 const MODAL_TREE_CHEVRON_TEXT_OFFSET_PX = 10;
-const MODAL_TREE_MAX_VISIBLE_DEPTH = 8; // 현재 BOM 최대 9단계 중 최상위 표시 행은 흰색(depth 0)
-const MODAL_TREE_MIN_TINT_PERCENT = 2;
-const MODAL_TREE_MAX_TINT_PERCENT = 20;
-const MODAL_TREE_TINT_STEP = (MODAL_TREE_MAX_TINT_PERCENT - MODAL_TREE_MIN_TINT_PERCENT)
-  / (MODAL_TREE_MAX_VISIBLE_DEPTH - 1);
+const MODAL_TREE_MAX_VISIBLE_DEPTH = 8; // 현재 BOM 최대 9단계 중 최상위 표시 행은 기본 표면색(depth 0)
 const RAIL = tint(LEGACY_COLORS.muted2, 30); // depth 무관 단일 중립 연결선색
 const RAIL_W = 1.5;
 
@@ -316,7 +312,7 @@ function ModalBomTreeItem({ node, depth }: { node: BOMTreeNode; depth: number })
       <li
         data-testid="bom-modal-row"
         data-depth={depth}
-        className="bom-modal-grid min-h-[52px] border-b bg-[var(--c-s1)] text-sm transition-colors hover:bg-[var(--c-s2)]"
+        className="bom-modal-grid min-h-[52px] border-b bg-[var(--c-s1)] text-sm"
         style={{
           borderColor: LEGACY_COLORS.border,
         }}
@@ -461,16 +457,15 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
   const hasKids = node.children.length > 0;
   const open = expandedItemIds.has(node.item_id);
   const isCapacityIgnoredZeroStock = node.production_capacity_ignored === true && node.current_stock === 0;
-  const tintPercent = MODAL_TREE_MIN_TINT_PERCENT
-    + (Math.min(depth, MODAL_TREE_MAX_VISIBLE_DEPTH) - 1) * MODAL_TREE_TINT_STEP;
-  // 깊이 단계 배경은 oklab 로 섞는다 — srgb 혼합은 다크 모드의 어두운 --c-s1 베이스에서
-  // 감마 압축으로 단계 차이가 거의 안 보이는 반면(라이트 모드 대비 체감차 큼), oklab 은
-  // 밝기 축이 지각적으로 균일해 라이트·다크 양쪽에서 동일한 %가 비슷한 체감 차이를 만든다.
-  const background = node.current_stock === 0 && !isCapacityIgnoredZeroStock
+  const isZeroStockWarning = node.current_stock === 0 && !isCapacityIgnoredZeroStock;
+  const depthClass = !isZeroStockWarning && depth > 0
+    ? ` bom-tree-depth bom-tree-depth-${Math.min(depth, MODAL_TREE_MAX_VISIBLE_DEPTH)}`
+    : "";
+  const background = isZeroStockWarning
     ? tint(LEGACY_COLORS.red, 15, "var(--c-s1)")
     : depth === 0
       ? LEGACY_COLORS.s1
-      : `color-mix(in oklab, ${LEGACY_COLORS.blue} ${tintPercent.toFixed(2)}%, var(--c-s1))`;
+      : undefined;
   const cells = (
     <>
       <span
@@ -524,7 +519,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
                 onToggleItem(node.item_id);
               }
             }}
-            className="bom-modal-grid bom-detail-modal-grid min-h-[52px] w-full cursor-pointer border-b text-left text-sm transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]"
+            className={`bom-modal-grid bom-detail-modal-grid min-h-[52px] w-full cursor-pointer border-b text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]${depthClass}`}
             style={{ borderColor: LEGACY_COLORS.border, background }}
             aria-expanded={open}
           >
@@ -532,7 +527,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
           </div>
         ) : (
           <div
-            className="bom-modal-grid bom-detail-modal-grid min-h-[52px] border-b text-sm transition-[filter] hover:brightness-95"
+            className={`bom-modal-grid bom-detail-modal-grid min-h-[52px] border-b text-sm${depthClass}`}
             style={{ borderColor: LEGACY_COLORS.border, background }}
           >
             {cells}

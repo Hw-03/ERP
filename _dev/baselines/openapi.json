@@ -11945,42 +11945,6 @@
               "title": "Year",
               "type": "integer"
             }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Admin-Pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Pin"
-            }
           }
         ],
         "responses": {
