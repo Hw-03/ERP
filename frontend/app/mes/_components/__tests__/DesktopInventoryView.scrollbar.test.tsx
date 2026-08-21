@@ -103,6 +103,10 @@ describe("DesktopInventoryView scrollbar", () => {
     expect(viewport).not.toHaveStyle({ background: "var(--c-s1)", borderColor: "var(--c-border)" });
     expect(viewport).not.toHaveClass("overflow-y-auto");
     expect(listCard).toHaveClass("card", "desktop-flat-surface");
+    expect(listCard.parentElement).toHaveClass("gap-3");
+    expect(listCard.parentElement).not.toHaveClass("gap-2");
+    expect(screen.getByTestId("inventory-capacity-panel").parentElement).toHaveClass("mt-3");
+    expect(screen.getByTestId("inventory-capacity-panel").parentElement).not.toHaveClass("mt-[15px]");
     expect(screen.getByRole("region", { name: "자재 목록" })).toBe(listCard);
     expect(listCard).not.toHaveClass("overflow-hidden", "overflow-y-auto");
     expect(screen.queryByTestId("inventory-items-scroll-region")).not.toBeInTheDocument();

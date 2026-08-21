@@ -130,7 +130,7 @@ export function InventoryItemsTable({
           <div
             aria-hidden
             data-testid="inventory-table-corner-mask"
-            className="pointer-events-none sticky top-[74px] z-20 -mb-6 flex h-6 justify-between"
+            className="pointer-events-none sticky top-[71px] z-20 -mb-6 flex h-6 justify-between"
           >
             <span
               className="h-6 w-6"
@@ -143,7 +143,7 @@ export function InventoryItemsTable({
           </div>
         )}
         <table className="min-w-full border-separate border-spacing-0 text-sm">
-          <thead className={`sticky ${compact ? "top-0" : "top-[74px]"} z-10`}>
+          <thead className={`sticky ${compact ? "top-0" : "top-[71px]"} z-10`}>
             <tr>
               {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }, columnIndex) => (
                 <th

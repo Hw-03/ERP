@@ -101,9 +101,9 @@ describe("InventoryItemsTable — chunked render", () => {
     expect(desktopTable?.parentElement).not.toHaveClass("overflow-x-auto");
     expect(desktopTable?.parentElement).toHaveClass("overflow-clip");
     expect(desktopTable?.parentElement).not.toHaveClass("border");
-    expect(container.querySelector("thead")).toHaveClass("top-[74px]");
+    expect(container.querySelector("thead")).toHaveClass("top-[71px]");
     const desktopCornerMask = container.querySelector('[data-testid="inventory-table-corner-mask"]');
-    expect(desktopCornerMask).toHaveClass("sticky", "top-[74px]", "z-20", "-mb-6");
+    expect(desktopCornerMask).toHaveClass("sticky", "top-[71px]", "z-20", "-mb-6");
     expect(desktopCornerMask?.children).toHaveLength(2);
     expect(desktopCornerMask?.children[0].getAttribute("style")).toContain(
       "var(--c-inventory-table-corner-backdrop)",
