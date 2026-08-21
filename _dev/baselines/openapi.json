@@ -3829,11 +3829,6 @@
             "title": "Item Id",
             "type": "string"
           },
-          "quantity": {
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "type": "integer"
-          },
           "selected": {
             "default": true,
             "title": "Selected",
@@ -3841,8 +3836,7 @@
           }
         },
         "required": [
-          "item_id",
-          "quantity"
+          "item_id"
         ],
         "title": "IoComponentSelection",
         "type": "object"

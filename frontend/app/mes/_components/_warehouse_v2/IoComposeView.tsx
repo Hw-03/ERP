@@ -283,6 +283,8 @@ export function IoComposeView({
     state,
     onStatusChange,
     restoreStep,
+    getAvailable,
+    inventorySnapshot: items,
   });
 
   useEffect(() => {
@@ -1223,12 +1225,9 @@ export function IoComposeView({
                 const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
                 const line = bundle?.lines.find((row) => row.line_id === lineId);
                 if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
-                  void refreshInternalUseBom(
-                    bundleId,
-                    line?.origin === "direct"
-                      ? { bundleQuantity: quantity }
-                      : { lineQuantity: { lineId, quantity } },
-                  );
+                  if (line?.origin === "direct") {
+                    void refreshInternalUseBom(bundleId, { bundleQuantity: quantity });
+                  }
                   return;
                 }
                 state.setBundles((prev) =>

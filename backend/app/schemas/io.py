@@ -21,7 +21,6 @@ class IoPreviewTarget(BaseModel):
 
 class IoComponentSelection(BaseModel):
     item_id: uuid.UUID
-    quantity: int = Field(..., gt=0)
     selected: bool = True
 
 

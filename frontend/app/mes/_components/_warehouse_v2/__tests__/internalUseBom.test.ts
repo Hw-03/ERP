@@ -46,10 +46,10 @@ function bundle(lines: IoLine[]): IoBundle {
 }
 
 describe("internalUseBom", () => {
-  it("방식 전환은 하위 체크와 조정 수량을 그대로 미리보기 요청에 싣는다", () => {
+  it("방식 전환은 하위 체크 상태만 미리보기 요청에 싣는다", () => {
     const target = buildInternalUseBomPreviewTarget(
       bundle([
-        line({ selected: false, included: false, quantity: 7, edited: true }),
+        line({ selected: false, included: false, quantity: 0 }),
         line({ line_id: "child-2", item_id: "item-2", quantity: 4 }),
       ]),
       { mode: "parent_and_children" },
@@ -57,15 +57,15 @@ describe("internalUseBom", () => {
 
     expect(target.internal_use_bom_mode).toBe("parent_and_children");
     expect(target.component_selections).toEqual([
-      { item_id: "item-1", quantity: 7, selected: false },
-      { item_id: "item-2", quantity: 4, selected: true },
+      { item_id: "item-1", selected: false },
+      { item_id: "item-2", selected: true },
     ]);
   });
 
-  it("기준 수량 변경은 수동 조정값은 보존하고 미편집 BOM 수량만 비례 계산한다", () => {
+  it("기준 수량 변경도 하위 수량을 보내지 않고 서버 계산에 맡긴다", () => {
     const target = buildInternalUseBomPreviewTarget(
       bundle([
-        line({ selected: false, included: false, quantity: 7, edited: true }),
+        line({ selected: false, included: false, quantity: 0 }),
         line({ line_id: "child-2", item_id: "item-2", quantity: 4 }),
       ]),
       { bundleQuantity: 3 },
@@ -73,8 +73,27 @@ describe("internalUseBom", () => {
 
     expect(target.quantity).toBe(3);
     expect(target.component_selections).toEqual([
-      { item_id: "item-1", quantity: 7, selected: false },
-      { item_id: "item-2", quantity: 6, selected: true },
+      { item_id: "item-1", selected: false },
+      { item_id: "item-2", selected: true },
+    ]);
+  });
+
+  it("변동 없음 행을 다시 선택할 때도 체크 상태만 반전한다", () => {
+    const target = buildInternalUseBomPreviewTarget(
+      bundle([
+        line({
+          selected: false,
+          included: false,
+          quantity: 0,
+          bom_expected: 4,
+          edited: true,
+        }),
+      ]),
+      { toggleLineId: "child-1" },
+    );
+
+    expect(target.component_selections).toEqual([
+      { item_id: "item-1", selected: true },
     ]);
   });
 

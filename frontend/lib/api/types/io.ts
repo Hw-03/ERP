@@ -75,7 +75,6 @@ export interface IoBundle {
 
 export interface IoComponentSelection {
   item_id: string;
-  quantity: number;
   selected: boolean;
 }
 

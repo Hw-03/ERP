@@ -101,16 +101,17 @@ export function IoLineRow({
   const selected = isInternalUse ? lineSelected(line) : line.included;
   const disabled = !line.included;
   // BOM 강제 모드: process(produce/disassemble) 한정 — bom_auto 하위는 상위 비례 자동 계산 → 체크/수량 차단.
-  // 창고 입출고는 묶음 선택 후 내부 자유 편집 허용 (qtyLocked=false).
+  // 일반 창고 입출고 BOM은 내부 편집을 허용하고, 연구 사용출고 BOM은 아래 고정 수량 표시로 분리한다.
   const qtyLocked =
     isBomForced(subType) &&
     line.origin === "bom_auto" &&
     line.bom_expected != null &&
     Number(line.bom_expected) > 0;
   const bomStockExempt = line.origin === "bom_auto" && line.bom_stock_exempt;
+  const fixedInternalUseBomQuantity = isInternalUse && line.origin === "bom_auto";
   const interactionLocked = qtyLocked || bomStockExempt;
   const stepperDisabled = (!isInternalUse && disabled) || interactionLocked;
-  // + 버튼은 미체크 상태에서도 활성 — qty=0 자동 해제된 라인 복귀용. qtyLocked 만 차단.
+  // 조절기를 사용하는 기존 행은 미체크 상태에서도 + 버튼으로 다시 포함할 수 있다.
   const incrementDisabled = interactionLocked;
   const shortage = line.included && line.shortage > 0;
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
@@ -252,16 +253,44 @@ export function IoLineRow({
         <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
       )}
 
-      {/* 4. 수량 stepper (모바일에선 한 줄 차지) */}
-      <QuantityStepper
-        value={currentQty}
-        onChange={onStepperChange}
-        disabled={editingDisabled || interactionLocked}
-        decrementDisabled={stepperDisabled}
-        incrementDisabled={incrementDisabled}
-        inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
-        className="w-full lg:w-auto"
-      />
+      {/* 4. 연구 BOM은 고정 수량, 나머지는 수량 stepper (모바일에선 한 줄 차지) */}
+      {fixedInternalUseBomQuantity ? (
+        <div className="flex w-full flex-col items-center gap-0.5 lg:w-[276px]">
+          <span
+            className="text-xs font-bold uppercase tracking-[1.5px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            수량
+          </span>
+          <div className="flex h-11 min-h-[44px] w-full items-center justify-center">
+            <div
+              role="textbox"
+              aria-label="수량"
+              aria-readonly="true"
+              title="상위 기준 수량과 BOM 소요량으로 자동 계산"
+              className="inline-flex h-11 min-h-[44px] w-[72px] items-center justify-center rounded-[10px] border px-2 py-2 text-center text-base font-black tabular-nums"
+              style={{
+                background: LEGACY_COLORS.s2,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+                opacity: editingDisabled ? 0.6 : 1,
+              }}
+            >
+              {formatQty(currentQty)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <QuantityStepper
+          value={currentQty}
+          onChange={onStepperChange}
+          disabled={editingDisabled || interactionLocked}
+          decrementDisabled={stepperDisabled}
+          incrementDisabled={incrementDisabled}
+          inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
+          className="w-full lg:w-auto"
+        />
+      )}
 
       {/* 항목 5-6 — 모바일만 가능재고+실행후를 가운데 정렬·간격 확보. lg:contents 로 데스크톱 7열 그리드 유지. */}
       <div className="flex w-full items-start justify-center gap-10 lg:contents">

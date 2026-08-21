@@ -291,6 +291,60 @@ describe("IoLineRow quantity", () => {
     expect(screen.getAllByText("소속 부서 재입고")).toHaveLength(1);
   });
 
+  it("연구 사용출고 BOM 하위 수량은 증감 버튼 없이 읽기 전용으로 표시한다", () => {
+    const onQuantityChange = vi.fn();
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "warehouse",
+          to_bucket: "none",
+          quantity: 4,
+          bom_expected: 4,
+          origin: "bom_auto",
+        })}
+        subType="internal_use_out"
+        isChild
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={onQuantityChange}
+        onRemove={() => {}}
+      />,
+    );
+
+    const quantity = screen.getByLabelText("수량");
+    expect(quantity).toHaveTextContent("4");
+    expect(quantity).toHaveAttribute("aria-readonly", "true");
+    expect(quantity).toHaveClass("h-11", "min-h-[44px]", "w-[72px]");
+    expect(screen.queryByRole("spinbutton", { name: "수량" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "-1" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+1" })).not.toBeInTheDocument();
+    expect(onQuantityChange).not.toHaveBeenCalled();
+  });
+
+  it("연구 사용출고 낱개 행은 기존 수량 조절기를 유지한다", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "warehouse",
+          to_bucket: "none",
+          quantity: 2,
+          origin: "direct",
+        })}
+        subType="internal_use_out"
+        isChild={false}
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "-1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+1" })).toBeInTheDocument();
+  });
+
   it("연구 사용출고 재고 미반영 행의 추가 설명은 유지한다", () => {
     render(
       <IoLineRow
@@ -312,6 +366,12 @@ describe("IoLineRow quantity", () => {
     );
 
     expect(screen.getByText("BOM 자동 처리 시 재고 미반영")).toBeInTheDocument();
+    const quantity = screen.getByRole("textbox", { name: "수량" });
+    expect(quantity).toHaveTextContent("2");
+    expect(quantity).toHaveClass("h-11", "min-h-[44px]", "w-[72px]");
+    expect(screen.queryByRole("button", { name: "-1" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+1" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("10")).toHaveLength(2);
   });
 
   it("연구 사용출고가 아닌 행의 기존 보조 문구는 유지한다", () => {

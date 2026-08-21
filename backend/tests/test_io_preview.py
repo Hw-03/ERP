@@ -141,8 +141,8 @@ def test_preview_internal_use_parent_and_children_routes_unselected_child_back_t
                 source_location="warehouse",
                 internal_use_bom_mode="parent_and_children",
                 component_selections=[
-                    SimpleNamespace(item_id=selected_child.item_id, quantity=D("4"), selected=True),
-                    SimpleNamespace(item_id=returned_child.item_id, quantity=D("6"), selected=False),
+                    SimpleNamespace(item_id=selected_child.item_id, selected=True),
+                    SimpleNamespace(item_id=returned_child.item_id, selected=False),
                 ],
             )
         ],
@@ -161,6 +161,7 @@ def test_preview_internal_use_parent_and_children_routes_unselected_child_back_t
         parent_line["from_bucket"],
         parent_line["to_bucket"],
     ) == ("out", "warehouse", "none")
+    assert selected_line["quantity"] == D("4")
     assert (selected_line["selected"], selected_line["included"]) == (True, True)
     assert (
         selected_line["direction"],
@@ -174,6 +175,7 @@ def test_preview_internal_use_parent_and_children_routes_unselected_child_back_t
         returned_line["to_bucket"],
         returned_line["to_department"],
     ) == ("in", "none", "production", "고압")
+    assert returned_line["quantity"] == D("6")
 
 
 def test_preview_internal_use_children_only_excludes_unselected_child(
@@ -193,7 +195,7 @@ def test_preview_internal_use_children_only_excludes_unselected_child(
                 parent.item_id,
                 internal_use_bom_mode="children_only",
                 component_selections=[
-                    SimpleNamespace(item_id=child.item_id, quantity=D("2"), selected=False),
+                    SimpleNamespace(item_id=child.item_id, selected=False),
                 ],
             )
         ],
@@ -206,7 +208,41 @@ def test_preview_internal_use_children_only_excludes_unselected_child(
     child_line = bundle["lines"][0]
     assert child_line["selected"] is False
     assert child_line["included"] is False
+    assert child_line["quantity"] == D("0")
     assert child_line["exclusion_note"] == "변동 없음"
+
+
+def test_preview_internal_use_parent_and_children_ignores_legacy_child_quantity(
+    db_session, make_item, make_bom
+):
+    parent = make_item(name="재입고 조립품", process_type_code="AF")
+    child = make_item(name="재입고 부품", process_type_code="HF")
+    make_bom(parent.item_id, child.item_id, D("3"))
+    db_session.commit()
+
+    result = iop.preview(
+        db_session,
+        work_type="internal_use",
+        sub_type="internal_use_out",
+        targets=[
+            _target(
+                parent.item_id,
+                quantity="2",
+                internal_use_bom_mode="parent_and_children",
+                component_selections=[
+                    SimpleNamespace(item_id=child.item_id, quantity=D("0"), selected=False),
+                ],
+            )
+        ],
+        to_department="연구",
+    )
+
+    child_line = next(
+        line for line in result["bundles"][0]["lines"] if line["item_id"] == child.item_id
+    )
+    assert child_line["quantity"] == D("6")
+    assert child_line["selected"] is False
+    assert child_line["included"] is True
 
 
 def test_preview_internal_use_manual_from_code_department(db_session, make_item):
