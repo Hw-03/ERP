@@ -1898,7 +1898,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
               {rows.length === 0 ? (
                 <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
               ) : (
-                rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />)
+                rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} layout="requestBoard" onClick={() => onOpen(request)} />)
               )}
             </ListColumn>
           );
@@ -2423,7 +2423,7 @@ function HistoryListEntry({
   const renderRows = (groupRows: ShippingRequest[]) => (
     <div className="grid content-start gap-2 p-2">
       {groupRows.map((request) => (
-        <RequestRow key={request.request_id} request={request} active={false} onClick={() => onOpen(request)} />
+        <RequestRow key={request.request_id} request={request} active={false} layout="historyList" onClick={() => onOpen(request)} />
       ))}
     </div>
   );
@@ -3917,23 +3917,40 @@ function serialNumberText(value: string | null) {
   return value?.trim() || "미입력";
 }
 
-function RequestRow({ request, active, onClick }: { request: ShippingRequest; active: boolean; onClick: () => void }) {
+type RequestRowLayout = "default" | "requestBoard" | "historyList";
+
+function RequestRow({ request, active, layout = "default", onClick }: { request: ShippingRequest; active: boolean; layout?: RequestRowLayout; onClick: () => void }) {
   const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
-  const dateLabel = request.status === "PICKED_UP" ? "출하 완료" : request.status === "CANCELLED" ? "요청 취소" : "요청 일시:";
+  const dateLabel = request.status === "PICKED_UP" ? "출하 완료" : request.status === "CANCELLED" ? "요청 취소" : "요청 일시";
   const dateValue = request.status === "PICKED_UP"
     ? request.picked_up_at
     : request.status === "CANCELLED"
       ? request.cancelled_at ?? null
       : request.created_at;
-  const baseLabel = request.final_pf_item_name && request.final_pf_item_name !== request.base_pf_item_name
+  const hasDifferentBasePf = Boolean(request.final_pf_item_name && request.final_pf_item_name !== request.base_pf_item_name);
+  const baseLabel = hasDifferentBasePf
     ? ` · 기준 ${request.base_pf_item_name}`
     : "";
+  const legacyDateLabel = request.status === "PICKED_UP" || request.status === "CANCELLED" ? dateLabel : `${dateLabel}:`;
+  const structuredLayout = layout !== "default";
+  const metadata = [
+    { key: "date", label: dateLabel, value: formatDate(dateValue), tabular: true },
+    { key: "requester", label: "요청자", value: request.requested_by_name ?? "요청자 없음", tabular: false },
+    { key: "quantity", label: "출하 수량", value: `${request.request_quantity}대`, tabular: true },
+    { key: "invoice", label: "인보이스", value: request.invoice_number ?? "미입력", tabular: false },
+  ] as const;
+  const rowClassName = layout === "requestBoard"
+    ? "flex h-[136px] flex-col overflow-hidden rounded-[16px] border px-4 py-2 text-left outline-none transition-all hover:brightness-105 active:scale-[0.995] focus-visible:ring-2"
+    : layout === "historyList"
+      ? "h-[112px] overflow-hidden rounded-[16px] border px-4 py-3 text-left outline-none transition-all hover:brightness-105 active:scale-[0.995] focus-visible:ring-2"
+      : "min-h-[136px] rounded-[14px] border px-4 py-3 text-left transition-colors";
   return (
     <button
       type="button"
       onClick={onClick}
       data-shipping-request-id={request.request_id}
-      className="min-h-[136px] rounded-[14px] border px-4 py-3 text-left transition-colors"
+      data-shipping-card-layout={layout}
+      className={rowClassName}
       style={{
         background: active ? tint(STATUS_TONE[request.status], 16) : LEGACY_COLORS.s2,
         borderColor: active ? STATUS_TONE[request.status] : LEGACY_COLORS.border,
@@ -3941,21 +3958,61 @@ function RequestRow({ request, active, onClick }: { request: ShippingRequest; ac
       }}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-black">{finalPfName}</div>
-          <div className="flex min-w-0 items-center gap-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            <SummaryCode code={request.base_pf_mes_code ?? "-"} testId={`shipping-request-code-${request.request_id}`} />
+        <div className="min-w-0 flex-1">
+          <div
+            className={structuredLayout
+              ? `${layout === "requestBoard" ? "line-clamp-2 leading-4" : "truncate leading-5"} text-sm font-black`
+              : "truncate text-sm font-black"}
+            title={structuredLayout ? finalPfName : undefined}
+          >
+            {finalPfName}
+          </div>
+          <div className={structuredLayout
+            ? `flex min-w-0 items-center gap-2 truncate text-xs font-bold ${layout === "requestBoard" ? "leading-3" : "leading-4"}`
+            : "flex min-w-0 items-center gap-1 truncate text-xs font-bold"} style={{ color: LEGACY_COLORS.muted2 }}>
+            <SummaryCode code={request.base_pf_mes_code ?? "-"} testId={`shipping-request-code-${request.request_id}`} className={structuredLayout ? "shrink-0" : undefined} />
+            {structuredLayout && hasDifferentBasePf && (
+              <span className="min-w-0 truncate" title={`기준 PF · ${request.base_pf_item_name}`}>기준 PF · {request.base_pf_item_name}</span>
+            )}
           </div>
         </div>
-        <StatusBadge status={request.status} compact />
+        {structuredLayout ? (
+          <span className="shrink-0"><StatusBadge status={request.status} compact /></span>
+        ) : (
+          <StatusBadge status={request.status} compact />
+        )}
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        <span>{dateLabel} {formatDate(dateValue)}{baseLabel}</span>
-        <span>요청자: {request.requested_by_name ?? "요청자 없음"}</span>
-      </div>
-      <div className="mt-1 truncate text-xs font-black" style={{ color: request.invoice_number ? LEGACY_COLORS.text : LEGACY_COLORS.yellow }}>
-        인보이스 번호 · {request.invoice_number ?? "미입력"}
-      </div>
+      {structuredLayout ? (
+        <div
+          data-testid={`shipping-request-metadata-${request.request_id}`}
+          className={`grid border-t ${layout === "requestBoard" ? "mt-auto grid-cols-2 gap-x-4 gap-y-0.5 pt-1" : "mt-2 grid-cols-4 gap-x-5 pt-1.5"}`}
+          style={{ borderColor: LEGACY_COLORS.border }}
+        >
+          {metadata.map((item) => (
+            <div key={item.key} data-testid={`shipping-request-meta-${item.key}-${request.request_id}`} className="min-w-0">
+              <span className={`block text-xs font-bold ${layout === "requestBoard" ? "leading-3" : "leading-4"}`} style={{ color: LEGACY_COLORS.muted2 }}>{item.label}</span>
+              <span
+                className={`block truncate text-sm font-black leading-4 ${item.tabular ? "tabular-nums" : ""}`}
+                title={item.value}
+                style={{ color: item.key === "invoice" && !request.invoice_number ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}
+              >
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            <span>{legacyDateLabel} {formatDate(dateValue)}{baseLabel}</span>
+            <span>요청자: {request.requested_by_name ?? "요청자 없음"}</span>
+            <span>출하 수량: {request.request_quantity}대</span>
+          </div>
+          <div className="mt-1 truncate text-xs font-black" style={{ color: request.invoice_number ? LEGACY_COLORS.text : LEGACY_COLORS.yellow }}>
+            인보이스 번호 · {request.invoice_number ?? "미입력"}
+          </div>
+        </>
+      )}
     </button>
   );
 }

@@ -2337,7 +2337,9 @@ describe("DesktopShippingView", () => {
 
   it("balances the request-list header and labels request metadata explicitly", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ request_id: "requested-meta", status: "REQUESTED", requested_by_name: "김건호" }),
+      request({ request_id: "requested-meta", status: "REQUESTED", request_quantity: 1, requested_by_name: "김건호" }),
+      request({ request_id: "preparing-meta", status: "PREPARING", request_quantity: 2 }),
+      request({ request_id: "prepared-meta", status: "PREPARED", request_quantity: 3 }),
       request({ request_id: "requested-missing", status: "REQUESTED", requested_by_name: null }),
     ]);
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
@@ -2349,12 +2351,79 @@ describe("DesktopShippingView", () => {
     expect(within(panel).getByText("출하 관리")).toHaveClass("text-xl");
 
     const named = container.querySelector('[data-shipping-request-id="requested-meta"]') as HTMLElement;
-    expect(named).toHaveTextContent("요청 일시:");
-    expect(named).toHaveTextContent("요청자: 김건호");
+    const namedMetadata = within(named).getByTestId("shipping-request-metadata-requested-meta");
+    expect(within(namedMetadata).getByText("요청 일시")).toBeInTheDocument();
+    expect(within(namedMetadata).getByText("김건호")).toBeInTheDocument();
+    expect(within(namedMetadata).getByText("1대")).toBeInTheDocument();
     expect(named).not.toHaveTextContent("· 김건호");
 
+    const preparing = container.querySelector('[data-shipping-request-id="preparing-meta"]') as HTMLElement;
+    expect(within(preparing).getByText("2대")).toBeInTheDocument();
+
+    const prepared = container.querySelector('[data-shipping-request-id="prepared-meta"]') as HTMLElement;
+    expect(within(prepared).getByText("3대")).toBeInTheDocument();
+
     const missing = container.querySelector('[data-shipping-request-id="requested-missing"]') as HTMLElement;
-    expect(missing).toHaveTextContent("요청자: 요청자 없음");
+    expect(within(missing).getByText("요청자 없음")).toBeInTheDocument();
+  });
+
+  it("lays out request-board cards as two-column information blocks", async () => {
+    const finalPfName = "DX-7020s_70kV, 2mA_호주_iM3 긴 품명 카드";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({
+        request_id: "request-board-layout",
+        status: "PREPARING",
+        request_quantity: 20,
+        final_pf_item_name: finalPfName,
+        requested_by_name: null,
+        invoice_number: null,
+      }),
+    ]);
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+
+    const row = container.querySelector('[data-shipping-request-id="request-board-layout"]') as HTMLElement;
+    const metadata = within(row).getByTestId("shipping-request-metadata-request-board-layout");
+    const date = within(metadata).getByTestId("shipping-request-meta-date-request-board-layout");
+    const title = within(row).getByText(finalPfName);
+    const invoice = within(metadata).getByText("미입력");
+    const emptyCard = within(screen.getByTestId("shipping-request-list-panel")).getByText("준비 완료 없음").parentElement;
+
+    expect(row).toHaveAttribute("data-shipping-card-layout", "requestBoard");
+    expect(emptyCard).toHaveClass("min-h-[136px]");
+    expect(row).toHaveClass("h-[136px]", "rounded-[16px]", "py-2", "hover:brightness-105", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(row).not.toHaveClass("h-[168px]");
+    expect(title).toHaveClass("line-clamp-2");
+    expect(title).not.toHaveClass("min-h-10");
+    expect(metadata).toHaveClass("grid", "grid-cols-2");
+    expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
+    expect(date).toHaveTextContent("요청 일시");
+    expect(date).not.toHaveTextContent("Standard PF");
+    expect(metadata).toHaveTextContent("요청자");
+    expect(metadata).toHaveTextContent("요청자 없음");
+    expect(metadata).toHaveTextContent("출하 수량");
+    expect(metadata).toHaveTextContent("20대");
+    expect(metadata).toHaveTextContent("인보이스");
+    expect(invoice).toHaveStyle({ color: LEGACY_COLORS.yellow });
+  });
+
+  it("keeps default request rows unchanged outside request and history lists", async () => {
+    navigationMock.search = "tab=shipping&shippingView=prepList";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([
+      request({ request_id: "default-prep-row", status: "PREPARING", request_quantity: 4 }),
+    ]);
+
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-request-id="default-prep-row"]')).toBeTruthy());
+    const row = container.querySelector('[data-shipping-request-id="default-prep-row"]') as HTMLElement;
+
+    expect(row).toHaveAttribute("data-shipping-card-layout", "default");
+    expect(row).toHaveClass("min-h-[136px]", "rounded-[14px]");
+    expect(row).not.toHaveClass("h-[168px]", "h-[112px]");
+    expect(within(row).queryByTestId("shipping-request-metadata-default-prep-row")).not.toBeInTheDocument();
+    expect(row).toHaveTextContent("출하 수량: 4대");
   });
 
   it("keeps wizard step labels on one line and blocks invalid next navigation", async () => {
@@ -3615,8 +3684,10 @@ describe("DesktopShippingView", () => {
       expect.objectContaining({ status: "CANCELLED", q: "INV-C" }),
     ));
     expect(await screen.findByText("7월 · 1건", { selector: "summary" })).toBeInTheDocument();
-    expect(await screen.findByText(/인보이스 번호 · INV-C/)).toBeInTheDocument();
-    expect(screen.getByText(/요청 취소 07/)).toBeInTheDocument();
+    expect(await screen.findByText("INV-C")).toBeInTheDocument();
+    const cancelledDate = screen.getByTestId("shipping-request-meta-date-hist-cancelled");
+    expect(cancelledDate).toHaveTextContent("요청 취소");
+    expect(cancelledDate).toHaveTextContent("07.");
   });
 
   it("uses the shared external-rail root viewport while preserving layout-only history grouping wrappers", async () => {
@@ -3652,7 +3723,7 @@ describe("DesktopShippingView", () => {
     expect(year).not.toHaveClass("rounded-[14px]", "border");
     expect(month).toHaveAttribute("data-surface", "layout-only");
     expect(month).not.toHaveClass("rounded-[12px]", "border");
-    expect(requestRow).toHaveClass("rounded-[14px]", "border");
+    expect(requestRow).toHaveClass("h-[112px]", "rounded-[16px]", "border");
 
     fireEvent.change(within(historyList).getByRole("searchbox", { name: "출하 이력 검색" }), { target: { value: "INV-LAYOUT" } });
     fireEvent.click(within(historyList).getByRole("button", { name: "검색" }));
@@ -3664,7 +3735,7 @@ describe("DesktopShippingView", () => {
     expect(searchYear).not.toHaveClass("rounded-[14px]", "border");
     expect(searchMonth).toHaveAttribute("data-surface", "layout-only");
     expect(searchMonth).not.toHaveClass("rounded-[12px]", "border");
-    expect(within(searchMonth).getByRole("button", { name: /Standard PF/ })).toHaveClass("rounded-[14px]", "border");
+    expect(within(searchMonth).getByRole("button", { name: /Standard PF/ })).toHaveClass("h-[112px]", "rounded-[16px]", "border");
 
     const historyCallsBeforeSearchToggle = vi.mocked(api.getShippingHistory).mock.calls.length;
     fireEvent.click(within(searchMonth).getByText("6월 · 1건", { selector: "summary" }));
@@ -3678,6 +3749,42 @@ describe("DesktopShippingView", () => {
     fireEvent(searchMonth, new Event("toggle"));
     expect(searchMonth).not.toHaveAttribute("open");
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(historyCallsBeforeSearchToggle);
+  });
+
+  it("lays out history cards as four-column information blocks", async () => {
+    const finalPfName = "DX3000_60kV, 2mA_우루과이_Melmont S.A. [Black / 배터리 1EA]";
+    const historyRequest = request({
+      request_id: "history-card-layout",
+      status: "PICKED_UP",
+      request_quantity: 10,
+      final_pf_item_name: finalPfName,
+      requested_by_name: "김건호",
+      invoice_number: "DEXCO-2026086-LONG-INVOICE",
+      picked_up_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 6, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [historyRequest], next_cursor: null, has_more: false });
+
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-request-id="history-card-layout"]')).toBeTruthy());
+    const row = container.querySelector('[data-shipping-request-id="history-card-layout"]') as HTMLElement;
+    const metadata = within(row).getByTestId("shipping-request-metadata-history-card-layout");
+    const date = within(metadata).getByTestId("shipping-request-meta-date-history-card-layout");
+    const title = within(row).getByText(finalPfName);
+
+    expect(row).toHaveAttribute("data-shipping-card-layout", "historyList");
+    expect(row).toHaveClass("h-[112px]", "rounded-[16px]", "hover:brightness-105", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(title).toHaveClass("truncate");
+    expect(title).not.toHaveClass("line-clamp-2");
+    expect(metadata).toHaveClass("grid", "grid-cols-4");
+    expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
+    expect(date).toHaveTextContent("출하 완료");
+    expect(date).not.toHaveTextContent("Standard PF");
+    expect(metadata).toHaveTextContent("김건호");
+    expect(metadata).toHaveTextContent("10대");
+    expect(metadata).toHaveTextContent("DEXCO-2026086-LONG-INVOICE");
   });
 
   it("uses semantic history colors, a balanced title, and controlled month disclosure", async () => {
@@ -3823,7 +3930,7 @@ describe("DesktopShippingView", () => {
     await openHubCard(container, "history");
     await waitFor(() => expect(api.getShippingHistoryMonths).toHaveBeenCalledWith({ status: "PICKED_UP" }));
     fireEvent.click(screen.getByRole("button", { name: "요청 취소" }));
-    expect(await screen.findByText(/인보이스 번호 · INV-RACE-C/)).toBeInTheDocument();
+    expect(await screen.findByText("INV-RACE-C")).toBeInTheDocument();
     await act(async () => {
       pickedMonths.resolve([{ year: 2026, month: 6, count: 1 }]);
       await pickedMonths.promise;
@@ -3831,7 +3938,7 @@ describe("DesktopShippingView", () => {
     });
 
     expect(screen.getByText("7월 · 1건", { selector: "summary" })).toBeInTheDocument();
-    expect(screen.getByText(/인보이스 번호 · INV-RACE-C/)).toBeInTheDocument();
+    expect(screen.getByText("INV-RACE-C")).toBeInTheDocument();
     expect(screen.queryByText(/INV-RACE-P/)).not.toBeInTheDocument();
   });
 
@@ -3849,7 +3956,7 @@ describe("DesktopShippingView", () => {
     });
     render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    expect(await screen.findByText(/인보이스 번호 · INV-INITIAL/)).toBeInTheDocument();
+    expect(await screen.findByText("INV-INITIAL")).toBeInTheDocument();
     const search = screen.getByRole("searchbox", { name: "출하 이력 검색" });
     fireEvent.change(search, { target: { value: "INV-OLDER" } });
     fireEvent.click(screen.getByRole("button", { name: "검색" }));
@@ -3858,7 +3965,7 @@ describe("DesktopShippingView", () => {
     ));
     fireEvent.change(search, { target: { value: "INV-NEWEST" } });
     fireEvent.click(screen.getByRole("button", { name: "검색" }));
-    expect(await screen.findByText(/인보이스 번호 · INV-NEWEST/)).toBeInTheDocument();
+    expect(await screen.findByText("INV-NEWEST")).toBeInTheDocument();
 
     await act(async () => {
       olderSearch.resolve({ requests: [older], next_cursor: null, has_more: false });
@@ -3866,7 +3973,7 @@ describe("DesktopShippingView", () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByText(/인보이스 번호 · INV-NEWEST/)).toBeInTheDocument();
+    expect(screen.getByText("INV-NEWEST")).toBeInTheDocument();
     expect(screen.queryByText(/INV-OLDER/)).not.toBeInTheDocument();
   });
 
