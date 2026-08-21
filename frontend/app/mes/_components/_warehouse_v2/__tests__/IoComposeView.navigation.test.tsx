@@ -493,6 +493,44 @@ describe("IoComposeView navigation chrome", () => {
     expect(workTypeCards()).toHaveLength(2);
   });
 
+  it("hides the five-step navigation and passes the fullscreen handler to the real Step 3 picker", async () => {
+    const onItemPickerFullscreenChange = vi.fn();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <IoComposeView
+          globalSearch=""
+          operator={operator}
+          employees={[]}
+          items={[conversionItem("item-1", "전체 화면 품목", 5)]}
+          productModels={[]}
+          setItems={() => {}}
+          onStatusChange={() => {}}
+          restoreStep={3}
+          restoreDraft={{
+            batch_id: "draft-fullscreen-step-3",
+            work_type: "warehouse_io",
+            sub_type: "warehouse_to_dept",
+            from_department: null,
+            to_department: "조립",
+            bundles: [],
+          } as never}
+          itemPickerFullscreen
+          onItemPickerFullscreenChange={onItemPickerFullscreenChange}
+        />
+      </QueryClientProvider>,
+    );
+
+    const exitButton = await screen.findByRole("button", { name: "전체 화면 해제" });
+
+    expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument();
+    onItemPickerFullscreenChange.mockClear();
+    fireEvent.click(exitButton);
+    expect(onItemPickerFullscreenChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("does not show a preselected work type while choosing Step 1", async () => {
     renderCompose();
 

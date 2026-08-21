@@ -54,5 +54,7 @@ export interface IoComposeViewProps {
   onStatusChange: (status: string) => void;
   onSubmitSuccess?: () => void;
   onItemConversionFocusChange?: (focused: boolean) => void;
+  itemPickerFullscreen?: boolean;
+  onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
   onDraftSaved?: (batchId: string, step: IoStep) => void;
 }

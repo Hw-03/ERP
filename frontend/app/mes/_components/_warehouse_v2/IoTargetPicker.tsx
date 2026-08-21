@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
+import { ArrowRight, GripVertical, Maximize2, Minimize2, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
@@ -65,6 +65,8 @@ interface Props {
   onRemoveBundles: (bundleIds: string[]) => void;
   onAdvance: () => void;
   busy?: boolean;
+  fullscreen?: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
   /**
    * 대시보드에서 BOM 부모 품목으로 진입했을 때, 자동 카트 추가는 보류하고
    * 해당 row 만 시각적으로 강조한다. row 가 마운트되면 scrollIntoView 로 가운데
@@ -218,6 +220,8 @@ export function IoTargetPicker({
   onRemoveBundles,
   onAdvance,
   busy,
+  fullscreen = false,
+  onFullscreenChange,
   highlightItemId,
 }: Props) {
   const [dept, setDept] = useState("ALL");
@@ -249,6 +253,15 @@ export function IoTargetPicker({
       el.scrollTop = scrollPosRef.current;
     }
   }, [bundles]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) onFullscreenChange?.(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fullscreen, onFullscreenChange]);
 
   const actionMode = getItemActionMode(subType);
   const keyword = search.trim().toLowerCase();
@@ -480,6 +493,8 @@ export function IoTargetPicker({
                 dragId={dragId}
                 dropTargetId={dropTargetId}
                 makeHandlers={makeHandlers}
+                fullscreen={fullscreen}
+                onFullscreenChange={onFullscreenChange}
               />
             ) : (
               <ItemTable
@@ -503,6 +518,8 @@ export function IoTargetPicker({
                 hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
                 allowMix={allowsMixedBundles(subType)}
                 highlightItemId={highlightItemId ?? null}
+                fullscreen={fullscreen}
+                onFullscreenChange={onFullscreenChange}
               />
             )}
           </div>
@@ -697,6 +714,8 @@ function ItemTable({
   hasSingleBundle,
   allowMix,
   highlightItemId,
+  fullscreen,
+  onFullscreenChange,
 }: {
   items: Item[];
   displayLimit: number;
@@ -723,6 +742,8 @@ function ItemTable({
   hasSingleBundle: boolean;
   allowMix: boolean;
   highlightItemId: string | null;
+  fullscreen: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
   const isInternalUse = workType === "internal_use" && subType === "internal_use_out";
@@ -754,7 +775,7 @@ function ItemTable({
           <col className={isInternalUse ? "w-0 lg:w-32" : "w-0 lg:w-[8%]"} />
           {!isInternalUse && <col style={{ width: 128 }} />}
         </colgroup>
-        <thead className="sticky top-0 z-10">
+        <thead className="sticky top-0 z-10 relative">
           <tr
             className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
             style={{ color: LEGACY_COLORS.muted2 }}
@@ -767,6 +788,7 @@ function ItemTable({
               }}
             >
               품목명
+              <FullscreenToggle fullscreen={fullscreen} onFullscreenChange={onFullscreenChange} />
             </th>
             <th
               className="hidden px-3 py-2 text-center lg:table-cell"
@@ -1123,11 +1145,15 @@ function EditOrderTable({
   dragId,
   dropTargetId,
   makeHandlers,
+  fullscreen,
+  onFullscreenChange,
 }: {
   items: Item[];
   dragId: string | null;
   dropTargetId: string | null;
   makeHandlers: UseItemOrderDragResult["makeHandlers"];
+  fullscreen: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   return (
     <table className="w-full border-collapse text-sm">
@@ -1136,7 +1162,7 @@ function EditOrderTable({
         <col style={{ width: "66%" }} />
         <col style={{ width: "30%" }} />
       </colgroup>
-      <thead className="sticky top-0 z-10">
+      <thead className="sticky top-0 z-10 relative">
         <tr
           className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
@@ -1150,6 +1176,7 @@ function EditOrderTable({
             style={{ background: "var(--c-popup-bg)", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
           >
             품목명
+            <FullscreenToggle fullscreen={fullscreen} onFullscreenChange={onFullscreenChange} />
           </th>
           <th
             className="px-3 py-2"
@@ -1210,6 +1237,30 @@ function EditOrderTable({
         )}
       </tbody>
     </table>
+  );
+}
+
+function FullscreenToggle({
+  fullscreen,
+  onFullscreenChange,
+}: {
+  fullscreen: boolean;
+  onFullscreenChange?: (fullscreen: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onFullscreenChange?.(!fullscreen)}
+      className="absolute left-1/2 top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[8px] border px-2 py-1 text-[11px] font-bold normal-case tracking-normal shadow-sm lg:inline-flex"
+      style={{
+        background: LEGACY_COLORS.s1,
+        borderColor: LEGACY_COLORS.border,
+        color: LEGACY_COLORS.muted2,
+      }}
+    >
+      {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+      {fullscreen ? "전체 화면 해제" : "전체 화면"}
+    </button>
   );
 }
 

@@ -57,7 +57,25 @@ vi.mock("../DesktopTopbar", () => ({
 }));
 
 vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => <div /> }));
-vi.mock("../DesktopWarehouseView", () => ({ DesktopWarehouseView: () => <div /> }));
+vi.mock("../DesktopWarehouseView", () => ({
+  DesktopWarehouseView: ({
+    itemPickerFullscreen,
+    onItemPickerFullscreenChange,
+  }: {
+    itemPickerFullscreen?: boolean;
+    onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
+  }) => (
+    <section>
+      <span data-testid="warehouse-item-picker-fullscreen-state">{String(Boolean(itemPickerFullscreen))}</span>
+      <button type="button" onClick={() => onItemPickerFullscreenChange?.(true)}>
+        enter item picker fullscreen
+      </button>
+      <button type="button" onClick={() => onItemPickerFullscreenChange?.(false)}>
+        exit item picker fullscreen
+      </button>
+    </section>
+  ),
+}));
 vi.mock("../DesktopShippingView", () => ({ DesktopShippingView: () => <div /> }));
 vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <div /> }));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <div /> }));
@@ -108,5 +126,22 @@ describe("DesktopMesShell warehouse map fullscreen", () => {
     const tabContent = container.querySelector<HTMLDivElement>(".desktop-tab-content");
     expect(tabContent).toBeInstanceOf(HTMLDivElement);
     expect(tabContent!.className).not.toMatch(/\bmt-\S+/);
+  });
+
+  it("hides the desktop topbar while the warehouse item picker is fullscreen", () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse");
+    render(<DesktopMesShell />);
+
+    expect(screen.getByTestId("warehouse-item-picker-fullscreen-state")).toHaveTextContent("false");
+    expect(screen.getByTestId("desktop-topbar")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "enter item picker fullscreen" }));
+
+    expect(screen.getByTestId("warehouse-item-picker-fullscreen-state")).toHaveTextContent("true");
+    expect(screen.queryByTestId("desktop-topbar")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "exit item picker fullscreen" }));
+    expect(screen.getByTestId("warehouse-item-picker-fullscreen-state")).toHaveTextContent("false");
+    expect(screen.getByTestId("desktop-topbar")).toBeInTheDocument();
   });
 });

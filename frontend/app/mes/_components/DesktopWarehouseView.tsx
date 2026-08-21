@@ -30,12 +30,16 @@ export function DesktopWarehouseView({
   preselectedItem,
   entryIntent,
   onSubmitSuccess,
+  itemPickerFullscreen = false,
+  onItemPickerFullscreenChange,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
   entryIntent?: IoEntryIntent | null;
   onSubmitSuccess?: () => void;
+  itemPickerFullscreen?: boolean;
+  onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const revision = useRealtimeRevision();
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
@@ -116,6 +120,7 @@ export function DesktopWarehouseView({
       const next = normalizeSectionTab(new URLSearchParams(window.location.search).get("section"));
       if (next !== sectionTab) {
         if (next !== "compose") setItemConversionFocused(false);
+        onItemPickerFullscreenChange?.(false);
         setWorkAreaEmpty(false);
       }
       setSectionTab(next);
@@ -231,6 +236,7 @@ export function DesktopWarehouseView({
   function handleSectionTabChange(next: WarehouseSectionTab) {
     if (next !== sectionTab) {
       if (next !== "compose") setItemConversionFocused(false);
+      onItemPickerFullscreenChange?.(false);
       setWorkAreaEmpty(false);
     }
     setSectionTab(next);
@@ -263,24 +269,26 @@ export function DesktopWarehouseView({
         className={`scrollbar-hide flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden pl-0 pr-4 pt-0 ${isComposeSection || removeWorkAreaBottomSpace ? "pb-0" : "pb-10"}`}
       >
         <WarehouseHeader loadFailure={loadFailure} />
-        <div
-          className={`sticky top-0 z-20 shrink-0 overflow-hidden bg-[var(--c-bg)] transition-[max-height,opacity,transform,margin] duration-200 ${
-            hideSectionTabs ? "-mb-3 max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"
-          }`}
-          aria-hidden={hideSectionTabs}
-        >
-          <WarehouseSectionTabs
-            active={sectionTab}
-            onChange={handleSectionTabChange}
-            showQueue={canSeeQueue}
-            showDeptQueue={canSeeDeptQueue}
-            showHandover={showHandover}
-            cartCount={cartCount}
-            queueCount={warehouseQueueCount}
-            deptQueueCount={deptQueueCount}
-            handoverInboxCount={handoverInboxCount}
-          />
-        </div>
+        {!itemPickerFullscreen && (
+          <div
+            className={`sticky top-0 z-20 shrink-0 overflow-hidden bg-[var(--c-bg)] transition-[max-height,opacity,transform,margin] duration-200 ${
+              hideSectionTabs ? "-mb-3 max-h-0 -translate-y-1 opacity-0" : "max-h-20 translate-y-0 opacity-100"
+            }`}
+            aria-hidden={hideSectionTabs}
+          >
+            <WarehouseSectionTabs
+              active={sectionTab}
+              onChange={handleSectionTabChange}
+              showQueue={canSeeQueue}
+              showDeptQueue={canSeeDeptQueue}
+              showHandover={showHandover}
+              cartCount={cartCount}
+              queueCount={warehouseQueueCount}
+              deptQueueCount={deptQueueCount}
+              handoverInboxCount={handoverInboxCount}
+            />
+          </div>
+        )}
 
         {!isComposeSection && (
           <div
@@ -362,6 +370,8 @@ export function DesktopWarehouseView({
                 onSubmitSuccess?.();
               }}
               onItemConversionFocusChange={setItemConversionFocused}
+              itemPickerFullscreen={itemPickerFullscreen}
+              onItemPickerFullscreenChange={onItemPickerFullscreenChange}
               onDraftSaved={persistWarehouseDraftUrl}
             />}
           </div>
