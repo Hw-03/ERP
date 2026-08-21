@@ -121,6 +121,8 @@ export function IoComposeView({
   onStatusChange,
   onSubmitSuccess,
   onItemConversionFocusChange,
+  itemPickerFullscreen = false,
+  onItemPickerFullscreenChange,
   onDraftSaved,
 }: IoComposeViewProps) {
   const revision = useRealtimeRevision();
@@ -800,6 +802,12 @@ export function IoComposeView({
     setAuditScreen({ key: "desktop.warehouse", label: "입출고" }, { force: true });
   }, []);
 
+  useEffect(() => {
+    if (step !== 3) onItemPickerFullscreenChange?.(false);
+  }, [step, onItemPickerFullscreenChange]);
+
+  useEffect(() => () => onItemPickerFullscreenChange?.(false), [onItemPickerFullscreenChange]);
+
   function stepTitle(stepId: IoStep) {
     if (stepId === 3) return `${pickerDirectionLabel(state.subType)} 품목 선택`;
     return stepId === 1
@@ -825,7 +833,7 @@ export function IoComposeView({
     state.goTo(1);
   }
 
-  const workChrome = (
+  const workChrome = itemPickerFullscreen ? undefined : (
     <div className="iwc">
       <nav className="iwp" data-testid="io-step-nav">
         {([1, 2, 3, 4, 5] as IoStep[]).map((stepId) => {
@@ -987,7 +995,7 @@ export function IoComposeView({
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, state.bundles.length]);
+  }, [step, state.bundles.length, itemPickerFullscreen]);
 
   useEffect(() => {
     const el = stepRefs.current[step];
@@ -1175,6 +1183,8 @@ export function IoComposeView({
                 if (state.bundles.length > 0) state.goTo(4);
               }}
               busy={previewing}
+              fullscreen={itemPickerFullscreen}
+              onFullscreenChange={onItemPickerFullscreenChange}
             />
           </WizardStepCard>
         </div>

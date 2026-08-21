@@ -7,10 +7,10 @@
 - 원 감사 기준일·SHA: 2026-08-13 KST, `71d6a34faf27ef736fe7dc64a5084ff2a7f46893`
 - 첫 개선 체크포인트 기준 SHA: `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`
 - 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
-- 최신 `main` 동기화 SHA: `ea6da6705c930e14c315accdc6d5c5101af703b1`
+- 최신 `main` 동기화 SHA: `957ec65805c3efe820416e49ba6eb839d6364665`
 - 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
 - Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. 체크포인트 3은 `e07bc0c1`·`88cdd25b`로 분리 커밋해 같은 원격 품질 브랜치에 push했고, 그 위에 최신 `origin/main` `ea6da670`을 병합한 이 문서 포함 merge commit도 품질 브랜치에만 push한다. `main` 역병합·push·PR은 없음
-- 실행 진척: 체크포인트 1 완료. 체크포인트 2의 `IC-04`·`IC-20`은 로컬 구현·PostgreSQL 실증을 완료했지만 GitHub CI·required-check 증거를 보류한다. 체크포인트 3의 `IC-01`은 승인 설계에 따라 구현하고 SQLite·Node 20·Playwright 통합 gate를 통과했다. 최신 `main`의 18개 커밋·123개 변경 경로를 품질 브랜치에 동기화하고 delta 감사·통합 검증을 수행했으며 체크포인트 4는 아직 시작하지 않았다. 이번 환경에는 `TEST_POSTGRES_URL`이 없어 체크포인트 3 전용 PostgreSQL 폐기 경합은 `NOT_VERIFIED`다.
+- 실행 진척: 체크포인트 1 완료. 체크포인트 2의 `IC-04`·`IC-20`은 로컬 구현·PostgreSQL 실증을 완료했지만 GitHub CI·required-check 증거를 보류한다. 체크포인트 3의 `IC-01`은 승인 설계에 따라 구현하고 SQLite·Node 20·Playwright 통합 gate를 통과했다. 최신 `main`의 20개 커밋(비병합 19개)·127개 변경 경로를 품질 브랜치에 동기화하고 delta 감사·통합 검증을 수행했으며 체크포인트 4는 아직 시작하지 않았다. 이번 환경에는 `TEST_POSTGRES_URL`이 없어 체크포인트 3 전용 PostgreSQL 폐기 경합은 `NOT_VERIFIED`다.
 - 잔여 작업: 엄격한 완료 판정상 `IC` 23개가 남는다. 이 중 `IC-04`·`IC-20`은 외부 증거 대기이고, 체크포인트 4 이후 21개는 미착수다. 최종 closeout은 `DOC-01`, `AT-01`, `AT-02`다.
 - 최종 판정: **조건부 사용 가능**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
@@ -1830,12 +1830,13 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 
 ### 12.14 최신 `main` 동기화와 체크포인트 4 진입 전 delta 감사
 
-- **동기화 경계:** 원격 품질 브랜치와 일치하던 `88cdd25b` 위에서 `origin/main` `ea6da6705c930e14c315accdc6d5c5101af703b1`만 품질 워크트리로 병합했다. 이전 동기화 기준 `c01034a3..ea6da670`은 18개 커밋·123개 변경 경로다. `C:\ERP` 메인 워크트리와 `C:\ERP-dev`는 수정·복사·stash·reset·commit·push하지 않았다.
+- **동기화 경계:** 원격 품질 브랜치와 일치하던 `88cdd25b` 위에서 `origin/main`을 품질 워크트리 방향으로만 병합했다. 첫 검증 기준 `ea6da670` 뒤 원격이 다시 이동해 추가 UI 커밋 `bf8d5412`와 이를 포함한 최신 merge `957ec65805c3efe820416e49ba6eb839d6364665`까지 이어서 병합했다. 이전 동기화 기준 `c01034a3..957ec658`은 20개 커밋(비병합 19개)·127개 변경 경로다. `C:\ERP` 메인 워크트리와 `C:\ERP-dev`는 수정·복사·stash·reset·commit·push하지 않았다.
 - **delta 판정:** 부서 입출고의 차감 부서 선택, AS·연구 사용출고 BOM 모드, BOM 고정 자식수량, 생산능력·입출고·이력 UI와 개발 진단 도구 변경을 router→service→schema/test 및 실제 render 경로까지 재대조했다. 새 P0/P1 재고 mutation 결함은 확정되지 않았고, 기존 `IC-03` 이후 카드의 완료 상태도 올리지 않았다.
+- **마지막 UI delta:** `bf8d5412`의 9개 경로는 `/mes` → `DesktopMesShell` → `DesktopWarehouseView` → `IoComposeView` → `IoTargetPicker` 실제 렌더 경로에서 품목 선택만 전체 화면으로 전환한다. 재고 API·수량 계산·DB mutation은 없고, 관련 4파일·43개 테스트와 strict lint·app typecheck가 PASS했다. 모바일 하단 탭과 desktop shipping step 5 동결 경로는 포함하지 않는다.
 - **migration 직렬화:** 체크포인트 3의 작업자 세션 migration `20260819_0023` 뒤에 최신 `main`의 사용출고 BOM migration을 `20260820_0024`로 직렬화했다. Alembic ScriptDirectory와 CLI는 단일 head `20260820_0024`이며, 품질 워크트리 전용 `backend/mes.db`만 `0022→0023→0024`로 올렸다. 메인·직원 DB는 접근하거나 변경하지 않았다.
 - **병합 정합성:** CP3의 서버 검증 `VerifiedActor`·작업자 세션 계약과 최신 `main`의 AS·연구 BOM 분기, 출고 승인 부서, 고정 자식수량을 함께 유지했다. OpenAPI baseline은 현재 `app.openapi()`와 exact 일치하고 schema read-only check와 독립 inventory integrity 검사는 모두 PASS다.
 - **backend 통합:** 전체 1,922개를 4개 격리 worker로 수집해 **1,906 PASS, 환경 전용 16 SKIP, 실패 0**으로 종료했다. 백업 안전성 test의 “두 subprocess가 같은 1초 안에 끝나야 함”이라는 Windows 시간 의존 조건은 동일 publish 이름을 고정 주입하는 결정적 충돌 test로 바꿨고, 무작위 기본 PIN hash가 pytest parameter ID에 들어가 worker별 수집명이 달라지던 CP3 test는 고정 ID로 바꿨다. 두 보강의 focused RED/GREEN도 별도로 확인했다.
-- **frontend 통합:** Node 20.20.2에서 app/unit/E2E type, 255파일·2,142 Vitest, coverage(statement 93.74%, branch 88.30%, function 90%), production build를 통과했다. unit-test TypeScript baseline은 기존 386개에서 383개로 줄었고 신규 종류·증가는 0이다. 최신 `main`의 빌드 산출물도 2,458,398 bytes로 2.325MB 한도를 이미 넘었으며 통합 결과는 2,461,169 bytes였다. 두 승인 기능 집합을 수용하는 최소 2.350MB 한도(2,464,153.6 bytes)로 gate·계약 test를 함께 맞춰 PASS했다.
+- **frontend 통합:** Node 20.20.2에서 app/unit/E2E type, 255파일·2,142 Vitest, coverage(statement 93.74%, branch 88.30%, function 90%), production build를 통과했다. unit-test TypeScript baseline은 기존 386개에서 383개로 줄었고 신규 종류·증가는 0이다. 첫 검증 시 최신 `main`의 빌드 산출물도 2,458,398 bytes로 2.325MB 한도를 이미 넘었고 초기 통합 결과는 2,461,169 bytes였다. 마지막 전체 화면 UI까지 포함해 다시 build한 최종 결과는 **2,463,257 bytes**이며, 두 승인 기능 집합을 수용하는 최소 2.350MB 한도(2,464,153.6 bytes)에서 gate·계약 test가 PASS했다.
 - **브라우저·종료:** 전용 `mes_e2e.db`, 8021/3100만 사용한 Playwright는 16/16 PASS였고 teardown에서 실제 `backend/mes.db` SHA-256 전후 `598BD3606C91543C19B05CD17B2CB6F49609F45297A4764C7332C17EC990D448` 불변, listener·임시 DB·seed·결과물 0을 확인했다.
 - **잔존 경계:** 체크포인트 3 전용 PostgreSQL 두 연결 경합은 `TEST_POSTGRES_URL` 부재로 계속 `NOT_VERIFIED`이며 PASS로 세지 않는다. 최신 `main`에서 이미 커밋된 주간보고 화면 변경은 사용자 기능 변경으로 그대로 보존했지만 품질 동기화 과정에서 동결 파일을 추가 수정하지 않았고, 모바일 하단 탭과 desktop shipping step 5 동결 계약도 변경하지 않았다. 체크포인트 4 제품 구현은 0이다.
 - **Git closeout:** 이 동기화는 merge commit으로 `codex/full-code-quality-improvement`에만 push한다. `main` push·PR·품질 브랜치의 `main` 병합은 수행하지 않으며, 다음 작업은 clean 품질 브랜치에서 체크포인트 4 승인 범위만 시작한다.

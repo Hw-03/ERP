@@ -6,6 +6,8 @@ const currentComposeProps = vi.hoisted(() => ({
   value: null as null | {
     restoreDraft?: { batch_id: string } | null;
     restoreStep?: number;
+    itemPickerFullscreen?: boolean;
+    onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
   },
 }));
 
@@ -243,6 +245,37 @@ describe("DesktopWarehouseView", () => {
     fireEvent.click(screen.getByRole("button", { name: "품목 전환 포커스" }));
 
     expect(container.querySelector('[role="tablist"]')?.parentElement).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("품목 선택 전체 화면에서는 입출고 섹션 탭을 DOM에서 제거한다", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse");
+    const { container } = render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+        itemPickerFullscreen
+      />,
+    );
+
+    expect(container.querySelector('[role="tablist"]')).not.toBeInTheDocument();
+  });
+
+  it("passes fullscreen state and its handler to the compose view", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse");
+    const onItemPickerFullscreenChange = vi.fn();
+
+    render(
+      <DesktopWarehouseView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+        itemPickerFullscreen
+        onItemPickerFullscreenChange={onItemPickerFullscreenChange}
+      />,
+    );
+
+    expect(currentComposeProps.value?.itemPickerFullscreen).toBe(true);
+    currentComposeProps.value?.onItemPickerFullscreenChange?.(false);
+    expect(onItemPickerFullscreenChange).toHaveBeenCalledWith(false);
   });
 
   it("clears item conversion focus when leaving for Mine", () => {

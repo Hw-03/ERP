@@ -15,7 +15,7 @@
 - 브랜치: `codex/full-code-quality-improvement`
 - CP3 구현 기준 HEAD: `27da6e25718453378160fb9b930d8ed9cff8b622`
 - CP3 closeout commit: 기존 6파일 정리 `e07bc0c1`, `IC-01` 구현 `88cdd25b`. 두 커밋은 원격 `codex/full-code-quality-improvement`에 push 완료했다.
-- 최신 동기화 기준: `origin/main` `ea6da6705c930e14c315accdc6d5c5101af703b1`. 이 문서를 포함한 merge commit을 같은 원격 품질 브랜치에만 push한다.
+- 최신 동기화 기준: `origin/main` `957ec65805c3efe820416e49ba6eb839d6364665`. 첫 검증 뒤 추가된 `bf8d5412` 품목 선택 전체 화면까지 포함한 merge commit을 같은 원격 품질 브랜치에만 push한다.
 - `C:\ERP` 메인 워크트리는 사용자 작업 영역이므로 CP3 과정에서 읽기 확인 외 수정·복사·stash·reset·commit을 하지 않았다.
 - `C:\ERP-dev`는 파일·해시·검색·DB·프로세스·포트를 포함해 접근하지 않았다.
 - 회사 도메인, DNS, 홈페이지, HTTPS, 인증서, Caddy는 범위 밖으로 유지했다.
@@ -213,9 +213,10 @@ tracked modified 217개와 시작 전 6파일 분리는 CP3 commit 직전 snapsh
 
 ## 최신 `main` 동기화 closeout
 
-- `c01034a3..ea6da670`의 18개 커밋·123개 경로를 전수 delta 감사한 뒤 품질 브랜치에만 병합했다.
+- `c01034a3..957ec658`의 20개 커밋(비병합 19개)·127개 경로를 전수 delta 감사한 뒤 품질 브랜치에만 병합했다.
 - 작업자 세션 `20260819_0023`과 최신 `main`의 AS·연구 BOM migration을 `20260820_0024`로 직렬화했고 Alembic head는 하나다.
 - CP3 `VerifiedActor`·세션 계약과 최신 `main`의 차감 부서·BOM 모드·고정 자식수량을 함께 유지했다.
+- 마지막 `bf8d5412`의 데스크톱 입출고 품목 선택 전체 화면 9개 경로는 충돌 없이 반영했고 관련 43개 테스트·lint·app typecheck를 통과했다. 재고 API·DB mutation·동결 UI 변화는 없다.
 - backend migration·actor·IO focused gate와 전체 **1,922개 중 1,906 PASS·환경 전용 16 SKIP**, frontend Node 20 app/unit/E2E type·2,142 unit tests·coverage·build·bundle, OpenAPI exact, docs, schema read-only, inventory integrity, Playwright 16/16을 검증했다.
 - `TEST_POSTGRES_URL` 부재로 CP3 PostgreSQL 실경합은 계속 `NOT_VERIFIED`다. 새 blocker나 PASS로 바꾸지 않는다.
 - Playwright teardown 뒤 8021·3100 listener, `mes_e2e.db`, seed·결과물은 0이고 실제 `backend/mes.db` SHA-256은 전후 `598BD3606C91543C19B05CD17B2CB6F49609F45297A4764C7332C17EC990D448`로 같다.
@@ -226,7 +227,7 @@ tracked modified 217개와 시작 전 6파일 분리는 CP3 commit 직전 snapsh
 CP4는 이 작업에서 시작하지 않는다. 별도 CP4 작업이 사용자에게 배정된 뒤에만 다음 순서를 따른다.
 
 1. `C:\ERP\AGENTS.md`와 이 최종 handoff를 읽는다.
-2. 작업 위치가 `C:\ERP\.worktrees\full-code-quality-checkpoint-2`, branch가 `codex/full-code-quality-improvement`인지 확인하고, `git log`에서 `e07bc0c1`·`88cdd25b`와 최신 `main` `ea6da670` 동기화 merge commit이 품질 원격 브랜치와 일치하는지 확인한다. `27da6e25718453378160fb9b930d8ed9cff8b622`는 역사적 CP3 구현 기준 HEAD다.
+2. 작업 위치가 `C:\ERP\.worktrees\full-code-quality-checkpoint-2`, branch가 `codex/full-code-quality-improvement`인지 확인하고, `git log`에서 `e07bc0c1`·`88cdd25b`와 최신 `main` `957ec658` 동기화 merge commit이 품질 원격 브랜치와 일치하는지 확인한다. `27da6e25718453378160fb9b930d8ed9cff8b622`는 역사적 CP3 구현 기준 HEAD다.
 3. 위 inventory는 역사적 CP3 provenance snapshot으로만 사용하고, CP4 시작 시 working tree가 clean인지 확인한다.
 4. PostgreSQL을 `NOT_VERIFIED`로 유지하고 사용자 승인 없이 추가 branch·commit·push·PR을 하지 않는다.
 5. CP4의 승인 범위만 별도 계획·TDD로 시작한다. CP3 closeout을 다시 구현하거나 제품 검증을 반복하지 않는다.

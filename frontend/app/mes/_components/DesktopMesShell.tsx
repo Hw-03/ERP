@@ -116,6 +116,7 @@ function DesktopMesShellInner({
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [adminPinEntryNonce, setAdminPinEntryNonce] = useState(0);
   const [warehouseMapFullscreen, setWarehouseMapFullscreen] = useState(false);
+  const [itemPickerFullscreen, setItemPickerFullscreen] = useState(false);
   const [dailyReportTopbarControls, setDailyReportTopbarControls] = useState<ReactNode>(null);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUrlTabRef = useRef<DesktopTabId | null>(null);
@@ -287,6 +288,12 @@ function DesktopMesShellInner({
   }, [activeTab, warehouseMapFullscreen]);
 
   useEffect(() => {
+    if (activeTab !== "warehouse" && itemPickerFullscreen) {
+      setItemPickerFullscreen(false);
+    }
+  }, [activeTab, itemPickerFullscreen]);
+
+  useEffect(() => {
     if (activeTab !== "dailyReport") setDailyReportTopbarControls(null);
   }, [activeTab]);
 
@@ -352,6 +359,7 @@ function DesktopMesShellInner({
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
 
   const activeMeta = TAB_META[activeTab];
+  const isItemPickerFullscreen = activeTab === "warehouse" && itemPickerFullscreen;
 
   const canOpenWarehouse = canOpenTab("warehouse");
   const canReceive = canSeeWorkType("receive", operator) && canOpenWarehouse;
@@ -393,6 +401,8 @@ function DesktopMesShellInner({
             clearWarehouseEntry();
             void refetchCapacity();
           }}
+          itemPickerFullscreen={isItemPickerFullscreen}
+          onItemPickerFullscreenChange={setItemPickerFullscreen}
         />
       );
     }
@@ -451,7 +461,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
+  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
 
   return (
     <>
@@ -479,7 +489,7 @@ function DesktopMesShellInner({
           />
 
           <div className="min-w-0 flex-1 flex flex-col">
-            {!warehouseMapFullscreen && (
+            {!warehouseMapFullscreen && !isItemPickerFullscreen && (
               <DesktopTopbar
                 title={activeMeta.title}
               icon={activeMeta.icon}
@@ -499,7 +509,7 @@ function DesktopMesShellInner({
               />
             )}
 
-            <div className={`${warehouseMapFullscreen ? "" : "mt-3"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>
+            <div className={`${warehouseMapFullscreen || isItemPickerFullscreen ? "" : "mt-3"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>
               <div
                 key={activeTab}
                 data-testid="desktop-tab-transition"
