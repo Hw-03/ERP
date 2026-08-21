@@ -47,6 +47,28 @@ describe("InventoryFilters", () => {
     expect(onSearchChange).toHaveBeenCalledWith("진공");
   });
 
+  it("스크롤 고정 검색 헤더의 24px 상단 곡률을 배경과 분리한다", () => {
+    render(
+      <InventoryTableStickyHeader
+        searchValue=""
+        onSearchChange={vi.fn()}
+        count={0}
+        isFiltered={false}
+      />,
+    );
+
+    const header = screen.getByRole("textbox", { name: "자재 검색" }).closest(".sticky");
+    const cornerMask = screen.getByTestId("inventory-sticky-header-corner-mask");
+
+    expect(header).toHaveClass("rounded-t-[24px]");
+    expect(header).not.toHaveClass("rounded-t-[28px]");
+    expect(cornerMask).toHaveClass("pointer-events-none", "absolute", "left-0", "-right-px", "top-0", "z-30", "h-6");
+    expect(cornerMask).not.toHaveClass("inset-x-0");
+    expect(cornerMask.children).toHaveLength(2);
+    expect(cornerMask.children[0].getAttribute("style")).toContain("var(--c-bg)");
+    expect(cornerMask.children[1].getAttribute("style")).toContain("var(--c-bg)");
+  });
+
   it("별도 AND/OR 안내 문구 없이 불용 칩을 렌더한다", () => {
     render(<InventoryFilters {...baseProps} />);
 

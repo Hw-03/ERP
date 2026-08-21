@@ -170,7 +170,7 @@ export function InventoryTableStickyHeader({
 }: StickyHeaderProps) {
   return (
     <div
-      className="sticky top-0 z-20 -mx-5 -mt-5 mb-0 rounded-t-[28px]"
+      className="sticky top-0 z-20 -mx-5 -mt-5 mb-0 rounded-t-[24px]"
       style={{
         background: "var(--c-popup-bg)",
       }}
@@ -190,6 +190,20 @@ export function InventoryTableStickyHeader({
             aria-label="자재 검색"
           />
         </div>
+      </div>
+      <div
+        aria-hidden
+        data-testid="inventory-sticky-header-corner-mask"
+        className="pointer-events-none absolute -right-px left-0 top-0 z-30 flex h-6 justify-between"
+      >
+        <span
+          className="h-6 w-6"
+          style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-bg) 24px)" }}
+        />
+        <span
+          className="h-6 w-6"
+          style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-bg) 24px)" }}
+        />
       </div>
     </div>
   );
