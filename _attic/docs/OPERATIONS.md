@@ -204,14 +204,18 @@ scripts\ops\healthcheck.bat
 ### 파일 로그 (Phase 4 추가)
 - 위치: `_attic/runtime/logs/backend/mes.log`
 - 런타임 stdout/stderr 및 상태 파일: `_attic/runtime/logs/backend/`, `_attic/runtime/logs/frontend/`
-- 프런트 개발 서버 종료 원인 추적 로그: `_attic/runtime/logs/frontend/dev-server.log` — `NEXT_SIGNAL_RECEIVED`가 기록되면 `watch-service.ps1 -Service frontend`가 `[FRONTEND ERROR]`로 강조하며, `NEXT_SIGNAL_PROBE_READY`와 `NEXT_PROCESS_EXIT`는 프로세스 수명 연결에 사용한다.
+- 프런트 개발 서버 종료 원인 추적 로그: `_attic/runtime/logs/frontend/dev-server.log` — `NEXT_SIGNAL_RECEIVED`가 기록되면 `watch-service.ps1 -Service frontend`가 `[FRONTEND ERROR]`로 강조하며, `NEXT_SIGNAL_PROBE_READY`, `NEXT_WORKER_CHILD_EXIT`, `NEXT_PROCESS_EXIT`는 프로세스 수명과 워커 원시 종료 결과 연결에 사용한다.
 - 회전: `ConcurrentRotatingFileHandler` 기반 다중 프로세스 안전 회전, 5MiB × 기본 5 backup (`mes.log.1` ~ `mes.log.5`)
 - 환경 변수: `LOG_LEVEL` (기본 INFO), `LOG_BACKUP_COUNT` (1 이상의 정수, 기본 5; 잘못된 값은 기본값 사용), `MES_RUNTIME_ROOT` (전체 런타임 루트 재정의)
 - 내용: 전역 예외 핸들러가 잡은 ValueError/IntegrityError/Exception + INFO 레벨 메시지
 
 ### 프런트 개발 서버 종료 원인 추적
 
-프런트 개발 서버가 예기치 않게 종료되면 먼저 `_attic/runtime/logs/frontend/dev-server.log`의 수명 기록을 확인한다. preload는 `NODE_OPTIONS`를 상속받은 일반 Node 자식에는 기록기나 신호 처리기를 붙이지 않고, 정확한 Next CLI 엔트리(`next/dist/bin/next`)와 `NEXT_PRIVATE_WORKER=1`인 Next worker 엔트리(`next/dist/server/lib/start-server.js`)만 기록한다. `NEXT_SIGNAL_RECEIVED`는 해당 Node 프로세스의 JavaScript 런타임이 `SIGINT` 또는 `SIGTERM`을 실제로 받은 신호 증거다. Windows에서 Next private worker가 JavaScript 신호 처리 없이 강제 종료되면 worker의 종료 기록 자체가 남지 않을 수 있다. 이때 조회 도구는 PID와 PPID가 모두 같은 부모 Next CLI 수명 안에서 기록된 worker의 `NEXT_SIGNAL_PROBE_READY`와 CLI의 `NEXT_PROCESS_EXIT`를 연결하여 CLI 종료 시각을 `worker_exit_without_signal` 후보 기준점으로 사용한다. 해당 CLI나 매핑된 worker의 같은 수명 신호 기록이 하나라도 있으면 신호 결과만 표시하고 fallback은 만들지 않는다. fallback의 `cliUptimeMs`는 CLI 종료 시점의 가동 시간이고, `workerReadyUptimeMs`는 worker가 probe를 붙인 시점의 가동 시간이며 worker의 전체 가동 시간이 아니다. Sysmon 수집기를 설치한 뒤에는 저장소 루트에서 다음처럼 추적 도구를 실행한다.
+프런트 개발 서버가 예기치 않게 종료되면 먼저 `_attic/runtime/logs/frontend/dev-server.log`의 수명 기록을 확인한다. preload는 `NODE_OPTIONS`를 상속받은 일반 Node 자식에는 기록기나 신호 처리기를 붙이지 않고, 정확한 Next CLI 엔트리(`next/dist/bin/next`)와 `NEXT_PRIVATE_WORKER=1`인 Next worker 엔트리(`next/dist/server/lib/start-server.js`)만 기록한다. `NEXT_SIGNAL_RECEIVED`는 해당 Node 프로세스의 JavaScript 런타임이 `SIGINT` 또는 `SIGTERM`을 실제로 받은 신호 증거다. 부모 Next CLI는 정확한 `start-server.js` 자식의 `exit` 이벤트만 읽기 전용으로 관찰하고 `NEXT_WORKER_CHILD_EXIT`에 워커 PID·부모 PID·원시 `exitCode`·`signal`을 기록한다. 자식의 종료·재시작·종료 코드는 변경하지 않는다.
+
+정확한 private worker에는 Node 진단 보고서도 켠다. 보고서는 `_attic/runtime/logs/frontend/node-reports/`에 최대 3개만 남기며, `reportOnFatalError`와 `reportOnUncaughtException`으로 OOM·미처리 JavaScript 예외 후보를 남긴다. 환경 변수와 네트워크 정보는 제외한다. `NEXT_NODE_REPORT_READY`가 있어야 수집 설정이 완료된 것이며, `NEXT_NODE_REPORT_SETUP_FAILED`는 서버 시작·종료 동작을 바꾸지 않고 설정 실패만 기록한다. CLI·직원 프로필·일반 Node 자식에는 이 설정을 적용하지 않는다.
+
+Windows에서 Next private worker가 JavaScript 신호 처리 없이 종료되면 worker 자신의 `NEXT_PROCESS_EXIT`가 남지 않을 수 있지만, 부모 CLI의 `NEXT_WORKER_CHILD_EXIT`는 이 경우에도 원시 자식 종료 결과를 보존한다. 조회 도구는 PID와 PPID가 모두 같은 부모 Next CLI 수명 안에서 이 기록을 연결해 `workerExitObservedUtc`, `workerExitCode`, `workerSignal`로 출력하고, 해당 관찰 시각을 Sysmon·덤프 조회 기준점으로 사용한다. 이전 로그처럼 관찰 기록이 없으면 CLI의 `NEXT_PROCESS_EXIT` 시각을 `worker_exit_without_signal` 기준점으로 계속 사용하며 세 필드는 `null`이다. 해당 CLI나 매핑된 worker의 같은 수명 신호 기록이 하나라도 있으면 신호 결과만 표시하고 fallback은 만들지 않는다. fallback의 `cliUptimeMs`는 CLI 종료 시점의 가동 시간이고, `workerReadyUptimeMs`는 worker가 probe를 붙인 시점의 가동 시간이며 worker의 전체 가동 시간이 아니다. 원시 종료 코드는 충돌 유형을 좁히는 직접 증거지만, 단독으로 오류 모듈이나 외부 발신 프로세스를 확정하지는 않으므로 WER 덤프·Node 진단 보고서·Sysmon 후보를 함께 대조한다. `nodeReportStatus=node_report_captured`면 `nodeReportPath`, `nodeReportCapturedUtc`, `nodeReportEvent`, `nodeReportTrigger`, `nodeReportJavaScriptMessage`, 최대 10개 `nodeReportNativeStack`을 함께 확인한다. WER 덤프와 Node 보고서가 같은 worker 수명에 함께 있으면 둘 다 보존하며, 두 증거가 모두 없다는 사실만으로 외부 종료를 단정하지 않는다. Sysmon 수집기를 설치한 뒤에는 저장소 루트에서 다음처럼 추적 도구를 실행한다.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\get-frontend-stop-attribution.ps1
@@ -219,7 +223,34 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\get-frontend-stop-attribu
 
 Sysmon Event 10(Process access)은 종료 시각에 접근한 프로세스를 좁히는 **후보 접근 증거**일 뿐이며, 그 이벤트만으로 종료 신호의 발신자를 확정할 수 없다. 특히 `worker_exit_without_signal`은 신호 없이 사라진 worker와 부모 CLI 종료의 시간 관계를 보완하는 후보 증거이지, worker가 강제 종료되었다거나 Sysmon 발신 프로세스가 종료시켰음을 단독으로 증명하지 않는다. 개발 서버 로그의 신호·종료 시각, 프로세스 수명, Sysmon 후보를 함께 대조한다.
 
-기본 조회 범위는 최근 2시간과 신호 또는 fallback 기준점 시각 전후 5초이며, `-Since`, `-WindowSeconds`(1~60), `-AsJson`을 선택할 수 있다. Sysmon 이벤트는 이벤트 뷰어의 `Applications and Services Logs > Microsoft > Windows > Sysmon > Operational` (`Microsoft-Windows-Sysmon/Operational`)에서 확인한다. 조회 도구는 그중 Event ID 10만 읽으며, 전역 ProcessCreate/발신 명령줄 수집은 사용하지 않는다. Sysmon 자체 서비스·구성 변화(Event ID 4·16)는 필터할 수 없어 채널에 남을 수 있지만, 후보 분석에는 사용하지 않는다.
+Windows Error Reporting(WER) 미니덤프 수집은 개발 PC에서만 관리자 PowerShell로 명시적으로 켠다. 기존 `node.exe` LocalDumps 설정 또는 DEXCOWIN MES 관리 표식이 있으면 덮어쓰지 않고 중단한다. 실제 적용 전에 `-WhatIf`로 대상을 확인하고, 확인 프롬프트에서 `Y`를 선택한다. 재부팅은 필요 없다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\enable-frontend-crash-dumps.ps1 -WhatIf
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\enable-frontend-crash-dumps.ps1
+```
+
+설정은 `HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\node.exe`에 `DumpType=1`, `DumpCount=3`, `DumpFolder=C:\ERP\_attic\runtime\logs\frontend\crashdumps`를 기록한다. WER 미니덤프는 Windows 네이티브 미처리 충돌의 후보 증거다. 이 Windows 설정은 실행 파일 이름이 `node.exe`인 프로세스 전체에 적용되므로, 다른 Node 프로세스가 실제로 충돌해도 최대 3개의 덤프가 만들어질 수 있다. 조회 도구는 덤프 파일명의 PID와 종료 기준점 전후 시간창을 모두 맞춰 Next worker 증거로 다시 좁힌다. 출력의 `dumpStatus=process_crash_dump_captured`이면 `dumpPath`, `dumpCapturedUtc`, `dumpSizeBytes`를 함께 확인한다. `dumpStatus=dump_not_captured`는 해당 PID·시간창에서 덤프를 찾지 못했다는 뜻일 뿐이며, 외부 강제 종료 또는 비충돌 종료를 확정하는 증거가 아니다. 현재 Node 24.15/Windows 환경에서 `process.abort()`는 WER 덤프와 Node 보고서의 수집 검증 수단이 아니므로, 이 결과를 외부 종료 증거로 해석하지 않는다.
+
+덤프와 Node 보고서는 비밀번호·토큰·업무 데이터가 들어 있을 수 있으므로 `_attic/runtime` 밖으로 복사하거나 커밋·업로드하지 않는다. 공식 WinDbg 설치 후 승인된 crashdumps 디렉터리의 `.dmp`만 다음 도구로 분석한다. 분석기는 GUI를 열지 않고 공식 `Microsoft.WinDbg` 패키지의 `amd64\cdb.exe`를 사용하며, 분석 보고서는 같은 런타임 디렉터리에 `*.analysis.txt`로 남는다.
+
+```powershell
+winget install --id Microsoft.WinDbg -e --source winget
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\analyze-frontend-crash-dump.ps1
+# 또는 특정 덤프
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\analyze-frontend-crash-dump.ps1 -DumpPath 'C:\ERP\_attic\runtime\logs\frontend\crashdumps\node.exe.<PID>.dmp'
+```
+
+분석 보고서에서는 `ExceptionCode`, `PROCESS_NAME`, `MODULE_NAME`/`IMAGE_NAME`, `FAILURE_BUCKET_ID`, `STACK_TEXT`를 먼저 확인하고 같은 시각의 `dev-server.log`와 Sysmon 후보를 대조한다. 수집을 끌 때는 다음 명령을 사용한다. 제거 도구는 자체 표식과 정확히 일치하는 레지스트리 설정만 제거하며, 이미 수집한 덤프와 분석 보고서는 보존한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\disable-frontend-crash-dumps.ps1 -WhatIf
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\disable-frontend-crash-dumps.ps1
+```
+
+기본 조회 범위는 최근 2시간과 신호 또는 fallback 기준점 시각 전후 5초이며, `-Since`, `-WindowSeconds`(1~60), `-AsJson`을 선택할 수 있다. Sysmon 이벤트는 이벤트 뷰어의 `Applications and Services Logs > Microsoft > Windows > Sysmon > Operational` (`Microsoft-Windows-Sysmon/Operational`)에서 확인한다. 조회 도구는 각 기준점의 대상 PID와 시간창을 XPath에 넣어 Event ID 10만 읽으며, 전역 ProcessCreate/발신 명령줄 수집은 사용하지 않는다. Sysmon 자체 서비스·구성 변화(Event ID 4·16)는 필터할 수 없어 채널에 남을 수 있지만, 후보 분석에는 사용하지 않는다.
+
+이벤트 접근량이 많으면 Operational 채널의 과거 레코드가 빠르게 덮어써질 수 있다. 예기치 않은 종료를 발견하면 즉시 관리자 PowerShell에서 조회하고, 필요한 `-AsJson` 결과를 `_attic/runtime/logs/frontend/`에 보존한다.
 
 현재 Windows 11 개발 호스트에는 Microsoft의 **내장 Sysmon**을 사용한다. standalone `Sysmon64.exe` v15.21이 이 호스트에서 `0xC0000409`로 중단되어, Microsoft가 지원하는 내장 기능으로 전환했다. 내장 Sysmon과 standalone Sysmon은 함께 설치할 수 없다.
 

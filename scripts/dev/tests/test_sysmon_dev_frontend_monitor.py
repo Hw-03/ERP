@@ -136,8 +136,11 @@ def test_attribution_contract_returns_each_signal_with_its_event_10_candidates()
     assert "[switch] $AsJson" in script
     assert '"dev-server.log"' in script
     assert "NEXT_SIGNAL_RECEIVED" in script
-    assert "$SysmonQueryStartUtc = $SinceUtc.Subtract($window)" in script
-    assert 'Get-WinEvent -FilterHashtable @{ LogName = "Microsoft-Windows-Sysmon/Operational"; Id = 10; StartTime = $SysmonQueryStartUtc' in script
+    assert "Get-SysmonProcessAccessEvents" in script
+    assert "AnchorUtc.Subtract($Window)" in script
+    assert "AnchorUtc.Add($Window)" in script
+    assert "Data[@Name='TargetProcessId']" in script
+    assert "Get-WinEvent -LogName $OperationalLogName -FilterXPath $xpath" in script
     for field in ("signalUtc", "signal", "targetPid", "targetPpid", "candidates"):
         assert field in script
     assert "candidates = @($candidateEvents" in script
@@ -186,6 +189,8 @@ def test_attribution_treats_no_matching_event_10_as_empty_candidates() -> None:
                     [CmdletBinding()]
                     param(
                         [hashtable] $FilterHashtable,
+                        [string] $LogName,
+                        [string] $FilterXPath,
                         [string] $ListLog
                     )
                     if ($PSBoundParameters.ContainsKey("ListLog")) {
@@ -280,6 +285,9 @@ def test_attribution_correlates_worker_ready_to_signal_less_cli_exit() -> None:
                     '{"readyAtUtc":"2026-08-20T01:00:01.000Z","targetPid":300,'
                     '"targetPpid":200,"port":"3001","uptimeMs":12,'
                     '"isNextPrivateWorker":true,"argv":["node","start-server"],"cwd":"C:\\\\ERP\\\\frontend"}',
+                    '[2026-08-20T01:02:02.000Z] NEXT_WORKER_CHILD_EXIT '
+                    '{"observedAtUtc":"2026-08-20T01:02:02.000Z","targetPid":300,'
+                    '"targetPpid":200,"exitCode":3221226505,"signal":null,"port":"3001"}',
                     '[2026-08-20T01:02:03.000Z] NEXT_PROCESS_EXIT '
                     '{"exitAtUtc":"2026-08-20T01:02:03.000Z","exitCode":0,"targetPid":200,'
                     '"targetPpid":100,"port":"3001","uptimeMs":123000,'
@@ -301,10 +309,19 @@ def test_attribution_correlates_worker_ready_to_signal_less_cli_exit() -> None:
                     [CmdletBinding()]
                     param(
                         [hashtable] $FilterHashtable,
+                        [string] $LogName,
+                        [string] $FilterXPath,
                         [string] $ListLog
                     )
                     if ($PSBoundParameters.ContainsKey("ListLog")) {
                         return [pscustomobject]@{ IsEnabled = $true }
+                    }
+                    if (-not $FilterXPath.Contains("Data[@Name='TargetProcessId']='300'")) {
+                        throw "Sysmon query did not restrict TargetProcessId to worker 300: $FilterXPath"
+                    }
+                    if (-not $FilterXPath.Contains("2026-08-20T01:01:57.0000000Z") -or
+                        -not $FilterXPath.Contains("2026-08-20T01:02:07.0000000Z")) {
+                        throw "Sysmon query did not use the worker exit +/- 5 second window: $FilterXPath"
                     }
 
                     $event = [pscustomobject]@{
@@ -364,6 +381,9 @@ def test_attribution_correlates_worker_ready_to_signal_less_cli_exit() -> None:
     assert payload["port"] == "3001"
     assert payload["cliUptimeMs"] == 123000
     assert payload["workerReadyUptimeMs"] == 12
+    assert payload["workerExitObservedUtc"] == "2026-08-20T01:02:02.0000000Z"
+    assert payload["workerExitCode"] == 3221226505
+    assert payload["workerSignal"] is None
     assert "uptimeMs" not in payload
     assert payload["candidates"] == [
         {
@@ -375,6 +395,32 @@ def test_attribution_correlates_worker_ready_to_signal_less_cli_exit() -> None:
             "utcTime": "2026-08-20T01:02:02.0000000Z",
         }
     ]
+
+
+def test_attribution_does_not_attach_a_worker_exit_observation_from_another_parent() -> None:
+    """A raw worker exit record must share both the worker PID and its CLI parent."""
+    result = run_attribution_with_empty_sysmon(
+        [
+            '[2026-08-20T00:59:00.000Z] NEXT_SIGNAL_PROBE_READY '
+            '{"readyAtUtc":"2026-08-20T00:59:00.000Z","targetPid":200,'
+            '"targetPpid":100,"port":"3001","uptimeMs":10,"isNextPrivateWorker":false}',
+            '[2026-08-20T01:00:00.000Z] NEXT_SIGNAL_PROBE_READY '
+            '{"readyAtUtc":"2026-08-20T01:00:00.000Z","targetPid":300,'
+            '"targetPpid":200,"port":"3001","uptimeMs":12,"isNextPrivateWorker":true}',
+            '[2026-08-20T01:02:02.000Z] NEXT_WORKER_CHILD_EXIT '
+            '{"observedAtUtc":"2026-08-20T01:02:02.000Z","targetPid":300,'
+            '"targetPpid":999,"exitCode":23,"signal":null,"port":"3001"}',
+            '[2026-08-20T01:02:03.000Z] NEXT_PROCESS_EXIT '
+            '{"exitAtUtc":"2026-08-20T01:02:03.000Z","exitCode":0,"targetPid":200,'
+            '"targetPpid":100,"port":"3001","uptimeMs":123000,"isNextPrivateWorker":false}',
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["workerExitObservedUtc"] is None
+    assert payload["workerExitCode"] is None
+    assert payload["workerSignal"] is None
 
 
 def run_attribution_with_empty_sysmon(log_lines: list[str]) -> subprocess.CompletedProcess[str]:
@@ -396,6 +442,8 @@ def run_attribution_with_empty_sysmon(log_lines: list[str]) -> subprocess.Comple
                     [CmdletBinding()]
                     param(
                         [hashtable] $FilterHashtable,
+                        [string] $LogName,
+                        [string] $FilterXPath,
                         [string] $ListLog
                     )
                     if ($PSBoundParameters.ContainsKey("ListLog")) {

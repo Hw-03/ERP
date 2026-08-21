@@ -194,11 +194,46 @@ function writeRuntimeFile(runtimeRoot, candidate, content, { append = false } = 
   }
 }
 
+function prepareNodeReportDirectory(rootDir, { maxReports = 3, reserveSlots = 1 } = {}) {
+  if (!Number.isInteger(maxReports) || maxReports < 1) {
+    throw new Error("maxReports must be a positive integer");
+  }
+  if (!Number.isInteger(reserveSlots) || reserveSlots < 0 || reserveSlots >= maxReports) {
+    throw new Error("reserveSlots must be a non-negative integer below maxReports");
+  }
+
+  const runtimeRoot = resolvedRuntimeRoot(rootDir);
+  const reportsDir = runtimePath(rootDir, "logs", "frontend", "node-reports");
+  assertRuntimePath(runtimeRoot, reportsDir);
+  fs.mkdirSync(reportsDir, { recursive: true });
+  assertRuntimePath(runtimeRoot, reportsDir);
+
+  const reports = fs.readdirSync(reportsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /^report\..+\.json$/i.test(entry.name))
+    .map((entry) => {
+      const reportPath = path.join(reportsDir, entry.name);
+      assertRuntimePath(runtimeRoot, reportPath);
+      return { path: reportPath, name: entry.name, mtimeMs: fs.statSync(reportPath).mtimeMs };
+    })
+    .sort((left, right) => right.name.localeCompare(left.name) || right.mtimeMs - left.mtimeMs);
+
+  for (const report of reports.slice(maxReports - reserveSlots)) {
+    assertRuntimePath(runtimeRoot, report.path);
+    fs.unlinkSync(report.path);
+  }
+
+  return reportsDir;
+}
+
 function createDiagnostics(rootDir) {
   const runtimeRoot = resolvedRuntimeRoot(rootDir);
   const logsDir = runtimePath(rootDir, "logs", "frontend");
   const dumpsDir = path.join(logsDir, "dumps");
   const logPath = path.join(logsDir, "dev-server.log");
+
+  function prepareNodeReportDirectoryForRuntime(options) {
+    return prepareNodeReportDirectory(rootDir, options);
+  }
 
   function ensureDirs() {
     assertRuntimePath(runtimeRoot, dumpsDir);
@@ -241,6 +276,7 @@ function createDiagnostics(rootDir) {
   return {
     log,
     logFrontendCompileError,
+    prepareNodeReportDirectory: prepareNodeReportDirectoryForRuntime,
     writeExitDump,
     paths: {
       logsDir,
@@ -254,6 +290,7 @@ module.exports = {
   buildExitDump,
   classifyExitReason,
   createDiagnostics,
+  prepareNodeReportDirectory,
   summarizeFrontendCompileError,
   timestampForFile,
 };

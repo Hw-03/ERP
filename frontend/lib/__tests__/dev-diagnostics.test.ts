@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const {
   buildExitDump,
   createDiagnostics,
+  prepareNodeReportDirectory,
   summarizeFrontendCompileError,
   timestampForFile,
 } = require("../../scripts/dev-diagnostics.js");
@@ -229,6 +230,50 @@ describe("dev server diagnostics", () => {
     expect(dumpPath).toContain(path.join("logs", "frontend", "dumps", "dev-exit-20260703-010203-"));
     expect(dump.reason).toBe("child-error");
     expect(dump.error.message).toBe("spawn failed");
+  });
+
+  it("prepares a bounded Node report directory inside MES_RUNTIME_ROOT", () => {
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mes-node-reports-"));
+    const root = path.join(repoRoot, "frontend");
+    const runtimeRoot = path.join(repoRoot, "runtime");
+    const previousRuntimeRoot = process.env.MES_RUNTIME_ROOT;
+    process.env.MES_RUNTIME_ROOT = runtimeRoot;
+
+    try {
+      const reportsDir = path.join(runtimeRoot, "logs", "frontend", "node-reports");
+      fs.mkdirSync(reportsDir, { recursive: true });
+      for (const [index, timestamp] of [
+        new Date("2026-08-21T01:01:01.000Z"),
+        new Date("2026-08-21T01:01:02.000Z"),
+        new Date("2026-08-21T01:01:03.000Z"),
+      ].entries()) {
+        const sequence = index + 1;
+        const reportPath = path.join(reportsDir, `report.20260821.01010${sequence}.100${sequence}.0.001.json`);
+        fs.writeFileSync(reportPath, "{}", "utf8");
+        fs.utimesSync(reportPath, timestamp, timestamp);
+      }
+      fs.writeFileSync(path.join(reportsDir, "keep.txt"), "sentinel", "utf8");
+
+      const preparedDir = prepareNodeReportDirectory(root, { maxReports: 3, reserveSlots: 1 });
+      const remainingReports = fs
+        .readdirSync(preparedDir)
+        .filter((name) => /^report\..+\.json$/.test(name))
+        .sort();
+
+      expect(preparedDir).toBe(reportsDir);
+      expect(remainingReports).toEqual([
+        "report.20260821.010102.1002.0.001.json",
+        "report.20260821.010103.1003.0.001.json",
+      ]);
+      expect(fs.readFileSync(path.join(reportsDir, "keep.txt"), "utf8")).toBe("sentinel");
+    } finally {
+      if (previousRuntimeRoot === undefined) {
+        delete process.env.MES_RUNTIME_ROOT;
+      } else {
+        process.env.MES_RUNTIME_ROOT = previousRuntimeRoot;
+      }
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
   });
 
   it("formats timestamps for stable dump file names", () => {
