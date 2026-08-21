@@ -1948,6 +1948,12 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
             </button>
             <PanelTitle icon={PackageCheck} title={finalPfName} subtitle={titleSubtitle} />
             <InvoiceNumberEditor request={request} onSaved={onInvoiceSaved} />
+            <div data-testid="shipping-request-detail-quantity" className="flex min-h-[64px] min-w-[112px] basis-[112px] grow items-center rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <div className="min-w-0">
+                <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</div>
+                <div className="mt-0.5 text-sm font-black tabular-nums" style={{ color: LEGACY_COLORS.text }}>{request.request_quantity}대</div>
+              </div>
+            </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {canCancelPrepared && (
@@ -3939,7 +3945,7 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
     { key: "quantity", label: "출하 수량", value: `${request.request_quantity}대`, tabular: true },
     { key: "invoice", label: "인보이스", value: request.invoice_number ?? "미입력", tabular: false },
   ] as const;
-  const requestBoardMetadata = [metadata[1], metadata[0], metadata[3], metadata[2]];
+  const requestBoardMetadata = [metadata[1], metadata[0], metadata[3]];
   const rowClassName = layout === "requestBoard"
     ? "flex h-[136px] flex-col overflow-hidden rounded-[16px] border px-4 py-2 text-left outline-none transition-all hover:brightness-105 active:scale-[0.995] focus-visible:ring-2"
     : layout === "historyList"
@@ -3969,7 +3975,13 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
               )}
             </div>
           </div>
-          <span className="shrink-0"><StatusBadge status={request.status} compact /></span>
+          <div className="flex shrink-0 items-start gap-3">
+            <div data-testid={`shipping-request-board-quantity-${request.request_id}`} className="text-right">
+              <span className="block text-xs font-bold leading-3" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</span>
+              <span className="block text-sm font-black leading-4 tabular-nums">{request.request_quantity}대</span>
+            </div>
+            <span className="shrink-0"><StatusBadge status={request.status} compact /></span>
+          </div>
         </div>
       ) : (
       <div className="flex items-start justify-between gap-2">
@@ -4001,11 +4013,11 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
       {structuredLayout ? (
         <div
           data-testid={`shipping-request-metadata-${request.request_id}`}
-          className={`grid ${layout === "requestBoard" ? "mt-2 flex-1 grid-cols-2 grid-rows-2 gap-x-4 gap-y-1" : "mt-2 grid-cols-4 gap-x-5 border-t pt-1.5"}`}
-          style={layout === "requestBoard" ? undefined : { borderColor: LEGACY_COLORS.border }}
+          className={`grid ${layout === "requestBoard" ? "mt-2 flex-1 content-center grid-cols-2 grid-rows-2 gap-x-4 border-t pt-2" : "mt-2 grid-cols-4 gap-x-5 border-t pt-1.5"}`}
+          style={{ borderColor: LEGACY_COLORS.border }}
         >
           {(layout === "requestBoard" ? requestBoardMetadata : metadata).map((item) => (
-            <div key={item.key} data-testid={`shipping-request-meta-${item.key}-${request.request_id}`} className="min-w-0">
+            <div key={item.key} data-testid={`shipping-request-meta-${item.key}-${request.request_id}`} className={`min-w-0 ${layout === "requestBoard" && item.key === "invoice" ? "col-span-2 self-end" : ""}`}>
               <span className={`block text-xs font-bold ${layout === "requestBoard" ? "leading-3" : "leading-4"}`} style={{ color: LEGACY_COLORS.muted2 }}>{item.label}</span>
               <span
                 className={`block truncate text-sm font-black leading-4 ${item.tabular ? "tabular-nums" : ""}`}

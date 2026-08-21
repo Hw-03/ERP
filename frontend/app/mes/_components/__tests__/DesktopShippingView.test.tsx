@@ -376,10 +376,14 @@ describe("DesktopShippingView", () => {
 
     const header = within(detail).getByTestId("shipping-request-detail-header");
     const statusBadge = within(header).getByTestId("shipping-request-detail-status-badge");
+    const quantity = within(header).getByTestId("shipping-request-detail-quantity");
     const revisionHistory = within(detail).getByTestId("shipping-revision-history");
     const lineSummary = within(detail).getByTestId("shipping-line-summary");
     const actions = within(detail).getByTestId("shipping-detail-actions");
     expect(header).toContainElement(within(detail).getByTestId("shipping-invoice-editor"));
+    expect(quantity).toHaveTextContent("출하 수량");
+    expect(quantity).toHaveTextContent("1대");
+    expect(quantity).toHaveClass("min-h-[64px]", "min-w-[112px]", "rounded-[14px]", "border");
     expect(statusBadge).toHaveClass("min-h-[64px]", "min-w-[96px]", "rounded-[14px]");
     expect(header.compareDocumentPosition(revisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(revisionHistory.compareDocumentPosition(lineSummary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -2352,9 +2356,10 @@ describe("DesktopShippingView", () => {
 
     const named = container.querySelector('[data-shipping-request-id="requested-meta"]') as HTMLElement;
     const namedMetadata = within(named).getByTestId("shipping-request-metadata-requested-meta");
+    const namedPrimary = within(named).getByTestId("shipping-request-board-primary-requested-meta");
     expect(within(namedMetadata).getByText("요청 일시")).toBeInTheDocument();
     expect(within(namedMetadata).getByText("김건호")).toBeInTheDocument();
-    expect(within(namedMetadata).getByText("1대")).toBeInTheDocument();
+    expect(within(namedPrimary).getByText("1대")).toBeInTheDocument();
     expect(named).not.toHaveTextContent("· 김건호");
 
     const preparing = container.querySelector('[data-shipping-request-id="preparing-meta"]') as HTMLElement;
@@ -2387,6 +2392,7 @@ describe("DesktopShippingView", () => {
     const metadata = within(row).getByTestId("shipping-request-metadata-request-board-layout");
     const primary = within(row).getByTestId("shipping-request-board-primary-request-board-layout");
     const date = within(metadata).getByTestId("shipping-request-meta-date-request-board-layout");
+    const invoiceBlock = within(metadata).getByTestId("shipping-request-meta-invoice-request-board-layout");
     const title = within(row).getByText(finalPfName);
     const invoice = within(metadata).getByText("미입력");
     const emptyCard = within(screen.getByTestId("shipping-request-list-panel")).getByText("준비 완료 없음").parentElement;
@@ -2398,15 +2404,17 @@ describe("DesktopShippingView", () => {
     expect(title).toHaveClass("truncate");
     expect(title).not.toHaveClass("line-clamp-2", "min-h-10");
     expect(primary).toHaveClass("grid", "grid-cols-[minmax(0,1fr)_auto]");
-    expect(within(primary).queryByTestId("shipping-request-board-quantity-request-board-layout")).not.toBeInTheDocument();
-    expect(metadata).toHaveClass("grid", "grid-cols-2", "grid-rows-2", "flex-1");
+    const quantity = within(primary).getByTestId("shipping-request-board-quantity-request-board-layout");
+    expect(quantity).toHaveTextContent("출하 수량");
+    expect(quantity).toHaveTextContent("20대");
+    expect(metadata).toHaveClass("grid", "grid-cols-2", "grid-rows-2", "flex-1", "content-center", "border-t", "pt-2");
+    expect(invoiceBlock).toHaveClass("col-span-2", "self-end");
     expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
     expect(date).toHaveTextContent("요청 일시");
     expect(date).not.toHaveTextContent("Standard PF");
     expect(metadata).toHaveTextContent("요청자");
     expect(metadata).toHaveTextContent("요청자 없음");
-    expect(metadata).toHaveTextContent("출하 수량");
-    expect(metadata).toHaveTextContent("20대");
+    expect(metadata).not.toHaveTextContent("출하 수량");
     expect(metadata).toHaveTextContent("인보이스");
     expect(invoice).toHaveStyle({ color: LEGACY_COLORS.yellow });
   });
