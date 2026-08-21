@@ -491,6 +491,25 @@ def test_employee_sync_uses_checked_alembic_commands_and_schema_patterns() -> No
     assert "migration_type_compare\\.py" in script
 
 
+def test_employee_sync_excludes_local_test_and_build_caches() -> None:
+    script = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
+
+    dry_run_backend = script[script.index("$backendDryRun"):script.index("$schemaHits")]
+    dry_run_frontend = script[script.index("$frontendDryRun"):script.index("$env:MES_RUNTIME_ROOT")]
+    sync_frontend_start = script.index('robocopy "$DevRoot\\frontend" $EmpFrontend /MIR')
+    sync_backend_start = script.index('robocopy "$DevRoot\\backend" $EmpBackend /MIR')
+    sync_frontend = script[sync_frontend_start:sync_backend_start]
+    sync_backend = script[sync_backend_start:script.index("# ---------------------------------------------------------------\n# 6)", sync_backend_start)]
+
+    for backend_copy in (dry_run_backend, sync_backend):
+        assert "/XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup" in backend_copy
+        assert '".testmondata"' in backend_copy
+        assert '".testmondata-*"' in backend_copy
+
+    for frontend_copy in (dry_run_frontend, sync_frontend):
+        assert '"tsconfig.tsbuildinfo"' in frontend_copy
+
+
 def test_employee_sync_auto_schema_preflight_runs_before_stopping_services() -> None:
     script = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
 

@@ -181,8 +181,8 @@ $schemaPatterns = @(
     'bootstrap_db\.py'
 )
 $backendDryRun = robocopy "$DevRoot\backend" $EmpBackend /L /MIR `
-    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" `
-    /XD __pycache__ .git .venv data logs .pytest_cache _backup `
+    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" ".testmondata" ".testmondata-*" `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup `
     /NJH /NDL /NP 2>&1 | Out-String -Stream
 $schemaHits = $backendDryRun | Where-Object {
     $line = $_
@@ -233,7 +233,7 @@ if ($DryRun) {
     $backendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
     $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
         /XD .next .next-prod node_modules _archive coverage test-results logs `
-        /XF .env.local `
+        /XF .env.local "tsconfig.tsbuildinfo" `
         /NJH /NDL /NP 2>&1 | Out-String -Stream
     Write-Host "[dry-run] 프론트엔드 변경 예정 파일:"
     $frontendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
@@ -317,7 +317,7 @@ Write-Host "[backup] 검증된 백업: $backupPath"
 Write-Host "[sync-frontend] 프론트엔드 동기화 중..."
 robocopy "$DevRoot\frontend" $EmpFrontend /MIR `
     /XD .next .next-prod node_modules _archive coverage test-results logs `
-    /XF .env.local `
+    /XF .env.local "tsconfig.tsbuildinfo" `
     /NJH /NDL /NP /NS /NC | Out-Null
 $frontendExit = $LASTEXITCODE
 if ($frontendExit -ge 8) {
@@ -380,8 +380,8 @@ foreach ($batName in @("start.bat", "watch.bat", "stop.bat", "status.bat")) {
 
 Write-Host "[sync] 백엔드 동기화 중..."
 robocopy "$DevRoot\backend" $EmpBackend /MIR `
-    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" `
-    /XD __pycache__ .git .venv data logs .pytest_cache _backup `
+    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" ".testmondata" ".testmondata-*" `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup `
     /NJH /NDL /NP /NS /NC | Out-Null
 $backendExit = $LASTEXITCODE
 if ($backendExit -ge 8) {
