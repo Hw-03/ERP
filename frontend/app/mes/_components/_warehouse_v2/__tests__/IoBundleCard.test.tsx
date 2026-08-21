@@ -428,7 +428,7 @@ describe("IoBundleCard", () => {
     expect(screen.getByRole("button", { name: "상·하위 차감" })).toBeDisabled();
     expect(screen.getByRole("spinbutton", { name: "기준 수량" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "재고 반영 변경" })).toBeDisabled();
-    expect(screen.getByRole("spinbutton", { name: "수량" })).toBeDisabled();
+    expect(screen.getByLabelText("수량")).toHaveAttribute("aria-readonly", "true");
     expect(screen.getByRole("button", { name: "묶음 삭제" })).toBeDisabled();
   });
 });

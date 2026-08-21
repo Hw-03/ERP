@@ -177,6 +177,8 @@ export function MobileIoComposeWizard({
     state,
     onStatusChange,
     restoreStep,
+    getAvailable,
+    inventorySnapshot: items,
   });
 
   // 4단계 진입 시 재고 스냅샷 갱신 — 취소·승인 등으로 재고가 바뀐 뒤 재추가할 때 stale 표시 방지.
@@ -745,12 +747,9 @@ export function MobileIoComposeWizard({
               const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
               const line = bundle?.lines.find((row) => row.line_id === lineId);
               if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
-                void refreshInternalUseBom(
-                  bundleId,
-                  line?.origin === "direct"
-                    ? { bundleQuantity: quantity }
-                    : { lineQuantity: { lineId, quantity } },
-                );
+                if (line?.origin === "direct") {
+                  void refreshInternalUseBom(bundleId, { bundleQuantity: quantity });
+                }
                 return;
               }
               state.setBundles((prev) =>

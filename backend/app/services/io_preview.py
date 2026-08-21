@@ -221,6 +221,8 @@ def _validate_internal_use_bom_bundle(
 
     for line in parent_lines:
         parent_item = _get_item(db, source_item_id)
+        if _d(getattr(line, "quantity", None)) != _d(getattr(bundle, "quantity", None)):
+            raise ValueError("사용출고 BOM 상위 자재 수량이 묶음 기준수량과 일치하지 않습니다.")
         expected_source = (
             ("warehouse", None)
             if source_location == "warehouse"
@@ -241,8 +243,21 @@ def _validate_internal_use_bom_bundle(
         selected = bool(getattr(line, "selected", True))
         included = bool(getattr(line, "included"))
         stock_exempt = bool(getattr(line, "bom_stock_exempt", False))
+        bom_expected = _d(children[item_id]) * _d(getattr(bundle, "quantity", 0))
+        expected_quantity = (
+            Decimal("0")
+            if mode != "parent_and_children" and not selected and not stock_exempt
+            else bom_expected
+        )
+        if _d(getattr(line, "quantity", None)) != expected_quantity:
+            raise ValueError("사용출고 BOM 하위 자재 수량이 기준수량과 일치하지 않습니다.")
+        if (
+            getattr(line, "bom_expected", None) is None
+            or _d(getattr(line, "bom_expected", None)) != bom_expected
+        ):
+            raise ValueError("사용출고 BOM 하위 자재 기준수량이 현재 BOM과 일치하지 않습니다.")
         if stock_exempt:
-            if included:
+            if included or selected:
                 raise ValueError("재고 미반영 BOM 하위 자재는 재고에 반영할 수 없습니다.")
             continue
         if mode == "parent_and_children" and not selected:
@@ -747,20 +762,17 @@ def _expanded_child_lines(
 def _internal_use_component_selection_map(
     children: list,
     component_selections: Iterable[object],
-) -> dict[object, tuple[Decimal, bool]]:
-    """클라이언트의 하위 체크·수량을 현재 직계 BOM 품목에만 적용한다."""
+) -> dict[object, bool]:
+    """클라이언트의 하위 체크 상태만 현재 직계 BOM 품목에 적용한다."""
     child_ids = {child_id for child_id, _ in children}
-    selected_by_item: dict[object, tuple[Decimal, bool]] = {}
+    selected_by_item: dict[object, bool] = {}
     for selection in component_selections:
         item_id = getattr(selection, "item_id", None)
         if item_id not in child_ids:
             raise ValueError("현재 BOM에 없는 하위 자재 선택입니다.")
         if item_id in selected_by_item:
             raise ValueError("같은 하위 자재 선택이 중복되었습니다.")
-        quantity = _d(getattr(selection, "quantity", 0))
-        if quantity <= 0:
-            raise ValueError("하위 자재 수량은 0보다 커야 합니다.")
-        selected_by_item[item_id] = (quantity, bool(getattr(selection, "selected", True)))
+        selected_by_item[item_id] = bool(getattr(selection, "selected", True))
     return selected_by_item
 
 
@@ -799,13 +811,13 @@ def _internal_use_bom_lines(
     for child_id, per_unit_qty in children:
         child = _get_item(db, child_id)
         expected = _d(per_unit_qty) * quantity
-        child_quantity, selected = selected_by_item.get(child_id, (expected, True))
+        selected = selected_by_item.get(child_id, True)
         if mode == "parent_and_children" and not selected:
             lines.append(
                 _line_dict(
                     db,
                     item=child,
-                    quantity=child_quantity,
+                    quantity=expected,
                     direction="in",
                     from_bucket="none",
                     from_department=None,
@@ -815,7 +827,7 @@ def _internal_use_bom_lines(
                     bom_expected=expected,
                     included=True,
                     selected=False,
-                    edited=child_quantity != expected,
+                    edited=False,
                     exclusion_note=INTERNAL_USE_RETURN_NOTE,
                 )
             )
@@ -824,7 +836,11 @@ def _internal_use_bom_lines(
             _routed_line(
                 db,
                 item=child,
-                quantity=child_quantity,
+                quantity=(
+                    Decimal("0")
+                    if mode != "parent_and_children" and not selected
+                    else expected
+                ),
                 sub_type=INTERNAL_USE_SUB_TYPE,
                 from_department=from_department,
                 to_department=to_department,
@@ -836,7 +852,7 @@ def _internal_use_bom_lines(
                 exclusion_note=None if selected else INTERNAL_USE_NO_CHANGE_NOTE,
             )
         )
-        lines[-1]["edited"] = child_quantity != expected
+        lines[-1]["edited"] = False
     return lines
 
 

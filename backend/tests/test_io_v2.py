@@ -607,7 +607,7 @@ def test_internal_use_bom_preview_round_trips_mode_source_and_component_selectio
                     "quantity": 1,
                     "internal_use_bom_mode": "parent_and_children",
                     "component_selections": [
-                        {"item_id": str(child.item_id), "quantity": 2, "selected": False}
+                        {"item_id": str(child.item_id), "selected": False}
                     ],
                 }
             ],
@@ -625,6 +625,108 @@ def test_internal_use_bom_preview_round_trips_mode_source_and_component_selectio
         "none",
         "production",
     )
+
+
+def test_internal_use_bom_preview_ignores_legacy_zero_for_unselected_no_change_child(
+    client, db_session, make_item, make_bom
+):
+    parent = make_item(name="변동 없음 조립품", process_type_code="AF")
+    child = make_item(name="변동 없음 하위품", process_type_code="AR")
+    make_bom(parent.item_id, child.item_id, Decimal("2"))
+    requester = _make_employee(
+        db_session, code="IU-BOM-ZERO", department=DepartmentEnum.RESEARCH
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": "연구",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(parent.item_id),
+                    "quantity": 1,
+                    "internal_use_bom_mode": "children_only",
+                    "component_selections": [
+                        {"item_id": str(child.item_id), "quantity": 0, "selected": False}
+                    ],
+                }
+            ],
+        },
+    )
+
+    assert preview.status_code == 200, preview.text
+    child_line = preview.json()["bundles"][0]["lines"][0]
+    assert child_line["quantity"] == 0
+    assert child_line["selected"] is False
+    assert child_line["included"] is False
+
+
+def test_internal_use_bom_draft_without_mode_keeps_unselected_child_as_no_change(
+    client, db_session, make_item, make_bom
+):
+    parent = make_item(name="방식 미선택 조립품", warehouse_qty=Decimal("5"))
+    child = make_item(name="방식 미선택 하위품", warehouse_qty=Decimal("10"))
+    make_bom(parent.item_id, child.item_id, Decimal("2"))
+    requester = _make_employee(
+        db_session, code="IU-BOM-NO-MODE", department=DepartmentEnum.RESEARCH
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "source_location": "warehouse",
+                    "item_id": str(parent.item_id),
+                    "quantity": 2,
+                    "component_selections": [
+                        {"item_id": str(child.item_id), "selected": False}
+                    ],
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    bundle = preview.json()["bundles"][0]
+    child_line = bundle["lines"][0]
+    assert bundle["internal_use_bom_mode"] is None
+    assert child_line["quantity"] == 0
+    assert child_line["included"] is False
+    assert child_line["exclusion_note"] == "변동 없음"
+
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "bundles": [bundle],
+        },
+    )
+    assert drafted.status_code == 200, drafted.text
+
+
+def test_internal_use_bom_selection_openapi_has_no_quantity_field(client):
+    schema = client.get("/openapi.json").json()
+    component_selection = schema["components"]["schemas"]["IoComponentSelection"]
+
+    assert component_selection["properties"] == {
+        "item_id": {"type": "string", "format": "uuid", "title": "Item Id"},
+        "selected": {"type": "boolean", "default": True, "title": "Selected"},
+    }
+    assert component_selection["required"] == ["item_id"]
 
 
 def test_internal_use_bom_draft_allows_unselected_mode_but_fresh_submit_rejects_it(
@@ -924,6 +1026,175 @@ def test_internal_use_rejects_bom_mode_changed_after_preview(
 
     assert submitted.status_code == 422, submitted.text
     assert "BOM" in submitted.text
+    assert db_session.query(StockRequest).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("quantity", 7),
+        ("bom_expected", 7),
+        ("included", False),
+        ("to_bucket", "warehouse"),
+    ],
+)
+def test_internal_use_bom_draft_rejects_tampered_child_state(
+    client, db_session, make_item, make_bom, field, value
+):
+    parent = make_item(name="하위 상태 변조 상위품", warehouse_qty=Decimal("5"))
+    child = make_item(name="하위 상태 변조 하위품", warehouse_qty=Decimal("10"))
+    make_bom(parent.item_id, child.item_id, Decimal("2"))
+    requester = _make_employee(
+        db_session,
+        code=f"IU-BOM-TAMPER-{field}",
+        department=DepartmentEnum.RESEARCH,
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "source_location": "warehouse",
+                    "item_id": str(parent.item_id),
+                    "quantity": 2,
+                    "internal_use_bom_mode": "children_only",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    bundles = preview.json()["bundles"]
+    child_line = next(line for line in bundles[0]["lines"] if line["origin"] == "bom_auto")
+    child_line[field] = value
+
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "bundles": bundles,
+        },
+    )
+
+    assert drafted.status_code == 422, drafted.text
+    assert db_session.query(IoBatch).count() == 0
+
+
+@pytest.mark.parametrize("change", ["parent_line", "bundle_and_children"])
+def test_internal_use_bom_draft_rejects_parent_quantity_inconsistent_with_bundle(
+    client, db_session, make_item, make_bom, change
+):
+    parent = make_item(name="상위 수량 변조 조립품", warehouse_qty=Decimal("10"))
+    child = make_item(name="상위 수량 변조 하위품", warehouse_qty=Decimal("10"))
+    make_bom(parent.item_id, child.item_id, Decimal("2"))
+    requester = _make_employee(
+        db_session,
+        code=f"IU-BOM-PARENT-QTY-{change}",
+        department=DepartmentEnum.RESEARCH,
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "source_location": "warehouse",
+                    "item_id": str(parent.item_id),
+                    "quantity": 2,
+                    "internal_use_bom_mode": "parent_and_children",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    bundles = preview.json()["bundles"]
+    bundle = bundles[0]
+    parent_line = next(line for line in bundle["lines"] if line["origin"] == "direct")
+    child_line = next(line for line in bundle["lines"] if line["origin"] == "bom_auto")
+    if change == "parent_line":
+        parent_line["quantity"] = 3
+    else:
+        bundle["quantity"] = 3
+        child_line["quantity"] = 6
+        child_line["bom_expected"] = 6
+
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "bundles": bundles,
+        },
+    )
+
+    assert drafted.status_code == 422, drafted.text
+    assert db_session.query(IoBatch).count() == 0
+
+
+def test_internal_use_submit_rejects_tampered_child_quantity_without_creating_batch(
+    client, db_session, make_item, make_bom
+):
+    parent = make_item(name="제출 하위 수량 변조 조립품", warehouse_qty=Decimal("5"))
+    child = make_item(name="제출 하위 수량 변조 하위품", warehouse_qty=Decimal("10"))
+    make_bom(parent.item_id, child.item_id, Decimal("2"))
+    requester = _make_employee(
+        db_session,
+        code="IU-BOM-SUBMIT-CHILD-QTY",
+        department=DepartmentEnum.RESEARCH,
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(parent.item_id),
+                    "quantity": 2,
+                    "internal_use_bom_mode": "children_only",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    bundles = preview.json()["bundles"]
+    bundles[0]["lines"][0]["quantity"] = 7
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.RESEARCH.value,
+            "bundles": bundles,
+        },
+    )
+
+    assert submitted.status_code == 422, submitted.text
+    assert db_session.query(IoBatch).count() == 0
     assert db_session.query(StockRequest).count() == 0
 
 
