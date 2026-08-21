@@ -2385,6 +2385,7 @@ describe("DesktopShippingView", () => {
 
     const row = container.querySelector('[data-shipping-request-id="request-board-layout"]') as HTMLElement;
     const metadata = within(row).getByTestId("shipping-request-metadata-request-board-layout");
+    const primary = within(row).getByTestId("shipping-request-board-primary-request-board-layout");
     const date = within(metadata).getByTestId("shipping-request-meta-date-request-board-layout");
     const title = within(row).getByText(finalPfName);
     const invoice = within(metadata).getByText("미입력");
@@ -2394,9 +2395,11 @@ describe("DesktopShippingView", () => {
     expect(emptyCard).toHaveClass("min-h-[136px]");
     expect(row).toHaveClass("h-[136px]", "rounded-[16px]", "py-2", "hover:brightness-105", "active:scale-[0.995]", "focus-visible:ring-2");
     expect(row).not.toHaveClass("h-[168px]");
-    expect(title).toHaveClass("line-clamp-2");
-    expect(title).not.toHaveClass("min-h-10");
-    expect(metadata).toHaveClass("grid", "grid-cols-2");
+    expect(title).toHaveClass("truncate");
+    expect(title).not.toHaveClass("line-clamp-2", "min-h-10");
+    expect(primary).toHaveClass("grid", "grid-cols-[minmax(0,1fr)_auto]");
+    expect(within(primary).queryByTestId("shipping-request-board-quantity-request-board-layout")).not.toBeInTheDocument();
+    expect(metadata).toHaveClass("grid", "grid-cols-2", "grid-rows-2", "flex-1");
     expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
     expect(date).toHaveTextContent("요청 일시");
     expect(date).not.toHaveTextContent("Standard PF");
