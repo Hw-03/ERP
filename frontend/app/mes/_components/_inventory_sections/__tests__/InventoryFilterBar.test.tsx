@@ -44,12 +44,15 @@ describe("InventoryFilters", () => {
     expect(onSearchChange).toHaveBeenCalledWith("진공");
   });
 
-  it("불용 칩을 렌더하고 안내 문구 없이 토글을 전달한다", () => {
+  it("불용 칩을 렌더하고 구분 간 AND 규칙을 안내한다", () => {
     render(<InventoryFilters {...baseProps} />);
+
+    expect(
+      screen.getByText("AND/OR는 같은 구분 안에서만 적용되며, 서로 다른 구분은 모두 만족해야 합니다."),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "불용" }));
 
     expect(baseProps.toggleDisused).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("선택한 부서·모델·공정을 모두 만족합니다.")).not.toBeInTheDocument();
   });
 });

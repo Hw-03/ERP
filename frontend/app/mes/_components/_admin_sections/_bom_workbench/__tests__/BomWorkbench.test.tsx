@@ -54,10 +54,58 @@ describe("BomWorkbench", () => {
       (element) => element.classList.contains("overflow-y-auto"),
     );
     expect(parentScrollRegion).toBeDefined();
-    expect(parentScrollRegion).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(parentScrollRegion).toHaveClass("absolute", "inset-y-0", "overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
 
     const parentListCard = closestWithClass(parentScrollRegion!, "rounded-2xl");
     expect(parentListCard.parentElement).toHaveClass("flex", "flex-1", "min-h-0", "flex-col");
+  });
+
+  it("keeps each BOM list's scroll owner in a stable external desktop rail without shifting table columns", async () => {
+    vi.spyOn(api, "getBOM").mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const child = {
+      item_id: "child-1",
+      item_name: "Candidate child",
+      mes_code: "CHILD-001",
+      process_type_code: "AR",
+      unit: "EA",
+    } as Item;
+
+    const { container } = render(
+      <BomWorkbench
+        items={[selectedParent, child]}
+        allBomRows={[]}
+        refreshAllBom={() => undefined}
+        refreshItems={async () => undefined}
+        onStatusChange={() => undefined}
+        onError={() => undefined}
+      />,
+    );
+
+    await screen.findByText("현재 구성 (0건)");
+    const viewports = Array.from(container.querySelectorAll<HTMLElement>("[data-scrollbar-rail-viewport]"));
+    expect(viewports).toHaveLength(3);
+
+    for (const viewport of viewports) {
+      expect(viewport).toHaveClass("absolute", "inset-y-0", "left-0", "right-0", "overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+      expect(viewport.parentElement).toHaveClass("relative", "min-h-0", "flex-1");
+      const shell = viewport.closest<HTMLElement>("[data-scrollbar-rail-shell]");
+      expect(shell).toHaveClass("relative", "min-h-0", "flex-1");
+      expect(shell?.querySelector("[data-scrollbar-rail-frame]"))?.toHaveClass("absolute", "inset-0", "rounded-2xl", "border");
+      const masks = shell?.querySelector("[data-scrollbar-rail-masks]");
+      expect(masks).toBeInTheDocument();
+      expect(masks?.querySelectorAll("span")).toHaveLength(4);
+      for (const mask of Array.from(masks?.querySelectorAll("span") ?? [])) {
+        expect((mask as HTMLElement).style.background).toContain("var(--c-bg)");
+      }
+      expect(viewport.firstElementChild).toHaveClass("min-h-full", "min-w-full");
+    }
+
+    const headers = Array.from(
+      container.querySelectorAll("[data-scrollbar-rail-viewport] .sticky.top-0"),
+    );
+    expect(headers).toHaveLength(3);
+    for (const header of headers) expect((header as HTMLElement).style.gridTemplateColumns).not.toBe("");
   });
 
   it("removes duplicate export and expands the mode controls into its space", async () => {
@@ -74,7 +122,7 @@ describe("BomWorkbench", () => {
 
     const departmentFilters = screen.getByTestId("bom-department-filters");
     expect(departmentFilters).toHaveClass("min-h-[58px]", "flex-wrap");
-    for (const filter of departmentFilters.querySelectorAll("button")) {
+    for (const filter of Array.from(departmentFilters.querySelectorAll("button"))) {
       expect(filter).toHaveClass("h-11");
     }
 

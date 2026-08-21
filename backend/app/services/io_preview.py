@@ -27,6 +27,7 @@ from app.services import stock_math
 from app.services.bom_stock_policy import (
     BOM_AUTO_ORIGIN,
     BOM_STOCK_EXEMPT_NOTE,
+    is_bom_generated_line,
     io_bom_auto_claims,
     _issue_bom_auto_token,
     should_skip_bom_inventory,
@@ -48,6 +49,9 @@ WORK_TYPES = {
 INTERNAL_USE_WORK_TYPE = "internal_use"
 INTERNAL_USE_SUB_TYPE = "internal_use_out"
 INTERNAL_USE_SOURCE_LOCATIONS = frozenset({"warehouse", "department"})
+INTERNAL_USE_BOM_MODES = frozenset({"parent_and_children", "children_only"})
+INTERNAL_USE_RETURN_NOTE = "소속 부서 재입고"
+INTERNAL_USE_NO_CHANGE_NOTE = "변동 없음"
 INTERNAL_USE_DEPARTMENTS = frozenset(
     {DepartmentEnum.AS.value, DepartmentEnum.RESEARCH.value}
 )
@@ -75,16 +79,33 @@ def validate_internal_use_operation(
     if to_department not in INTERNAL_USE_DEPARTMENTS:
         raise ValueError("사내 사용 반출 부서는 AS 또는 연구만 선택할 수 있습니다.")
     for line in lines:
+        direction = getattr(line, "direction")
+        from_bucket = getattr(line, "from_bucket")
+        from_department = getattr(line, "from_department")
+        line_to_bucket = getattr(line, "to_bucket")
+        line_to_department = getattr(line, "to_department")
+        if direction == "in":
+            if (
+                getattr(line, "origin", None) != BOM_AUTO_ORIGIN
+                or from_bucket != "none"
+                or from_department is not None
+                or line_to_bucket != "production"
+                or db is None
+            ):
+                raise ValueError("사내 사용 라인 구성이 올바르지 않습니다.")
+            item = _get_item(db, getattr(line, "item_id"))
+            if line_to_department != _component_source_dept(item, None):
+                raise ValueError("사내 사용 라인 구성이 올바르지 않습니다.")
+            continue
+
         common_route = (
-            getattr(line, "direction"),
-            getattr(line, "to_bucket"),
-            getattr(line, "to_department"),
+            direction,
+            line_to_bucket,
+            line_to_department,
         )
         if common_route != ("out", "none", to_department):
             raise ValueError("사내 사용 라인 구성이 올바르지 않습니다.")
 
-        from_bucket = getattr(line, "from_bucket")
-        from_department = getattr(line, "from_department")
         if from_bucket == "warehouse" and from_department is None:
             continue
         if from_bucket != "production" or db is None:
@@ -119,8 +140,10 @@ def validate_internal_use_bundles(
     work_type: str,
     sub_type: str,
     bundles: Iterable[object],
+    require_bom_mode: bool = False,
+    db: Optional[Session] = None,
 ) -> None:
-    """같은 부모 품목의 원본 또는 방식을 둘 이상 제출하지 못하게 한다."""
+    """같은 부모 품목의 중복과 BOM 차감 방식 누락을 막는다."""
     if (work_type, sub_type) != (INTERNAL_USE_WORK_TYPE, INTERNAL_USE_SUB_TYPE):
         return
     source_item_ids: set[uuid.UUID] = set()
@@ -131,6 +154,144 @@ def validate_internal_use_bundles(
         if source_item_id in source_item_ids:
             raise ValueError("같은 품목에는 한 원본과 한 방식만 선택할 수 있습니다.")
         source_item_ids.add(source_item_id)
+        mode = getattr(bundle, "internal_use_bom_mode", None)
+        is_bom_bundle = getattr(bundle, "source_kind", None) == "bom_parent"
+        if not is_bom_bundle and mode is not None:
+            raise ValueError("BOM 차감 방식은 BOM 묶음에만 사용할 수 있습니다.")
+        if mode is not None and mode not in INTERNAL_USE_BOM_MODES:
+            raise ValueError("지원하지 않는 사용출고 BOM 차감 방식입니다.")
+        if require_bom_mode and is_bom_bundle and mode is None:
+            raise ValueError("사용출고 BOM 차감 방식을 선택해 주세요.")
+        if is_bom_bundle and db is not None:
+            _validate_internal_use_bom_bundle(db, bundle=bundle, mode=mode)
+
+
+def _validate_internal_use_bom_bundle(
+    db: Session,
+    *,
+    bundle: object,
+    mode: Optional[str],
+) -> None:
+    """서버 미리보기가 발급한 BOM 구성과 선택 모드가 일치하는지 검증한다."""
+    source_location = getattr(bundle, "source_location", None)
+    if source_location not in INTERNAL_USE_SOURCE_LOCATIONS:
+        raise ValueError("사용출고 BOM 재고 원본이 올바르지 않습니다.")
+
+    source_item_id = getattr(bundle, "source_item_id")
+    children = dict(bom_svc.direct_children(db, source_item_id))
+    if not children:
+        raise ValueError("사용출고 BOM 구성이 현재 BOM과 일치하지 않습니다.")
+
+    parent_lines: list[object] = []
+    child_lines: dict[uuid.UUID, object] = {}
+    for line in getattr(bundle, "lines", ()):  # payload와 ORM 묶음 모두 지원
+        item_id = getattr(line, "item_id")
+        if getattr(line, "origin", None) == BOM_AUTO_ORIGIN:
+            if item_id in child_lines:
+                raise ValueError("사용출고 BOM 하위 자재가 중복되었습니다.")
+            if not is_bom_generated_line(
+                db,
+                bundle_id=getattr(bundle, "bundle_id"),
+                line_id=getattr(line, "line_id"),
+                source_kind=getattr(bundle, "source_kind"),
+                source_item_id=source_item_id,
+                item_id=item_id,
+                work_type=INTERNAL_USE_WORK_TYPE,
+                sub_type=INTERNAL_USE_SUB_TYPE,
+                direction=getattr(line, "direction"),
+                from_bucket=getattr(line, "from_bucket"),
+                from_department=getattr(line, "from_department"),
+                to_bucket=getattr(line, "to_bucket"),
+                to_department=getattr(line, "to_department"),
+                bom_auto_token=getattr(line, "bom_auto_token", None),
+            ):
+                raise ValueError("사용출고 BOM 검증 정보가 올바르지 않습니다.")
+            child_lines[item_id] = line
+            continue
+        if item_id == source_item_id and getattr(line, "origin", None) == "direct":
+            parent_lines.append(line)
+            continue
+        raise ValueError("사용출고 BOM에 허용되지 않은 자재가 포함되었습니다.")
+
+    if set(child_lines) != set(children):
+        raise ValueError("사용출고 BOM 구성이 현재 BOM과 일치하지 않습니다.")
+    expected_parent_count = 1 if mode == "parent_and_children" else 0
+    if len(parent_lines) != expected_parent_count:
+        raise ValueError("사용출고 BOM 차감 방식과 상위 자재 구성이 일치하지 않습니다.")
+
+    for line in parent_lines:
+        parent_item = _get_item(db, source_item_id)
+        if _d(getattr(line, "quantity", None)) != _d(getattr(bundle, "quantity", None)):
+            raise ValueError("사용출고 BOM 상위 자재 수량이 묶음 기준수량과 일치하지 않습니다.")
+        expected_source = (
+            ("warehouse", None)
+            if source_location == "warehouse"
+            else ("production", _component_source_dept(parent_item, None))
+        )
+        if (
+            getattr(line, "direction"),
+            getattr(line, "from_bucket"),
+            getattr(line, "from_department"),
+            getattr(line, "to_bucket"),
+            bool(getattr(line, "included")),
+            bool(getattr(line, "selected", True)),
+        ) != ("out", expected_source[0], expected_source[1], "none", True, True):
+            raise ValueError("사용출고 상위 자재 구성이 올바르지 않습니다.")
+
+    for item_id, line in child_lines.items():
+        item = _get_item(db, item_id)
+        selected = bool(getattr(line, "selected", True))
+        included = bool(getattr(line, "included"))
+        stock_exempt = bool(getattr(line, "bom_stock_exempt", False))
+        bom_expected = _d(children[item_id]) * _d(getattr(bundle, "quantity", 0))
+        expected_quantity = (
+            Decimal("0")
+            if mode != "parent_and_children" and not selected and not stock_exempt
+            else bom_expected
+        )
+        if _d(getattr(line, "quantity", None)) != expected_quantity:
+            raise ValueError("사용출고 BOM 하위 자재 수량이 기준수량과 일치하지 않습니다.")
+        if (
+            getattr(line, "bom_expected", None) is None
+            or _d(getattr(line, "bom_expected", None)) != bom_expected
+        ):
+            raise ValueError("사용출고 BOM 하위 자재 기준수량이 현재 BOM과 일치하지 않습니다.")
+        if stock_exempt:
+            if included or selected:
+                raise ValueError("재고 미반영 BOM 하위 자재는 재고에 반영할 수 없습니다.")
+            continue
+        if mode == "parent_and_children" and not selected:
+            expected_route = (
+                "in",
+                "none",
+                None,
+                "production",
+                _component_source_dept(item, None),
+            )
+            expected_included = not stock_exempt
+        else:
+            expected_source = (
+                ("warehouse", None)
+                if source_location == "warehouse"
+                else ("production", _component_source_dept(item, None))
+            )
+            expected_route = (
+                "out",
+                expected_source[0],
+                expected_source[1],
+                "none",
+                getattr(line, "to_department"),
+            )
+            expected_included = selected and not stock_exempt
+        actual_route = (
+            getattr(line, "direction"),
+            getattr(line, "from_bucket"),
+            getattr(line, "from_department"),
+            getattr(line, "to_bucket"),
+            getattr(line, "to_department"),
+        )
+        if actual_route != expected_route or included != expected_included:
+            raise ValueError("사용출고 BOM 하위 자재 구성이 올바르지 않습니다.")
 
 
 def _is_warehouse_adjust(work_type: str, sub_type: str) -> bool:
@@ -295,6 +456,7 @@ def _line_dict(
     origin: str,
     bom_expected: Optional[Decimal] = None,
     included: bool = True,
+    selected: Optional[bool] = None,
     edited: bool = False,
     exclusion_note: Optional[str] = None,
 ) -> dict:
@@ -304,7 +466,10 @@ def _line_dict(
     )
     if bom_stock_exempt:
         included = False
+        selected = False
         exclusion_note = BOM_STOCK_EXEMPT_NOTE
+    if selected is None:
+        selected = included
     shortage = Decimal("0")
     if included and from_bucket != "none":
         available = _bucket_available(
@@ -330,6 +495,7 @@ def _line_dict(
         "bom_stock_exempt": bom_stock_exempt,
         "bom_auto_token": None,
         "included": included,
+        "selected": selected,
         "origin": origin,
         "edited": edited,
         "has_children": _has_children(db, item.item_id),
@@ -367,7 +533,7 @@ def _route_for_sub_type(
         return ("out", "production", dept, "none", None)
     if sub_type == "disassemble":
         if role == "result":
-            dept = _default_production_dept(item, from_department or to_department)
+            dept = _default_production_dept(item, to_department or from_department)
             return ("out", "production", dept, "none", None)
         # 회수 부품: 소속 공정으로 복귀.
         dept = _component_source_dept(item, from_department or to_department)
@@ -446,6 +612,8 @@ def _routed_line(
     role: str = "component",
     source_location: str = "warehouse",
     bom_expected: Optional[Decimal] = None,
+    included: bool = True,
+    selected: Optional[bool] = None,
     exclusion_note: Optional[str] = None,
 ) -> dict:
     """라우팅 규칙을 적용해 라인 하나를 생성한다(추출 전 인라인 패턴 보존)."""
@@ -468,6 +636,8 @@ def _routed_line(
         to_department=route[4],
         origin=origin,
         bom_expected=bom_expected,
+        included=included,
+        selected=selected,
         exclusion_note=exclusion_note,
     )
 
@@ -589,6 +759,103 @@ def _expanded_child_lines(
     return lines
 
 
+def _internal_use_component_selection_map(
+    children: list,
+    component_selections: Iterable[object],
+) -> dict[object, bool]:
+    """클라이언트의 하위 체크 상태만 현재 직계 BOM 품목에 적용한다."""
+    child_ids = {child_id for child_id, _ in children}
+    selected_by_item: dict[object, bool] = {}
+    for selection in component_selections:
+        item_id = getattr(selection, "item_id", None)
+        if item_id not in child_ids:
+            raise ValueError("현재 BOM에 없는 하위 자재 선택입니다.")
+        if item_id in selected_by_item:
+            raise ValueError("같은 하위 자재 선택이 중복되었습니다.")
+        selected_by_item[item_id] = bool(getattr(selection, "selected", True))
+    return selected_by_item
+
+
+def _internal_use_bom_lines(
+    db: Session,
+    *,
+    item: Item,
+    quantity: Decimal,
+    children: list,
+    from_department: Optional[str],
+    to_department: Optional[str],
+    source_location: str,
+    mode: Optional[str],
+    component_selections: Iterable[object],
+) -> list[dict]:
+    """사용출고 BOM 모드와 하위 체크 상태를 실제 재고 반영 라인으로 만든다."""
+    if mode is not None and mode not in INTERNAL_USE_BOM_MODES:
+        raise ValueError("지원하지 않는 사용출고 BOM 차감 방식입니다.")
+    selected_by_item = _internal_use_component_selection_map(children, component_selections)
+    lines: list[dict] = []
+    if mode == "parent_and_children":
+        lines.append(
+            _routed_line(
+                db,
+                item=item,
+                quantity=quantity,
+                sub_type=INTERNAL_USE_SUB_TYPE,
+                from_department=from_department,
+                to_department=to_department,
+                origin="direct",
+                source_location=source_location,
+                selected=True,
+            )
+        )
+
+    for child_id, per_unit_qty in children:
+        child = _get_item(db, child_id)
+        expected = _d(per_unit_qty) * quantity
+        selected = selected_by_item.get(child_id, True)
+        if mode == "parent_and_children" and not selected:
+            lines.append(
+                _line_dict(
+                    db,
+                    item=child,
+                    quantity=expected,
+                    direction="in",
+                    from_bucket="none",
+                    from_department=None,
+                    to_bucket="production",
+                    to_department=_component_source_dept(child, None),
+                    origin="bom_auto",
+                    bom_expected=expected,
+                    included=True,
+                    selected=False,
+                    edited=False,
+                    exclusion_note=INTERNAL_USE_RETURN_NOTE,
+                )
+            )
+            continue
+        lines.append(
+            _routed_line(
+                db,
+                item=child,
+                quantity=(
+                    Decimal("0")
+                    if mode != "parent_and_children" and not selected
+                    else expected
+                ),
+                sub_type=INTERNAL_USE_SUB_TYPE,
+                from_department=from_department,
+                to_department=to_department,
+                origin="bom_auto",
+                source_location=source_location,
+                bom_expected=expected,
+                included=selected,
+                selected=selected,
+                exclusion_note=None if selected else INTERNAL_USE_NO_CHANGE_NOTE,
+            )
+        )
+        lines[-1]["edited"] = False
+    return lines
+
+
 def _single_line(
     db: Session,
     *,
@@ -628,6 +895,8 @@ def _direct_item_bundle(
     to_department: Optional[str],
     source_kind: str = "direct_item",
     source_location: str = "warehouse",
+    internal_use_bom_mode: Optional[str] = None,
+    component_selections: Iterable[object] = (),
 ) -> dict:
     children = bom_svc.direct_children(db, item.item_id)
     should_expand = (
@@ -643,6 +912,8 @@ def _direct_item_bundle(
         "source_mes_code": item.mes_code,
         "quantity": quantity,
         "expanded_level": 1,
+        "internal_use_bom_mode": internal_use_bom_mode if sub_type == INTERNAL_USE_SUB_TYPE and should_expand else None,
+        "source_location": source_location if sub_type == INTERNAL_USE_SUB_TYPE else None,
         "lines": [],
     }
 
@@ -676,6 +947,18 @@ def _direct_item_bundle(
             sub_type=sub_type,
             from_department=from_department,
             to_department=to_department,
+        )
+    elif should_expand and sub_type == INTERNAL_USE_SUB_TYPE:
+        bundle["lines"] = _internal_use_bom_lines(
+            db,
+            item=item,
+            quantity=quantity,
+            children=children,
+            from_department=from_department,
+            to_department=to_department,
+            source_location=source_location,
+            mode=internal_use_bom_mode,
+            component_selections=component_selections,
         )
     elif should_expand:
         bundle["lines"] = _expanded_child_lines(
@@ -762,6 +1045,8 @@ def preview(
     for target in targets:
         source_kind = getattr(target, "source_kind", "direct_item")
         source_location = _target_source_location(target, sub_type=sub_type)
+        internal_use_bom_mode = getattr(target, "internal_use_bom_mode", None)
+        component_selections = getattr(target, "component_selections", ())
         qty = _d(getattr(target, "quantity", Decimal("1")))
         item_id = getattr(target, "item_id", None)
         if item_id is None:
@@ -777,6 +1062,8 @@ def preview(
             to_department=to_department,
             source_kind=source_kind,
             source_location=source_location,
+            internal_use_bom_mode=internal_use_bom_mode,
+            component_selections=component_selections,
         )
         _issue_bundle_bom_auto_tokens(
             db,

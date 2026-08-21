@@ -100,6 +100,23 @@ describe("다크 테마 색상 계약", () => {
     expect(tokens["--c-department-color-neutral"]).toBe("#adb7c3");
   });
 
+  it("BOM 깊이 행은 테마 반응형 ink 톤으로 깊어질수록 진해진다", () => {
+    const styles = globalStyles();
+    const tokens = darkTokens();
+    const lightMixes = ["2", "4.57", "7.14", "9.71", "12.29", "14.86", "17.43", "20"];
+    const darkMixes = ["10", "20", "30", "40", "50", "60", "70", "80"];
+
+    expect(tokens["--c-bom-tree-depth-tone"]).toBe("var(--c-blue-solid)");
+    expect(styles).toMatch(/\.bom-tree-depth\s*\{[\s\S]*?background:\s*color-mix\(in oklab, var\(--c-bom-tree-depth-tone\) var\(--bom-tree-depth-mix\), var\(--c-s1\)\);/);
+
+    lightMixes.forEach((mix, index) => {
+      expect(styles).toMatch(new RegExp(`\\.bom-tree-depth-${index + 1}\\s*\\{\\s*--bom-tree-depth-mix:\\s*${mix}%;`));
+    });
+    darkMixes.forEach((mix, index) => {
+      expect(styles).toMatch(new RegExp(`:root\\[data-theme="dark"\\] \\.bom-tree-depth-${index + 1}\\s*\\{\\s*--bom-tree-depth-mix:\\s*${mix}%;`));
+    });
+  });
+
   it("공용 primary 버튼은 채움 전용 파랑 토큰을 사용한다", () => {
     expect(globalStyles()).toMatch(/\.btn-primary\s*\{[\s\S]*?background:\s*var\(--c-blue-solid\);/);
   });

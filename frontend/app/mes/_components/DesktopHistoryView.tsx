@@ -506,14 +506,21 @@ export function DesktopHistoryView() {
   const activeFilterCount = selectedDepts.length + selectedModels.length + selectedOps.length;
 
   return (
-    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
-      {/* ── 좌측: 스크롤 영역 ── */}
+    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-1">
+      {/* ── 좌측: 전체 작업 영역 스크롤 + 바깥 전용 스크롤 바 ── */}
       <div
         data-testid="history-left-viewport"
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[24px]"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col"
       >
-        <div data-testid="history-left-content" className="sg min-h-0 flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-2">
+        <div
+          data-testid="history-left-content"
+          className="sg min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll"
+        >
+          <div
+            data-testid="history-scroll-surface"
+            className="min-h-full"
+          >
+            <div className="flex flex-col gap-2">
           <HistoryStatsBar
             baseline={baselineSummary}
             currentCount={summary?.total ?? null}
@@ -622,7 +629,22 @@ export function DesktopHistoryView() {
             referenceSummariesLoading={referenceSummariesLoading}
             collapseRequestNonce={collapseRequestNonce}
           />
+            </div>
           </div>
+        </div>
+        <div
+          aria-hidden
+          data-testid="history-scroll-frame"
+          className="pointer-events-none absolute bottom-0 left-0 right-2.5 z-30 h-6"
+        >
+          <span
+            className="absolute bottom-0 left-0 h-6 w-6"
+            style={{ background: "radial-gradient(circle at 100% 0, transparent 0 23px, var(--c-bg) 24px)" }}
+          />
+          <span
+            className="absolute bottom-0 right-0 h-6 w-6"
+            style={{ background: "radial-gradient(circle at 0 0, transparent 0 23px, var(--c-bg) 24px)" }}
+          />
         </div>
       </div>
 

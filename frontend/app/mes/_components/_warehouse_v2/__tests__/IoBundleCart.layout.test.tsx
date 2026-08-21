@@ -119,4 +119,26 @@ describe("IoBundleCart layout", () => {
 
     expect(screen.getByRole("button", { name: "선택한 1개 가져오기" })).toBeInTheDocument();
   });
+
+  it("재계산 중에는 임시저장과 다음 단계 이동을 막는다", () => {
+    render(
+      <IoBundleCart
+        bundles={[bundle]}
+        subType="internal_use_out"
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 10}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        onSaveDraft={vi.fn()}
+        internalUseBomBusy
+        canAdvance
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "제출확인 →" })).toBeDisabled();
+  });
 });

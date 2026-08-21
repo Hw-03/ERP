@@ -13,12 +13,13 @@
 
 - 작업 경로: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
 - 브랜치: `codex/full-code-quality-improvement`
-- HEAD: `27da6e25718453378160fb9b930d8ed9cff8b622`
-- CP3는 위 품질 워크트리의 working diff로 구현·검증했으며, 이 문서 작성 뒤 사용자 승인에 따라 시작 전 6파일과 CP3를 분리 커밋해 품질 브랜치에만 push한다.
+- CP3 구현 기준 HEAD: `27da6e25718453378160fb9b930d8ed9cff8b622`
+- CP3 closeout commit: 기존 6파일 정리 `e07bc0c1`, `IC-01` 구현 `88cdd25b`. 두 커밋은 원격 `codex/full-code-quality-improvement`에 push 완료했다.
+- 최신 동기화 기준: `origin/main` `ea6da6705c930e14c315accdc6d5c5101af703b1`. 이 문서를 포함한 merge commit을 같은 원격 품질 브랜치에만 push한다.
 - `C:\ERP` 메인 워크트리는 사용자 작업 영역이므로 CP3 과정에서 읽기 확인 외 수정·복사·stash·reset·commit을 하지 않았다.
 - `C:\ERP-dev`는 파일·해시·검색·DB·프로세스·포트를 포함해 접근하지 않았다.
 - 회사 도메인, DNS, 홈페이지, HTTPS, 인증서, Caddy는 범위 밖으로 유지했다.
-- CP3 구현·검증 중 branch 생성·전환, 추가 main 병합, commit, push, PR은 수행하지 않았다. 후속 closeout에서는 사용자 승인 범위인 기존 6파일·CP3 분리 commit과 품질 브랜치 push만 수행하고, 최신 `main` 병합과 PR은 메인 작업 종료 뒤로 보류한다.
+- CP3 구현·검증 중에는 branch 전환, 추가 main 병합, commit, push, PR을 수행하지 않았다. 이후 사용자 승인으로 기존 6파일·CP3 분리 commit과 품질 브랜치 push를 마쳤고, 메인 작업 종료 확인 뒤 최신 `origin/main`을 품질 브랜치 방향으로만 병합했다. `main` push와 PR은 수행하지 않는다.
 
 ## CP3 구현 범위
 
@@ -114,7 +115,9 @@ CP4 카드와 CP4 제품 구현은 **미착수**다. 이 closeout에서도 제�
 - `12.13 체크포인트 3 IC-01 검증된 작업자 세션 결과`에는 이 문서와 같은 branch/HEAD, migration·PIN·session·manifest 범위, backend/frontend/Playwright 수치, DB hash, residue 0, frozen diff 0, 리뷰 0/0/0이 기록돼 있다.
 - closeout read-only 대조에서 불일치를 찾지 못했으므로 감사 계획은 추가 수정하지 않았다.
 
-## Commit 직전 working-tree inventory
+## 역사적 CP3 commit 직전 working-tree inventory
+
+이 절은 `e07bc0c1`·`88cdd25b` 작성 전 provenance snapshot이다. 현재 working tree 상태나 최신 `main` 동기화 diff로 해석하지 않는다.
 
 ### closeout 문서 작성 시점 전체 상태
 
@@ -206,14 +209,24 @@ CP3 신규 untracked 구현·테스트 파일은 다음과 같다.
 - `frontend/scripts/next-server.js`
 - `frontend/tests/e2e/operator-session-ui.spec.ts`
 
-tracked modified 217개의 정확한 파일 목록은 이 working tree의 현재 `git status --short`가 정본이다. 위 개수와 시작 전 6파일 분리를 유지하며, 다음 작업에서 일괄 reset·stash·checkout하거나 CP4 변경으로 재분류하지 않는다.
+tracked modified 217개와 시작 전 6파일 분리는 CP3 commit 직전 snapshot이다. 현재 파일 상태의 정본은 최신 품질 브랜치의 `git status --short`이며, 이 과거 목록을 CP4 변경으로 재분류하지 않는다.
+
+## 최신 `main` 동기화 closeout
+
+- `c01034a3..ea6da670`의 18개 커밋·123개 경로를 전수 delta 감사한 뒤 품질 브랜치에만 병합했다.
+- 작업자 세션 `20260819_0023`과 최신 `main`의 AS·연구 BOM migration을 `20260820_0024`로 직렬화했고 Alembic head는 하나다.
+- CP3 `VerifiedActor`·세션 계약과 최신 `main`의 차감 부서·BOM 모드·고정 자식수량을 함께 유지했다.
+- backend migration·actor·IO focused gate와 전체 **1,922개 중 1,906 PASS·환경 전용 16 SKIP**, frontend Node 20 app/unit/E2E type·2,142 unit tests·coverage·build·bundle, OpenAPI exact, docs, schema read-only, inventory integrity, Playwright 16/16을 검증했다.
+- `TEST_POSTGRES_URL` 부재로 CP3 PostgreSQL 실경합은 계속 `NOT_VERIFIED`다. 새 blocker나 PASS로 바꾸지 않는다.
+- Playwright teardown 뒤 8021·3100 listener, `mes_e2e.db`, seed·결과물은 0이고 실제 `backend/mes.db` SHA-256은 전후 `598BD3606C91543C19B05CD17B2CB6F49609F45297A4764C7332C17EC990D448`로 같다.
+- 품질 동기화 과정에서 동결 UI를 추가 수정하지 않았고 CP4 제품 코드는 시작하지 않았다.
 
 ## CP4 담당 작업의 첫 행동
 
 CP4는 이 작업에서 시작하지 않는다. 별도 CP4 작업이 사용자에게 배정된 뒤에만 다음 순서를 따른다.
 
 1. `C:\ERP\AGENTS.md`와 이 최종 handoff를 읽는다.
-2. 작업 위치가 `C:\ERP\.worktrees\full-code-quality-checkpoint-2`, branch가 `codex/full-code-quality-improvement`인지 확인하고, `git log`에서 기존 6파일과 CP3가 분리 커밋돼 품질 원격 브랜치와 일치하는지 확인한다. `27da6e25718453378160fb9b930d8ed9cff8b622`는 CP3 구현 기준 HEAD다.
-3. 위 inventory는 commit 직전 provenance snapshot으로 사용하고, CP4 시작 시 working tree가 clean인지 확인한다.
+2. 작업 위치가 `C:\ERP\.worktrees\full-code-quality-checkpoint-2`, branch가 `codex/full-code-quality-improvement`인지 확인하고, `git log`에서 `e07bc0c1`·`88cdd25b`와 최신 `main` `ea6da670` 동기화 merge commit이 품질 원격 브랜치와 일치하는지 확인한다. `27da6e25718453378160fb9b930d8ed9cff8b622`는 역사적 CP3 구현 기준 HEAD다.
+3. 위 inventory는 역사적 CP3 provenance snapshot으로만 사용하고, CP4 시작 시 working tree가 clean인지 확인한다.
 4. PostgreSQL을 `NOT_VERIFIED`로 유지하고 사용자 승인 없이 추가 branch·commit·push·PR을 하지 않는다.
 5. CP4의 승인 범위만 별도 계획·TDD로 시작한다. CP3 closeout을 다시 구현하거나 제품 검증을 반복하지 않는다.

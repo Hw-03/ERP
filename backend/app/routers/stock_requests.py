@@ -11,6 +11,7 @@ from typing import List, Optional
 from datetime import datetime as _dt
 
 from fastapi import Depends, Query, Request, Response, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from sqlalchemy.exc import IntegrityError
@@ -213,7 +214,12 @@ def list_department_queue(
         ),
     )
     if visible is not None:
-        base_query = base_query.filter(StockRequest.requester_department.in_(list(visible)))
+        base_query = base_query.filter(
+            func.coalesce(
+                StockRequest.approval_department,
+                StockRequest.requester_department,
+            ).in_(list(visible))
+        )
 
     return (
         base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
@@ -248,7 +254,12 @@ def count_department_queue(
         ),
     )
     if visible is not None:
-        base_query = base_query.filter(StockRequest.requester_department.in_(list(visible)))
+        base_query = base_query.filter(
+            func.coalesce(
+                StockRequest.approval_department,
+                StockRequest.requester_department,
+            ).in_(list(visible))
+        )
 
     return {"count": int(base_query.count())}
 

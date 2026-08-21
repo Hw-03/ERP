@@ -59,7 +59,7 @@ export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeCh
           onClick={() => onItemConversion?.()}
           icon={PackageCheck}
           title="품목 전환"
-          description="기존 PA 재고를 대상 PA 재고로 전환합니다."
+          description="기존 품목 재고를 대상 품목 재고로 전환합니다."
           tone={LEGACY_COLORS.cyan}
           className="p-10"
           size="large"

@@ -305,6 +305,7 @@ def test_operator_session_partial_true_default_matches_bootstrap_fingerprint(
         db.commit()
 
     command.upgrade(config, MIGRATION_REVISION)
+    command.upgrade(config, "head")
     engine = sa.create_engine(f"sqlite:///{path.as_posix()}")
     try:
         with engine.connect() as connection:

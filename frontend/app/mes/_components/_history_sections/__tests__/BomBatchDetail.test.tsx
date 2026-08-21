@@ -437,4 +437,64 @@ describe("BomBatchDetail", () => {
     expect(dash.parentElement).toHaveClass("justify-center");
     expect(screen.queryByText("제외")).not.toBeInTheDocument();
   });
+
+  it("shows the internal-use BOM mode and every child inventory effect", () => {
+    const batch = makeBatch();
+    batch.work_type = "internal_use";
+    batch.sub_type = "internal_use_out";
+    batch.bundles[0] = {
+      ...batch.bundles[0],
+      internal_use_bom_mode: "parent_and_children",
+      lines: [
+        makeLine({
+          line_id: "parent-line",
+          item_id: "parent",
+          item_name: "상위 자재",
+          origin: "direct",
+          direction: "out",
+          from_bucket: "warehouse",
+          from_department: null,
+          to_bucket: "none",
+          to_department: null,
+          selected: true,
+        }),
+        makeLine({
+          line_id: "selected-child",
+          item_id: "selected-child",
+          item_name: "선택 하위",
+          selected: true,
+        }),
+        makeLine({
+          line_id: "returned-child",
+          item_id: "returned-child",
+          item_name: "재입고 하위",
+          direction: "in",
+          from_bucket: "none",
+          from_department: null,
+          to_bucket: "production",
+          to_department: "가공",
+          selected: false,
+        }),
+        makeLine({
+          line_id: "unchanged-child",
+          item_id: "unchanged-child",
+          item_name: "변동 없는 하위",
+          included: false,
+          selected: false,
+        }),
+      ],
+    };
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    expect(screen.getByText("상·하위 차감")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+
+    expect(screen.getByText("재입고 하위")).toBeInTheDocument();
+    expect(screen.getByText("변동 없는 하위")).toBeInTheDocument();
+    expect(screen.getByText("소속 부서 재입고")).toBeInTheDocument();
+    expect(screen.getByText("변동 없음")).toBeInTheDocument();
+  });
 });

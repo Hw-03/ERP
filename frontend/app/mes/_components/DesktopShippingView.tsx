@@ -1719,9 +1719,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           right={selectedHistory && (
             <>
               {hasPickedUpSerialNumbers && (
-                <div data-testid="shipping-history-serial-summary" className="min-h-[64px] min-w-[280px] basis-[280px] grow rounded-[14px] border px-3 py-2" style={{ background: tint(LEGACY_COLORS.cyan, 10), borderColor: tint(LEGACY_COLORS.cyan, 45) }}>
-                  <div className="text-xs font-black" style={{ color: LEGACY_COLORS.cyan }}>{SERIAL_NUMBERS_LABEL}</div>
-                  <div className="sn-b truncate text-sm font-bold" title={selectedHistory.serial_numbers ?? undefined} style={{ color: LEGACY_COLORS.text }}>{serialNumberText(selectedHistory.serial_numbers)}</div>
+                <div data-testid="shipping-history-serial-summary" className="flex min-h-[64px] min-w-[280px] basis-[280px] grow items-center rounded-[14px] border px-3 py-2" style={{ background: tint(LEGACY_COLORS.cyan, 10), borderColor: tint(LEGACY_COLORS.cyan, 45) }}>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-black" style={{ color: LEGACY_COLORS.cyan }}>{SERIAL_NUMBERS_LABEL}</div>
+                    <div className="mt-0.5 h-7 truncate text-sm font-bold leading-7" title={selectedHistory.serial_numbers ?? undefined} style={{ color: LEGACY_COLORS.text }}>{serialNumberText(selectedHistory.serial_numbers)}</div>
+                  </div>
                 </div>
               )}
               <InvoiceNumberEditor request={selectedHistory} onSaved={handleInvoiceSaved} />
@@ -1750,21 +1752,36 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     );
   }
 
-  const usesLayoutOnlyRoot = view === "requestDetail" || view === "historyList";
+  const usesExternalRootRail = view === "requestDetail" || view === "historyList" || view === "historyWork";
+  const rootContent = (
+    <>
+      {error && <Notice tone={LEGACY_COLORS.red} title="오류" body={error} />}
+      {renderActiveView()}
+    </>
+  );
   return (
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       <div
         data-testid="shipping-root-panel"
-        data-surface={usesLayoutOnlyRoot ? "layout-only" : undefined}
-        className={`scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto ${usesLayoutOnlyRoot ? "" : "rounded-[28px] border px-4 py-4"}`}
-        style={usesLayoutOnlyRoot ? undefined : {
+        className={usesExternalRootRail
+          ? "relative flex min-h-0 min-w-0 flex-1 flex-col rounded-[28px] border px-4 py-4"
+          : "scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-[28px] border px-4 py-4"}
+        style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
           boxShadow: "none",
         }}
       >
-        {error && <Notice tone={LEGACY_COLORS.red} title="오류" body={error} />}
-        {renderActiveView()}
+        {usesExternalRootRail ? (
+          <>
+            <div data-testid="shipping-root-viewport" className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
+              <div className="flex min-h-full min-w-0 flex-col px-4 py-4" style={{ background: LEGACY_COLORS.s1 }}>
+                {rootContent}
+              </div>
+            </div>
+            <ExternalRailFrame dataTestId="shipping-root-scroll-frame" radiusClass="rounded-[28px]" cornerRadius={28} maskColor={LEGACY_COLORS.bg} />
+          </>
+        ) : rootContent}
       </div>
 
       {confirmAction && (
@@ -1948,7 +1965,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
                 <span className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>준비 완료 취소 후 수정 가능</span>
               </div>
             )}
-            <StatusBadge status={request.status} />
+            <StatusBadge status={request.status} expanded />
           </div>
         </div>
 
@@ -2412,8 +2429,8 @@ function HistoryListEntry({
   );
 
   return (
-    <div className={SHIPPING_FLEX_COL_CLASS}>
-      <div data-testid="shipping-history-list" data-surface="layout-only" className={SHIPPING_FLEX_COL_CLASS}>
+    <div className="flex min-w-0 flex-col">
+      <div data-testid="shipping-history-list" data-surface="layout-only" className="flex min-w-0 flex-col">
         <div className={SHIPPING_TOP_ROW_CLASS}>
           <div className="flex min-h-11 items-center gap-3">
             <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -2473,7 +2490,7 @@ function HistoryListEntry({
           </button>
         </form>
 
-        <div data-testid="shipping-history-list-body" data-surface="layout-only" className="mt-4 flex min-h-0 flex-1 overflow-y-auto">
+        <div data-testid="shipping-history-list-body" data-surface="layout-only" className="mt-4 flex min-h-0 flex-1 overflow-y-auto lg:flex-none lg:overflow-visible">
           {error && rows.length > 0 && (
             <div className="mb-3">
               <LoadFailureCard
@@ -2819,35 +2836,38 @@ function RequestSection(props: {
                     placeholder="PF 코드/품명 검색"
                   />
                 </Field>
-                <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto rounded-[14px] border p-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  {props.pfItemsLoading ? (
-                    <EmptyState title="PF 후보를 불러오는 중입니다." body="잠시만 기다려주세요." />
-                  ) : props.pfItemsError ? (
-                    <EmptyState title="PF 후보를 불러오지 못했습니다." body={props.pfItemsError} />
-                  ) : filteredPfItems.length === 0 ? (
-                    <EmptyState title="선택 가능한 PF 없음" body="검색어를 바꾸거나 품목 목록을 확인하세요." />
-                  ) : (
-                    filteredPfItems.slice(0, 80).map((item) => {
-                      const selected = props.basePfId === item.item_id;
-                      return (
-                        <button
-                          key={item.item_id}
-                          type="button"
-                          data-testid={`shipping-pf-option-${item.item_id}`}
-                          onClick={() => props.onBasePfChange(item.item_id)}
-                          disabled={locked || props.pending !== null}
-                          className="flex min-h-12 items-center justify-between gap-3 rounded-[12px] border px-3 py-2 text-left transition-all hover:brightness-110 disabled:opacity-50"
-                          style={{ background: selected ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.blue, 45) : LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-black">{item.item_name}</span>
-                            <SummaryCode code={item.mes_code ?? item.process_type_code ?? "-"} testId={`shipping-pf-option-code-${item.item_id}`} />
-                          </span>
-                          {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-                        </button>
-                      );
-                    })
-                  )}
+                <div data-testid="shipping-pf-selection-scroll-shell" className="relative min-h-0 flex-1">
+                  <div data-testid="shipping-pf-selection-viewport" className="absolute inset-y-0 left-0 right-0 grid content-start gap-2 overflow-y-auto p-2 lg:-right-2.5 lg:[scrollbar-gutter:stable]" style={{ background: LEGACY_COLORS.s2 }}>
+                    {props.pfItemsLoading ? (
+                      <EmptyState title="PF 후보를 불러오는 중입니다." body="잠시만 기다려주세요." />
+                    ) : props.pfItemsError ? (
+                      <EmptyState title="PF 후보를 불러오지 못했습니다." body={props.pfItemsError} />
+                    ) : filteredPfItems.length === 0 ? (
+                      <EmptyState title="선택 가능한 PF 없음" body="검색어를 바꾸거나 품목 목록을 확인하세요." />
+                    ) : (
+                      filteredPfItems.slice(0, 80).map((item) => {
+                        const selected = props.basePfId === item.item_id;
+                        return (
+                          <button
+                            key={item.item_id}
+                            type="button"
+                            data-testid={`shipping-pf-option-${item.item_id}`}
+                            onClick={() => props.onBasePfChange(item.item_id)}
+                            disabled={locked || props.pending !== null}
+                            className="flex min-h-12 items-center justify-between gap-3 rounded-[12px] border px-3 py-2 text-left transition-all hover:brightness-110 disabled:opacity-50"
+                            style={{ background: selected ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.blue, 45) : LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-black">{item.item_name}</span>
+                              <SummaryCode code={item.mes_code ?? item.process_type_code ?? "-"} testId={`shipping-pf-option-code-${item.item_id}`} />
+                            </span>
+                            {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                  <ExternalRailFrame dataTestId="shipping-pf-selection-scroll-frame" />
                 </div>
               </div>
             </WorkStep>
@@ -3615,13 +3635,14 @@ function BomEditor({
         </span>
       </div>
       <ItemSearchAdd query={query} setQuery={setQuery} itemOptions={itemOptions} disabled={disabled} inputTestId={`shipping-bom-search-${stageLower}`} buttonTestPrefix={`shipping-bom-add-${stageLower}`} ariaLabel={`${title} 검색`} placeholder="검색 후 추가" tone={stageColor} onAdd={(itemId) => onAdd(stage, itemId)} />
-      <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1">
-        {lines.length === 0 ? (
-          <div className="rounded-[10px] border px-3 py-4 text-center text-sm font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-            구성품이 없습니다.
-          </div>
-        ) : (
-          lines.map((line) => {
+      <div data-testid={`shipping-bom-editor-${stageLower}-scroll-shell`} className="relative min-h-0 flex-1">
+        <div data-testid={`shipping-bom-editor-${stageLower}-viewport`} className="absolute inset-y-0 left-0 right-0 grid content-start gap-2 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
+          {lines.length === 0 ? (
+            <div className="rounded-[10px] border px-3 py-4 text-center text-sm font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+              구성품이 없습니다.
+            </div>
+          ) : (
+            lines.map((line) => {
             const item = itemById.get(line.child_item_id);
             const needsSalesReview = Boolean(item?.sales_review_required);
             const isCustom = line.origin === "CUSTOM";
@@ -3680,8 +3701,10 @@ function BomEditor({
                 </button>
               </div>
             );
-          })
-        )}
+            })
+          )}
+        </div>
+        <ExternalRailFrame dataTestId={`shipping-bom-editor-${stageLower}-scroll-frame`} maskColor={LEGACY_COLORS.s2} />
       </div>
     </div>
   );
@@ -4203,6 +4226,26 @@ function WorkStep({ number, title, body, children, dataTestId, showHeader = true
   );
 }
 
+function ExternalRailFrame({ dataTestId, radiusClass = "rounded-[14px]", cornerRadius = 14, maskColor = LEGACY_COLORS.s1 }: { dataTestId: string; radiusClass?: string; cornerRadius?: number; maskColor?: string }) {
+  const cornerClass = cornerRadius === 28 ? "h-7 w-7" : "h-[14px] w-[14px]";
+  const edge = cornerRadius - 1;
+  return (
+    <>
+      <div data-testid={dataTestId} aria-hidden className={`pointer-events-none absolute inset-0 z-20 border ${radiusClass}`} style={{ borderColor: LEGACY_COLORS.border }} />
+      <div data-testid={`${dataTestId}-masks`} aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+        <div className="flex justify-between">
+          <span className={cornerClass} style={{ background: `radial-gradient(circle at 100% 100%, transparent 0 ${edge}px, ${maskColor} ${cornerRadius}px)` }} />
+          <span className={cornerClass} style={{ background: `radial-gradient(circle at 0 100%, transparent 0 ${edge}px, ${maskColor} ${cornerRadius}px)` }} />
+        </div>
+        <div className="flex justify-between">
+          <span className={cornerClass} style={{ background: `radial-gradient(circle at 100% 0, transparent 0 ${edge}px, ${maskColor} ${cornerRadius}px)` }} />
+          <span className={cornerClass} style={{ background: `radial-gradient(circle at 0 0, transparent 0 ${edge}px, ${maskColor} ${cornerRadius}px)` }} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, action }: { icon: typeof PackageCheck; title: string; subtitle: string; children: ReactNode; bodyDataTestId?: string; action?: ReactNode }) {
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
@@ -4225,10 +4268,15 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
-function StatusBadge({ status, compact = false }: { status: ShippingRequestStatus; compact?: boolean }) {
+function StatusBadge({ status, compact = false, expanded = false }: { status: ShippingRequestStatus; compact?: boolean; expanded?: boolean }) {
   return (
     <span
-      className={compact ? "rounded-full px-2 py-1 text-xs font-black" : "rounded-full px-3 py-1.5 text-xs font-black"}
+      data-testid={expanded ? "shipping-request-detail-status-badge" : undefined}
+      className={compact
+        ? "rounded-full px-2 py-1 text-xs font-black"
+        : expanded
+          ? "inline-flex min-h-[64px] min-w-[96px] items-center justify-center rounded-[14px] px-3 py-2 text-sm font-black"
+          : "rounded-full px-3 py-1.5 text-xs font-black"}
       style={{ background: tint(STATUS_TONE[status], 20), color: STATUS_TONE[status] }}
     >
       {STATUS_LABEL[status]}

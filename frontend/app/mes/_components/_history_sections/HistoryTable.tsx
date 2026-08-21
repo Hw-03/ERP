@@ -59,10 +59,10 @@ const COLUMNS: ColSpec[] = [
   { label: "대상" },
   { label: "품목코드", width: "118px", align: "center" },
   { label: "수량", width: "270px", align: "center" },
-  { label: "담당자", width: "120px", align: "center" },
+  { label: "담당자", width: "160px", align: "center" },
 ];
 const VISIBLE_FETCH_CONCURRENCY = 4;
-const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-x-clip rounded-[24px]";
+const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-clip rounded-[24px]";
 
 function historyTableHeaderClass(column: (typeof COLUMNS)[number], index: number): string {
   const alignment = column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left";
@@ -86,11 +86,11 @@ function HistoryTableCornerMask() {
     >
       <span
         className="h-6 w-6"
-        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-history-table-header) 24px)" }}
+        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-bg) 24px)" }}
       />
       <span
         className="h-6 w-6"
-        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-history-table-header) 24px)" }}
+        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-bg) 24px)" }}
       />
     </div>
   );
@@ -110,7 +110,7 @@ function HistoryTableSkeleton() {
         className="w-full table-fixed border-separate border-spacing-0 text-sm"
       >
         <thead>
-          <tr style={{ background: "var(--c-history-table-header)" }}>
+          <tr>
             {COLUMNS.map((column, index) => (
               <th
                 key={column.label || `loading-spacer-${index}`}
@@ -411,7 +411,7 @@ export function HistoryTable({
           <HistoryTableCornerMask />
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
             <thead>
-              <tr style={{ background: "var(--c-history-table-header)" }}>
+              <tr>
                 {COLUMNS.map((column, index) => (
                   <th
                     key={column.label || `spacer-${index}`}

@@ -353,7 +353,7 @@ describe("DesktopShippingView", () => {
     expect(root).not.toHaveAttribute("data-surface");
   });
 
-  it("uses layout-only root and outer wrappers for an existing request detail", async () => {
+  it("uses the shared outer surface and a single external-rail root viewport for an existing request detail", async () => {
     const detailRequest = request({ request_id: "layout-only-detail", notes: "상세 작업 메모" });
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=layout-only-detail";
     vi.mocked(api.getShippingRequests).mockResolvedValue([detailRequest]);
@@ -362,30 +362,45 @@ describe("DesktopShippingView", () => {
 
     const detail = await screen.findByTestId("shipping-request-detail");
     const root = screen.getByTestId("shipping-root-panel");
-    expect(root).toHaveAttribute("data-surface", "layout-only");
-    expect(root).not.toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    const viewport = screen.getByTestId("shipping-root-viewport");
+    expect(root).not.toHaveAttribute("data-surface");
+    expect(root).toHaveClass("relative", "rounded-[28px]", "border", "px-4", "py-4");
+    expect(root).not.toHaveClass("overflow-y-auto");
+    expect(viewport).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+    expect(screen.getByTestId("shipping-root-scroll-frame")).toHaveClass("rounded-[28px]", "border");
+    expect(screen.getByTestId("shipping-root-scroll-frame-masks").querySelector("span")).toHaveStyle({
+      background: "radial-gradient(circle at 100% 100%, transparent 0 27px, var(--c-bg) 28px)",
+    });
     expect(detail).toHaveAttribute("data-surface", "layout-only");
     expect(detail).not.toHaveClass("rounded-[24px]", "border", "p-4");
 
     const header = within(detail).getByTestId("shipping-request-detail-header");
+    const statusBadge = within(header).getByTestId("shipping-request-detail-status-badge");
     const revisionHistory = within(detail).getByTestId("shipping-revision-history");
     const lineSummary = within(detail).getByTestId("shipping-line-summary");
     const actions = within(detail).getByTestId("shipping-detail-actions");
     expect(header).toContainElement(within(detail).getByTestId("shipping-invoice-editor"));
+    expect(statusBadge).toHaveClass("min-h-[64px]", "min-w-[96px]", "rounded-[14px]");
     expect(header.compareDocumentPosition(revisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(revisionHistory.compareDocumentPosition(lineSummary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(lineSummary.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(actions).toHaveClass("rounded-[14px]", "border", "p-3");
+
+    fireEvent.click(within(detail).getByTestId("shipping-edit-request"));
+    const workHeader = await screen.findByTestId("shipping-work-header");
+    expect(screen.queryByTestId("shipping-request-detail-status-badge")).not.toBeInTheDocument();
+    expect(workHeader.querySelector(":scope > span")).not.toHaveClass("min-h-[64px]", "min-w-[96px]", "rounded-[14px]");
   });
 
-  it("keeps the empty request-detail guidance panel inside the layout-only root", async () => {
+  it("keeps the empty request-detail guidance panel inside the shared root surface", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=missing-detail";
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);
 
     render(<DesktopShippingView onStatusChange={() => {}} />);
 
     expect(await screen.findByText("선택된 요청 없음")).toBeInTheDocument();
-    expect(screen.getByTestId("shipping-root-panel")).toHaveAttribute("data-surface", "layout-only");
+    expect(screen.getByTestId("shipping-root-panel")).toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    expect(screen.getByTestId("shipping-root-viewport")).toHaveClass("overflow-y-auto");
     const guidancePanel = screen.getByText("선택된 요청 없음").closest('[class~="rounded-[24px]"]');
     expect(guidancePanel).toHaveClass("border", "p-4");
   });
@@ -3075,6 +3090,32 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByText("세부 목록", { exact: true })).not.toBeInTheDocument();
   });
 
+  it("moves only PF and PA/PF editor scroll owners onto fixed external rails", async () => {
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+
+    const pfShell = await screen.findByTestId("shipping-pf-selection-scroll-shell");
+    const pfViewport = screen.getByTestId("shipping-pf-selection-viewport");
+    expect(pfShell).toHaveClass("relative", "min-h-0", "flex-1");
+    expect(pfViewport).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+    expect(screen.getByTestId("shipping-pf-selection-scroll-frame")).toHaveClass("rounded-[14px]", "border");
+
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+
+    for (const stage of ["pa", "pf"] as const) {
+      const editor = await screen.findByTestId(`shipping-bom-editor-${stage}`);
+      const shell = within(editor).getByTestId(`shipping-bom-editor-${stage}-scroll-shell`);
+      const viewport = within(editor).getByTestId(`shipping-bom-editor-${stage}-viewport`);
+      expect(shell).toHaveClass("relative", "min-h-0", "flex-1");
+      expect(viewport).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+      expect(within(editor).getByTestId(`shipping-bom-editor-${stage}-scroll-frame`)).toHaveClass("rounded-[14px]", "border");
+    }
+  });
+
   it("keeps the invoice field above PF selection and includes it in request creation", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -3418,11 +3459,17 @@ describe("DesktopShippingView", () => {
 
     const detail = await screen.findByTestId("shipping-history-detail");
     const viewHeader = screen.getByTestId("shipping-history-view-header");
+    const root = screen.getByTestId("shipping-root-panel");
+    expect(root).toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    expect(root).not.toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("shipping-root-viewport")).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
     const headerRight = within(viewHeader).getByTestId("shipping-view-header-right");
     expect(headerRight).toHaveClass("min-w-[min(100%,620px)]", "basis-[620px]", "flex-1", "flex-wrap");
     const serialSummary = within(viewHeader).getByTestId("shipping-history-serial-summary");
     expect(serialSummary).toHaveTextContent("34M25H0490 ~ 34M25H0493 (4개)");
-    expect(serialSummary).toHaveClass("min-h-[64px]", "min-w-[280px]", "basis-[280px]", "grow");
+    expect(serialSummary).toHaveClass("flex", "min-h-[64px]", "min-w-[280px]", "basis-[280px]", "grow", "items-center", "rounded-[14px]", "border");
+    expect(within(serialSummary).getByText("완제품 SN")).toHaveClass("text-xs", "font-black");
+    expect(within(serialSummary).getByText("34M25H0490 ~ 34M25H0493 (4개)")).toHaveClass("mt-0.5", "h-7", "truncate");
     const invoiceEditor = within(viewHeader).getByTestId("shipping-invoice-editor");
     expect(invoiceEditor).toHaveClass("min-w-[280px]", "basis-[280px]", "grow");
     const invoiceShell = within(invoiceEditor).getByTestId("shipping-invoice-field-shell");
@@ -3583,7 +3630,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByText(/요청 취소 07/)).toBeInTheDocument();
   });
 
-  it("uses layout-only root, list, year, and month wrappers for history and search results", async () => {
+  it("uses the shared external-rail root viewport while preserving layout-only history grouping wrappers", async () => {
     const historyRequest = request({
       request_id: "layout-only-history",
       status: "PICKED_UP",
@@ -3603,11 +3650,14 @@ describe("DesktopShippingView", () => {
     const month = within(historyList).getByTestId("shipping-history-month-2026-6");
     const requestRow = within(month).getByRole("button", { name: /Standard PF/ });
 
-    expect(root).toHaveAttribute("data-surface", "layout-only");
-    expect(root).not.toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    expect(root).toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
+    expect(root).not.toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("shipping-root-viewport")).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+    expect(screen.getByTestId("shipping-root-scroll-frame")).toHaveClass("rounded-[28px]", "border");
     expect(historyList).toHaveAttribute("data-surface", "layout-only");
     expect(historyList).not.toHaveClass("rounded-[24px]", "border", "p-4");
     expect(body).toHaveAttribute("data-surface", "layout-only");
+    expect(body).toHaveClass("overflow-y-auto", "lg:overflow-visible");
     expect(body).not.toHaveClass("rounded-[18px]", "border", "p-3");
     expect(year).toHaveAttribute("data-surface", "layout-only");
     expect(year).not.toHaveClass("rounded-[14px]", "border");

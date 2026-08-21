@@ -125,6 +125,24 @@ function getPillDisplayLabel(label: string): { label: string; title?: string } {
   };
 }
 
+export function InternalUseEffectBadge({ label }: { label: string }) {
+  const color = label === "출고"
+    ? LEGACY_COLORS.red
+    : label === "소속 부서 재입고"
+      ? LEGACY_COLORS.green
+      : label === "재고 미반영"
+        ? LEGACY_COLORS.yellow
+        : LEGACY_COLORS.muted2;
+  return (
+    <span
+      className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold leading-none"
+      style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, color }}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function MovementSummaryCell({
   summary,
   compact = false,

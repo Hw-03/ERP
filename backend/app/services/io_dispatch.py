@@ -192,11 +192,13 @@ def _submit_internal_use_approvals(
     requester: Employee,
     batch: IoBatch,
 ) -> None:
-    """사용출고 라인을 창고 1건과 원본 생산부서별 요청으로 분리한다."""
+    """사용출고 라인을 출고 원본별 요청과 재입고 대상 부서별 요청으로 분리한다."""
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
+    outbound_lines = [line for line in lines if line.direction == "out"]
+    return_lines = [line for line in lines if line.direction == "in"]
     grouped: dict[tuple[str, Optional[str]], list[IoLine]] = {}
-    for line in lines:
+    for line in outbound_lines:
         key = (line.from_bucket, line.from_department)
         grouped.setdefault(key, []).append(line)
 
@@ -237,6 +239,51 @@ def _submit_internal_use_approvals(
             lines=group_lines,
             update_batch=False,
         )
+        requests.append(request)
+        notif_svc._notify_request_arrived(db, request)
+
+    returns_by_department: dict[str, list[IoLine]] = {}
+    for line in return_lines:
+        if line.to_bucket != "production" or not line.to_department:
+            raise ValueError("사용출고 재입고 대상 부서가 올바르지 않습니다.")
+        returns_by_department.setdefault(line.to_department, []).append(line)
+
+    for approval_department, group_lines in sorted(returns_by_department.items()):
+        inputs = [
+            stock_request_svc.LineInput(
+                item_id=line.item_id,
+                quantity=line.quantity,
+                from_bucket=_request_bucket(line.from_bucket),
+                from_department=line.from_department,
+                to_bucket=_request_bucket(line.to_bucket),
+                to_department=line.to_department,
+            )
+            for line in group_lines
+        ]
+        request = stock_request_svc.create_manual_adjustment_request(
+            db,
+            requester=requester,
+            lines_input=inputs,
+            reference_no=batch.reference_no,
+            notes=batch.notes,
+            approval_department=approval_department,
+        )
+        _link_stock_request(
+            db,
+            batch=batch,
+            request=request,
+            lines=group_lines,
+            update_batch=False,
+        )
+        if request.department_approved_by_employee_id is not None:
+            _prelock_line_inventories(db, group_lines)
+            for line in group_lines:
+                _apply_line(db, batch=batch, line=line, requester=requester)
+            now = datetime.utcnow()
+            request.status = StockRequestStatusEnum.COMPLETED
+            request.completed_at = now
+            for request_line in request.lines:
+                request_line.status = StockRequestStatusEnum.COMPLETED
         requests.append(request)
         notif_svc._notify_request_arrived(db, request)
 
@@ -347,15 +394,32 @@ def execute_batch_after_dept_approval(
     if request.request_code and not batch.reference_no:
         batch.reference_no = request.request_code
 
-    lines = _included_lines(batch)
+    if batch.sub_type == INTERNAL_USE_SUB_TYPE:
+        operation_line_ids = {
+            request_line.operation_line_id
+            for request_line in request.lines
+            if request_line.operation_line_id is not None
+        }
+        if len(operation_line_ids) != len(request.lines):
+            raise ValueError("결재 요청과 작업 라인의 연결 정보가 올바르지 않습니다.")
+        lines = [
+            line
+            for line in _included_lines(batch)
+            if line.line_id in operation_line_ids
+        ]
+        if len(lines) != len(operation_line_ids):
+            raise ValueError("결재 요청에 연결된 작업 라인을 찾을 수 없습니다.")
+    else:
+        lines = _included_lines(batch)
     _validate_included_lines(db, lines)
     _prelock_line_inventories(db, lines)
     # 부서 결재로 권한 검증이 이미 완료된 시점이므로 ship 권한 재검증 생략.
     for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
         _apply_line(db, batch=batch, line=line, requester=approver)
     now = datetime.utcnow()
-    batch.status = "completed"
-    batch.completed_at = now
+    if batch.sub_type != INTERNAL_USE_SUB_TYPE:
+        batch.status = "completed"
+        batch.completed_at = now
     batch.updated_at = now
     db.flush()
 
@@ -598,6 +662,8 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         work_type=batch.work_type,
         sub_type=batch.sub_type,
         bundles=batch.bundles,
+        require_bom_mode=True,
+        db=db,
     )
     validate_internal_use_operation(
         work_type=batch.work_type,

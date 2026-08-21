@@ -157,7 +157,7 @@ describe("ItemConversionView", () => {
     expect(onItemConversion).toHaveBeenCalledTimes(1);
   });
 
-  it("labels the conversion card as existing PA inventory", () => {
+  it("labels the conversion card for all item inventory", () => {
     render(
       <IoWorkTypeStep
         workType="process"
@@ -167,7 +167,7 @@ describe("ItemConversionView", () => {
       />,
     );
 
-    expect(screen.getByTestId("warehouse-item-conversion-card")).toHaveTextContent("기존 PA 재고를 대상 PA 재고로 전환");
+    expect(screen.getByTestId("warehouse-item-conversion-card")).toHaveTextContent("기존 품목 재고를 대상 품목 재고로 전환합니다.");
   });
 
   it("품목 전환 카드는 조립·출하 부서에만 표시한다", () => {
@@ -301,6 +301,39 @@ describe("ItemConversionView", () => {
     expect(screen.getByTestId("item-conversion-target-option-af-1")).toBeInTheDocument();
     expect(screen.getByTestId("item-conversion-target-option-af-6")).toHaveTextContent("선택됨");
     expect(targetList.scrollTop).toBe(72);
+  });
+
+  it("moves both candidate list scrollbars onto fixed external rails", () => {
+    render(
+      <ItemConversionWorkView
+        items={scrollItems}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+
+    for (const kind of ["source", "target"] as const) {
+      expect(screen.getByTestId(`item-conversion-${kind}-candidate-shell`)).toHaveClass(
+        "relative",
+        "min-h-0",
+        "flex-1",
+      );
+      expect(screen.getByTestId(`item-conversion-${kind}-candidate-list`)).toHaveClass(
+        "overflow-y-auto",
+        "lg:-right-2.5",
+        "lg:[scrollbar-gutter:stable]",
+      );
+      expect(screen.getByTestId(`item-conversion-${kind}-candidate-frame`)).toHaveClass(
+        "pointer-events-none",
+        "absolute",
+        "inset-0",
+        "rounded-[14px]",
+        "border",
+      );
+    }
   });
 
   it("uses searchable source and target selection before moving to preview", async () => {

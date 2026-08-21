@@ -20,6 +20,7 @@ import { ExpandableItemName } from "./ExpandableItemName";
 import { deductionSourceName, IoDeductionSourceBadge } from "./IoDeductionSourceBadge";
 import { QuantityStepper } from "./QuantityStepper";
 import { IoRemoveButton } from "./IoRemoveButton";
+import { lineSelected } from "./internalUseBom";
 
 interface Props {
   line: IoLine;
@@ -35,6 +36,7 @@ interface Props {
   onToggle: () => void;
   onQuantityChange: (quantity: number, shortage: number) => void;
   onRemove: () => void;
+  editingDisabled?: boolean;
 }
 
 // originLabel 은 lineTagLabel 로 대체됨 (현장 친화 태그 + 입출고 부호 배지)
@@ -91,28 +93,36 @@ export function IoLineRow({
   onToggle,
   onQuantityChange,
   onRemove,
+  editingDisabled = false,
 }: Props) {
   const getDeptColor = useDeptColorLookup();
   const [showChildren, setShowChildren] = useState(false);
+  const isInternalUse = subType === "internal_use_out";
+  const selected = isInternalUse ? lineSelected(line) : line.included;
   const disabled = !line.included;
   // BOM 강제 모드: process(produce/disassemble) 한정 — bom_auto 하위는 상위 비례 자동 계산 → 체크/수량 차단.
-  // 창고 입출고는 묶음 선택 후 내부 자유 편집 허용 (qtyLocked=false).
+  // 일반 창고 입출고 BOM은 내부 편집을 허용하고, 연구 사용출고 BOM은 아래 고정 수량 표시로 분리한다.
   const qtyLocked =
     isBomForced(subType) &&
     line.origin === "bom_auto" &&
     line.bom_expected != null &&
     Number(line.bom_expected) > 0;
   const bomStockExempt = line.origin === "bom_auto" && line.bom_stock_exempt;
+  const fixedInternalUseBomQuantity = isInternalUse && line.origin === "bom_auto";
   const interactionLocked = qtyLocked || bomStockExempt;
-  const stepperDisabled = disabled || interactionLocked;
-  // + 버튼은 미체크 상태에서도 활성 — qty=0 자동 해제된 라인 복귀용. qtyLocked 만 차단.
+  const stepperDisabled = (!isInternalUse && disabled) || interactionLocked;
+  // 조절기를 사용하는 기존 행은 미체크 상태에서도 + 버튼으로 다시 포함할 수 있다.
   const incrementDisabled = interactionLocked;
   const shortage = line.included && line.shortage > 0;
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
   const deptBadge = item ? mesCodeDeptBadge(item.mes_code, getDeptColor) : null;
-  const deductionSource = subType === "internal_use_out" ? deductionSourceName(line) : null;
+  const deductionSource =
+    isInternalUse &&
+    (line.from_bucket === "warehouse" || line.from_bucket === "production")
+      ? deductionSourceName(line)
+      : null;
   const isWarehouseAdjust = isWarehouseAdjustSubType(subType);
   const displayedCurrent = isWarehouseAdjust && item
     ? Number(item.warehouse_qty) || 0
@@ -160,17 +170,17 @@ export function IoLineRow({
       <button
         type="button"
         onClick={onToggle}
-        disabled={interactionLocked}
+        disabled={editingDisabled || interactionLocked}
         aria-label={bomStockExempt ? "BOM 재고 미반영 항목" : "재고 반영 변경"}
         className="flex h-6 w-6 items-center justify-center rounded-[6px] border transition-colors disabled:cursor-not-allowed"
         style={{
-          background: line.included ? LEGACY_COLORS.blue : "transparent",
-          borderColor: line.included ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-          color: line.included ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+          background: selected ? LEGACY_COLORS.blue : "transparent",
+          borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+          color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
         }}
-        aria-pressed={line.included}
+        aria-pressed={selected}
       >
-        {line.included ? <Check className="h-4 w-4" /> : <MinusCircle className="h-3.5 w-3.5" />}
+        {selected ? <Check className="h-4 w-4" /> : <MinusCircle className="h-3.5 w-3.5" />}
       </button>
 
       {/* 2. 품목명 + 코드 + 메타 (모바일에선 flex-1 로 한 줄 폭 확보) */}
@@ -215,15 +225,17 @@ export function IoLineRow({
               BOM 재고 미반영
             </span>
           )}
-          <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            {bomStockExempt
-              ? "BOM 자동 처리 시 재고 미반영"
-              : qtyLocked
-              ? "상위 품목과 함께 자동 처리"
-              : line.included
-                ? "재고 반영 포함"
-                : line.exclusion_note || "이번 작업 제외"}
-          </span>
+          {(bomStockExempt || !isInternalUse) && (
+            <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              {bomStockExempt
+                ? "BOM 자동 처리 시 재고 미반영"
+                : qtyLocked
+                ? "상위 품목과 함께 자동 처리"
+                : line.included
+                  ? "재고 반영 포함"
+                  : line.exclusion_note || "이번 작업 제외"}
+            </span>
+          )}
         </div>
       </div>
 
@@ -241,16 +253,44 @@ export function IoLineRow({
         <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
       )}
 
-      {/* 4. 수량 stepper (모바일에선 한 줄 차지) */}
-      <QuantityStepper
-        value={currentQty}
-        onChange={onStepperChange}
-        disabled={interactionLocked}
-        decrementDisabled={stepperDisabled}
-        incrementDisabled={incrementDisabled}
-        inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
-        className="w-full lg:w-auto"
-      />
+      {/* 4. 연구 BOM은 고정 수량, 나머지는 수량 stepper (모바일에선 한 줄 차지) */}
+      {fixedInternalUseBomQuantity ? (
+        <div className="flex w-full flex-col items-center gap-0.5 lg:w-[276px]">
+          <span
+            className="text-xs font-bold uppercase tracking-[1.5px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            수량
+          </span>
+          <div className="flex h-11 min-h-[44px] w-full items-center justify-center">
+            <div
+              role="textbox"
+              aria-label="수량"
+              aria-readonly="true"
+              title="상위 기준 수량과 BOM 소요량으로 자동 계산"
+              className="inline-flex h-11 min-h-[44px] w-[72px] items-center justify-center rounded-[10px] border px-2 py-2 text-center text-base font-black tabular-nums"
+              style={{
+                background: LEGACY_COLORS.s2,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+                opacity: editingDisabled ? 0.6 : 1,
+              }}
+            >
+              {formatQty(currentQty)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <QuantityStepper
+          value={currentQty}
+          onChange={onStepperChange}
+          disabled={editingDisabled || interactionLocked}
+          decrementDisabled={stepperDisabled}
+          incrementDisabled={incrementDisabled}
+          inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
+          className="w-full lg:w-auto"
+        />
+      )}
 
       {/* 항목 5-6 — 모바일만 가능재고+실행후를 가운데 정렬·간격 확보. lg:contents 로 데스크톱 7열 그리드 유지. */}
       <div className="flex w-full items-start justify-center gap-10 lg:contents">
@@ -295,6 +335,7 @@ export function IoLineRow({
         {pullSelectable && onTogglePull && (
           <button
             type="button"
+            disabled={editingDisabled}
             onClick={(e) => {
               e.stopPropagation();
               onTogglePull();
@@ -317,7 +358,7 @@ export function IoLineRow({
 
       {/* 7. 삭제 (manual 또는 forceShowRemove) */}
       {line.origin === "manual" || forceShowRemove ? (
-        <IoRemoveButton label="삭제" onClick={onRemove} />
+        <IoRemoveButton label="삭제" onClick={onRemove} disabled={editingDisabled} />
       ) : (
         <span aria-hidden className="block" />
       )}

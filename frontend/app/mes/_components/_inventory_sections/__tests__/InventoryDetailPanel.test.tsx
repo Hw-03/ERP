@@ -377,6 +377,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     const zeroStockRow = zeroStockCell.closest("[data-testid='bom-modal-row']")!;
     expect(zeroStockCell).toHaveStyle({ color: LEGACY_COLORS.red });
     expect(zeroStockRow.querySelector("div")).toHaveAttribute("style", expect.stringContaining(`${LEGACY_COLORS.red} 15%`));
+    expect(zeroStockRow.querySelector("div")).not.toHaveClass("bom-tree-depth");
   });
 
   it("toggles a branch from its full row and exposes tree-wide expand and collapse", async () => {
@@ -445,7 +446,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(branch).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("reserves scrollbar space and spreads blue tint across the deepest BOM hierarchy", async () => {
+  it("reserves scrollbar space and delegates normal BOM depth tones to reactive CSS", async () => {
     const depthNodes: BOMTreeNode[] = Array.from({ length: 9 }, (_, depth) => ({
       ...bomTree.children[0],
       item_id: `depth-${depth}`,
@@ -480,9 +481,12 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(depthOneToggle).toHaveClass("w-11");
     expect(depthOneToggle.style.transform).toBe("translateX(58px)");
     expect(depthEightToggle.style.transform).toBe("translateX(394px)");
-    expect(depthOneRow.querySelector("[role='button']")).toHaveAttribute("style", expect.stringContaining("2.00%"));
-    expect(depthTwoRow.querySelector("[role='button']")).toHaveAttribute("style", expect.stringContaining("4.57%"));
-    expect(depthEightRow.firstElementChild).toHaveAttribute("style", expect.stringContaining("20.00%"));
+    expect(depthOneRow.querySelector("[role='button']")).toHaveClass("bom-tree-depth", "bom-tree-depth-1");
+    expect(depthTwoRow.querySelector("[role='button']")).toHaveClass("bom-tree-depth", "bom-tree-depth-2");
+    expect(depthEightRow.firstElementChild).toHaveClass("bom-tree-depth", "bom-tree-depth-8");
+    expect(depthOneRow.querySelector("[role='button']")).not.toHaveClass("hover:brightness-95");
+    expect(depthEightRow.firstElementChild).not.toHaveClass("hover:brightness-95");
+    expect(depthOneRow.querySelector("[role='button']")).not.toHaveAttribute("style", expect.stringContaining("color-mix"));
   });
 
   it("keeps a capacity-ignored zero-stock component row normal while striking its stock", async () => {
@@ -641,12 +645,13 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     const row = directName.closest("[data-testid='bom-modal-row']")!;
     expect(screen.getByTestId("bom-modal-grid-header")).toHaveClass("bom-modal-grid", "sticky", "top-0");
     expect(row).toHaveClass("bom-modal-grid");
+    expect(row).not.toHaveClass("hover:bg-[var(--c-s2)]");
     expect(within(row).getByRole("button", { expanded: false })).toHaveClass("bom-modal-toggle");
     expect(screen.getByTestId("bom-modal-grid-header")).not.toHaveTextContent("유형");
     expect(within(row).queryByText("Packaging")).not.toBeInTheDocument();
     expect(within(row).getByTestId("bom-modal-code")).toHaveTextContent("46-AA-0081");
     expect(within(row).getByText("1.5EA")).toHaveClass("text-center");
-    expect(within(row).getByText("10 EA")).toHaveClass("text-center");
+    expect(within(row).getByText("10 EA")).toHaveClass("text-right", "pr-3");
     expect(screen.queryByTestId("bom-modal-rail")).not.toBeInTheDocument();
     expect(screen.queryByTestId("bom-modal-connector")).not.toBeInTheDocument();
     expect(screen.queryByText("nested-component")).not.toBeInTheDocument();
@@ -787,7 +792,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(rowContext.getByText(longItemName)).toBeInTheDocument();
     expect(rowContext.getByTestId("bom-modal-code")).toHaveTextContent("46-AA-0081");
     expect(rowContext.getByText("2 EA")).toHaveClass("text-center");
-    expect(rowContext.getByText("10 EA")).toHaveClass("text-center");
+    expect(rowContext.getByText("10 EA")).toHaveClass("text-right", "pr-3");
     expect(rowContext.getByRole("button", { expanded: false })).toHaveClass("bom-modal-grid");
     expect(rowContext.getByTestId("bom-modal-name-cell")).toHaveClass("break-words");
     expect(rowContext.queryByTestId("bom-modal-connector")).not.toBeInTheDocument();

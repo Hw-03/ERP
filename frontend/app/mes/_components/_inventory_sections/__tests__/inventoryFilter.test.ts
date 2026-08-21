@@ -101,7 +101,36 @@ describe("matchesInventoryCategoryFilters", () => {
     ).toBe(false);
   });
 
-  it("OR는 불용 또는 다른 선택 칩 하나만 일치해도 포함한다", () => {
+  it("OR는 서로 다른 구분을 모두 만족해야 한다", () => {
+    expect(
+      matchesInventoryCategoryFilters(assemblyItem, {
+        ...noFilters,
+        selectedDepts: ["조립"],
+        selectedSlots: new Set([2]),
+        logic: "OR",
+      }),
+    ).toBe(false);
+    expect(
+      matchesInventoryCategoryFilters(assemblyItem, {
+        ...noFilters,
+        selectedDepts: ["조립"],
+        selectedSlots: new Set([1, 2]),
+        logic: "OR",
+      }),
+    ).toBe(true);
+  });
+
+  it("OR는 같은 구분에서 하나만 일치해도 포함한다", () => {
+    expect(
+      matchesInventoryCategoryFilters(assemblyItem, {
+        ...noFilters,
+        selectedDepts: ["조립", "출하"],
+        logic: "OR",
+      }),
+    ).toBe(true);
+  });
+
+  it("OR는 불용과 다른 구분을 함께 만족해야 한다", () => {
     const disusedItem = { ...assemblyItem, legacy_item_type: "불용" } as Item;
 
     expect(
@@ -111,9 +140,9 @@ describe("matchesInventoryCategoryFilters", () => {
         showDisused: true,
         logic: "OR",
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
-      matchesInventoryCategoryFilters(assemblyItem, {
+      matchesInventoryCategoryFilters(disusedItem, {
         ...noFilters,
         selectedDepts: ["조립"],
         showDisused: true,

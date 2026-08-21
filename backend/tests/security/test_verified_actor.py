@@ -59,7 +59,11 @@ def test_mutation_without_operator_session_fails_before_write(db_session, client
     assert db_session.get(Employee, employee.employee_id).theme is None
 
 
-@pytest.mark.parametrize("stored_hash", [None, hash_pin("0000")])
+@pytest.mark.parametrize(
+    "stored_hash",
+    [None, hash_pin("0000")],
+    ids=["unset", "default-pin"],
+)
 def test_unset_or_default_pin_challenge_cannot_authorize_mutation(
     db_session,
     client,

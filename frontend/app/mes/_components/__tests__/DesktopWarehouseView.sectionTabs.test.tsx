@@ -9,6 +9,12 @@ const currentComposeProps = vi.hoisted(() => ({
   },
 }));
 
+const currentWorkAreaProps = vi.hoisted(() => ({
+  value: null as null | {
+    onEmptyStateChange?: (empty: boolean) => void;
+  },
+}));
+
 const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
   listDrafts: vi.fn(),
@@ -34,19 +40,26 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
   WarehouseDraftPanelTabs: ({
     sectionTab,
     onContinueIoDraft,
+    onEmptyStateChange,
   }: {
     sectionTab: string;
     onContinueIoDraft?: (draft: never) => void;
+    onEmptyStateChange?: (empty: boolean) => void;
   }) => {
+    currentWorkAreaProps.value = { onEmptyStateChange };
     if (sectionTab === "compose") return null;
 
     return (
-      <button
-        type="button"
-        onClick={() => onContinueIoDraft?.({ batch_id: "draft-2" } as never)}
-      >
-        continue draft
-      </button>
+      <>
+        <button
+          type="button"
+          onClick={() => onContinueIoDraft?.({ batch_id: "draft-2" } as never)}
+        >
+          continue draft
+        </button>
+        <button type="button" onClick={() => onEmptyStateChange?.(true)}>set empty</button>
+        <button type="button" onClick={() => onEmptyStateChange?.(false)}>set populated</button>
+      </>
     );
   },
 }));
@@ -85,6 +98,7 @@ describe("DesktopWarehouseView", () => {
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
     currentComposeProps.value = null;
+    currentWorkAreaProps.value = null;
   });
 
   it("내 요청 URL로 직접 진입해도 상단 기본 탭 3개를 표시한다", () => {
@@ -151,6 +165,60 @@ describe("DesktopWarehouseView", () => {
     render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
 
     expect(screen.getByTestId("warehouse-section-work-area")).toHaveClass("flex-1", "min-h-0");
+  });
+
+  it("removes bottom scroll space only while a work-area panel is empty", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    const contentRoot = screen.getByTestId("desktop-warehouse-content");
+    expect(contentRoot).toHaveClass("pb-10");
+
+    fireEvent.click(screen.getByRole("button", { name: "set empty" }));
+    expect(contentRoot).toHaveClass("pb-0");
+    expect(contentRoot).not.toHaveClass("pb-10");
+
+    fireEvent.click(screen.getByRole("button", { name: "set populated" }));
+    expect(contentRoot).toHaveClass("pb-10");
+  });
+
+  it("keeps empty work-area spacing when its active tab is clicked again", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "set empty" }));
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
+
+    fireEvent.click(screen.getByRole("tab", { name: /작성 중/ }));
+
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
+  });
+
+  it("keeps empty work-area spacing for a same-section popstate", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "set empty" }));
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
+
+    act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
+  });
+
+  it("restores bottom scroll space when popstate enters a work-area panel", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "set empty" }));
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-0");
+
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=mine");
+    act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=cart");
+    act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+
+    expect(screen.getByTestId("desktop-warehouse-content")).toHaveClass("pb-10");
   });
 
   it("요청 작성에서는 섹션 탭 다음에 작성 본문을 바로 렌더한다", () => {

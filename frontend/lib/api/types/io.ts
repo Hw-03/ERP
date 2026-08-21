@@ -28,6 +28,7 @@ export type IoSubType =
 
 export type IoSourceKind = "direct_item" | "bom_parent" | "manual";
 export type IoSourceLocation = "warehouse" | "department";
+export type IoInternalUseBomMode = "parent_and_children" | "children_only";
 export type IoLineOrigin = "direct" | "bom_auto" | "package_auto" | "manual";
 export type IoLineDirection = "in" | "out" | "move" | "defective" | "adjust";
 export type IoBucket = "warehouse" | "production" | "defective" | "none";
@@ -50,6 +51,8 @@ export interface IoLine {
   /** 서버 미리보기에서 발급한 자동 BOM 행 근거. */
   bom_auto_token?: string | null;
   included: boolean;
+  /** 화면 체크 상태. 구 응답은 included를 폴백으로 사용한다. */
+  selected?: boolean;
   origin: IoLineOrigin;
   edited: boolean;
   has_children: boolean;
@@ -65,7 +68,14 @@ export interface IoBundle {
   source_mes_code: string | null;
   quantity: number;
   expanded_level: number;
+  internal_use_bom_mode?: IoInternalUseBomMode | null;
+  source_location?: IoSourceLocation | null;
   lines: IoLine[];
+}
+
+export interface IoComponentSelection {
+  item_id: string;
+  selected: boolean;
 }
 
 export interface IoPreviewTarget {
@@ -73,6 +83,8 @@ export interface IoPreviewTarget {
   source_location?: IoSourceLocation | null;
   item_id?: string | null;
   quantity: number;
+  internal_use_bom_mode?: IoInternalUseBomMode | null;
+  component_selections?: IoComponentSelection[];
 }
 
 export interface IoPreviewPayload {
@@ -143,6 +155,8 @@ export interface IoStockRequestSummary {
   requires_department_approval: boolean;
   approver_employee_id: string | null;
   approver_name: string | null;
+  /** 결재 요청이 실제로 반영하는 IoLine. 구 응답에는 없을 수 있다. */
+  operation_line_ids?: string[];
 }
 
 export interface IoSubmitResponse {

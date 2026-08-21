@@ -41,6 +41,7 @@ export function EmployeeCombobox({
   const inputRef = useRef<HTMLInputElement | null>(null);
   // 영타 조립 전 원본 키 버퍼 (직원코드 등 라틴 검색 폴백용)
   const rawRef = useRef("");
+  const pendingLatinKeyRef = useRef<{ character: string; position: number } | null>(null);
 
   const sortedEmployees = useMemo(
     () => [...employees].sort((a, b) => a.name.localeCompare(b.name, "ko-KR")),
@@ -136,6 +137,18 @@ export function EmployeeCombobox({
     }
   };
 
+  const handleInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && /^[a-z]$/i.test(e.key)) {
+      pendingLatinKeyRef.current = {
+        character: e.shiftKey ? e.key.toUpperCase() : e.key.toLowerCase(),
+        position: e.currentTarget.selectionStart ?? 0,
+      };
+    } else {
+      pendingLatinKeyRef.current = null;
+    }
+    handleKey(e);
+  };
+
   const displayValue = open ? query : value ? `${value.name} · ${value.department}` : query;
 
   return (
@@ -175,15 +188,24 @@ export function EmployeeCombobox({
           onClick={() => setOpen(true)}
           onChange={(e) => {
             // 이미 표시된 한글은 키로 되돌리고, 새로 입력된 라틴 문자는 그대로 이어붙여
-            // 전체를 다시 한글로 조립한다 (Caps Lock 대비 대소문자 무시).
-            const raw = Array.from(e.target.value)
+            // 전체를 다시 한글로 조립한다. 실제 Shift 키 입력만 Shift 자모로 보존한다.
+            const pendingLatinKey = pendingLatinKeyRef.current;
+            let inputValue = e.target.value;
+            if (pendingLatinKey) {
+              const { character, position } = pendingLatinKey;
+              if (inputValue.slice(position, position + 1).toLowerCase() === character.toLowerCase()) {
+                inputValue = `${inputValue.slice(0, position)}${character}${inputValue.slice(position + 1)}`;
+              }
+              pendingLatinKeyRef.current = null;
+            }
+            const raw = Array.from(inputValue)
               .map((c) => (isHangulChar(c) ? toQwerty(c) : c))
               .join("");
             rawRef.current = raw;
             setQuery(toHangul(raw));
             setOpen(true);
           }}
-          onKeyDown={handleKey}
+          onKeyDown={handleInputKeyDown}
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--c-muted)]"
           style={{ color: "var(--c-text)" }}
         />

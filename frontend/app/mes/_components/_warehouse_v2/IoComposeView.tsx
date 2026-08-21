@@ -7,7 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { tint } from "@/lib/mes/colorUtils";
-import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
+import { api, type BOMDetailEntry, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
@@ -33,6 +33,12 @@ import { ItemConversionWorkView } from "./ItemConversionView";
 import { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "../common/StatusTargetNotice";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ioLineAvailable } from "@/lib/mes/inventory";
+import {
+  buildInternalUseBomPreviewTarget,
+  hasUnselectedInternalUseBomMode,
+  isInternalUseBomBundle,
+} from "./internalUseBom";
+import { useInternalUseBomPreviewLock } from "./useInternalUseBomPreviewLock";
 
 function workTypeLabel(workType: IoWorkType) {
   return IO_WORK_TYPES.find((row) => row.id === workType)?.label ?? workType;
@@ -149,6 +155,9 @@ export function IoComposeView({
   const previousAuditScreenRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
+  const latestBundlesRef = useRef<IoBundle[]>(state.bundles);
+  latestBundlesRef.current = state.bundles;
+  const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
 
   const { previewing, previewTarget } = useIoPreview();
@@ -272,6 +281,8 @@ export function IoComposeView({
     state,
     onStatusChange,
     restoreStep,
+    getAvailable,
+    inventorySnapshot: items,
   });
 
   useEffect(() => {
@@ -408,7 +419,9 @@ export function IoComposeView({
     ioDirty,
     async () => {
       if (!employeeId) return;
-      if (state.bundles.length === 0) {
+      await internalUsePreviewLock.waitForIdle();
+      const currentBundles = latestBundlesRef.current;
+      if (currentBundles.length === 0) {
         // 모든 품목 삭제 후 "저장하고 나가기" = 서버 드래프트 삭제
         if (autosaveBatchIdRef.current) {
           await api.deleteDraft(autosaveBatchIdRef.current, employeeId);
@@ -425,7 +438,7 @@ export function IoComposeView({
         referenceNo: state.referenceNo,
         notes: state.notes,
         batchId: autosaveBatchIdRef.current,
-        bundles: state.bundles,
+        bundles: currentBundles,
       });
       autosaveBatchIdRef.current = saved.batch_id;
       onDraftSaved?.(saved.batch_id, state.step);
@@ -439,6 +452,47 @@ export function IoComposeView({
     const item = items.find((row) => row.item_id === line.item_id);
     if (!item) return null;
     return ioLineAvailable(item, line);
+  }
+
+  async function refreshInternalUseBom(
+    bundleId: string,
+    options: Parameters<typeof buildInternalUseBomPreviewTarget>[1],
+  ) {
+    const bundle = latestBundlesRef.current.find((row) => row.bundle_id === bundleId);
+    if (
+      state.subType !== "internal_use_out" ||
+      !bundle ||
+      !isInternalUseBomBundle(bundle)
+    ) {
+      return;
+    }
+    await internalUsePreviewLock.run(bundleId, async () => {
+      setError(null);
+      try {
+        const departments = ioDepartmentPayload(
+          state.subType,
+          state.fromDepartment,
+          state.toDepartment,
+        );
+        const response = await previewTarget({
+          employeeId,
+          workType: state.workType,
+          subType: state.subType,
+          fromDepartment: departments.fromDepartment,
+          toDepartment: departments.toDepartment,
+          target: buildInternalUseBomPreviewTarget(bundle, options),
+        });
+        const replacement = response.bundles[0];
+        if (!replacement) throw new Error("사용출고 BOM 미리보기 결과가 없습니다.");
+        const nextBundles = latestBundlesRef.current.map((row) =>
+          row.bundle_id === bundleId ? replacement : row,
+        );
+        latestBundlesRef.current = nextBundles;
+        state.setBundles(nextBundles);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "사용출고 BOM 재계산에 실패했습니다.");
+      }
+    });
   }
 
   // 새 작업 시작(작업유형/세부작업/부서 변경) — 진행 중 임시저장 슬롯과의 연결을 끊는다.
@@ -525,7 +579,9 @@ export function IoComposeView({
       setError("작업자를 선택하세요.");
       return;
     }
-    if (state.bundles.length === 0) return;
+    await internalUsePreviewLock.waitForIdle();
+    const currentBundles = latestBundlesRef.current;
+    if (currentBundles.length === 0) return;
     try {
       const response = await saveDraft({
         employeeId,
@@ -535,7 +591,7 @@ export function IoComposeView({
         referenceNo: state.referenceNo,
         notes: state.notes,
         batchId: autosaveBatchIdRef.current,
-        bundles: state.bundles,
+        bundles: currentBundles,
       });
       autosaveBatchIdRef.current = response.batch_id;
       onDraftSaved?.(response.batch_id, state.step);
@@ -615,6 +671,16 @@ export function IoComposeView({
       setError("작업자를 선택하세요.");
       return;
     }
+    await internalUsePreviewLock.waitForIdle();
+    const currentBundles = latestBundlesRef.current;
+    if (
+      state.subType === "internal_use_out" &&
+      hasUnselectedInternalUseBomMode(currentBundles)
+    ) {
+      setError("각 BOM 묶음의 차감 방식을 선택하세요.");
+      state.goTo(4);
+      return;
+    }
     if (autosaveBatchIdRef.current) {
       const staleId = autosaveBatchIdRef.current;
       autosaveBatchIdRef.current = null;
@@ -625,7 +691,7 @@ export function IoComposeView({
       }
     }
     try {
-      const kind = approvalKind(state.subType, state.bundles, state.fromDepartment);
+      const kind = approvalKind(state.subType, currentBundles, state.fromDepartment);
       const response = await submit({
         employeeId,
         workType: state.workType,
@@ -633,7 +699,7 @@ export function IoComposeView({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
-        bundles: state.bundles,
+        bundles: currentBundles,
       });
       // 서버가 멱등 응답(409 → 기존 batch)이든 신규 처리든 동일한 IoSubmitResponse 모양 → 같은 흐름.
       // 결재 종류별로 토스트 문구 분기 (백엔드 response.message 는 fallback).
@@ -1135,26 +1201,49 @@ export function IoComposeView({
               subType={state.subType}
               itemMap={itemMap}
               getAvailable={getAvailable}
-              onToggleLine={(bundleId, lineId) =>
+              onToggleLine={(bundleId, lineId) => {
+                const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
+                if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
+                  void refreshInternalUseBom(bundleId, { toggleLineId: lineId });
+                  return;
+                }
                 state.setBundles((prev) =>
                   applyToggleLine(prev, bundleId, lineId, state.subType, getAvailable),
-                )
-              }
-              onQuantityChange={(bundleId, lineId, quantity, shortage) =>
+                );
+              }}
+              onQuantityChange={(bundleId, lineId, quantity, shortage) => {
+                const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
+                const line = bundle?.lines.find((row) => row.line_id === lineId);
+                if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
+                  if (line?.origin === "direct") {
+                    void refreshInternalUseBom(bundleId, { bundleQuantity: quantity });
+                  }
+                  return;
+                }
                 state.setBundles((prev) =>
                   applyLineQuantityChange(prev, bundleId, lineId, quantity, shortage, state.subType, getAvailable),
-                )
-              }
-              onBundleQuantityChange={(bundleId, newQty) =>
+                );
+              }}
+              onBundleQuantityChange={(bundleId, newQty) => {
+                const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
+                if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
+                  void refreshInternalUseBom(bundleId, { bundleQuantity: newQty });
+                  return;
+                }
                 state.setBundles((prev) =>
                   applyBundleQuantityChange(prev, bundleId, newQty, state.subType, getAvailable),
-                )
+                );
+              }}
+              onInternalUseBomModeChange={(bundleId, mode: IoInternalUseBomMode) =>
+                void refreshInternalUseBom(bundleId, { mode })
               }
+              internalUseBomBusy={internalUsePreviewLock.busy}
               onRemoveLine={state.removeLine}
               onRemoveBundle={(bundleId) =>
                 state.setBundles((prev) => prev.filter((bundle) => bundle.bundle_id !== bundleId))
               }
               onAdvance={() => {
+                if (internalUsePreviewLock.busy) return;
                 // state.step=3 (bundles>0 로 Step 4 카드만 자동 노출된 상태) 에서 곧장 5 로 점프하면
                 // URL history 에 step=4 가 안 쌓여 뒤로 가기가 step=3 으로 떨어진다.
                 // pendingFinalStepRef 에 5 를 예약해두고 먼저 goTo(4) — URL 이 step=4 로 갱신된 뒤

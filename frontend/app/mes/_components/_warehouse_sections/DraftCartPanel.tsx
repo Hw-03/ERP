@@ -23,6 +23,7 @@ interface Props {
   onContinueIo?: (draft: IoBatch) => void;
   onChanged: () => void;
   onCountChange?: (n: number) => void;
+  onEmptyStateChange?: (empty: boolean) => void;
   onStartCompose?: () => void;
 }
 
@@ -38,6 +39,7 @@ export function DraftCartPanel({
   onContinueIo,
   onChanged,
   onCountChange,
+  onEmptyStateChange,
   onStartCompose,
 }: Props) {
   const { data, isLoading: loading, error: qError, refetch } = useDraftCartQuery(employeeId);
@@ -53,6 +55,11 @@ export function DraftCartPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [opError, setOpError] = useState<string | null>(null);
+  const empty = Boolean(employeeId) && !loading && drafts.length === 0 && ioDrafts.length === 0 && !loadError;
+
+  useEffect(() => {
+    onEmptyStateChange?.(empty && !opError);
+  }, [empty, onEmptyStateChange, opError]);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거)
   useEffect(() => {
@@ -103,8 +110,6 @@ export function DraftCartPanel({
       />
     );
   }
-
-  const empty = !loading && drafts.length === 0 && ioDrafts.length === 0 && !loadError;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">

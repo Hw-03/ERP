@@ -93,8 +93,9 @@ export function BomParentList({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col rounded-2xl border"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      data-scrollbar-rail-shell
+      className="relative flex min-h-0 flex-1 flex-col rounded-2xl"
+      style={{ background: LEGACY_COLORS.s2 }}
     >
       {/* 검색 */}
       <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
@@ -134,44 +135,59 @@ export function BomParentList({
       </div>
 
       {/* 리스트 */}
-      <div
-        className="min-h-0 flex-1 overflow-y-auto"
-        style={{ borderTop: `1px solid ${LEGACY_COLORS.border}` }}
-      >
-        <BomTableHeader
-          variant={mode === "edit" ? "parent" : "whereused"}
-          gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
-        />
-        {list.length === 0 ? (
-          <EmptyState variant="no-search-result" compact />
-        ) : (
-          list.map((i) => {
-            const isSelected = i.item_id === selectedId;
-            const status = bomStatusOf(i.item_id, completedSet, childCountMap);
-            const meta = BOM_STATUS_META[status];
-            return (
-              <BomTableItemRow
-                key={i.item_id}
-                item={i}
-                gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
-                onClick={() => onSelect(i.item_id)}
-                pressed={isSelected}
-                background={isSelected ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` : undefined}
-                trailing={mode === "edit" ? (
-                  <span
-                    className="inline-flex justify-self-end items-center rounded px-1.5 py-0.5 text-[12px] font-bold"
-                    style={{
-                      background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
-                      color: meta.color,
-                    }}
-                  >
-                    {meta.label}
-                  </span>
-                ) : null}
-              />
-            );
-          })
-        )}
+      <div className="relative min-h-0 flex-1">
+        <div
+          data-scrollbar-rail-viewport
+          className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
+        >
+          <div className="min-h-full min-w-full" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
+            <BomTableHeader
+              variant={mode === "edit" ? "parent" : "whereused"}
+              gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
+            />
+            {list.length === 0 ? (
+              <EmptyState variant="no-search-result" compact />
+            ) : (
+              list.map((i) => {
+                const isSelected = i.item_id === selectedId;
+                const status = bomStatusOf(i.item_id, completedSet, childCountMap);
+                const meta = BOM_STATUS_META[status];
+                return (
+                  <BomTableItemRow
+                    key={i.item_id}
+                    item={i}
+                    gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
+                    onClick={() => onSelect(i.item_id)}
+                    pressed={isSelected}
+                    background={isSelected ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` : undefined}
+                    trailing={mode === "edit" ? (
+                      <span
+                        className="inline-flex justify-self-end items-center rounded px-1.5 py-0.5 text-[12px] font-bold"
+                        style={{
+                          background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
+                          color: meta.color,
+                        }}
+                      >
+                        {meta.label}
+                      </span>
+                    ) : null}
+                  />
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+      <div data-scrollbar-rail-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-2xl border" style={{ borderColor: LEGACY_COLORS.border }} />
+      <div data-scrollbar-rail-masks aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+        <div className="flex justify-between">
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+        </div>
+        <div className="flex justify-between">
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+          <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+        </div>
       </div>
     </div>
   );

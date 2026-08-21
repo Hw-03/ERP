@@ -55,6 +55,11 @@ function matchesDepartment(item: Item, department: string): boolean {
       item.locations.some((location) => location.department === department);
 }
 
+function matchesSelectedGroup(matches: boolean[], logic: InventoryFilterLogic): boolean | null {
+  if (matches.length === 0) return null;
+  return logic === "AND" ? matches.every(Boolean) : matches.some(Boolean);
+}
+
 export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCategoryFilters): boolean {
   const isDisused = isDisusedInventoryItem(item);
   if (isDisused && !filters.showDisused) return false;
@@ -63,16 +68,28 @@ export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCa
   const hasDefect = item.locations.some(
     (location) => location.status === "DEFECTIVE" && (location.quantity ?? 0) > 0,
   );
-  const activeMatches = [
-    ...filters.selectedDepts.map((department) => matchesDepartment(item, department)),
-    ...Array.from(filters.selectedSlots, (slot) => item.model_slots.includes(slot)),
-    ...(filters.showUnclassified ? [item.model_slots.length === 0] : []),
-    ...filters.selectedProcessSteps.map(
+  const departmentMatch = matchesSelectedGroup(
+    filters.selectedDepts.map((department) => matchesDepartment(item, department)),
+    filters.logic,
+  );
+  const modelMatch = matchesSelectedGroup(
+    [
+      ...Array.from(filters.selectedSlots, (slot) => item.model_slots.includes(slot)),
+      ...(filters.showUnclassified ? [item.model_slots.length === 0] : []),
+    ],
+    filters.logic,
+  );
+  const processMatch = matchesSelectedGroup(
+    filters.selectedProcessSteps.map(
       (processStep) => processStep === stage || (processStep === "DEFECT" && hasDefect),
     ),
-    ...(filters.showDisused ? [isDisused] : []),
-  ];
+    filters.logic,
+  );
+  const disusedMatch = filters.showDisused ? isDisused : null;
+  const activeMatches = [departmentMatch, modelMatch, processMatch, disusedMatch].filter(
+    (match): match is boolean => match !== null,
+  );
 
   if (activeMatches.length === 0) return true;
-  return filters.logic === "OR" ? activeMatches.some(Boolean) : activeMatches.every(Boolean);
+  return activeMatches.every(Boolean);
 }

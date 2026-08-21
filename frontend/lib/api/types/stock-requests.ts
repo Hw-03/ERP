@@ -49,6 +49,7 @@ export interface StockRequestLine {
   to_bucket: RequestBucket;
   to_department: Department | null;
   status: StockRequestStatus;
+  operation_line_id?: string | null;
   created_at: string;
 }
 
@@ -58,6 +59,7 @@ export interface StockRequest {
   requester_employee_id: string;
   requester_name: string;
   requester_department: Department;
+  approval_department?: Department | null;
   request_type: StockRequestType;
   status: StockRequestStatus;
   requires_warehouse_approval: boolean;

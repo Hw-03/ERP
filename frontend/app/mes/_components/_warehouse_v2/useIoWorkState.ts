@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import { DEFAULT_SUB_TYPE, type DeptIoDirection } from "./ioWorkType";
+import { hasUnselectedInternalUseBomMode } from "./internalUseBom";
 
 export type IoStep = 1 | 2 | 3 | 4 | 5;
 
@@ -64,6 +65,8 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   );
   const hasShortage = includedLines.some((line) => line.shortage > 0);
   const hasInvalidQuantity = includedLines.some((line) => line.quantity <= 0);
+  const hasMissingInternalUseBomMode =
+    workType === "internal_use" && hasUnselectedInternalUseBomMode(bundles);
 
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
     return {
@@ -74,10 +77,14 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
           ? toDepartment === "AS" || toDepartment === "연구"
           : true,
       3: bundles.length > 0,
-      4: includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
+      4:
+        includedLines.length > 0 &&
+        !hasShortage &&
+        !hasInvalidQuantity &&
+        !hasMissingInternalUseBomMode,
       5: true,
     };
-  }, [workType, deptIoDirection, toDepartment, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity]);
+  }, [workType, deptIoDirection, toDepartment, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
@@ -132,6 +139,7 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     excludedLines,
     hasShortage,
     hasInvalidQuantity,
+    hasMissingInternalUseBomMode,
     canAdvance,
     setWorkType,
     setSubType,

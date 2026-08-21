@@ -461,47 +461,82 @@ export function IoTargetPicker({
 
       {/* 결과 영역 */}
       <div
-        ref={tableContainerRef}
-        onScroll={handleTableScroll}
-        data-keep-scroll
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border"
-        style={{
-          background: LEGACY_COLORS.s2,
-          borderColor: LEGACY_COLORS.border,
-          overscrollBehavior: "contain",
-        }}
+        className="relative min-h-0 flex-1"
       >
-        {editMode ? (
-          <EditOrderTable
-            items={editItems}
-            dragId={dragId}
-            dropTargetId={dropTargetId}
-            makeHandlers={makeHandlers}
-          />
-        ) : (
-          <ItemTable
-            items={filteredItems}
-            displayLimit={displayLimit}
-            onShowMore={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
-            onAdd={onAddItem}
-            onRemove={onRemoveBundles}
-            busy={busy}
-            hasActiveFilter={hasActiveFilter}
-            clearFilters={clearFilters}
-            mode={actionMode}
-            workType={workType}
-            subType={subType}
-            targetDepartment={targetDepartment}
-            deptIoDirection={deptIoDirection}
-            bundleSubType={bundleSubType}
-            bomParents={bomParents}
-            bundles={bundles}
-            hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
-            hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
-            allowMix={allowsMixedBundles(subType)}
-            highlightItemId={highlightItemId ?? null}
-          />
-        )}
+        <div
+          ref={tableContainerRef}
+          onScroll={handleTableScroll}
+          data-keep-scroll
+          className="absolute inset-y-0 left-0 right-0 overflow-y-auto overflow-x-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
+          style={{ overscrollBehavior: "contain" }}
+        >
+          <div
+            className="min-h-full min-w-full"
+            style={{ background: LEGACY_COLORS.s2 }}
+          >
+            {editMode ? (
+              <EditOrderTable
+                items={editItems}
+                dragId={dragId}
+                dropTargetId={dropTargetId}
+                makeHandlers={makeHandlers}
+              />
+            ) : (
+              <ItemTable
+                items={filteredItems}
+                displayLimit={displayLimit}
+                onShowMore={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
+                onAdd={onAddItem}
+                onRemove={onRemoveBundles}
+                busy={busy}
+                hasActiveFilter={hasActiveFilter}
+                clearFilters={clearFilters}
+                mode={actionMode}
+                workType={workType}
+                subType={subType}
+                targetDepartment={targetDepartment}
+                deptIoDirection={deptIoDirection}
+                bundleSubType={bundleSubType}
+                bomParents={bomParents}
+                bundles={bundles}
+                hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
+                hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
+                allowMix={allowsMixedBundles(subType)}
+                highlightItemId={highlightItemId ?? null}
+              />
+            )}
+          </div>
+        </div>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-20 rounded-[16px] border"
+          style={{ borderColor: LEGACY_COLORS.border }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between"
+        >
+          <div className="flex justify-between">
+            <span
+              className="h-4 w-4"
+              style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-s1) 16px)" }}
+            />
+            <span
+              className="h-4 w-4"
+              style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-s1) 16px)" }}
+            />
+          </div>
+          <div className="flex justify-between">
+            <span
+              className="h-4 w-4"
+              style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-s1) 16px)" }}
+            />
+            <span
+              className="h-4 w-4"
+              style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-s1) 16px)" }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* 하단 advance 버튼 — 선택 품목 없으면 비활성.

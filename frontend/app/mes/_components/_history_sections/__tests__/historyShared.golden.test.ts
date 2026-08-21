@@ -16,6 +16,7 @@ import {
   getHistoryMovementSummary,
   getHistoryBomParentLine,
   getHistoryLineStatusLabel,
+  getInternalUseHistoryLineEffectLabel,
   parseTransactionNotes,
 } from "../historyBatchInterpreter";
 import {
@@ -67,6 +68,7 @@ function makeBundle(overrides: Partial<IoBundle> & { lines?: IoLine[] } = {}): I
     source_kind: "direct_item",
     title: "테스트 번들",
     source_item_id: null,
+    source_mes_code: null,
     quantity: 10,
     expanded_level: 0,
     lines: [],
@@ -1082,10 +1084,163 @@ describe("internal use history", () => {
     });
     expect(getHistoryFlowLabel(log, batch)).toBe("창고 → 연구소");
     expect(getHistoryMovementSummary(log, batch).parts[0]).toEqual({
-      label: "반출 1품목 · 10 EA",
+      label: "출고 1품목 · 10 EA",
       tone: "danger",
     });
     expect(classifyHistoryScope(log, batch)).toBe("warehouse_involved");
+  });
+
+  it("상·하위 차감의 해제 자재를 소속 부서 재입고로 해석한다", () => {
+    const parent = makeLine({
+      line_id: "parent",
+      item_id: "PARENT",
+      item_name: "상위 자재",
+      origin: "direct",
+      direction: "out",
+      from_bucket: "warehouse",
+      to_bucket: "none",
+      quantity: 1,
+      selected: true,
+    });
+    const selectedChild = makeLine({
+      line_id: "selected-child",
+      item_id: "CHILD-OUT",
+      item_name: "선택 하위",
+      origin: "bom_auto",
+      direction: "out",
+      from_bucket: "production",
+      from_department: "조립",
+      to_bucket: "none",
+      quantity: 2,
+      selected: true,
+    });
+    const returnedChild = makeLine({
+      line_id: "returned-child",
+      item_id: "CHILD-RETURN",
+      item_name: "해제 하위",
+      origin: "bom_auto",
+      direction: "in",
+      from_bucket: "none",
+      to_bucket: "production",
+      to_department: "가공",
+      quantity: 3,
+      selected: false,
+    });
+    const bundle = makeBundle({
+      source_kind: "bom_parent",
+      source_item_id: "PARENT",
+      internal_use_bom_mode: "parent_and_children",
+      lines: [parent, selectedChild, returnedChild],
+    });
+    const batch = makeBatch({
+      work_type: "internal_use",
+      sub_type: "internal_use_out",
+      to_department: "연구",
+      bundles: [bundle],
+    });
+    const returnLog = {
+      transaction_type: "PRODUCE",
+      item_id: "CHILD-RETURN",
+      department: "가공",
+    };
+
+    expect(getHistoryDisplayLabel(returnLog, batch)).toBe("가공 재입고");
+    expect(getHistoryDisplaySubLabel(returnLog, batch)).toBe("선택 해제 자재를 소속 부서에 재입고");
+    expect(getHistoryFlowLabel(returnLog, batch)).toBe("사용출고 해제 → 가공");
+    expect(getHistoryLineSignedQuantity(returnedChild, batch, bundle)).toMatchObject({
+      sign: "+",
+      label: "+3 EA",
+      tone: "increase",
+    });
+    expect(getHistoryMovementSummary(returnLog, batch).parts).toEqual([
+      { label: "출고 2품목 · 3 EA", tone: "danger" },
+      { label: "재입고 1품목 · 3 EA", tone: "success" },
+    ]);
+  });
+
+  it.each([
+    {
+      status: "SUBMITTED",
+      expectedEffect: "재입고 승인 대기",
+      expectedPart: { label: "승인 대기 1품목 · 3 EA", tone: "warning" },
+    },
+    {
+      status: "REJECTED",
+      expectedEffect: "재입고 반려/미반영",
+      expectedPart: { label: "반려/미반영 1품목 · 3 EA", tone: "muted" },
+    },
+  ])("부분 완료 이력에서 재입고 요청 $status 상태를 실제 결과와 구분한다", ({
+    status,
+    expectedEffect,
+    expectedPart,
+  }) => {
+    const outbound = makeLine({
+      line_id: "completed-outbound",
+      item_id: "PARENT",
+      origin: "direct",
+      direction: "out",
+      from_bucket: "warehouse",
+      to_bucket: "none",
+      quantity: 1,
+    });
+    const returned = makeLine({
+      line_id: "pending-return",
+      item_id: "CHILD-RETURN",
+      origin: "bom_auto",
+      direction: "in",
+      from_bucket: "none",
+      to_bucket: "production",
+      to_department: "가공",
+      quantity: 3,
+      selected: false,
+    });
+    const batch = makeBatch({
+      work_type: "internal_use",
+      sub_type: "internal_use_out",
+      status: "partially_completed",
+      bundles: [
+        makeBundle({
+          source_kind: "bom_parent",
+          source_item_id: "PARENT",
+          internal_use_bom_mode: "parent_and_children",
+          lines: [outbound, returned],
+        }),
+      ],
+      stock_requests: [
+        {
+          stock_request_id: "completed-request",
+          request_code: "SR-OUT",
+          status: "COMPLETED",
+          from_bucket: "warehouse",
+          from_department: null,
+          approval_kind: "warehouse",
+          requires_warehouse_approval: true,
+          requires_department_approval: false,
+          approver_employee_id: "approver-1",
+          approver_name: "승인자",
+          operation_line_ids: [outbound.line_id],
+        },
+        {
+          stock_request_id: "return-request",
+          request_code: "SR-RETURN",
+          status,
+          from_bucket: "none",
+          from_department: null,
+          approval_kind: "department",
+          requires_warehouse_approval: false,
+          requires_department_approval: true,
+          approver_employee_id: null,
+          approver_name: null,
+          operation_line_ids: [returned.line_id],
+        },
+      ],
+    });
+
+    expect(getInternalUseHistoryLineEffectLabel(returned, batch)).toBe(expectedEffect);
+    expect(getHistoryMovementSummary(log, batch).parts).toEqual([
+      { label: "출고 1품목 · 1 EA", tone: "danger" },
+      expectedPart,
+    ]);
   });
 
   it("batch cache가 없어도 log.department로 라벨과 반출 movement를 표시한다", () => {

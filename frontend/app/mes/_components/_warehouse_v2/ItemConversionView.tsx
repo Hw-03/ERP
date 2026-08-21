@@ -548,41 +548,61 @@ function CandidatePanel({
           className="ict h-full min-w-0 flex-1 bg-transparent text-sm font-bold outline-none disabled:cursor-not-allowed"
         />
       </label>
-      <div
-        ref={candidateListRef}
-        data-testid={`item-conversion-${kind}-candidate-list`}
-        className="icpnl sg min-h-0 flex-1 overflow-y-auto rounded-[14px] border p-2"
-      >
-        {disabled || candidates.length === 0 ? (
-          <div className="icm flex h-full min-h-[180px] items-center justify-center text-sm font-bold">
-            {emptyText}
+      <div data-testid={`item-conversion-${kind}-candidate-shell`} className="relative min-h-0 flex-1">
+        <div
+          ref={candidateListRef}
+          data-testid={`item-conversion-${kind}-candidate-list`}
+          className="sg absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
+        >
+          <div className="icpnl min-h-full min-w-full p-2">
+            {candidates.length === 0 ? (
+              <div className="icm flex h-full min-h-[180px] items-center justify-center text-sm font-bold">
+                {emptyText}
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                {candidates.map((item) => {
+                  const isSelected = selected?.item_id === item.item_id;
+                  return (
+                    <button
+                      key={item.item_id}
+                      type="button"
+                      data-testid={`item-conversion-${kind}-option-${item.item_id}`}
+                      aria-pressed={isSelected}
+                      ref={isSelected ? selectedRowRef : null}
+                      onClick={() => onSelect(item, query.trim().length > 0)}
+                      className={isSelected ? "ico ico-active" : "ico"}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-black">{item.item_name}</span>
+                        <span className="icm mt-0.5 block truncate text-xs font-bold">
+                          {item.mes_code ?? "-"} · {formatQty(itemStock(item), item.unit)} · {item.bom_completed_at ? "BOM" : "확인 필요"}
+                        </span>
+                      </span>
+                      {isSelected && <span className="ic-selected-mark">선택됨</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="grid gap-2">
-            {candidates.map((item) => {
-              const isSelected = selected?.item_id === item.item_id;
-              return (
-                <button
-                  key={item.item_id}
-                  type="button"
-                  data-testid={`item-conversion-${kind}-option-${item.item_id}`}
-                  aria-pressed={isSelected}
-                  ref={isSelected ? selectedRowRef : null}
-                  onClick={() => onSelect(item, query.trim().length > 0)}
-                  className={isSelected ? "ico ico-active" : "ico"}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-black">{item.item_name}</span>
-                    <span className="icm mt-0.5 block truncate text-xs font-bold">
-                      {item.mes_code ?? "-"} · {formatQty(itemStock(item), item.unit)} · {item.bom_completed_at ? "BOM" : "확인 필요"}
-                    </span>
-                  </span>
-                  {isSelected && <span className="ic-selected-mark">선택됨</span>}
-                </button>
-              );
-            })}
+        </div>
+        <div
+          aria-hidden
+          data-testid={`item-conversion-${kind}-candidate-frame`}
+          className="pointer-events-none absolute inset-0 z-20 rounded-[14px] border"
+          style={{ borderColor: "var(--c-border)" }}
+        />
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+          <div className="flex justify-between">
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 13px, var(--c-s2) 14px)" }} />
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 13px, var(--c-s2) 14px)" }} />
           </div>
-        )}
+          <div className="flex justify-between">
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 13px, var(--c-s2) 14px)" }} />
+            <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 13px, var(--c-s2) 14px)" }} />
+          </div>
+        </div>
       </div>
     </section>
   );

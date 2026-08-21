@@ -80,6 +80,7 @@ def save_draft(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         bundles=payload.bundles,
+        db=db,
     )
     validate_internal_use_operation(
         work_type=payload.work_type,

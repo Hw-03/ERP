@@ -5,7 +5,6 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import datetime as real_datetime
 from pathlib import Path
 
 import pytest
@@ -546,32 +545,27 @@ def test_concurrent_sqlite_backup_processes_create_distinct_verified_files(tmp_p
 
 def test_failed_sqlite_backup_cannot_delete_an_existing_normal_backup(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     valid = tmp_path / "valid.db"
     corrupt = tmp_path / "corrupt.db"
     _create_ops_schema_db(valid)
     corrupt.write_bytes(b"not a sqlite database")
-    env = {"MES_RUNTIME_ROOT": str(tmp_path / "runtime")}
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setattr(
+        backup_db_module,
+        "_regular_backup_name",
+        lambda suffix: f"mes_20260821_000000_000000_fixed{suffix}",
+    )
 
-    for _ in range(4):
-        while time.time() % 1 > 0.1:
-            time.sleep(0.01)
-        successful = _run_script(BACKUP_DB, "--sqlite", str(valid), env=env)
-        assert successful.returncode == 0, successful.stdout + successful.stderr
-        successful_backup = _backup_path_from_stdout(successful.stdout)
-        backup_second = successful_backup.name[4:19]
-        if backup_second != real_datetime.now().strftime("%Y%m%d_%H%M%S") or time.time() % 1 > 0.75:
-            continue
+    successful_backup = backup_db_module.backup_sqlite(str(valid))
 
-        failed = _run_script(BACKUP_DB, "--sqlite", str(corrupt), env=env)
+    with pytest.raises(SystemExit):
+        backup_db_module.backup_sqlite(str(corrupt))
 
-        assert failed.returncode != 0
-        assert successful_backup.exists()
-        verify = _run_script(VERIFY_BACKUP, str(successful_backup))
-        assert verify.returncode == 0, verify.stdout + verify.stderr
-        return
-
-    pytest.fail("could not execute both backup subprocesses within one timestamp second")
+    assert successful_backup.exists()
+    verify = _run_script(VERIFY_BACKUP, str(successful_backup))
+    assert verify.returncode == 0, verify.stdout + verify.stderr
 
 
 def test_backup_db_py_rejects_legacy_backup_directory_override(tmp_path: Path) -> None:

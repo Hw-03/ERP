@@ -11,7 +11,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.admin import require_admin_pin
 from app.services import f705_02_production_log
 
 
@@ -29,7 +28,6 @@ def _content_disposition(year: int) -> str:
 
 @router.get(
     "/production-log/f705-02.xlsx",
-    dependencies=[Depends(require_admin_pin)],
     response_class=StreamingResponse,
     responses={200: {"content": {_XLSX_MEDIA_TYPE: {}}}},
 )

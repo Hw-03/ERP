@@ -7,6 +7,7 @@ const { execFileSync, spawn } = require("child_process");
 const os = require("os");
 const path = require("path");
 const { createDiagnostics, summarizeFrontendCompileError } = require("./dev-diagnostics");
+const { buildNextSignalProbeEnv } = require("./next-signal-probe");
 
 const requiredSupervisorEnvironment = [
   "MES_SUPERVISED_FRONTEND",
@@ -232,6 +233,7 @@ diagnostics.log("frontend server wrapper started", {
 });
 
 const nextServer = path.join(__dirname, "next-server.js");
+const nextSignalProbePath = path.join(__dirname, "next-signal-probe.js");
 
 child = spawn(
   process.execPath,
@@ -239,7 +241,10 @@ child = spawn(
   {
     cwd: rootDir,
     stdio: ["inherit", "pipe", "pipe"],
-    env: { ...process.env, FORCE_COLOR: "1" },
+    env: {
+      ...buildNextSignalProbeEnv(process.env, nextSignalProbePath),
+      FORCE_COLOR: "1",
+    },
   }
 );
 diagnostics.log("next child spawned", { childPid: child.pid, runMode, nextCommand });

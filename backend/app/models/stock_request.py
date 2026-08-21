@@ -86,6 +86,7 @@ class StockRequest(Base):
     )
     requester_name = Column(String(100), nullable=False)
     requester_department = Column(String(50), nullable=False)
+    approval_department = Column(String(50), nullable=True, index=True)
     request_type = Column(
         SAEnum(StockRequestTypeEnum, name="stock_request_type_enum", create_type=True),
         nullable=False,

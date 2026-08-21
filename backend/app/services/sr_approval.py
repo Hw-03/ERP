@@ -132,7 +132,8 @@ def approve_request_department(
     #   - 창고 정/부: 모든 부서 결재
     #   - admin level 단독: 결재 권한 없음
     # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
-    if not _can_approve_department(approver, request.requester_department):
+    approval_department = request.approval_department or request.requester_department
+    if not _can_approve_department(approver, approval_department):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )
@@ -288,7 +289,8 @@ def reject_request_department(
     if not request.requires_department_approval:
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
-    if not _can_approve_department(approver, request.requester_department):
+    approval_department = request.approval_department or request.requester_department
+    if not _can_approve_department(approver, approval_department):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )

@@ -52,6 +52,9 @@ export function InventoryFilters({
   if (!open) return null;
   return (
     <div id="inventory-filter-panel" className="mt-2.5 grid gap-2.5 xl:grid-cols-3">
+      <p className="xl:col-span-3 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+        AND/OR는 같은 구분 안에서만 적용되며, 서로 다른 구분은 모두 만족해야 합니다.
+      </p>
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-bold">
           <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />

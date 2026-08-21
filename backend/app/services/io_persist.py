@@ -179,6 +179,7 @@ def _line_to_dict(line: IoLine) -> dict:
         "bom_stock_exempt": line.bom_stock_exempt,
         "bom_auto_token": line.bom_auto_token,
         "included": line.included,
+        "selected": line.selected,
         "origin": line.origin,
         "edited": line.edited,
         "has_children": line.has_children_snapshot,
@@ -232,6 +233,7 @@ def _bom_fallback_child_lines(
                 "bom_expected": expected,
                 "bom_auto_token": None,
                 "included": True,
+                "selected": True,
                 "origin": "bom_fallback",
                 "edited": False,
                 "has_children": False,
@@ -269,6 +271,11 @@ def _stock_request_summary(request: StockRequest) -> dict:
         "requires_department_approval": bool(request.requires_department_approval),
         "approver_employee_id": approver_employee_id,
         "approver_name": approver_name,
+        "operation_line_ids": [
+            line.operation_line_id
+            for line in request.lines
+            if line.operation_line_id is not None
+        ],
     }
 
 
@@ -298,6 +305,8 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
                 "source_mes_code": bundle.source_item.mes_code if bundle.source_item else None,
                 "quantity": bundle.quantity,
                 "expanded_level": bundle.expanded_level,
+                "internal_use_bom_mode": bundle.internal_use_bom_mode,
+                "source_location": bundle.source_location,
                 "lines": lines_payload,
             }
         )
@@ -375,6 +384,8 @@ def _persist_batch(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         bundles=payload.bundles,
+        require_bom_mode=status != "draft",
+        db=db,
     )
     validate_internal_use_operation(
         work_type=payload.work_type,
@@ -506,6 +517,8 @@ def _add_bundles_and_lines(db: Session, batch: IoBatch, payload) -> None:
             title_snapshot=incoming_bundle.title,
             quantity=incoming_bundle.quantity,
             expanded_level=incoming_bundle.expanded_level,
+            internal_use_bom_mode=incoming_bundle.internal_use_bom_mode,
+            source_location=incoming_bundle.source_location,
         )
         db.add(bundle)
         db.flush()
@@ -528,6 +541,7 @@ def _add_bundles_and_lines(db: Session, batch: IoBatch, payload) -> None:
                     bom_stock_exempt=incoming_line.bom_stock_exempt,
                     bom_auto_token=incoming_line.bom_auto_token,
                     included=incoming_line.included,
+                    selected=incoming_line.selected,
                     origin=incoming_line.origin,
                     edited=incoming_line.edited,
                     has_children_snapshot=incoming_line.has_children,
@@ -570,13 +584,7 @@ def _sync_batch_from_stock_requests(
         return
 
     statuses = {_enum_value(request.status) for request in linked_requests}
-    if StockRequestStatusEnum.RESERVED.value in statuses:
-        batch.status = "reserved"
-        batch.completed_at = None
-    elif StockRequestStatusEnum.SUBMITTED.value in statuses:
-        batch.status = "submitted"
-        batch.completed_at = None
-    elif statuses == {StockRequestStatusEnum.COMPLETED.value}:
+    if statuses == {StockRequestStatusEnum.COMPLETED.value}:
         batch.status = "completed"
         batch.completed_at = max(
             (request.completed_at or datetime.utcnow()) for request in linked_requests
@@ -587,6 +595,12 @@ def _sync_batch_from_stock_requests(
             (request.completed_at for request in linked_requests if request.completed_at),
             default=datetime.utcnow(),
         )
+    elif StockRequestStatusEnum.RESERVED.value in statuses:
+        batch.status = "reserved"
+        batch.completed_at = None
+    elif StockRequestStatusEnum.SUBMITTED.value in statuses:
+        batch.status = "submitted"
+        batch.completed_at = None
     elif StockRequestStatusEnum.FAILED_APPROVAL.value in statuses:
         batch.status = "failed"
         batch.completed_at = None

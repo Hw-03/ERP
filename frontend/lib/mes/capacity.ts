@@ -16,7 +16,7 @@ export interface ModelCapacityGroup {
   key: string;
   /** 표시명 = getModelLabel(model_symbol) 또는 "미분류". */
   label: string;
-  /** 이 모델에 속한 AF 항목들 (ship_ready 내림차순). */
+  /** 이 모델에 속한 AF 항목들 (BOM 미등록·출하 경로 없음은 하단, 나머지는 ship_ready 내림차순). */
   items: ProductionCapacityAfItem[];
   /** 모델 내 AF 합계. 공유 자재가 있으면 동시 보장은 아님(표시용 합산). */
   totals: {
@@ -52,7 +52,12 @@ export function groupAfByModel(
 
   return Array.from(groups.entries())
     .map(([key, arr]) => {
-      const sorted = [...arr].sort((a, b) => b.ship_ready - a.ship_ready);
+      const sorted = [...arr].sort((a, b) => {
+        const aNeedsAttention = a.bom_status === "incomplete" || !a.has_pf_path;
+        const bNeedsAttention = b.bom_status === "incomplete" || !b.has_pf_path;
+        if (aNeedsAttention !== bNeedsAttention) return aNeedsAttention ? 1 : -1;
+        return b.ship_ready - a.ship_ready;
+      });
       const totals = arr.reduce(
         (acc, it) => {
           acc.ship_ready += it.ship_ready;

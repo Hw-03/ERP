@@ -8,8 +8,10 @@ import {
   api,
   type BOMDetailEntry,
   type IoBundle,
+  type IoInternalUseBomMode,
   type IoLine,
   type IoSourceKind,
+  type IoSourceLocation,
   type IoSubType,
   type IoWorkType,
   type Item,
@@ -54,6 +56,12 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ioLineAvailable } from "@/lib/mes/inventory";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { sendClientEvent } from "@/lib/client-events";
+import {
+  buildInternalUseBomPreviewTarget,
+  hasUnselectedInternalUseBomMode,
+  isInternalUseBomBundle,
+} from "../../_warehouse_v2/internalUseBom";
+import { useInternalUseBomPreviewLock } from "../../_warehouse_v2/useInternalUseBomPreviewLock";
 
 const STEP_META: { key: string; label: string }[] = [
   { key: "1", label: "작업 유형" },
@@ -117,6 +125,9 @@ export function MobileIoComposeWizard({
   const autosaveBatchIdRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
+  const latestBundlesRef = useRef<IoBundle[]>(state.bundles);
+  latestBundlesRef.current = state.bundles;
+  const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
   useEffect(() => {
     if (!entryIntent || intentAppliedRef.current) return;
@@ -166,6 +177,8 @@ export function MobileIoComposeWizard({
     state,
     onStatusChange,
     restoreStep,
+    getAvailable,
+    inventorySnapshot: items,
   });
 
   // 4단계 진입 시 재고 스냅샷 갱신 — 취소·승인 등으로 재고가 바뀐 뒤 재추가할 때 stale 표시 방지.
@@ -204,6 +217,7 @@ export function MobileIoComposeWizard({
     item: Item,
     sourceKind: IoSourceKind = "direct_item",
     subTypeOverride?: IoSubType,
+    sourceLocation?: IoSourceLocation,
   ) {
     setError(null);
     const effectiveSubType = subTypeOverride ?? state.subType;
@@ -224,7 +238,12 @@ export function MobileIoComposeWizard({
         subType: effectiveSubType,
         fromDepartment: departments.fromDepartment,
         toDepartment: departments.toDepartment,
-        target: { source_kind: sourceKind, item_id: item.item_id, quantity: 1 },
+        target: {
+          source_kind: sourceKind,
+          source_location: effectiveSubType === "internal_use_out" ? sourceLocation : undefined,
+          item_id: item.item_id,
+          quantity: 1,
+        },
       });
       const newBundles = response.bundles;
       if (existingIdx !== -1) {
@@ -288,6 +307,47 @@ export function MobileIoComposeWizard({
     return ioLineAvailable(item, line);
   }
 
+  async function refreshInternalUseBom(
+    bundleId: string,
+    options: Parameters<typeof buildInternalUseBomPreviewTarget>[1],
+  ) {
+    const bundle = latestBundlesRef.current.find((row) => row.bundle_id === bundleId);
+    if (
+      state.subType !== "internal_use_out" ||
+      !bundle ||
+      !isInternalUseBomBundle(bundle)
+    ) {
+      return;
+    }
+    await internalUsePreviewLock.run(bundleId, async () => {
+      setError(null);
+      try {
+        const departments = ioDepartmentPayload(
+          state.subType,
+          state.fromDepartment,
+          state.toDepartment,
+        );
+        const response = await previewTarget({
+          employeeId,
+          workType: state.workType,
+          subType: state.subType,
+          fromDepartment: departments.fromDepartment,
+          toDepartment: departments.toDepartment,
+          target: buildInternalUseBomPreviewTarget(bundle, options),
+        });
+        const replacement = response.bundles[0];
+        if (!replacement) throw new Error("사용출고 BOM 미리보기 결과가 없습니다.");
+        const nextBundles = latestBundlesRef.current.map((row) =>
+          row.bundle_id === bundleId ? replacement : row,
+        );
+        latestBundlesRef.current = nextBundles;
+        state.setBundles(nextBundles);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "사용출고 BOM 재계산에 실패했습니다.");
+      }
+    });
+  }
+
   // 부서/세부작업 변경 시 임시저장 슬롯을 끊어 새 슬롯으로 시작한다.
   // (안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
   function beginNewCompositionSlot() {
@@ -333,7 +393,9 @@ export function MobileIoComposeWizard({
       setError("작업자를 선택하세요.");
       throw new Error("작업자를 선택하세요.");
     }
-    if (state.bundles.length === 0) return null;
+    await internalUsePreviewLock.waitForIdle();
+    const currentBundles = latestBundlesRef.current;
+    if (currentBundles.length === 0) return null;
     const response = await saveDraft({
       employeeId,
       workType: state.workType,
@@ -342,7 +404,7 @@ export function MobileIoComposeWizard({
       referenceNo: state.referenceNo,
       notes: state.notes,
       batchId: autosaveBatchIdRef.current,
-      bundles: state.bundles,
+      bundles: currentBundles,
     });
     autosaveBatchIdRef.current = response.batch_id;
     onDraftSaved?.(response.batch_id, state.step);
@@ -408,6 +470,16 @@ export function MobileIoComposeWizard({
       setError("작업자를 선택하세요.");
       return;
     }
+    await internalUsePreviewLock.waitForIdle();
+    const currentBundles = latestBundlesRef.current;
+    if (
+      state.subType === "internal_use_out" &&
+      hasUnselectedInternalUseBomMode(currentBundles)
+    ) {
+      setError("각 BOM 묶음의 차감 방식을 선택하세요.");
+      state.goTo(4);
+      return;
+    }
     if (autosaveBatchIdRef.current) {
       const staleId = autosaveBatchIdRef.current;
       autosaveBatchIdRef.current = null;
@@ -418,7 +490,7 @@ export function MobileIoComposeWizard({
       }
     }
     try {
-      const kind = approvalKind(state.subType, state.bundles, state.fromDepartment);
+      const kind = approvalKind(state.subType, currentBundles, state.fromDepartment);
       const response = await submit({
         employeeId,
         workType: state.workType,
@@ -426,12 +498,16 @@ export function MobileIoComposeWizard({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
-        bundles: state.bundles,
+        bundles: currentBundles,
       });
+      const requestSummaries = response.stock_requests ?? [];
+      const responseApprovalKind = requestSummaries[0]?.approval_kind ?? kind;
       const successTitle = response.requires_approval
-        ? kind === "department"
-          ? "부서 결재 요청 완료"
-          : "창고 결재 요청 완료"
+        ? state.subType === "internal_use_out" && requestSummaries.length > 1
+          ? "위치별 결재 요청 완료"
+          : responseApprovalKind === "department"
+            ? "부서 결재 요청 완료"
+            : "창고 결재 요청 완료"
         : "입출고 반영 완료";
       setResult({ kind: "success", title: successTitle, message: response.message });
       state.reset();
@@ -628,8 +704,8 @@ export function MobileIoComposeWizard({
                 search={search}
                 onSearchChange={setSearch}
                 highlightItemId={highlightItemId}
-                onAddItem={(item, sourceKind, subTypeOverride) =>
-                  addItem(item, sourceKind ?? "direct_item", subTypeOverride)
+                onAddItem={(item, sourceKind, subTypeOverride, sourceLocation) =>
+                  addItem(item, sourceKind ?? "direct_item", subTypeOverride, sourceLocation)
                 }
                 onRemoveBundles={(bundleIds) =>
                   state.setBundles((prev) => prev.filter((bundle) => !bundleIds.includes(bundle.bundle_id)))
@@ -657,12 +733,25 @@ export function MobileIoComposeWizard({
                 ? pullSelected.size
                 : shortageLines(state.bundles).length
             }
-            onToggleLine={(bundleId, lineId) =>
+            onToggleLine={(bundleId, lineId) => {
+              const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
+              if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
+                void refreshInternalUseBom(bundleId, { toggleLineId: lineId });
+                return;
+              }
               state.setBundles((prev) =>
                 applyToggleLine(prev, bundleId, lineId, state.subType, getAvailable),
-              )
-            }
-            onQuantityChange={(bundleId, lineId, quantity, shortage) =>
+              );
+            }}
+            onQuantityChange={(bundleId, lineId, quantity, shortage) => {
+              const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
+              const line = bundle?.lines.find((row) => row.line_id === lineId);
+              if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
+                if (line?.origin === "direct") {
+                  void refreshInternalUseBom(bundleId, { bundleQuantity: quantity });
+                }
+                return;
+              }
               state.setBundles((prev) =>
                 applyLineQuantityChange(
                   prev,
@@ -673,13 +762,22 @@ export function MobileIoComposeWizard({
                   state.subType,
                   getAvailable,
                 ),
-              )
-            }
-            onBundleQuantityChange={(bundleId, newQty) =>
+              );
+            }}
+            onBundleQuantityChange={(bundleId, newQty) => {
+              const bundle = state.bundles.find((row) => row.bundle_id === bundleId);
+              if (state.subType === "internal_use_out" && bundle && isInternalUseBomBundle(bundle)) {
+                void refreshInternalUseBom(bundleId, { bundleQuantity: newQty });
+                return;
+              }
               state.setBundles((prev) =>
                 applyBundleQuantityChange(prev, bundleId, newQty, state.subType, getAvailable),
-              )
+              );
+            }}
+            onInternalUseBomModeChange={(bundleId, mode: IoInternalUseBomMode) =>
+              void refreshInternalUseBom(bundleId, { mode })
             }
+            internalUseBomBusy={internalUsePreviewLock.busy}
             onRemoveLine={state.removeLine}
             onRemoveBundle={(bundleId) =>
               state.setBundles((prev) =>
@@ -687,6 +785,7 @@ export function MobileIoComposeWizard({
               )
             }
             onAdvance={() => {
+              if (internalUsePreviewLock.busy) return;
               if (state.canAdvance[4]) state.goTo(5);
             }}
             canAdvance={state.canAdvance[4]}

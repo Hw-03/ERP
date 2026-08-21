@@ -13,6 +13,15 @@ class IoPreviewTarget(BaseModel):
     item_id: Optional[uuid.UUID] = None
     quantity: int = Field(1, gt=0)
     source_location: Optional[Literal["warehouse", "department"]] = None
+    internal_use_bom_mode: Optional[
+        Literal["parent_and_children", "children_only"]
+    ] = None
+    component_selections: List["IoComponentSelection"] = Field(default_factory=list)
+
+
+class IoComponentSelection(BaseModel):
+    item_id: uuid.UUID
+    selected: bool = True
 
 
 class IoLinePayload(BaseModel):
@@ -31,6 +40,7 @@ class IoLinePayload(BaseModel):
     bom_stock_exempt: bool = False
     bom_auto_token: Optional[str] = Field(None, pattern="^[0-9a-f]{64}$")
     included: bool = True
+    selected: bool = True
     origin: str
     edited: bool = False
     has_children: bool = False
@@ -46,6 +56,10 @@ class IoBundlePayload(BaseModel):
     source_mes_code: Optional[str] = None
     quantity: int
     expanded_level: int = 1
+    internal_use_bom_mode: Optional[
+        Literal["parent_and_children", "children_only"]
+    ] = None
+    source_location: Optional[Literal["warehouse", "department"]] = None
     lines: List[IoLinePayload] = Field(default_factory=list)
 
 
@@ -102,6 +116,7 @@ class IoStockRequestSummary(BaseModel):
     requires_department_approval: bool
     approver_employee_id: Optional[uuid.UUID] = None
     approver_name: Optional[str] = None
+    operation_line_ids: List[uuid.UUID] = Field(default_factory=list)
 
 
 class IoBatchResponse(BaseModel):

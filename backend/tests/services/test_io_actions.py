@@ -378,7 +378,7 @@ def test_internal_use_source_requests_approve_and_reject_independently(
         pin="0000",
     )
     batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one()
-    assert batch.status == "reserved"
+    assert batch.status == "partially_completed"
     assert (
         db_session.query(Inventory)
         .filter(Inventory.item_id == warehouse_item.item_id)
@@ -433,6 +433,11 @@ def test_internal_use_source_requests_approve_and_reject_independently(
         for summary in batch_payload["stock_requests"]
     }
     assert summaries[("warehouse", None)]["status"] == "completed"
+    assert set(summaries[("warehouse", None)]["operation_line_ids"]) == {
+        line.operation_line_id
+        for line in warehouse_request.lines
+        if line.operation_line_id is not None
+    }
     assert (
         summaries[("warehouse", None)]["approver_employee_id"]
         == warehouse_approver.employee_id

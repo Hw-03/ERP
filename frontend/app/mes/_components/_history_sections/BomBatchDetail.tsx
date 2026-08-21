@@ -9,6 +9,10 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import {
+  INTERNAL_USE_BOM_MODE_LABEL,
+} from "../_warehouse_v2/internalUseBom";
+import {
+  getInternalUseHistoryLineEffectLabel,
   getHistoryBomParentLine,
   getDisplayBundles,
   getHistoryLineSignedQuantity,
@@ -20,6 +24,7 @@ import {
   HISTORY_CHILD_CELL_CLASS,
   HISTORY_CHILD_ROW_CLASS,
   HISTORY_TABLE_OPERATION_PILL_CLASS,
+  InternalUseEffectBadge,
   ItemCodeCell,
   MovementSummaryCell,
 } from "./historyTableHelpers";
@@ -220,8 +225,9 @@ function BundleRows({
   const padX = compact ? "px-2" : "px-4";
   const isBomParent = bundle.source_kind === "bom_parent";
   const parentLine = getHistoryBomParentLine(bundle);
+  const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
   const childLines = (parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines)
-    .filter((line) => line.included);
+    .filter((line) => isInternalUseBom || line.included);
   const isSingleLineDirect = !isBomParent && childLines.length === 1;
   const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
@@ -246,6 +252,9 @@ function BundleRows({
   const displayTitle = isBomParent && (batch.sub_type === "warehouse_to_dept" || batch.sub_type === "dept_to_warehouse")
     ? "이동 구성"
     : bundle.title;
+  const internalUseModeLabel = isInternalUseBom && bundle.internal_use_bom_mode
+    ? INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]
+    : null;
   const targetPadX = compact ? "px-2" : "px-4";
   const quantityPadX = compact ? "px-2" : "px-4";
   const statusPadX = compact ? "px-2" : "px-4";
@@ -321,6 +330,17 @@ function BundleRows({
             >
               {displayTitle}
             </TruncatedText>
+            {internalUseModeLabel && (
+              <span
+                className="inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-bold leading-none"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
+                  color: LEGACY_COLORS.blue,
+                }}
+              >
+                {internalUseModeLabel}
+              </span>
+            )}
           </div>
         </td>
         <ItemCodeCell code={bundle.source_mes_code ?? singleLineCode} compact={compact} dense />
@@ -380,6 +400,9 @@ function BomLineRow({
   const signed = getHistoryLineSignedQuantity(line, batch, bundle);
   const qtyColor = SIGN_TONE_HEX[signed.tone];
   const highlighted = highlightItemId === line.item_id;
+  const internalUseEffect = batch.sub_type === "internal_use_out" && bundle.source_kind === "bom_parent"
+    ? getInternalUseHistoryLineEffectLabel(line, batch)
+    : null;
   return (
     <tr
       id={rowId}
@@ -419,7 +442,10 @@ function BomLineRow({
         />
       </td>
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <StatusBadge shortage={line.shortage} />
+        <div className="flex flex-wrap justify-center gap-1">
+          {internalUseEffect && <InternalUseEffectBadge label={internalUseEffect} />}
+          <StatusBadge shortage={line.shortage} />
+        </div>
       </td>
     </tr>
   );
