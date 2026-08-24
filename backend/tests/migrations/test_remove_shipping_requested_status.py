@@ -27,6 +27,7 @@ MIGRATION_PATH = (
 )
 PREVIOUS_REVISION = "20260820_0023"
 MIGRATION_REVISION = "20260821_0024"
+HEAD_REVISION = "20260824_0026"
 
 
 def _config(path: Path) -> Config:
@@ -230,9 +231,16 @@ def test_ensure_schema_with_foreign_keys_preserves_all_shipping_dependents(
             "transaction_logs",
             "transaction_edit_logs",
         )
+        dependent_columns = {
+            table_name: tuple(
+                row[1] for row in db.execute(f"PRAGMA table_info({table_name})")
+            )
+            for table_name in dependent_tables
+        }
         before_dependents = {
             table_name: db.execute(
-                f"SELECT * FROM {table_name} ORDER BY 1"
+                f'SELECT {", ".join(dependent_columns[table_name])} '
+                f"FROM {table_name} ORDER BY 1"
             ).fetchall()
             for table_name in dependent_tables
         }
@@ -247,7 +255,7 @@ def test_ensure_schema_with_foreign_keys_preserves_all_shipping_dependents(
 
             result = ensure_schema(connection=connection)
 
-            assert result.revision == MIGRATION_REVISION
+            assert result.revision == HEAD_REVISION
             assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1
     finally:
         engine.dispose()
@@ -258,7 +266,8 @@ def test_ensure_schema_with_foreign_keys_preserves_all_shipping_dependents(
         )
         after_dependents = {
             table_name: db.execute(
-                f"SELECT * FROM {table_name} ORDER BY 1"
+                f'SELECT {", ".join(dependent_columns[table_name])} '
+                f"FROM {table_name} ORDER BY 1"
             ).fetchall()
             for table_name in dependent_tables
         }
