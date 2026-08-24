@@ -1,5 +1,6 @@
+const fs = require("fs");
 const path = require("path");
-const { createDiagnostics } = require("./dev-diagnostics");
+const { createDiagnostics, timestampForFile } = require("./dev-diagnostics");
 
 const PROBE_ENVIRONMENT_FLAG = "MES_NEXT_SIGNAL_PROBE";
 const NEXT_CLI_PATTERN = /(?:^|[\\/])next[\\/]dist[\\/]bin[\\/]next$/i;
@@ -136,6 +137,39 @@ function attachNextWorkerExitObserver({
   return true;
 }
 
+function writeSanitizedExceptionReport({ processRef, diagnostics, reportDirectory, error }) {
+  // process.report.excludeEnv only exists from Node v22.13.0/v23.3.0 onward — it is not
+  // available anywhere on the Node 20.x line this project pins in CI and for employee
+  // deployment (Node docs list no v20.x "Added in" entry for excludeEnv, only excludeNetwork
+  // at v20.13.0). Setting the flag on Node 20.x is a silent no-op, so the automatic
+  // reportOnUncaughtException writer would still persist full environment variables —
+  // including secrets — to disk. Take exception handling over ourselves so we can strip
+  // environmentVariables unconditionally, regardless of what the running Node version honors.
+  const report = processRef.report.getReport(error);
+  // getReport() is a manual API call, so Node tags it "JavaScript API" instead of the
+  // "Exception" event/trigger the automatic reportOnUncaughtException path would record.
+  // Restore that label to match what actually happened: an uncaught exception.
+  report.header.event = "Exception";
+  report.header.trigger = "Exception";
+  delete report.environmentVariables;
+  if (report.header) delete report.header.networkInterfaces;
+  try {
+    const reportPath = path.join(
+      reportDirectory,
+      `report.${timestampForFile()}.${processRef.pid}.json`,
+    );
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  } catch (writeError) {
+    try {
+      diagnostics.log("NEXT_NODE_REPORT_WRITE_FAILED", {
+        message: writeError instanceof Error ? writeError.message : String(writeError),
+      });
+    } catch {
+      // Diagnostics failures must not interrupt the crash path below.
+    }
+  }
+}
+
 function configureNextWorkerDiagnosticReport({ processRef = process, diagnostics }) {
   if (!processRef.report || typeof diagnostics.prepareNodeReportDirectory !== "function") {
     return false;
@@ -151,6 +185,16 @@ function configureNextWorkerDiagnosticReport({ processRef = process, diagnostics
     processRef.report.reportOnUncaughtException = true;
     processRef.report.excludeEnv = true;
     processRef.report.excludeNetwork = true;
+    // Registering our own uncaughtException listener suppresses Node's automatic
+    // reportOnUncaughtException write (verified: with a listener attached, no report file
+    // is produced automatically), so writeSanitizedExceptionReport becomes the only writer
+    // for this path and fully replaces it — reportOnFatalError (true V8 fatal errors, which
+    // cannot be intercepted from JS) is untouched and keeps using Node's built-in writer.
+    processRef.on("uncaughtException", (error) => {
+      writeSanitizedExceptionReport({ processRef, diagnostics, reportDirectory, error });
+      console.error(error);
+      processRef.exit(1);
+    });
     diagnostics.log("NEXT_NODE_REPORT_READY", {
       reportDirectory,
       maxReports: NODE_REPORT_MAX_FILES,
