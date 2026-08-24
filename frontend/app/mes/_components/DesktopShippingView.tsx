@@ -3750,7 +3750,7 @@ function BomEditor({
       </div>
       <ItemSearchAdd query={query} setQuery={setQuery} itemOptions={itemOptions} disabled={disabled} inputTestId={`shipping-bom-search-${stageLower}`} buttonTestPrefix={`shipping-bom-add-${stageLower}`} ariaLabel={`${title} 검색`} placeholder="검색 후 추가" tone={stageColor} onAdd={(itemId) => onAdd(stage, itemId)} />
       <div data-testid={`shipping-bom-editor-${stageLower}-scroll-shell`} className="relative min-h-0 flex-1">
-        <div data-testid={`shipping-bom-editor-${stageLower}-viewport`} className="absolute inset-y-0 left-0 right-0 grid content-start gap-2 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]">
+        <div data-testid={`shipping-bom-editor-${stageLower}-viewport`} className="absolute inset-y-0 left-0 right-0 grid content-start gap-2 overflow-y-auto p-[14px] lg:-right-2.5 lg:[scrollbar-gutter:stable]">
           {lines.length === 0 ? (
             <div className="rounded-[10px] border px-3 py-4 text-center text-sm font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
               구성품이 없습니다.

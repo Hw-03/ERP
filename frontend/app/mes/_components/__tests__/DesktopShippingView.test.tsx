@@ -1219,6 +1219,8 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-wizard-step-2")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-bom-editor-pf")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-bom-editor-pa")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-bom-editor-pa-viewport")).toHaveClass("p-[14px]");
+    expect(screen.getByTestId("shipping-bom-editor-pf-viewport")).toHaveClass("p-[14px]");
     fireEvent.click(await screen.findByRole("button", { name: /Cable Set/ }));
     expect(container.querySelector('[data-bom-line-child="acc-1"][data-bom-line-included="false"]')).toBeTruthy();
     fireEvent.change(screen.getByTestId("shipping-bom-search-pa"), { target: { value: "Bracket" } });
