@@ -107,7 +107,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260824_0026"
+            ) == "20260824_0027"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")

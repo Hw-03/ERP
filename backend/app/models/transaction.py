@@ -96,6 +96,12 @@ class TransactionLog(Base):
     )
     shipping_phase = Column(String(20), nullable=True, index=True)
     department = Column(String(50), nullable=True, index=True)
+    defect_quarantine_record_id = Column(
+        UUIDString,
+        ForeignKey("defect_quarantine_records.record_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     cancel_reason = Column(Text, nullable=True)
     cancelled_by = Column(
