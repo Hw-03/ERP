@@ -47,7 +47,6 @@ vi.mock("@/lib/api", () => ({
     updateShippingInvoice: vi.fn(),
     createShippingRequest: vi.fn(),
     updateShippingRequest: vi.fn(),
-    sendShippingToPrep: vi.fn(),
     deleteShippingRequest: vi.fn(),
     updateShippingChecklist: vi.fn(),
     clearShippingChecklist: vi.fn(),
@@ -227,7 +226,7 @@ beforeEach(() => {
   navigationMock.search = "tab=shipping";
   vi.mocked(api.getItems).mockResolvedValue(items);
   vi.mocked(api.getShippingRequests).mockResolvedValue([
-    request({ request_id: "requested-1", status: "REQUESTED" }),
+    request({ request_id: "requested-1", status: "PREPARING" }),
     request(),
     request({ request_id: "prepared-1", status: "PREPARED", prepared_at: "2026-06-26T01:00:00Z" }),
     request({
@@ -332,9 +331,8 @@ beforeEach(() => {
     checklist_lines: request().checklist_lines.map((line) => line.item_id === "acc-1" ? { ...line, checked: true } : line),
   }));
   vi.mocked(api.clearShippingChecklist).mockResolvedValue(request());
-  vi.mocked(api.createShippingRequest).mockResolvedValue(request({ request_id: "new-1", status: "REQUESTED" }));
-  vi.mocked(api.updateShippingRequest).mockResolvedValue(request({ request_id: "requested-1", status: "REQUESTED" }));
-  vi.mocked(api.sendShippingToPrep).mockResolvedValue(request({ request_id: "requested-1", status: "PREPARING" }));
+  vi.mocked(api.createShippingRequest).mockResolvedValue(request({ request_id: "new-1", status: "PREPARING" }));
+  vi.mocked(api.updateShippingRequest).mockResolvedValue(request({ request_id: "requested-1", status: "PREPARING" }));
   vi.mocked(api.deleteShippingRequest).mockResolvedValue(undefined);
   vi.mocked(api.prepareShippingComplete).mockResolvedValue(request({ status: "PREPARED" }));
   vi.mocked(api.cancelShippingPrepare).mockResolvedValue(request({ status: "PREPARING" }));
@@ -385,10 +383,10 @@ describe("DesktopShippingView", () => {
     expect(quantity).toHaveTextContent("1대");
     expect(quantity).toHaveClass("min-h-[64px]", "min-w-[112px]", "rounded-[14px]", "border");
     expect(statusBadge).toHaveClass("min-h-[64px]", "min-w-[96px]", "rounded-[14px]");
-    expect(header.compareDocumentPosition(revisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(revisionHistory.compareDocumentPosition(lineSummary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.compareDocumentPosition(lineSummary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(lineSummary.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(actions).toHaveClass("rounded-[14px]", "border", "p-3");
+    expect(actions.compareDocumentPosition(revisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(actions).toHaveClass("rounded-[14px]", "border", "p-3", "md:items-stretch");
 
     fireEvent.click(within(detail).getByTestId("shipping-edit-request"));
     const workHeader = await screen.findByTestId("shipping-work-header");
@@ -566,6 +564,43 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(api.getItems).toHaveBeenCalledWith({ limit: 2000 }));
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+  });
+
+  it("does not apply an older PF selection after starting a newer draft", async () => {
+    const fullItemsRequest = deferred<Item[]>();
+    vi.mocked(api.getItems).mockImplementation((params?: any) => {
+      if (params?.process_type_code === "PF") return Promise.resolve([items[0]]);
+      if (params?.limit === 2000) return fullItemsRequest.promise;
+      return Promise.resolve(items);
+    });
+    navigationMock.search = "tab=shipping&shippingView=requestWork&shippingStep=1";
+    const statusChange = vi.fn();
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={statusChange} />);
+    fireEvent.click(await screen.findByTestId("shipping-pf-option-pf-1"));
+    await waitFor(() => expect(api.getItems).toHaveBeenCalledWith({ limit: 2000 }));
+
+    fireEvent.click(screen.getByRole("button", { name: "이전 화면" }));
+    navigationMock.search = latestPushedSearch("shippingView=requestList");
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-request-list-panel");
+    await openNewRequest(container);
+    const newerWorkSearch = latestPushedSearch("shippingView=requestWork");
+    navigationMock.search = newerWorkSearch;
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    const newerInvoice = await screen.findByTestId("shipping-invoice-number");
+    fireEvent.change(newerInvoice, { target: { value: "NEWER-PF-DRAFT" } });
+
+    vi.mocked(api.getBOM).mockClear();
+    statusChange.mockClear();
+    await act(async () => {
+      fullItemsRequest.resolve(items);
+      await fullItemsRequest.promise;
+    });
+
+    expect(api.getBOM).not.toHaveBeenCalled();
+    expect(statusChange).not.toHaveBeenCalled();
+    expect(navigationMock.search).toBe(newerWorkSearch);
+    expect(screen.getByTestId("shipping-invoice-number")).toHaveValue("NEWER-PF-DRAFT");
   });
 
   it("refreshes loaded PF candidates when the first realtime snapshot arrives without resetting the request draft", async () => {
@@ -841,7 +876,7 @@ describe("DesktopShippingView", () => {
   });
 
   it("moves through all five steps and allows an empty invoice through PREPARING", async () => {
-    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
@@ -866,12 +901,288 @@ describe("DesktopShippingView", () => {
 
     nextStep(container);
     expect(await screen.findByTestId("shipping-wizard-step-5")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
 
     await waitFor(() => {
       expect(api.createShippingRequest).toHaveBeenCalledWith(expect.objectContaining({ custom_pf_name: "Custom PF", invoice_number: null }));
-      expect(api.sendShippingToPrep).toHaveBeenCalledWith("new-1");
+      expect(api.createShippingRequest).toHaveBeenCalledTimes(1);
     });
+    const savedSearch = String(navigationMock.replace.mock.calls.at(-1)?.[0]).replace(/^\?/, "");
+    navigationMock.search = savedSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByTestId("shipping-request-list-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toContainElement(
+      container.querySelector('[data-shipping-request-id="new-1"]'),
+    );
+  });
+
+  it("allows only one submit while BOM matching and request creation are in flight", async () => {
+    const matchRequest = deferred<Awaited<ReturnType<typeof api.matchShippingBom>>>();
+    const createRequest = deferred<ShippingRequest>();
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalled());
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    nextStep(container);
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-5");
+
+    vi.mocked(api.matchShippingBom).mockClear();
+    vi.mocked(api.matchShippingBom).mockReturnValue(matchRequest.promise);
+    vi.mocked(api.createShippingRequest).mockReturnValue(createRequest.promise);
+    const submit = screen.getByTestId("shipping-submit-request") as HTMLButtonElement;
+    act(() => {
+      submit.click();
+      submit.click();
+    });
+
+    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalledTimes(1));
+    expect(api.createShippingRequest).not.toHaveBeenCalled();
+    await act(async () => {
+      matchRequest.resolve({
+        matched_pa_item_id: "pa-1",
+        matched_pf_item_id: null,
+        matched_pa_item_name: "Standard PA",
+        matched_pf_item_name: null,
+        requires_pa_name: false,
+        requires_pf_name: true,
+      });
+    });
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      createRequest.resolve(request({ request_id: "guarded-create", status: "PREPARING" }));
+    });
+    expect(api.createShippingRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the step-five draft after create failure and permits one successful retry", async () => {
+    vi.mocked(api.createShippingRequest)
+      .mockRejectedValueOnce(new Error("출하 요청 생성 실패"))
+      .mockResolvedValueOnce(request({ request_id: "retried-create", status: "PREPARING" }));
+    const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Retry PF" } });
+    nextStep(container);
+    nextStep(container);
+    await screen.findByTestId("shipping-wizard-step-5");
+
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
+    expect(await screen.findByText("출하 요청 생성 실패")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-wizard-step-5")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-submit-request")).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(2));
+    const savedSearch = String(navigationMock.replace.mock.calls.at(-1)?.[0]).replace(/^\?/, "");
+    navigationMock.search = savedSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByTestId("shipping-request-list-panel")).toBeInTheDocument();
+    expect(api.createShippingRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a newer draft and URL when an older create response arrives", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestWork&shippingStep=1";
+    const olderCreate = deferred<ShippingRequest>();
+    vi.mocked(api.createShippingRequest).mockReturnValue(olderCreate.promise);
+    const statusChange = vi.fn();
+    const client = makeClient({ staleTime: 5 * 60_000 });
+    const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    await fillRichRequestDraft(container, "older", true);
+    nextStep(container);
+    const olderStepFiveSearch = latestPushedSearch("shippingStep=5");
+    navigationMock.search = olderStepFiveSearch;
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-wizard-step-5");
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "이전 화면" }));
+    const requestListSearch = latestPushedSearch("shippingView=requestList");
+    navigationMock.search = requestListSearch;
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-request-list-panel");
+    await openNewRequest(container);
+    const newerStepOneSearch = latestPushedSearch("shippingView=requestWork");
+    navigationMock.search = newerStepOneSearch;
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    const newerInvoice = await screen.findByTestId("shipping-invoice-number");
+    fireEvent.change(newerInvoice, { target: { value: "NEWER-DRAFT" } });
+
+    navigationMock.push.mockClear();
+    navigationMock.replace.mockClear();
+    statusChange.mockClear();
+    await act(async () => {
+      olderCreate.resolve(request({ request_id: "older-created", status: "PREPARING" }));
+    });
+    await waitFor(() => expect(client.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())).toEqual(
+      expect.arrayContaining([expect.objectContaining({ request_id: "older-created", status: "PREPARING" })]),
+    ));
+
+    expect(screen.getByTestId("shipping-wizard-step-1")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-invoice-number")).toHaveValue("NEWER-DRAFT");
+    expect(navigationMock.search).toBe(newerStepOneSearch);
+    expect(navigationMock.replace).not.toHaveBeenCalled();
+    expect(navigationMock.push).not.toHaveBeenCalled();
+    expect(statusChange).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate or report status after an in-flight create unmounts", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestWork&shippingStep=1";
+    const createRequest = deferred<ShippingRequest>();
+    vi.mocked(api.createShippingRequest).mockReturnValue(createRequest.promise);
+    const statusChange = vi.fn();
+    const client = makeClient({ staleTime: 5 * 60_000 });
+    const { container, rerender, unmount } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    await fillRichRequestDraft(container, "unmounted", true);
+    nextStep(container);
+    navigationMock.search = latestPushedSearch("shippingStep=5");
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-wizard-step-5");
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
+
+    navigationMock.push.mockClear();
+    navigationMock.replace.mockClear();
+    statusChange.mockClear();
+    unmount();
+    await act(async () => {
+      createRequest.resolve(request({ request_id: "created-after-unmount", status: "PREPARING" }));
+    });
+    await waitFor(() => expect(client.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())).toEqual(
+      expect.arrayContaining([expect.objectContaining({ request_id: "created-after-unmount", status: "PREPARING" })]),
+    ));
+
+    expect(navigationMock.replace).not.toHaveBeenCalled();
+    expect(navigationMock.push).not.toHaveBeenCalled();
+    expect(statusChange).not.toHaveBeenCalled();
+  });
+
+  it("allows a newer draft submit while an older generation is still in flight", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestWork&shippingStep=1";
+    const olderCreate = deferred<ShippingRequest>();
+    const newerCreate = deferred<ShippingRequest>();
+    vi.mocked(api.createShippingRequest)
+      .mockReturnValueOnce(olderCreate.promise)
+      .mockReturnValueOnce(newerCreate.promise);
+    const statusChange = vi.fn();
+    const client = makeClient({ staleTime: 5 * 60_000 });
+    const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    await fillRichRequestDraft(container, "older-flight", true);
+    nextStep(container);
+    navigationMock.search = latestPushedSearch("shippingStep=5");
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-wizard-step-5");
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "이전 화면" }));
+    navigationMock.search = latestPushedSearch("shippingView=requestList");
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-request-list-panel");
+    await openNewRequest(container);
+    navigationMock.search = latestPushedSearch("shippingView=requestWork");
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-wizard-step-1");
+    await fillRichRequestDraft(container, "newer-flight", true);
+    nextStep(container);
+    const newerStepFiveSearch = latestPushedSearch("shippingStep=5");
+    navigationMock.search = newerStepFiveSearch;
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await screen.findByTestId("shipping-wizard-step-5");
+
+    navigationMock.push.mockClear();
+    navigationMock.replace.mockClear();
+    statusChange.mockClear();
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("shipping-submit-request")).toBeDisabled();
+
+    await act(async () => {
+      olderCreate.resolve(request({ request_id: "older-flight-created", status: "PREPARING" }));
+    });
+    await waitFor(() => expect(client.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())).toEqual(
+      expect.arrayContaining([expect.objectContaining({ request_id: "older-flight-created" })]),
+    ));
+    expect(screen.getByTestId("shipping-wizard-step-5")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-final-request-summary")).toHaveTextContent("newer-flight-memo");
+    expect(screen.getByTestId("shipping-submit-request")).toBeDisabled();
+    expect(navigationMock.replace).not.toHaveBeenCalled();
+    expect(navigationMock.push).not.toHaveBeenCalled();
+    expect(statusChange).not.toHaveBeenCalled();
+
+    await act(async () => {
+      newerCreate.resolve(request({ request_id: "newer-flight-created", status: "PREPARING" }));
+    });
+    await waitFor(() => expect(navigationMock.replace).toHaveBeenCalledWith(
+      expect.stringContaining("shippingRequestId=newer-flight-created"),
+      { scroll: false },
+    ));
+    expect(api.createShippingRequest).toHaveBeenCalledTimes(2);
+    expect(client.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())).toEqual(expect.arrayContaining([
+      expect.objectContaining({ request_id: "older-flight-created" }),
+      expect.objectContaining({ request_id: "newer-flight-created" }),
+    ]));
+  });
+
+  it("keeps request B isolated when its requestWork URL replaces request A during a save", async () => {
+    const requestA = request({ request_id: "direct-a", notes: "request-a-memo", invoice_number: "A-001" });
+    const requestB = request({ request_id: "direct-b", notes: "request-b-memo", invoice_number: "B-001" });
+    vi.mocked(api.getShippingRequests).mockResolvedValue([requestA, requestB]);
+    const updateA = deferred<ShippingRequest>();
+    vi.mocked(api.updateShippingRequest).mockReturnValue(updateA.promise);
+    navigationMock.search = "tab=shipping&shippingView=requestWork&shippingRequestId=direct-a&shippingStep=5";
+    const statusChange = vi.fn();
+    const client = makeClient({ staleTime: 5 * 60_000 });
+    const { rerender } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    await screen.findByTestId("shipping-wizard-step-5");
+    expect(screen.getByTestId("shipping-final-request-summary")).toHaveTextContent("request-a-memo");
+    fireEvent.click(screen.getByTestId("shipping-update-request"));
+    await waitFor(() => expect(api.updateShippingRequest).toHaveBeenCalledWith("direct-a", expect.any(Object)));
+
+    const requestBSearch = "tab=shipping&shippingView=requestWork&shippingRequestId=direct-b&shippingStep=5";
+    navigationMock.search = requestBSearch;
+    rerender(<DesktopShippingView onStatusChange={statusChange} />);
+    await waitFor(() => expect(screen.getByTestId("shipping-final-request-summary")).toHaveTextContent("request-b-memo"));
+
+    navigationMock.push.mockClear();
+    navigationMock.replace.mockClear();
+    statusChange.mockClear();
+    await act(async () => {
+      updateA.resolve(request({ request_id: "direct-a", notes: "request-a-saved", status: "PREPARING" }));
+    });
+    await waitFor(() => expect(client.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())).toEqual(
+      expect.arrayContaining([expect.objectContaining({ request_id: "direct-a", notes: "request-a-saved" })]),
+    ));
+
+    expect(screen.getByTestId("shipping-wizard-step-5")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-final-request-summary")).toHaveTextContent("request-b-memo");
+    expect(screen.getByTestId("shipping-update-request")).toBeEnabled();
+    expect(navigationMock.search).toBe(requestBSearch);
+    expect(navigationMock.replace).not.toHaveBeenCalled();
+    expect(navigationMock.push).not.toHaveBeenCalled();
+    expect(statusChange).not.toHaveBeenCalled();
   });
 
   it("opens existing request edits directly on the BOM step", async () => {
@@ -897,7 +1208,7 @@ describe("DesktopShippingView", () => {
     expect(screen.queryByTestId("shipping-edit-scope-notice")).not.toBeInTheDocument();
   });
 
-  it("shows PF and PA BOM groups, then carries excluded lines into send-to-prep save", async () => {
+  it("shows PF and PA BOM groups, then carries excluded lines into a preparing-request update", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -919,7 +1230,7 @@ describe("DesktopShippingView", () => {
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
     nextStep(container);
     nextStep(container);
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-update-request"));
 
     await waitFor(() => {
       expect(api.updateShippingRequest).toHaveBeenCalledWith(
@@ -931,7 +1242,6 @@ describe("DesktopShippingView", () => {
           ]),
         }),
       );
-      expect(api.sendShippingToPrep).toHaveBeenCalledWith("requested-1");
     });
   });
 
@@ -1139,6 +1449,32 @@ describe("DesktopShippingView", () => {
     expect(api.getShippingHistory).toHaveBeenCalledTimes(3);
   });
 
+  it("applies and clears the history search as the input changes", async () => {
+    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    const overview = request({ request_id: "search-overview", status: "PICKED_UP", invoice_number: "INV-OVERVIEW", picked_up_at: "2026-07-01T01:00:00Z" });
+    const matched = request({ request_id: "search-live", status: "PICKED_UP", invoice_number: "INV-LIVE", picked_up_at: "2026-07-02T01:00:00Z" });
+    vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params?: any) => ({
+      requests: params?.q === "INV-LIVE" ? [matched] : [overview],
+      next_cursor: null,
+      has_more: false,
+    }));
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByText("INV-OVERVIEW")).toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "출하 이력 검색" });
+    fireEvent.change(search, { target: { value: "INV-LIVE" } });
+    await waitFor(() => expect(api.getShippingHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "PICKED_UP", q: "INV-LIVE" }),
+    ));
+    expect(await screen.findByText("INV-LIVE")).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: "" } });
+    await waitFor(() => expect(api.getShippingHistoryMonths).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("INV-OVERVIEW")).toBeInTheDocument();
+  });
+
   it("keeps the selected history month and avoids a duplicate overview fetch on realtime refresh", async () => {
     navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
     vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([
@@ -1264,21 +1600,20 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-summary-quantity-bom-1-PF")).toHaveClass("tabular-nums");
   });
 
-  it("can send an existing requested detail to prep", async () => {
+  it("keeps edit and cancel without a transition action for a preparing detail", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
     await openRequestById(container, "requested-1");
 
-    fireEvent.click(await screen.findByTestId("shipping-detail-send-to-prep"));
-
-    await waitFor(() => {
-      expect(api.sendShippingToPrep).toHaveBeenCalledWith("requested-1");
-    });
+    const actions = await screen.findByTestId("shipping-detail-actions-buttons");
+    expect(within(actions).queryByRole("button", { name: "출하 요청" })).not.toBeInTheDocument();
+    expect(within(actions).getByTestId("shipping-edit-request")).toBeInTheDocument();
+    expect(within(actions).getByTestId("shipping-delete-request")).toBeInTheDocument();
   });
 
-  it("can delete an existing requested detail after confirmation", async () => {
+  it("can delete an existing preparing detail after confirmation", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -1416,18 +1751,8 @@ describe("DesktopShippingView", () => {
 
   it("normalizes a newly saved request identity without resetting its step-five draft", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestWork&shippingStep=1";
-    const sendRequest = deferred<ShippingRequest>();
-    vi.mocked(api.createShippingRequest).mockResolvedValue(request({
-      request_id: "new-1",
-      status: "REQUESTED",
-      invoice_number: null,
-      request_quantity: 1,
-      custom_pa_name: null,
-      custom_pf_name: null,
-      notes: "server-old",
-      companion_lines: [],
-    }));
-    vi.mocked(api.sendShippingToPrep).mockReturnValue(sendRequest.promise);
+    const createRequest = deferred<ShippingRequest>();
+    vi.mocked(api.createShippingRequest).mockReturnValue(createRequest.promise);
     const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
     await fillRichRequestDraft(container, "new-save", true);
     const stepFourSearch = latestPushedSearch("shippingStep=4");
@@ -1438,19 +1763,48 @@ describe("DesktopShippingView", () => {
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
     await screen.findByTestId("shipping-wizard-step-5");
     navigationMock.replace.mockClear();
+    navigationMock.push.mockClear();
 
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
 
     await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(api.sendShippingToPrep).toHaveBeenCalledWith("new-1"));
+    expect(screen.getByTestId("shipping-wizard-step-5")).toBeInTheDocument();
+    await act(async () => {
+      createRequest.resolve(request({
+        request_id: "new-1",
+        status: "PREPARING",
+        invoice_number: null,
+        request_quantity: 1,
+        custom_pa_name: null,
+        custom_pf_name: null,
+        notes: "server-old",
+        companion_lines: [],
+      }));
+    });
     await waitFor(() => expect(navigationMock.replace).toHaveBeenCalledTimes(1));
+    expect(navigationMock.push).not.toHaveBeenCalled();
+    expect(screen.getByTestId("shipping-wizard-step-5")).toBeInTheDocument();
     const savedSearch = String(navigationMock.replace.mock.calls.at(-1)?.[0]).replace(/^\?/, "");
     const savedParams = new URLSearchParams(savedSearch);
     expect(savedParams.get("shippingRequestId")).toBe("new-1");
     expect(savedParams.get("shippingStep")).toBe("5");
+
+    navigationMock.search = savedSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await waitFor(() => expect(navigationMock.push).toHaveBeenCalledWith(
+      expect.stringContaining("shippingView=requestList"),
+      { scroll: false },
+    ));
+    expect(await screen.findByTestId("shipping-request-list-panel")).toBeInTheDocument();
+    const requestListSearch = latestPushedSearch("shippingView=requestList");
+    navigationMock.search = requestListSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await screen.findByTestId("shipping-request-list-panel");
+
     navigationMock.search = savedSearch;
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
     expect(await screen.findByTestId("shipping-wizard-step-5")).toBeInTheDocument();
+    expect(api.createShippingRequest).toHaveBeenCalledTimes(1);
 
     navigationMock.replace.mockClear();
     navigationMock.search = stepFourSearch;
@@ -1474,6 +1828,7 @@ describe("DesktopShippingView", () => {
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
     expect(await screen.findByTestId("shipping-wizard-step-4")).toBeInTheDocument();
     await expectRichRequestDraft(container, rerender, normalizedBackSearch, "new-save");
+    expect(api.createShippingRequest).toHaveBeenCalledTimes(1);
   });
 
   it("keeps saved new-draft aliases across the request list and consecutive browser Back entries", async () => {
@@ -1489,11 +1844,13 @@ describe("DesktopShippingView", () => {
     await screen.findByTestId("shipping-wizard-step-5");
     navigationMock.replace.mockClear();
 
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
 
     await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
-    await screen.findByTestId("shipping-request-list-panel");
     const savedSearch = String(navigationMock.replace.mock.calls.at(-1)?.[0]).replace(/^\?/, "");
+    navigationMock.search = savedSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await screen.findByTestId("shipping-request-list-panel");
     const requestListSearch = latestPushedSearch("shippingView=requestList");
     navigationMock.search = requestListSearch;
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
@@ -1542,7 +1899,7 @@ describe("DesktopShippingView", () => {
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
     await screen.findByTestId("shipping-wizard-step-5");
 
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-update-request"));
 
     await waitFor(() => expect(api.updateShippingRequest).toHaveBeenCalledWith(
       "req-1",
@@ -1666,9 +2023,8 @@ describe("DesktopShippingView", () => {
       requires_pa_name: false,
       requires_pf_name: false,
     });
-    vi.mocked(api.createShippingRequest).mockResolvedValue(request({ request_id: "new-generation", status: "REQUESTED" }));
-    const sendRequest = deferred<ShippingRequest>();
-    vi.mocked(api.sendShippingToPrep).mockReturnValue(sendRequest.promise);
+    const createRequest = deferred<ShippingRequest>();
+    vi.mocked(api.createShippingRequest).mockReturnValue(createRequest.promise);
     const { container, rerender } = render(<DesktopShippingView onStatusChange={() => {}} />);
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
@@ -1698,16 +2054,25 @@ describe("DesktopShippingView", () => {
     await selectBasePf();
     await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
 
-    fireEvent.click(screen.getByText("5. 저장 및 전환").closest("button") as HTMLElement);
+    fireEvent.click(screen.getByText("5. 출하 요청 확인").closest("button") as HTMLElement);
     const secondStepFiveSearch = latestPushedSearch("shippingStep=5");
     navigationMock.search = secondStepFiveSearch;
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
     await screen.findByTestId("shipping-wizard-step-5");
     navigationMock.replace.mockClear();
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
     await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(api.sendShippingToPrep).toHaveBeenCalledWith("new-generation"));
+    await act(async () => {
+      createRequest.resolve(request({ request_id: "new-generation", status: "PREPARING" }));
+    });
     const savedSearch = String(navigationMock.replace.mock.calls.at(-1)?.[0]).replace(/^\?/, "");
+    navigationMock.search = savedSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await screen.findByTestId("shipping-request-list-panel");
+    const postSaveRequestListSearch = latestPushedSearch("shippingView=requestList");
+    navigationMock.search = postSaveRequestListSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    await screen.findByTestId("shipping-request-list-panel");
     navigationMock.search = savedSearch;
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
     await screen.findByTestId("shipping-wizard-step-5");
@@ -1781,7 +2146,7 @@ describe("DesktopShippingView", () => {
     vi.clearAllMocks();
     vi.mocked(api.getItems).mockResolvedValue(items);
     vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ request_id: "requested-1", status: "REQUESTED" }),
+      request({ request_id: "requested-1", status: "PREPARING" }),
     ]);
     vi.mocked(api.getShippingRevisions).mockResolvedValue([]);
     navigationMock.search = "tab=shipping&shippingView=requestWork&shippingRequestId=requested-1&shippingStep=invalid";
@@ -2018,7 +2383,7 @@ describe("DesktopShippingView", () => {
     nextStep(container);
     expect(await screen.findByTestId("shipping-request-info-fields")).toHaveTextContent("김현우");
     nextStep(container);
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
 
     await waitFor(() => {
       expect(api.createShippingRequest).toHaveBeenCalledWith(expect.objectContaining({ requested_by_name: "김현우" }));
@@ -2044,13 +2409,13 @@ describe("DesktopShippingView", () => {
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
 
-    expect(await screen.findByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("flex-1");
-    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("flex-1");
+    expect(await screen.findByTestId("shipping-request-column-body-PREPARING")).toHaveClass("flex-1");
     expect(screen.getByTestId("shipping-request-column-body-PREPARED")).toHaveClass("flex-1");
-    expect(screen.getByTestId("shipping-request-column-body-REQUESTED")).toHaveClass("min-h-0", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toHaveClass("min-h-0", "overflow-y-auto");
+    expect(screen.getByTestId("shipping-request-list-grid").children).toHaveLength(2);
   });
 
-  it("removes the request list outer frame and lets the three status columns fill the workspace", async () => {
+  it("removes the request list outer frame and lets the two status columns fill the workspace", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -2063,19 +2428,29 @@ describe("DesktopShippingView", () => {
     expect(panel).toHaveClass("flex-1", "min-h-0");
     expect(screen.getByTestId("shipping-request-list-grid")).toHaveClass("flex-1");
     expect(screen.getByTestId("shipping-request-list-grid")).toHaveClass("min-h-0");
+    expect(screen.getByTestId("shipping-request-list-grid")).toHaveClass("grid-cols-2");
+    expect(screen.getByTestId("shipping-request-list-grid")).not.toHaveClass("xl:grid-cols-3");
   });
 
-  it("puts the new-request action inside the shipping request column", async () => {
+  it("centers a broad new-request action between balanced header margins and opens the request wizard", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
     await openHubCard(container, "request");
 
-    const requestedBody = await screen.findByTestId("shipping-request-column-body-REQUESTED");
-    const requestedColumn = requestedBody.closest("section");
-    expect(requestedColumn).toHaveTextContent("출하 요청");
-    expect(requestedColumn).toHaveTextContent("새 요청 만들기");
-    expect(screen.queryByText("요청됨")).not.toBeInTheDocument();
+    const header = await screen.findByTestId("shipping-request-list-header");
+    const newRequest = within(header).getByRole("button", { name: "새 출하 요청 만들기" });
+    expect(header).toHaveClass("grid-cols-[minmax(0,1fr)_minmax(0,6fr)_minmax(0,1fr)]", "gap-4");
+    expect(newRequest).toHaveClass("h-11", "w-full", "px-6", "text-base", "focus-visible:ring-2");
+    expect(newRequest).not.toHaveClass("text-sm");
+    expect(newRequest.querySelector("svg")).toHaveClass("h-5", "w-5");
+    expect(newRequest).not.toHaveClass("min-w-44");
+    expect(header.lastElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).not.toContainElement(newRequest);
+    expect(screen.getByTestId("shipping-request-column-body-PREPARED")).not.toContainElement(newRequest);
+
+    fireEvent.click(newRequest);
+    expect(await screen.findByTestId("shipping-wizard-step-1")).toBeInTheDocument();
   });
 
   it("shows delete for preparing details and prepare-cancel for prepared details", async () => {
@@ -2084,7 +2459,7 @@ describe("DesktopShippingView", () => {
 
     expect(await screen.findByTestId("shipping-request-detail")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-delete-request")).toBeInTheDocument();
-    expect(screen.queryByTestId("shipping-detail-send-to-prep")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("shipping-detail-actions-buttons")).queryByRole("button", { name: "출하 요청" })).not.toBeInTheDocument();
     unmount();
 
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-1";
@@ -2095,10 +2470,17 @@ describe("DesktopShippingView", () => {
     expect(detailHeader).toContainElement(editLock);
     expect(editLock).toHaveTextContent("수정 잠김");
     expect(editLock).toHaveTextContent("준비 완료 취소 후 수정 가능");
+    expect(editLock).toHaveClass("min-h-[64px]", "min-w-[240px]", "rounded-[14px]", "border");
     expect(screen.getAllByText("수정 잠김")).toHaveLength(1);
     expect(screen.getByTestId("shipping-pickup-from-detail")).toBeInTheDocument();
     expect(screen.getByTestId("shipping-prepare-cancel-from-detail")).toBeInTheDocument();
     expect(screen.queryByTestId("shipping-delete-request")).not.toBeInTheDocument();
+    const preparedDetail = screen.getByTestId("shipping-request-detail");
+    const preparedLineSummary = within(preparedDetail).getByTestId("shipping-line-summary");
+    const preparedActions = within(preparedDetail).getByTestId("shipping-detail-actions");
+    const preparedRevisionHistory = within(preparedDetail).getByTestId("shipping-revision-history");
+    expect(preparedLineSummary.compareDocumentPosition(preparedActions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(preparedActions.compareDocumentPosition(preparedRevisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("completes preparation from a preparing request detail when an invoice exists", async () => {
@@ -2341,10 +2723,10 @@ describe("DesktopShippingView", () => {
 
   it("balances the request-list header and labels request metadata explicitly", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ request_id: "requested-meta", status: "REQUESTED", request_quantity: 1, requested_by_name: "김건호" }),
+      request({ request_id: "requested-meta", status: "PREPARING", request_quantity: 1, requested_by_name: "김건호" }),
       request({ request_id: "preparing-meta", status: "PREPARING", request_quantity: 2 }),
       request({ request_id: "prepared-meta", status: "PREPARED", request_quantity: 3 }),
-      request({ request_id: "requested-missing", status: "REQUESTED", requested_by_name: null }),
+      request({ request_id: "requested-missing", status: "PREPARING", requested_by_name: null }),
     ]);
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -2437,6 +2819,16 @@ describe("DesktopShippingView", () => {
     expect(row).toHaveTextContent("출하 수량: 4대");
   });
 
+  it("describes the empty preparation list using the immediate preparation workflow", async () => {
+    navigationMock.search = "tab=shipping&shippingView=prepList";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByText("새 출하 요청이 생성되면 여기에 표시됩니다.")).toBeInTheDocument();
+    expect(screen.queryByText("출하 요청을 준비 중으로 보내면 여기에 표시됩니다.")).not.toBeInTheDocument();
+  });
+
   it("keeps wizard step labels on one line and blocks invalid next navigation", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -2445,7 +2837,7 @@ describe("DesktopShippingView", () => {
     await openNewRequest(container);
 
     expect(await screen.findByText("1. 기준 PF 선택")).toBeInTheDocument();
-    expect(screen.getByText("5. 저장 및 전환")).toBeInTheDocument();
+    expect(screen.getByText("5. 출하 요청 확인")).toBeInTheDocument();
     expect(screen.queryByText("출하할 최종 PF를 먼저 선택하면 기본 PF/PA 구성이 준비됩니다.")).not.toBeInTheDocument();
     expect(screen.getByTestId("shipping-pf-search")).toBeInTheDocument();
 
@@ -2677,7 +3069,7 @@ describe("DesktopShippingView", () => {
     await screen.findByTestId("shipping-wizard-step-4");
     nextStep(container);
     await screen.findByTestId("shipping-wizard-step-5");
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
 
     await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledWith(expect.objectContaining({
       finalization_mode: "REUSE_CANDIDATE",
@@ -2769,7 +3161,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-final-group-list-pf")).toContainElement(screen.getByTestId("shipping-final-line-pf-pa-1"));
   });
 
-  it("returns a preparing request to the three-column request list after saving", async () => {
+  it("returns a preparing request to the two-column request list after saving", async () => {
     vi.mocked(api.matchShippingBom).mockResolvedValue({
       matched_pa_item_id: "pa-1",
       matched_pf_item_id: "pf-1",
@@ -2793,7 +3185,7 @@ describe("DesktopShippingView", () => {
     await screen.findByTestId("shipping-wizard-step-4");
     nextStep(container);
     await screen.findByTestId("shipping-wizard-step-5");
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-update-request"));
 
     await waitFor(() => {
       expect(api.updateShippingRequest).toHaveBeenCalledWith("req-1", expect.any(Object));
@@ -2833,7 +3225,7 @@ describe("DesktopShippingView", () => {
     await screen.findByTestId("shipping-wizard-step-4");
     nextStep(container);
     await screen.findByTestId("shipping-wizard-step-5");
-    fireEvent.click(await screen.findByTestId("shipping-send-to-prep"));
+    fireEvent.click(await screen.findByTestId("shipping-update-request"));
     await waitFor(() => expect(screen.getByTestId("shipping-request-list-panel")).toBeInTheDocument());
     await openRequestById(container, "req-1");
 
@@ -2963,7 +3355,7 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-final-line-companion-carton-1")).toHaveTextContent("Carton Box");
   });
 
-  it("moves final save and send actions into the bottom action bar", async () => {
+  it("moves the final submit action into the bottom action bar", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
     await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
@@ -2982,8 +3374,8 @@ describe("DesktopShippingView", () => {
     const actionBar = screen.getByTestId("shipping-wizard-action-bar");
     expect(screen.queryByText("요청 저장")).not.toBeInTheDocument();
     expect(screen.queryByText("준비 중으로 보내기")).not.toBeInTheDocument();
-    expect(actionBar).toContainElement(screen.getByRole("button", { name: /출하 요청/ }));
-    expect(actionBar).toContainElement(screen.getByTestId("shipping-send-to-prep"));
+    expect(actionBar).toContainElement(within(actionBar).getByRole("button", { name: "출하 요청" }));
+    expect(actionBar).toContainElement(screen.getByTestId("shipping-submit-request"));
   });
 
 
@@ -3211,7 +3603,7 @@ describe("DesktopShippingView", () => {
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
     nextStep(container);
     nextStep(container);
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
 
     await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledWith(
       expect.objectContaining({ invoice_number: "inv-001" }),
@@ -3222,9 +3614,9 @@ describe("DesktopShippingView", () => {
     navigationMock.search = "tab=shipping&shippingView=requestWork";
     const client = makeClient({ staleTime: 5 * 60_000 });
     client.setQueryData(queryKeys.shipping.requests(), [
-      request({ request_id: "cache-initial", status: "REQUESTED" }),
+      request({ request_id: "cache-initial", status: "PREPARING" }),
     ]);
-    const { container } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, {
+    const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, {
       wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
     });
 
@@ -3233,7 +3625,7 @@ describe("DesktopShippingView", () => {
 
     await act(async () => {
       client.setQueryData(queryKeys.shipping.requests(), [
-        request({ request_id: "cache-refresh", status: "REQUESTED" }),
+        request({ request_id: "cache-refresh", status: "PREPARING" }),
       ]);
     });
 
@@ -3246,24 +3638,86 @@ describe("DesktopShippingView", () => {
     fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
     nextStep(container);
     nextStep(container);
-    fireEvent.click(screen.getByTestId("shipping-send-to-prep"));
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
 
     await waitFor(() => {
       expect(api.createShippingRequest).toHaveBeenCalledWith(
         expect.objectContaining({ invoice_number: "INV-CACHE-001" }),
       );
-      expect(api.sendShippingToPrep).toHaveBeenCalledWith("new-1");
     });
-    expect(await screen.findByTestId("shipping-prep-detail")).toBeInTheDocument();
+    const savedSearch = String(navigationMock.replace.mock.calls.at(-1)?.[0]).replace(/^\?/, "");
+    navigationMock.search = savedSearch;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+    expect(await screen.findByTestId("shipping-request-list-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toContainElement(
+      container.querySelector('[data-shipping-request-id="new-1"]'),
+    );
+  });
+
+  it("cancels a stale requests refetch before upserting a created request", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestWork";
+    const staleRequests = deferred<ShippingRequest[]>();
+    let staleSignal: AbortSignal | undefined;
+    vi.mocked(api.getShippingRequests).mockImplementation((_params, options) => {
+      staleSignal = options?.signal;
+      return staleRequests.promise;
+    });
+    const client = makeClient({ staleTime: 5 * 60_000 });
+    client.setQueryData(queryKeys.shipping.requests(), [
+      request({ request_id: "stale-request", status: "PREPARING" }),
+    ]);
+    const { container, rerender } = rtlRender(<DesktopShippingView onStatusChange={() => {}} />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+
+    act(() => {
+      void client.refetchQueries({ queryKey: queryKeys.shipping.requests(), exact: true });
+    });
+    await waitFor(() => expect(staleSignal).toBeDefined());
+
+    await selectBasePf();
+    await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+    nextStep(container);
+    nextStep(container);
+    fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Fresh PF" } });
+    nextStep(container);
+    nextStep(container);
+    fireEvent.click(screen.getByTestId("shipping-submit-request"));
+
+    await waitFor(() => expect(api.createShippingRequest).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(staleSignal?.aborted).toBe(true));
+    expect(client.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())).toEqual(
+      expect.arrayContaining([expect.objectContaining({ request_id: "new-1", status: "PREPARING" })]),
+    );
+
+    await act(async () => {
+      staleRequests.resolve([request({ request_id: "stale-request", status: "PREPARING" })]);
+      await Promise.resolve();
+    });
+    expect(client.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())).toEqual(
+      expect.arrayContaining([expect.objectContaining({ request_id: "new-1", status: "PREPARING" })]),
+    );
+
+    const savedSearch = navigationMock.replace.mock.calls
+      .map(([url]) => String(url).replace(/^\?/, ""))
+      .find((search) => search.includes("shippingRequestId=new-1"));
+    expect(savedSearch).toBeDefined();
+    navigationMock.search = savedSearch!;
+    rerender(<DesktopShippingView onStatusChange={() => {}} />);
+
+    expect(await screen.findByTestId("shipping-request-list-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-request-column-body-PREPARING")).toContainElement(
+      container.querySelector('[data-shipping-request-id="new-1"]'),
+    );
   });
 
   it("edits invoice from detail using the normalized response and discloses revisions", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=requested-1";
     vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ request_id: "requested-1", status: "REQUESTED", invoice_number: "OLD-1" }),
+      request({ request_id: "requested-1", status: "PREPARING", invoice_number: "OLD-1" }),
     ]);
     vi.mocked(api.updateShippingInvoice).mockResolvedValue(
-      request({ request_id: "requested-1", status: "REQUESTED", invoice_number: "INV-001" }),
+      request({ request_id: "requested-1", status: "PREPARING", invoice_number: "INV-001" }),
     );
     const revisions = [
       {
@@ -3627,10 +4081,10 @@ describe("DesktopShippingView", () => {
   it("allows saving an invoice number already used by another request", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=requested-1";
     vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ request_id: "requested-1", status: "REQUESTED", invoice_number: "OLD-1" }),
+      request({ request_id: "requested-1", status: "PREPARING", invoice_number: "OLD-1" }),
     ]);
     vi.mocked(api.updateShippingInvoice).mockResolvedValue(
-      request({ request_id: "requested-1", status: "REQUESTED", invoice_number: "DUPLICATE" }),
+      request({ request_id: "requested-1", status: "PREPARING", invoice_number: "DUPLICATE" }),
     );
 
     render(<DesktopShippingView onStatusChange={() => {}} />);
@@ -3701,7 +4155,7 @@ describe("DesktopShippingView", () => {
     expect(cancelledDate).toHaveTextContent("07.");
   });
 
-  it("uses the shared external-rail root viewport while preserving layout-only history grouping wrappers", async () => {
+  it("uses compact accordion containers for history year and month groups", async () => {
     const historyRequest = request({
       request_id: "layout-only-history",
       status: "PICKED_UP",
@@ -3731,9 +4185,11 @@ describe("DesktopShippingView", () => {
     expect(body).toHaveClass("overflow-y-auto", "lg:overflow-visible");
     expect(body).not.toHaveClass("rounded-[18px]", "border", "p-3");
     expect(year).toHaveAttribute("data-surface", "layout-only");
-    expect(year).not.toHaveClass("rounded-[14px]", "border");
+    expect(year).toHaveClass("overflow-hidden", "rounded-[14px]", "border");
     expect(month).toHaveAttribute("data-surface", "layout-only");
-    expect(month).not.toHaveClass("rounded-[12px]", "border");
+    expect(month).toHaveClass("overflow-hidden", "rounded-[12px]", "border");
+    expect(year.querySelector("summary")).toHaveClass("flex", "min-h-11", "items-center", "justify-between");
+    expect(month.querySelector("summary")).toHaveClass("flex", "min-h-11", "items-center", "justify-between");
     expect(requestRow).toHaveClass("h-[112px]", "rounded-[16px]", "border");
 
     fireEvent.change(within(historyList).getByRole("searchbox", { name: "출하 이력 검색" }), { target: { value: "INV-LAYOUT" } });
@@ -3743,9 +4199,9 @@ describe("DesktopShippingView", () => {
     const searchYear = within(historyList).getByTestId("shipping-history-year-2026");
     const searchMonth = within(historyList).getByTestId("shipping-history-month-2026-6");
     expect(searchYear).toHaveAttribute("data-surface", "layout-only");
-    expect(searchYear).not.toHaveClass("rounded-[14px]", "border");
+    expect(searchYear).toHaveClass("overflow-hidden", "rounded-[14px]", "border");
     expect(searchMonth).toHaveAttribute("data-surface", "layout-only");
-    expect(searchMonth).not.toHaveClass("rounded-[12px]", "border");
+    expect(searchMonth).toHaveClass("overflow-hidden", "rounded-[12px]", "border");
     expect(within(searchMonth).getByRole("button", { name: /Standard PF/ })).toHaveClass("h-[112px]", "rounded-[16px]", "border");
 
     const historyCallsBeforeSearchToggle = vi.mocked(api.getShippingHistory).mock.calls.length;
@@ -3762,7 +4218,7 @@ describe("DesktopShippingView", () => {
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(historyCallsBeforeSearchToggle);
   });
 
-  it("lays out history cards as four-column information blocks", async () => {
+  it("lays out history cards in two desktop columns with four-column information blocks", async () => {
     const finalPfName = "DX3000_60kV, 2mA_우루과이_Melmont S.A. [Black / 배터리 1EA]";
     const historyRequest = request({
       request_id: "history-card-layout",
@@ -3787,9 +4243,11 @@ describe("DesktopShippingView", () => {
 
     expect(row).toHaveAttribute("data-shipping-card-layout", "historyList");
     expect(row).toHaveClass("h-[112px]", "rounded-[16px]", "hover:brightness-105", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(row.parentElement).toHaveClass("grid", "xl:grid-cols-2", "gap-2", "p-2");
     expect(title).toHaveClass("truncate");
     expect(title).not.toHaveClass("line-clamp-2");
-    expect(metadata).toHaveClass("grid", "grid-cols-4");
+    expect(metadata).toHaveClass("grid", "grid-cols-[1.5fr_1fr_1fr_2fr]", "gap-x-2");
+    expect(metadata).not.toHaveClass("gap-x-5");
     expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
     expect(date).toHaveTextContent("출하 완료");
     expect(date).not.toHaveTextContent("Standard PF");
@@ -3834,7 +4292,7 @@ describe("DesktopShippingView", () => {
       expect.objectContaining({ status: "PICKED_UP", year: 2026, month: 6, limit: 50 }),
     ));
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeJune + 1);
-    expect(june).toHaveStyle({ color: LEGACY_COLORS.blue });
+    expect(june).toHaveStyle({ color: LEGACY_COLORS.muted2 });
 
     fireEvent.click(june);
     expect(june.closest("details")).not.toHaveAttribute("open");
@@ -3883,7 +4341,7 @@ describe("DesktopShippingView", () => {
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(cancelledCallsBeforeToggle);
   });
 
-  it("closes a manually reopened month when selecting a different month in the same year", async () => {
+  it("keeps an already open month visible when another month opens in the same year", async () => {
     navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
     vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([
       { year: 2026, month: 7, count: 1 },
@@ -3909,6 +4367,7 @@ describe("DesktopShippingView", () => {
       expect.objectContaining({ status: "PICKED_UP", year: 2026, month: 6, limit: 50 }),
     ));
     const juneDetails = june.closest("details") as HTMLDetailsElement;
+    await waitFor(() => expect(within(juneDetails).getByTestId("shipping-request-code-history-6")).toBeInTheDocument());
     expect(juneDetails).toHaveAttribute("open");
     fireEvent.click(june);
     expect(juneDetails).not.toHaveAttribute("open");
@@ -3917,12 +4376,14 @@ describe("DesktopShippingView", () => {
 
     const july = within(historyPanel).getByText("7월 · 1건", { selector: "summary" });
     fireEvent.click(july);
-    await waitFor(() => expect(api.getShippingHistory).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: "PICKED_UP", year: 2026, month: 7, limit: 50 }),
-    ));
-    expect(juneDetails).not.toHaveAttribute("open");
-    expect(july.closest("details")).toHaveAttribute("open");
-    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeMonthChange + 2);
+    const julyDetails = within(historyPanel).getByText("7월 · 1건", { selector: "summary" }).closest("details") as HTMLDetailsElement;
+    julyDetails.open = true;
+    fireEvent(julyDetails, new Event("toggle"));
+    expect(juneDetails).toHaveAttribute("open");
+    expect(julyDetails).toHaveAttribute("open");
+    expect(within(juneDetails).getByTestId("shipping-request-code-history-6")).toBeInTheDocument();
+    expect(within(julyDetails).getByTestId("shipping-request-code-history-7")).toBeInTheDocument();
+    expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(callsBeforeMonthChange + 1);
   });
 
   it("ignores an older completed-history response after switching to cancelled", async () => {
@@ -4019,7 +4480,7 @@ describe("DesktopShippingView", () => {
       base_pf_item_name: "다른 취소 PF",
       cancelled_at: "2026-07-20T01:00:00Z",
     });
-    vi.mocked(api.getShippingRequests).mockResolvedValue([request({ request_id: "active-1", status: "REQUESTED" })]);
+    vi.mocked(api.getShippingRequests).mockResolvedValue([request({ request_id: "active-1", status: "PREPARING" })]);
     vi.mocked(api.getShippingRequest).mockResolvedValue(oldCancelled);
     vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 7, count: 1 }]);
     vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [otherCancelled], next_cursor: null, has_more: false });

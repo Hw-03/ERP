@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode, SyntheticEvent } from "react";
+import type { MouseEvent, ReactNode, SyntheticEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   ClipboardList,
   History,
@@ -73,7 +74,6 @@ type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit
 type PendingAction =
   | "load"
   | "save"
-  | "send"
   | "match"
   | "checklist"
   | "clear"
@@ -98,10 +98,15 @@ type NameValidationNotice = {
 
 const UNINITIALIZED_REQUEST_DRAFT = Symbol("uninitialized-request-draft");
 type RequestDraftIdentity = typeof UNINITIALIZED_REQUEST_DRAFT | string | null;
+type HistoryRowsByMonth = Record<string, ShippingRequest[]>;
+const HISTORY_SEARCH_DEBOUNCE_MS = 350;
 
 const EMPTY_STOCK_SHORTAGES: ShippingRequest["stock_shortages"] = [];
+
+function historyMonthKey(year: number, month: number): string {
+  return `${year}-${month}`;
+}
 const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
-  REQUESTED: "요청",
   PREPARING: "준비 중",
   PREPARED: "준비 완료",
   PICKED_UP: "픽업 완료",
@@ -109,7 +114,6 @@ const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
 };
 
 const STATUS_TONE: Record<ShippingRequestStatus, string> = {
-  REQUESTED: LEGACY_COLORS.blue,
   PREPARING: LEGACY_COLORS.green,
   PREPARED: LEGACY_COLORS.yellow,
   PICKED_UP: LEGACY_COLORS.purple,
@@ -306,10 +310,15 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const searchParams = useSearchParams();
   const lastUrlSearchRef = useRef(searchParams.toString());
   const pendingUrlSearchRef = useRef<PendingUrlSearch | null>(null);
+  const postSaveRequestListSearchRef = useRef<string | null>(null);
   const requestWizardPushStackRef = useRef<RequestWizardPushEntry[]>([]);
   const requestWizardForwardStackRef = useRef<RequestWizardPushEntry[]>([]);
   const requestDraftIdentityRef = useRef<RequestDraftIdentity>(UNINITIALIZED_REQUEST_DRAFT);
   const requestDraftLegacyAliasesRef = useRef<RequestDraftLegacyAliases | null>(null);
+  const requestDraftGenerationRef = useRef(0);
+  const requestSubmitInFlightRef = useRef<number | null>(null);
+  const requestSaveInFlightRef = useRef<number | null>(null);
+  const mountedRef = useRef(false);
   function clearRequestWizardHistory(): void {
     requestWizardPushStackRef.current = [];
     requestWizardForwardStackRef.current = [];
@@ -369,6 +378,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [historySearch, setHistorySearch] = useState("");
   const [historyAppliedSearch, setHistoryAppliedSearch] = useState("");
   const [historyRows, setHistoryRows] = useState<ShippingRequest[]>([]);
+  const [historyRowsByMonth, setHistoryRowsByMonth] = useState<HistoryRowsByMonth>({});
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -384,6 +394,31 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const historyRefreshRevisionRef = useRef<number | null>(realtimeRevision);
   const historyDetailRevisionRef = useRef<number | null>(realtimeRevision);
   const nameValidationNoticeIdRef = useRef(0);
+
+  function isCurrentRequestDraftGeneration(generation: number): boolean {
+    return mountedRef.current && requestDraftGenerationRef.current === generation;
+  }
+
+  function advanceRequestDraftGeneration(): number {
+    requestDraftGenerationRef.current += 1;
+    postSaveRequestListSearchRef.current = null;
+    if (mountedRef.current) {
+      setPending(null);
+      setError(null);
+    }
+    return requestDraftGenerationRef.current;
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestDraftGenerationRef.current += 1;
+      requestSubmitInFlightRef.current = null;
+      requestSaveInFlightRef.current = null;
+      postSaveRequestListSearchRef.current = null;
+    };
+  }, []);
 
   const showNameValidationNotice = useCallback((message: string) => {
     nameValidationNoticeIdRef.current += 1;
@@ -429,7 +464,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     if (exact) return exact;
     return view === "historyWork" && selectedHistoryId ? null : historyRows[0] ?? null;
   }, [historyRows, requests, selectedHistoryId, view]);
-  const canEditDraft = !selectedRequest || selectedRequest.status === "REQUESTED" || selectedRequest.status === "PREPARING";
+  const canEditDraft = !selectedRequest || selectedRequest.status === "PREPARING";
   const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "historyWork";
   const saveShippingWork = useCallback(() => {}, []);
   useRegisterDirty("shipping-work", shippingWorkDirty, saveShippingWork, undefined, { mode: "confirm-only" });
@@ -467,6 +502,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     requestStepOverride?: RequestWizardStep,
     options?: ViewNavigationOptions,
   ) {
+    if (view === "requestWork" && nextView !== "requestWork") {
+      advanceRequestDraftGeneration();
+    }
     if (nextView !== "requestWork") {
       clearRequestWizardHistory();
     }
@@ -526,24 +564,30 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setInvoiceNumber(next.invoice_number ?? "");
   }, [upsertRequest]);
 
-  const ensureItemsLoaded = useCallback(async (): Promise<Item[] | null> => {
+  const ensureItemsLoaded = useCallback(async (requestGeneration?: number): Promise<Item[] | null> => {
+    const ownsRequestContext = () => mountedRef.current && (
+      requestGeneration === undefined || requestDraftGenerationRef.current === requestGeneration
+    );
     if (items.length > 0) return items;
     if (itemsLoading) return items.length > 0 ? items : null;
-    setItemsLoading(true);
-    setPending("load");
-    setError(null);
+    if (mountedRef.current) setItemsLoading(true);
+    if (ownsRequestContext()) {
+      setPending("load");
+      setError(null);
+    }
     try {
       const nextItems = await api.getItems({ limit: 2000 });
-      setItems(nextItems);
+      if (mountedRef.current) setItems(nextItems);
       return nextItems;
     } catch (err) {
+      if (!ownsRequestContext()) return null;
       const msg = err instanceof Error ? err.message : "품목 목록을 불러오지 못했습니다.";
       setError(msg);
       onStatusChange(msg);
       return null;
     } finally {
-      setItemsLoading(false);
-      setPending(null);
+      if (mountedRef.current) setItemsLoading(false);
+      if (ownsRequestContext()) setPending(null);
     }
   }, [items, itemsLoading, onStatusChange, setError]);
 
@@ -636,6 +680,15 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     try {
       const page = await api.getShippingHistory({ ...params, limit: 50 });
       if (requestGeneration !== historyRequestGenerationRef.current) return;
+      if (!params.q && params.year !== undefined && params.month !== undefined) {
+        const key = historyMonthKey(params.year, params.month);
+        setHistoryRowsByMonth((current) => ({
+          ...current,
+          [key]: append
+            ? [...(current[key] ?? []), ...page.requests.filter((row) => !(current[key] ?? []).some((item) => item.request_id === row.request_id))]
+            : page.requests,
+        }));
+      }
       setHistoryRows((current) => append
         ? [...current, ...page.requests.filter((row) => !current.some((item) => item.request_id === row.request_id))]
         : (() => {
@@ -671,6 +724,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setHistoryLoading(true);
     setHistoryError(null);
     setHistoryAppliedSearch("");
+    setHistoryRowsByMonth({});
     try {
       const months = await api.getShippingHistoryMonths({ status });
       if (requestGeneration !== historyRequestGenerationRef.current) return;
@@ -706,6 +760,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setHistorySearch("");
     setHistoryAppliedSearch("");
     setHistoryRows([]);
+    setHistoryRowsByMonth({});
     if (view === "historyList" || view === "historyWork") {
       const params = new URLSearchParams(searchParams.toString());
       params.set("shippingHistoryStatus", status);
@@ -721,6 +776,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setHistoryMonth(month);
     setHistorySearch("");
     setHistoryAppliedSearch("");
+    if (historyRowsByMonth[historyMonthKey(year, month)]) return;
     void loadHistoryPage({ status: historyStatus, year, month });
   }
 
@@ -737,8 +793,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setHistoryLoading(false);
   }
 
-  function searchHistory() {
-    const q = historySearch.trim();
+  function searchHistory(query = historySearch) {
+    const q = query.trim();
+    if (q === historyAppliedSearch) return;
     if (!q) {
       void loadHistoryOverview(historyStatus);
       return;
@@ -748,6 +805,16 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setHistoryMonth(null);
     void loadHistoryPage({ status: historyStatus, q });
   }
+
+  useEffect(() => {
+    if (view !== "historyList") return;
+    const q = historySearch.trim();
+    if (q === historyAppliedSearch) return;
+    const timer = window.setTimeout(() => searchHistory(q), HISTORY_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+    // searchHistory는 이 렌더의 현재 검색 상태만 사용한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyAppliedSearch, historySearch, historyStatus, view]);
 
   function loadMoreHistory() {
     if (!historyNextCursor || historyLoading) return;
@@ -873,7 +940,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realtimeRevision]);
   useEffect(() => {
-    if (searchParams.get("tab") !== "shipping") return;
+    if (searchParams.get("tab") !== "shipping") {
+      if (view === "requestWork") advanceRequestDraftGeneration();
+      return;
+    }
     const currentSearch = searchParams.toString();
     let settledPendingNavigation = false;
     const pendingUrlSearch = pendingUrlSearchRef.current;
@@ -887,6 +957,16 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         pendingUrlSearchRef.current = null;
         clearRequestWizardHistory();
       }
+    }
+    const postSaveRequestListSearch = postSaveRequestListSearchRef.current;
+    if (postSaveRequestListSearch && currentSearch === postSaveRequestListSearch) {
+      postSaveRequestListSearchRef.current = null;
+      lastUrlSearchRef.current = currentSearch;
+      navigateView("requestList");
+      return;
+    }
+    if (postSaveRequestListSearch && pendingUrlSearchRef.current === null) {
+      postSaveRequestListSearchRef.current = null;
     }
     if (!settledPendingNavigation) {
       setHubEntryAnimationView(null);
@@ -916,6 +996,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     if (!hasSubview && lastUrlSearchRef.current === currentSearch && view !== "hub") return;
     lastUrlSearchRef.current = currentSearch;
     const nextView = isShippingViewMode(searchParams.get("shippingView")) ? searchParams.get("shippingView") as ViewMode : "hub";
+    if (view === "requestWork" && nextView !== "requestWork") {
+      advanceRequestDraftGeneration();
+    }
     if (nextView !== "requestWork") {
       clearRequestWizardHistory();
     }
@@ -975,6 +1058,12 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       ? legacyAliases.requestId
       : null;
     const effectiveRequestId = requestId ?? legacyAliasRequestId;
+    if (
+      requestDraftIdentityRef.current !== UNINITIALIZED_REQUEST_DRAFT
+      && requestDraftIdentityRef.current !== effectiveRequestId
+    ) {
+      advanceRequestDraftGeneration();
+    }
     const defaultRequestStep: RequestWizardStep = effectiveRequestId ? 2 : 1;
     const requestedStep = requestWizardStepFromParam(searchParams.get("shippingStep"));
     const found = effectiveRequestId ? requests.find((req) => req.request_id === effectiveRequestId) : null;
@@ -1032,7 +1121,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         setMatchResult(null);
         setRequestWizardStep(nextRequestStep);
         setView("requestWork");
-        void ensureItemsLoaded();
+        void ensureItemsLoaded(requestDraftGenerationRef.current);
         void ensurePfItemsLoaded();
       } else if (!loading) setView("requestList");
       return;
@@ -1061,6 +1150,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }, [searchParams, requests, loading, view, historyStatus, editingId, basePfId, requestQuantity, requestWizardStep, matchResult, customPaName, customPfName, ensurePfItemsLoaded, ensureItemsLoaded]);
 
   function clearDraft() {
+    advanceRequestDraftGeneration();
     clearRequestWizardHistory();
     requestDraftLegacyAliasesRef.current = null;
     requestDraftIdentityRef.current = null;
@@ -1083,6 +1173,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }
 
   function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork", syncUrl = true) {
+    advanceRequestDraftGeneration();
     clearRequestWizardHistory();
     if (requestDraftLegacyAliasesRef.current?.requestId !== req.request_id) {
       requestDraftLegacyAliasesRef.current = null;
@@ -1104,12 +1195,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
     if (syncUrl) navigateView(nextView, req.request_id, undefined, nextView === "requestWork" ? 2 : undefined);
     else setView(nextView);
-    if (nextView === "requestWork") void ensureItemsLoaded();
+    if (nextView === "requestWork") void ensureItemsLoaded(requestDraftGenerationRef.current);
   }
 
-  async function loadDefaultBom(nextBasePfId: string, sourceItems: Item[] = items) {
+  async function loadDefaultBom(nextBasePfId: string, generation: number, sourceItems: Item[] = items) {
+    if (!isCurrentRequestDraftGeneration(generation)) return;
     if (!nextBasePfId) {
-      setDraftLines([]);
+      if (isCurrentRequestDraftGeneration(generation)) setDraftLines([]);
       return;
     }
     setPending("load");
@@ -1117,6 +1209,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     try {
       const sourceItemById = new Map(sourceItems.map((item) => [item.item_id, item]));
       const pfRows = await api.getBOM(nextBasePfId);
+      if (!isCurrentRequestDraftGeneration(generation)) return;
       const lines: DraftLine[] = pfRows.map((row) => ({
         key: row.bom_id,
         parent_stage: "PF",
@@ -1131,6 +1224,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         .find((item) => item?.process_type_code === "PA");
       if (paChild) {
         const paRows = await api.getBOM(paChild.item_id);
+        if (!isCurrentRequestDraftGeneration(generation)) return;
         lines.push(
           ...paRows.map((row) => ({
             key: row.bom_id,
@@ -1143,26 +1237,30 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           })),
         );
       }
+      if (!isCurrentRequestDraftGeneration(generation)) return;
       setDraftLines(lines);
       setMatchResult(null);
       setFinalizationMode("KEEP_BASE");
       setReusePfItemId(null);
       onStatusChange("기본 BOM을 출하 요청에 불러왔습니다.");
     } catch (err) {
+      if (!isCurrentRequestDraftGeneration(generation)) return;
       const msg = err instanceof Error ? err.message : "기본 BOM을 불러오지 못했습니다.";
       setError(msg);
       onStatusChange(msg);
     } finally {
-      setPending(null);
+      if (isCurrentRequestDraftGeneration(generation)) setPending(null);
     }
   }
 
   async function handleBasePfChange(nextBasePfId: string) {
+    const generation = requestDraftGenerationRef.current;
+    if (!isCurrentRequestDraftGeneration(generation)) return;
     setBasePfId(nextBasePfId);
     setRequestWizardStep(1);
-    const loadedItems = await ensureItemsLoaded();
-    if (!loadedItems) return;
-    await loadDefaultBom(nextBasePfId, loadedItems);
+    const loadedItems = await ensureItemsLoaded(generation);
+    if (!loadedItems || !isCurrentRequestDraftGeneration(generation)) return;
+    await loadDefaultBom(nextBasePfId, generation, loadedItems);
   }
 
   function draftPayload() {
@@ -1189,7 +1287,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     };
   }
 
-  async function saveRequest() {
+  async function saveRequest(generation = requestDraftGenerationRef.current) {
+    if (!isCurrentRequestDraftGeneration(generation)) return null;
     if (!basePfId) {
       onStatusChange("기준 PF를 먼저 선택하세요.");
       return null;
@@ -1198,18 +1297,23 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       onStatusChange("출하 수량은 1 이상의 정수여야 합니다.");
       return null;
     }
+    if (requestSaveInFlightRef.current === generation) return null;
+    requestSaveInFlightRef.current = generation;
     setPending("save");
     setError(null);
     try {
-      const wasNewDraft = editingId === null;
+      const editingRequestId = editingId;
+      const wasNewDraft = editingRequestId === null;
       const payload = draftPayload();
-      const saved = editingId
-        ? await api.updateShippingRequest(editingId, payload)
+      const saved = editingRequestId
+        ? await api.updateShippingRequest(editingRequestId, payload)
         : await api.createShippingRequest({ base_pf_item_id: basePfId, ...payload });
+      await queryClient.cancelQueries({ queryKey: queryKeys.shipping.requests(), exact: true });
       upsertRequest(saved);
-      if (editingId) {
+      if (editingRequestId) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(saved.request_id) });
       }
+      if (!isCurrentRequestDraftGeneration(generation)) return saved;
       requestDraftIdentityRef.current = saved.request_id;
       setEditingId(saved.request_id);
       if (wasNewDraft) {
@@ -1224,25 +1328,31 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         const url = buildShippingUrl("requestWork", saved.request_id, undefined, requestWizardStep);
         const toSearch = url.startsWith("?") ? url.slice(1) : url;
         clearRequestWizardHistory();
+        postSaveRequestListSearchRef.current = saved.status === "PREPARING" ? toSearch : null;
         pendingUrlSearchRef.current = { from: currentSearch, to: toSearch };
         router.replace(url, { scroll: false });
       }
-      onStatusChange(editingId ? "출하 요청을 수정했습니다." : "출하 요청을 생성했습니다.");
-      if (saved.status === "PREPARING") {
+      onStatusChange(editingRequestId ? "출하 요청을 수정했습니다." : "출하 요청을 생성했습니다.");
+      if (saved.status === "PREPARING" && !wasNewDraft) {
         navigateView("requestList");
       }
       return saved;
     } catch (err) {
+      if (!isCurrentRequestDraftGeneration(generation)) return null;
       const msg = err instanceof Error ? err.message : "출하 요청 저장에 실패했습니다.";
       setError(msg);
       onStatusChange(msg);
       return null;
     } finally {
-      setPending(null);
+      if (requestSaveInFlightRef.current === generation) {
+        requestSaveInFlightRef.current = null;
+      }
+      if (isCurrentRequestDraftGeneration(generation)) setPending(null);
     }
   }
 
-  async function ensureReadyForPrep() {
+  async function ensureRequestReady(generation = requestDraftGenerationRef.current) {
+    if (!isCurrentRequestDraftGeneration(generation)) return false;
     if (!basePfId) {
       onStatusChange("기준 PF를 먼저 선택하세요.");
       return false;
@@ -1258,6 +1368,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         base_pf_item_id: basePfId,
         bom_lines: draftPayload().bom_lines,
       });
+      if (!isCurrentRequestDraftGeneration(generation)) return false;
       setMatchResult(result);
       const usesCandidateSelection = result.base_pf_matches !== undefined;
       const resolvedMode = result.base_pf_matches ? "KEEP_BASE" : finalizationMode;
@@ -1280,66 +1391,34 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         : result.requires_pf_name && !customPfName.trim();
       if (missingPaName || missingPfName) {
         const required = [missingPaName ? "PA" : null, missingPfName ? "PF" : null].filter(Boolean).join("/");
-        const msg = `동일 BOM 후보를 기준으로 새 ${required} 이름을 입력해야 준비 중으로 보낼 수 있습니다.`;
+        const msg = `동일 BOM 후보를 기준으로 새 ${required} 이름을 입력해야 출하 요청할 수 있습니다.`;
         setError(msg);
         onStatusChange(msg);
         return false;
       }
       return true;
     } catch (err) {
+      if (!isCurrentRequestDraftGeneration(generation)) return false;
       const msg = err instanceof Error ? err.message : "동일 BOM 확인에 실패했습니다.";
       setError(msg);
       onStatusChange(msg);
       return false;
     } finally {
-      setPending(null);
+      if (isCurrentRequestDraftGeneration(generation)) setPending(null);
     }
   }
 
-  async function sendToPrep() {
-    if (!(await ensureReadyForPrep())) return;
-    const saved = await saveRequest();
-    if (!saved) return;
-    if (saved.status !== "REQUESTED") {
-      onStatusChange("요청 상태에서만 준비 중으로 보낼 수 있습니다.");
-      return;
-    }
-    setPending("send");
-    setError(null);
+  async function submitRequest() {
+    const generation = requestDraftGenerationRef.current;
+    if (!isCurrentRequestDraftGeneration(generation) || requestSubmitInFlightRef.current === generation) return;
+    requestSubmitInFlightRef.current = generation;
     try {
-      const next = await api.sendShippingToPrep(saved.request_id);
-      upsertRequest(next);
-      setSelectedPrepId(next.request_id);
-      navigateView("prepWork", next.request_id);
-      onStatusChange("출하 요청을 준비 중으로 넘겼습니다.");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "준비 중 전환에 실패했습니다.";
-      setError(msg);
-      onStatusChange(msg);
+      if (!(await ensureRequestReady(generation))) return;
+      await saveRequest(generation);
     } finally {
-      setPending(null);
-    }
-  }
-
-  async function sendExistingToPrep(req: ShippingRequest) {
-    if (req.status !== "REQUESTED") {
-      onStatusChange("요청 상태에서만 준비 중으로 보낼 수 있습니다.");
-      return;
-    }
-    setPending("send");
-    setError(null);
-    try {
-      const next = await api.sendShippingToPrep(req.request_id);
-      upsertRequest(next);
-      setSelectedPrepId(next.request_id);
-      navigateView("prepWork", next.request_id);
-      onStatusChange("출하 요청을 준비 중으로 넘겼습니다.");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "준비 중 전환에 실패했습니다.";
-      setError(msg);
-      onStatusChange(msg);
-    } finally {
-      setPending(null);
+      if (requestSubmitInFlightRef.current === generation) {
+        requestSubmitInFlightRef.current = null;
+      }
     }
   }
 
@@ -1558,7 +1637,6 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           request={selectedRequest}
           onBack={() => navigateView("requestList")}
           onEdit={(req) => loadRequestIntoDraft(req, "requestWork")}
-          onSendToPrep={(req) => void sendExistingToPrep(req)}
           onDelete={deleteRequest}
           onPrepareComplete={completePrepare}
           onPrepareCancel={cancelPrepare}
@@ -1630,7 +1708,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             onUpdateCompanion={(key, patch) => setCompanionDraft((prev) => prev.map((line) => line.key === key ? { ...line, ...patch } : line))}
             onRemoveCompanion={(key) => setCompanionDraft((prev) => prev.filter((line) => line.key !== key))}
             onSave={() => void saveRequest()}
-            onSend={() => void sendToPrep()}
+            onSubmit={() => void submitRequest()}
           />
       );
     }
@@ -1672,6 +1750,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       const entry = (
         <HistoryListEntry
           rows={historyRows}
+          rowsByMonth={historyRowsByMonth}
           status={historyStatus}
           months={historyMonths}
           selectedYear={historyYear}
@@ -1870,20 +1949,31 @@ function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, numbe
 
 function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onNew: () => void; onOpen: (request: ShippingRequest) => void }) {
   const groups: Array<{ status: ShippingRequestStatus; label: string }> = [
-    { status: "REQUESTED", label: "출하 요청" },
     { status: "PREPARING", label: "준비 중" },
     { status: "PREPARED", label: "준비 완료" },
   ];
   return (
     <div data-testid="shipping-request-list-panel" className={`${SHIPPING_FLEX_COL_CLASS} gap-3`}>
-      <div className="flex min-h-11 items-center gap-3">
-        <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 관리</div>
+      <div data-testid="shipping-request-list-header" className="grid min-h-11 grid-cols-[minmax(0,1fr)_minmax(0,6fr)_minmax(0,1fr)] items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="truncate text-xl font-black" style={{ color: LEGACY_COLORS.text }}>출하 관리</div>
+        </div>
+        <PrimaryActionButton
+          icon={Plus}
+          label="새 출하 요청 만들기"
+          tone={LEGACY_COLORS.blue}
+          onClick={onNew}
+          dataAction="new-shipping-request"
+          large
+          className="h-11 w-full px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        />
+        <div aria-hidden="true" />
       </div>
 
-      <div data-testid="shipping-request-list-grid" className="grid min-h-0 flex-1 gap-3 xl:grid-cols-3">
+      <div data-testid="shipping-request-list-grid" className="grid min-h-0 flex-1 grid-cols-2 gap-3">
         {groups.map((group) => {
           const rows = requests.filter((request) => request.status === group.status);
           return (
@@ -1893,7 +1983,6 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
               title={group.label}
               subtitle={`${rows.length}건`}
               bodyDataTestId={`shipping-request-column-body-${group.status}`}
-              action={group.status === "REQUESTED" ? <PrimaryActionButton icon={Plus} label="새 요청 만들기" tone={LEGACY_COLORS.blue} onClick={onNew} dataAction="new-shipping-request" /> : null}
             >
               {rows.length === 0 ? (
                 <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
@@ -1909,7 +1998,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
 }
 
 
-function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, onPrepareComplete, onPrepareCancel, onPickup, onInvoiceSaved, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onSendToPrep: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareComplete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; pending: PendingAction }) {
+function RequestDetailEntry({ request, onBack, onEdit, onDelete, onPrepareComplete, onPrepareCancel, onPickup, onInvoiceSaved, pending }: { request: ShippingRequest | null; onBack: () => void; onEdit: (request: ShippingRequest) => void; onDelete: (request: ShippingRequest) => void; onPrepareComplete: (request: ShippingRequest) => void; onPrepareCancel: (request: ShippingRequest) => void; onPickup: (request: ShippingRequest) => void; onInvoiceSaved: (request: ShippingRequest) => void; pending: PendingAction }) {
   if (!request) {
     return (
       <div className={SHIPPING_FLEX_COL_CLASS}>
@@ -1927,9 +2016,8 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
       </div>
     );
   }
-  const editable = request.status === "REQUESTED" || request.status === "PREPARING";
-  const canSend = request.status === "REQUESTED";
-  const canDelete = request.status === "REQUESTED" || request.status === "PREPARING";
+  const editable = request.status === "PREPARING";
+  const canDelete = request.status === "PREPARING";
   const canPrepareComplete = request.status === "PREPARING";
   const canCancelPrepared = request.status === "PREPARED";
   const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
@@ -1955,20 +2043,22 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className="flex shrink-0 flex-wrap items-stretch justify-end gap-2">
             {canCancelPrepared && (
               <div
                 data-testid="shipping-detail-edit-lock"
-                className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black"
+                className="flex min-h-[64px] min-w-[240px] items-center gap-2 rounded-[14px] border px-3 py-2 text-xs font-black"
                 style={{
                   background: tint(LEGACY_COLORS.yellow, 10),
                   borderColor: tint(LEGACY_COLORS.yellow, 35),
                   color: LEGACY_COLORS.text,
                 }}
               >
-                <LockKeyhole className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
-                <span>수정 잠김</span>
-                <span className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>준비 완료 취소 후 수정 가능</span>
+                <LockKeyhole className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
+                <div className="min-w-0">
+                  <div>수정 잠김</div>
+                  <div className="mt-0.5 truncate font-bold" style={{ color: LEGACY_COLORS.muted2 }}>준비 완료 취소 후 수정 가능</div>
+                </div>
               </div>
             )}
             <StatusBadge status={request.status} expanded />
@@ -1976,15 +2066,11 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
         </div>
 
         {request.status === "PREPARED" && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(request.serial_numbers)} /></div>}
-
-        <div className="mt-3"><RevisionHistory request={request} /></div>
-
         <div className="mt-3"><LineSummary request={request} contentSized /></div>
 
-        <div data-testid="shipping-detail-actions" className={`mt-3 flex flex-col gap-3 rounded-[14px] border p-3 ${request.notes ? "md:flex-row md:items-center md:justify-between" : "items-end"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div data-testid="shipping-detail-actions" className={`mt-3 flex flex-col gap-3 rounded-[14px] border p-3 ${request.notes ? "md:flex-row md:items-stretch md:justify-between" : "items-end"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {request.notes && <div data-testid="shipping-detail-request-memo" className="min-w-0 flex-1"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
-          <div data-testid="shipping-detail-actions-buttons" className="flex shrink-0 flex-wrap justify-end gap-2">
-            {canSend && <ActionButton icon={Send} label={pending === "send" ? "요청 중" : "출하 요청"} tone={LEGACY_COLORS.green} onClick={() => onSendToPrep(request)} disabled={pending !== null} dataTestId="shipping-detail-send-to-prep" />}
+          <div data-testid="shipping-detail-actions-buttons" className="flex shrink-0 self-stretch flex-wrap justify-end gap-2">
             {editable && <ActionButton icon={Pencil} label="수정" tone={LEGACY_COLORS.blue} onClick={() => onEdit(request)} disabled={pending !== null} dataTestId="shipping-edit-request" />}
             {canDelete && <ActionButton icon={Trash2} label={pending === "delete" ? "취소 중" : "요청 취소"} tone={LEGACY_COLORS.red} onClick={() => onDelete(request)} disabled={pending !== null} dataTestId="shipping-delete-request" />}
             {canPrepareComplete && <ActionButton icon={PackageCheck} label={pending === "prepare" ? "처리 중" : "준비 완료"} tone={LEGACY_COLORS.green} onClick={() => onPrepareComplete(request)} disabled={pending !== null || !request.invoice_number?.trim()} dataTestId="shipping-prepare-from-detail" />}
@@ -1992,6 +2078,8 @@ function RequestDetailEntry({ request, onBack, onEdit, onSendToPrep, onDelete, o
             {canCancelPrepared && <ActionButton icon={RotateCcw} label={pending === "cancel" ? "취소 중" : "준비 완료 취소"} tone={LEGACY_COLORS.yellow} onClick={() => onPrepareCancel(request)} disabled={pending !== null} dataTestId="shipping-prepare-cancel-from-detail" />}
           </div>
         </div>
+
+        <div className="mt-3"><RevisionHistory request={request} /></div>
       </div>
     </div>
   );
@@ -2336,7 +2424,7 @@ function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest
         <div className={SHIPPING_MODAL_BODY_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {requests.length === 0 ? (
             <div className="flex flex-1 items-center justify-center">
-              <EmptyState title="준비 중 요청 없음" body="출하 요청을 준비 중으로 보내면 여기에 표시됩니다." />
+              <EmptyState title="준비 중 요청 없음" body="새 출하 요청이 생성되면 여기에 표시됩니다." />
             </div>
           ) : (
             <div className="grid flex-1 content-start gap-2 overflow-y-auto pr-1">
@@ -2350,8 +2438,32 @@ function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest
 }
 
 
+function HistoryDisclosureSummary({
+  label,
+  level,
+  onClick,
+}: {
+  label: string;
+  level: "year" | "month";
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
+}) {
+  const isYear = level === "year";
+  const tone = isYear ? LEGACY_COLORS.text : LEGACY_COLORS.muted2;
+  return (
+    <summary
+      onClick={onClick}
+      className={`flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 font-black transition hover:brightness-105 [&::-webkit-details-marker]:hidden ${isYear ? "text-sm" : "text-xs"}`}
+      style={{ color: tone }}
+    >
+      {label}
+      <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+    </summary>
+  );
+}
+
 function HistoryListEntry({
   rows,
+  rowsByMonth,
   status,
   months,
   selectedYear,
@@ -2372,6 +2484,7 @@ function HistoryListEntry({
   onOpen,
 }: {
   rows: ShippingRequest[];
+  rowsByMonth: HistoryRowsByMonth;
   status: ShippingHistoryStatus;
   months: ShippingHistoryMonth[];
   selectedYear: number | null;
@@ -2427,7 +2540,7 @@ function HistoryListEntry({
   }
 
   const renderRows = (groupRows: ShippingRequest[]) => (
-    <div className="grid content-start gap-2 p-2">
+    <div className="grid content-start gap-2 p-2 xl:grid-cols-2">
       {groupRows.map((request) => (
         <RequestRow key={request.request_id} request={request} active={false} layout="historyList" onClick={() => onOpen(request)} />
       ))}
@@ -2517,12 +2630,12 @@ function HistoryListEntry({
             ) : (
               <div className="grid flex-1 content-start gap-2">
                 {Array.from(new Set(searchGroups.map((group) => group.year))).map((year, yearIndex) => (
-                  <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={disclosureOpen("search", year, yearIndex === 0)} onToggle={(event) => rememberDisclosure(event, "search", year)} className="min-w-0">
-                    <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{year}년</summary>
+                  <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={disclosureOpen("search", year, yearIndex === 0)} onToggle={(event) => rememberDisclosure(event, "search", year)} className="group min-w-0 overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <HistoryDisclosureSummary label={`${year}년`} level="year" />
                     <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
                       {searchGroups.filter((group) => group.year === year).map((group) => (
-                        <details key={`${group.year}-${group.month}`} data-testid={`shipping-history-month-${group.year}-${group.month}`} data-surface="layout-only" open={disclosureOpen("search", group.year, true, group.month)} onToggle={(event) => rememberDisclosure(event, "search", group.year, group.month)} className="min-w-0">
-                          <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>{group.month}월 · {group.rows.length}건</summary>
+                        <details key={`${group.year}-${group.month}`} data-testid={`shipping-history-month-${group.year}-${group.month}`} data-surface="layout-only" open={disclosureOpen("search", group.year, true, group.month)} onToggle={(event) => rememberDisclosure(event, "search", group.year, group.month)} className="group min-w-0 overflow-hidden rounded-[12px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                          <HistoryDisclosureSummary label={`${group.month}월 · ${group.rows.length}건`} level="month" />
                           {renderRows(group.rows)}
                         </details>
                       ))}
@@ -2535,60 +2648,55 @@ function HistoryListEntry({
             <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력 없음" body={historyEmptyBody} /></div>
           ) : (
             <div className="grid flex-1 content-start gap-2">
-              {years.map((year) => (
-                <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={disclosureOpen("browse", year, year === selectedYear)} onToggle={(event) => rememberDisclosure(event, "browse", year)} className="min-w-0">
-                  <summary
-                    className="min-h-11 cursor-pointer px-3 py-3 text-sm font-black"
-                    style={{ color: LEGACY_COLORS.text }}
-                    onClick={() => {
-                      const key = disclosureKey("browse", year);
-                      if (year === selectedYear) {
-                        if (pendingDisclosureOpenRef.current === key) pendingDisclosureOpenRef.current = null;
-                        return;
-                      }
-                      pendingDisclosureOpenRef.current = key;
+              {years.map((year) => {
+                const yearOpen = disclosureOpen("browse", year, year === selectedYear);
+                return (
+                <details key={year} data-testid={`shipping-history-year-${year}`} data-surface="layout-only" open={yearOpen} onToggle={(event) => rememberDisclosure(event, "browse", year)} className="group min-w-0 overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <HistoryDisclosureSummary
+                    label={`${year}년`}
+                    level="year"
+                    onClick={(event) => {
+                      event.preventDefault();
                       setDisclosureOverrides((current) => ({
                         ...current,
-                        ...(selectedYear === null ? {} : { [disclosureKey("browse", selectedYear)]: false }),
+                        [disclosureKey("browse", year)]: !yearOpen,
+                        ...(year === selectedYear || selectedYear === null ? {} : { [disclosureKey("browse", selectedYear)]: false }),
                       }));
-                      onYear(year);
+                      if (!yearOpen && year !== selectedYear) onYear(year);
                     }}
-                  >
-                    {year}년
-                  </summary>
+                  />
                   <div className="grid gap-2 border-t p-2" style={{ borderColor: LEGACY_COLORS.border }}>
                     {months.filter((row) => row.year === year).map((row) => {
                       const selected = selectedYear === row.year && selectedMonth === row.month;
+                      const monthKey = historyMonthKey(row.year, row.month);
+                      const monthOpen = disclosureOpen("browse", row.year, selected, row.month);
+                      const monthRows = rowsByMonth[monthKey] ?? (selected ? rows : []);
                       return (
-                        <details key={`${row.year}-${row.month}`} data-testid={`shipping-history-month-${row.year}-${row.month}`} data-surface="layout-only" open={disclosureOpen("browse", row.year, selected, row.month)} onToggle={(event) => rememberDisclosure(event, "browse", row.year, row.month)} className="min-w-0">
-                          <summary
-                            className="min-h-11 cursor-pointer px-3 py-3 text-xs font-black"
-                            style={{ color: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
-                            onClick={() => {
-                              const key = disclosureKey("browse", row.year, row.month);
-                              if (selected) {
-                                if (pendingDisclosureOpenRef.current === key) pendingDisclosureOpenRef.current = null;
-                                return;
-                              }
-                              pendingDisclosureOpenRef.current = key;
+                        <details key={`${row.year}-${row.month}`} data-testid={`shipping-history-month-${row.year}-${row.month}`} data-surface="layout-only" open={monthOpen} onToggle={(event) => rememberDisclosure(event, "browse", row.year, row.month)} className="group min-w-0 overflow-hidden rounded-[12px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                          <HistoryDisclosureSummary
+                            label={`${row.month}월 · ${row.count}건`}
+                            level="month"
+                            onClick={(event) => {
+                              event.preventDefault();
                               setDisclosureOverrides((current) => ({
                                 ...current,
-                                ...(selectedYear === row.year && selectedMonth !== null
-                                  ? { [disclosureKey("browse", row.year, selectedMonth)]: false }
-                                  : {}),
+                                [disclosureKey("browse", row.year, row.month)]: !monthOpen,
                               }));
-                              onMonth(row.year, row.month);
+                              if (!monthOpen) onMonth(row.year, row.month);
                             }}
-                          >
-                            {row.month}월 · {row.count}건
-                          </summary>
-                          {selected && renderRows(rows)}
+                          />
+                          {monthOpen && monthRows.length > 0 && (
+                            <div className="animate-desktop-tab-enter">
+                              {renderRows(monthRows)}
+                            </div>
+                          )}
                         </details>
                       );
                     })}
                   </div>
                 </details>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -2648,7 +2756,7 @@ function RequestSection(props: {
   onUpdateCompanion: (key: string, patch: Partial<CompanionDraftLine>) => void;
   onRemoveCompanion: (key: string) => void;
   onSave: () => void;
-  onSend: () => void;
+  onSubmit: () => void;
   onBack: () => void;
 }) {
   const sortedDraftLines = useMemo(
@@ -2695,7 +2803,7 @@ function RequestSection(props: {
   const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
   const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
   const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || candidateChoiceMissing || props.selectedRequest?.status === "PREPARED";
-  const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "저장 및 전환"];
+  const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "출하 요청 확인"];
   const matchedPaItem = props.matchResult?.matched_pa_item_id ? props.itemById.get(props.matchResult.matched_pa_item_id) : undefined;
   const matchedPfItem = props.matchResult?.matched_pf_item_id ? props.itemById.get(props.matchResult.matched_pf_item_id) : undefined;
   const itemCodeText = (item?: Item | null) => item?.mes_code ?? item?.process_type_code ?? "-";
@@ -3092,11 +3200,11 @@ function RequestSection(props: {
             ) : (
               <PrimaryActionButton
                 icon={finalActionIsUpdateOnly ? CheckCircle2 : Send}
-                label={finalActionIsUpdateOnly ? (props.pending === "save" ? "반영 중" : "변경사항 반영") : (props.pending === "send" ? "요청 중" : "출하 요청")}
+                label={finalActionIsUpdateOnly ? (props.pending === "save" ? "반영 중" : "변경사항 반영") : (props.pending !== null ? "요청 중" : "출하 요청")}
                 tone={finalActionIsUpdateOnly ? LEGACY_COLORS.blue : LEGACY_COLORS.green}
-                onClick={finalActionIsUpdateOnly ? props.onSave : props.onSend}
+                onClick={finalActionIsUpdateOnly ? props.onSave : props.onSubmit}
                 disabled={finalActionDisabled}
-                dataTestId="shipping-send-to-prep"
+                dataTestId={finalActionIsUpdateOnly ? "shipping-update-request" : "shipping-submit-request"}
               />
             )}
           </div>
@@ -3856,9 +3964,7 @@ function ShippingActionConfirmModal({
       : kind === "pickupCancel"
         ? "픽업 완료 재고 반영을 취소하고, 준비 완료 상태와 출하 예약으로 되돌립니다."
       : kind === "delete"
-        ? request.status === "PREPARING"
-          ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."
-          : "요청 상태의 출하 요청을 목록에서 삭제합니다. 이력은 남지 않습니다."
+        ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."
         : "최종 PF와 동반 출하품을 출하 처리합니다.";
   const lines = isPrepare
     ? [
@@ -4013,7 +4119,7 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
       {structuredLayout ? (
         <div
           data-testid={`shipping-request-metadata-${request.request_id}`}
-          className={`grid ${layout === "requestBoard" ? "mt-2 flex-1 content-center grid-cols-2 grid-rows-2 gap-x-4 border-t pt-2" : "mt-2 grid-cols-4 gap-x-5 border-t pt-1.5"}`}
+          className={`grid ${layout === "requestBoard" ? "mt-2 flex-1 content-center grid-cols-2 grid-rows-2 gap-x-4 border-t pt-2" : "mt-2 grid-cols-[1.5fr_1fr_1fr_2fr] gap-x-2 border-t pt-1.5"}`}
           style={{ borderColor: LEGACY_COLORS.border }}
         >
           {(layout === "requestBoard" ? requestBoardMetadata : metadata).map((item) => (
@@ -4402,6 +4508,8 @@ function PrimaryActionButton({
   disabled = false,
   dataAction,
   dataTestId,
+  large = false,
+  className = "",
 }: {
   icon: typeof PackageCheck;
   label: string;
@@ -4410,6 +4518,8 @@ function PrimaryActionButton({
   disabled?: boolean;
   dataAction?: string;
   dataTestId?: string;
+  large?: boolean;
+  className?: string;
 }) {
   return (
     <button
@@ -4418,10 +4528,10 @@ function PrimaryActionButton({
       data-testid={dataTestId}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-black transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-45"
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] border px-4 py-2 font-black transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-45 ${large ? "text-base" : "text-sm"} ${className}`}
       style={{ background: tint(tone, 16), borderColor: tint(tone, 48), color: tone }}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className={large ? "h-5 w-5" : "h-4 w-4"} />
       {label}
     </button>
   );
