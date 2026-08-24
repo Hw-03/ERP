@@ -8930,6 +8930,18 @@
             "title": "Quantity",
             "type": "integer"
           },
+          "record_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
+          },
           "to_bucket": {
             "$ref": "#/components/schemas/RequestBucketEnum"
           },
@@ -9015,6 +9027,18 @@
           "quantity": {
             "title": "Quantity",
             "type": "integer"
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
           },
           "request_id": {
             "format": "uuid",

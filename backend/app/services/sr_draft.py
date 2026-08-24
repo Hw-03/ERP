@@ -100,6 +100,7 @@ def upsert_draft_request(
                     to_bucket=li.to_bucket,
                     to_department=li.to_department,
                     status=StockRequestStatusEnum.DRAFT,
+                    defect_quarantine_record_id=li.record_id,
                 )
             )
         db.flush()
@@ -232,6 +233,7 @@ def submit_draft_request(
             from_department=line.from_department,
             to_bucket=line.to_bucket,
             to_department=line.to_department,
+            record_id=line.defect_quarantine_record_id,
         )
         for line in db_lines
     ]

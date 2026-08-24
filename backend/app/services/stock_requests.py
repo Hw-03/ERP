@@ -171,6 +171,7 @@ def _build_request_and_lines(
             to_bucket=li.to_bucket,
             to_department=li.to_department,
             status=status,
+            defect_quarantine_record_id=li.record_id,
         )
         db.add(line)
     db.flush()
@@ -212,21 +213,35 @@ def create_request(
 
     # 불량 격리/처리 결재 룰: 격리 출처가 "창고" 면 창고 정/부 결재, 그 외 부서면 그 부서 정/부 결재.
     # 정/부 권한자 직접 처리 시 _finalize_submission 이 즉시 완료로 흡수 — 별도 분기 불필요.
-    _DEFECT_TYPES = {
+    _IMMEDIATE_DEFECT_TYPES = {
         StockRequestTypeEnum.MARK_DEFECTIVE_WH,
         StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
-        StockRequestTypeEnum.DEFECT_SCRAP,
-        StockRequestTypeEnum.DEFECT_RETURN,
-        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
         # R 정상 재고 바로 폐기/반품 — 기존 불량 처리와 동일하게 즉시 처리(결재 없음)로 통일.
         StockRequestTypeEnum.SCRAP_NORMAL,
         StockRequestTypeEnum.RETURN_NORMAL,
         StockRequestTypeEnum.REWORK_NORMAL,
     }
+    _QUARANTINE_PROCESS_TYPES = {
+        StockRequestTypeEnum.DEFECT_SCRAP,
+        StockRequestTypeEnum.DEFECT_RETURN,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    }
     warehouse_override: Optional[bool] = None
-    if request_type in _DEFECT_TYPES:
+    approval_department: Optional[str] = None
+    if request_type in _IMMEDIATE_DEFECT_TYPES:
         warehouse_override = False
         requires_department_approval = False
+    elif request_type in _QUARANTINE_PROCESS_TYPES:
+        warehouse_override = False
+        requires_department_approval = True
+        departments = {
+            str(getattr(line.from_department, "value", line.from_department))
+            for line in lines_input
+            if line.from_department is not None
+        }
+        if len(departments) != 1:
+            raise ValueError("격리 처리 요청은 한 부서의 기록만 포함해야 합니다.")
+        approval_department = departments.pop()
 
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
@@ -246,6 +261,7 @@ def create_request(
         client_request_id=client_request_id,
         requires_warehouse_approval_override=warehouse_override,
         requires_department_approval=requires_department_approval,
+        approval_department=approval_department,
         reason_category=reason_category,
         reason_memo=reason_memo,
     )

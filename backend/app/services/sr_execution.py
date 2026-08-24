@@ -299,6 +299,7 @@ def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Dec
         reason_memo=reason_memo_val,
         actor=approver.name,
         actor_employee_id=approver.employee_id,
+        defect_quarantine_record_id=line.defect_quarantine_record_id,
     )
     return -qty
 
@@ -365,6 +366,23 @@ def _execute_line(
     qty = line.quantity or Decimal("0")
     item_id = line.item_id
     rt = request.request_type
+    record = None
+    if line.from_bucket == RequestBucketEnum.DEFECTIVE:
+        from app.services import defect_records as defect_records_svc
+
+        record = defect_records_svc.get_record_for_action(
+            db,
+            record_id=line.defect_quarantine_record_id,
+            item_id=item_id,
+            department=line.from_department,
+        )
+        if record is not None:
+            defect_records_svc.ensure_available(
+                db,
+                record,
+                qty,
+                exclude_line_id=line.line_id,
+            )
 
     # 이동 전 수량과 위치 셀을 기록한다.
     inv = inventory_svc.get_or_create_inventory(db, item_id)
@@ -375,6 +393,32 @@ def _execute_line(
     if handler is None:
         raise ValueError(f"지원하지 않는 요청 유형: {rt}")
     quantity_change: Decimal = handler(db, request, line, approver, qty, item_id)
+
+    created_record = None
+    if rt in {
+        StockRequestTypeEnum.MARK_DEFECTIVE_WH,
+        StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
+    }:
+        from app.services import defect_records as defect_records_svc
+
+        created_record = defect_records_svc.create_record(
+            db,
+            item_id=item_id,
+            department=line.to_department,
+            quantity=qty,
+            actor_employee_id=approver.employee_id,
+            actor_name=approver.name,
+            reason_category=request.reason_category,
+            memo=request.reason_memo,
+        )
+
+    if record is not None:
+        defect_records_svc.decrement_record(
+            db,
+            record,
+            qty,
+            exclude_line_id=line.line_id,
+        )
 
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, item_id)
@@ -402,7 +446,14 @@ def _execute_line(
     producer_employee_id = (
         request.requester_employee_id if is_internal_use else approver.employee_id
     )
-    department = line.to_department if is_internal_use else line.from_department
+    department = line.to_department if (
+        is_internal_use
+        or rt in {
+            StockRequestTypeEnum.MARK_DEFECTIVE_WH,
+            StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
+        }
+    ) else line.from_department
+    linked_record = record or created_record
 
     db.add(
         TransactionLog(
@@ -420,6 +471,9 @@ def _execute_line(
             operation_batch_id=getattr(request, "operation_batch_id", None),
             operation_line_id=line.operation_line_id,
             department=str(department) if department else None,
+            defect_quarantine_record_id=(
+                linked_record.record_id if linked_record else None
+            ),
             **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
         )
     )

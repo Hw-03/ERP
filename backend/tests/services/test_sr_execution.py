@@ -22,6 +22,7 @@ import pytest
 
 from app.models import (
     DepartmentEnum,
+    DefectQuarantineRecord,
     Employee,
     EmployeeLevelEnum,
     Inventory,
@@ -409,6 +410,14 @@ def test_execute_line_mark_defective_wh(db_session, make_item):
     logs = _logs(db_session, item.item_id)
     assert len(logs) == 1
     assert logs[0].transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
+    record = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == item.item_id)
+        .one()
+    )
+    assert record.remaining_quantity == D("3")
+    assert record.department == ASSEMBLY.value
+    assert logs[0].defect_quarantine_record_id == record.record_id
 
 
 def test_execute_line_mark_defective_prod(db_session, make_item, make_location):
@@ -619,6 +628,18 @@ def test_execute_line_defect_disassemble_uses_three_way_child_split(
         TransactionTypeEnum.MARK_DEFECTIVE,
         TransactionTypeEnum.DEFECT_SCRAP,
     ]
+    child_record = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == child.item_id)
+        .one()
+    )
+    child_mark_log = next(
+        log
+        for log in child_logs
+        if log.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
+    )
+    assert child_record.remaining_quantity == D("1")
+    assert child_mark_log.defect_quarantine_record_id == child_record.record_id
 
 
 def test_execute_line_defect_disassemble_rejects_stale_bom_quantity_before_inventory_changes(
