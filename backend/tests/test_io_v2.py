@@ -202,7 +202,6 @@ def test_shipping_request_id_is_rejected_for_new_io_submission_and_draft(
             "invoice_number": "SHIP-LINKED-IO-001",
         },
     )
-    shipping_svc.send_to_prep(db_session, request.request_id)
     db_session.commit()
 
     preview = client.post(

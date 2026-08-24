@@ -465,6 +465,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     if base_pf.process_type_code != "PF":
         raise ShippingError("기준 품목은 PF여야 합니다.")
     req = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARING,
         base_pf_item_id=base_pf.item_id,
         request_quantity=_payload_request_quantity(payload),
         requested_by_name=payload.get("requested_by_name"),
@@ -483,7 +484,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     _resolve_final_items(db, req)
     db.refresh(req)
     _sync_checklist(db, req)
-    _record_event(db, req, "REQUEST_CREATED", "출하 요청 생성")
+    _record_event(db, req, "REQUEST_CREATED", "출하 요청 생성 및 준비 시작")
     db.flush()
     return req
 
@@ -496,8 +497,8 @@ def update_request(
 ) -> ShippingRequest:
     actor = _require_actor(actor)
     req = _get_request(db, request_id)
-    if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
-        raise ShippingError("준비 완료된 요청은 먼저 준비 완료 취소 후 수정할 수 있습니다.")
+    if req.status != ShippingRequestStatusEnum.PREPARING:
+        raise ShippingError("준비 중 상태에서만 출하 요청을 수정할 수 있습니다.")
     before = _revision_snapshot(req)
     if "request_quantity" in payload:
         req.request_quantity = _payload_request_quantity(payload)
@@ -547,8 +548,8 @@ def delete_request(
 ) -> None:
     actor = _require_actor(actor)
     req = _get_request(db, request_id)
-    if req.status not in {ShippingRequestStatusEnum.REQUESTED, ShippingRequestStatusEnum.PREPARING}:
-        raise ShippingError("요청 또는 준비 중 상태에서만 출하 요청을 취소할 수 있습니다.")
+    if req.status != ShippingRequestStatusEnum.PREPARING:
+        raise ShippingError("준비 중 상태에서만 출하 요청을 취소할 수 있습니다.")
     req.status = ShippingRequestStatusEnum.CANCELLED
     req.cancelled_at = datetime.utcnow()
     req.cancelled_by_employee_id = actor.employee_id
@@ -577,19 +578,6 @@ def update_invoice(
         _record_event(db, req, "INVOICE_UPDATED", "인보이스 번호 수정")
     db.flush()
     return req
-
-def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
-    req = _get_request(db, request_id)
-    if req.status != ShippingRequestStatusEnum.REQUESTED:
-        raise ShippingError("요청 상태에서만 준비 중으로 전환할 수 있습니다.")
-    _resolve_final_items(db, req)
-    req.status = ShippingRequestStatusEnum.PREPARING
-    req.updated_at = datetime.utcnow()
-    _sync_checklist(db, req)
-    _record_event(db, req, "SENT_TO_PREP", "출하 준비 중 전환")
-    db.flush()
-    return req
-
 
 def update_checklist(db: Session, request_id: uuid.UUID, checks: dict[uuid.UUID, bool]) -> ShippingRequest:
     req = _get_request(db, request_id)

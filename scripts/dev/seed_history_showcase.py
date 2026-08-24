@@ -323,7 +323,6 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
             "invoice_number": f"HISTORY-{uuid.uuid4().hex[:12].upper()}",
         },
     )
-    shipping_svc.send_to_prep(db, request.request_id)
     _final_pa, final_pf = shipping_svc._require_final_items(db, request)
     batch, bundle = _new_batch(db, plan, marker, "shipping_prepare_produce", final_pf)
     batch.work_type = "process"

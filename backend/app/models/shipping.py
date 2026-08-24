@@ -37,7 +37,6 @@ __all__ = [
 
 
 class ShippingRequestStatusEnum(str, enum.Enum):
-    REQUESTED = "REQUESTED"
     PREPARING = "PREPARING"
     PREPARED = "PREPARED"
     PICKED_UP = "PICKED_UP"
@@ -57,8 +56,8 @@ class ShippingRequest(Base):
     status = Column(
         SAEnum(ShippingRequestStatusEnum, name="shipping_request_status_enum", create_type=True),
         nullable=False,
-        default=ShippingRequestStatusEnum.REQUESTED,
-        server_default=ShippingRequestStatusEnum.REQUESTED.value,
+        default=ShippingRequestStatusEnum.PREPARING,
+        server_default=ShippingRequestStatusEnum.PREPARING.value,
         index=True,
     )
     base_pf_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="RESTRICT"), nullable=False, index=True)

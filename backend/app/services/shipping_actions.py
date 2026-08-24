@@ -48,12 +48,6 @@ def update_invoice(
         return shipping_svc.update_invoice(db, request_id, invoice_number, actor)
 
 
-def send_to_prep(db: Session, request_id: uuid.UUID) -> ShippingRequest:
-    """준비 전환과 체크리스트·이벤트 변경을 원자적으로 확정한다."""
-    with transactional(db):
-        return shipping_svc.send_to_prep(db, request_id)
-
-
 def update_checklist(
     db: Session,
     request_id: uuid.UUID,

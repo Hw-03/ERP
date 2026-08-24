@@ -205,8 +205,6 @@ def _prepared_shipping_component_change(
     )
     assert created.status_code == 201, created.text
     request_id = created.json()["request_id"]
-    prepared = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
-    assert prepared.status_code == 200, prepared.text
     return request_id, {
         "source_pa_item_id": str(base_pa.item_id),
         "quantity": 1,
@@ -249,7 +247,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    assert create.json()["status"] == ShippingRequestStatusEnum.REQUESTED.value
+    assert create.json()["status"] == ShippingRequestStatusEnum.PREPARING.value
     assert create.json()["request_quantity"] == 2
     assert create.json()["final_pa_item_name"] == "Base PF with Pouch PA"
     assert create.json()["final_pf_item_name"] == "Base PF with Pouch"
@@ -257,11 +255,18 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     assert create.json()["companion_lines"][0]["quantity"] == 2
     assert len(create.json()["bom_lines"]) == 3
     assert create.json()["transaction_count"] == 0
+    assert any(line["item_name"] == "Pouch" for line in create.json()["checklist_lines"])
 
-    prep = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
-    assert prep.status_code == 200, prep.text
-    assert prep.json()["status"] == ShippingRequestStatusEnum.PREPARING.value
-    assert any(line["item_name"] == "Pouch" for line in prep.json()["checklist_lines"])
+    requested_filter = client.get(
+        "/api/shipping/requests",
+        params={"status": "REQUESTED"},
+    )
+    assert requested_filter.status_code == 422, requested_filter.text
+
+    removed_transition = client.post(
+        f"/api/shipping/requests/{request_id}/send-to-prep"
+    )
+    assert removed_transition.status_code in {404, 405}, removed_transition.text
 
     preview = client.get(
         f"/api/shipping/requests/{request_id}/component-change-preview",
@@ -284,7 +289,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     assert component_change.status_code == 200, component_change.text
     assert any(log["shipping_phase"] == "COMPONENT_CHANGE" for log in component_change.json()["transactions"])
 
-    checklist_id = [line for line in prep.json()["checklist_lines"] if line["item_name"] == "Pouch"][0]["item_id"]
+    checklist_id = [line for line in create.json()["checklist_lines"] if line["item_name"] == "Pouch"][0]["item_id"]
     checked = client.patch(
         f"/api/shipping/requests/{request_id}/checklist",
         json={"checks": [{"item_id": checklist_id, "checked": True}]},
@@ -1150,7 +1155,6 @@ def test_shipping_mobile_list_is_read_only_shape(client, db_session, make_item, 
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
 
     rows = client.get("/api/shipping/requests?status=PREPARING")
     assert rows.status_code == 200, rows.text
@@ -1189,8 +1193,6 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
     assert all(line["item_id"] != str(cable.item_id) for line in body["checklist_lines"])
 
     request_id = body["request_id"]
-    prep = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
-    assert prep.status_code == 200, prep.text
 
     update = client.patch(
         f"/api/shipping/requests/{request_id}",
@@ -1227,7 +1229,7 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
     assert [candidate["pf_item_id"] for candidate in match.json()["pf_candidates"]] == [update.json()["final_pf_item_id"]]
 
 
-def test_requested_and_preparing_shipping_requests_can_be_deleted(client, db_session, make_item, make_bom):
+def test_preparing_shipping_requests_can_be_deleted(client, db_session, make_item, make_bom):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("1"), model_symbol="4", serial_no=1)
     pa = make_item(name="Base PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     pf = make_item(name="Base PF", process_type_code="PF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -1242,29 +1244,12 @@ def test_requested_and_preparing_shipping_requests_can_be_deleted(client, db_ses
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
 
-    delete_requested = client.delete(f"/api/shipping/requests/{request_id}")
-    assert delete_requested.status_code == 204, delete_requested.text
+    delete_preparing = client.delete(f"/api/shipping/requests/{request_id}")
+    assert delete_preparing.status_code == 204, delete_preparing.text
 
     rows = client.get("/api/shipping/requests")
     assert rows.status_code == 200, rows.text
     assert all(row["request_id"] != request_id for row in rows.json())
-
-    create_again = client.post(
-        "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user"},
-    )
-    assert create_again.status_code == 201, create_again.text
-    preparing_id = create_again.json()["request_id"]
-    prep = client.post(f"/api/shipping/requests/{preparing_id}/send-to-prep")
-    assert prep.status_code == 200, prep.text
-
-    delete_preparing = client.delete(f"/api/shipping/requests/{preparing_id}")
-    assert delete_preparing.status_code == 204, delete_preparing.text
-
-    rows_after_preparing_delete = client.get("/api/shipping/requests")
-    assert rows_after_preparing_delete.status_code == 200, rows_after_preparing_delete.text
-    assert all(row["request_id"] != preparing_id for row in rows_after_preparing_delete.json())
-
 
 def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_session, make_item, make_bom, make_location):
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("2"), model_symbol="4", serial_no=1)
@@ -1281,7 +1266,6 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
     requester = db_session.query(Employee).filter(Employee.employee_code == "shipping-test-actor").one()
     _submit_final_pf_production(
         client,
@@ -1316,8 +1300,6 @@ def test_shipping_prepare_complete_requires_final_pf_shipping_department_stock(c
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
-
     prepared = client.post(f"/api/shipping/requests/{request_id}/prepare-complete", json={"serial_numbers": "SN-001", "companion_lines": []})
 
     assert prepared.status_code == 422, prepared.text
@@ -1344,8 +1326,6 @@ def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
-
     prepared = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
         json={"serial_numbers": "SN-001"},
@@ -1388,8 +1368,6 @@ def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
-
     prepared = client.post(
         f"/api/shipping/requests/{request_id}/prepare-complete",
         json={"serial_numbers": "SN-ACTOR-001"},
@@ -1457,8 +1435,6 @@ def test_shipping_prepare_complete_rejects_invalid_actor_without_state_changes(
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
-
     if actor_mode == "missing":
         client.headers.pop("X-MES-Employee-Code", None)
     else:
@@ -1507,7 +1483,6 @@ def test_shipping_prepare_complete_requires_nonblank_serial_numbers_without_stat
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
-    assert client.post(f"/api/shipping/requests/{request_id}/send-to-prep").status_code == 200
     before = db_session.query(ShippingRequest).filter(ShippingRequest.request_id == request_id).one()
     event_count = len(before.events)
 
@@ -1546,12 +1521,7 @@ def test_shipping_preparing_response_includes_stock_shortages(client, db_session
         },
     )
     assert create.status_code == 201, create.text
-    request_id = create.json()["request_id"]
-
-    prep = client.post(f"/api/shipping/requests/{request_id}/send-to-prep")
-
-    assert prep.status_code == 200, prep.text
-    shortages = prep.json()["stock_shortages"]
+    shortages = create.json()["stock_shortages"]
     assert {line["item_name"] for line in shortages} == {"Short PA", "AF Main", "Companion Box"}
     assert {line["item_name"]: line["shortage_quantity"] for line in shortages} == {
         "Short PA": 1,

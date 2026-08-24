@@ -382,7 +382,6 @@ def _make_prepared_request(
             ],
         },
     )
-    shipping_actions_svc.send_to_prep(db_session, request.request_id)
     _submit_final_pf_production(
         db_session,
         request=request,
@@ -881,8 +880,6 @@ def test_requested_component_change_rolls_back_inventory_logs_request_and_events
     target_id = request.final_pa_item_id
     source_id = source.item_id
     extra_id = extra.item_id
-    shipping_actions_svc.send_to_prep(db_session, request_id)
-
     item_ids = (source_id, target_id, extra_id)
     with Session(bind=db_session.get_bind()) as verify_db:
         before = _prepared_request_state(verify_db, request_id, item_ids)
@@ -1025,7 +1022,6 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
             "invoice_number": "ACTIONS-INV-ATOMIC",
         },
     )
-    shipping_svc.send_to_prep(db_session, request.request_id)
     db_session.commit()
 
     _submit_final_pf_production(

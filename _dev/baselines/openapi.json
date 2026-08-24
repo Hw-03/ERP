@@ -8166,7 +8166,6 @@
       },
       "ShippingRequestStatusEnum": {
         "enum": [
-          "REQUESTED",
           "PREPARING",
           "PREPARED",
           "PICKED_UP",
@@ -20633,49 +20632,6 @@
           }
         },
         "summary": "List Revisions",
-        "tags": [
-          "Shipping"
-        ]
-      }
-    },
-    "/api/shipping/requests/{request_id}/send-to-prep": {
-      "post": {
-        "operationId": "send_to_prep_api_shipping_requests__request_id__send_to_prep_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "request_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Request Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ShippingRequestResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Send To Prep",
         "tags": [
           "Shipping"
         ]
