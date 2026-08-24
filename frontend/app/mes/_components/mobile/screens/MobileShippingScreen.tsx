@@ -17,7 +17,6 @@ type MobileShippingTab = "requests" | "prep" | "history";
 const RESUME_REFETCH_DEDUP_MS = 250;
 
 const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
-  REQUESTED: "요청",
   PREPARING: "준비 중",
   PREPARED: "준비 완료",
   PICKED_UP: "픽업 완료",
@@ -25,7 +24,6 @@ const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
 };
 
 const STATUS_TONE: Record<ShippingRequestStatus, string> = {
-  REQUESTED: LEGACY_COLORS.blue,
   PREPARING: LEGACY_COLORS.green,
   PREPARED: LEGACY_COLORS.yellow,
   PICKED_UP: LEGACY_COLORS.purple,
@@ -177,7 +175,7 @@ export function MobileShippingScreen() {
       {!loading && !initialError && tab === "prep" && (
         <div className="mw0 grid gap-2">
           {prepRequests.length === 0 ? (
-            <InlineState title="준비 중 없음" body="PC에서 요청을 준비 중으로 넘기면 표시됩니다." />
+            <InlineState title="준비 중 없음" body="PC에서 새 출하 요청을 만들면 바로 표시됩니다." />
           ) : (
             prepRequests.map((req) => (
               <MobilePrepCard

@@ -1,6 +1,6 @@
 import type { TransactionType } from "./shared";
 
-export type ShippingRequestStatus = "REQUESTED" | "PREPARING" | "PREPARED" | "PICKED_UP" | "CANCELLED";
+export type ShippingRequestStatus = "PREPARING" | "PREPARED" | "PICKED_UP" | "CANCELLED";
 export type ShippingHistoryStatus = "PICKED_UP" | "CANCELLED";
 export type ShippingBomParentStage = "PA" | "PF";
 export type ShippingBomLineOrigin = "DEFAULT" | "CUSTOM";

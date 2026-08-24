@@ -114,6 +114,15 @@ afterEach(() => {
 });
 
 describe("MobileShippingScreen", () => {
+  it("빈 준비 목록에서 새 요청이 즉시 표시되는 흐름을 안내한다", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([]);
+
+    renderScreen();
+
+    expect(await screen.findByText("PC에서 새 출하 요청을 만들면 바로 표시됩니다.")).toBeInTheDocument();
+    expect(screen.queryByText("PC에서 요청을 준비 중으로 넘기면 표시됩니다.")).not.toBeInTheDocument();
+  });
+
   it("공용 requests query로 최초 조회하고 마운트 중 30초마다만 폴링한다", async () => {
     vi.useFakeTimers();
     const { queryClient, unmount } = renderScreen();
