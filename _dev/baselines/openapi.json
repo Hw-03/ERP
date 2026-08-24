@@ -1779,6 +1779,11 @@
       },
       "DefectLocationItem": {
         "properties": {
+          "available_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Available Quantity",
+            "type": "string"
+          },
           "defective_at": {
             "anyOf": [
               {
@@ -1800,6 +1805,11 @@
             "title": "Has Bom",
             "type": "boolean"
           },
+          "is_legacy": {
+            "default": false,
+            "title": "Is Legacy",
+            "type": "boolean"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -1819,6 +1829,17 @@
               }
             ],
             "title": "Mes Code"
+          },
+          "original_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Original Quantity",
+            "type": "string"
+          },
+          "pending_quantity": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending Quantity",
+            "type": "string"
           },
           "quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -1869,14 +1890,22 @@
               }
             ],
             "title": "Reason Memo"
+          },
+          "record_id": {
+            "format": "uuid",
+            "title": "Record Id",
+            "type": "string"
           }
         },
         "required": [
+          "record_id",
           "item_id",
           "item_name",
           "mes_code",
           "department",
           "quantity",
+          "original_quantity",
+          "available_quantity",
           "defective_at",
           "reason_category",
           "reason_memo",
@@ -1884,6 +1913,115 @@
           "quarantined_by_employee_id"
         ],
         "title": "DefectLocationItem",
+        "type": "object"
+      },
+      "DefectMemoRevisionItem": {
+        "properties": {
+          "edited_at": {
+            "format": "date-time",
+            "title": "Edited At",
+            "type": "string"
+          },
+          "edited_by_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By Employee Id"
+          },
+          "edited_by_name": {
+            "title": "Edited By Name",
+            "type": "string"
+          },
+          "is_initial": {
+            "title": "Is Initial",
+            "type": "boolean"
+          },
+          "next_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Memo"
+          },
+          "previous_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Memo"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_id",
+          "previous_memo",
+          "next_memo",
+          "edited_by_employee_id",
+          "edited_by_name",
+          "edited_at",
+          "is_initial"
+        ],
+        "title": "DefectMemoRevisionItem",
+        "type": "object"
+      },
+      "DefectMemoUpdateRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "memo": {
+            "title": "Memo",
+            "type": "string"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "memo",
+          "actor_employee_id",
+          "pin"
+        ],
+        "title": "DefectMemoUpdateRequest",
+        "type": "object"
+      },
+      "DefectMemoUpdateResult": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "memo": {
+            "title": "Memo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "memo",
+          "changed"
+        ],
+        "title": "DefectMemoUpdateResult",
         "type": "object"
       },
       "DepartmentCreate": {
@@ -10001,6 +10139,18 @@
               }
             ],
             "title": "Reason Memo"
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
           }
         },
         "required": [
@@ -13550,7 +13700,7 @@
     },
     "/api/defects/kpi": {
       "get": {
-        "description": "KPI 카드 2개:\n- quarantined: DEFECTIVE 위치 수 (quantity > 0)\n- over_one_year: defective_at <= now - 365 days",
+        "description": "KPI 카드 2개:\n- quarantined: 남은 수량이 있는 격리 기록 수\n- over_one_year: 격리 시각이 365일을 넘긴 활성 기록 수",
         "operationId": "get_defect_kpi_api_defects_kpi_get",
         "responses": {
           "200": {
@@ -13572,7 +13722,7 @@
     },
     "/api/defects/locations": {
       "get": {
-        "description": "DEFECTIVE 상태 InventoryLocation 목록.\n\n각 (item, department) 조합에 대해 가장 최근 MARK_DEFECTIVE 트랜잭션의 사유를 포함.",
+        "description": "남은 수량이 있는 격리 기록을 격리 건 단위로 반환한다.",
         "operationId": "list_defect_locations_api_defects_locations_get",
         "parameters": [
           {
@@ -13663,6 +13813,108 @@
           }
         },
         "summary": "Quarantine",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/records/{record_id}/memo": {
+      "put": {
+        "description": "PIN으로 확인한 직원이 격리 메모를 수정하고 변경 전후를 보존한다.",
+        "operationId": "update_defect_memo_api_defects_records__record_id__memo_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefectMemoUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectMemoUpdateResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Defect Memo",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/records/{record_id}/memo-history": {
+      "get": {
+        "description": "최초 등록부터 현재까지 격리 메모의 전후 값을 시간순으로 반환한다.",
+        "operationId": "get_defect_memo_history_api_defects_records__record_id__memo_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DefectMemoRevisionItem"
+                  },
+                  "title": "Response Get Defect Memo History Api Defects Records  Record Id  Memo History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Defect Memo History",
         "tags": [
           "Defects"
         ]

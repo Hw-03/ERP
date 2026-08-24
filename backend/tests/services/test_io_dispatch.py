@@ -16,6 +16,7 @@ import pytest
 
 from app.models import (
     DepartmentEnum,
+    DefectQuarantineRecord,
     Employee,
     EmployeeLevelEnum,
     Inventory,
@@ -453,6 +454,13 @@ def test_apply_line_defective_mark(make_item, make_location, db_session):
     assert log.warehouse_qty_after == D("0")
     assert log.department_qty_before == D("5")
     assert log.department_qty_after == D("3")
+    record = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == item.item_id)
+        .one()
+    )
+    assert record.remaining_quantity == D("2")
+    assert log.defect_quarantine_record_id == record.record_id
 
 
 def test_apply_line_adjust_in_and_out(make_item, make_location, db_session):

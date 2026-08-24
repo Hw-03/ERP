@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.models import (
     DepartmentEnum,
+    DefectQuarantineRecord,
     DeptAdjSubTypeEnum,
     LocationStatusEnum,
     TransactionLog,
@@ -647,6 +648,18 @@ def test_submit_disassembly_mixed(make_item, make_location, db_session):
     assert "DISASSEMBLE" in types
     assert "RECEIVE" in types
     assert "MARK_DEFECTIVE" in types
+    record = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == c.item_id)
+        .one()
+    )
+    mark_log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.item_id == c.item_id)
+        .one()
+    )
+    assert record.remaining_quantity == D("1")
+    assert mark_log.defect_quarantine_record_id == record.record_id
 
 
 def test_submit_correction_in_out(make_item, make_location, db_session):

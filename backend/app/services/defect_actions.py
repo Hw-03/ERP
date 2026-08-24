@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
+from app.services import defect_records as defect_records_svc
 from app.services._tx import transactional
 
 
@@ -63,6 +64,16 @@ def quarantine_inventory(
         )
         db.flush()
         inv = inventory_svc.get_or_create_inventory(db, item_id)
+        record = defect_records_svc.create_record(
+            db,
+            item_id=item_id,
+            department=target_dept,
+            quantity=qty,
+            actor_employee_id=actor.employee_id,
+            actor_name=actor.name,
+            reason_category=reason_category,
+            memo=reason_memo,
+        )
         db.add(
             TransactionLog(
                 item_id=item_id,
@@ -77,6 +88,7 @@ def quarantine_inventory(
                 reason_memo=reason_memo or None,
                 client_request_id=client_request_id,
                 department=target_dept.value,
+                defect_quarantine_record_id=record.record_id,
                 **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
         )
@@ -86,6 +98,7 @@ def quarantine_inventory(
 def unquarantine_inventory(
     db: Session,
     *,
+    record_id: Optional[uuid.UUID] = None,
     item_id: uuid.UUID,
     qty: Decimal,
     dept: DepartmentEnum,
@@ -95,6 +108,14 @@ def unquarantine_inventory(
 ) -> Inventory:
     """정상 복귀와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
+        record = defect_records_svc.get_record_for_action(
+            db,
+            record_id=record_id,
+            item_id=item_id,
+            department=dept,
+        )
+        if record is not None:
+            defect_records_svc.ensure_available(db, record, qty)
         inv = inventory_svc.get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
         cells_before = inv_effect.snapshot_cells(db, item_id)
@@ -111,6 +132,8 @@ def unquarantine_inventory(
             ),
         )
         db.flush()
+        if record is not None:
+            defect_records_svc.decrement_record(db, record, qty)
         inv = inventory_svc.get_or_create_inventory(db, item_id)
         db.add(
             TransactionLog(
@@ -125,6 +148,7 @@ def unquarantine_inventory(
                 reason_category=reason_category,
                 reason_memo=reason_memo or None,
                 department=dept.value,
+                defect_quarantine_record_id=(record.record_id if record else None),
                 **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
         )

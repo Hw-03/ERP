@@ -437,6 +437,7 @@ def _log_immediate(
     stock_snapshot: inv_effect.TransactionStockSnapshot,
     producer_employee_id: uuid.UUID | None = None,
     department: str | None = None,
+    defect_quarantine_record_id: uuid.UUID | None = None,
 ) -> None:
     db.add(
         TransactionLog(
@@ -453,6 +454,7 @@ def _log_immediate(
             notes=batch.notes,
             operation_batch_id=batch.batch_id,
             operation_line_id=line.line_id,
+            defect_quarantine_record_id=defect_quarantine_record_id,
             **stock_snapshot,
         )
     )
@@ -573,6 +575,8 @@ def _dept_for_line(line: IoLine, tx_type: TransactionTypeEnum) -> str | None:
         return _val(line.from_department)
     if tx_type == TransactionTypeEnum.TRANSFER_DEPT:
         return _val(line.from_department)
+    if tx_type == TransactionTypeEnum.MARK_DEFECTIVE:
+        return _val(line.to_department)
     if tx_type == TransactionTypeEnum.ADJUST and (
         line.from_bucket == _BUCKET_WAREHOUSE or line.to_bucket == _BUCKET_WAREHOUSE
     ):
@@ -600,6 +604,21 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     else:
         raise ValueError(f"지원하지 않는 라인 방향입니다: {line.direction}")
 
+    quarantine_record = None
+    if line.direction == "defective":
+        from app.services import defect_records as defect_records_svc
+
+        quarantine_record = defect_records_svc.create_record(
+            db,
+            item_id=line.item_id,
+            department=line.to_department,
+            quantity=qty,
+            actor_employee_id=requester.employee_id,
+            actor_name=requester.name,
+            reason_category=None,
+            memo=batch.notes,
+        )
+
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     after = _d(inv.quantity)
@@ -615,6 +634,9 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         producer_employee_id=requester.employee_id,
         department=_dept_for_line(line, tx_type),
         stock_snapshot=inv_effect.capture_log_stock_snapshot(db, line.item_id, cells_before),
+        defect_quarantine_record_id=(
+            quarantine_record.record_id if quarantine_record else None
+        ),
     )
 
 

@@ -399,6 +399,7 @@ def _apply_adjustment(
 
         tx_type = _TRANSACTION_TYPE_MAP[(ln.direction, sub_str)]
         cells_before = inv_effect.snapshot_cells(db, ln.item_id)
+        quarantine_record = None
 
         if ln.direction == "out":
             inv = inventory_svc.consume_from_department(db, ln.item_id, qty, dept_enum)
@@ -420,6 +421,18 @@ def _apply_adjustment(
                 ),
             )
             qty_before = inv.quantity or Decimal("0")
+            from app.services import defect_records as defect_records_svc
+
+            quarantine_record = defect_records_svc.create_record(
+                db,
+                item_id=ln.item_id,
+                department=dept_enum,
+                quantity=qty,
+                actor_employee_id=producer_employee_id,
+                actor_name=operator_name,
+                reason_category=None,
+                memo=reason_str or None,
+            )
 
         log = TransactionLog(
             item_id=ln.item_id,
@@ -432,6 +445,9 @@ def _apply_adjustment(
             producer_employee_id=producer_employee_id,
             notes=log_notes or None,
             department=dept_enum.value,
+            defect_quarantine_record_id=(
+                quarantine_record.record_id if quarantine_record else None
+            ),
             **inv_effect.capture_log_stock_snapshot(db, ln.item_id, cells_before),
         )
         db.add(log)
@@ -630,6 +646,7 @@ def _submit_rework_disassemble(
     reason_memo: str,
     actor: str,
     actor_employee_id: Optional[uuid.UUID] = None,
+    defect_quarantine_record_id: Optional[uuid.UUID] = None,
 ) -> dict:
     if parent_qty <= 0:
         raise ValueError("재작업 수량은 0보다 커야 합니다.")
@@ -703,6 +720,7 @@ def _submit_rework_disassemble(
         reason_memo=reason_memo,
         reference_no=batch_ref,
         department=parent_dept_value,
+        defect_quarantine_record_id=defect_quarantine_record_id,
         **inv_effect.capture_log_stock_snapshot(db, parent_item_id, parent_cells_before),
     )
     db.add(parent_log)
@@ -771,6 +789,18 @@ def _submit_rework_disassemble(
                 ),
             )
             qty_before_child = (child_inv.quantity or Decimal("0")) - defective_qty
+            from app.services import defect_records as defect_records_svc
+
+            child_record = defect_records_svc.create_record(
+                db,
+                item_id=item_id,
+                department=child_dept,
+                quantity=defective_qty,
+                actor_employee_id=actor_employee_id,
+                actor_name=actor,
+                reason_category=reason_category,
+                memo=child_note or None,
+            )
             log = TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
@@ -784,6 +814,7 @@ def _submit_rework_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
+                defect_quarantine_record_id=child_record.record_id,
                 **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
             db.add(log)
@@ -894,6 +925,7 @@ def submit_defective_disassemble(
     reason_memo: str,
     actor: str,
     actor_employee_id: Optional[uuid.UUID] = None,
+    defect_quarantine_record_id: Optional[uuid.UUID] = None,
 ) -> dict:
     """격리 품목 재작업: 부모 DEFECTIVE 차감 후 하위 정상/격리/폐기 3분할."""
     return _submit_rework_disassemble(
@@ -907,6 +939,7 @@ def submit_defective_disassemble(
         reason_memo=reason_memo,
         actor=actor,
         actor_employee_id=actor_employee_id,
+        defect_quarantine_record_id=defect_quarantine_record_id,
     )
 
 
