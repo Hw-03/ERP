@@ -13,6 +13,7 @@ import { HistoryLogRow } from "./HistoryLogRow";
 import {
   BatchHeader,
   HISTORY_CELL_TRANSITION,
+  HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX,
   HISTORY_CODE_QUANTITY_WIDTH_PX,
   HISTORY_ITEM_CODE_WIDTH_PX,
   HISTORY_QUANTITY_WIDTH_PX,
@@ -88,8 +89,8 @@ const COLUMNS: ColSpec[] = [
     colSpan: 2,
     groupLabels: ["품목코드", "수량"],
   },
-  { label: "작업 전 재고", width: "158px", align: "center", px: "px-1" },
-  { label: "작업 후 재고", width: "158px", align: "center", px: "px-1" },
+  { label: "작업 전 재고", width: "192px", align: "center", px: "px-1" },
+  { label: "작업 후 재고", width: "192px", align: "center", px: "px-1" },
   { label: "담당자", width: "132px", align: "center", px: "px-2" },
 ];
 const HISTORY_TABLE_COLUMN_SPAN = COLUMNS.reduce((total, column) => total + (column.colSpan ?? 1), 0);
@@ -159,7 +160,7 @@ function HistoryTableSkeleton() {
                   <div
                     data-history-collapsible-content="true"
                     className="grid"
-                    style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px` }}
+                    style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
                   >
                     {column.groupLabels.map((label) => <span key={label}>{label}</span>)}
                   </div>
@@ -183,7 +184,7 @@ function HistoryTableSkeleton() {
                     <div
                       data-history-collapsible-content="true"
                       className="grid h-[64px]"
-                      style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px` }}
+                      style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
                     >
                       {column.groupLabels.map((label, labelIndex) => (
                         <div key={label} className="flex items-center justify-center px-2">
@@ -492,7 +493,7 @@ export function HistoryTable({
                       <div
                         data-history-collapsible-content="true"
                         className="grid"
-                        style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px` }}
+                      style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
                       >
                         {column.groupLabels.map((label) => <span key={label}>{label}</span>)}
                       </div>

@@ -19,6 +19,7 @@ import {
   ReferenceBatchDetail,
   TargetSummaryBlock,
   buildGroups,
+  getStockSnapshotQuantityWidth,
   toHistoryLogGroups,
 } from "../historyTableHelpers";
 
@@ -67,6 +68,19 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
     ...overrides,
   };
 }
+
+describe("getStockSnapshotQuantityWidth", () => {
+  it("묶음 내 재고가 더 짧아도 쉼표 포함 5자리 수량 폭을 미리 확보한다", () => {
+    expect(getStockSnapshotQuantityWidth([
+      makeLog({
+        warehouse_qty_before: 800,
+        warehouse_qty_after: 800,
+        department_qty_before: 76,
+        department_qty_after: 75,
+      }),
+    ])).toBe(6);
+  });
+});
 
 describe("buildGroups shipping phase grouping", () => {
   it("separates prepare and pickup logs that share a shipping request reference", () => {
@@ -549,11 +563,11 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("116px");
     expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
     const codeQuantityHeader = screen.getByRole("columnheader", { name: "품목코드 · 수량" });
-    expect(codeQuantityHeader.style.width).toBe("328px");
+    expect(codeQuantityHeader.style.width).toBe("368px");
     expect(codeQuantityHeader).toHaveAttribute("colspan", "2");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "작업 전 재고" }).style.width).toBe("158px");
-    expect(screen.getByRole("columnheader", { name: "작업 후 재고" }).style.width).toBe("158px");
+    expect(screen.getByRole("columnheader", { name: "작업 전 재고" }).style.width).toBe("192px");
+    expect(screen.getByRole("columnheader", { name: "작업 후 재고" }).style.width).toBe("192px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
     expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");
@@ -656,9 +670,9 @@ describe("history table helper rendering policies", () => {
 
     expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "품목코드 · 수량" }).style.width).toBe("328px");
-    expect(screen.getByRole("columnheader", { name: "작업 전 재고" }).style.width).toBe("158px");
-    expect(screen.getByRole("columnheader", { name: "작업 후 재고" }).style.width).toBe("158px");
+    expect(screen.getByRole("columnheader", { name: "품목코드 · 수량" }).style.width).toBe("368px");
+    expect(screen.getByRole("columnheader", { name: "작업 전 재고" }).style.width).toBe("192px");
+    expect(screen.getByRole("columnheader", { name: "작업 후 재고" }).style.width).toBe("192px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
     expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");

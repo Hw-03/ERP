@@ -51,7 +51,10 @@ export const HISTORY_CHILD_CELL_CLASS = "h-[40px] overflow-hidden border-b py-0 
 export const HISTORY_TABLE_OPERATION_PILL_CLASS = "w-32 max-w-full min-w-0 overflow-hidden";
 export const HISTORY_ITEM_CODE_WIDTH_PX = 108;
 export const HISTORY_QUANTITY_WIDTH_PX = 220;
-export const HISTORY_CODE_QUANTITY_WIDTH_PX = HISTORY_ITEM_CODE_WIDTH_PX + HISTORY_QUANTITY_WIDTH_PX;
+export const HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX = HISTORY_ITEM_CODE_WIDTH_PX + HISTORY_QUANTITY_WIDTH_PX;
+export const HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX = 40;
+export const HISTORY_CODE_QUANTITY_WIDTH_PX = HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX + HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX;
+const STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH = formatQty(10_000).length;
 
 export function FlowBadge({
   type,
@@ -318,7 +321,7 @@ export function ItemCodeQuantityCell({
       <div
         data-history-collapsible-content="true"
         className={`grid ${dense ? "h-[40px]" : "h-[64px]"}`}
-        style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px` }}
+        style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
       >
         <div
           className={`flex min-w-0 items-center justify-center overflow-hidden whitespace-nowrap ${padX} text-center text-xs font-semibold`}
@@ -391,7 +394,10 @@ export function StockSnapshotCell({
   }
   const warehouseText = formatQty(warehouse);
   const departmentText = formatQty(department);
-  const chipQuantityWidth = quantityWidth ?? Math.max(warehouseText.length, departmentText.length);
+  const chipQuantityWidth = Math.max(
+    STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH,
+    quantityWidth ?? Math.max(warehouseText.length, departmentText.length),
+  );
 
   return (
     <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
@@ -418,7 +424,9 @@ export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | 
     log.department_qty_before,
     log.department_qty_after,
   ]).filter((quantity): quantity is number => quantity != null);
-  return quantities.length > 0 ? Math.max(...quantities.map((quantity) => formatQty(quantity).length)) : undefined;
+  return quantities.length > 0
+    ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH, ...quantities.map((quantity) => formatQty(quantity).length))
+    : undefined;
 }
 
 function StockSnapshotChip({
