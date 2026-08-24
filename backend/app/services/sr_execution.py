@@ -369,7 +369,6 @@ def _execute_line(
     # 이동 전 수량과 위치 셀을 기록한다.
     inv = inventory_svc.get_or_create_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
-    warehouse_qty_before = inv.warehouse_qty or Decimal("0")
     cells_before = inv_effect.snapshot_cells(db, item_id)
 
     handler = _LINE_HANDLERS.get(rt)
@@ -380,7 +379,6 @@ def _execute_line(
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, item_id)
     qty_after = inv.quantity or Decimal("0")
-    warehouse_qty_after = inv.warehouse_qty or Decimal("0")
 
     # TransactionLog 작성 — 결재 흐름 맥락을 notes 에 기록.
     from_label = _bucket_label(line.from_bucket, line.from_department)
@@ -413,8 +411,6 @@ def _execute_line(
             quantity_change=quantity_change,
             quantity_before=qty_before,
             quantity_after=qty_after,
-            warehouse_qty_before=warehouse_qty_before if is_internal_use else None,
-            warehouse_qty_after=warehouse_qty_after if is_internal_use else None,
             reference_no=request.request_code,
             produced_by=producer_name,
             producer_employee_id=producer_employee_id,
@@ -422,8 +418,9 @@ def _execute_line(
             reason_category=request.reason_category,
             reason_memo=request.reason_memo,
             operation_batch_id=getattr(request, "operation_batch_id", None),
+            operation_line_id=line.operation_line_id,
             department=str(department) if department else None,
-            inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+            **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
         )
     )
 

@@ -272,6 +272,10 @@ def test_quantity_correct_adjust_log_records_effect_and_editor_id(client, db_ses
     )
     assert correction.producer_employee_id == editor.employee_id
     assert correction.inventory_effect is not None
+    assert correction.warehouse_qty_before == Decimal("100")
+    assert correction.warehouse_qty_after == Decimal("80")
+    assert correction.department_qty_before == Decimal("0")
+    assert correction.department_qty_after == Decimal("0")
     deltas = {
         (cell["scope"], cell.get("department"), cell.get("status")): cell["delta"]
         for cell in correction.inventory_effect

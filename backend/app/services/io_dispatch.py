@@ -434,11 +434,9 @@ def _log_immediate(
     before: Decimal,
     after: Decimal,
     operator_name: str,
+    stock_snapshot: inv_effect.TransactionStockSnapshot,
     producer_employee_id: uuid.UUID | None = None,
-    wh_before: Decimal | None = None,
-    wh_after: Decimal | None = None,
     department: str | None = None,
-    inventory_effect: list[dict] | None = None,
 ) -> None:
     db.add(
         TransactionLog(
@@ -447,8 +445,6 @@ def _log_immediate(
             quantity_change=quantity_change,
             quantity_before=before,
             quantity_after=after,
-            warehouse_qty_before=wh_before,
-            warehouse_qty_after=wh_after,
             transfer_qty=line.quantity if line.direction in ("move", "defective") else None,
             department=department,
             reference_no=batch.reference_no,
@@ -456,7 +452,8 @@ def _log_immediate(
             producer_employee_id=producer_employee_id,
             notes=batch.notes,
             operation_batch_id=batch.batch_id,
-            inventory_effect=inventory_effect,
+            operation_line_id=line.line_id,
+            **stock_snapshot,
         )
     )
 
@@ -587,10 +584,6 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     qty = _d(line.quantity)
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     before = _d(inv.quantity)
-    tracks_warehouse = (
-        line.from_bucket == _BUCKET_WAREHOUSE or line.to_bucket == _BUCKET_WAREHOUSE
-    )
-    wh_before = _d(inv.warehouse_qty) if tracks_warehouse else None
     # 취소 역재생용 — mutation 전 재고 셀 스냅샷.
     cells_before = inv_effect.snapshot_cells(db, line.item_id)
 
@@ -610,7 +603,6 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     after = _d(inv.quantity)
-    wh_after = _d(inv.warehouse_qty) if tracks_warehouse else None
     _log_immediate(
         db,
         batch=batch,
@@ -621,10 +613,8 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         after=after,
         operator_name=requester.name,
         producer_employee_id=requester.employee_id,
-        wh_before=wh_before,
-        wh_after=wh_after,
         department=_dept_for_line(line, tx_type),
-        inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
+        stock_snapshot=inv_effect.capture_log_stock_snapshot(db, line.item_id, cells_before),
     )
 
 

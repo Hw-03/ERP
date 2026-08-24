@@ -14,9 +14,10 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   HISTORY_STATUS_CELL_CLASS,
-  ItemCodeCell,
+  ItemCodeQuantityCell,
   PeopleStatusCell,
   QuantityStockCell,
+  StockSnapshotCell,
   TargetSummaryBlock,
   ChevronToggleBtn,
 } from "./historyTableHelpers";
@@ -36,8 +37,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
   const [hovered, setHovered] = useState(false);
   const padX = "px-4";
   const targetPadX = "px-4";
-  const quantityPadX = "px-4";
-  const statusPadX = "px-4";
+  const statusPadX = "px-2";
   const basePresentation = getHistoryRowPresentation(log);
   const presentation = separationHint
     ? { ...basePresentation, statusChips: [...basePresentation.statusChips, { label: separationHint, tone: "muted" as const }] }
@@ -98,10 +98,12 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
           cancelled={log.cancelled}
         />
       </td>
-      <ItemCodeCell code={presentation.target.code} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} cancelled={log.cancelled} />
-      </td>
+      <ItemCodeQuantityCell
+        code={presentation.target.code}
+        quantity={<QuantityStockCell presentation={presentation} cancelled={log.cancelled} />}
+      />
+      <StockSnapshotCell log={log} moment="before" />
+      <StockSnapshotCell log={log} moment="after" />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>

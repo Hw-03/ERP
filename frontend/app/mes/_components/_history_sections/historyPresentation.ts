@@ -97,6 +97,7 @@ export interface ReferenceBatchPresentation {
   flowLabel: string | null;
   targetTitle: string;
   targetCode: string | null;
+  representativeLogId: string | null;
   targetMeta: string[];
   movement: MovementSummary;
   sourceTarget?: {
@@ -246,6 +247,7 @@ export function getReferenceBatchPresentation(
     flowLabel: sourceTarget ? getComponentChangeFlowLabel(logs) : flowLabel,
     targetTitle: shipmentTarget?.title ?? (summary === null ? titlePrefix : `${titlePrefix} ${summary?.logCount ?? logs.length}건`),
     targetCode: shipmentTarget?.code ?? (homogeneous ? first.mes_code : null),
+    representativeLogId: shipmentTarget?.logId ?? first.log_id,
     targetMeta: [],
     movement: summarizeReferenceLogs(logs, movementVerb, movementTone, summary),
     sourceTarget,
@@ -276,24 +278,24 @@ function getComponentChangeFlowLabel(logs: TransactionLog[]): string {
   return "품목 전환";
 }
 
-function getShippingTarget(logs: TransactionLog[], phase?: string | null): { title: string; code: string | null } | null {
+function getShippingTarget(logs: TransactionLog[], phase?: string | null): { title: string; code: string | null; logId: string } | null {
   if (phase === "COMPONENT_CHANGE") {
     const targetPaLog = logs.find((log) => (log.transaction_type === "PRODUCE" || log.transaction_type === "RECEIVE") && log.quantity_change > 0);
     const title = targetPaLog?.item_name?.trim();
-    if (title && targetPaLog) return { title, code: targetPaLog.mes_code };
+    if (title && targetPaLog) return { title, code: targetPaLog.mes_code, logId: targetPaLog.log_id };
   }
   if (phase === "PREPARE") {
     const finalPfLog = logs.find((log) => log.transaction_type === "PRODUCE" && log.quantity_change > 0);
     const title = finalPfLog?.item_name?.trim();
-    if (title && finalPfLog) return { title, code: finalPfLog.mes_code };
+    if (title && finalPfLog) return { title, code: finalPfLog.mes_code, logId: finalPfLog.log_id };
   }
   for (const log of logs) {
     const parsed = parseShippingPickupNote(log.notes);
-    if (parsed) return { title: parsed, code: log.mes_code };
+    if (parsed) return { title: parsed, code: log.mes_code, logId: log.log_id };
   }
   const pickupLog = logs.find((log) => log.transaction_type === "SHIP" && !isShippingCompanionLog(log));
   const title = pickupLog?.item_name?.trim();
-  return title && pickupLog ? { title, code: pickupLog.mes_code } : null;
+  return title && pickupLog ? { title, code: pickupLog.mes_code, logId: pickupLog.log_id } : null;
 }
 
 function parseShippingPickupNote(notes: string | null | undefined): string | null {

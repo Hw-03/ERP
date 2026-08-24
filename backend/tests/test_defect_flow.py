@@ -128,6 +128,10 @@ def test_quarantine_sets_defective_at_and_logs(db_session, client, make_item):
     ).first()
     assert log is not None
     assert log.reason_category == "외관불량"
+    assert log.warehouse_qty_before == Decimal("10")
+    assert log.warehouse_qty_after == Decimal("7")
+    assert log.department_qty_before == Decimal("0")
+    assert log.department_qty_after == Decimal("0")
 
 
 def test_quarantine_rejects_client_request_id_owned_by_other_operation(

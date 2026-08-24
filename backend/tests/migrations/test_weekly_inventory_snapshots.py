@@ -28,7 +28,7 @@ def test_weekly_inventory_snapshot_migration_adds_only_new_tables(tmp_path):
     engine = sa.create_engine(f"sqlite:///{path.as_posix()}")
     try:
         before_tables = set(sa.inspect(engine).get_table_names())
-        command.upgrade(config, "head")
+        command.upgrade(config, MIGRATION_REVISION)
         inspector = sa.inspect(engine)
         after_tables = set(inspector.get_table_names())
 

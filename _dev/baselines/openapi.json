@@ -9496,6 +9496,28 @@
             ],
             "title": "Department"
           },
+          "department_qty_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Qty After"
+          },
+          "department_qty_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Qty Before"
+          },
           "edit_count": {
             "default": 0,
             "title": "Edit Count",
@@ -9578,6 +9600,18 @@
               }
             ],
             "title": "Operation Batch Id"
+          },
+          "operation_line_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Line Id"
           },
           "produced_by": {
             "anyOf": [

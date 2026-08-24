@@ -154,7 +154,7 @@ def correct_transaction_quantity(
             produced_by=editor.name,
             producer_employee_id=editor.employee_id,
             department="창고",
-            inventory_effect=inv_effect.capture_effect(db, log.item_id, cells_before),
+            **inv_effect.capture_log_stock_snapshot(db, log.item_id, cells_before),
         )
         db.add(correction_log)
         db.flush()

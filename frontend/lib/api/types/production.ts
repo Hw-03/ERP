@@ -26,6 +26,8 @@ export interface TransactionLog {
   quantity_after: number | null;
   warehouse_qty_before: number | null;
   warehouse_qty_after: number | null;
+  department_qty_before?: number | null;
+  department_qty_after?: number | null;
   transfer_qty: number | null;
   reference_no: string | null;
   produced_by: string | null;
@@ -41,6 +43,7 @@ export interface TransactionLog {
   reason_category?: string | null;
   reason_memo?: string | null;
   operation_batch_id: string | null;
+  operation_line_id?: string | null;
   shipping_phase?: string | null;
   created_at: string;
   edit_count?: number;

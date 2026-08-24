@@ -10,7 +10,19 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState, LoadFailureCard } from "../common";
 import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
-import { BatchHeader, OpBatchHeader, ReferenceBatchDetail, buildGroups, getHistorySeparationHint, type LogGroup, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
+import {
+  BatchHeader,
+  HISTORY_CELL_TRANSITION,
+  HISTORY_CODE_QUANTITY_WIDTH_PX,
+  HISTORY_ITEM_CODE_WIDTH_PX,
+  HISTORY_QUANTITY_WIDTH_PX,
+  OpBatchHeader,
+  ReferenceBatchDetail,
+  buildGroups,
+  getHistorySeparationHint,
+  getStockSnapshotQuantityWidth,
+  type LogGroup,
+} from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
 import { ReworkBatchHeader } from "./ReworkBatchHeader";
 import { ReworkBatchDetail } from "./ReworkBatchDetail";
@@ -50,17 +62,37 @@ type Props = {
   collapseRequestNonce?: number;
 };
 
-type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center" | "right"; hidden?: boolean; px?: string };
+type ColSpec = {
+  label: string;
+  width?: string;
+  minWidth?: string;
+  align?: "left" | "center" | "right";
+  hidden?: boolean;
+  px?: string;
+  collapseWithPanel?: boolean;
+  colSpan?: number;
+  groupLabels?: readonly [string, string];
+};
 
-// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 수량/재고 → 상태.
+// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 수량 → 위치 재고 → 담당자.
 const COLUMNS: ColSpec[] = [
-  { label: "일시", width: "120px", align: "center" },
-  { label: "작업", width: "228px", align: "center" },
+  { label: "일시", width: "116px", align: "center", px: "px-2" },
+  { label: "작업", width: "184px", align: "center" },
   { label: "대상" },
-  { label: "품목코드", width: "118px", align: "center" },
-  { label: "수량", width: "270px", align: "center" },
-  { label: "담당자", width: "160px", align: "center" },
+  {
+    label: "품목코드 · 수량",
+    width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px`,
+    align: "center",
+    px: "px-0",
+    collapseWithPanel: true,
+    colSpan: 2,
+    groupLabels: ["품목코드", "수량"],
+  },
+  { label: "작업 전 재고", width: "158px", align: "center", px: "px-1" },
+  { label: "작업 후 재고", width: "158px", align: "center", px: "px-1" },
+  { label: "담당자", width: "132px", align: "center", px: "px-2" },
 ];
+const HISTORY_TABLE_COLUMN_SPAN = COLUMNS.reduce((total, column) => total + (column.colSpan ?? 1), 0);
 const VISIBLE_FETCH_CONCURRENCY = 4;
 const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-clip rounded-[24px]";
 
@@ -107,19 +139,31 @@ function HistoryTableSkeleton() {
       <table
         aria-busy="true"
         aria-label="입출고 내역 불러오는 중"
-        className="w-full table-fixed border-separate border-spacing-0 text-sm"
+        className="history-table-panel-motion w-full table-fixed border-separate border-spacing-0 text-sm"
+        data-panel-open="false"
       >
         <thead>
           <tr>
             {COLUMNS.map((column, index) => (
               <th
                 key={column.label || `loading-spacer-${index}`}
-                scope={column.label ? "col" : undefined}
+                scope={column.colSpan ? "colgroup" : column.label ? "col" : undefined}
                 aria-hidden={column.label ? undefined : true}
+                aria-label={column.groupLabels ? column.label : undefined}
+                colSpan={column.colSpan}
+                data-history-collapsible-group={column.collapseWithPanel ? "true" : undefined}
                 className={historyTableHeaderClass(column, index)}
                 style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
               >
-                {column.label}
+                {column.groupLabels ? (
+                  <div
+                    data-history-collapsible-content="true"
+                    className="grid"
+                    style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px` }}
+                  >
+                    {column.groupLabels.map((label) => <span key={label}>{label}</span>)}
+                  </div>
+                ) : column.label}
               </th>
             ))}
           </tr>
@@ -130,17 +174,34 @@ function HistoryTableSkeleton() {
               {COLUMNS.map((column, columnIndex) => (
                 <td
                   key={`${column.label}-${columnIndex}`}
-                  className="border-b px-4 py-2 align-middle"
-                  style={{ borderColor: LEGACY_COLORS.border }}
+                  colSpan={column.colSpan}
+                  data-history-collapsible-group={column.collapseWithPanel ? "true" : undefined}
+                  className={column.groupLabels ? "h-[64px] overflow-hidden border-b p-0 align-middle" : "border-b px-4 py-2 align-middle"}
+                  style={{ borderColor: LEGACY_COLORS.border, width: column.groupLabels ? column.width : undefined, transition: column.groupLabels ? HISTORY_CELL_TRANSITION : undefined }}
                 >
-                  <div
-                    aria-hidden="true"
-                    className="mx-auto h-4 animate-pulse rounded-[6px]"
-                    style={{
-                      background: LEGACY_COLORS.s3,
-                      width: columnIndex === 2 ? "72%" : columnIndex === 4 ? "76%" : "58%",
-                    }}
-                  />
+                  {column.groupLabels ? (
+                    <div
+                      data-history-collapsible-content="true"
+                      className="grid h-[64px]"
+                      style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px` }}
+                    >
+                      {column.groupLabels.map((label, labelIndex) => (
+                        <div key={label} className="flex items-center justify-center px-2">
+                          <div
+                            aria-hidden="true"
+                            className="h-4 animate-pulse rounded-[6px]"
+                            style={{ background: LEGACY_COLORS.s3, width: labelIndex === 1 ? "76%" : "58%" }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      aria-hidden="true"
+                      className="mx-auto h-4 animate-pulse rounded-[6px]"
+                      style={{ background: LEGACY_COLORS.s3, width: columnIndex === 2 ? "72%" : "58%" }}
+                    />
+                  )}
                 </td>
               ))}
             </tr>
@@ -384,6 +445,7 @@ export function HistoryTable({
   // selection helpers
   const selectedLogId = selection?.kind === "log" ? selection.log.log_id : undefined;
   const selectedBatchId = selection?.kind === "batch" ? selection.batchId : undefined;
+  const detailPanelOpen = selection !== null;
 
   return (
     <div className="min-w-0">
@@ -409,18 +471,32 @@ export function HistoryTable({
           style={{ background: LEGACY_COLORS.s1 }}
         >
           <HistoryTableCornerMask />
-          <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+          <table
+            className="history-table-panel-motion w-full table-fixed border-separate border-spacing-0 text-sm"
+            data-panel-open={detailPanelOpen ? "true" : "false"}
+          >
             <thead>
               <tr>
                 {COLUMNS.map((column, index) => (
                   <th
                     key={column.label || `spacer-${index}`}
-                    scope={column.label ? "col" : undefined}
+                    scope={column.colSpan ? "colgroup" : column.label ? "col" : undefined}
                     aria-hidden={column.label ? undefined : true}
+                    aria-label={column.groupLabels ? column.label : undefined}
+                    colSpan={column.colSpan}
+                    data-history-collapsible-group={column.collapseWithPanel ? "true" : undefined}
                     className={historyTableHeaderClass(column, index)}
                     style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
-                    {column.label}
+                    {column.groupLabels ? (
+                      <div
+                        data-history-collapsible-content="true"
+                        className="grid"
+                        style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px` }}
+                      >
+                        {column.groupLabels.map((label) => <span key={label}>{label}</span>)}
+                      </div>
+                    ) : column.label}
                   </th>
                 ))}
               </tr>
@@ -477,6 +553,7 @@ export function HistoryTable({
                   const expanded = expandedGroupKey === group.batchId;
                   const controlsId = historyGroupPanelId(group.batchId);
                   const batch = batchCache.get(group.batchId) ?? null;
+                  const snapshotQuantityWidth = getStockSnapshotQuantityWidth(group.logs);
                   const isSelected = selectedBatchId === group.batchId;
                   const focusItemId = focusTarget?.groupKey === group.batchId ? focusTarget.itemId ?? null : null;
                   return (
@@ -496,13 +573,16 @@ export function HistoryTable({
                         rowRef={opBatchRowRef}
                         controlsId={controlsId}
                         separationHint={separationHint}
+                        snapshotQuantityWidth={snapshotQuantityWidth}
                       />
                       {expanded && (
                         <BomBatchDetail
                           batchId={group.batchId}
-                          colSpan={COLUMNS.length}
+                          colSpan={HISTORY_TABLE_COLUMN_SPAN}
                           cache={batchCache}
                           onCached={handleCacheBatch}
+                          logs={group.logs}
+                          snapshotQuantityWidth={snapshotQuantityWidth}
                           highlightItemId={focusItemId}
                           controlsId={controlsId}
                         />
@@ -538,7 +618,7 @@ export function HistoryTable({
                         <ReworkBatchDetail
                           logs={childLogs}
                           parentItemId={parentLog.item_id}
-                          colSpan={COLUMNS.length}
+                          colSpan={HISTORY_TABLE_COLUMN_SPAN}
                           controlsId={controlsId}
                           cancelled={group.logs.some((log) => log.cancelled)}
                         />

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, GitBranch, Package, Recycle } from "lucide-react";
 import { ioApi } from "@/lib/api/io";
+import type { TransactionLog } from "@/lib/api";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -25,8 +26,9 @@ import {
   HISTORY_CHILD_ROW_CLASS,
   HISTORY_TABLE_OPERATION_PILL_CLASS,
   InternalUseEffectBadge,
-  ItemCodeCell,
+  ItemCodeQuantityCell,
   MovementSummaryCell,
+  StockSnapshotCell,
 } from "./historyTableHelpers";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
@@ -46,6 +48,10 @@ type Props = {
   compact?: boolean;
   highlightItemId?: string | null;
   controlsId?: string;
+  /** 같은 operation_batch의 실제 거래 로그. BOM 줄별 스냅샷 표시용. */
+  logs?: TransactionLog[];
+  /** 작업 묶음 전체에 맞춘 재고 수량 표기 폭. */
+  snapshotQuantityWidth?: number;
 };
 
 const SIGN_TONE_MOVEMENT = {
@@ -55,7 +61,7 @@ const SIGN_TONE_MOVEMENT = {
   muted: "muted",
 } as const;
 
-export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId }: Props) {
+export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId, logs = [], snapshotQuantityWidth }: Props) {
   const realtimeRevision = useRealtimeRevision();
   const [batch, setBatch] = useState<IoBatch | null>(cache.get(batchId) ?? null);
   const [loading, setLoading] = useState(!cache.has(batchId));
@@ -152,6 +158,8 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
           compact={compact}
           highlightItemId={highlightItemId}
           rowId={index === 0 ? controlsId : undefined}
+          logs={logs}
+          snapshotQuantityWidth={snapshotQuantityWidth}
         />
       ))}
     </>
@@ -213,6 +221,8 @@ function BundleRows({
   compact,
   highlightItemId,
   rowId,
+  logs,
+  snapshotQuantityWidth,
 }: {
   bundle: IoBundle;
   batch: IoBatch;
@@ -221,10 +231,20 @@ function BundleRows({
   compact?: boolean;
   highlightItemId?: string | null;
   rowId?: string;
+  logs: TransactionLog[];
+  snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const isBomParent = bundle.source_kind === "bom_parent";
   const parentLine = getHistoryBomParentLine(bundle);
+  const isAdjustmentSummary = bundle.bundle_id === `history-adjustment-${batch.batch_id}`;
+  const parentLog = parentLine
+    ? getBomLineSnapshotLog(parentLine, logs, batch)
+    : isAdjustmentSummary
+      ? getBatchRepresentativeSnapshotLog(logs, batch)
+      : bundle.lines.length === 1
+        ? getBomLineSnapshotLog(bundle.lines[0], logs, batch)
+        : null;
   const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
   const childLines = (parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines)
     .filter((line) => isInternalUseBom || line.included);
@@ -256,8 +276,7 @@ function BundleRows({
     ? INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]
     : null;
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
 
   return (
     <>
@@ -343,15 +362,23 @@ function BundleRows({
             )}
           </div>
         </td>
-        <ItemCodeCell code={bundle.source_mes_code ?? singleLineCode} compact={compact} dense />
-        <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
-          {headerSigned ? (
-            <MovementSummaryCell
-              summary={{ parts: [{ label: headerSigned.label, tone: SIGN_TONE_MOVEMENT[headerSigned.tone] }] }}
-              compact={compact}
-            />
-          ) : headerQtyText}
-        </td>
+        <ItemCodeQuantityCell
+          code={bundle.source_mes_code ?? singleLineCode}
+          compact={compact}
+          dense
+          quantity={(
+            <div className="text-xs font-bold" style={{ color: headerQtyColor }}>
+              {headerSigned ? (
+                <MovementSummaryCell
+                  summary={{ parts: [{ label: headerSigned.label, tone: SIGN_TONE_MOVEMENT[headerSigned.tone] }] }}
+                  compact={compact}
+                />
+              ) : headerQtyText}
+            </div>
+          )}
+        />
+        <StockSnapshotCell log={parentLog} moment="before" dense quantityWidth={snapshotQuantityWidth} />
+        <StockSnapshotCell log={parentLog} moment="after" dense quantityWidth={snapshotQuantityWidth} />
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap justify-center gap-1">
             {shortageCount > 0 && <StatusBadge shortage={shortageCount} />}
@@ -371,6 +398,8 @@ function BundleRows({
           compact={compact}
           highlightItemId={highlightItemId}
           rowId={index === 0 ? detailId : undefined}
+          log={getBomLineSnapshotLog(line, logs, batch)}
+          snapshotQuantityWidth={snapshotQuantityWidth}
         />
       ))}
     </>
@@ -384,6 +413,8 @@ function BomLineRow({
   compact,
   highlightItemId,
   rowId,
+  log,
+  snapshotQuantityWidth,
 }: {
   line: IoLine;
   batch: IoBatch;
@@ -391,11 +422,12 @@ function BomLineRow({
   compact?: boolean;
   highlightItemId?: string | null;
   rowId?: string;
+  log: TransactionLog | null;
+  snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
   const cancelled = batch.status === "cancelled";
   const signed = getHistoryLineSignedQuantity(line, batch, bundle);
   const qtyColor = SIGN_TONE_HEX[signed.tone];
@@ -433,14 +465,22 @@ function BomLineRow({
           </TruncatedText>
         </div>
       </td>
-      <ItemCodeCell code={line.mes_code} compact={compact} dense />
-      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: qtyColor }}>
-        <MovementSummaryCell
-          summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
-          compact={compact}
-          cancelled={cancelled}
-        />
-      </td>
+      <ItemCodeQuantityCell
+        code={line.mes_code}
+        compact={compact}
+        dense
+        quantity={(
+          <div className="text-xs font-bold" style={{ color: qtyColor }}>
+            <MovementSummaryCell
+              summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
+              compact={compact}
+              cancelled={cancelled}
+            />
+          </div>
+        )}
+      />
+      <StockSnapshotCell log={log} moment="before" dense quantityWidth={snapshotQuantityWidth} />
+      <StockSnapshotCell log={log} moment="after" dense quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex flex-wrap justify-center gap-1">
           {internalUseEffect && <InternalUseEffectBadge label={internalUseEffect} />}
@@ -449,6 +489,32 @@ function BomLineRow({
       </td>
     </tr>
   );
+}
+
+function getBomLineSnapshotLog(line: IoLine, logs: TransactionLog[], batch: IoBatch): TransactionLog | null {
+  const exactMatches = logs.filter((log) => log.operation_line_id === line.line_id);
+  if (exactMatches.length === 1) return exactMatches[0];
+
+  const matchingLines = batch.bundles
+    .flatMap((bundle) => bundle.lines)
+    .filter((candidate) => candidate.item_id === line.item_id);
+  if (matchingLines.length !== 1) return null;
+
+  const legacyMatches = logs.filter(
+    (log) => log.item_id === line.item_id
+      && (log.operation_line_id === null || log.operation_line_id === undefined),
+  );
+  return legacyMatches.length === 1 ? legacyMatches[0] : null;
+}
+
+function getBatchRepresentativeSnapshotLog(logs: TransactionLog[], batch: IoBatch): TransactionLog | null {
+  const target = getDisplayBundles(batch)[0];
+  if (!target) return logs[0] ?? null;
+  return logs.find((log) => target.source_item_id && log.item_id === target.source_item_id)
+    ?? logs.find((log) => target.source_mes_code && log.mes_code === target.source_mes_code)
+    ?? logs.find((log) => log.item_name === target.title)
+    ?? logs[0]
+    ?? null;
 }
 
 function LineKindBadge({ line, compact }: { line: IoLine; compact?: boolean }) {

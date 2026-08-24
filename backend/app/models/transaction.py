@@ -59,6 +59,8 @@ class TransactionLog(Base):
     quantity_after = Column(IntQuantity, nullable=True)
     warehouse_qty_before = Column(IntQuantity, nullable=True)
     warehouse_qty_after = Column(IntQuantity, nullable=True)
+    department_qty_before = Column(IntQuantity, nullable=True)
+    department_qty_after = Column(IntQuantity, nullable=True)
     transfer_qty = Column(IntQuantity, nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
@@ -77,6 +79,12 @@ class TransactionLog(Base):
     operation_batch_id = Column(
         UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    operation_line_id = Column(
+        UUIDString,
+        ForeignKey("io_lines.line_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )

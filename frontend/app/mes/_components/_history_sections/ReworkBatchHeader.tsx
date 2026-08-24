@@ -12,9 +12,10 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   HISTORY_STATUS_CELL_CLASS,
-  ItemCodeCell,
+  ItemCodeQuantityCell,
   PeopleStatusCell,
   QuantityStockCell,
+  StockSnapshotCell,
   TargetSummaryBlock,
   type LogGroup,
 } from "./historyTableHelpers";
@@ -35,8 +36,7 @@ type Props = {
 export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelect, compact, controlsId }: Props) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
   const childCount = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE").length;
   const cancelled = group.logs.some((log) => log.cancelled);
@@ -113,10 +113,13 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
           cancelled={cancelled}
         />
       </td>
-      <ItemCodeCell code={presentation.target.code} compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} cancelled={cancelled} />
-      </td>
+      <ItemCodeQuantityCell
+        code={presentation.target.code}
+        compact={compact}
+        quantity={<QuantityStockCell presentation={presentation} cancelled={cancelled} />}
+      />
+      <StockSnapshotCell log={parentLog} moment="before" />
+      <StockSnapshotCell log={parentLog} moment="after" />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>

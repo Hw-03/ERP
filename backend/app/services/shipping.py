@@ -989,16 +989,14 @@ def _log_inventory_change(
         quantity_change=quantity_change,
         quantity_before=quantity_before,
         quantity_after=int(inv.quantity or 0) if inv else None,
-        warehouse_qty_before=before_cells.get(("warehouse", None, None), 0),
-        warehouse_qty_after=int(inv.warehouse_qty or 0) if inv else None,
         reference_no=reference_no,
         produced_by=produced_by,
         producer_employee_id=producer_employee_id,
         notes=notes,
-        inventory_effect=inv_effect.capture_effect(db, item.item_id, before_cells),
         shipping_request_id=request_id,
         shipping_phase=phase,
         department=department.value if department is not None else None,
+        **inv_effect.capture_log_stock_snapshot(db, item.item_id, before_cells),
     )
     db.add(log)
     db.flush()

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -39,6 +39,165 @@ function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>()
 }
 
 describe("HistoryTable hierarchy", () => {
+  it("orders the location snapshots after quantity and renders zero as chips", () => {
+    const log = makeLog({
+      cancelled: true,
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 4,
+      department_qty_before: 0,
+      department_qty_after: 7,
+    });
+
+    renderTable([{ type: "solo", log }]);
+
+    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+      "일시",
+      "작업",
+      "대상",
+      "품목코드수량",
+      "작업 전 재고",
+      "작업 후 재고",
+      "담당자",
+    ]);
+    const groupedHeader = screen.getByRole("columnheader", { name: "품목코드 · 수량" });
+    expect(within(groupedHeader).getByText("품목코드")).toBeInTheDocument();
+    expect(within(groupedHeader).getByText("수량")).toBeInTheDocument();
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    const before = within(row).getByLabelText("작업 전 재고: 창고 0, 부서 0");
+    const after = within(row).getByLabelText("작업 후 재고: 창고 4, 부서 7");
+    expect(within(before).getByLabelText("창고 0")).toBeInTheDocument();
+    expect(within(before).getByLabelText("부서 0")).toBeInTheDocument();
+    expect(within(after).getByLabelText("창고 4")).toBeInTheDocument();
+    expect(within(after).getByLabelText("부서 7")).toBeInTheDocument();
+  });
+
+  it("collapses item code and quantity through one spanning cell", () => {
+    const log = makeLog();
+    const groups: LogGroup[] = [{ type: "solo", log }];
+    const view = renderTable(groups);
+    const table = screen.getByRole("table");
+    const itemMovementHeader = screen.getByRole("columnheader", { name: "품목코드 · 수량" });
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    const itemMovementCell = row.querySelector("[data-history-collapsible-group='true']");
+
+    expect(table).toHaveClass("history-table-panel-motion");
+    expect(table).toHaveAttribute("data-panel-open", "false");
+    expect(itemMovementHeader).toHaveAttribute("colspan", "2");
+    expect(itemMovementHeader).toHaveAttribute("data-history-collapsible-group", "true");
+    expect(itemMovementCell).toHaveAttribute("colspan", "2");
+    expect(row.querySelectorAll("[data-history-collapsible-group='true']")).toHaveLength(1);
+    expect(within(itemMovementCell as HTMLElement).getByText("3-AA-0005")).toBeInTheDocument();
+
+    view.rerender(
+      <HistoryTable loading={false} displayGroups={groups} selection={{ kind: "log", log }} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+    );
+
+    expect(table).toHaveAttribute("data-panel-open", "true");
+    expect(itemMovementHeader.getAttribute("style")).toContain("padding 160ms");
+    expect(itemMovementHeader.getAttribute("style")).toContain("width 160ms");
+    expect(screen.getByText("3-AA-0005")).toBeInTheDocument();
+
+    view.rerender(
+      <HistoryTable loading={false} displayGroups={groups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+    );
+
+    expect(table).toHaveAttribute("data-panel-open", "false");
+    expect(itemMovementHeader).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("shows unrecorded for legacy logs without a complete location snapshot", () => {
+    renderTable([{ type: "solo", log: makeLog() }]);
+
+    expect(screen.getAllByText("기록 없음")).toHaveLength(2);
+  });
+
+  it("uses the displayed shipment target log for the summary snapshots", () => {
+    const source = makeLog({
+      log_id: "source-pa",
+      item_id: "SOURCE",
+      item_name: "기존 PA",
+      mes_code: "3-PA-0001",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 소스 PA 사용: 기존 PA x 1",
+      warehouse_qty_before: 1,
+      warehouse_qty_after: 0,
+      department_qty_before: 2,
+      department_qty_after: 2,
+    });
+    const target = makeLog({
+      log_id: "target-pa",
+      item_id: "TARGET",
+      item_name: "변경 PA",
+      mes_code: "3-PA-0002",
+      transaction_type: "PRODUCE",
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 대상 PA 입고: 변경 PA x 1",
+      warehouse_qty_before: 30,
+      warehouse_qty_after: 31,
+      department_qty_before: 40,
+      department_qty_after: 40,
+    });
+
+    renderTable([{ type: "batch", refKey: "conversion", refNo: "ITEM-CONV-1", logs: [source, target] }]);
+
+    const row = screen.getByLabelText("기존 PA → 변경 PA").closest("tr")!;
+    expect(within(row).getByLabelText("작업 전 재고: 창고 30, 부서 40")).toBeInTheDocument();
+    expect(within(row).getByLabelText("작업 후 재고: 창고 31, 부서 40")).toBeInTheDocument();
+  });
+
+  it("uses the log matching the operation batch target for summary snapshots", () => {
+    const component = makeLog({
+      log_id: "component",
+      item_id: "COMP-1",
+      item_name: "BOM 구성품",
+      mes_code: "3-AR-0001",
+      transaction_type: "BACKFLUSH",
+      operation_batch_id: "batch-1",
+      warehouse_qty_before: 1,
+      warehouse_qty_after: 1,
+      department_qty_before: 9,
+      department_qty_after: 8,
+    });
+    const target = makeLog({
+      log_id: "target",
+      operation_batch_id: "batch-1",
+      warehouse_qty_before: 20,
+      warehouse_qty_after: 20,
+      department_qty_before: 4,
+      department_qty_after: 5,
+    });
+
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [component, target] }],
+      new Map([["batch-1", makeBatch()]]),
+    );
+
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    expect(within(row).getByLabelText("작업 전 재고: 창고 20, 부서 4")).toBeInTheDocument();
+    expect(within(row).getByLabelText("작업 후 재고: 창고 20, 부서 5")).toBeInTheDocument();
+  });
+
+  it("shows the matching transaction snapshot on the BOM parent row", () => {
+    const parent = makeLog({
+      operation_batch_id: "batch-1",
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      department_qty_before: 0,
+      department_qty_after: 1,
+    });
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [parent] }],
+      new Map([["batch-1", makeBatch()]]),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "묶음 펼치기" }));
+    const bomRow = screen.getByText("BOM").closest("tr")!;
+    expect(within(bomRow).getByLabelText("작업 전 재고: 창고 0, 부서 0")).toBeInTheDocument();
+    expect(within(bomRow).getByLabelText("작업 후 재고: 창고 0, 부서 1")).toBeInTheDocument();
+  });
+
   it("keeps the final table geometry while the first page is loading", () => {
     const { container } = render(
       <HistoryTable loading displayGroups={[]} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
@@ -46,7 +205,7 @@ describe("HistoryTable hierarchy", () => {
 
     expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "작업" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "수량" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "품목코드 · 수량" })).toBeInTheDocument();
     const surface = screen.getByTestId("history-table-surface");
     expect(surface).toHaveClass(
       "min-w-0",

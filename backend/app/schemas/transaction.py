@@ -64,6 +64,8 @@ class TransactionLogResponse(BaseModel):
     quantity_after: Optional[int]
     warehouse_qty_before: Optional[int] = None
     warehouse_qty_after: Optional[int] = None
+    department_qty_before: Optional[int] = None
+    department_qty_after: Optional[int] = None
     transfer_qty: Optional[int] = None
     department: Optional[str] = None
     reference_no: Optional[str]
@@ -77,6 +79,7 @@ class TransactionLogResponse(BaseModel):
     reason_category: Optional[str] = None
     reason_memo: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
+    operation_line_id: Optional[uuid.UUID] = None
     shipping_phase: Optional[str] = None
     created_at: UtcDatetime
     edit_count: int = 0

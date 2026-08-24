@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoLine } from "@/lib/api/types/io";
+import type { TransactionLog } from "@/lib/api/types/production";
 import { BomBatchDetail } from "../BomBatchDetail";
 
 const realtimeState = vi.hoisted(() => ({
@@ -97,6 +98,39 @@ function makeBatch(): IoBatch {
   };
 }
 
+function makeTransactionLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
+  return {
+    log_id: "log-1",
+    item_id: "item",
+    mes_code: "MES-001",
+    item_name: "품목",
+    item_process_type_code: "AR",
+    item_unit: "EA",
+    transaction_type: "BACKFLUSH",
+    quantity_change: -1,
+    quantity_before: 1,
+    quantity_after: 0,
+    warehouse_qty_before: 10,
+    warehouse_qty_after: 10,
+    department_qty_before: 3,
+    department_qty_after: 2,
+    transfer_qty: null,
+    reference_no: null,
+    produced_by: "작업자",
+    requester_name: "작업자",
+    approver_name: "작업자",
+    department: "조립",
+    notes: null,
+    operation_batch_id: "batch-1",
+    created_at: "2026-08-24T04:12:00Z",
+    cancelled: false,
+    cancel_reason: null,
+    cancelled_by: null,
+    cancelled_at: null,
+    ...overrides,
+  };
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((promiseResolve) => {
@@ -168,6 +202,131 @@ beforeEach(() => {
 });
 
 describe("BomBatchDetail", () => {
+  it("shows unique batch logs on the BOM parent and component rows", () => {
+    const batch = makeBatch();
+    const logs = [
+      makeTransactionLog({
+        log_id: "parent-log",
+        item_id: "parent",
+        mes_code: "PARENT-001",
+        item_name: "완제품",
+        transaction_type: "PRODUCE",
+        quantity_change: 1,
+        warehouse_qty_before: 0,
+        warehouse_qty_after: 0,
+        department_qty_before: 15,
+        department_qty_after: 16,
+      }),
+      makeTransactionLog({
+        log_id: "child-log",
+        item_id: "child",
+        mes_code: "CHILD-001",
+        item_name: "아주 긴 구성품 라인 이름",
+      }),
+    ];
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
+    );
+
+    expect(screen.getByLabelText("작업 전 재고: 창고 0, 부서 15")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 후 재고: 창고 0, 부서 16")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+
+    expect(screen.getByLabelText("작업 전 재고: 창고 10, 부서 3")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 후 재고: 창고 10, 부서 2")).toBeInTheDocument();
+  });
+
+  it("prefers the exact operation line log when a BOM component is duplicated", () => {
+    const batch = makeBatch();
+    const logs = [
+      makeTransactionLog({
+        log_id: "other-child-log",
+        item_id: "child",
+        warehouse_qty_before: 90,
+        warehouse_qty_after: 90,
+        department_qty_before: 9,
+        department_qty_after: 8,
+        operation_line_id: "other-child-line",
+      }),
+      makeTransactionLog({
+        log_id: "child-log",
+        item_id: "child",
+        warehouse_qty_before: 10,
+        warehouse_qty_after: 10,
+        department_qty_before: 3,
+        department_qty_after: 2,
+        operation_line_id: "child-line",
+      }),
+    ];
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+
+    expect(screen.getByLabelText("작업 전 재고: 창고 10, 부서 3")).toBeInTheDocument();
+    expect(screen.queryByLabelText("작업 전 재고: 창고 90, 부서 9")).not.toBeInTheDocument();
+  });
+
+  it("keeps an ambiguous legacy component snapshot empty", () => {
+    const batch = makeBatch();
+    const logs = [
+      makeTransactionLog({ log_id: "first-child-log", item_id: "child" }),
+      makeTransactionLog({ log_id: "second-child-log", item_id: "child" }),
+    ];
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+
+    const row = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
+    expect(within(row).getAllByText("—")).toHaveLength(2);
+  });
+
+  it("does not use another line's linked log as a legacy fallback", () => {
+    const batch = makeBatch();
+    const logs = [makeTransactionLog({
+      log_id: "different-linked-child-log",
+      item_id: "child",
+      operation_line_id: "different-child-line",
+    })];
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+
+    const row = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
+    expect(within(row).getAllByText("—")).toHaveLength(2);
+  });
+
+  it("keeps duplicate BOM lines empty when legacy logs cannot identify a line", () => {
+    const batch = makeBatch();
+    batch.bundles[0].lines.push({
+      ...batch.bundles[0].lines[1],
+      line_id: "second-child-line",
+    });
+    const logs = [makeTransactionLog({ log_id: "only-child-log", item_id: "child" })];
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+
+    const rows = Array.from(new Set(
+      screen.getAllByText("아주 긴 구성품 라인 이름").map((element) => element.closest("tr")!),
+    ));
+    expect(rows).toHaveLength(2);
+    rows.forEach((row) => expect(within(row).getAllByText("—")).toHaveLength(2));
+  });
+
   it("refreshes an open BOM batch and republishes the fresh batch without collapsing it", async () => {
     const staleBatch = makeBatch();
     staleBatch.bundles[0].title = "Stale BOM Bundle";
@@ -436,6 +595,84 @@ describe("BomBatchDetail", () => {
     expect(dash.closest("td")).toHaveClass("text-center");
     expect(dash.parentElement).toHaveClass("justify-center");
     expect(screen.queryByText("제외")).not.toBeInTheDocument();
+  });
+
+  it("uses the current representative log snapshot on a multi-item quantity adjustment", () => {
+    const batch = makeMultiItemAdjustmentBatch();
+    const logs = [
+      makeTransactionLog({
+        log_id: "second-log",
+        item_id: "item-2",
+        warehouse_qty_before: 40,
+        warehouse_qty_after: 41,
+        department_qty_before: 4,
+        department_qty_after: 5,
+      }),
+      makeTransactionLog({
+        log_id: "representative-log",
+        item_id: "item",
+        warehouse_qty_before: 7,
+        warehouse_qty_after: 8,
+        department_qty_before: 2,
+        department_qty_after: 3,
+      }),
+    ];
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
+    );
+
+    expect(screen.getByLabelText("작업 전 재고: 창고 7, 부서 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 후 재고: 창고 8, 부서 3")).toBeInTheDocument();
+    expect(screen.queryByLabelText("작업 전 재고: 창고 40, 부서 4")).not.toBeInTheDocument();
+  });
+
+  it("uses each line's exact log for a non-summary multi-item batch", () => {
+    const batch = makeMultiItemAdjustmentBatch();
+    batch.sub_type = "warehouse_to_dept";
+    const logs = [
+      makeTransactionLog({
+        log_id: "first-line-log",
+        item_id: "item",
+        operation_line_id: "line-1",
+        warehouse_qty_before: 7,
+        warehouse_qty_after: 8,
+        department_qty_before: 2,
+        department_qty_after: 3,
+      }),
+      makeTransactionLog({
+        log_id: "second-line-log",
+        item_id: "item-2",
+        operation_line_id: "line-2",
+        warehouse_qty_before: 40,
+        warehouse_qty_after: 41,
+        department_qty_before: 4,
+        department_qty_after: 5,
+      }),
+    ];
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
+    );
+
+    expect(screen.getByLabelText("작업 전 재고: 창고 7, 부서 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 후 재고: 창고 8, 부서 3")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 전 재고: 창고 40, 부서 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 후 재고: 창고 41, 부서 5")).toBeInTheDocument();
+  });
+
+  it("keeps both stock snapshot cells unavailable for configuration-only rows", () => {
+    const batch = makeBatch();
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    const bundleRow = screen.getByText("아주 긴 완제품 구성 묶음 이름").closest("tr")!;
+    expect(within(bundleRow).getAllByText("—")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+    const lineRow = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
+    expect(within(lineRow).getAllByText("—")).toHaveLength(2);
   });
 
   it("shows the internal-use BOM mode and every child inventory effect", () => {

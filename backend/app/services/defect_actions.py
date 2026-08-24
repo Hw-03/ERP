@@ -77,7 +77,7 @@ def quarantine_inventory(
                 reason_memo=reason_memo or None,
                 client_request_id=client_request_id,
                 department=target_dept.value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
         )
     return inv
@@ -125,7 +125,7 @@ def unquarantine_inventory(
                 reason_category=reason_category,
                 reason_memo=reason_memo or None,
                 department=dept.value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
         )
     return inv

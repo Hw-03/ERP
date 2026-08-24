@@ -362,6 +362,10 @@ def test_apply_line_move_warehouse_to_production(make_item, make_location, db_se
     # move 방향은 quantity_change 0 (위치만 이동, 총량 불변)
     assert log.quantity_change == D("0")
     assert log.transfer_qty == D("4")
+    assert log.warehouse_qty_before == D("10")
+    assert log.warehouse_qty_after == D("6")
+    assert log.department_qty_before == D("0")
+    assert log.department_qty_after == D("4")
 
 
 def test_apply_line_move_production_to_warehouse(make_item, make_location, db_session):
@@ -415,6 +419,10 @@ def test_apply_line_move_between_departments(make_item, make_location, db_sessio
     assert _prod_qty(db_session, item.item_id, dept=TUNING) == D("2")
     log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
     assert log.transaction_type == TransactionTypeEnum.TRANSFER_DEPT
+    assert log.warehouse_qty_before == D("0")
+    assert log.warehouse_qty_after == D("0")
+    assert log.department_qty_before == D("6")
+    assert log.department_qty_after == D("6")
 
 
 def test_apply_line_defective_mark(make_item, make_location, db_session):
@@ -441,6 +449,10 @@ def test_apply_line_defective_mark(make_item, make_location, db_session):
     assert _defective_qty(db_session, item.item_id) == D("2")
     log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
     assert log.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
+    assert log.warehouse_qty_before == D("0")
+    assert log.warehouse_qty_after == D("0")
+    assert log.department_qty_before == D("5")
+    assert log.department_qty_after == D("3")
 
 
 def test_apply_line_adjust_in_and_out(make_item, make_location, db_session):

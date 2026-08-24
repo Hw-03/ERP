@@ -432,7 +432,7 @@ def _apply_adjustment(
             producer_employee_id=producer_employee_id,
             notes=log_notes or None,
             department=dept_enum.value,
-            inventory_effect=inv_effect.capture_effect(db, ln.item_id, cells_before),
+            **inv_effect.capture_log_stock_snapshot(db, ln.item_id, cells_before),
         )
         db.add(log)
         db.flush()
@@ -703,7 +703,7 @@ def _submit_rework_disassemble(
         reason_memo=reason_memo,
         reference_no=batch_ref,
         department=parent_dept_value,
-        inventory_effect=inv_effect.capture_effect(db, parent_item_id, parent_cells_before),
+        **inv_effect.capture_log_stock_snapshot(db, parent_item_id, parent_cells_before),
     )
     db.add(parent_log)
     db.flush()
@@ -751,7 +751,7 @@ def _submit_rework_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
             db.add(log)
             db.flush()
@@ -784,7 +784,7 @@ def _submit_rework_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
             db.add(log)
             db.flush()
@@ -806,7 +806,7 @@ def _submit_rework_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
-                inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             )
             db.add(log)
             db.flush()

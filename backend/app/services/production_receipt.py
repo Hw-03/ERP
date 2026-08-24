@@ -165,7 +165,7 @@ def _backflush_components(
             producer_employee_id=producer_id,
             department=dept.value,
             notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
-            inventory_effect=inv_effect.capture_effect(db, comp_item_id, comp_cells_before),
+            **inv_effect.capture_log_stock_snapshot(db, comp_item_id, comp_cells_before),
         )
         db.add(log)
         db.flush()
@@ -209,7 +209,7 @@ def _record_production(
         producer_employee_id=producer_id,
         department=dept.value,
         notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
-        inventory_effect=inv_effect.capture_effect(db, payload.item_id, prod_cells_before),
+        **inv_effect.capture_log_stock_snapshot(db, payload.item_id, prod_cells_before),
     )
     db.add(produce_log)
     db.flush()

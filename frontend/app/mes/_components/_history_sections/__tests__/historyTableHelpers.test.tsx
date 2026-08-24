@@ -13,7 +13,7 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   FlowBadge,
-  ItemCodeCell,
+  ItemCodeQuantityCell,
   MovementSummaryCell,
   PeopleStatusCell,
   ReferenceBatchDetail,
@@ -489,8 +489,8 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByText(/표시 .*건/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "현재 묶음 접기" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "top-0", "z-10");
-    expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "228px" });
-    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "160px" });
+    expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "184px" });
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "132px" });
   });
 
   it("defines a single fixed rhythm for main history rows", () => {
@@ -546,13 +546,16 @@ describe("history table helper rendering policies", () => {
     const target = screen.getByRole("columnheader", { name: "대상" });
     expect(target.style.width).toBe("");
     expect(target.style.minWidth).toBe("");
-    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("120px");
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
-    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("118px");
+    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("116px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
+    const codeQuantityHeader = screen.getByRole("columnheader", { name: "품목코드 · 수량" });
+    expect(codeQuantityHeader.style.width).toBe("328px");
+    expect(codeQuantityHeader).toHaveAttribute("colspan", "2");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
+    expect(screen.getByRole("columnheader", { name: "작업 전 재고" }).style.width).toBe("158px");
+    expect(screen.getByRole("columnheader", { name: "작업 후 재고" }).style.width).toBe("158px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
-    expect(statusHeader.style.width).toBe("160px");
+    expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");
 
     const row = screen.getByRole("button");
@@ -651,11 +654,13 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
+    expect(screen.getByRole("columnheader", { name: "품목코드 · 수량" }).style.width).toBe("328px");
+    expect(screen.getByRole("columnheader", { name: "작업 전 재고" }).style.width).toBe("158px");
+    expect(screen.getByRole("columnheader", { name: "작업 후 재고" }).style.width).toBe("158px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
-    expect(statusHeader.style.width).toBe("160px");
+    expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");
   });
 
@@ -874,13 +879,15 @@ describe("history table helper rendering policies", () => {
       <table>
         <tbody>
           <tr>
-            <ItemCodeCell code="46-AR-0093" sourceCode="4-AA-0077" />
+            <ItemCodeQuantityCell code="46-AR-0093" sourceCode="4-AA-0077" quantity={<span>수량</span>} />
           </tr>
         </tbody>
       </table>,
     );
 
     const cell = screen.getByText("4-AA-0077").closest("td");
+    expect(cell).toHaveAttribute("colspan", "2");
+    expect(cell).toHaveAttribute("data-history-collapsible-group", "true");
     expect(cell).toHaveTextContent("4-AA-0077↓46-AR-0093");
     expect(within(cell!).getByText("↓")).toBeInTheDocument();
   });

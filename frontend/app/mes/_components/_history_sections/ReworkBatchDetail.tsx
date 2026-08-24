@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
-import { ChevronToggleBtn, HISTORY_CELL_TRANSITION, HISTORY_TABLE_OPERATION_PILL_CLASS, ItemCodeCell } from "./historyTableHelpers";
+import { ChevronToggleBtn, HISTORY_CELL_TRANSITION, HISTORY_TABLE_OPERATION_PILL_CLASS, ItemCodeQuantityCell, StockSnapshotCell } from "./historyTableHelpers";
 import { buildReworkItemSummaries, type ReworkItemSummary, type ReworkResultTone } from "./reworkSummary";
 
 const REWORK_RESULT_LABEL = "처리결과";
@@ -103,21 +103,29 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
           </TruncatedText>
         </div>
       </td>
-      <ItemCodeCell code={summary.mesCode} compact={compact} dense />
-      <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border }}>
-        {summary.resultParts.map((part, index) => (
-          <span key={`${part.tone}-${part.label}`}>
-            {index > 0 && (
-              <span aria-hidden className={cancelled ? "line-through" : undefined} style={{ color: LEGACY_COLORS.muted2 }}>
-                {" · "}
+      <ItemCodeQuantityCell
+        code={summary.mesCode}
+        compact={compact}
+        dense
+        quantity={(
+          <div className="text-xs font-bold">
+            {summary.resultParts.map((part, index) => (
+              <span key={`${part.tone}-${part.label}`}>
+                {index > 0 && (
+                  <span aria-hidden className={cancelled ? "line-through" : undefined} style={{ color: LEGACY_COLORS.muted2 }}>
+                    {" · "}
+                  </span>
+                )}
+                <span className={cancelled ? "line-through" : undefined} style={{ color: REWORK_RESULT_TONE_COLORS[part.tone] }}>
+                  {part.label}
+                </span>
               </span>
-            )}
-            <span className={cancelled ? "line-through" : undefined} style={{ color: REWORK_RESULT_TONE_COLORS[part.tone] }}>
-              {part.label}
-            </span>
-          </span>
-        ))}
-      </td>
+            ))}
+          </div>
+        )}
+      />
+      <StockSnapshotCell log={summary.representativeLog} moment="before" dense />
+      <StockSnapshotCell log={summary.representativeLog} moment="after" dense />
       <td className="border-b px-4 py-2 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         -
       </td>

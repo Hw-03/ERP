@@ -214,7 +214,7 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
                 department=doc.to_department,
                 reference_no=doc.handover_code,
                 notes=f"인수인계 {doc.from_department}→{doc.to_department}",
-                inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, line.item_id, cells_before),
             )
         )
 
