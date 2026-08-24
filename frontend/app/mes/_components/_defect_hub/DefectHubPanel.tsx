@@ -70,9 +70,8 @@ export function DefectHubPanel({
     if (!processingLocation) return null;
     return locations.find(
       (location) =>
-        location.item_id === processingLocation.item_id &&
-        location.department === processingLocation.department &&
-        Number(location.quantity) > 0,
+        location.record_id === processingLocation.record_id &&
+        Number(location.available_quantity) > 0,
     ) ?? null;
   }, [locations, processingLocation]);
 
@@ -235,6 +234,12 @@ export function DefectHubPanel({
     setKpiFilter((prev) => (prev === kind ? null : kind));
   }
 
+  function handleMemoUpdated(recordId: string, memo: string) {
+    setLocations((current) => current.map((location) =>
+      location.record_id === recordId ? { ...location, reason_memo: memo } : location,
+    ));
+  }
+
   // 처리 화면 — 데스크톱 DefectProcessPanel 과 동일 동작의 모바일 통합 패널(전폭).
   if (view === "process" && activeProcessingLocation) {
     return (
@@ -326,7 +331,12 @@ export function DefectHubPanel({
           {error}
         </InlineErrorNote>
       ) : (
-        <DefectDepartmentList locations={filteredLocations} onProcess={handleProcess} />
+        <DefectDepartmentList
+          locations={filteredLocations}
+          currentEmployee={currentEmployee}
+          onMemoUpdated={handleMemoUpdated}
+          onProcess={handleProcess}
+        />
       )}
     </>
   );

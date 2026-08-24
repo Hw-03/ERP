@@ -30,12 +30,12 @@ vi.mock("../_defect_hub/DefectDepartmentList", () => ({
     locations,
     onProcess,
   }: {
-    locations: Array<{ item_id: string; mes_code: string }>;
+    locations: Array<{ record_id: string; item_id: string; mes_code: string }>;
     onProcess: (location: unknown) => void;
   }) => (
     <div data-testid="defect-list">
       {locations.map((location) => (
-        <button key={location.item_id} type="button" onClick={() => onProcess(location)}>
+        <button key={location.record_id} type="button" onClick={() => onProcess(location)}>
           Process {location.mes_code}
         </button>
       ))}
@@ -60,12 +60,19 @@ const operator = {
 } as Operator;
 
 const location = {
+  record_id: "record-1",
   item_id: "item-1",
   item_name: "Defect item",
   mes_code: "D-001",
   department: "assembly",
   quantity: 5,
+  original_quantity: 5,
+  pending_quantity: 0,
+  available_quantity: 5,
   defective_at: null,
+  quarantined_by: "Operator",
+  quarantined_by_employee_id: operator.employee_id,
+  is_legacy: false,
   has_bom: false,
 };
 
@@ -106,7 +113,7 @@ describe("DesktopDefectView realtime refresh", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Process D-001" }));
     expect(screen.getByTestId("process-location")).toHaveTextContent("5");
 
-    mocks.listDefects.mockResolvedValueOnce([{ ...location, quantity: 2 }]);
+    mocks.listDefects.mockResolvedValueOnce([{ ...location, quantity: 2, available_quantity: 2 }]);
     mocks.revision = 1;
     rerender(<DesktopDefectView operator={operator} />);
     await waitFor(() => expect(screen.getByTestId("process-location")).toHaveTextContent("2"));
@@ -133,7 +140,7 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
     expect(screen.queryByText(/로딩 중/)).not.toBeInTheDocument();
 
-    await act(async () => pendingRefresh.resolve([{ ...location, quantity: 2 }]));
+    await act(async () => pendingRefresh.resolve([{ ...location, quantity: 2, available_quantity: 2 }]));
   });
 
   it("keeps the loaded list visible after refresh failure and retries without a loading screen", async () => {
@@ -149,7 +156,7 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
 
-    mocks.listDefects.mockResolvedValueOnce([{ ...location, quantity: 2 }]);
+    mocks.listDefects.mockResolvedValueOnce([{ ...location, quantity: 2, available_quantity: 2 }]);
     fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
@@ -170,6 +177,7 @@ describe("DesktopDefectView realtime refresh", () => {
     mocks.listDefects.mockResolvedValueOnce([
       {
         ...location,
+        record_id: "record-mine-assembly",
         item_id: "mine-assembly",
         mes_code: "MINE-ASSEMBLY",
         quarantined_by_employee_id: operator.employee_id,
@@ -177,6 +185,7 @@ describe("DesktopDefectView realtime refresh", () => {
       },
       {
         ...location,
+        record_id: "record-mine-vacuum",
         item_id: "mine-vacuum",
         mes_code: "MINE-VACUUM",
         department: "vacuum",
@@ -185,12 +194,14 @@ describe("DesktopDefectView realtime refresh", () => {
       },
       {
         ...location,
+        record_id: "record-other-assembly",
         item_id: "other-assembly",
         mes_code: "OTHER-ASSEMBLY",
         quarantined_by_employee_id: "employee-2",
       },
       {
         ...location,
+        record_id: "record-unknown-assembly",
         item_id: "unknown-assembly",
         mes_code: "UNKNOWN-ASSEMBLY",
         quarantined_by_employee_id: null,

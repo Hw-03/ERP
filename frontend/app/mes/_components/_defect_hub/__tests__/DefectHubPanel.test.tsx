@@ -34,24 +34,40 @@ import { defectsApi } from "@/lib/api/defects";
 // 조립부 1개, 진공부 1개
 const mockLocations: DefectLocation[] = [
   {
+    record_id: "record-001",
     item_id: "item-001",
     item_name: "전극(70kV)",
     mes_code: "7-TR-0001",
     department: "조립",
     quantity: 3,
+    original_quantity: 3,
+    pending_quantity: 0,
+    available_quantity: 3,
     defective_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(), // 200일 전
     reason_category: "외관 불량",
     reason_memo: "스크래치",
+    quarantined_by: "김건호",
+    quarantined_by_employee_id: "emp-001",
+    is_legacy: false,
+    has_bom: false,
   },
   {
+    record_id: "record-002",
     item_id: "item-002",
     item_name: "게터",
     mes_code: "7-TR-0003",
     department: "진공",
     quantity: 8,
+    original_quantity: 8,
+    pending_quantity: 0,
+    available_quantity: 8,
     defective_at: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(), // 400일 전 (1년 초과)
     reason_category: "기능 불량",
     reason_memo: null,
+    quarantined_by: "이서윤",
+    quarantined_by_employee_id: "emp-002",
+    is_legacy: false,
+    has_bom: false,
   },
 ];
 
@@ -209,6 +225,7 @@ describe("DefectHubPanel", () => {
     vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
       {
         ...mockLocations[0],
+        record_id: "record-mine-assembly",
         item_id: "mine-assembly",
         item_name: "내 조립 격리",
         mes_code: "MINE-ASSEMBLY",
@@ -218,6 +235,7 @@ describe("DefectHubPanel", () => {
       },
       {
         ...mockLocations[0],
+        record_id: "record-mine-vacuum",
         item_id: "mine-vacuum",
         item_name: "내 진공 격리",
         mes_code: "MINE-VACUUM",
@@ -227,6 +245,7 @@ describe("DefectHubPanel", () => {
       },
       {
         ...mockLocations[0],
+        record_id: "record-other-assembly",
         item_id: "other-assembly",
         item_name: "다른 작업자 격리",
         mes_code: "OTHER-ASSEMBLY",
@@ -235,6 +254,7 @@ describe("DefectHubPanel", () => {
       },
       {
         ...mockLocations[0],
+        record_id: "record-unknown-assembly",
         item_id: "unknown-assembly",
         item_name: "처리자 미상 격리",
         mes_code: "UNKNOWN-ASSEMBLY",
@@ -331,7 +351,7 @@ describe("DefectHubPanel realtime refresh", () => {
     expect(screen.getByTestId("process-panel")).toHaveTextContent("7-TR-0001:3");
 
     vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
-      { ...mockLocations[0], quantity: 1 },
+      { ...mockLocations[0], quantity: 1, available_quantity: 1 },
       mockLocations[1],
     ]);
     realtime.revision = 1;
