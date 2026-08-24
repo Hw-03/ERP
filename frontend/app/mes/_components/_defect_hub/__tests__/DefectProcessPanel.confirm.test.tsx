@@ -19,14 +19,21 @@ vi.mock("@/lib/api/stock-requests", () => ({
 }));
 
 const location: DefectLocation = {
+  record_id: "record-1",
   item_id: "item-1",
   item_name: "Defect Item",
   mes_code: "DEF-001",
   department: "Assembly",
   quantity: 3,
+  original_quantity: 5,
+  pending_quantity: 0,
+  available_quantity: 3,
   defective_at: null,
   reason_category: null,
   reason_memo: null,
+  quarantined_by: "Kim",
+  quarantined_by_employee_id: "emp-1",
+  is_legacy: false,
   has_bom: false,
 };
 
@@ -50,6 +57,9 @@ describe("DefectProcessPanel normal recovery", () => {
     fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
 
     await waitFor(() => expect(defectsApi.unquarantine).toHaveBeenCalledTimes(1));
+    expect(defectsApi.unquarantine).toHaveBeenCalledWith(
+      expect.objectContaining({ record_id: "record-1", qty: 3 }),
+    );
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 });

@@ -39,7 +39,7 @@ export function PaPfDefectWizard({
 
   const [action, setAction] = useState<DisposalAction>("disassemble");
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
-  const [processQty, setProcessQty] = useState<number>(Number(location.quantity));
+  const [processQty, setProcessQty] = useState<number>(Number(location.available_quantity));
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,8 +68,8 @@ export function PaPfDefectWizard({
 
   const submitLabel: Record<DisposalAction, string> = {
     unquarantine: "정상 복귀로 변경",
-    scrap: "즉시 처리 →",
-    disassemble: "즉시 처리 →",
+    scrap: "폐기 요청 →",
+    disassemble: "재작업 요청 →",
   };
 
   async function handleSubmit() {
@@ -79,6 +79,7 @@ export function PaPfDefectWizard({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
+          record_id: location.record_id,
           item_id: location.item_id,
           qty: processQty,
           dept: location.department,
@@ -95,6 +96,7 @@ export function PaPfDefectWizard({
           notes: memo || null,
           lines: [
             {
+              record_id: location.record_id,
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",
@@ -114,6 +116,7 @@ export function PaPfDefectWizard({
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
             {
+              record_id: location.record_id,
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",
@@ -180,10 +183,10 @@ export function PaPfDefectWizard({
             <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
             <QuantityInput
               min={1}
-              max={Number(location.quantity)}
+              max={Number(location.available_quantity)}
               value={processQty}
               onChange={(e) => {
-                const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
+                const v = Math.max(1, Math.min(Number(location.available_quantity), Number(e.target.value) || 1));
                 setProcessQty(v);
                 setDecisions([]);
               }}
@@ -191,7 +194,7 @@ export function PaPfDefectWizard({
               style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
             />
             <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-              / 총 {location.quantity}개 격리
+              / 처리 가능 {location.available_quantity}개
             </span>
           </div>
 
@@ -247,7 +250,7 @@ export function PaPfDefectWizard({
               <DisassembleTree
                 parentItemId={location.item_id}
                 parentItemName={location.item_name}
-                parentMesCode={location.mes_code}
+                parentMesCode={location.mes_code ?? ""}
                 parentQty={processQty}
                 parentDept={location.department}
                 decisions={decisions}
@@ -313,8 +316,8 @@ export function PaPfDefectWizard({
         open={confirmOpen}
         title={action === "scrap" ? "폐기 확인" : "재작업 확인"}
         tone="danger"
-        cautionMessage="이 작업은 즉시 반영됩니다."
-        confirmLabel="즉시 처리"
+        cautionMessage="승인 완료 후 재고에 반영됩니다."
+        confirmLabel="처리 요청"
         busy={busy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}

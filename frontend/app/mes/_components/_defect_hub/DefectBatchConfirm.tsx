@@ -16,8 +16,8 @@ export type BatchAction = "unquarantine" | "scrap" | "return";
 
 const META: Record<BatchAction, { title: string; submit: string }> = {
   unquarantine: { title: "선택 항목 정상 복귀", submit: "정상 복귀" },
-  scrap: { title: "선택 항목 폐기", submit: "즉시 폐기" },
-  return: { title: "선택 항목 반품", submit: "즉시 반품" },
+  scrap: { title: "선택 항목 폐기", submit: "폐기 요청" },
+  return: { title: "선택 항목 반품", submit: "반품 요청" },
 };
 
 interface ReasonRow {
@@ -39,7 +39,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const keyOf = (loc: DefectLocation) => `${loc.item_id}__${loc.department}`;
+const keyOf = (loc: DefectLocation) => loc.record_id;
 
 /**
  * 단순 격리 항목(정상복귀/폐기/반품) 일괄 처리 확인 전폭 화면.
@@ -54,7 +54,7 @@ export function DefectBatchConfirm({
 }: Props) {
   const meta = META[action];
   const [reasons, setReasons] = useState<Record<string, ReasonRow>>(() =>
-    Object.fromEntries(locations.map((l) => [keyOf(l), { category: "", memo: "", qty: String(l.quantity) }])),
+    Object.fromEntries(locations.map((l) => [keyOf(l), { category: "", memo: "", qty: String(l.available_quantity) }])),
   );
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<RowFailure[]>([]);
@@ -67,7 +67,7 @@ export function DefectBatchConfirm({
         if (!r?.category) return false;
         if (action === "unquarantine") {
           const n = Number(r.qty);
-          return Number.isFinite(n) && n > 0 && n <= Number(l.quantity);
+          return Number.isFinite(n) && n > 0 && n <= Number(l.available_quantity);
         }
         return true;
       }),
@@ -85,7 +85,7 @@ export function DefectBatchConfirm({
     setReasons((prev) => {
       const next = { ...prev };
       locations.slice(index + 1).forEach((l) => {
-        next[keyOf(l)] = { category: src.category, memo: src.memo, qty: prev[keyOf(l)]?.qty ?? String(l.quantity) };
+        next[keyOf(l)] = { category: src.category, memo: src.memo, qty: prev[keyOf(l)]?.qty ?? String(l.available_quantity) };
       });
       return next;
     });
@@ -93,9 +93,10 @@ export function DefectBatchConfirm({
 
   async function submitRow(loc: DefectLocation): Promise<void> {
     const r = reasons[keyOf(loc)];
-    const qty = action === "unquarantine" ? Number(r.qty) : Number(loc.quantity);
+    const qty = action === "unquarantine" ? Number(r.qty) : Number(loc.available_quantity);
     if (action === "unquarantine") {
       await defectsApi.unquarantine({
+        record_id: loc.record_id,
         item_id: loc.item_id,
         qty,
         dept: loc.department,
@@ -113,6 +114,7 @@ export function DefectBatchConfirm({
       notes: r.memo || null,
       lines: [
         {
+          record_id: loc.record_id,
           item_id: loc.item_id,
           quantity: qty,
           from_bucket: "defective",
@@ -164,7 +166,7 @@ export function DefectBatchConfirm({
             {meta.title}
           </h2>
           <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {locations.length}건 일괄 처리 — 즉시 반영됩니다. 줄마다 사유를 입력하세요.
+            {locations.length}건 일괄 처리 — {action === "unquarantine" ? "즉시 반영" : "승인 완료 후 반영"}됩니다. 줄마다 사유를 입력하세요.
           </p>
         </div>
       </div>
@@ -198,18 +200,18 @@ export function DefectBatchConfirm({
                     <QuantityInput
                       value={r.qty}
                       min={1}
-                      max={Number(loc.quantity)}
+                      max={Number(loc.available_quantity)}
                       onChange={(e) => setReason(key, { qty: e.target.value })}
                       className="w-20 rounded-[8px] border px-2 py-1 text-sm font-bold"
                       style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
                     />
                     <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                      / {formatQty(loc.quantity)}개
+                      / {formatQty(loc.available_quantity)}개
                     </span>
                   </div>
                 ) : (
                   <span className="shrink-0 text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-                    × {formatQty(loc.quantity)}개
+                    × {formatQty(loc.available_quantity)}개
                   </span>
                 )}
                 {idx < locations.length - 1 && (r.category || r.memo) && (

@@ -25,7 +25,7 @@ interface PaPfDefectWizardPanelProps {
 /**
  * PA/PF(분해 가능) 격리 항목 처리 패널 — PaPfDefectWizard 의 마스터-디테일 패널 버전.
  * createPortal + fixed overlay 껍데기만 벗기고 폼/검증/제출 로직(분해 트리 포함)은 100% 보존.
- * 폐기/분해는 즉시 처리 — ConfirmModal 만 모달로 유지.
+ * 폐기/분해는 승인 요청 — ConfirmModal 만 모달로 유지.
  */
 export function PaPfDefectWizardPanel({
   location,
@@ -35,7 +35,7 @@ export function PaPfDefectWizardPanel({
 }: PaPfDefectWizardPanelProps) {
   const [action, setAction] = useState<DisposalAction>("disassemble");
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
-  const [processQty, setProcessQty] = useState<number>(Number(location.quantity));
+  const [processQty, setProcessQty] = useState<number>(Number(location.available_quantity));
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,13 +46,13 @@ export function PaPfDefectWizardPanel({
   useEffect(() => {
     setAction("disassemble");
     setDecisions([]);
-    setProcessQty(Number(location.quantity));
+    setProcessQty(Number(location.available_quantity));
     setCategory("");
     setMemo("");
     setErrorMsg(null);
     setBusy(false);
     setConfirmOpen(false);
-  }, [location.item_id, location.department, location.quantity]);
+  }, [location.record_id, location.available_quantity]);
 
   // action 변경 시 decisions 초기화
   useEffect(() => {
@@ -66,8 +66,8 @@ export function PaPfDefectWizardPanel({
 
   const submitLabel: Record<DisposalAction, string> = {
     unquarantine: "정상 복귀로 변경",
-    scrap: "즉시 처리 →",
-    disassemble: "즉시 처리 →",
+    scrap: "폐기 요청 →",
+    disassemble: "재작업 요청 →",
   };
 
   async function handleSubmit() {
@@ -77,6 +77,7 @@ export function PaPfDefectWizardPanel({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
+          record_id: location.record_id,
           item_id: location.item_id,
           qty: processQty,
           dept: location.department,
@@ -93,6 +94,7 @@ export function PaPfDefectWizardPanel({
           notes: memo || null,
           lines: [
             {
+              record_id: location.record_id,
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",
@@ -112,6 +114,7 @@ export function PaPfDefectWizardPanel({
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
             {
+              record_id: location.record_id,
               item_id: location.item_id,
               quantity: processQty,
               from_bucket: "defective",
@@ -156,17 +159,17 @@ export function PaPfDefectWizardPanel({
           <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
           <QuantityInput
             min={1}
-            max={Number(location.quantity)}
+            max={Number(location.available_quantity)}
             value={processQty}
             onChange={(e) => {
-              const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
+              const v = Math.max(1, Math.min(Number(location.available_quantity), Number(e.target.value) || 1));
               setProcessQty(v);
             }}
             className="w-16 rounded-[8px] border px-2 py-1 text-base font-black"
             style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
           />
           <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            / 총 {Number(location.quantity)}개 격리
+            / 처리 가능 {Number(location.available_quantity)}개
           </span>
         </div>
 
@@ -218,7 +221,7 @@ export function PaPfDefectWizardPanel({
             <DisassembleTree
               parentItemId={location.item_id}
               parentItemName={location.item_name}
-              parentMesCode={location.mes_code}
+              parentMesCode={location.mes_code ?? ""}
               parentQty={processQty}
               parentDept={location.department}
               decisions={decisions}
@@ -281,8 +284,8 @@ export function PaPfDefectWizardPanel({
         open={confirmOpen}
         title={action === "scrap" ? "폐기 확인" : "재작업 확인"}
         tone="danger"
-        cautionMessage="이 작업은 즉시 반영됩니다."
-        confirmLabel="즉시 처리"
+        cautionMessage="승인 완료 후 재고에 반영됩니다."
+        confirmLabel="처리 요청"
         busy={busy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}

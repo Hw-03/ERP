@@ -19,14 +19,22 @@ import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 
 const mockLocation: DefectLocation = {
+  record_id: "record-001",
   item_id: "item-001",
   item_name: "텅스텐 와이어",
   mes_code: "7-MAT-0001",
   department: "조립",
   quantity: 5,
+  original_quantity: 5,
+  pending_quantity: 0,
+  available_quantity: 5,
   defective_at: "2025-08-15T00:00:00.000Z",
   reason_category: "외관 불량",
   reason_memo: "스크래치",
+  quarantined_by: "김건호",
+  quarantined_by_employee_id: "emp-001",
+  is_legacy: false,
+  has_bom: false,
 };
 
 const mockEmployee = {
@@ -104,6 +112,7 @@ describe("RDefectActionModal", () => {
       expect(defectsApi.unquarantine).toHaveBeenCalledOnce();
       expect(defectsApi.unquarantine).toHaveBeenCalledWith(
         expect.objectContaining({
+          record_id: "record-001",
           item_id: "item-001",
           qty: 5,
           dept: "조립",
@@ -133,6 +142,7 @@ describe("RDefectActionModal", () => {
           reason_memo: null,
           lines: expect.arrayContaining([
             expect.objectContaining({
+              record_id: "record-001",
               item_id: "item-001",
               quantity: 5,
               from_bucket: "defective",
