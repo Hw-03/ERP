@@ -42,7 +42,8 @@ boot_id·활성직원)을 런타임 조회로 inject. 결재 2-세션 테스트�
 | `io-process-produce.spec.ts` | 생산(BOM 자동 전개, **즉시 반영**) + 자식 강제 잠김 | BOM 분기. produce 는 자식 제외 불가(`isBomForced`) |
 | `io-warehouse-adjust.spec.ts` | 창고 보정 입고·출고(**즉시 반영**) | 창고 정·부 권한, 데스크톱·모바일, ADJUST 이력 |
 | `io-approval-cycle.spec.ts` | 제출(E01) → 창고 승인함 PIN 승인(E22) → 큐 소멸 | **2-세션 결재 풀사이클** |
-| `io-defect.spec.ts` | 불량 격리 → 정상 복귀 | 불량 흐름(즉시 처리) |
+| `io-defect.spec.ts` | 불량 격리 → 정상 복귀 | 격리·정상 복귀 즉시 처리 |
+| `defect-quarantine-records.spec.ts` | 동일 품목 2건 → 부분 처리·메모·예약 승인/취소 | 건별 원장과 승인 예약 생명주기 |
 | `io-history-labels.spec.ts` | 같은 작업이 화면에서 같은 라벨로 보임 | P0-1 라벨 회귀 방어 |
 
 ## 작성 원칙
