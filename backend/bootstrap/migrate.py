@@ -321,7 +321,7 @@ _MIGRATION_DDL: list[str] = [
     # 2026-06-26: 출하 요청 워크플로우
     """CREATE TABLE IF NOT EXISTS shipping_requests (
         request_id CHAR(36) PRIMARY KEY,
-        status VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
+        status VARCHAR(20) NOT NULL DEFAULT 'PREPARING',
         base_pf_item_id CHAR(36) NOT NULL REFERENCES items(item_id),
         final_pa_item_id CHAR(36) REFERENCES items(item_id),
         final_pf_item_id CHAR(36) REFERENCES items(item_id),
