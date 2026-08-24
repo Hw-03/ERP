@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Request
+from fastapi import HTTPException, Request
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.ext.declarative import declarative_base
@@ -103,6 +103,31 @@ ReadSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=read_eng
 Base = declarative_base()
 
 
+_WEEKLY_SNAPSHOT_GUARD_PREFIXES = (
+    "/api/items",
+    "/api/inventory",
+    "/api/io",
+    "/api/production",
+    "/api/shipping",
+    "/api/stock-requests",
+    "/api/handovers",
+    "/api/dept-adjustment",
+    "/api/defects",
+)
+
+
+def _requires_weekly_snapshot_guard(request: Request) -> bool:
+    """재고 수량이나 완료품 활성 범위에 영향을 줄 수 있는 쓰기인지 판정한다."""
+
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return False
+    path = request.url.path
+    return any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in _WEEKLY_SNAPSHOT_GUARD_PREFIXES
+    )
+
+
 def get_db(request: Request):
     session_factory = (
         ReadSessionLocal
@@ -111,6 +136,22 @@ def get_db(request: Request):
     )
     db = session_factory()
     try:
+        if _requires_weekly_snapshot_guard(request):
+            from app.services.weekly_inventory_snapshot import (
+                WeeklyInventorySnapshotGapError,
+                ensure_due_snapshot_committed,
+            )
+
+            try:
+                ensure_due_snapshot_committed(db, source="first_write")
+            except WeeklyInventorySnapshotGapError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "DB_UNAVAILABLE",
+                        "message": str(exc),
+                    },
+                ) from exc
         yield db
     except Exception:
         # WS4: 핸들러 중간 예외 시 세션을 명시적으로 롤백한 뒤 반환.

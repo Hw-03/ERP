@@ -6,12 +6,23 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from itertools import count
 
 import pytest
-from app.models import Inventory, Item, ProductSymbol, TransactionLog, TransactionTypeEnum
+from app.models import (
+    DepartmentEnum,
+    Inventory,
+    InventoryLocation,
+    Item,
+    LocationStatusEnum,
+    ProductSymbol,
+    TransactionLog,
+    TransactionTypeEnum,
+    WeeklyInventorySnapshot,
+    WeeklyInventorySnapshotItem,
+)
 
 
 WEEK_START = "2026-05-04"  # 월요일
@@ -75,6 +86,35 @@ def _add_log(db_session, item_id, *, tx_type: TransactionTypeEnum,
     log.created_at = at
     db_session.add(log)
     return log
+
+
+def _add_snapshot(
+    db_session,
+    *,
+    week_end: date,
+    item_quantities: list[tuple[Item, Decimal]],
+) -> WeeklyInventorySnapshot:
+    snapshot = WeeklyInventorySnapshot(
+        week_end=week_end,
+        as_of_utc=datetime.combine(week_end, datetime.max.time()),
+        captured_at=datetime.combine(week_end, datetime.max.time()),
+        capture_source="scheduled",
+        item_count=len(item_quantities),
+        total_quantity=sum((quantity for _, quantity in item_quantities), Decimal("0")),
+    )
+    snapshot.items = [
+        WeeklyInventorySnapshotItem(
+            item_id=item.item_id,
+            mes_code=item.mes_code,
+            item_name=item.item_name,
+            process_type_code=item.process_type_code,
+            quantity=quantity,
+        )
+        for item, quantity in item_quantities
+    ]
+    db_session.add(snapshot)
+    db_session.flush()
+    return snapshot
 
 
 # ── 기본 집계 ────────────────────────────────────────────────────────────
@@ -404,3 +444,275 @@ def test_all_transaction_types_classified():
     assert not overlap, (
         f"중복 분류: {sorted(t.value for t in overlap)} — 한 쪽에서만 정의해야 합니다."
     )
+
+
+# ── 신규 주말 스냅샷 경계 ────────────────────────────────────────────────
+
+def test_legacy_week_keeps_existing_cancelled_transaction_result(client, db_session):
+    """스냅샷 도입 전 주차는 취소 생산까지 포함하던 기존 -1 산출값을 보존한다."""
+    item = _make_prod_item(
+        db_session,
+        name="CSGR + CSCB 레거시",
+        process_code="VF",
+        model_symbol="8",
+        qty=_dec(8),
+    )
+    _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(8),
+        at=_WEEK_MID,
+    )
+    cancelled = _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(1),
+        at=_WEEK_MID,
+    )
+    cancelled.cancelled = True
+    cancelled.cancelled_at = datetime(2026, 5, 6, 13, 0)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    row = {
+        item_row["item_id"]: item_row
+        for group in resp.json()["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert _dec(row["current_qty"]) == _dec(8)
+    assert _dec(row["prev_qty"]) == _dec(-1)
+    assert _dec(row["produce_qty"]) == _dec(9)
+    assert _dec(row["delta"]) == _dec(9)
+
+
+def test_closed_snapshot_week_uses_boundaries_and_excludes_cancelled_flow(client, db_session):
+    """연속 스냅샷 주차는 경계 수량 차이를 쓰고 기준 전에 취소된 생산은 제외한다."""
+    item = _make_prod_item(
+        db_session,
+        name="CSGR + CSCB 신규",
+        process_code="VF",
+        model_symbol="8",
+        qty=_dec(8),
+    )
+    _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(8),
+        at=_WEEK_MID,
+    )
+    cancelled = _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(1),
+        at=_WEEK_MID,
+    )
+    cancelled.cancelled = True
+    cancelled.cancelled_at = datetime(2026, 5, 6, 13, 0)
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(0))])
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(8))])
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body) == {
+        "week_start",
+        "week_end",
+        "groups",
+        "summary",
+        "warnings",
+        "production_matrix",
+    }
+    row = {
+        item_row["item_id"]: item_row
+        for group in body["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert _dec(row["prev_qty"]) == _dec(0)
+    assert _dec(row["current_qty"]) == _dec(8)
+    assert _dec(row["delta"]) == _dec(8)
+    assert _dec(row["produce_qty"]) == _dec(8)
+    assert _dec(body["summary"]["total_current_qty"]) == _dec(8)
+
+
+def test_current_snapshot_week_uses_live_dashboard_stock_math(
+    client,
+    db_session,
+    monkeypatch,
+):
+    """진행 중 주차 현재 재고는 Inventory.quantity가 아니라 대시보드 위치 합계와 같다."""
+    from app.routers.inventory import weekly_report
+
+    item = _make_prod_item(
+        db_session,
+        name="현재 VF 완료품",
+        process_code="VF",
+        model_symbol="6",
+        qty=_dec(99),
+    )
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inventory.warehouse_qty = _dec(3)
+    db_session.add_all([
+        InventoryLocation(
+            item_id=item.item_id,
+            department=DepartmentEnum.VACUUM,
+            status=LocationStatusEnum.PRODUCTION,
+            quantity=_dec(4),
+        ),
+        InventoryLocation(
+            item_id=item.item_id,
+            department=DepartmentEnum.VACUUM,
+            status=LocationStatusEnum.DEFECTIVE,
+            quantity=_dec(2),
+        ),
+    ])
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(5))])
+    db_session.commit()
+    monkeypatch.setattr(weekly_report, "_today_kst", lambda: date(2026, 5, 6), raising=False)
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    row = {
+        item_row["item_id"]: item_row
+        for group in resp.json()["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert _dec(row["prev_qty"]) == _dec(5)
+    assert _dec(row["current_qty"]) == _dec(9)
+    assert _dec(row["delta"]) == _dec(4)
+    assert _dec(resp.json()["summary"]["total_current_qty"]) == _dec(9)
+
+
+def test_snapshot_era_missing_closed_boundary_returns_503(client, db_session, monkeypatch):
+    """정확 적용이 시작된 뒤 종료 주차 스냅샷이 빠지면 레거시 값으로 대체하지 않는다."""
+    from app.routers.inventory import weekly_report
+
+    item = _make_prod_item(
+        db_session,
+        name="누락 경계 VF",
+        process_code="VF",
+        model_symbol="6",
+        qty=_dec(4),
+    )
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(2))])
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(4))])
+    db_session.commit()
+    monkeypatch.setattr(weekly_report, "_today_kst", lambda: date(2026, 5, 18), raising=False)
+
+    resp = client.get(
+        "/api/inventory/weekly-report?week_start=2026-05-11&week_end=2026-05-17"
+    )
+
+    assert resp.status_code == 503
+
+
+def test_snapshot_week_keeps_transaction_cancelled_after_cutoff(client, db_session):
+    """일요일 확정 뒤 취소된 거래는 해당 주말 시점에는 유효했던 것으로 집계한다."""
+    item = _make_prod_item(
+        db_session,
+        name="마감 후 취소 VF",
+        process_code="VF",
+        model_symbol="6",
+        qty=_dec(1),
+    )
+    log = _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(1),
+        at=_WEEK_MID,
+    )
+    log.cancelled = True
+    log.cancelled_at = datetime(2026, 5, 10, 15, 0)  # 2026-05-11 00:00 KST
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(0))])
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(1))])
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    row = {
+        item_row["item_id"]: item_row
+        for group in resp.json()["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert _dec(row["produce_qty"]) == _dec(1)
+
+
+def test_snapshot_week_keeps_cancelled_transaction_without_cancel_time(client, db_session):
+    """취소 시각이 없으면 기준 이전 취소로 단정하지 않고 해당 주 거래에 포함한다."""
+    item = _make_prod_item(
+        db_session,
+        name="취소 시각 미상 VF",
+        process_code="VF",
+        model_symbol="6",
+        qty=_dec(1),
+    )
+    log = _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(1),
+        at=_WEEK_MID,
+    )
+    log.cancelled = True
+    log.cancelled_at = None
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(0))])
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(1))])
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    row = {
+        item_row["item_id"]: item_row
+        for group in resp.json()["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert _dec(row["produce_qty"]) == _dec(1)
+
+
+def test_snapshot_week_uses_kst_half_open_transaction_boundary(client, db_session):
+    """월요일 00:00 KST는 포함하고 다음 월요일 00:00 KST는 제외한다."""
+    item = _make_prod_item(
+        db_session,
+        name="KST 경계 VF",
+        process_code="VF",
+        model_symbol="6",
+        qty=_dec(1),
+    )
+    _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(1),
+        at=datetime(2026, 5, 3, 15, 0),  # 2026-05-04 00:00 KST
+    )
+    _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(7),
+        at=datetime(2026, 5, 10, 15, 0),  # 2026-05-11 00:00 KST
+    )
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(0))])
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(1))])
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert resp.status_code == 200
+    row = {
+        item_row["item_id"]: item_row
+        for group in resp.json()["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert _dec(row["produce_qty"]) == _dec(1)

@@ -10,12 +10,12 @@ from starlette.requests import Request
 from app import database
 
 
-def _request(method: str = "POST") -> Request:
+def _request(method: str = "POST", path: str = "/probe") -> Request:
     return Request(
         {
             "type": "http",
             "method": method,
-            "path": "/probe",
+            "path": path,
             "headers": [],
             "query_string": b"",
             "server": ("testserver", 80),
@@ -54,3 +54,33 @@ def test_get_db_no_rollback_on_normal_completion():
             pass
         fake.rollback.assert_not_called()
         fake.close.assert_called_once()
+
+
+def test_get_db_guards_inventory_domain_writes():
+    fake = MagicMock()
+    with (
+        patch.object(database, "SessionLocal", return_value=fake),
+        patch(
+            "app.services.weekly_inventory_snapshot.ensure_due_snapshot_committed"
+        ) as ensure_snapshot,
+    ):
+        gen = database.get_db(_request(path="/api/inventory/transactions"))
+        assert next(gen) is fake
+        gen.close()
+
+    ensure_snapshot.assert_called_once_with(fake, source="first_write")
+
+
+def test_get_db_does_not_guard_unrelated_writes():
+    fake = MagicMock()
+    with (
+        patch.object(database, "SessionLocal", return_value=fake),
+        patch(
+            "app.services.weekly_inventory_snapshot.ensure_due_snapshot_committed"
+        ) as ensure_snapshot,
+    ):
+        gen = database.get_db(_request(path="/api/settings/integrity/repair"))
+        assert next(gen) is fake
+        gen.close()
+
+    ensure_snapshot.assert_not_called()
