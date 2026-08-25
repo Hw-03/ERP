@@ -344,7 +344,12 @@ function DefectRecordRow({
           <p className="break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
           <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {location.is_legacy && <StatusBadge label="기존 합산" color={LEGACY_COLORS.muted2} />}
+            {location.is_legacy && (
+              <StatusBadge
+                label={location.legacy_origin === "aggregate" ? "기존 합산" : "기존 복원"}
+                color={LEGACY_COLORS.muted2}
+              />
+            )}
             {pendingQty > 0 && <StatusBadge label={`승인 대기 ${formatQty(pendingQty)}개`} color={LEGACY_COLORS.yellow} />}
             {warn && <StatusBadge label="1년 초과" color={LEGACY_COLORS.red} icon={<AlertTriangle className="h-3 w-3" />} />}
           </div>

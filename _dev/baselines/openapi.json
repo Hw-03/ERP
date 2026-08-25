@@ -1819,6 +1819,21 @@
             "title": "Item Name",
             "type": "string"
           },
+          "legacy_origin": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aggregate",
+                  "reconstructed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Origin"
+          },
           "mes_code": {
             "anyOf": [
               {

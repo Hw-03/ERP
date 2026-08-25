@@ -21,6 +21,7 @@ from app.models import (
     DepartmentEnum,
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
+    DefectQuarantineReconstruction,
     Employee,
     EmployeeLevelEnum,
     Inventory,
@@ -1325,6 +1326,91 @@ def test_locations_returns_defective_list(db_session, client, make_item):
     assert res2.status_code == 200
     for loc in res2.json():
         assert loc["department"] == DepartmentEnum.ASSEMBLY.value
+
+
+def test_locations_distinguishes_aggregate_reconstructed_and_normal_records(
+    db_session,
+    client,
+    make_item,
+):
+    aggregate_item = make_item(name="기존 합산 품목", warehouse_qty=Decimal("0"))
+    reconstructed_item = make_item(name="기존 복원 품목", warehouse_qty=Decimal("0"))
+    normal_item = make_item(name="일반 격리 품목", warehouse_qty=Decimal("0"))
+
+    aggregate = DefectQuarantineRecord(
+        item_id=aggregate_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("2"),
+        remaining_quantity=Decimal("2"),
+        is_legacy=True,
+    )
+    parent = DefectQuarantineRecord(
+        item_id=reconstructed_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("1"),
+        remaining_quantity=Decimal("0"),
+        is_legacy=True,
+    )
+    child = DefectQuarantineRecord(
+        item_id=reconstructed_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("1"),
+        remaining_quantity=Decimal("1"),
+        is_legacy=True,
+    )
+    normal = DefectQuarantineRecord(
+        item_id=normal_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("3"),
+        remaining_quantity=Decimal("3"),
+        is_legacy=False,
+    )
+    db_session.add_all([aggregate, parent, child, normal])
+    db_session.flush()
+    source = TransactionLog(
+        item_id=reconstructed_item.item_id,
+        transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        quantity_change=Decimal("1"),
+        department=DepartmentEnum.ASSEMBLY.value,
+        defect_quarantine_record_id=child.record_id,
+        inventory_effect=[
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": 1,
+            }
+        ],
+    )
+    db_session.add(source)
+    db_session.flush()
+    db_session.add(
+        DefectQuarantineReconstruction(
+            child_record_id=child.record_id,
+            parent_record_id=parent.record_id,
+            source_transaction_log_id=source.log_id,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/defects/locations")
+
+    assert response.status_code == 200, response.json()
+    origins = {
+        row["item_id"]: row["legacy_origin"]
+        for row in response.json()
+        if row["item_id"]
+        in {
+            str(aggregate_item.item_id),
+            str(reconstructed_item.item_id),
+            str(normal_item.item_id),
+        }
+    }
+    assert origins == {
+        str(aggregate_item.item_id): "aggregate",
+        str(reconstructed_item.item_id): "reconstructed",
+        str(normal_item.item_id): None,
+    }
 
 
 def test_locations_keeps_repeated_quarantines_as_separate_records(

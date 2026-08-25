@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
@@ -26,6 +26,7 @@ from app.models import (
     DepartmentEnum,
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
+    DefectQuarantineReconstruction,
     Employee,
     InventoryLocation,
     Item,
@@ -67,6 +68,7 @@ class DefectLocationItem(BaseModel):
     quarantined_by: Optional[str]
     quarantined_by_employee_id: Optional[uuid.UUID]
     is_legacy: bool = False
+    legacy_origin: Optional[Literal["aggregate", "reconstructed"]] = None
     # BOM 자식 보유 여부. 프론트 격리 처리 액션에서 "재작업" 옵션 노출 조건.
     has_bom: bool = False
 
@@ -232,6 +234,16 @@ def list_defect_locations(
 
     record_rows = q.order_by(DefectQuarantineRecord.quarantined_at.asc()).all()
     record_ids = [record.record_id for record, _ in record_rows]
+    reconstructed_record_ids = {
+        row[0]
+        for row in (
+            db.query(DefectQuarantineReconstruction.child_record_id)
+            .filter(DefectQuarantineReconstruction.child_record_id.in_(record_ids))
+            .all()
+            if record_ids
+            else []
+        )
+    }
     pending_by_record = {
         record_id: Decimal(str(quantity or 0))
         for record_id, quantity in (
@@ -320,6 +332,11 @@ def list_defect_locations(
                 quarantined_by=record.quarantined_by_name,
                 quarantined_by_employee_id=record.quarantined_by_employee_id,
                 is_legacy=record.is_legacy,
+                legacy_origin=(
+                    "reconstructed"
+                    if record.record_id in reconstructed_record_ids
+                    else ("aggregate" if record.is_legacy else None)
+                ),
                 has_bom=item.item_id in bom_items,
             )
         )
@@ -348,6 +365,7 @@ def list_defect_locations(
                     last_log.producer_employee_id if last_log else None
                 ),
                 is_legacy=True,
+                legacy_origin="aggregate",
                 has_bom=item.item_id in bom_items,
             )
         )
