@@ -1,0 +1,4 @@
+interface:
+  display_name: "TODO Capture"
+  short_description: "Collect user-pointed issues into handoff-ready TODO docs without implementing."
+  default_prompt: "Use $todo-capture to collect UI issues into a handoff-ready TODO document before planning implementation."
