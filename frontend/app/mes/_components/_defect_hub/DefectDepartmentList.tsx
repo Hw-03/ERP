@@ -346,7 +346,7 @@ function DefectRecordRow({
           <div className="mt-2 flex flex-wrap gap-1.5">
             {location.is_legacy && (
               <StatusBadge
-                label={location.legacy_origin === "aggregate" ? "기존 합산" : "기존 복원"}
+                label={location.legacy_origin === "reconstructed" ? "기존 복원" : "기존 합산"}
                 color={LEGACY_COLORS.muted2}
               />
             )}
