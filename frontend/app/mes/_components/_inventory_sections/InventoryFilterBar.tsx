@@ -77,8 +77,8 @@ export function InventoryFilters({
                   onClick={() => onDepartmentFilterBasisChange(basis)}
                   className="rounded-[8px] px-2 py-1 text-xs font-bold transition-colors"
                   style={{
-                    background: active ? LEGACY_COLORS.green : "transparent",
-                    color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+                    background: active ? `color-mix(in srgb, ${LEGACY_COLORS.green} 20%, transparent)` : "transparent",
+                    color: active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
                   }}
                 >
                   {label}
