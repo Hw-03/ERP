@@ -89,7 +89,12 @@ from app.models.weekly_inventory_snapshot import (
     WeeklyInventorySnapshot,
     WeeklyInventorySnapshotItem,
 )
-from app.models.defect import DefectQuarantineMemoRevision, DefectQuarantineRecord
+from app.models.defect import (
+    DefectQuarantineMemoRevision,
+    DefectQuarantineRecord,
+    DefectQuarantineReconstruction,
+    DefectQuarantineReconstructionAllocation,
+)
 
 __all__ = [
     # Base / 공통
@@ -170,4 +175,6 @@ __all__ = [
     # defect quarantine records
     "DefectQuarantineRecord",
     "DefectQuarantineMemoRevision",
+    "DefectQuarantineReconstruction",
+    "DefectQuarantineReconstructionAllocation",
 ]
