@@ -116,7 +116,7 @@ describe("DefectDepartmentList", () => {
     expect(screen.getByText("승인 대기 1개")).toBeInTheDocument();
   });
 
-  it("distinguishes unresolved legacy aggregates from reconstructed records", () => {
+  it("flags only unresolved legacy aggregates, not reconstructed records", () => {
     render(
       <DefectDepartmentList
         locations={[
@@ -146,8 +146,8 @@ describe("DefectDepartmentList", () => {
     );
 
     expect(screen.getByText("기존 합산")).toBeInTheDocument();
-    expect(screen.getByText("기존 복원")).toBeInTheDocument();
-    expect(screen.getAllByText(/기존 (합산|복원)/, { selector: "span" })).toHaveLength(2);
+    expect(screen.queryByText("기존 복원")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/기존 (합산|복원)/, { selector: "span" })).toHaveLength(1);
   });
 
   it("groups same-item records into an initially collapsed item summary", () => {

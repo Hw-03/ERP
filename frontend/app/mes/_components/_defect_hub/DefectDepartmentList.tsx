@@ -344,9 +344,9 @@ function DefectRecordRow({
           <p className="break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
           <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {location.is_legacy && (
+            {location.is_legacy && location.legacy_origin !== "reconstructed" && (
               <StatusBadge
-                label={location.legacy_origin === "reconstructed" ? "기존 복원" : "기존 합산"}
+                label="기존 합산"
                 color={LEGACY_COLORS.muted2}
               />
             )}
