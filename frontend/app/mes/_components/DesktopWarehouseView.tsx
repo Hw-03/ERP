@@ -10,7 +10,11 @@ import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPan
 import { IoComposeView } from "./_warehouse_v2/IoComposeView";
 import { readCurrentOperator } from "./login/useCurrentOperator";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
-import type { IoStep } from "./_warehouse_v2/useIoWorkState";
+import {
+  clearWarehouseDraftRestore,
+  parseWarehouseStep,
+  persistWarehouseDraftUrl,
+} from "./_warehouse_v2/warehouseDraftUrl";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { LoadFailureCard } from "./common/LoadFailureCard";
@@ -53,7 +57,7 @@ export function DesktopWarehouseView({
     : new URLSearchParams(window.location.search).get("draftId");
   const urlRestoreStep = typeof window === "undefined"
     ? undefined
-    : parseIoStep(new URLSearchParams(window.location.search).get("step"));
+    : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   // 알림 클릭 딥링크 — URL ?section= 으로 초기 섹션 결정 (권한 없으면 compose 폴백).
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
@@ -372,25 +376,17 @@ export function DesktopWarehouseView({
               onItemConversionFocusChange={setItemConversionFocused}
               itemPickerFullscreen={itemPickerFullscreen}
               onItemPickerFullscreenChange={onItemPickerFullscreenChange}
-              onDraftSaved={persistWarehouseDraftUrl}
+              onDraftSaved={(batchId, step, persistInUrl) => {
+                if (persistInUrl === false) {
+                  clearWarehouseDraftRestore(batchId, setRestoreIoDraft, restoredUrlDraftRef);
+                  return;
+                }
+                persistWarehouseDraftUrl(batchId, step);
+              }}
             />}
           </div>
         )}
       </div>
     </div>
   );
-}
-
-function parseIoStep(raw: string | null): IoStep | undefined {
-  const step = Number(raw);
-  return step >= 1 && step <= 5 ? step as IoStep : undefined;
-}
-
-function persistWarehouseDraftUrl(batchId: string, step: IoStep): void {
-  const url = new URL(window.location.href);
-  url.searchParams.set("tab", "warehouse");
-  url.searchParams.set("section", "compose");
-  url.searchParams.set("step", String(step));
-  url.searchParams.set("draftId", batchId);
-  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }

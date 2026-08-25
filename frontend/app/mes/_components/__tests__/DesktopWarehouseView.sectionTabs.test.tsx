@@ -8,6 +8,7 @@ const currentComposeProps = vi.hoisted(() => ({
     restoreStep?: number;
     itemPickerFullscreen?: boolean;
     onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
+    onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
   },
 }));
 
@@ -71,6 +72,7 @@ vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
     onItemConversionFocusChange: (focused: boolean) => void;
     restoreDraft?: { batch_id: string } | null;
     restoreStep?: number;
+    onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
   }) => {
     currentComposeProps.value = props;
     return (
@@ -334,6 +336,36 @@ describe("DesktopWarehouseView", () => {
     expect(params.get("section")).toBe("compose");
     expect(params.get("step")).toBe("4");
     expect(params.get("draftId")).toBe("draft-2");
+  });
+
+  it("새 작업 전환용 원 초안 저장은 URL draftId를 남기지 않는다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=source-draft");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "source-draft" }]);
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("source-draft"));
+    act(() => currentComposeProps.value?.onDraftSaved?.("source-draft", 4, false));
+
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("draftId")).toBeNull();
+    expect(params.get("section")).toBe("compose");
+    expect(params.get("step")).toBe("4");
+    expect(currentComposeProps.value?.restoreDraft).toBeNull();
+  });
+
+  it("늦게 끝난 A 전환은 현재 B draftId를 지우지 않는다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-a");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-a" }, { batch_id: "draft-b" }]);
+    const { rerender } = render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-a"));
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-b");
+    rerender(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-b"));
+    act(() => currentComposeProps.value?.onDraftSaved?.("draft-a", 4, false));
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBe("draft-b");
+    expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("draft-b");
   });
 
   it("restores the URL draft even when the legacy draft count fails", async () => {

@@ -13,6 +13,11 @@ import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraf
 import { readCurrentOperator } from "../../login/useCurrentOperator";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
 import type { IoStep } from "../../_warehouse_v2/useIoWorkState";
+import {
+  clearWarehouseDraftRestore,
+  parseWarehouseStep,
+  persistWarehouseDraftUrl,
+} from "../../_warehouse_v2/warehouseDraftUrl";
 import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
 import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
 import { AsyncState } from "../primitives/AsyncState";
@@ -68,7 +73,7 @@ export function MobileWarehouseScreen({
     : new URLSearchParams(window.location.search).get("draftId");
   const urlRestoreStep = typeof window === "undefined"
     ? undefined
-    : parseIoStep(new URLSearchParams(window.location.search).get("step"));
+    : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
@@ -303,7 +308,13 @@ export function MobileWarehouseScreen({
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
-            onDraftSaved={persistWarehouseDraftUrl}
+            onDraftSaved={(batchId, step, persistInUrl) => {
+              if (persistInUrl === false) {
+                clearWarehouseDraftRestore(batchId, setRestoreIoDraft, restoredUrlDraftRef);
+                return;
+              }
+              persistWarehouseDraftUrl(batchId, step);
+            }}
           />
         ) : (
           <div className={`h-full overflow-y-auto px-3 pb-6 ${panelStyles.touchScope}`}>
@@ -357,20 +368,6 @@ export function MobileWarehouseScreen({
       />
     </div>
   );
-}
-
-function parseIoStep(raw: string | null): IoStep | undefined {
-  const step = Number(raw);
-  return step >= 1 && step <= 5 ? step as IoStep : undefined;
-}
-
-function persistWarehouseDraftUrl(batchId: string, step: IoStep): void {
-  const url = new URL(window.location.href);
-  url.searchParams.set("tab", "warehouse");
-  url.searchParams.set("section", "compose");
-  url.searchParams.set("step", String(step));
-  url.searchParams.set("draftId", batchId);
-  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function defaultDraftStep(draft: IoBatch): IoStep {

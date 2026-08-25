@@ -166,7 +166,7 @@ export function InventoryItemsTable({
                 className={`border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "rounded-tr-[24px] text-center" : "text-right sm:text-center"}`}
                 style={{ background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
               >
-                총재고
+                사용 가능 재고
               </th>
               {!compact && (
                 <th

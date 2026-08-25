@@ -34,7 +34,16 @@ import {
   useResetMyItemOrderMutation,
 } from "@/lib/queries/useMyItemOrderQuery";
 import { useItemOrderDrag, type UseItemOrderDragResult } from "./useItemOrderDrag";
-import type { IoBundle, IoSourceLocation, IoSubType, IoWorkType, Item, ProductModel } from "./types";
+import {
+  INITIAL_IO_TARGET_PICKER_FILTERS,
+  type IoBundle,
+  type IoSourceLocation,
+  type IoSubType,
+  type IoTargetPickerFilters,
+  type IoWorkType,
+  type Item,
+  type ProductModel,
+} from "./types";
 import {
   allowsMixedBundles,
   deptIoSubType,
@@ -44,7 +53,7 @@ import {
   type ItemActionMode,
 } from "./ioWorkType";
 
-interface Props {
+interface BaseProps {
   workType: IoWorkType;
   subType: IoSubType;
   deptIoDirection: DeptIoDirection | null;
@@ -76,7 +85,24 @@ interface Props {
   highlightItemId?: string | null;
 }
 
+type FilterControlProps =
+  | {
+    /** 작성 작업 수명 동안 외부에서 제어하는 부서·모델·단계 필터. */
+    filters: IoTargetPickerFilters;
+    onFiltersChange: (filters: IoTargetPickerFilters) => void;
+  }
+  | {
+    filters?: undefined;
+    onFiltersChange?: undefined;
+  };
+
+type Props = BaseProps & FilterControlProps;
+
 const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
+const TABLE_HEADER_STYLE = {
+  background: "var(--c-popup-bg)",
+  borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+};
 
 /** BOM/낱개 버튼의 선택·비활성 색 우선순위를 두 렌더 분기에서 동일하게 유지한다. */
 function actionButtonStyle(
@@ -214,6 +240,8 @@ export function IoTargetPicker({
   items,
   productModels,
   bundles,
+  filters,
+  onFiltersChange,
   search,
   onSearchChange,
   onAddItem,
@@ -224,9 +252,9 @@ export function IoTargetPicker({
   onFullscreenChange,
   highlightItemId,
 }: Props) {
-  const [dept, setDept] = useState("ALL");
-  const [model, setModel] = useState("전체");
-  const [stage, setStage] = useState("ALL");
+  const [localFilters, setLocalFilters] = useState<IoTargetPickerFilters>(
+    INITIAL_IO_TARGET_PICKER_FILTERS,
+  );
   const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT);
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<Item[]>([]);
@@ -264,6 +292,8 @@ export function IoTargetPicker({
   }, [fullscreen, onFullscreenChange]);
 
   const actionMode = getItemActionMode(subType);
+  const activeFilters = filters ?? localFilters;
+  const { department: dept, model, stage } = activeFilters;
   const keyword = search.trim().toLowerCase();
   const deptOptions = DEPT_OPTIONS;
 
@@ -360,10 +390,12 @@ export function IoTargetPicker({
   );
   const hasActiveFilter = dept !== "ALL" || model !== "전체" || stage !== "ALL" || keyword.length > 0;
 
+  function updateFilters(next: IoTargetPickerFilters) {
+    (onFiltersChange ?? setLocalFilters)(next);
+  }
+
   function clearFilters() {
-    setDept("ALL");
-    setModel("전체");
-    setStage("ALL");
+    updateFilters(INITIAL_IO_TARGET_PICKER_FILTERS);
     onSearchChange("");
   }
 
@@ -379,9 +411,24 @@ export function IoTargetPicker({
         {/* 항목 9 — 모바일은 필터 그리드를 전폭 한 줄로(순서 편집 버튼은 아래 행). 데스크톱(lg)은 기존 인라인. */}
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="grid grid-cols-3 gap-2 lg:flex-1 lg:grid-cols-[1fr_1fr_1fr_2fr]" style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
-            <LabeledSelect label="부서" value={dept} onChange={setDept} options={deptOptions} />
-            <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
-            <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
+            <LabeledSelect
+              label="부서"
+              value={dept}
+              onChange={(department) => updateFilters({ ...activeFilters, department })}
+              options={deptOptions}
+            />
+            <LabeledSelect
+              label="모델"
+              value={model}
+              onChange={(nextModel) => updateFilters({ ...activeFilters, model: nextModel })}
+              options={modelOptions}
+            />
+            <LabeledSelect
+              label="단계"
+              value={stage}
+              onChange={(nextStage) => updateFilters({ ...activeFilters, stage: nextStage })}
+              options={STAGE_OPTIONS}
+            />
             {/* 모바일: 검색을 아래 전체폭 줄로(드롭다운 폭 확보). 데스크톱(lg): 기존 4열 인라인. */}
             <label className="col-span-3 flex flex-col gap-0.5 lg:col-span-1">
               <span
@@ -782,48 +829,33 @@ function ItemTable({
           >
             <th
               className="px-3 py-2"
-              style={{
-                background: "var(--c-popup-bg)",
-                borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-              }}
+              style={TABLE_HEADER_STYLE}
             >
               품목명
               <FullscreenToggle fullscreen={fullscreen} onFullscreenChange={onFullscreenChange} />
             </th>
             <th
               className="hidden px-3 py-2 text-center lg:table-cell"
-              style={{
-                background: "var(--c-popup-bg)",
-                borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-              }}
+              style={TABLE_HEADER_STYLE}
             >
               품목 코드
             </th>
             <th
               className="hidden whitespace-nowrap px-3 py-2 text-center lg:table-cell"
-              style={{
-                background: "var(--c-popup-bg)",
-                borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-              }}
+              style={TABLE_HEADER_STYLE}
             >
               창고
             </th>
             <th
               className="hidden whitespace-nowrap px-3 py-2 text-center lg:table-cell"
-              style={{
-                background: "var(--c-popup-bg)",
-                borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-              }}
+              style={TABLE_HEADER_STYLE}
             >
               부서
             </th>
             {!isInternalUse && (
               <th
                 className="px-3 py-2 text-center"
-                style={{
-                  background: "var(--c-popup-bg)",
-                  borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-                }}
+                style={TABLE_HEADER_STYLE}
               >
                 추가
               </th>
