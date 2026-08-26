@@ -44,6 +44,13 @@ export interface TransactionLog {
   reason_memo?: string | null;
   operation_batch_id: string | null;
   operation_line_id?: string | null;
+  operation_id?: string | null;
+  operation_role?: string | null;
+  operation_kind?: "BUSINESS" | "CANCELLATION" | null;
+  operation_display_label?: string | null;
+  operation_effective_status?: "active" | "cancelled" | "cancellation" | null;
+  reversal_operation_id?: string | null;
+  reverses_log_id?: string | null;
   shipping_phase?: string | null;
   created_at: string;
   edit_count?: number;
@@ -52,6 +59,83 @@ export interface TransactionLog {
   cancelled_by: string | null;
   cancelled_at: string | null;
   inventory_effect?: InventoryEffectCell[] | null;
+}
+
+export interface InventoryOperationLine {
+  logId: string;
+  itemId: string;
+  itemName: string | null;
+  mesCode: string | null;
+  transactionType: TransactionType;
+  quantityChange: number;
+  quantityBefore: number | null;
+  quantityAfter: number | null;
+  transferQty: number | null;
+  department: string | null;
+  operationRole: string | null;
+  reversesLogId: string | null;
+  referenceNo: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface InventoryOperationEffect {
+  effectId: string;
+  effectKind: string;
+  subjectType: string;
+  subjectId: string;
+  role: string;
+  beforeState: Record<string, unknown>;
+  afterState: Record<string, unknown>;
+  reversesEffectId: string | null;
+}
+
+export interface InventoryOperation {
+  operationId: string;
+  kind: "BUSINESS" | "CANCELLATION";
+  domain: string;
+  action: string;
+  displayLabel: string;
+  effectiveStatus: "active" | "cancelled" | "cancellation";
+  actorEmployeeId: string | null;
+  actorName: string;
+  department: string | null;
+  reason: string | null;
+  effectiveAt: string;
+  reversesOperationId: string | null;
+  reversalOperationId: string | null;
+  canCancel: boolean;
+  cancelBlockers: string[];
+  lines: InventoryOperationLine[];
+  matchingLines: InventoryOperationLine[];
+  effects: InventoryOperationEffect[];
+}
+
+export interface InventoryOperationPage {
+  items: InventoryOperation[];
+  nextCursor: string | null;
+}
+
+export interface InventoryOperationCancellationCell {
+  itemId: string;
+  scope: string;
+  department: string | null;
+  status: string | null;
+  boxId: string | null;
+  quantityChange: number;
+  currentQuantity: number;
+  reservedQuantity: number;
+  quantityAfter: number;
+}
+
+export interface InventoryOperationCancellationPreview {
+  operationId: string;
+  planHash: string;
+  canCancel: boolean;
+  blockers: string[];
+  cells: InventoryOperationCancellationCell[];
+  defectRecords: Array<Record<string, unknown>>;
+  effects: Array<Record<string, unknown>>;
 }
 
 /** 거래 수정 이력 (3차 메타 수정 + 4차 수량 보정 공통). */
