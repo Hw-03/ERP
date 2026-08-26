@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
+import type { TransactionLog } from "@/lib/api/types/production";
 import {
   getHistoryDisplayLabel,
   getHistoryDisplaySubLabel,
@@ -95,6 +96,38 @@ function makeBatch(overrides: Partial<IoBatch> & { bundles?: IoBundle[] } = {}):
     submitted_at: null,
     completed_at: null,
     bundles: [],
+    ...overrides,
+  };
+}
+
+function makeTransactionLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
+  return {
+    log_id: "log-1",
+    item_id: "ITEM-001",
+    mes_code: null,
+    item_name: "테스트 부품",
+    item_process_type_code: null,
+    item_unit: "EA",
+    transaction_type: "ADJUST",
+    quantity_change: 1,
+    quantity_before: 10,
+    quantity_after: 11,
+    warehouse_qty_before: 10,
+    warehouse_qty_after: 11,
+    transfer_qty: null,
+    reference_no: null,
+    produced_by: null,
+    requester_name: null,
+    approver_name: null,
+    department: null,
+    notes: null,
+    operation_batch_id: "batch-001",
+    operation_line_id: "l1",
+    created_at: "2026-05-15T10:00:00",
+    cancelled: false,
+    cancel_reason: null,
+    cancelled_by: null,
+    cancelled_at: null,
     ...overrides,
   };
 }
@@ -437,7 +470,15 @@ describe("describeBatchFlow", () => {
 // getHistoryLineSignedQuantity
 // ──────────────────────────────────────────────────────────────────
 describe("getHistoryLineSignedQuantity", () => {
-  const baseLine = { included: true, origin: "direct" as const, direction: "in" as const, quantity: 10, unit: "EA" };
+  const baseLine = {
+    included: true,
+    origin: "direct" as const,
+    direction: "in" as const,
+    from_bucket: "none",
+    to_bucket: "production",
+    quantity: 10,
+    unit: "EA",
+  };
 
   it("sub_type=produce, bom_parent+direct → +10 EA (increase)", () => {
     const batch = makeBatch({ sub_type: "produce" });
@@ -545,16 +586,39 @@ describe("getHistoryLineSignedQuantity", () => {
     expect(result.tone).toBe("move");
   });
 
-  it("batch 없음, direction=adjust + qty>=0 → +", () => {
-    const adjLine = { ...baseLine, direction: "adjust" as const, quantity: 5 };
-    const result = getHistoryLineSignedQuantity(adjLine);
-    expect(result.sign).toBe("+");
+  it("실행 로그 ADJUST -1은 계획 수량이 +1이어도 -1 EA", () => {
+    const adjLine = { ...baseLine, direction: "adjust" as const, quantity: 1, from_bucket: "production", to_bucket: "none" };
+    const result = getHistoryLineSignedQuantity(adjLine, undefined, undefined, makeTransactionLog({ quantity_change: -1 }));
+    expect(result).toMatchObject({ sign: "-", label: "-1 EA", tone: "decrease" });
   });
 
-  it("batch 없음, direction=adjust + qty<0 → -", () => {
-    const adjLine = { ...baseLine, direction: "adjust" as const, quantity: -5 };
+  it("로그 없는 production → none 단품 조정은 -", () => {
+    const adjLine = { ...baseLine, direction: "adjust" as const, quantity: 5, from_bucket: "production", to_bucket: "none" };
     const result = getHistoryLineSignedQuantity(adjLine);
-    expect(result.sign).toBe("-");
+    expect(result).toMatchObject({ sign: "-", label: "-5 EA" });
+  });
+
+  it("로그 없는 none → production 단품 조정은 +", () => {
+    const adjLine = { ...baseLine, direction: "adjust" as const, quantity: 5, from_bucket: "none", to_bucket: "production" };
+    const result = getHistoryLineSignedQuantity(adjLine);
+    expect(result).toMatchObject({ sign: "+", label: "+5 EA" });
+  });
+
+  it("순증감 0 이동·격리는 의미 라벨로 표시", () => {
+    const move = getHistoryLineSignedQuantity(
+      { ...baseLine, direction: "move" as const, quantity: 3 },
+      undefined,
+      undefined,
+      makeTransactionLog({ transaction_type: "TRANSFER_DEPT", quantity_change: 0, transfer_qty: 3 }),
+    );
+    const quarantine = getHistoryLineSignedQuantity(
+      { ...baseLine, direction: "defective" as const, quantity: 2 },
+      undefined,
+      undefined,
+      makeTransactionLog({ transaction_type: "MARK_DEFECTIVE", quantity_change: 0, transfer_qty: 2 }),
+    );
+    expect(move).toMatchObject({ label: "이동 3 EA", tone: "move" });
+    expect(quarantine).toMatchObject({ label: "격리 2 EA", tone: "decrease" });
   });
 
   it("included=false → tone=muted", () => {
@@ -786,6 +850,38 @@ describe("classifyHistoryScope", () => {
 
   it("ADJUST (no batch) → ambiguous", () => {
     expect(classifyHistoryScope({ transaction_type: "ADJUST" })).toBe("ambiguous");
+  });
+
+  it("혼합 분해 묶음은 실행 로그의 BOM·단품 출고를 모두 요약", () => {
+    const parent = makeLine({ line_id: "parent", item_id: "PARENT", origin: "direct", quantity: 2 });
+    const child = makeLine({ line_id: "child", item_id: "CHILD", origin: "bom_auto", quantity: 11 });
+    const direct = makeLine({
+      line_id: "direct",
+      item_id: "DIRECT",
+      origin: "manual",
+      direction: "adjust",
+      from_bucket: "production",
+      to_bucket: "none",
+      quantity: 16,
+    });
+    const bom = makeBundle({ source_kind: "bom_parent", lines: [parent, child] });
+    const manual = makeBundle({ bundle_id: "direct-bundle", source_kind: "manual", lines: [direct] });
+    const batch = makeBatch({ sub_type: "disassemble", bundles: [bom, manual] });
+    const result = getHistoryMovementSummary(
+      { transaction_type: "DISASSEMBLE" },
+      batch,
+      undefined,
+      [
+        makeTransactionLog({ operation_line_id: "parent", transaction_type: "BACKFLUSH", quantity_change: -2 }),
+        makeTransactionLog({ log_id: "log-child", operation_line_id: "child", transaction_type: "PRODUCE", quantity_change: 11 }),
+        makeTransactionLog({ log_id: "log-direct", operation_line_id: "direct", transaction_type: "ADJUST", quantity_change: -16 }),
+      ],
+    );
+    expect(result.parts.map((part) => part.label)).toEqual([
+      "재작업 -2 EA",
+      "부품 +11 EA",
+      "단품 출고 -16 EA",
+    ]);
   });
 
   it("창고 ADJUST (no batch) → warehouse_involved", () => {

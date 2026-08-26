@@ -202,6 +202,49 @@ beforeEach(() => {
 });
 
 describe("BomBatchDetail", () => {
+  it("단품 출고는 실행 로그의 감소 부호와 재고 스냅샷을 함께 표시한다", () => {
+    const batch = makeBatch();
+    const line = makeLine({
+      line_id: "shipment-line",
+      origin: "manual",
+      direction: "adjust",
+      from_bucket: "production",
+      to_bucket: "none",
+      quantity: 1,
+    });
+    const directBatch: IoBatch = {
+      ...batch,
+      sub_type: "disassemble",
+      bundles: [{
+        bundle_id: "shipment-bundle",
+        source_kind: "manual",
+        title: "단품 출고",
+        source_item_id: line.item_id,
+        source_mes_code: line.mes_code,
+        quantity: 1,
+        expanded_level: 0,
+        lines: [line],
+      }],
+    };
+    const log = makeTransactionLog({
+      operation_line_id: line.line_id,
+      transaction_type: "ADJUST",
+      quantity_change: -1,
+      warehouse_qty_before: 202,
+      warehouse_qty_after: 202,
+      department_qty_before: 4,
+      department_qty_after: 3,
+    });
+
+    render(
+      <table><tbody><BomBatchDetail batchId={directBatch.batch_id} colSpan={8} cache={new Map([[directBatch.batch_id, directBatch]])} onCached={vi.fn()} logs={[log]} /></tbody></table>,
+    );
+
+    expect(screen.getByText("-1 EA")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 전 재고: 창고 202, 부서 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 후 재고: 창고 202, 부서 3")).toBeInTheDocument();
+  });
+
   it("shows unique batch logs on the BOM parent and component rows", () => {
     const batch = makeBatch();
     const logs = [

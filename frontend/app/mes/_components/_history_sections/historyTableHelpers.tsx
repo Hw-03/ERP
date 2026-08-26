@@ -1276,7 +1276,7 @@ export function OpBatchHeader({
     titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
   }
 
-  const summary = getHistoryMovementSummary(first, batch, group.logs.length);
+  const summary = getHistoryMovementSummary(first, batch, group.logs.length, group.logs);
   const presentation: HistoryRowPresentation = {
     ...basePresentation,
     movement: summary,

@@ -16,6 +16,7 @@ import {
   getInternalUseHistoryLineEffectLabel,
   getHistoryBomParentLine,
   getDisplayBundles,
+  getHistoryLineExecutionLog,
   getHistoryLineSignedQuantity,
   isManualOnlyProductionBatch,
   type LineSignTone,
@@ -253,9 +254,9 @@ function BundleRows({
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
 
   const headerSigned = parentLine
-    ? getHistoryLineSignedQuantity(parentLine, batch, bundle)
+    ? getHistoryLineSignedQuantity(parentLine, batch, bundle, getHistoryLineExecutionLog(parentLine, logs))
     : bundle.lines.length === 1
-      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle)
+      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle, getHistoryLineExecutionLog(bundle.lines[0], logs))
       : null;
   const bundleUnit = (() => {
     const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
@@ -429,7 +430,12 @@ function BomLineRow({
   const targetPadX = compact ? "px-2" : "px-4";
   const statusPadX = "px-2";
   const cancelled = batch.status === "cancelled";
-  const signed = getHistoryLineSignedQuantity(line, batch, bundle);
+  const signed = getHistoryLineSignedQuantity(
+    line,
+    batch,
+    bundle,
+    log?.operation_line_id === line.line_id ? log : null,
+  );
   const qtyColor = SIGN_TONE_HEX[signed.tone];
   const highlighted = highlightItemId === line.item_id;
   const internalUseEffect = batch.sub_type === "internal_use_out" && bundle.source_kind === "bom_parent"

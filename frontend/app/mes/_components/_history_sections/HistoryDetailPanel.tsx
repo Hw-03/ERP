@@ -14,6 +14,7 @@ import { PROCESS_TYPE_META } from "./historyTheme";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import {
   getHistoryActor,
+  getHistoryMovementSummary,
   getHistoryWorkTypeLabel,
   parseTransactionNotes,
 } from "./historyBatchInterpreter";
@@ -206,7 +207,12 @@ export function HistoryDetailPanel({
           fillHeight
         />
       ) : (
-        <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
+        <HistoryDetailHero
+          log={selected}
+          flow={flow}
+          editCount={editCount}
+          logs={cancellationScope.status === "ready" ? cancellationScope.logs : [selected]}
+        />
       )}
 
       {variant !== "desktop" && isCancelled && (
@@ -308,14 +314,17 @@ function HistoryDetailHero({
   log,
   flow,
   editCount,
+  logs,
 }: {
   log: TransactionLog;
   flow: FlowState;
   editCount: number;
+  logs: TransactionLog[];
 }) {
   const tcolor = transactionColor(log.transaction_type);
   const batch = flow.status === "available" ? flow.batch : null;
   const presentation = getHistoryRowPresentation(log, batch ?? undefined);
+  const movement = getHistoryMovementSummary(log, batch ?? undefined, logs.length, logs);
   const heroStyle = {
     background: `color-mix(in srgb, ${tcolor} 5%, ${LEGACY_COLORS.s2})`,
     borderColor: `color-mix(in srgb, ${tcolor} 22%, ${LEGACY_COLORS.border})`,
@@ -339,7 +348,7 @@ function HistoryDetailHero({
           color={tcolor}
           variant="panel"
         />
-        <MovementSummaryCell summary={presentation.movement} />
+        <MovementSummaryCell summary={movement} />
         {editCount > 0 && (
           <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
