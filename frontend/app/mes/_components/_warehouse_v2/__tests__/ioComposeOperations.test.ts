@@ -61,9 +61,21 @@ describe("ioComposeOperations", () => {
     expect(setPulling).toHaveBeenLastCalledWith(false);
   });
 
-  it("제출 전에 남은 초안을 지우고 위치별 결재 제목을 공통 계산한다", async () => {
+  it("복원된 초안은 삭제하지 않고 같은 batch 제출 경로를 사용한다", async () => {
     const batchRef = { current: "draft-1" as string | null };
     const deleteDraft = vi.fn(async () => {});
+    const submitNew = vi.fn(async () => ({
+      batch_id: "submitted-new",
+      requires_approval: true,
+      message: "new",
+    } as never));
+    const submitExisting = vi.fn(async () => ({
+      batch_id: "draft-1",
+      requires_approval: true,
+      message: "ok",
+      stock_requests: [{ approval_kind: "warehouse" }, { approval_kind: "warehouse" }],
+    } as never));
+    const onDraftSubmitted = vi.fn();
 
     const setResult = vi.fn();
     await runCompositionSubmit(
@@ -73,13 +85,7 @@ describe("ioComposeOperations", () => {
       async () => {},
       () => [{ bundle_id: "bundle-1", lines: [] } as never],
       batchRef,
-      deleteDraft,
-      async () => ({
-        batch_id: "submitted-1",
-        requires_approval: true,
-        message: "ok",
-        stock_requests: [{ approval_kind: "warehouse" }, { approval_kind: "warehouse" }],
-      } as never),
+      submitNew,
       vi.fn(),
       vi.fn(),
       setResult,
@@ -88,14 +94,55 @@ describe("ioComposeOperations", () => {
       vi.fn(),
       async () => [],
       vi.fn(),
+      undefined,
+      submitExisting,
+      onDraftSubmitted,
     );
 
-    expect(deleteDraft).toHaveBeenCalledWith("draft-1");
+    expect(deleteDraft).not.toHaveBeenCalled();
+    expect(submitNew).not.toHaveBeenCalled();
+    expect(submitExisting).toHaveBeenCalledWith("draft-1");
     expect(batchRef.current).toBeNull();
+    expect(onDraftSubmitted).toHaveBeenCalledWith("draft-1");
     expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
       kind: "success",
       title: "위치별 결재 요청 완료",
     }));
+  });
+
+  it("기존 초안 제출 실패 시 batch 연결을 보존한다", async () => {
+    const batchRef = { current: "draft-1" as string | null };
+    const submitExisting = vi.fn(async () => { throw new Error("제출 실패"); });
+    const setResult = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_out", "조립", async () => {},
+      () => [{ bundle_id: "bundle-1", lines: [] } as never], batchRef,
+      vi.fn(), vi.fn(), vi.fn(), setResult, vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined, submitExisting,
+    );
+
+    expect(batchRef.current).toBe("draft-1");
+    expect(submitExisting).toHaveBeenCalledWith("draft-1");
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({ kind: "error" }));
+  });
+
+  it("새 작업은 기존 일반 제출 경로를 유지한다", async () => {
+    const batchRef = { current: null as string | null };
+    const submitNew = vi.fn(async () => ({
+      batch_id: "new-batch", requires_approval: false, message: "완료",
+    } as never));
+    const submitExisting = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {},
+      () => [{ bundle_id: "bundle-1", lines: [] } as never], batchRef,
+      submitNew, vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined, submitExisting,
+    );
+
+    expect(submitNew).toHaveBeenCalledOnce();
+    expect(submitExisting).not.toHaveBeenCalled();
   });
 
   it("내용 변경과 작업 교체 세대를 서로 다른 ref로 추적한다", () => {

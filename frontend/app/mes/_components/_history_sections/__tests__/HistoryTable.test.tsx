@@ -179,6 +179,45 @@ describe("HistoryTable hierarchy", () => {
     expect(within(row).getByLabelText("작업 후 재고: 창고 20, 부서 5")).toBeInTheDocument();
   });
 
+  it("does not reuse a component snapshot when a custom BOM parent was not executed", () => {
+    const batch = makeBatch();
+    batch.bundles[0].lines[0] = {
+      ...batch.bundles[0].lines[0],
+      quantity: 5,
+      included: false,
+      exclusion_note: "커스텀 BOM 상위 미반영",
+    };
+    batch.bundles[0].lines[1] = {
+      ...batch.bundles[0].lines[1],
+      quantity: 5,
+      edited: true,
+    };
+    const component = makeLog({
+      log_id: "component-only",
+      item_id: "COMP-1",
+      item_name: "BOM 구성품",
+      mes_code: "3-AR-0001",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -5,
+      operation_batch_id: "batch-1",
+      operation_line_id: "child",
+      warehouse_qty_before: 339,
+      warehouse_qty_after: 339,
+      department_qty_before: 8,
+      department_qty_after: 3,
+    });
+
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [component] }],
+      new Map([["batch-1", batch]]),
+    );
+
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    expect(within(row).queryByLabelText("작업 전 재고: 창고 339, 부서 8")).not.toBeInTheDocument();
+    expect(within(row).queryByLabelText("작업 후 재고: 창고 339, 부서 3")).not.toBeInTheDocument();
+    expect(within(row).getAllByText("—")).toHaveLength(2);
+  });
+
   it("shows the matching transaction snapshot on the BOM parent row", () => {
     const parent = makeLog({
       operation_batch_id: "batch-1",
@@ -300,6 +339,10 @@ describe("HistoryTable hierarchy", () => {
       item_name: "보정 품목 A",
       transaction_type: "ADJUST",
       operation_batch_id: "batch-adjust",
+      warehouse_qty_before: 7,
+      warehouse_qty_after: 8,
+      department_qty_before: 2,
+      department_qty_after: 3,
     });
     const second = makeLog({
       log_id: "adjust-b",
@@ -307,6 +350,10 @@ describe("HistoryTable hierarchy", () => {
       item_name: "보정 품목 B",
       transaction_type: "ADJUST",
       operation_batch_id: "batch-adjust",
+      warehouse_qty_before: 40,
+      warehouse_qty_after: 41,
+      department_qty_before: 4,
+      department_qty_after: 5,
     });
     const batch = { ...makeBatch(), batch_id: "batch-adjust", sub_type: "adjust_in", bundles: [] };
 
@@ -317,6 +364,10 @@ describe("HistoryTable hierarchy", () => {
 
     expect(screen.queryByText("보정 품목 B")).not.toBeInTheDocument();
     expect(document.querySelectorAll("[data-history-main-row='true']")).toHaveLength(1);
+    const summaryRow = screen.getByText("보정 품목 A 외 1건").closest("tr")!;
+    expect(within(summaryRow).queryByLabelText(/^작업 전 재고:/)).not.toBeInTheDocument();
+    expect(within(summaryRow).queryByLabelText(/^작업 후 재고:/)).not.toBeInTheDocument();
+    expect(within(summaryRow).getAllByText("—")).toHaveLength(2);
     const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");

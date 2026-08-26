@@ -190,21 +190,15 @@ async function submitComposition(
   fromDepartment: string,
   bundles: IoBundle[],
   draftIdRef: MutableRefObject<string | null>,
-  deleteDraft: (draftId: string) => Promise<void>,
   submit: (bundles: IoBundle[]) => Promise<IoSubmitResponse>,
-): Promise<{ response: IoSubmitResponse; title: string }> {
-  if (draftIdRef.current) {
-    const staleId = draftIdRef.current;
-    draftIdRef.current = null;
-    try {
-      await deleteDraft(staleId);
-    } catch {
-      // 이미 없거나 권한이 변동되어도 본 제출은 계속한다.
-    }
-  }
+  submitExistingDraft: (draftId: string) => Promise<IoSubmitResponse>,
+): Promise<{ response: IoSubmitResponse; title: string; submittedDraftId: string | null }> {
+  const draftId = draftIdRef.current;
   try {
     const fallbackKind = approvalKind(subType, bundles, fromDepartment);
-    const response = await submit(bundles);
+    const response = draftId
+      ? await submitExistingDraft(draftId)
+      : await submit(bundles);
     const requests = response.stock_requests ?? [];
     const responseKind = requests[0]?.approval_kind ?? fallbackKind;
     const title = response.requires_approval
@@ -214,7 +208,8 @@ async function submitComposition(
           ? "부서 결재 요청 완료"
           : "창고 결재 요청 완료"
       : "입출고 반영 완료";
-    return { response, title };
+    if (draftIdRef.current === draftId) draftIdRef.current = null;
+    return { response, title, submittedDraftId: draftId };
   } catch (error) {
     if (error instanceof ApiError && error.isUnavailable) {
       throw new Error("서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요.");
@@ -230,7 +225,6 @@ export async function runCompositionSubmit(
   waitForIdle: () => Promise<void>,
   getBundles: () => IoBundle[],
   draftIdRef: MutableRefObject<string | null>,
-  deleteDraft: (draftId: string) => Promise<void>,
   submit: (bundles: IoBundle[]) => Promise<IoSubmitResponse>,
   setError: (message: string) => void,
   goTo: (step: 4) => void,
@@ -241,6 +235,9 @@ export async function runCompositionSubmit(
   refreshItems: () => Promise<Item[]>,
   setItems: (items: Item[]) => void,
   onSubmitSuccess?: () => void,
+  submitExistingDraft: (draftId: string) => Promise<IoSubmitResponse> = () =>
+    Promise.reject(new Error("기존 임시저장 제출 경로가 없습니다.")),
+  onDraftSubmitted?: (draftId: string) => void,
 ): Promise<void> {
   if (!employeeId) {
     setError("작업자를 선택하세요.");
@@ -254,14 +251,15 @@ export async function runCompositionSubmit(
     return;
   }
   try {
-    const { response, title } = await submitComposition(
+    const { response, title, submittedDraftId } = await submitComposition(
       subType,
       fromDepartment,
       bundles,
       draftIdRef,
-      deleteDraft,
       submit,
+      submitExistingDraft,
     );
+    if (submittedDraftId) onDraftSubmitted?.(submittedDraftId);
     setResult({ kind: "success", title, message: response.message });
     reset();
     resetFilters();

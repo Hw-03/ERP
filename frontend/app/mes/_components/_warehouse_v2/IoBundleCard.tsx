@@ -14,6 +14,7 @@ import { deductionSourceSummary, IoDeductionSourceBadge } from "./IoDeductionSou
 import { QuantityStepper } from "./QuantityStepper";
 import { IoRemoveButton } from "./IoRemoveButton";
 import { INTERNAL_USE_BOM_MODE_LABEL } from "./internalUseBom";
+import { isCustomProcessBomBundle, processBomEffectLine } from "./ioWorkType";
 
 interface Props {
   bundle: IoBundle;
@@ -84,23 +85,31 @@ export function IoBundleCard({
     bundle.source_mes_code ??
     null;
   const included = bundle.lines.filter((line) => line.included);
-  const excluded = bundle.lines.length - included.length;
   const autoCount = bundle.lines.filter((line) => line.origin === "bom_auto").length;
   const hasDirectLine = bundle.lines.some((line) => line.origin === "direct");
   const directParentLine =
     bundle.source_kind === "bom_parent"
       ? bundle.lines.find((line) => line.origin === "direct")
       : undefined;
+  const customProcessBom = isCustomProcessBomBundle(subType, bundle);
+  const displayedIncluded = customProcessBom
+    ? included.filter((line) => line.origin !== "direct")
+    : included;
+  const displayedLineCount = customProcessBom
+    ? bundle.lines.filter((line) => line.origin !== "direct").length
+    : bundle.lines.length;
+  const excluded = displayedLineCount - displayedIncluded.length;
   const parentAvailable = directParentLine ? getAvailable(directParentLine) : null;
   const parentExpected = directParentLine
     ? expectedAfter(directParentLine, parentAvailable)
     : null;
+  const displayedParentExpected = customProcessBom ? parentAvailable : parentExpected;
   const parentExpectedColor =
-    parentExpected === null
+    displayedParentExpected === null
       ? LEGACY_COLORS.muted2
-      : parentExpected < 0
+      : displayedParentExpected < 0
       ? LEGACY_COLORS.red
-      : parentExpected === 0
+      : displayedParentExpected === 0
       ? LEGACY_COLORS.yellow
       : LEGACY_COLORS.green;
   // BOM 묶음 — 부모 라인이 있으면 부모 라인 수량을, 없으면 bundle.quantity 를 stepper 로 노출.
@@ -109,6 +118,11 @@ export function IoBundleCard({
     (directParentLine != null || !!onBundleQuantityChange);
   const compositionLabel = (() => {
     if (bundle.source_kind === "bom_parent" || autoCount > 0) {
+      if (customProcessBom) {
+        return subType === "disassemble"
+          ? "BOM 참고 출고 · 상위 미반영"
+          : `BOM 자동 전개 · 상위 미반영 · 하위 ${autoCount}`;
+      }
       return hasDirectLine
         ? `BOM 자동 전개 · 상위 1 + 하위 ${autoCount}`
         : `BOM 자동 전개 · 자재 ${autoCount}`;
@@ -215,7 +229,7 @@ export function IoBundleCard({
           >
             {bundleCode && <span>{bundleCode}</span>}
             {bundleCode && <span>·</span>}
-            <span>반영 {included.length}개</span>
+            <span>반영 {displayedIncluded.length}개</span>
             {excluded > 0 && (
               <>
                 <span>·</span>
@@ -362,13 +376,13 @@ export function IoBundleCard({
                 className="text-[9px] font-bold uppercase tracking-[1.5px]"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
-                실행 후
+                {customProcessBom ? "상위 미반영" : "실행 후"}
               </div>
               <div
                 className="text-base font-black tabular-nums"
                 style={{ color: parentExpectedColor }}
               >
-                {parentExpected === null ? "-" : formatQty(parentExpected)}
+                {displayedParentExpected === null ? "-" : formatQty(displayedParentExpected)}
               </div>
             </div>
           </div>
@@ -392,14 +406,19 @@ export function IoBundleCard({
           className="divide-y rounded-[12px] border"
           style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
         >
-          {visibleLines.map((line) => (
+          {visibleLines.map((line) => {
+            const inventoryEffect = customProcessBom
+              ? processBomEffectLine(subType, bundle, line)
+              : undefined;
+            return (
             <li key={line.line_id} style={{ borderColor: LEGACY_COLORS.border }}>
               <IoLineRow
                 line={line}
+                inventoryEffect={inventoryEffect}
                 subType={subType}
                 isChild={line.origin === "bom_auto"}
                 item={itemMap.get(line.item_id)}
-                available={getAvailable(line)}
+                available={getAvailable(inventoryEffect ?? line)}
                 pullSelectable={linePullSelectable(line)}
                 pullSelected={pullSelected?.has(line.line_id)}
                 onTogglePull={onTogglePull ? () => onTogglePull(line.line_id) : undefined}
@@ -409,7 +428,8 @@ export function IoBundleCard({
                 editingDisabled={internalUseBomBusy}
               />
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </article>

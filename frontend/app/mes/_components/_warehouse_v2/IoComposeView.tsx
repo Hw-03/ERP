@@ -135,7 +135,9 @@ export function IoComposeView({
   onDraftSaved,
 }: IoComposeViewProps) {
   const revision = useRealtimeRevision();
-  const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
+  // 제출·임시저장·미리보기는 현재 로그인 작업자의 ID로만 수행한다.
+  // 로컬 state로 보관하면 작업자 전환 뒤 이전 결재권자 ID가 남을 수 있다.
+  const employeeId = operator?.employee_id ?? "";
   const [search, setSearch] = useState(globalSearch);
   const [pickerFilters, setPickerFilters] = useState<IoTargetPickerFilters>(
     INITIAL_IO_TARGET_PICKER_FILTERS,
@@ -161,7 +163,7 @@ export function IoComposeView({
   const [hasDraftOnServer, setHasDraftOnServer] = useState(false);
   const dirtyEffectMountedRef = useRef(false);
   const absorbedRestoreRef = useRef<string | null>(null);
-  const state = useIoWorkState(defaultWorkType, operator?.department);
+  const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
   const [
     pullSelected,
@@ -269,10 +271,6 @@ export function IoComposeView({
   // entryIntent는 마운트 시 1회만 적용 — deps 배열에 state 함수 넣으면 재실행되므로 의도적으로 생략.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryIntent]);
-
-  useEffect(() => {
-    if (operator?.employee_id && !employeeId) setEmployeeId(operator.employee_id);
-  }, [operator?.employee_id, employeeId]);
 
   useEffect(() => {
     setSearch(globalSearch);
@@ -711,7 +709,6 @@ export function IoComposeView({
       internalUsePreviewLock.waitForIdle,
       () => latestBundlesRef.current,
       autosaveBatchIdRef,
-      (draftId) => api.deleteDraft(draftId, employeeId),
       (bundles) => submit({
         employeeId,
         workType: state.workType,
@@ -730,6 +727,13 @@ export function IoComposeView({
       () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       setItems,
       onSubmitSuccess,
+      (draftId) => api.submitDraft(draftId, employeeId),
+      (draftId) => {
+        restoredDraftRef.current = null;
+        restoredNonceRef.current = null;
+        setHasDraftOnServer(false);
+        onDraftSaved?.(draftId, state.step, false);
+      },
     );
   }
 

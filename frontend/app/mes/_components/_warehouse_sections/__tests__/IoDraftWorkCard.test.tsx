@@ -45,4 +45,21 @@ describe("IoDraftWorkCard timestamp", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/(?:방금 전|분 전|시간 전|일 전)/)).not.toBeInTheDocument();
   });
+
+  it("최신 연결 반려 사유를 작성 중 카드에 표시한다", () => {
+    const draft = makeDraft();
+    draft.stock_requests = [{
+      stock_request_id: "request-1", request_code: "SR-1", status: "rejected",
+      from_bucket: "production", from_department: "조립", approval_kind: "department",
+      requires_warehouse_approval: false, requires_department_approval: true,
+      approver_employee_id: null, approver_name: null,
+      rejected_by_name: "조립 부서장", rejected_at: "2026-08-04T01:05:00Z",
+      rejected_reason: "수량 근거를 보완하세요",
+    }];
+
+    render(<IoDraftWorkCard draft={draft} isBusy={false} onContinue={vi.fn()} onRequestDelete={vi.fn()} />);
+
+    expect(screen.getByText("반려 사유: 수량 근거를 보완하세요")).toBeInTheDocument();
+    expect(screen.getByText(/조립 부서장.*2026년 08월 04일 10시 05분/)).toBeInTheDocument();
+  });
 });

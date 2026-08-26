@@ -116,6 +116,9 @@ class IoStockRequestSummary(BaseModel):
     requires_department_approval: bool
     approver_employee_id: Optional[uuid.UUID] = None
     approver_name: Optional[str] = None
+    rejected_by_name: Optional[str] = None
+    rejected_at: Optional[UtcDatetime] = None
+    rejected_reason: Optional[str] = None
     operation_line_ids: List[uuid.UUID] = Field(default_factory=list)
 
 

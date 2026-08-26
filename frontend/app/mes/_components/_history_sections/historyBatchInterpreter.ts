@@ -907,6 +907,7 @@ export function getHistoryMovementSummary(
     if (rejected.length > 0) parts.push(_verbItemPart("반려/미반영", "muted", rejected));
   } else if (sub === "produce" || tx === "PRODUCE" || sub === "disassemble" || tx === "DISASSEMBLE") {
     const isRework = sub === "disassemble" || tx === "DISASSEMBLE";
+    const hasLinkedExecutionLogs = executedLogs?.some((entry) => !!entry.operation_line_id) ?? false;
     type QuantityGroup = { sum: number; unit: string | null; unitMixed: boolean; itemIds: Set<string> };
     const groups = new Map<string, QuantityGroup>();
     const add = (key: string, line: IoLine, delta: number, unit: string | null) => {
@@ -924,6 +925,7 @@ export function getHistoryMovementSummary(
       for (const l of b.lines) {
         if (!l.included) continue;
         const executionLog = getHistoryLineExecutionLog(l, executedLogs);
+        if (hasLinkedExecutionLogs && !executionLog) continue;
         const signed = getHistoryLineSignedQuantity(l, batch, b, executionLog);
         const delta = executionLog ? _toNum(executionLog.quantity_change) : Math.abs(_toNum(l.quantity)) * (signed.sign === "-" ? -1 : 1);
         const signKey = delta < 0 ? "negative" : delta > 0 ? "positive" : "neutral";

@@ -518,7 +518,8 @@ function BundleBlock({
   const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
   const parentLine = getHistoryBomParentLine(bundle);
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
-  const headerSigned = parentLine
+  const parentNotExecuted = !!parentLine && !parentLine.included;
+  const headerSigned = parentLine && !parentNotExecuted
     ? getHistoryLineSignedQuantity(parentLine, batch, bundle, getHistoryLineExecutionLog(parentLine, logs))
     : null;
   // parentLine 없는 경로(BOM warehouse_to_dept 등)는 bundle.quantity 만으론 단위가 빠져
@@ -527,7 +528,9 @@ function BundleBlock({
     const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
     return units.size === 1 ? Array.from(units)[0] : null;
   })();
-  const headerQtyText = headerSigned
+  const headerQtyText = parentNotExecuted
+    ? "상위 미반영"
+    : headerSigned
     ? headerSigned.label
     : bundleUnit
       ? `${formatQty(bundle.quantity)} ${bundleUnit}`

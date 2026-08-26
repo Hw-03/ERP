@@ -4,7 +4,7 @@ import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-rea
 import { useEffect, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { isFutureKstDate } from "./dailyReportDate";
+import { formatWorkDateLabel, isFutureKstDate } from "./dailyReportDate";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -106,7 +106,7 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
         >
           <CalendarDays className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>작성일</span>
-          <span className="whitespace-nowrap">{value}</span>
+          <span className="whitespace-nowrap">{formatWorkDateLabel(value)}</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" style={{ color: LEGACY_COLORS.muted, transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
         </button>
 

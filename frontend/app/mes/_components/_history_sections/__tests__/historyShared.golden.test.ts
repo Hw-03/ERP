@@ -678,6 +678,21 @@ describe("getHistoryMovementSummary", () => {
     expect(result.parts.find((p) => p.label.includes("부품"))?.tone).toBe("danger");
   });
 
+  it("커스텀 BOM은 실제 실행 로그가 없는 상위를 변동 요약에서 제외한다", () => {
+    const parentLine = makeLine({ line_id: "parent", item_id: "PARENT", origin: "direct", quantity: 1 });
+    const childLine = makeLine({ line_id: "child", item_id: "CHILD", origin: "bom_auto", quantity: 3 });
+    const bundle = makeBundle({ source_kind: "bom_parent", lines: [parentLine, childLine] });
+    const batch = makeBatch({ sub_type: "produce", bundles: [bundle] });
+    const result = getHistoryMovementSummary(
+      { transaction_type: "BACKFLUSH" },
+      batch,
+      undefined,
+      [makeTransactionLog({ operation_line_id: "child", item_id: "CHILD", transaction_type: "BACKFLUSH", quantity_change: -3 })],
+    );
+
+    expect(result.parts.map((part) => part.label)).toEqual(["부품 -3 EA"]);
+  });
+
   it("disassemble → 재작업=danger, 부품=primary", () => {
     const parentLine = makeLine({ origin: "direct", quantity: 5, unit: "EA" });
     const childLine = makeLine({ line_id: "l2", item_id: "ITEM-002", origin: "bom_auto", quantity: 10, unit: "EA" });
