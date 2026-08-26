@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
+    InventoryOperation,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationRoleEnum,
     IoBatch,
     IoLine,
     RequestBucketEnum,
@@ -25,6 +28,7 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services import inventory_operations as operation_svc
 from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
 from app.services.approval_rules import MEMO_REQUIRED_SUB_TYPES
@@ -276,14 +280,36 @@ def _submit_internal_use_approvals(
             update_batch=False,
         )
         if request.department_approved_by_employee_id is not None:
+            batch_status_before = batch.status
+            request_status_before = request.status
             _prelock_line_inventories(db, group_lines)
+            operation = _create_execution_operation(
+                db,
+                batch=batch,
+                actor=requester,
+                execution_key=f"request:{request.request_id}",
+            )
             for line in group_lines:
-                _apply_line(db, batch=batch, line=line, requester=requester)
+                _apply_line(
+                    db,
+                    batch=batch,
+                    line=line,
+                    requester=requester,
+                    operation=operation,
+                )
             now = datetime.utcnow()
             request.status = StockRequestStatusEnum.COMPLETED
             request.completed_at = now
             for request_line in request.lines:
                 request_line.status = StockRequestStatusEnum.COMPLETED
+            _record_execution_workflow(
+                db,
+                operation=operation,
+                batch=batch,
+                batch_status_before=batch_status_before,
+                request=request,
+                request_status_before=request_status_before,
+            )
         requests.append(request)
         notif_svc.notify_request_arrived(db, request)
 
@@ -357,9 +383,23 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
 
     # 자가승인 경로 — create_manual_adjustment_request 가 dept_approved 를 이미 마크했으면 즉시 실행.
     if request.department_approved_by_employee_id is not None:
+        batch_status_before = batch.status
+        request_status_before = request.status
         _prelock_line_inventories(db, lines)
+        operation = _create_execution_operation(
+            db,
+            batch=batch,
+            actor=requester,
+            execution_key=f"request:{request.request_id}",
+        )
         for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
-            _apply_line(db, batch=batch, line=line, requester=requester)
+            _apply_line(
+                db,
+                batch=batch,
+                line=line,
+                requester=requester,
+                operation=operation,
+            )
         now = datetime.utcnow()
         request.status = StockRequestStatusEnum.COMPLETED
         request.completed_at = now
@@ -368,6 +408,14 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
         batch.status = "completed"
         batch.completed_at = now
         batch.updated_at = now
+        _record_execution_workflow(
+            db,
+            operation=operation,
+            batch=batch,
+            batch_status_before=batch_status_before,
+            request=request,
+            request_status_before=request_status_before,
+        )
         db.flush()
 
     # 자가승인으로 즉시 완료된 경우엔 notify_request_arrived 가 상태 가드로 아무 것도 안 한다.
@@ -412,15 +460,37 @@ def execute_batch_after_dept_approval(
     else:
         lines = _included_lines(batch)
     _validate_included_lines(db, lines)
+    batch_status_before = batch.status
+    request_status_before = request.status
     _prelock_line_inventories(db, lines)
+    operation = _create_execution_operation(
+        db,
+        batch=batch,
+        actor=approver,
+        execution_key=f"request:{request.request_id}",
+    )
     # 부서 결재로 권한 검증이 이미 완료된 시점이므로 ship 권한 재검증 생략.
     for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
-        _apply_line(db, batch=batch, line=line, requester=approver)
+        _apply_line(
+            db,
+            batch=batch,
+            line=line,
+            requester=approver,
+            operation=operation,
+        )
     now = datetime.utcnow()
     if batch.sub_type != INTERNAL_USE_SUB_TYPE:
         batch.status = "completed"
         batch.completed_at = now
     batch.updated_at = now
+    _record_execution_workflow(
+        db,
+        operation=operation,
+        batch=batch,
+        batch_status_before=batch_status_before,
+        request=request,
+        request_status_before=request_status_before,
+    )
     db.flush()
 
 
@@ -438,9 +508,11 @@ def _log_immediate(
     producer_employee_id: uuid.UUID | None = None,
     department: str | None = None,
     defect_quarantine_record_id: uuid.UUID | None = None,
+    operation: InventoryOperation | None = None,
+    operation_role: InventoryOperationRoleEnum = InventoryOperationRoleEnum.PRIMARY,
 ) -> None:
     db.add(
-        TransactionLog(
+        operation_svc.attach_transaction(TransactionLog(
             item_id=line.item_id,
             transaction_type=tx_type,
             quantity_change=quantity_change,
@@ -456,7 +528,7 @@ def _log_immediate(
             operation_line_id=line.line_id,
             defect_quarantine_record_id=defect_quarantine_record_id,
             **stock_snapshot,
-        )
+        ), operation, operation_role)
     )
 
 
@@ -584,7 +656,86 @@ def _dept_for_line(line: IoLine, tx_type: TransactionTypeEnum) -> str | None:
     return None
 
 
-def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employee) -> None:
+def _operation_role_for_line(
+    batch: IoBatch,
+    line: IoLine,
+) -> InventoryOperationRoleEnum:
+    """입출고 라인의 업무 의미를 취소·주간집계가 재추정하지 않게 고정한다."""
+    if line.direction == "adjust":
+        return InventoryOperationRoleEnum.CORRECTION
+    if line.direction == "move":
+        return InventoryOperationRoleEnum.TRANSFER
+    if batch.sub_type == "produce":
+        return (
+            InventoryOperationRoleEnum.COMPONENT_INPUT
+            if line.direction == "out"
+            else InventoryOperationRoleEnum.PRODUCT_OUTPUT
+        )
+    return InventoryOperationRoleEnum.PRIMARY
+
+
+def _create_execution_operation(
+    db: Session,
+    *,
+    batch: IoBatch,
+    actor: Employee,
+    execution_key: str,
+) -> InventoryOperation | None:
+    """실재고가 반영되는 한 번의 입출고 실행 작업을 만든다."""
+    return operation_svc.create_business_operation(
+        db,
+        domain="inventory_io",
+        action=batch.sub_type,
+        display_label=batch.sub_type,
+        actor_name=actor.name,
+        actor_employee_id=actor.employee_id,
+        department=batch.requester_department,
+        reason=batch.notes,
+        idempotency_key=f"io:{batch.batch_id}:{execution_key}",
+    )
+
+
+def _record_execution_workflow(
+    db: Session,
+    *,
+    operation: InventoryOperation | None,
+    batch: IoBatch,
+    batch_status_before: str,
+    request: StockRequest | None = None,
+    request_status_before: StockRequestStatusEnum | None = None,
+) -> None:
+    """실행에 연결된 배치·요청을 취소 시 최종 종료할 근거로 남긴다."""
+    operation_svc.record_effect(
+        db,
+        operation=operation,
+        effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+        subject_type="IoBatch",
+        subject_id=batch.batch_id,
+        role="EXECUTION_STATUS",
+        before_state={"status": batch_status_before},
+        after_state={"status": "completed"},
+    )
+    if request is not None and request_status_before is not None:
+        operation_svc.record_effect(
+            db,
+            operation=operation,
+            effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+            subject_type="StockRequest",
+            subject_id=request.request_id,
+            role="EXECUTION_STATUS",
+            before_state={"status": request_status_before.value},
+            after_state={"status": StockRequestStatusEnum.COMPLETED.value},
+        )
+
+
+def _apply_line(
+    db: Session,
+    *,
+    batch: IoBatch,
+    line: IoLine,
+    requester: Employee,
+    operation: InventoryOperation | None = None,
+) -> None:
     qty = _d(line.quantity)
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     before = _d(inv.quantity)
@@ -637,19 +788,57 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         defect_quarantine_record_id=(
             quarantine_record.record_id if quarantine_record else None
         ),
+        operation=operation,
+        operation_role=_operation_role_for_line(batch, line),
     )
+    if quarantine_record is not None:
+        operation_svc.record_defect_movement(
+            db,
+            operation=operation,
+            record_id=quarantine_record.record_id,
+            item_id=line.item_id,
+            department=str(line.to_department),
+            movement_type="QUARANTINE",
+            quantity_delta=qty,
+            role="IO_DEFECTIVE",
+            actor_name=requester.name,
+            actor_employee_id=requester.employee_id,
+        )
 
 
 def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> None:
     lines = _included_lines(batch)
+    status_before = batch.status
     _validate_included_lines(db, lines)
     _prelock_line_inventories(db, lines)
+    operation = _create_execution_operation(
+        db,
+        batch=batch,
+        actor=requester,
+        execution_key="immediate",
+    )
     for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
-        _apply_line(db, batch=batch, line=line, requester=requester)
+        _apply_line(
+            db,
+            batch=batch,
+            line=line,
+            requester=requester,
+            operation=operation,
+        )
     now = datetime.utcnow()
     batch.status = "completed"
     batch.completed_at = now
     batch.updated_at = now
+    operation_svc.record_effect(
+        db,
+        operation=operation,
+        effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+        subject_type="IoBatch",
+        subject_id=batch.batch_id,
+        role="EXECUTION_STATUS",
+        before_state={"status": status_before},
+        after_state={"status": "completed"},
+    )
     db.flush()
 
 

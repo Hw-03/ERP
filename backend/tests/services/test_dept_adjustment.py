@@ -10,9 +10,13 @@ from sqlalchemy import text
 
 from app.models import (
     DepartmentEnum,
+    DefectInventoryMovement,
     DefectQuarantineRecord,
     DeptAdjSubTypeEnum,
+    InventoryOperation,
+    InventoryOperationRoleEnum,
     LocationStatusEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -56,6 +60,16 @@ def _defective_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
 def _tx_types(db_session) -> list[str]:
     from app.models import TransactionLog
     return [r.transaction_type.value for r in db_session.query(TransactionLog).all()]
+
+
+def _enable_operation_ledger(db_session) -> None:
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
 
 
 def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutation(
@@ -115,6 +129,57 @@ def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutati
     )
 
     assert events[0] == ("lock", expected_ids)
+
+
+def test_normal_rework_records_one_operation_with_explicit_line_roles(
+    make_item, make_location, db_session
+):
+    parent = make_item(name="원장 재작업 부모", process_type_code="AF")
+    normal = make_item(name="정상 회수 자식", process_type_code="TR")
+    defective = make_item(name="불량 회수 자식", process_type_code="HR")
+    scrap = make_item(name="폐기 자식", process_type_code="VR")
+    make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
+    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    _enable_operation_ledger(db_session)
+
+    result = svc.submit_normal_disassemble(
+        db_session,
+        parent.item_id,
+        D("1"),
+        "production",
+        ASSEMBLY,
+        [
+            {"item_id": normal.item_id, "qty": D("1"), "normal_qty": D("1")},
+            {
+                "item_id": defective.item_id,
+                "qty": D("1"),
+                "defective_qty": D("1"),
+            },
+            {"item_id": scrap.item_id, "qty": D("1"), "scrap_qty": D("1")},
+        ],
+        reason_category="재작업",
+        reason_memo="역할 검증",
+        actor="작업자",
+    )
+
+    operation = db_session.query(InventoryOperation).one()
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.reference_no == result["batch_ref"])
+        .order_by(TransactionLog.created_at)
+        .all()
+    )
+    assert {log.operation_id for log in logs} == {operation.operation_id}
+    assert [log.operation_role for log in logs] == [
+        InventoryOperationRoleEnum.REWORK_PARENT_NORMAL,
+        InventoryOperationRoleEnum.REWORK_CHILD_NORMAL,
+        InventoryOperationRoleEnum.REWORK_CHILD_DEFECTIVE,
+        InventoryOperationRoleEnum.REWORK_CHILD_SCRAP,
+    ]
+    movement = db_session.query(DefectInventoryMovement).one()
+    assert movement.item_id == defective.item_id
+    assert movement.quantity_delta == D("1")
+    assert movement.operation_id == operation.operation_id
 
 
 def test_normal_rework_skips_flagged_bom_leaf_inventory(
@@ -332,6 +397,43 @@ def test_submit_production(make_item, make_location, db_session):
         log.department for log in db_session.query(TransactionLog).all()
     } == {ASSEMBLY.value}
     assert {log.log_id for log in db_session.query(TransactionLog).all()} == set(log_ids)
+
+
+def test_submit_production_records_one_operation_and_bom_roles(
+    make_item, make_location, db_session
+):
+    result = make_item(name="원장 생산 결과", process_type_code="AF")
+    component = make_item(name="원장 생산 자재", process_type_code="AR")
+    make_location(component.item_id, department=ASSEMBLY, quantity=D("2"))
+    _enable_operation_ledger(db_session)
+
+    svc.submit_adjustment(
+        db_session,
+        DeptAdjSubTypeEnum.PRODUCTION,
+        [
+            svc.AdjLine(
+                item_id=component.item_id,
+                direction="out",
+                quantity=D("2"),
+                department=ASSEMBLY,
+            ),
+            svc.AdjLine(
+                item_id=result.item_id,
+                direction="in",
+                quantity=D("1"),
+                department=ASSEMBLY,
+            ),
+        ],
+        operator_name="생산 작업자",
+    )
+
+    operation = db_session.query(InventoryOperation).one()
+    logs = db_session.query(TransactionLog).order_by(TransactionLog.created_at).all()
+    assert {log.operation_id for log in logs} == {operation.operation_id}
+    assert [log.operation_role for log in logs] == [
+        InventoryOperationRoleEnum.COMPONENT_INPUT,
+        InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+    ]
 
 
 @pytest.mark.parametrize(
@@ -667,6 +769,7 @@ def test_submit_correction_in_out(make_item, make_location, db_session):
     item_a = make_item(name="A")
     item_b = make_item(name="B")
     make_location(item_b.item_id, department=ASSEMBLY, quantity=D("5"))
+    _enable_operation_ledger(db_session)
 
     lines = [
         svc.AdjLine(item_id=item_a.item_id, direction="in",  quantity=D("3"), department=ASSEMBLY, reason="발견"),
@@ -680,6 +783,7 @@ def test_submit_correction_in_out(make_item, make_location, db_session):
 
     types = _tx_types(db_session)
     assert types.count("ADJUST") == 2
+    assert db_session.query(InventoryOperation).one().display_label == "부서 입출고"
 
 
 def test_submit_insufficient_stock_raises(make_item, make_location, db_session):

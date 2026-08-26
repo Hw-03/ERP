@@ -20,6 +20,9 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationRoleEnum,
     InventoryLocation,
     IoBatch,
     IoBundle,
@@ -30,6 +33,7 @@ from app.models import (
     StockRequestStatusEnum,
     ShippingRequest,
     ShippingRequestStatusEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -531,6 +535,58 @@ def test_submit_immediate_completes_and_orders_out_first(make_item, make_locatio
     assert _prod_qty(db_session, comp.item_id) == D("8")
     assert _prod_qty(db_session, result.item_id) == D("1")
     assert db_session.query(TransactionLog).count() == 2
+
+
+def test_submit_immediate_records_one_operation_for_all_batch_lines(
+    make_item, make_location, db_session
+):
+    component = make_item(name="원장 배치 구성품")
+    result = make_item(name="원장 배치 결과품", process_type_code="AF")
+    make_location(component.item_id, department=ASSEMBLY, quantity=D("2"))
+    requester = _make_employee(db_session, code="LEDGER-IO")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        lines=[
+            {
+                "item_id": result.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY,
+                "quantity": D("1"),
+            },
+            {
+                "item_id": component.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY,
+                "to_bucket": "none",
+                "quantity": D("2"),
+            },
+        ],
+    )
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    svc._submit_immediate(db_session, requester=requester, batch=batch)
+
+    operation = db_session.query(InventoryOperation).one()
+    logs = db_session.query(TransactionLog).order_by(TransactionLog.created_at).all()
+    assert {log.operation_id for log in logs} == {operation.operation_id}
+    assert [log.operation_role for log in logs] == [
+        InventoryOperationRoleEnum.COMPONENT_INPUT,
+        InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+    ]
+    effect = db_session.query(InventoryOperationEffect).one()
+    assert effect.subject_type == "IoBatch"
+    assert effect.after_state == {"status": "completed"}
 
 
 def test_submit_immediate_prelocks_sorted_unique_inventories_before_mutation(
