@@ -36,6 +36,8 @@ class DashboardFinishedStock:
 
     item: Item
     quantity: Decimal
+    normal_quantity: Decimal
+    defective_quantity: Decimal
 
 
 def load_dashboard_finished_stock(db: Session) -> list[DashboardFinishedStock]:
@@ -52,13 +54,18 @@ def load_dashboard_finished_stock(db: Session) -> list[DashboardFinishedStock]:
         .all()
     )
     figures = stock_math.bulk_compute(db, [item.item_id for item in items])
-    return [
-        DashboardFinishedStock(
-            item=item,
-            quantity=figures.get(item.item_id, stock_math.StockFigures()).total,
+    rows: list[DashboardFinishedStock] = []
+    for item in items:
+        stock = figures.get(item.item_id, stock_math.StockFigures())
+        rows.append(
+            DashboardFinishedStock(
+                item=item,
+                quantity=stock.total,
+                normal_quantity=stock.warehouse_qty + stock.production_total,
+                defective_quantity=stock.defective_total,
+            )
         )
-        for item in items
-    ]
+    return rows
 
 
 def sunday_cutoff_utc(week_end: date) -> datetime:
@@ -138,8 +145,11 @@ def capture_weekly_inventory_snapshot(
         as_of_utc=sunday_cutoff_utc(week_end),
         captured_at=captured_at,
         capture_source=source,
+        basis_version=2,
         item_count=len(rows),
         total_quantity=sum((row.quantity for row in rows), Decimal("0")),
+        normal_total_quantity=sum((row.normal_quantity for row in rows), Decimal("0")),
+        defective_total_quantity=sum((row.defective_quantity for row in rows), Decimal("0")),
     )
     snapshot.items = [
         WeeklyInventorySnapshotItem(
@@ -148,6 +158,8 @@ def capture_weekly_inventory_snapshot(
             item_name=row.item.item_name,
             process_type_code=row.item.process_type_code,
             quantity=row.quantity,
+            normal_quantity=row.normal_quantity,
+            defective_quantity=row.defective_quantity,
         )
         for row in rows
     ]

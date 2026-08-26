@@ -64,6 +64,12 @@ function WeeklyDetailTableImpl({ group }: Props) {
         </span>
         <span
           className="text-[12px]"
+          style={{ color: (group.defect_qty ?? 0) > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
+        >
+          불량 {formatQty(group.defect_qty ?? 0)}
+        </span>
+        <span
+          className="text-[12px]"
           style={{
             color:
               group.delta > 0
@@ -127,13 +133,14 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 </div>
               </div>
               <div
-                className="mt-2 grid grid-cols-5 gap-1 text-center text-[11px] font-bold tabular-nums"
+                className="mt-2 grid grid-cols-6 gap-1 text-center text-[11px] font-bold tabular-nums"
               >
                 {[
                   { l: "전주", v: row.prev_qty, c: LEGACY_COLORS.muted2 },
                   { l: "생산", v: row.produce_qty, c: LEGACY_COLORS.green },
                   { l: "입고", v: row.receive_qty, c: LEGACY_COLORS.blue },
                   { l: "출고", v: row.out_qty, c: LEGACY_COLORS.red },
+                  { l: "불량", v: row.defect_qty ?? 0, c: LEGACY_COLORS.red },
                   { l: "현재", v: row.current_qty, c: LEGACY_COLORS.text },
                 ].map((x) => (
                   <div key={x.l}>
@@ -167,11 +174,12 @@ function WeeklyDetailTableImpl({ group }: Props) {
             <col style={{ width: "9%" }} />
             <col style={{ width: "9%" }} />
             <col style={{ width: "9%" }} />
+            <col style={{ width: "9%" }} />
             <col style={{ width: "10%" }} />
           </colgroup>
           <thead>
             <tr>
-              {["품목 코드", "품명", "전주 재고", "생산", "입고", "출고", "현재 재고", "증감"].map(
+              {["품목 코드", "품명", "전주 재고", "생산", "입고", "출고", "불량", "현재 재고", "증감"].map(
                 (h, i) => (
                   <th
                     key={h}
@@ -259,6 +267,14 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   {/* 출고 내역 */}
                   <Num
                     val={row.out_qty}
+                    bg={rowBg}
+                    border={rowBorder}
+                    color={LEGACY_COLORS.red}
+                    highlightColor={LEGACY_COLORS.red}
+                  />
+                  {/* 불량 */}
+                  <Num
+                    val={row.defect_qty ?? 0}
                     bg={rowBg}
                     border={rowBorder}
                     color={LEGACY_COLORS.red}

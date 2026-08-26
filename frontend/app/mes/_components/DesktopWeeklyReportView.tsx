@@ -44,11 +44,6 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
 
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
 
-  const cardBase = {
-    background: LEGACY_COLORS.s1,
-    borderColor: LEGACY_COLORS.border,
-  };
-
   const matrixRows = data?.production_matrix ?? [];
   const hasProduction = matrixRows.some((r) => r.total_qty > 0);
 
@@ -87,7 +82,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
   }
 
   const f705DownloadButton = (
-    <div data-testid="weekly-f705-download-anchor" className="ml-auto lg:absolute lg:right-4 lg:top-2">
+    <div data-testid="weekly-f705-download-anchor" className="weekly-download">
       <Button
         size="sm"
         iconLeft={<Download />}
@@ -100,105 +95,97 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
     </div>
   );
 
+  if (data?.report_status === "failed") {
+    return (
+      <section role="alert" className="weekly-failed">
+        <h2>집계 검산 실패</h2>
+        <p>{data.validation?.message ?? "잘못된 주간 표를 공개하지 않았습니다."}</p>
+        <ul>
+          {(data.validation?.failures ?? []).map((failure) => <li key={failure.problem_id}>
+            <b>{failure.mes_code ?? failure.item_id ?? "보고 전체"}</b> · {failure.reason} · {failure.problem_id}
+          </li>)}
+        </ul>
+      </section>
+    );
+  }
+
+  const basisNotice = data?.report_status === "transition"
+    ? data.transition_notice
+    : data?.report_status === "legacy" && data.basis_version === 1
+      ? "기존 기준·검산 전 자료입니다."
+      : null;
+
   return (
-    <div className="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col gap-3 py-1 pr-1 lg:overflow-hidden">
+    <div className="weekly-report">
+      {basisNotice && <div role="status" className="weekly-notice">
+        {basisNotice}
+      </div>}
       {error && (
-        <div
-          className="shrink-0 rounded-[10px] border px-3 py-1.5 text-[12px]"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 6%, ${LEGACY_COLORS.s1})`,
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, ${LEGACY_COLORS.border})`,
-            color: LEGACY_COLORS.red,
-          }}
-        >
-          {error}
-        </div>
+        <div className="weekly-error">{error}</div>
       )}
 
       {/* ── 행1: 생산 현황 (빈 상태는 얇은 노트로 축소) ── */}
       {(() => {
         if (loading && !data) {
           return (
-            <div className="shrink-0 rounded-[18px] border py-2.5 px-4" style={cardBase}>
+            <div className="weekly-card weekly-loading">
               <LoadingSkeleton variant="card" rows={1} />
             </div>
           );
         }
         if (!hasProduction) {
           return (
-            <div
-              data-testid="weekly-production-card"
-              className="relative shrink-0 rounded-[12px] border px-4 py-2"
-              style={cardBase}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className="text-[11px] font-bold tracking-wide"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                >
-                  생산 현황
-                </span>
-                <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div data-testid="weekly-production-card" className="weekly-card weekly-production-empty">
+              <div>
+                <b>생산 현황</b>
+                <span>
                   이번 주 생산 실적 없음 · 모델별 공정 생산 기록이 없습니다.
                 </span>
                 {f705DownloadButton}
               </div>
-              {f705DownloadError && <p role="alert" className="mt-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>{f705DownloadError}</p>}
+              {f705DownloadError && <p role="alert" className="weekly-download-error">{f705DownloadError}</p>}
             </div>
           );
         }
         return (
-          <div data-testid="weekly-production-card" className="relative shrink-0 rounded-[18px] border py-3 px-4" style={cardBase}>
+          <div data-testid="weekly-production-card" className="weekly-card weekly-production">
             {/* 헤더: 타이틀 + KPI 배지 */}
-            <div className="mb-2 flex flex-wrap items-center gap-2 lg:flex-nowrap lg:whitespace-nowrap lg:pr-[220px]">
-              <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                생산 현황
-              </h2>
+            <div className="weekly-production-head">
+              <h2>생산 현황</h2>
               {/* KPI 배지 */}
               <span
-                className="rounded-[7px] px-2 py-0.5 text-[12px] font-bold tabular-nums"
-                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+                data-tone="total"
               >
                 총 {totalQty.toLocaleString()}개
               </span>
               {topModel && (
                 <span
-                  className="rounded-[7px] px-2 py-0.5 text-[12px] font-bold"
-                  style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}
+                  data-tone="top"
                 >
                   최다 {topModel.model_label} ({topModel.total_qty.toLocaleString()})
                 </span>
               )}
               <span
-                className="rounded-[7px] px-2 py-0.5 text-[12px] font-bold tabular-nums"
-                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
+                data-tone="department"
               >
                 생산 부서 {activeDepts}/{totalDepts}
               </span>
               {f705DownloadButton}
             </div>
-            {f705DownloadError && <p role="alert" className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>{f705DownloadError}</p>}
+            {f705DownloadError && <p role="alert" className="weekly-download-error">{f705DownloadError}</p>}
             <WeeklyProductionMatrix rows={matrixRows} />
           </div>
         );
       })()}
 
       {/* ── 행2: 2-column (공정별 변화 | 품목 상세) ── 남은 높이 전부 사용 */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-1 lg:min-h-0">
+      <div className="weekly-report-body">
         {/* 좌: 공정별 변화 */}
-        <div
-          className="flex w-full shrink-0 flex-col overflow-hidden rounded-[18px] border min-h-[220px] lg:w-[330px] lg:min-h-0 lg:max-h-full"
-          style={cardBase}
-        >
-          <div
-            className="shrink-0 border-b px-3 py-2.5"
-            style={{ borderColor: LEGACY_COLORS.border }}
-          >
-            <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-              공정별 변화
-            </h2>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden p-2">
+        <div className="weekly-card weekly-group-panel">
+          <header>
+            <h2>공정별 변화</h2>
+          </header>
+          <div>
             {loading && !data ? (
               <LoadingSkeleton variant="card" rows={4} />
             ) : (
@@ -213,21 +200,16 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         </div>
 
         {/* 우: 품목 상세 */}
-        <div className="flex flex-1 flex-col min-w-0 rounded-[18px] border min-h-[280px] lg:min-h-0" style={cardBase}>
+        <div className="weekly-card weekly-detail-panel">
           {/* min-h-0 — flex 체인에서 자식의 overflow-y-auto 가 동작하려면 모든 ancestor 가 min-h-0 필요.
               누락 시 자식 content 크기가 부모를 밀어내서 스크롤이 안 잡힘. */}
-          <div
-            className="flex min-h-0 flex-1 flex-col"
-          >
-            <div
-              className="shrink-0 border-b px-4 py-2.5"
-              style={{ borderColor: LEGACY_COLORS.border }}
-            >
-              <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
+          <div>
+            <header>
+              <h2>
                 {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
               </h2>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-2">
+            </header>
+            <div className="weekly-detail-content">
               {loading && !data ? (
                 <LoadingSkeleton variant="list" rows={8} />
               ) : (

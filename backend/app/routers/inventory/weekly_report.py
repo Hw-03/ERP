@@ -49,6 +49,7 @@ from app.services.weekly_inventory_snapshot import (
     load_dashboard_finished_stock,
     sunday_cutoff_utc,
 )
+from app.services import weekly_report_contract
 
 from ._shared import PROCESS_TYPE_LABELS
 
@@ -320,6 +321,20 @@ def get_weekly_report(
     if week_start is None or week_end is None:
         week_start, week_end = _current_week_bounds()
 
+    contract_state = weekly_report_contract.weekly_contract_state(
+        db,
+        week_start=week_start,
+        week_end=week_end,
+        today=_today_kst(),
+    )
+    if contract_state.report_status == "verified":
+        return weekly_report_contract.build_verified_weekly_report(
+            db,
+            week_start=week_start,
+            week_end=week_end,
+            today=_today_kst(),
+        )
+
     snapshot_context = _load_snapshot_report_context(
         db,
         week_start=week_start,
@@ -372,6 +387,8 @@ def get_weekly_report(
                 groups_unchanged=0,
             ),
             warnings=[],
+            report_status=contract_state.report_status,
+            transition_notice=contract_state.transition_notice,
         )
 
     item_ids = (
@@ -636,4 +653,6 @@ def get_weekly_report(
         summary=summary,
         warnings=warnings,
         production_matrix=production_matrix,
+        report_status=contract_state.report_status,
+        transition_notice=contract_state.transition_notice,
     )

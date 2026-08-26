@@ -15,9 +15,14 @@ from app.models import (
     DepartmentEnum,
     Inventory,
     InventoryLocation,
+    InventoryOperation,
+    InventoryOperationKindEnum,
+    InventoryOperationRoleEnum,
+    InventoryOperationStatusEnum,
     Item,
     LocationStatusEnum,
     ProductSymbol,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
     WeeklyInventorySnapshot,
@@ -93,14 +98,22 @@ def _add_snapshot(
     *,
     week_end: date,
     item_quantities: list[tuple[Item, Decimal]],
+    verified: bool = False,
 ) -> WeeklyInventorySnapshot:
     snapshot = WeeklyInventorySnapshot(
         week_end=week_end,
         as_of_utc=datetime.combine(week_end, datetime.max.time()),
         captured_at=datetime.combine(week_end, datetime.max.time()),
         capture_source="scheduled",
+        basis_version=2 if verified else 1,
         item_count=len(item_quantities),
         total_quantity=sum((quantity for _, quantity in item_quantities), Decimal("0")),
+        normal_total_quantity=(
+            sum((quantity for _, quantity in item_quantities), Decimal("0"))
+            if verified
+            else None
+        ),
+        defective_total_quantity=Decimal("0") if verified else None,
     )
     snapshot.items = [
         WeeklyInventorySnapshotItem(
@@ -109,12 +122,68 @@ def _add_snapshot(
             item_name=item.item_name,
             process_type_code=item.process_type_code,
             quantity=quantity,
+            normal_quantity=quantity if verified else None,
+            defective_quantity=Decimal("0") if verified else None,
         )
         for item, quantity in item_quantities
     ]
     db_session.add(snapshot)
     db_session.flush()
     return snapshot
+
+
+def _activate_verified_weekly_report(db_session, starts_at: str = "2026-05-04T00:00:00+09:00") -> None:
+    db_session.add_all([
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        ),
+        SystemSetting(
+            setting_key="weekly_report_v2_starts_at",
+            setting_value=starts_at,
+        ),
+    ])
+    db_session.flush()
+
+
+def _add_operation_log(
+    db_session,
+    *,
+    item: Item,
+    tx_type: TransactionTypeEnum,
+    role: InventoryOperationRoleEnum,
+    quantity_change: int,
+    effects: list[dict],
+    action: str,
+    display_label: str,
+    at: datetime = _WEEK_MID,
+) -> TransactionLog:
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="weekly-test",
+        action=action,
+        status=InventoryOperationStatusEnum.COMMITTED,
+        display_label=display_label,
+        actor_name="관리자",
+        effective_at=at,
+        contract_version=1,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=tx_type,
+        quantity_change=quantity_change,
+        quantity_before=0,
+        quantity_after=0,
+        operation_id=operation.operation_id,
+        operation_role=role,
+        inventory_effect=effects,
+        created_at=at,
+    )
+    db_session.add(log)
+    db_session.flush()
+    return log
 
 
 # ── 기본 집계 ────────────────────────────────────────────────────────────
@@ -529,6 +598,10 @@ def test_closed_snapshot_week_uses_boundaries_and_excludes_cancelled_flow(client
         "summary",
         "warnings",
         "production_matrix",
+        "basis_version",
+        "report_status",
+        "transition_notice",
+        "validation",
     }
     row = {
         item_row["item_id"]: item_row
@@ -716,3 +789,273 @@ def test_snapshot_week_uses_kst_half_open_transaction_boundary(client, db_sessio
         for item_row in group["items"]
     }[str(item.item_id)]
     assert _dec(row["produce_qty"]) == _dec(1)
+
+
+def test_verified_week_excludes_same_week_original_and_cancellation_pair(client, db_session):
+    item = _make_prod_item(
+        db_session,
+        name="같은 주 출고 취소 VF",
+        process_code="VF",
+        model_symbol="8",
+        qty=_dec(10),
+    )
+    _activate_verified_weekly_report(db_session)
+    original = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="department_inventory",
+        action="out",
+        status=InventoryOperationStatusEnum.COMMITTED,
+        display_label="부서 입출고",
+        actor_name="관리자",
+        effective_at=_WEEK_MID,
+        contract_version=1,
+    )
+    db_session.add(original)
+    db_session.flush()
+    original_log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.SHIP,
+        quantity_change=-7,
+        quantity_before=10,
+        quantity_after=3,
+        operation_id=original.operation_id,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
+        inventory_effect=[{"scope": "warehouse", "delta": -7}],
+        created_at=_WEEK_MID,
+    )
+    db_session.add(original_log)
+    db_session.flush()
+    cancellation = InventoryOperation(
+        kind=InventoryOperationKindEnum.CANCELLATION,
+        domain=original.domain,
+        action=original.action,
+        status=InventoryOperationStatusEnum.COMMITTED,
+        display_label="부서 입출고 취소",
+        actor_name="관리자",
+        effective_at=datetime(2026, 5, 6, 13, 0, 0),
+        contract_version=1,
+        reverses_operation_id=original.operation_id,
+    )
+    db_session.add(cancellation)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.SHIP,
+            quantity_change=7,
+            quantity_before=3,
+            quantity_after=10,
+            operation_id=cancellation.operation_id,
+            operation_role=InventoryOperationRoleEnum.PRIMARY,
+            reverses_log_id=original_log.log_id,
+            inventory_effect=[{"scope": "warehouse", "delta": 7}],
+            created_at=datetime(2026, 5, 6, 13, 0, 0),
+        )
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 3),
+        item_quantities=[(item, _dec(10))],
+        verified=True,
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 10),
+        item_quantities=[(item, _dec(10))],
+        verified=True,
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}"
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["basis_version"] == 2
+    assert body["report_status"] == "verified"
+    assert body["validation"]["status"] == "verified"
+    row = {
+        item_row["item_id"]: item_row
+        for group in body["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert row["produce_qty"] == 0
+    assert row["receive_qty"] == 0
+    assert row["out_qty"] == 0
+    assert row["defect_qty"] == 0
+    assert row["current_qty"] == 10
+    assert row["delta"] == 0
+
+
+def test_verified_week_matches_rework_quarantine_restore_examples(client, db_session):
+    rebuilt = _make_prod_item(db_session, name="정상 재작업 VF", process_code="VF", qty=_dec(1))
+    recovered = _make_prod_item(db_session, name="정상 회수 VF", process_code="VF", qty=_dec(1))
+    defective_child = _make_prod_item(db_session, name="불량 회수 VF", process_code="VF", qty=_dec(0))
+    old_defect = _make_prod_item(db_session, name="전주 불량 VF", process_code="VF", qty=_dec(0))
+    restored = _make_prod_item(db_session, name="정상 복귀 VF", process_code="VF", qty=_dec(1))
+    _activate_verified_weekly_report(db_session)
+
+    _add_operation_log(
+        db_session,
+        item=rebuilt,
+        tx_type=TransactionTypeEnum.DISASSEMBLE,
+        role=InventoryOperationRoleEnum.REWORK_PARENT_NORMAL,
+        quantity_change=-1,
+        effects=[{"scope": "location", "department": "진공", "status": "PRODUCTION", "delta": -1}],
+        action="rework_normal",
+        display_label="재작업",
+    )
+    _add_operation_log(
+        db_session,
+        item=rebuilt,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+        quantity_change=1,
+        effects=[{"scope": "location", "department": "진공", "status": "PRODUCTION", "delta": 1}],
+        action="produce",
+        display_label="생산",
+        at=datetime(2026, 5, 6, 13, 0),
+    )
+    _add_operation_log(
+        db_session,
+        item=recovered,
+        tx_type=TransactionTypeEnum.RECEIVE,
+        role=InventoryOperationRoleEnum.REWORK_CHILD_NORMAL,
+        quantity_change=1,
+        effects=[{"scope": "location", "department": "진공", "status": "PRODUCTION", "delta": 1}],
+        action="rework_defective",
+        display_label="재작업 정상 회수",
+    )
+    _add_operation_log(
+        db_session,
+        item=defective_child,
+        tx_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        role=InventoryOperationRoleEnum.REWORK_CHILD_DEFECTIVE,
+        quantity_change=1,
+        effects=[{"scope": "location", "department": "진공", "status": "DEFECTIVE", "delta": 1}],
+        action="rework_defective",
+        display_label="재작업 불량 회수",
+    )
+    _add_operation_log(
+        db_session,
+        item=old_defect,
+        tx_type=TransactionTypeEnum.DEFECT_SCRAP,
+        role=InventoryOperationRoleEnum.PRIMARY,
+        quantity_change=-1,
+        effects=[{"scope": "location", "department": "진공", "status": "DEFECTIVE", "delta": -1}],
+        action="defect_scrap",
+        display_label="불량 폐기",
+    )
+    _add_operation_log(
+        db_session,
+        item=restored,
+        tx_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
+        role=InventoryOperationRoleEnum.PRIMARY,
+        quantity_change=0,
+        effects=[
+            {"scope": "location", "department": "진공", "status": "DEFECTIVE", "delta": -1},
+            {"scope": "location", "department": "진공", "status": "PRODUCTION", "delta": 1},
+        ],
+        action="restore",
+        display_label="정상 복귀",
+    )
+    previous = [
+        (rebuilt, _dec(1)),
+        (recovered, _dec(0)),
+        (defective_child, _dec(0)),
+        (old_defect, _dec(0)),
+        (restored, _dec(0)),
+    ]
+    current = [
+        (rebuilt, _dec(1)),
+        (recovered, _dec(1)),
+        (defective_child, _dec(0)),
+        (old_defect, _dec(0)),
+        (restored, _dec(1)),
+    ]
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=previous, verified=True)
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=current, verified=True)
+    db_session.commit()
+
+    response = client.get(
+        f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}"
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["report_status"] == "verified"
+    rows = {
+        item_row["item_id"]: item_row
+        for group in body["groups"]
+        for item_row in group["items"]
+    }
+    assert (rows[str(rebuilt.item_id)]["produce_qty"], rows[str(rebuilt.item_id)]["defect_qty"], rows[str(rebuilt.item_id)]["delta"]) == (1, 1, 0)
+    assert (rows[str(recovered.item_id)]["receive_qty"], rows[str(recovered.item_id)]["delta"]) == (1, 1)
+    assert (rows[str(defective_child.item_id)]["receive_qty"], rows[str(defective_child.item_id)]["defect_qty"], rows[str(defective_child.item_id)]["delta"]) == (1, 1, 0)
+    assert rows[str(old_defect.item_id)]["defect_qty"] == 0
+    assert (rows[str(restored.item_id)]["receive_qty"], rows[str(restored.item_id)]["delta"]) == (1, 1)
+    for row in rows.values():
+        assert row["delta"] == row["current_qty"] - row["prev_qty"]
+        assert row["delta"] == row["produce_qty"] + row["receive_qty"] - row["out_qty"] - row["defect_qty"]
+        assert min(row["prev_qty"], row["produce_qty"], row["receive_qty"], row["out_qty"], row["defect_qty"], row["current_qty"]) >= 0
+
+
+def test_verified_week_hides_table_when_inventory_equation_fails(client, db_session):
+    item = _make_prod_item(
+        db_session,
+        name="미분류 VF",
+        process_code="VF",
+        model_symbol="8",
+        qty=_dec(9),
+    )
+    _activate_verified_weekly_report(db_session)
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 3),
+        item_quantities=[(item, _dec(10))],
+        verified=True,
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 10),
+        item_quantities=[(item, _dec(9))],
+        verified=True,
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}"
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["report_status"] == "failed"
+    assert body["groups"] == []
+    assert body["validation"]["status"] == "failed"
+    assert body["validation"]["failures"][0]["item_id"] == str(item.item_id)
+    assert "집계 검산 실패" in body["validation"]["message"]
+
+
+def test_transition_week_keeps_legacy_report_and_shows_fixed_notice(
+    client,
+    db_session,
+    monkeypatch,
+):
+    from app.routers.inventory import weekly_report
+
+    _activate_verified_weekly_report(db_session, "2026-05-11T00:00:00+09:00")
+    monkeypatch.setattr(weekly_report, "_today_kst", lambda: date(2026, 5, 6), raising=False)
+    db_session.commit()
+
+    response = client.get(
+        f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}"
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["report_status"] == "transition"
+    assert body["transition_notice"] == (
+        "주간보고 계산 기준을 개선 중입니다. 이번 주 수치는 실제 재고와 다를 수 있으며, "
+        "다음 주부터 새 기준으로 정확한 정보가 표시됩니다."
+    )

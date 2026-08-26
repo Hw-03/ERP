@@ -88,8 +88,8 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     const populatedCard = screen.getByTestId("weekly-production-card");
     const populatedAnchor = screen.getByTestId("weekly-f705-download-anchor");
 
-    expect(populatedCard).toHaveClass("relative");
-    expect(populatedAnchor).toHaveClass("lg:absolute", "lg:right-4", "lg:top-2");
+    expect(populatedCard).toHaveClass("weekly-card", "weekly-production");
+    expect(populatedAnchor).toHaveClass("weekly-download");
 
     state.useWeeklyReportQuery.mockReturnValue({
       data: { groups: [], production_matrix: [] },
@@ -100,8 +100,8 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
 
     const emptyCard = screen.getByTestId("weekly-production-card");
     const emptyAnchor = screen.getByTestId("weekly-f705-download-anchor");
-    expect(emptyCard).toHaveClass("relative");
-    expect(emptyAnchor).toHaveClass("lg:absolute", "lg:right-4", "lg:top-2");
+    expect(emptyCard).toHaveClass("weekly-card", "weekly-production-empty");
+    expect(emptyAnchor).toHaveClass("weekly-download");
   });
 
   it("성공하면 파일명을 설정한 앵커를 정리하고 Blob URL을 해제한다", async () => {
@@ -142,5 +142,46 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     fireEvent.click(screen.getByRole("button", { name: "F705-02 생산일지 다운로드" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("생산일지 생성 실패");
+  });
+
+  it("전환 주에는 확정 안내를 크게 표시한다", () => {
+    state.useWeeklyReportQuery.mockReturnValue({
+      data: {
+        groups: [],
+        production_matrix: [],
+        report_status: "transition",
+        transition_notice: "주간보고 계산 기준을 개선 중입니다. 이번 주 수치는 실제 재고와 다를 수 있으며, 다음 주부터 새 기준으로 정확한 정보가 표시됩니다.",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderWeekly();
+
+    expect(screen.getByRole("status")).toHaveTextContent("다음 주부터 새 기준으로 정확한 정보가 표시됩니다");
+  });
+
+  it("검산 실패 시 숫자 표를 숨기고 원인 거래 안내만 표시한다", () => {
+    state.useWeeklyReportQuery.mockReturnValue({
+      data: {
+        groups: [],
+        production_matrix: [],
+        report_status: "failed",
+        validation: {
+          status: "failed",
+          message: "집계 검산 실패: 잘못된 주간 표를 공개하지 않았습니다.",
+          failures: [{ problem_id: "WEEKLY-ABC", item_id: "item-1", mes_code: "8-VF-0006", reason: "현재 재고 증감과 활동 열 합계가 일치하지 않습니다." }],
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderWeekly();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("집계 검산 실패");
+    expect(screen.getByRole("alert")).toHaveTextContent("8-VF-0006");
+    expect(screen.queryByTestId("weekly-production-card")).not.toBeInTheDocument();
+    expect(screen.queryByText("공정별 변화")).not.toBeInTheDocument();
   });
 });

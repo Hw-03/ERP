@@ -70,6 +70,8 @@ def test_dashboard_finished_stock_uses_location_sum_and_active_scope(
     rows = load_dashboard_finished_stock(db_session)
 
     assert _quantity_by_item(rows) == {str(active.item_id): Decimal("9")}
+    assert rows[0].normal_quantity == Decimal("7")
+    assert rows[0].defective_quantity == Decimal("2")
 
 
 def test_weekly_snapshot_is_idempotent_and_keeps_first_values(
@@ -113,10 +115,14 @@ def test_weekly_snapshot_is_idempotent_and_keeps_first_values(
     )
     assert second.snapshot_id == first.snapshot_id
     assert first.capture_source == "scheduled"
+    assert first.basis_version == 2
     assert first.item_count == 1
     assert first.total_quantity == Decimal("8")
     assert [(str(line.item_id), line.quantity) for line in lines] == [
         (str(item.item_id), Decimal("8")),
+    ]
+    assert [(line.normal_quantity, line.defective_quantity) for line in lines] == [
+        (Decimal("8"), Decimal("0")),
     ]
 
 
