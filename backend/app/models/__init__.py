@@ -64,6 +64,15 @@ from app.models.stock_request import (
     StockRequestTypeEnum,
 )
 from app.models.system import DataRevision, SystemSetting
+from app.models.inventory_operation import (
+    DefectInventoryMovement,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationKindEnum,
+    InventoryOperationRoleEnum,
+    InventoryOperationStatusEnum,
+)
 from app.models.transaction import (
     TransactionEditLog,
     TransactionLog,
@@ -116,6 +125,13 @@ __all__ = [
     "TransactionLog",
     "TransactionEditLog",
     "TransactionTypeEnum",
+    "InventoryOperation",
+    "InventoryOperationEffect",
+    "DefectInventoryMovement",
+    "InventoryOperationKindEnum",
+    "InventoryOperationStatusEnum",
+    "InventoryOperationEffectKindEnum",
+    "InventoryOperationRoleEnum",
     # shipping
     "ShippingAllocation",
     "ShippingRequest",

@@ -14,11 +14,13 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, IntQuantity, UUIDString
+from app.models.inventory_operation import InventoryOperationRoleEnum
 
 __all__ = [
     "TransactionTypeEnum",
@@ -88,6 +90,23 @@ class TransactionLog(Base):
         nullable=True,
         index=True,
     )
+    operation_id = Column(
+        UUIDString,
+        ForeignKey("inventory_operations.operation_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    operation_role = Column(
+        SAEnum(InventoryOperationRoleEnum, name="inventory_operation_role_enum"),
+        nullable=True,
+        index=True,
+    )
+    reverses_log_id = Column(
+        UUIDString,
+        ForeignKey("transaction_logs.log_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     shipping_request_id = Column(
         UUIDString,
         ForeignKey("shipping_requests.request_id", ondelete="SET NULL"),
@@ -112,7 +131,8 @@ class TransactionLog(Base):
     cancelled_at = Column(DateTime, nullable=True)
     # 이 거래가 건드린 재고 셀의 증감 기록 — 취소 시 부호 반전해 일반적으로 역재생.
     # 예: [{"scope":"warehouse","delta":-100},{"scope":"location","department":"조립","status":"DEFECTIVE","delta":100}]
-    # 이번 재구현 이전 로그는 None → _cancel_one_log 의 레거시 폴백 경로로 처리.
+    # 전환 전 로그는 None. 원장 활성화 뒤 취소 시 안전 편입하거나 차단하고,
+    # 원장이 비활성인 호환 환경에서만 레거시 직접 원복 경로를 사용한다.
     inventory_effect = Column(JSON, nullable=True)
     created_at = Column(
         DateTime,
@@ -126,6 +146,7 @@ class TransactionLog(Base):
     item = relationship("Item", back_populates="transaction_logs")
 
     __table_args__ = (
+        UniqueConstraint("reverses_log_id", name="uq_transaction_log_reverses_log"),
         # 5.5-A: "품목 X 의 최근 거래 N건" / "기간 export" 쿼리 가속.
         Index("ix_tx_item_created", "item_id", "created_at"),
         # 창고/부서 탭 필터 쿼리 가속 (transaction_type IN (...) + 날짜 정렬).
@@ -133,6 +154,7 @@ class TransactionLog(Base):
         # operation_batch_id 기반 배치 그룹 조회 가속.
         Index("ix_tx_batch_created", "operation_batch_id", "created_at"),
         Index("ix_tx_shipping_request", "shipping_request_id", "created_at"),
+        Index("ix_tx_operation_created", "operation_id", "created_at"),
     )
 
 

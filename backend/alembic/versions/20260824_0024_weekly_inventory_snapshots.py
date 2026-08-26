@@ -34,13 +34,34 @@ _ITEM_COLUMNS = {
     "process_type_code",
     "quantity",
 }
+_V2_SNAPSHOT_COLUMNS = {
+    "basis_version",
+    "normal_total_quantity",
+    "defective_total_quantity",
+}
+_V2_ITEM_COLUMNS = {
+    "normal_quantity",
+    "defective_quantity",
+}
 
 
 def _existing_tables_are_compatible(bind: sa.Connection) -> bool:
     inspector = sa.inspect(bind)
-    if {column["name"] for column in inspector.get_columns("weekly_inventory_snapshots")} != _SNAPSHOT_COLUMNS:
-        return False
-    if {column["name"] for column in inspector.get_columns("weekly_inventory_snapshot_items")} != _ITEM_COLUMNS:
+    snapshot_columns = {
+        column["name"] for column in inspector.get_columns("weekly_inventory_snapshots")
+    }
+    item_columns = {
+        column["name"]
+        for column in inspector.get_columns("weekly_inventory_snapshot_items")
+    }
+    allowed_column_pairs = {
+        (frozenset(_SNAPSHOT_COLUMNS), frozenset(_ITEM_COLUMNS)),
+        (
+            frozenset(_SNAPSHOT_COLUMNS | _V2_SNAPSHOT_COLUMNS),
+            frozenset(_ITEM_COLUMNS | _V2_ITEM_COLUMNS),
+        ),
+    }
+    if (frozenset(snapshot_columns), frozenset(item_columns)) not in allowed_column_pairs:
         return False
     if not any(
         constraint["name"] == "uq_weekly_inventory_snapshots_week_end"

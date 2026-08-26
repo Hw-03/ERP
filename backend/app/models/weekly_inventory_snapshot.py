@@ -37,8 +37,11 @@ class WeeklyInventorySnapshot(Base):
         server_default=func.now(),
     )
     capture_source = Column(String(32), nullable=False)
+    basis_version = Column(Integer, nullable=False, default=1, server_default="1")
     item_count = Column(Integer, nullable=False)
     total_quantity = Column(IntQuantity, nullable=False)
+    normal_total_quantity = Column(IntQuantity, nullable=True)
+    defective_total_quantity = Column(IntQuantity, nullable=True)
 
     items = relationship(
         "WeeklyInventorySnapshotItem",
@@ -51,6 +54,14 @@ class WeeklyInventorySnapshot(Base):
         UniqueConstraint("week_end", name="uq_weekly_inventory_snapshots_week_end"),
         CheckConstraint("item_count >= 0", name="ck_weekly_inventory_snapshots_item_count_nonneg"),
         CheckConstraint("total_quantity >= 0", name="ck_weekly_inventory_snapshots_total_nonneg"),
+        CheckConstraint(
+            "normal_total_quantity IS NULL OR normal_total_quantity >= 0",
+            name="ck_weekly_inventory_snapshots_normal_total_nonneg",
+        ),
+        CheckConstraint(
+            "defective_total_quantity IS NULL OR defective_total_quantity >= 0",
+            name="ck_weekly_inventory_snapshots_defective_total_nonneg",
+        ),
         Index("ix_weekly_inventory_snapshots_week_end", "week_end"),
     )
 
@@ -71,6 +82,8 @@ class WeeklyInventorySnapshotItem(Base):
     item_name = Column(String(200), nullable=False)
     process_type_code = Column(String(2), nullable=False)
     quantity = Column(IntQuantity, nullable=False)
+    normal_quantity = Column(IntQuantity, nullable=True)
+    defective_quantity = Column(IntQuantity, nullable=True)
 
     snapshot = relationship("WeeklyInventorySnapshot", back_populates="items")
 
@@ -81,6 +94,14 @@ class WeeklyInventorySnapshotItem(Base):
             name="uq_weekly_inventory_snapshot_items_snapshot_item",
         ),
         CheckConstraint("quantity >= 0", name="ck_weekly_inventory_snapshot_items_quantity_nonneg"),
+        CheckConstraint(
+            "normal_quantity IS NULL OR normal_quantity >= 0",
+            name="ck_weekly_inventory_snapshot_items_normal_nonneg",
+        ),
+        CheckConstraint(
+            "defective_quantity IS NULL OR defective_quantity >= 0",
+            name="ck_weekly_inventory_snapshot_items_defective_nonneg",
+        ),
         Index("ix_weekly_inventory_snapshot_items_snapshot", "snapshot_id"),
         Index("ix_weekly_inventory_snapshot_items_process", "process_type_code"),
     )

@@ -31,6 +31,7 @@ class HandoverStatusEnum(str, enum.Enum):
     DRAFT = "draft"          # 작성 중(임시저장)
     SUBMITTED = "submitted"  # 제출됨 — 인수 부서 확인 대기
     RECEIVED = "received"    # 인수 확인 완료 — 재고 이동됨
+    CANCELLED = "cancelled"  # 재고 작업 취소 — 재처리는 새 문서로 시작
 
 
 class HandoverDoc(Base):
@@ -69,6 +70,13 @@ class HandoverDoc(Base):
     )
     received_by_name = Column(String(100), nullable=True)
     received_at = Column(DateTime, nullable=True)
+    cancelled_by_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    cancelled_by_name = Column(String(100), nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
     created_at = Column(
         DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True
     )
