@@ -78,7 +78,7 @@ describe("AdminSectionTabs", () => {
     expect(row).toHaveClass("min-w-[880px]", "lg:min-w-0", "flex-1");
     expect(groups[0]).toHaveStyle({ flexGrow: "4" });
     expect(groups[1]).toHaveStyle({ flexGrow: "1" });
-    expect(groups[2]).toHaveStyle({ flexGrow: "2" });
+    expect(groups[2]).toHaveStyle({ flexGrow: "3" });
     expect(groups[0]).toHaveStyle({ flexBasis: "0px" });
     expect(groups[1]).toHaveStyle({ flexBasis: "0px" });
     expect(groups[2]).toHaveStyle({ flexBasis: "0px" });
@@ -120,5 +120,6 @@ describe("AdminSectionTabs", () => {
     expect(within(masterGroup).getByRole("button", { name: "모델 관리" })).toBeInTheDocument();
     expect(within(configurationGroup).getByRole("button", { name: "BOM 관리" })).toBeInTheDocument();
     expect(within(systemGroup).getByRole("button", { name: "보안" })).toBeInTheDocument();
+    expect(within(systemGroup).getByRole("button", { name: "정합성" })).toBeInTheDocument();
   });
 });

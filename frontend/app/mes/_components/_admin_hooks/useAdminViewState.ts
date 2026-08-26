@@ -19,6 +19,7 @@ export type AdminSection =
   | "models"
   | "bom"
   | "export"
+  | "integrity"
   | "settings"
   | "departments";
 

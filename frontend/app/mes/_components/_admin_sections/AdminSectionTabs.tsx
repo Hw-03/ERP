@@ -7,6 +7,7 @@ import {
   Download,
   Layers,
   Network,
+  ShieldAlert,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const SECTION_GROUPS: { label: string; tabs: AdminSectionTab[] }[] = [
     label: "시스템",
     tabs: [
       { id: "export", label: "내보내기", icon: Download },
+      { id: "integrity", label: "정합성", icon: ShieldAlert },
       { id: "settings", label: "보안", icon: ShieldCheck, danger: true },
     ],
   },
