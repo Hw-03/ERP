@@ -74,6 +74,13 @@ _WEEKLY_V2_SNAPSHOT_COLUMNS = {
 }
 _WEEKLY_V2_ITEM_COLUMNS = {"normal_quantity", "defective_quantity"}
 
+_SQLiteDependentSnapshot = tuple[
+    str,
+    list[str],
+    list[str],
+    list[tuple[object, ...]],
+]
+
 
 def _column_names(inspector: sa.Inspector, table_name: str) -> set[str]:
     if table_name not in inspector.get_table_names():
@@ -143,15 +150,16 @@ def _quote_identifier(identifier: str) -> str:
 
 def _snapshot_sqlite_dependents(
     bind: sa.Connection,
-) -> list[tuple[str, list[str], list[str], list[tuple[object, ...]]]]:
-    """SQLite가 transaction_logs를 재생성할 때 하위 감사 행을 보존한다."""
+    parent_tables: set[str],
+) -> list[_SQLiteDependentSnapshot]:
+    """SQLite가 부모 테이블을 재생성할 때 모든 하위 행을 보존한다."""
     if bind.dialect.name != "sqlite":
         return []
 
     inspector = sa.inspect(bind)
     remaining = set(inspector.get_table_names())
-    parents = {"transaction_logs"}
-    snapshots: list[tuple[str, list[str], list[str], list[tuple[object, ...]]]] = []
+    parents = set(parent_tables)
+    snapshots: list[_SQLiteDependentSnapshot] = []
     while True:
         children = sorted(
             table_name
@@ -170,7 +178,7 @@ def _snapshot_sqlite_dependents(
             )
             if not primary_keys:
                 raise RuntimeError(
-                    f"SQLite transaction_logs dependent table has no primary key: {table_name}"
+                    f"SQLite dependent table has no primary key: {table_name}"
                 )
             selected = ", ".join(_quote_identifier(column) for column in columns)
             rows = [
@@ -187,7 +195,7 @@ def _snapshot_sqlite_dependents(
 
 def _restore_sqlite_dependents(
     bind: sa.Connection,
-    snapshots: list[tuple[str, list[str], list[str], list[tuple[object, ...]]]],
+    snapshots: list[_SQLiteDependentSnapshot],
 ) -> None:
     for table_name, columns, primary_keys, rows in snapshots:
         if not rows:
@@ -213,11 +221,57 @@ def _restore_sqlite_dependents(
 
 def _clear_sqlite_dependents(
     bind: sa.Connection,
-    snapshots: list[tuple[str, list[str], list[str], list[tuple[object, ...]]]],
+    snapshots: list[_SQLiteDependentSnapshot],
 ) -> None:
     """부모 테이블 재생성 전에 하위 행을 역순으로 비워 FK 위반을 막는다."""
     for table_name, *_ in reversed(snapshots):
         bind.exec_driver_sql(f"DELETE FROM {_quote_identifier(table_name)}")
+
+
+def _prepare_sqlite_dependents(
+    bind: sa.Connection,
+    parent_tables: set[str],
+) -> tuple[
+    list[_SQLiteDependentSnapshot],
+    set[str],
+    set[tuple[object, ...]],
+]:
+    """부모 재생성 전 하위 행과 기존 FK 위반 기준선을 보존한다."""
+    snapshots = _snapshot_sqlite_dependents(bind, parent_tables)
+    if bind.dialect.name != "sqlite":
+        return snapshots, set(), set()
+    affected_tables = parent_tables | {table_name for table_name, *_ in snapshots}
+    baseline_violations = {
+        tuple(row)
+        for row in bind.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+        if row[0] in affected_tables
+    }
+    _clear_sqlite_dependents(bind, snapshots)
+    return snapshots, affected_tables, baseline_violations
+
+
+def _restore_sqlite_dependents_and_verify(
+    bind: sa.Connection,
+    snapshots: list[_SQLiteDependentSnapshot],
+    affected_tables: set[str],
+    baseline_violations: set[tuple[object, ...]],
+    operation_name: str,
+) -> None:
+    """보존한 하위 행을 복원하고 부모 재생성이 새 FK 위반을 만들지 않았음을 증명한다."""
+    _restore_sqlite_dependents(bind, snapshots)
+    if bind.dialect.name != "sqlite":
+        return
+    violations = {
+        tuple(row)
+        for row in bind.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+        if row[0] in affected_tables
+    }
+    new_violations = violations - baseline_violations
+    if new_violations:
+        raise RuntimeError(
+            f"{operation_name} migration left foreign key violations: "
+            f"{sorted(new_violations)[:5]}"
+        )
 
 
 def _create_operation_tables() -> None:
@@ -440,19 +494,9 @@ def _alter_transaction_logs() -> None:
             )
     else:
         bind = op.get_bind()
-        snapshots = _snapshot_sqlite_dependents(bind)
-        affected_tables: set[str] = set()
-        baseline_violations: set[tuple[object, ...]] = set()
-        if bind.dialect.name == "sqlite":
-            affected_tables = {"transaction_logs"} | {
-                table_name for table_name, *_ in snapshots
-            }
-            baseline_violations = {
-                tuple(row)
-                for row in bind.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
-                if row[0] in affected_tables
-            }
-            _clear_sqlite_dependents(bind, snapshots)
+        snapshots, affected_tables, baseline_violations = _prepare_sqlite_dependents(
+            bind, {"transaction_logs"}
+        )
         with op.batch_alter_table("transaction_logs") as batch_op:
             batch_op.add_column(sa.Column("operation_id", sa.String(length=32), nullable=True))
             batch_op.add_column(sa.Column("operation_role", role_enum, nullable=True))
@@ -474,19 +518,13 @@ def _alter_transaction_logs() -> None:
             batch_op.create_unique_constraint(
                 "uq_transaction_log_reverses_log", ["reverses_log_id"]
             )
-        _restore_sqlite_dependents(bind, snapshots)
-        if bind.dialect.name == "sqlite":
-            violations = {
-                tuple(row)
-                for row in bind.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
-                if row[0] in affected_tables
-            }
-            new_violations = violations - baseline_violations
-            if new_violations:
-                raise RuntimeError(
-                    "transaction_logs migration left foreign key violations: "
-                    f"{sorted(new_violations)[:5]}"
-                )
+        _restore_sqlite_dependents_and_verify(
+            bind,
+            snapshots,
+            affected_tables,
+            baseline_violations,
+            "transaction_logs",
+        )
 
     op.create_index("ix_transaction_logs_operation_id", "transaction_logs", ["operation_id"])
     op.create_index("ix_transaction_logs_operation_role", "transaction_logs", ["operation_role"])
@@ -501,6 +539,9 @@ def _alter_handovers() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         op.execute("ALTER TYPE handover_status_enum ADD VALUE IF NOT EXISTS 'cancelled'")
+    snapshots, affected_tables, baseline_violations = _prepare_sqlite_dependents(
+        bind, {"handovers"}
+    )
     with op.batch_alter_table("handovers") as batch_op:
         batch_op.add_column(sa.Column("cancelled_by_employee_id", sa.String(length=32)))
         batch_op.add_column(sa.Column("cancelled_by_name", sa.String(length=100)))
@@ -512,10 +553,21 @@ def _alter_handovers() -> None:
             ["employee_id"],
             ondelete="SET NULL",
         )
+    _restore_sqlite_dependents_and_verify(
+        bind,
+        snapshots,
+        affected_tables,
+        baseline_violations,
+        "handovers",
+    )
 
 
 def _alter_weekly_snapshots() -> None:
     """신규 주차부터 정상·불량 기준선을 분리 보존한다."""
+    bind = op.get_bind()
+    snapshots, affected_tables, baseline_violations = _prepare_sqlite_dependents(
+        bind, {"weekly_inventory_snapshots"}
+    )
     with op.batch_alter_table("weekly_inventory_snapshots") as batch_op:
         batch_op.add_column(
             sa.Column("basis_version", sa.Integer(), server_default="1", nullable=False)
@@ -541,6 +593,13 @@ def _alter_weekly_snapshots() -> None:
             "ck_weekly_inventory_snapshot_items_defective_nonneg",
             "defective_quantity IS NULL OR defective_quantity >= 0",
         )
+    _restore_sqlite_dependents_and_verify(
+        bind,
+        snapshots,
+        affected_tables,
+        baseline_violations,
+        "weekly_inventory_snapshots",
+    )
 
 
 def upgrade() -> None:
