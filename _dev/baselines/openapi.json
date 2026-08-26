@@ -3524,6 +3524,115 @@
         "title": "IntegrityRepairResponse",
         "type": "object"
       },
+      "InventoryIntegrityIssue": {
+        "properties": {
+          "category": {
+            "enum": [
+              "DEFECT_STOCK_MISMATCH",
+              "PARTIAL_CANCELLATION",
+              "WORKFLOW_STATE_RESIDUE",
+              "SHIPPING_ALLOCATION_MISMATCH",
+              "DUPLICATE_REVERSAL",
+              "WEEKLY_UNCLASSIFIED_EFFECT"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "cause_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cause Ids",
+            "type": "array"
+          },
+          "current_value": {
+            "title": "Current Value",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "expected_value": {
+            "title": "Expected Value",
+            "type": "string"
+          },
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "repairable": {
+            "title": "Repairable",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem_id",
+          "category",
+          "title",
+          "description",
+          "cause_ids",
+          "current_value",
+          "expected_value",
+          "repairable"
+        ],
+        "title": "InventoryIntegrityIssue",
+        "type": "object"
+      },
+      "InventoryIntegrityResponse": {
+        "properties": {
+          "category_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "DEFECT_STOCK_MISMATCH",
+                "PARTIAL_CANCELLATION",
+                "WORKFLOW_STATE_RESIDUE",
+                "SHIPPING_ALLOCATION_MISMATCH",
+                "DUPLICATE_REVERSAL",
+                "WEEKLY_UNCLASSIFIED_EFFECT"
+              ]
+            },
+            "title": "Category Counts",
+            "type": "object"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "is_consistent": {
+            "title": "Is Consistent",
+            "type": "boolean"
+          },
+          "issue_count": {
+            "title": "Issue Count",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryIntegrityIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "generated_at",
+          "is_consistent",
+          "issue_count",
+          "category_counts",
+          "issues"
+        ],
+        "title": "InventoryIntegrityResponse",
+        "type": "object"
+      },
       "InventoryLocationResponse": {
         "description": "부서×상태(생산/불량) 단위 재고 분포.",
         "properties": {
@@ -3556,6 +3665,14 @@
         ],
         "title": "InventoryLocationResponse",
         "type": "object"
+      },
+      "InventoryOperationKindEnum": {
+        "enum": [
+          "BUSINESS",
+          "CANCELLATION"
+        ],
+        "title": "InventoryOperationKindEnum",
+        "type": "string"
       },
       "InventoryResponse": {
         "properties": {
@@ -5743,6 +5860,41 @@
           "created_at"
         ],
         "title": "NotificationResponse",
+        "type": "object"
+      },
+      "OperationCancelRequest": {
+        "properties": {
+          "employee_code": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Employee Code",
+            "type": "string"
+          },
+          "pin": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Pin",
+            "type": "string"
+          },
+          "plan_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Plan Hash",
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "employee_code",
+          "pin",
+          "plan_hash"
+        ],
+        "title": "OperationCancelRequest",
         "type": "object"
       },
       "PinVerifyRequest": {
@@ -9498,6 +9650,7 @@
               "solo",
               "batch",
               "op_batch",
+              "operation",
               "defect_lifecycle"
             ],
             "title": "Type",
@@ -9762,6 +9915,51 @@
             ],
             "title": "Operation Batch Id"
           },
+          "operation_display_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Display Label"
+          },
+          "operation_effective_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Effective Status"
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Id"
+          },
+          "operation_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Kind"
+          },
           "operation_line_id": {
             "anyOf": [
               {
@@ -9773,6 +9971,17 @@
               }
             ],
             "title": "Operation Line Id"
+          },
+          "operation_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Role"
           },
           "produced_by": {
             "anyOf": [
@@ -9878,6 +10087,30 @@
               }
             ],
             "title": "Requester Name"
+          },
+          "reversal_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversal Operation Id"
+          },
+          "reverses_log_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverses Log Id"
           },
           "shipping_phase": {
             "anyOf": [
@@ -11077,6 +11310,45 @@
         "title": "WarehouseSpecialZoneUpdate",
         "type": "object"
       },
+      "WeeklyActivityEvidence": {
+        "properties": {
+          "column": {
+            "enum": [
+              "produce",
+              "receive",
+              "out",
+              "defect"
+            ],
+            "title": "Column",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "log_id": {
+            "title": "Log Id",
+            "type": "string"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "column",
+          "operation_id",
+          "log_id",
+          "quantity",
+          "label"
+        ],
+        "title": "WeeklyActivityEvidence",
+        "type": "object"
+      },
       "WeeklyGroupReport": {
         "properties": {
           "current_qty": {
@@ -11085,6 +11357,11 @@
           },
           "decrease_qty": {
             "title": "Decrease Qty",
+            "type": "integer"
+          },
+          "defect_qty": {
+            "default": 0,
+            "title": "Defect Qty",
             "type": "integer"
           },
           "delta": {
@@ -11155,8 +11432,21 @@
       },
       "WeeklyItemReport": {
         "properties": {
+          "activity_evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WeeklyActivityEvidence"
+            },
+            "title": "Activity Evidence",
+            "type": "array"
+          },
           "current_qty": {
             "title": "Current Qty",
+            "type": "integer"
+          },
+          "defect_qty": {
+            "default": 0,
+            "title": "Defect Qty",
             "type": "integer"
           },
           "delta": {
@@ -11268,6 +11558,11 @@
       },
       "WeeklyReportResponse": {
         "properties": {
+          "basis_version": {
+            "default": 1,
+            "title": "Basis Version",
+            "type": "integer"
+          },
           "groups": {
             "items": {
               "$ref": "#/components/schemas/WeeklyGroupReport"
@@ -11283,8 +11578,33 @@
             "title": "Production Matrix",
             "type": "array"
           },
+          "report_status": {
+            "default": "legacy",
+            "enum": [
+              "legacy",
+              "transition",
+              "verified",
+              "failed"
+            ],
+            "title": "Report Status",
+            "type": "string"
+          },
           "summary": {
             "$ref": "#/components/schemas/WeeklyReportSummary"
+          },
+          "transition_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transition Notice"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/WeeklyReportValidation"
           },
           "warnings": {
             "items": {
@@ -11330,6 +11650,11 @@
             "title": "Total Current Qty",
             "type": "integer"
           },
+          "total_defect_qty": {
+            "default": 0,
+            "title": "Total Defect Qty",
+            "type": "integer"
+          },
           "total_out_qty": {
             "title": "Total Out Qty",
             "type": "integer"
@@ -11353,6 +11678,101 @@
           "groups_unchanged"
         ],
         "title": "WeeklyReportSummary",
+        "type": "object"
+      },
+      "WeeklyReportValidation": {
+        "properties": {
+          "failures": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WeeklyValidationFailure"
+            },
+            "title": "Failures",
+            "type": "array"
+          },
+          "message": {
+            "default": "기존 기준·검산 전 자료입니다.",
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "default": "legacy",
+            "enum": [
+              "legacy",
+              "verified",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "WeeklyReportValidation",
+        "type": "object"
+      },
+      "WeeklyValidationFailure": {
+        "properties": {
+          "activity_delta": {
+            "default": 0,
+            "title": "Activity Delta",
+            "type": "integer"
+          },
+          "inventory_delta": {
+            "default": 0,
+            "title": "Inventory Delta",
+            "type": "integer"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "log_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Log Ids",
+            "type": "array"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "operation_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Operation Ids",
+            "type": "array"
+          },
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem_id",
+          "reason"
+        ],
+        "title": "WeeklyValidationFailure",
         "type": "object"
       },
       "WeeklyWarning": {
@@ -12229,6 +12649,76 @@
         "summary": "List Audit Logs",
         "tags": [
           "Admin Audit"
+        ]
+      }
+    },
+    "/api/admin/inventory-integrity": {
+      "get": {
+        "description": "재고·불량·취소·주간 분류 불변식을 변경 없이 검사한다.",
+        "operationId": "get_inventory_integrity_api_admin_inventory_integrity_get",
+        "parameters": [
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryIntegrityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Inventory Integrity",
+        "tags": [
+          "Admin Integrity"
         ]
       }
     },
@@ -15807,6 +16297,286 @@
         ]
       }
     },
+    "/api/inventory/operations": {
+      "get": {
+        "operationId": "list_operations_api_inventory_operations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "item_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Item Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InventoryOperationKindEnum"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Operations Api Inventory Operations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Operations",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/operations/summary": {
+      "get": {
+        "operationId": "operation_summary_api_inventory_operations_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Operation Summary Api Inventory Operations Summary Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Operation Summary",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/operations/{operation_id}": {
+      "get": {
+        "operationId": "get_operation_api_inventory_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Operation Api Inventory Operations  Operation Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Operation",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/operations/{operation_id}/cancel": {
+      "post": {
+        "operationId": "cancel_operation_api_inventory_operations__operation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cancel Operation Api Inventory Operations  Operation Id  Cancel Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Operation",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/operations/{operation_id}/cancel/preview": {
+      "post": {
+        "operationId": "preview_operation_cancel_api_inventory_operations__operation_id__cancel_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Operation Cancel Api Inventory Operations  Operation Id  Cancel Preview Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Operation Cancel",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/inventory/summary": {
       "get": {
         "description": "공정 코드 기준 재고 요약. 코드 목록은 GET /api/codes/process-types에서 조회한다.",
@@ -15848,6 +16618,23 @@
                 }
               ],
               "title": "Item Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "operation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Operation Id"
             }
           },
           {
@@ -23241,6 +24028,10 @@
     {
       "description": "관리자 액션 감사로그 조회 (마스터/설정 변경).",
       "name": "Admin Audit"
+    },
+    {
+      "description": "관리자용 재고·취소 원장 정합성 읽기 전용 진단.",
+      "name": "Admin Integrity"
     },
     {
       "description": "관리자용 생산 이력 내보내기.",
