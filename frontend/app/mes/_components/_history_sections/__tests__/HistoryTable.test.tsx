@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { transactionColor } from "@/lib/mes-status";
 import { HistoryTable } from "../HistoryTable";
 import type { LogGroup } from "../historyTableHelpers";
 
@@ -39,6 +43,42 @@ function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>()
 }
 
 describe("HistoryTable hierarchy", () => {
+  it("draws continuous strike segments across work fields and after-stock for cancelled source rows", () => {
+    const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
+    expect(css).toMatch(
+      /tr\[data-history-cancelled\] > :is\(td:nth-child\(1\), td:nth-child\(2\), td:nth-child\(3\), td:nth-child\(4\), td:nth-child\(6\)\)\s*\{[\s\S]*?opacity: \.55;[\s\S]*?position: relative;/,
+    );
+    expect(css).toMatch(
+      /tr\[data-history-cancelled\] > :is\(td:nth-child\(1\), td:nth-child\(2\), td:nth-child\(3\), td:nth-child\(4\), td:nth-child\(6\)\)::after\s*\{[^}]*content: "";[^}]*top: 50%;[^}]*height: 1px;[^}]*background: var\(--c-muted2\);[^}]*pointer-events: none;/,
+    );
+    expect(css).toMatch(/tr\[data-history-cancelled\] > td:nth-child\(1\)::after\s*\{[^}]*left: 2\.375rem;/);
+    expect(css).toMatch(/tr\[data-history-cancelled\] > :is\(td:nth-child\(2\), td:nth-child\(3\)\)::after\s*\{[^}]*right: 0;[^}]*left: 0;/);
+    expect(css).toMatch(/tr\[data-history-cancelled\] > td:nth-child\(4\)::after\s*\{[^}]*right: 3rem;[^}]*left: 0;/);
+    expect(css).toMatch(/tr\[data-history-cancelled\] > td:nth-child\(6\)::after\s*\{[^}]*right: \.25rem;[^}]*left: \.25rem;/);
+    expect(css).not.toContain("tr[data-history-cancelled] > td:nth-child(6) span[aria-label] > span:last-child");
+  });
+
+  it("keeps the legacy hover strength for regular rows and uses 20 percent only for cancellation rows", () => {
+    renderTable([{ type: "solo", log: makeLog() }]);
+    const regularRow = screen.getByText("대표 품목").closest("tr")!;
+
+    fireEvent.mouseEnter(regularRow);
+
+    expect(regularRow).toHaveStyle({ background: tint(transactionColor("PRODUCE"), 14) });
+
+    const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
+    expect(css).toMatch(
+      /tr\[data-history-cancellation="true"\]\s*\{\s*background: color-mix\(in srgb, var\(--c-red\) 10%, transparent\) !important;/,
+    );
+    expect(css).toMatch(
+      /tr\[data-history-cancellation="true"\]:hover\s*\{\s*background: color-mix\(in srgb, var\(--c-red\) 20%, transparent\) !important;/,
+    );
+    expect(css).toMatch(
+      /tr\[data-history-cancellation="true"\]\[aria-pressed="true"\]\s*\{\s*outline: 1\.5px solid var\(--c-red\) !important;/,
+    );
+    expect(css).toContain('tr[data-history-cancellation="true"] > td:nth-child(2) > span');
+  });
+
   it("orders the location snapshots after quantity and renders zero as chips", () => {
     const log = makeLog({
       cancelled: true,
@@ -69,6 +109,68 @@ describe("HistoryTable hierarchy", () => {
     expect(within(before).getByLabelText("부서 0")).toBeInTheDocument();
     expect(within(after).getByLabelText("창고 4")).toBeInTheDocument();
     expect(within(after).getByLabelText("부서 7")).toBeInTheDocument();
+    expect(row).not.toHaveClass("opacity-60");
+    expect(row).toHaveAttribute("data-history-cancelled", "true");
+    expect(before.closest("td")).toBe(row.children[4]);
+    expect(after.closest("td")).toBe(row.children[5]);
+    expect(within(row.children[6] as HTMLElement).getByText("취소")).toBeInTheDocument();
+  });
+
+  it("renders operation and cancellation groups as separate expandable rows", () => {
+    const originalParent = makeLog({
+      log_id: "original-parent",
+      operation_id: "operation-1",
+      operation_role: "PRIMARY",
+      operation_kind: "BUSINESS",
+      operation_effective_status: "cancelled",
+      cancelled: true,
+    });
+    const originalChild = makeLog({
+      log_id: "original-child",
+      item_id: "CHILD-1",
+      item_name: "원 작업 하위 자재",
+      operation_id: "operation-1",
+      operation_role: "COMPONENT_INPUT",
+      operation_kind: "BUSINESS",
+      operation_effective_status: "cancelled",
+      cancelled: true,
+    });
+    const cancellationParent = makeLog({
+      ...originalParent,
+      log_id: "cancel-parent",
+      operation_id: "operation-2",
+      operation_kind: "CANCELLATION",
+      operation_effective_status: "cancellation",
+      quantity_change: -originalParent.quantity_change,
+      cancelled: false,
+    });
+    const cancellationChild = makeLog({
+      ...originalChild,
+      log_id: "cancel-child",
+      operation_id: "operation-2",
+      operation_kind: "CANCELLATION",
+      operation_effective_status: "cancellation",
+      quantity_change: -originalChild.quantity_change,
+      cancelled: false,
+    });
+
+    renderTable([
+      { type: "operation", operationId: "operation-2", logs: [cancellationParent, cancellationChild] },
+      { type: "operation", operationId: "operation-1", logs: [originalParent, originalChild] },
+    ]);
+
+    const cancellationRow = screen.getByText("부서 입출고 취소").closest("tr");
+    expect(cancellationRow).not.toHaveAttribute("data-history-cancelled");
+    expect(cancellationRow).toHaveAttribute("data-history-cancellation", "true");
+    expect(within(cancellationRow as HTMLElement).getByText("생산 -1 EA")).toBeInTheDocument();
+    const originalRow = screen.getByText("부서 입출고").closest("tr");
+    expect(originalRow).toHaveAttribute("data-history-cancelled", "true");
+    expect(originalRow).not.toHaveAttribute("data-history-cancellation");
+    const toggles = screen.getAllByRole("button", { name: "작업 구성 펼치기" });
+    fireEvent.click(toggles[0]);
+    expect(screen.getByText("원 작업 하위 자재").closest("tr")).not.toHaveAttribute("data-history-cancelled");
+    fireEvent.click(toggles[1]);
+    expect(screen.getByText("원 작업 하위 자재").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
   });
 
   it("collapses item code and quantity through one spanning cell", () => {

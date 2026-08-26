@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
+import { productionApi } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
@@ -70,10 +71,17 @@ export function HistoryDetailPanel({
   const canCancelAsBatch = cancelScope === "batch";
   const cancellationScope = useHistoryCancellationScopeLogs({
     panelOpen: panelOpen && selected !== null,
-    identity: selected ? `log:${selected.log_id}` : "log:none",
+    identity: selected?.operation_id
+      ? `operation:${selected.operation_id}`
+      : selected
+        ? `log:${selected.log_id}`
+        : "log:none",
     visibleLogs: selected ? [selected] : [],
-    operationBatchId: selected?.operation_batch_id ?? null,
-    referenceNo: selected?.operation_batch_id ? null : selected?.reference_no ?? null,
+    operationId: selected?.operation_id ?? null,
+    operationBatchId: selected?.operation_id ? null : selected?.operation_batch_id ?? null,
+    referenceNo: selected?.operation_id || selected?.operation_batch_id
+      ? null
+      : selected?.reference_no ?? null,
   });
 
   useLayoutEffect(() => {
@@ -170,19 +178,48 @@ export function HistoryDetailPanel({
   const summary = cancellationScope.status === "ready"
     ? buildHistoryDetailSummary(cancellationScope.logs, batch)
     : { ...visibleSummary, impactGroups: [] };
-  const isCancelled = cancellationLogs.length > 0 && cancellationLogs.every((log) => log.cancelled);
+  const isCancelled = selected.operation_kind === "CANCELLATION"
+    || selected.operation_effective_status === "cancelled"
+    || (cancellationLogs.length > 0 && cancellationLogs.every((log) => log.cancelled));
   const cancelReason = cancellationLogs.find((log) => log.cancel_reason?.trim())?.cancel_reason
     ?? selected.cancel_reason;
+  const cancellationBlocker = selected.operation_id
+    && cancellationScope.status === "ready"
+    ? cancellationScope.blocker
+    : null;
   const effects = cancellationScopeStatus === "ready"
     ? cancellationSummary.impactGroups.flatMap((group) => group.effects)
     : [];
-
   const handleCancelSubmit = async ({ reason, pin }: HistoryCancelCredentials) => {
     if (!operator?.employee_code) {
       throw new Error("로그인 정보가 없습니다. 다시 로그인해 주세요.");
     }
     if (canCancelAsBatch && cancellationScope.status !== "ready") {
       throw new Error("취소 범위를 확인한 뒤 다시 시도해 주세요.");
+    }
+    if (selected.operation_id) {
+      if (cancellationScope.blocker || !cancellationScope.planHash) {
+        throw new Error(cancellationScope.blocker ?? "취소 계획을 확인한 뒤 다시 시도해 주세요.");
+      }
+      const cancellation = await productionApi.cancelInventoryOperation(
+        selected.operation_id,
+        {
+          reason,
+          employee_code: operator.employee_code,
+          pin,
+          plan_hash: cancellationScope.planHash,
+        },
+      );
+      onLogUpdated({
+        ...selected,
+        cancelled: true,
+        cancel_reason: reason,
+        cancelled_by: cancellation.actorEmployeeId,
+        cancelled_at: cancellation.effectiveAt,
+        operation_effective_status: "cancelled",
+        reversal_operation_id: cancellation.operationId,
+      });
+      return;
     }
     const target = cancellationLogs.find((log) => !log.cancelled);
     if (!target) {
@@ -194,6 +231,19 @@ export function HistoryDetailPanel({
       pin,
     });
     onLogUpdated(updated);
+  };
+  const cancelActionProps = {
+    panelOpen,
+    identity: selected.operation_id ? `operation:${selected.operation_id}` : `log:${selected.log_id}`,
+    scope: cancelScope,
+    effects,
+    cancelled: isCancelled,
+    scopeStatus: cancellationScopeStatus,
+    blocker: cancellationBlocker,
+    onRetryScope: cancellationScope.retry,
+    onSubmit: handleCancelSubmit,
+    triggerLabel: "이 내역 취소",
+    scopeCount: cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined,
   };
 
   return (
@@ -244,32 +294,14 @@ export function HistoryDetailPanel({
           )}
           {allowCancellation && (
             <HistoryCancelAction
-              panelOpen={panelOpen}
-              identity={`log:${selected.log_id}`}
-              scope={cancelScope}
-              effects={effects}
-              cancelled={isCancelled}
-              scopeStatus={cancellationScopeStatus}
-              onRetryScope={cancellationScope.retry}
-              onSubmit={handleCancelSubmit}
-              triggerLabel="이 내역 취소"
-              scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
+              {...cancelActionProps}
               pinToDesktopFooter
             />
           )}
         </>
       ) : allowCancellation ? (
         <HistoryCancelAction
-          panelOpen={panelOpen}
-          identity={`log:${selected.log_id}`}
-          scope={cancelScope}
-          effects={effects}
-          cancelled={isCancelled}
-          scopeStatus={cancellationScopeStatus}
-          onRetryScope={cancellationScope.retry}
-          onSubmit={handleCancelSubmit}
-          triggerLabel="이 내역 취소"
-          scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
+          {...cancelActionProps}
         >
           {(controller) => (
             <>
@@ -277,6 +309,7 @@ export function HistoryDetailPanel({
                 log={selected}
                 scope={cancelScope}
                 canCancel={controller.available}
+                blocker={cancellationBlocker}
                 scopeStatus={isCancelled ? "ready" : controller.scopeStatus}
                 onRetryScope={controller.retryScope}
                 onCancelClick={controller.openConfirmation}
@@ -451,6 +484,7 @@ function HistoryDetailMetaStrip({
   log,
   scope,
   canCancel,
+  blocker,
   scopeStatus,
   onRetryScope,
   onCancelClick,
@@ -458,6 +492,7 @@ function HistoryDetailMetaStrip({
   log: TransactionLog;
   scope: "single" | "batch";
   canCancel: boolean;
+  blocker?: string | null;
   scopeStatus: HistoryCancelScopeStatus;
   onRetryScope: () => void;
   onCancelClick: () => void;
@@ -532,6 +567,11 @@ function HistoryDetailMetaStrip({
           <XCircle className="h-3.5 w-3.5" />
           {cancelScopeLabel}
         </button>
+      )}
+      {!canCancel && scopeStatus === "ready" && blocker && (
+        <span className="max-w-full text-xs font-bold leading-5" style={{ color: LEGACY_COLORS.red }}>
+          {blocker}
+        </span>
       )}
     </div>
   );

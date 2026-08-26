@@ -107,12 +107,14 @@ describe("toHistoryLogGroups", () => {
     const parent = makeLog({ log_id: "defect-parent", transaction_type: "MARK_DEFECTIVE" });
     const child = makeLog({ log_id: "defect-child", transaction_type: "DISASSEMBLE" });
     const groups = toHistoryLogGroups([
+      { type: "operation", key: "operation-1", logs: [makeLog({ operation_id: "operation-1" })] },
       { type: "op_batch", key: "batch-1", logs: [makeLog({ operation_batch_id: "batch-1" })] },
       { type: "batch", key: "REF-1::PICKUP", logs: [makeLog({ reference_no: "REF-1", shipping_phase: "PICKUP" })] },
       { type: "defect_lifecycle", key: "defect-lifecycle:defect-parent:defect-child", logs: [parent, child] },
     ]);
 
     expect(groups).toEqual([
+      expect.objectContaining({ type: "operation", operationId: "operation-1" }),
       expect.objectContaining({ type: "op_batch", batchId: "batch-1" }),
       expect.objectContaining({ type: "batch", refKey: "REF-1::PICKUP", refNo: "REF-1" }),
       expect.objectContaining({ type: "defect_lifecycle", parent, child }),

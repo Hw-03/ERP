@@ -192,7 +192,12 @@ export function MobileHistoryList({
 
         const logs = g.logs;
         const first = logs[0];
-        const key = g.type === "op_batch" ? g.batchId : g.refKey;
+        const key =
+          g.type === "operation"
+            ? g.operationId
+            : g.type === "op_batch"
+              ? g.batchId
+              : g.refKey;
         const active = selectedKey === `batch:${key}`;
         const tcolor = transactionColor(first.transaction_type);
         return (

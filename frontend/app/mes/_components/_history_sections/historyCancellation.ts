@@ -20,7 +20,7 @@ export function isHistoryReferenceCancellationGroup(log: TransactionLog): boolea
 }
 
 export function getHistoryCancelScope(log: TransactionLog): HistoryCancelScope {
-  return log.operation_batch_id || isHistoryReferenceCancellationGroup(log)
+  return log.operation_id || log.operation_batch_id || isHistoryReferenceCancellationGroup(log)
     ? "batch"
     : "single";
 }

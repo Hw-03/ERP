@@ -990,6 +990,7 @@ const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: bo
 
 export function getSingleLogMovement(log: {
   transaction_type: string;
+  operation_kind?: string | null;
   transfer_qty?: number | null;
   quantity_change: number | string;
   item_unit?: string | null;
@@ -999,7 +1000,9 @@ export function getSingleLogMovement(log: {
   const suffix = unit ? ` ${unit}` : "";
   const qc = Number(log.quantity_change);
 
-  if (conf.signed) {
+  const showSignedReversal = log.operation_kind === "CANCELLATION"
+    && !log.transaction_type.startsWith("TRANSFER_");
+  if (conf.signed || showSignedReversal) {
     const sign = qc >= 0 ? "+" : "-";
     return { label: `${conf.verb} ${sign}${formatQty(Math.abs(qc))}${suffix}`, tone: conf.tone };
   }

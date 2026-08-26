@@ -337,7 +337,7 @@ describe("ReworkBatchDetail", () => {
     expect(screen.getByText(label)).toHaveStyle({ color });
   });
 
-  it("keeps each cancelled result part struck through", () => {
+  it("marks every cancelled result row for selective strike styling", () => {
     render(
       <table>
         <tbody>
@@ -354,8 +354,8 @@ describe("ReworkBatchDetail", () => {
       </table>,
     );
 
-    expect(screen.getByText("폐기 5 EA")).toHaveClass("line-through");
-    expect(screen.getByText("회수 2 EA")).toHaveClass("line-through");
+    expect(screen.getByText("폐기 5 EA").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
+    expect(screen.getByText("회수 2 EA").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
   });
 
   it("shows the full overflowing item name on hover and focus", async () => {

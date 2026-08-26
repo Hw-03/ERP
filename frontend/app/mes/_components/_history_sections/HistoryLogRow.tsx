@@ -31,9 +31,10 @@ type Props = {
   onToggle?: () => void;
   controlsId?: string;
   separationHint?: string | null;
+  toggleLabel?: string;
 };
 
-function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint }: Props) {
+function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint, toggleLabel }: Props) {
   const [hovered, setHovered] = useState(false);
   const padX = "px-4";
   const targetPadX = "px-4";
@@ -56,6 +57,8 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
     <tr
       data-log-id={log.log_id}
       data-history-main-row="true"
+      data-history-cancelled={log.cancelled || undefined}
+      data-history-cancellation={log.operation_kind === "CANCELLATION" || undefined}
       onClick={handleSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -68,7 +71,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
       aria-pressed={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${log.cancelled ? " opacity-60" : ""}`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${tcolor}` : "none",
@@ -81,7 +84,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
       >
         <div className="flex items-center justify-center gap-1.5">
           {onToggle ? (
-            <ChevronToggleBtn expanded={Boolean(expanded)} onToggle={onToggle} controlsId={controlsId} />
+            <ChevronToggleBtn expanded={Boolean(expanded)} onToggle={onToggle} controlsId={controlsId} label={toggleLabel} />
           ) : (
             <span aria-hidden className="inline-block h-5 w-5 shrink-0" />
           )}
@@ -95,12 +98,11 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
-          cancelled={log.cancelled}
         />
       </td>
       <ItemCodeQuantityCell
         code={presentation.target.code}
-        quantity={<QuantityStockCell presentation={presentation} cancelled={log.cancelled} />}
+        quantity={<QuantityStockCell presentation={presentation} />}
       />
       <StockSnapshotCell log={log} moment="before" />
       <StockSnapshotCell log={log} moment="after" />

@@ -73,6 +73,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
   return (
     <tr
       data-history-main-row="true"
+      data-history-cancelled={cancelled || undefined}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -84,7 +85,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.red}` : "none",
@@ -110,13 +111,12 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
-          cancelled={cancelled}
         />
       </td>
       <ItemCodeQuantityCell
         code={presentation.target.code}
         compact={compact}
-        quantity={<QuantityStockCell presentation={presentation} cancelled={cancelled} />}
+        quantity={<QuantityStockCell presentation={presentation} />}
       />
       <StockSnapshotCell log={parentLog} moment="before" />
       <StockSnapshotCell log={parentLog} moment="after" />

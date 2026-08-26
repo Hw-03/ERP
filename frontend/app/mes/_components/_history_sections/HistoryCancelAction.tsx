@@ -6,7 +6,6 @@ import type { TransactionLog } from "@/lib/api";
 import { ApiConnectionError } from "@/lib/api-core";
 import { productionApi } from "@/lib/api/production";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import {
   getHistoryCancelCopy,
@@ -38,10 +37,30 @@ export type HistoryCancelController = {
   submitCancellation: () => Promise<void>;
 };
 
-type HistoryCancellationScopeState =
-  | { scopeKey: string; status: "loading"; logs: TransactionLog[] }
-  | { scopeKey: string; status: "error"; logs: TransactionLog[] }
-  | { scopeKey: string; status: "ready"; logs: TransactionLog[] };
+type HistoryCancellationScopeState = {
+  scopeKey: string;
+  status: HistoryCancelScopeStatus;
+  logs: TransactionLog[];
+  planHash: string | null;
+  blocker: string | null;
+};
+
+function scopeState(
+  scopeKey: string,
+  status: HistoryCancelScopeStatus,
+  logs: TransactionLog[] = [],
+  preview?: { planHash: string; canCancel: boolean; blockers: string[] } | null,
+): HistoryCancellationScopeState {
+  return {
+    scopeKey,
+    status,
+    logs,
+    planHash: preview?.planHash ?? null,
+    blocker: preview && !preview.canCancel
+      ? preview.blockers[0] ?? "현재 상태에서는 이 작업을 취소할 수 없습니다."
+      : null,
+  };
+}
 
 function patchAtomicScopeFromVisibleCancellation(
   state: HistoryCancellationScopeState,
@@ -71,28 +90,30 @@ export function useHistoryCancellationScopeLogs({
   panelOpen,
   identity,
   visibleLogs,
+  operationId,
   operationBatchId,
   referenceNo,
 }: {
   panelOpen: boolean;
   identity: string;
   visibleLogs: TransactionLog[];
+  operationId?: string | null;
   operationBatchId?: string | null;
   referenceNo?: string | null;
 }): HistoryCancellationScopeState & { retry: () => void } {
   const realtimeRevision = useRealtimeRevision();
-  const requestKey = operationBatchId
-    ? `operation:${operationBatchId}`
-    : referenceNo
-      ? `reference:${referenceNo}`
-      : null;
+  const requestKey = operationId
+    ? `inventory-operation:${operationId}`
+    : operationBatchId
+      ? `operation:${operationBatchId}`
+      : referenceNo
+        ? `reference:${referenceNo}`
+        : null;
   const scopeKey = `${identity}|${requestKey ?? "none"}`;
   const [retryNonce, setRetryNonce] = useState(0);
-  const [state, setState] = useState<HistoryCancellationScopeState>({
-    scopeKey,
-    status: requestKey ? "loading" : "ready",
-    logs: requestKey ? [] : visibleLogs,
-  });
+  const [state, setState] = useState<HistoryCancellationScopeState>(
+    scopeState(scopeKey, requestKey ? "loading" : "ready", requestKey ? [] : visibleLogs),
+  );
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -103,31 +124,43 @@ export function useHistoryCancellationScopeLogs({
     const controller = new AbortController();
     const background = stateRef.current.scopeKey === scopeKey && stateRef.current.status === "ready";
     if (!background) {
-      setState({ scopeKey, status: "loading", logs: [] });
+      setState(scopeState(scopeKey, "loading"));
     }
-    const params = operationBatchId
-      ? { operationBatchId, limit: 2000, skip: 0 }
-      : { referenceNo: referenceNo!, limit: 2000, skip: 0 };
+    const params = operationId
+      ? { operationId, limit: 2000, skip: 0 }
+      : operationBatchId
+        ? { operationBatchId, limit: 2000, skip: 0 }
+        : { referenceNo: referenceNo!, limit: 2000, skip: 0 };
+    const preview = operationId
+      ? productionApi.previewInventoryOperationCancellation(operationId)
+      : Promise.resolve(null);
 
-    void productionApi.getTransactions(params, { signal: controller.signal })
-      .then((logs) => {
+    void Promise.all([
+      productionApi.getTransactions(params, { signal: controller.signal }),
+      preview,
+    ])
+      .then(([logs, cancellationPreview]) => {
         if (!active) return;
         if (logs.length === 0) {
-          if (!background) setState({ scopeKey, status: "error", logs: [] });
+          if (!background) {
+            setState(scopeState(scopeKey, "error"));
+          }
           return;
         }
-        setState({ scopeKey, status: "ready", logs });
+        setState(scopeState(scopeKey, "ready", logs, cancellationPreview));
       })
       .catch((err: unknown) => {
         if (!active || (err as Error)?.name === "AbortError") return;
-        if (!background) setState({ scopeKey, status: "error", logs: [] });
+        if (!background) {
+          setState(scopeState(scopeKey, "error"));
+        }
       });
 
     return () => {
       active = false;
       controller.abort();
     };
-  }, [operationBatchId, panelOpen, realtimeRevision, referenceNo, requestKey, retryNonce, scopeKey]);
+  }, [operationBatchId, operationId, panelOpen, realtimeRevision, referenceNo, requestKey, retryNonce, scopeKey]);
 
   const synchronizedState = requestKey && state.scopeKey === scopeKey
     ? patchAtomicScopeFromVisibleCancellation(state, visibleLogs)
@@ -139,17 +172,13 @@ export function useHistoryCancellationScopeLogs({
 
   if (!requestKey) {
     return {
-      status: "ready",
-      scopeKey,
-      logs: visibleLogs,
+      ...scopeState(scopeKey, "ready", visibleLogs),
       retry: () => {},
     };
   }
   if (synchronizedState.scopeKey !== scopeKey) {
     return {
-      scopeKey,
-      status: "loading",
-      logs: [],
+      ...scopeState(scopeKey, "loading"),
       retry: () => setRetryNonce((nonce) => nonce + 1),
     };
   }
@@ -167,18 +196,10 @@ export function HistoryCancelScopeLoadState({
   onRetry?: () => void;
 }) {
   return (
-    <div
-      className="flex min-h-11 items-center justify-between gap-3 border-t pt-4 text-xs"
-      style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-    >
+    <div className="hc-load">
       <span>{status === "loading" ? "취소 범위 확인 중..." : "취소 범위를 불러오지 못했습니다."}</span>
       {status === "error" && onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-[10px] border px-3 py-2 text-xs font-bold"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        >
+        <button type="button" onClick={onRetry}>
           취소 범위 다시 불러오기
         </button>
       )}
@@ -193,6 +214,7 @@ export function HistoryCancelAction({
   effects,
   cancelled,
   scopeStatus = "ready",
+  blocker,
   onRetryScope,
   onSubmit,
   triggerLabel,
@@ -206,6 +228,7 @@ export function HistoryCancelAction({
   effects: InventoryEffectRow[];
   cancelled: boolean;
   scopeStatus?: HistoryCancelScopeStatus;
+  blocker?: string | null;
   onRetryScope?: () => void;
   onSubmit: (credentials: HistoryCancelCredentials) => Promise<void>;
   triggerLabel?: string;
@@ -242,6 +265,7 @@ export function HistoryCancelAction({
     if (
       !normalizedReason
       || !pin
+      || blocker
       || submittingRef.current
       || inFlightCancellationIdentities.has(identity)
     ) return;
@@ -275,7 +299,7 @@ export function HistoryCancelAction({
     }
   }
 
-  const available = panelOpen && !cancelled && scopeStatus === "ready";
+  const available = panelOpen && !cancelled && scopeStatus === "ready" && !blocker;
   const controller: HistoryCancelController = {
     available,
     step,
@@ -298,49 +322,32 @@ export function HistoryCancelAction({
   let content: ReactNode = null;
   if (panelOpen && !cancelled && scopeStatus !== "ready") {
     content = <HistoryCancelScopeLoadState status={scopeStatus} onRetry={onRetryScope} />;
-  } else if (panelOpen && !cancelled && step === "idle") {
+  } else if (panelOpen && !cancelled && !blocker && step === "idle") {
     content = (
-      <div className="border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
+      <div className="hc-idle">
         <button
           type="button"
           onClick={controller.openConfirmation}
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition hover:brightness-110 active:scale-[0.98]"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 7%, transparent)`,
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, ${LEGACY_COLORS.border})`,
-            color: LEGACY_COLORS.red,
-          }}
         >
           <XCircle className="h-4 w-4" />
           {triggerLabel ?? copy.trigger}
         </button>
       </div>
     );
-  } else if (panelOpen && !cancelled) {
+  } else if (panelOpen && !cancelled && !blocker) {
     content = (
     <section
       data-testid="history-cancel-confirmation"
-      className="space-y-3 border-t pt-4"
-      style={{ borderColor: LEGACY_COLORS.border }}
+      className="hc-confirm"
     >
       <div>
-        <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-          취소 범위 확인
-        </div>
-        <div className="mt-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
-          {copy.description}
-        </div>
+        <strong>취소 범위 확인</strong>
+        <p>{copy.description}</p>
         <HistoryCancelImpactPreview effects={effects} scopeCount={scopeCount} />
       </div>
 
       <textarea
         aria-label="취소 사유"
-        className="w-full resize-none rounded-[12px] border px-3 py-2 text-sm outline-none focus-visible:ring-2"
-        style={{
-          background: LEGACY_COLORS.s1,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
         rows={2}
         placeholder="취소 사유를 입력하세요 (필수)"
         value={reason}
@@ -350,28 +357,18 @@ export function HistoryCancelAction({
         aria-label="PIN"
         type="password"
         autoComplete="off"
-        className="min-h-11 w-full rounded-[12px] border px-3 py-2 text-sm outline-none focus-visible:ring-2"
-        style={{
-          background: LEGACY_COLORS.s1,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
         placeholder="PIN 입력"
         value={pin}
         onChange={(event) => setPin(event.target.value)}
       />
       {error && (
-        <div className="text-xs" role="alert" style={{ color: LEGACY_COLORS.red }}>
-          {error}
-        </div>
+        <div className="hc-error" role="alert">{error}</div>
       )}
-      <div className="flex gap-2">
+      <div className="hc-actions">
         <button
           type="button"
           onClick={() => void submitCancellation()}
           disabled={step === "submitting" || !reason.trim() || !pin}
-          className="min-h-11 flex-1 rounded-[12px] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.redSolid }}
         >
           {step === "submitting" ? "처리 중…" : step === "error" ? "다시 시도" : "취소 확정"}
         </button>
@@ -379,8 +376,6 @@ export function HistoryCancelAction({
           type="button"
           onClick={closeConfirmation}
           disabled={step === "submitting"}
-          className="min-h-11 rounded-[12px] border px-4 py-2 text-sm font-bold disabled:opacity-50"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
         >
           닫기
         </button>
@@ -402,45 +397,24 @@ function HistoryCancelImpactPreview({
   return (
     <>
       {scopeCount != null && (
-        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
-          대상 {scopeCount}건
-        </div>
+        <div className="hc-count">대상 {scopeCount}건</div>
       )}
-      <div
-        className="mt-3 overflow-hidden rounded-[12px] border"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
-      >
-        <div className="px-3 py-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          되돌릴 실제 영향
-        </div>
+      <div className="hc-impact">
+        <strong>되돌릴 실제 영향</strong>
         {effects.length > 0 ? effects.map((effect) => {
-          const color = effect.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
           return (
-            <div
-              key={effect.key}
-              className="flex min-h-11 items-center justify-between gap-3 border-t px-3 py-2"
-              style={{ borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="min-w-0">
-                <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
-                  {effect.itemName}
-                </div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {effect.label}
-                </div>
+            <div key={effect.key} className="hc-impact-row">
+              <div>
+                <strong>{effect.itemName}</strong>
+                <small>{effect.label}</small>
               </div>
-              <div className="shrink-0 text-sm font-black" style={{ color }}>
+              <b data-positive={effect.delta > 0}>
                 {effect.deltaLabel}{effect.unit ? ` ${effect.unit}` : ""}
-              </div>
+              </b>
             </div>
           );
         }) : (
-          <div
-            className="border-t px-3 py-2 text-xs"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-          >
-            기록된 실제 재고 영향이 없습니다.
-          </div>
+          <p>기록된 실제 재고 영향이 없습니다.</p>
         )}
       </div>
     </>
@@ -467,28 +441,12 @@ export function HistoryMobileCancelConfirmation({
     : "선택한 이력 1건의 재고 변동만 취소합니다.";
 
   return (
-    <div
-      className="space-y-3 rounded-[20px] border p-4"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-    >
-      <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-        취소 범위 확인
-      </div>
-      <div
-        className="rounded-[12px] border px-3 py-2 text-xs font-bold"
-        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}
-      >
-        {scopeDescription}
-      </div>
+    <div className="hc-mobile">
+      <strong>취소 범위 확인</strong>
+      <p className="hc-scope">{scopeDescription}</p>
       <HistoryCancelImpactPreview effects={effects} scopeCount={scopeCount} />
       <textarea
         aria-label="취소 사유"
-        className="w-full resize-none rounded-[12px] border px-3 py-2 text-[13px]"
-        style={{
-          background: LEGACY_COLORS.s1,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
         rows={2}
         placeholder="취소 사유를 입력하세요 (필수)"
         value={controller.reason}
@@ -498,28 +456,18 @@ export function HistoryMobileCancelConfirmation({
         aria-label="PIN"
         type="password"
         autoComplete="off"
-        className="w-full rounded-[12px] border px-3 py-2 text-[13px]"
-        style={{
-          background: LEGACY_COLORS.s1,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
         placeholder="PIN 입력"
         value={controller.pin}
         onChange={(event) => controller.setPin(event.target.value)}
       />
       {controller.error && (
-        <div className="text-[12px]" role="alert" style={{ color: LEGACY_COLORS.red }}>
-          {controller.error}
-        </div>
+        <div className="hc-error" role="alert">{controller.error}</div>
       )}
-      <div className="flex gap-2">
+      <div className="hc-actions">
         <button
           type="button"
           onClick={() => void controller.submitCancellation()}
           disabled={controller.step === "submitting" || !controller.reason.trim() || !controller.pin}
-          className="flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.redSolid }}
         >
           {controller.step === "submitting"
             ? "처리 중…"
@@ -532,8 +480,6 @@ export function HistoryMobileCancelConfirmation({
         <button
           type="button"
           onClick={controller.closeConfirmation}
-          className="rounded-[12px] border px-3 py-2 text-[13px] font-bold"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
         >
           닫기
         </button>

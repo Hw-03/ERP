@@ -235,6 +235,7 @@ function BundleRows({
   snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
+  const cancelled = batch.status === "cancelled";
   const isBomParent = bundle.source_kind === "bom_parent";
   const parentLine = getHistoryBomParentLine(bundle);
   const isAdjustmentSummary = bundle.bundle_id === `history-adjustment-${batch.batch_id}`;
@@ -282,6 +283,7 @@ function BundleRows({
     <>
       <tr
         id={rowId}
+        data-history-cancelled={cancelled || undefined}
         tabIndex={canExpand ? 0 : undefined}
         aria-label={canExpand ? `${isBomParent ? "BOM 구성" : "라인 구성"} ${displayTitle}` : undefined}
         aria-expanded={canExpand ? expanded : undefined}
@@ -438,6 +440,7 @@ function BomLineRow({
   return (
     <tr
       id={rowId}
+      data-history-cancelled={cancelled || undefined}
       className={HISTORY_CHILD_ROW_CLASS}
       data-history-focus-line={highlighted ? "true" : undefined}
       style={{
@@ -445,7 +448,6 @@ function BomLineRow({
           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
           : "color-mix(in srgb, var(--c-blue) 3%, transparent)",
         boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
-        opacity: cancelled ? 0.58 : 1,
       }}
     >
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
@@ -458,7 +460,7 @@ function BomLineRow({
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={line.item_name}
-            className={`truncate text-xs font-semibold leading-snug${cancelled ? " line-through" : ""}`}
+            className="truncate text-xs font-semibold leading-snug"
             style={{ color: LEGACY_COLORS.text }}
           >
             {line.item_name}
@@ -474,7 +476,6 @@ function BomLineRow({
             <MovementSummaryCell
               summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
               compact={compact}
-              cancelled={cancelled}
             />
           </div>
         )}

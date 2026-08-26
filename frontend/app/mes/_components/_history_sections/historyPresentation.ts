@@ -567,6 +567,9 @@ export function getHistoryListOperationLabel(
   log: TransactionLog,
   batch?: IoBatch | null,
 ): string {
+  if (log.operation_kind === "CANCELLATION") {
+    return `${getHistoryListOperationLabel({ ...log, operation_kind: null }, batch)} 취소`;
+  }
   if (log.reference_no?.startsWith("defect-disassemble:")) return "불량";
 
   const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);

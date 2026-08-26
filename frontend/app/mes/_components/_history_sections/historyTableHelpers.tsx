@@ -493,6 +493,7 @@ export function PeopleStatusCell({
 }
 export type LogGroup =
   | { type: "solo"; log: TransactionLog }
+  | { type: "operation"; operationId: string; logs: TransactionLog[] }
   | { type: "batch"; refKey: string; refNo: string; logs: TransactionLog[] }
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] }
   | { type: "defect_lifecycle"; key: string; parent: TransactionLog; child: TransactionLog };
@@ -504,6 +505,10 @@ export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[
     if (!first) return result;
     if (group.type === "solo") {
       result.push({ type: "solo", log: first });
+      return result;
+    }
+    if (group.type === "operation") {
+      result.push({ type: "operation", operationId: group.key, logs: group.logs });
       return result;
     }
     if (group.type === "op_batch") {
@@ -535,6 +540,7 @@ function referenceGroupKey(log: TransactionLog): string {
 }
 
 export function buildGroups(logs: TransactionLog[]): LogGroup[] {
+  const operations = new Map<string, TransactionLog[]>();
   const opBatches = new Map<string, TransactionLog[]>();
   const refBatches = new Map<string, TransactionLog[]>();
   const defectPairs = findDefectLifecyclePairs(logs);
@@ -548,7 +554,11 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
   }
 
   for (const log of logs) {
-    if (log.operation_batch_id) {
+    if (log.operation_id) {
+      const group = operations.get(log.operation_id) ?? [];
+      group.push(log);
+      operations.set(log.operation_id, group);
+    } else if (log.operation_batch_id) {
       const g = opBatches.get(log.operation_batch_id) ?? [];
       g.push(log);
       opBatches.set(log.operation_batch_id, g);
@@ -562,9 +572,20 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
 
   const groups: LogGroup[] = [];
   const seenOp = new Set<string>();
+  const seenOperations = new Set<string>();
   const seenRef = new Set<string>();
 
   for (const log of logs) {
+    if (log.operation_id) {
+      if (seenOperations.has(log.operation_id)) continue;
+      seenOperations.add(log.operation_id);
+      groups.push({
+        type: "operation",
+        operationId: log.operation_id,
+        logs: operations.get(log.operation_id) ?? [log],
+      });
+      continue;
+    }
     const defectPair = defectPairByLogId.get(log.log_id);
     if (defectPair) {
       if (defectPair.anchorLogId === log.log_id) {
@@ -613,7 +634,7 @@ export function getHistorySeparationHint(
   current: TransactionLog,
 ): string | null {
   if (!previous || previous.item_id !== current.item_id) return null;
-  if (current.cancelled) return "취소 이력";
+  if (current.cancelled) return null;
 
   const previousReference = previous.reference_no?.trim();
   const currentReference = current.reference_no?.trim();
@@ -839,6 +860,7 @@ export function BatchHeader({
   return (
     <tr
       data-history-main-row="true"
+      data-history-cancelled={cancelled || undefined}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -850,7 +872,7 @@ export function BatchHeader({
       aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${flowColor}` : "none",
@@ -871,14 +893,13 @@ export function BatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-            cancelled={cancelled}
           />
         </div>
       </td>
       <ItemCodeQuantityCell
         code={presentation.target.code}
         sourceCode={presentation.target.sourceCode}
-        quantity={<QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />}
+        quantity={<QuantityStockCell presentation={presentation} summary={summary} />}
       />
       <StockSnapshotCell log={representativeLog} moment="before" />
       <StockSnapshotCell log={representativeLog} moment="after" />
@@ -895,16 +916,36 @@ export function ReferenceBatchDetail({
   highlightLogId,
   onSelectLog,
   controlsId,
+  flat = false,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
   highlightLogId?: string | null;
   onSelectLog?: (log: TransactionLog) => void;
   controlsId?: string;
+  flat?: boolean;
 }) {
   const presentation = getReferenceBatchPresentation(logs);
 
   const sortedLogs = [...logs].sort((a, b) => getReferenceBatchLineOrder(a, presentation.kind) - getReferenceBatchLineOrder(b, presentation.kind));
+
+  if (flat) {
+    return (
+      <>
+        {sortedLogs.map((log, index) => (
+          <ReferenceBatchLineRow
+            key={log.log_id}
+            log={log}
+            kind={presentation.kind}
+            compact={compact}
+            highlightLogId={highlightLogId}
+            onSelectLog={onSelectLog}
+            rowId={index === 0 ? controlsId : undefined}
+          />
+        ))}
+      </>
+    );
+  }
 
   if (presentation.phase === "COMPONENT_CHANGE") {
     return (
@@ -1132,6 +1173,7 @@ function ReferenceBatchLineRow({
   return (
     <tr
       id={rowId}
+      data-history-cancelled={log.cancelled || undefined}
       tabIndex={onRowAction ? 0 : undefined}
       aria-expanded={canToggle ? expanded ?? false : undefined}
       aria-controls={canToggle ? controlsId : undefined}
@@ -1172,7 +1214,7 @@ function ReferenceBatchLineRow({
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={log.item_name}
-            className={`truncate text-xs font-semibold${log.cancelled ? " line-through" : ""}`}
+            className="truncate text-xs font-semibold"
             style={{ color: LEGACY_COLORS.text }}
           >
             {log.item_name}
@@ -1185,7 +1227,7 @@ function ReferenceBatchLineRow({
         dense
         quantity={(
           <div className="flex h-10 items-center justify-center overflow-hidden">
-            <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} cancelled={log.cancelled} />
+            <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} />
           </div>
         )}
       />
@@ -1302,6 +1344,7 @@ export function OpBatchHeader({
       ref={rowRef}
       data-batch-id={group.batchId}
       data-history-main-row="true"
+      data-history-cancelled={cancelled || undefined}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -1313,7 +1356,7 @@ export function OpBatchHeader({
       aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${flowColor}` : "none",
@@ -1338,7 +1381,6 @@ export function OpBatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-            cancelled={cancelled}
           />
         </div>
       </td>
@@ -1346,7 +1388,7 @@ export function OpBatchHeader({
         code={presentation.target.code}
         compact={compact}
         quantity={batch ? (
-          <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
+          <QuantityStockCell presentation={presentation} summary={summary} />
         ) : (
           <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-28" : "w-48"} />
         )}

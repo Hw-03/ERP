@@ -73,6 +73,7 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
   return (
     <tr
       id={rowId}
+      data-history-cancelled={cancelled || undefined}
       tabIndex={onToggle ? 0 : undefined}
       aria-label={onToggle ? `처리결과 구성 ${displayTitle}` : undefined}
       aria-expanded={onToggle ? expanded ?? false : undefined}
@@ -84,7 +85,7 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
         event.preventDefault();
         onToggle();
       } : undefined}
-      className={`${onToggle ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : ""}${cancelled ? " opacity-60" : ""}`}
+      className={onToggle ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : undefined}
       style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}
     >
       <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
@@ -96,7 +97,7 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
           {onToggle ? <ChevronToggleBtn label="처리결과 구성" expanded={expanded ?? false} onToggle={onToggle} controlsId={controlsId} /> : <span aria-hidden className="h-5 w-5 shrink-0" />}
           <TruncatedText
             accessibilityLabel={displayTitle}
-            className={`truncate text-xs font-semibold${cancelled ? " line-through" : ""}`}
+            className="truncate text-xs font-semibold"
             style={{ color: LEGACY_COLORS.text }}
           >
             {displayTitle}
@@ -112,11 +113,11 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
             {summary.resultParts.map((part, index) => (
               <span key={`${part.tone}-${part.label}`}>
                 {index > 0 && (
-                  <span aria-hidden className={cancelled ? "line-through" : undefined} style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span aria-hidden style={{ color: LEGACY_COLORS.muted2 }}>
                     {" · "}
                   </span>
                 )}
-                <span className={cancelled ? "line-through" : undefined} style={{ color: REWORK_RESULT_TONE_COLORS[part.tone] }}>
+                <span style={{ color: REWORK_RESULT_TONE_COLORS[part.tone] }}>
                   {part.label}
                 </span>
               </span>

@@ -220,7 +220,16 @@ function historyGroupPanelId(groupKey: string): string {
 function getGroupPrimaryLog(group: LogGroup): TransactionLog {
   if (group.type === "solo") return group.log;
   if (group.type === "defect_lifecycle") return group.parent;
+  if (group.type === "operation") return getOperationPrimaryLog(group.logs);
   return group.logs[0];
+}
+
+function getOperationPrimaryLog(logs: TransactionLog[]): TransactionLog {
+  for (const role of ["PRIMARY", "REWORK_PARENT_NORMAL", "REWORK_PARENT_DEFECTIVE", "PRODUCT_OUTPUT"]) {
+    const match = logs.find((log) => log.operation_role === role);
+    if (match) return match;
+  }
+  return logs[0];
 }
 
 export function HistoryTable({
@@ -520,6 +529,38 @@ export function HistoryTable({
                       onSelect={onSelectLog}
                       separationHint={separationHint}
                     />
+                  );
+                }
+
+                if (group.type === "operation") {
+                  const primaryLog = getOperationPrimaryLog(group.logs);
+                  const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
+                  const expanded = expandedGroupKey === group.operationId;
+                  const controlsId = historyGroupPanelId(group.operationId);
+                  const selected = selectedLogId === primaryLog.log_id
+                    || childLogs.some((log) => log.log_id === selectedLogId);
+                  return (
+                    <Fragment key={`operation-${group.operationId}`}>
+                      <HistoryLogRow
+                        log={primaryLog}
+                        selected={selected}
+                        onSelect={onSelectLog}
+                        expanded={expanded}
+                        onToggle={childLogs.length > 0 ? () => toggleGroup(group.operationId) : undefined}
+                        controlsId={childLogs.length > 0 ? controlsId : undefined}
+                        toggleLabel="작업 구성"
+                        separationHint={separationHint}
+                      />
+                      {expanded && childLogs.length > 0 && (
+                        <ReferenceBatchDetail
+                          logs={childLogs}
+                          highlightLogId={selectedLogId}
+                          onSelectLog={onSelectChildLog ?? onSelectLog}
+                          controlsId={controlsId}
+                          flat
+                        />
+                      )}
+                    </Fragment>
                   );
                 }
 
