@@ -14,12 +14,17 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationRoleEnum,
     InventoryLocation,
     IoBatch,
     LocationStatusEnum,
     ShippingAllocation,
     ShippingRequestCompanionLine,
     ShippingRequestStatusEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -27,6 +32,7 @@ from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services import io as io_svc
 from app.services import io_actions as io_actions_svc
+from app.services import inventory_operation_cancellation as cancellation_svc
 from app.schemas.io import IoPreviewTarget, IoSubmitRequest
 
 
@@ -96,7 +102,7 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
     monkeypatch.setattr(
         shipping_svc,
         "_ship_from_item_location",
-        lambda _db, _req, item, _qty, _notes: events.append(("ship", item.item_id)),
+        lambda _db, _req, item, _qty, _notes, **_kwargs: events.append(("ship", item.item_id)),
     )
 
     shipping_svc._consume_pickup_allocations(db_session, request, final_pf, 1)
@@ -737,6 +743,13 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     assert added["delta_per_unit"] == 1
     assert added["total_delta"] == 1
     assert added["available_quantity"] == 2
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
 
     changed = shipping_svc.execute_component_change(
         db_session,
@@ -761,11 +774,23 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     assert any(log.item_id == source_pa.item_id and log.quantity_change == -1 for log in component_logs)
     assert any(log.item_id == final_pa.item_id and log.quantity_change == 1 for log in component_logs)
     assert any(log.item_id == cable.item_id and log.quantity_change == -1 for log in component_logs)
+    component_operation = (
+        db_session.query(InventoryOperation)
+        .filter(
+            InventoryOperation.domain == "shipping",
+            InventoryOperation.action == "component_change",
+        )
+        .one()
+    )
+    assert {log.operation_id for log in component_logs} == {
+        component_operation.operation_id
+    }
 
+    shipping_actor = _shipping_actor(db_session)
     _submit_final_pf_production(
         db_session,
         request=req,
-        actor=_shipping_actor(db_session),
+        actor=shipping_actor,
     )
     prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
@@ -801,6 +826,48 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     ]
     assert {log.produced_by for log in pickup_logs} == {"shipping-user"}
     assert all(log.producer_employee_id is None for log in pickup_logs)
+    pickup_operation = (
+        db_session.query(InventoryOperation)
+        .filter(
+            InventoryOperation.domain == "shipping",
+            InventoryOperation.action == "pickup",
+        )
+        .one()
+    )
+    assert {log.operation_id for log in pickup_logs} == {pickup_operation.operation_id}
+    assert {log.operation_role for log in pickup_logs} == {
+        InventoryOperationRoleEnum.PRIMARY
+    }
+    workflow_effects = (
+        db_session.query(InventoryOperationEffect)
+        .filter(InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW)
+        .all()
+    )
+    assert {(effect.before_state["status"], effect.after_state["status"]) for effect in workflow_effects} >= {
+        ("PREPARING", "PREPARED"),
+        ("PREPARED", "PICKED_UP"),
+    }
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        pickup_operation.operation_id,
+    )
+    cancellation_svc.cancel_operation(
+        db_session,
+        operation_id=pickup_operation.operation_id,
+        canceller=shipping_actor,
+        reason="픽업 처리 취소",
+        plan_hash=preview.plan_hash,
+    )
+    db_session.refresh(req)
+    assert req.status == ShippingRequestStatusEnum.CANCELLED
+    assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 1
+    assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 5
+    assert {
+        allocation.status
+        for allocation in db_session.query(ShippingAllocation)
+        .filter(ShippingAllocation.request_id == req.request_id)
+        .all()
+    } == {"RELEASED"}
 
 
 def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_change(

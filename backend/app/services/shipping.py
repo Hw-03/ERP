@@ -14,6 +14,11 @@ from app.models import (
     BOM,
     DepartmentEnum,
     Inventory,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationKindEnum,
+    InventoryOperationRoleEnum,
     Item,
     ShippingAllocation,
     ShippingRequest,
@@ -30,6 +35,8 @@ from app.models import (
 )
 from app.repositories import item_repository
 from app.services import inv_effect
+from app.services import inventory_operations as operation_svc
+from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory as inventory_svc
 from app.services.bom import bom_child_item_ordering
 from app.services.bom_stock_policy import should_skip_bom_inventory
@@ -75,6 +82,71 @@ def _get_item(db: Session, item_id: uuid.UUID) -> Item:
 
 def _record_event(db: Session, req: ShippingRequest, event_type: str, message: str | None = None) -> None:
     db.add(ShippingRequestEvent(request_id=req.request_id, event_type=event_type, message=message))
+
+
+def _shipping_workflow_operation(
+    db: Session,
+    req: ShippingRequest,
+    *,
+    action: str,
+) -> InventoryOperation | None:
+    """전환 이후 출하 상태 변경을 만든 원 작업을 찾는다."""
+    return (
+        db.query(InventoryOperation)
+        .join(
+            InventoryOperationEffect,
+            InventoryOperationEffect.operation_id == InventoryOperation.operation_id,
+        )
+        .filter(
+            InventoryOperation.kind == InventoryOperationKindEnum.BUSINESS,
+            InventoryOperation.domain == "shipping",
+            InventoryOperation.action == action,
+            InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW,
+            InventoryOperationEffect.subject_type == "ShippingRequest",
+            InventoryOperationEffect.subject_id == str(req.request_id),
+        )
+        .order_by(InventoryOperation.effective_at.desc())
+        .first()
+    )
+
+
+def _resolve_cancellation_actor(
+    db: Session,
+    operation: InventoryOperation,
+    actor: Employee | None,
+) -> Employee:
+    """HTTP 작업자를 우선하고, 내부 호출은 원 작업자를 호환 기본값으로 사용한다."""
+    if actor is not None:
+        return _require_actor(actor)
+    if operation.actor_employee_id is not None:
+        original_actor = db.get(Employee, operation.actor_employee_id)
+        if original_actor is not None:
+            return _require_actor(original_actor)
+    raise ShippingError("취소 처리자 정보가 필요합니다.")
+
+
+def _cancel_shipping_operation(
+    db: Session,
+    *,
+    operation: InventoryOperation,
+    actor: Employee | None,
+    reason: str,
+) -> None:
+    """공통 미리보기와 동일한 계획으로 출하 작업 전체를 역전한다."""
+    resolved_actor = _resolve_cancellation_actor(db, operation, actor)
+    plan = cancellation_svc.preview_cancellation(db, operation.operation_id)
+    if not plan.can_cancel:
+        raise ShippingError(plan.blockers[0])
+    try:
+        cancellation_svc.cancel_operation(
+            db,
+            operation_id=operation.operation_id,
+            canceller=resolved_actor,
+            reason=reason,
+            plan_hash=plan.plan_hash,
+        )
+    except cancellation_svc.CancellationError as exc:
+        raise ShippingError(str(exc)) from exc
 
 
 def _normalize_invoice_number(value: str | None) -> str | None:
@@ -969,9 +1041,11 @@ def _log_inventory_change(
     phase: str,
     department: DepartmentEnum | None = None,
     producer_employee_id: uuid.UUID | None = None,
+    operation: InventoryOperation | None = None,
+    operation_role: InventoryOperationRoleEnum = InventoryOperationRoleEnum.PRIMARY,
 ) -> TransactionLog:
     inv = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
-    log = TransactionLog(
+    log = operation_svc.attach_transaction(TransactionLog(
         item_id=item.item_id,
         transaction_type=tx_type,
         quantity_change=quantity_change,
@@ -985,7 +1059,7 @@ def _log_inventory_change(
         shipping_phase=phase,
         department=department.value if department is not None else None,
         **inv_effect.capture_log_stock_snapshot(db, item.item_id, before_cells),
-    )
+    ), operation, operation_role)
     db.add(log)
     db.flush()
     return log
@@ -1264,6 +1338,7 @@ def _backflush_component_location(
     request_id: uuid.UUID | None,
     produced_by: str = "구성품 변경",
     producer_employee_id: uuid.UUID | None = None,
+    operation: InventoryOperation | None = None,
 ) -> TransactionLog:
     before = inv_effect.snapshot_cells(db, item.item_id)
     inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
@@ -1281,6 +1356,8 @@ def _backflush_component_location(
         phase=COMPONENT_CHANGE_PHASE,
         department=dept,
         producer_employee_id=producer_employee_id,
+        operation=operation,
+        operation_role=InventoryOperationRoleEnum.COMPONENT_INPUT,
     )
 
 
@@ -1294,6 +1371,7 @@ def _receive_component_location(
     tx_type: TransactionTypeEnum = TransactionTypeEnum.PRODUCE,
     produced_by: str = "구성품 변경",
     producer_employee_id: uuid.UUID | None = None,
+    operation: InventoryOperation | None = None,
 ) -> TransactionLog:
     before = inv_effect.snapshot_cells(db, item.item_id)
     inv, qty_before, dept = inventory_svc.receive_to_item_department(db, item, Decimal(qty))
@@ -1311,6 +1389,8 @@ def _receive_component_location(
         phase=COMPONENT_CHANGE_PHASE,
         department=dept,
         producer_employee_id=producer_employee_id,
+        operation=operation,
+        operation_role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
     )
 
 
@@ -1365,6 +1445,15 @@ def _execute_component_change_core(
         }
     )
     inventory_svc.ensure_and_lock_inventories(db, item_ids)
+    operation = operation_svc.create_business_operation(
+        db,
+        domain="shipping",
+        action="component_change",
+        display_label="품목 전환",
+        actor_name=produced_by,
+        actor_employee_id=requester_employee_id,
+        reason=memo,
+    )
 
     logs.append(_backflush_component_location(
         db,
@@ -1375,6 +1464,7 @@ def _execute_component_change_core(
         request_id,
         produced_by=produced_by,
         producer_employee_id=requester_employee_id,
+        operation=operation,
     ))
     for line in applied_lines:
         delta = int(line["total_delta"])
@@ -1389,6 +1479,7 @@ def _execute_component_change_core(
                 request_id,
                 produced_by=produced_by,
                 producer_employee_id=requester_employee_id,
+                operation=operation,
             ))
 
     logs.append(_receive_component_location(
@@ -1400,6 +1491,7 @@ def _execute_component_change_core(
         request_id,
         produced_by=produced_by,
         producer_employee_id=requester_employee_id,
+        operation=operation,
     ))
     for line in applied_lines:
         delta = int(line["total_delta"])
@@ -1416,6 +1508,7 @@ def _execute_component_change_core(
                 tx_type=TransactionTypeEnum.RECEIVE,
                 produced_by=produced_by,
                 producer_employee_id=requester_employee_id,
+                operation=operation,
             ))
 
     completed_at = datetime.utcnow()
@@ -1493,6 +1586,7 @@ def _reserve_pickup_items(
     final_pf: Item,
     request_qty: int,
     reference_no: str,
+    operation: InventoryOperation | None = None,
 ) -> None:
     """Validate and reserve the pre-produced final PF with every companion item."""
     reservations: list[tuple[Item, int, str, str]] = [
@@ -1524,11 +1618,11 @@ def _reserve_pickup_items(
         item_id: _require_item_location_available(db, item_by_id[item_id], quantity)
         for item_id, quantity in required_by_item.items()
     }
+    created_allocations: list[ShippingAllocation] = []
     for item, quantity, unit, item_reference in reservations:
         if quantity <= 0:
             continue
-        db.add(
-            ShippingAllocation(
+        allocation = ShippingAllocation(
                 request_id=req.request_id,
                 item_id=item.item_id,
                 quantity=quantity,
@@ -1537,8 +1631,25 @@ def _reserve_pickup_items(
                 status=ALLOCATION_RESERVED,
                 reference_no=item_reference,
             )
-        )
+        db.add(allocation)
+        created_allocations.append(allocation)
     db.flush()
+    for allocation in created_allocations:
+        operation_svc.record_effect(
+            db,
+            operation=operation,
+            effect_kind=InventoryOperationEffectKindEnum.ALLOCATION,
+            subject_type="ShippingAllocation",
+            subject_id=allocation.allocation_id,
+            role="RESERVE",
+            before_state={"exists": False},
+            after_state={
+                "exists": True,
+                "status": allocation.status,
+                "quantity": int(allocation.quantity or 0),
+                "item_id": str(allocation.item_id),
+            },
+        )
 
 
 def _release_pickup_allocations(db: Session, req: ShippingRequest, reason: str | None) -> None:
@@ -1555,6 +1666,7 @@ def _consume_pickup_allocations(
     req: ShippingRequest,
     final_pf: Item,
     request_qty: int,
+    operation: InventoryOperation | None = None,
 ) -> None:
     """Deduct reserved pickup items, with a direct-deduction fallback for legacy requests."""
     allocations = _active_allocations_for_request(db, req)
@@ -1564,9 +1676,23 @@ def _consume_pickup_allocations(
     sorted_item_ids = sorted(item_ids)
     inventory_svc.ensure_and_lock_inventories(db, sorted_item_ids)
     if not allocations:
-        _ship_from_item_location(db, req, final_pf, request_qty, f"출하 픽업: {final_pf.item_name} x {request_qty}")
+        _ship_from_item_location(
+            db,
+            req,
+            final_pf,
+            request_qty,
+            f"출하 픽업: {final_pf.item_name} x {request_qty}",
+            operation=operation,
+        )
         for line in req.companion_lines:
-            _ship_from_item_location(db, req, line.item, int(line.quantity), f"동반 출하: {line.item.item_name}")
+            _ship_from_item_location(
+                db,
+                req,
+                line.item,
+                int(line.quantity),
+                f"동반 출하: {line.item.item_name}",
+                operation=operation,
+            )
         return
 
     final_pf_reference = _final_pf_allocation_reference(f"SHIP-PREP-{req.request_id.hex[:8]}")
@@ -1582,11 +1708,30 @@ def _consume_pickup_allocations(
                 allocation.item,
                 int(allocation.quantity or 0),
                 f"출하 픽업: {allocation.item.item_name} x {int(allocation.quantity or 0)}",
+                operation=operation,
             )
             allocation.status = ALLOCATION_CONSUMED
             allocation.consumed_at = now
+            if operation is not None:
+                operation_svc.record_effect(
+                    db,
+                    operation=operation,
+                    effect_kind=InventoryOperationEffectKindEnum.ALLOCATION,
+                    subject_type="ShippingAllocation",
+                    subject_id=allocation.allocation_id,
+                    role="CONSUME",
+                    before_state={"status": ALLOCATION_RESERVED},
+                    after_state={"status": ALLOCATION_CONSUMED},
+                )
     else:
-        _ship_from_item_location(db, req, final_pf, request_qty, f"출하 픽업: {final_pf.item_name} x {request_qty}")
+        _ship_from_item_location(
+            db,
+            req,
+            final_pf,
+            request_qty,
+            f"출하 픽업: {final_pf.item_name} x {request_qty}",
+            operation=operation,
+        )
 
     for allocation in allocations:
         if allocation.reference_no == final_pf_reference:
@@ -1597,9 +1742,21 @@ def _consume_pickup_allocations(
             allocation.item,
             int(allocation.quantity or 0),
             f"동반 출하: {allocation.item.item_name}",
+            operation=operation,
         )
         allocation.status = ALLOCATION_CONSUMED
         allocation.consumed_at = now
+        if operation is not None:
+            operation_svc.record_effect(
+                db,
+                operation=operation,
+                effect_kind=InventoryOperationEffectKindEnum.ALLOCATION,
+                subject_type="ShippingAllocation",
+                subject_id=allocation.allocation_id,
+                role="CONSUME",
+                before_state={"status": ALLOCATION_RESERVED},
+                after_state={"status": ALLOCATION_CONSUMED},
+            )
     db.flush()
 
 
@@ -1622,23 +1779,68 @@ def prepare_complete(
     request_qty = _request_quantity(req)
     _final_pa, final_pf = _require_final_items(db, req)
     reference_no = f"SHIP-PREP-{req.request_id.hex[:8]}"
+    operation = operation_svc.create_business_operation(
+        db,
+        domain="shipping",
+        action="prepare",
+        display_label="출하 준비",
+        actor_name=prepared_by_name or req.requested_by_name,
+        actor_employee_id=prepared_by_employee_id,
+        reason=req.notes,
+        idempotency_key=f"shipping:{req.request_id}:prepare",
+    )
 
-    _reserve_pickup_items(db, req, final_pf, request_qty, reference_no)
+    _reserve_pickup_items(
+        db,
+        req,
+        final_pf,
+        request_qty,
+        reference_no,
+        operation=operation,
+    )
     req.serial_numbers = normalized_serial_numbers
     req.status = ShippingRequestStatusEnum.PREPARED
     req.prepared_at = datetime.utcnow()
     req.prepared_by_employee_id = prepared_by_employee_id
     req.prepared_by_name = prepared_by_name
     req.updated_at = datetime.utcnow()
+    operation_svc.record_effect(
+        db,
+        operation=operation,
+        effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+        subject_type="ShippingRequest",
+        subject_id=req.request_id,
+        role="PREPARE_STATUS",
+        before_state={"status": ShippingRequestStatusEnum.PREPARING.value},
+        after_state={"status": ShippingRequestStatusEnum.PREPARED.value},
+    )
     _record_event(db, req, "PREPARED", "출하 준비 완료")
     db.flush()
     return req
 
 
-def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None) -> ShippingRequest:
+def prepare_cancel(
+    db: Session,
+    request_id: uuid.UUID,
+    reason: str | None = None,
+    *,
+    actor: Employee | None = None,
+) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
         raise ShippingError("준비 완료 요청에서만 취소할 수 있습니다.")
+    operation = _shipping_workflow_operation(db, req, action="prepare")
+    if operation is not None:
+        cancellation_reason = reason or "출하 준비 취소"
+        _cancel_shipping_operation(
+            db,
+            operation=operation,
+            actor=actor,
+            reason=cancellation_reason,
+        )
+        _record_event(db, req, "PREPARE_CANCELLED", cancellation_reason)
+        db.flush()
+        return req
     logs = (
         db.query(TransactionLog)
         .filter(
@@ -1672,7 +1874,15 @@ def prepare_cancel(db: Session, request_id: uuid.UUID, reason: str | None = None
     db.flush()
     return req
 
-def _ship_from_item_location(db: Session, req: ShippingRequest, item: Item, qty: int, notes: str) -> None:
+def _ship_from_item_location(
+    db: Session,
+    req: ShippingRequest,
+    item: Item,
+    qty: int,
+    notes: str,
+    *,
+    operation: InventoryOperation | None = None,
+) -> None:
     reference_no = f"SHIP-{req.request_id.hex[:8]}"
     before = inv_effect.snapshot_cells(db, item.item_id)
     inv, qty_before, dept = inventory_svc.consume_from_item_department(db, item, Decimal(qty))
@@ -1690,6 +1900,8 @@ def _ship_from_item_location(db: Session, req: ShippingRequest, item: Item, qty:
         request_id=req.request_id,
         phase=PICKUP_PHASE,
         department=dept,
+        operation=operation,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
     )
 
 
@@ -1701,22 +1913,65 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     if req.final_pf_item is None:
         raise ShippingError("최종 PF가 생성되지 않았습니다.")
     request_qty = _request_quantity(req)
-    _consume_pickup_allocations(db, req, req.final_pf_item, request_qty)
+    operation = operation_svc.create_business_operation(
+        db,
+        domain="shipping",
+        action="pickup",
+        display_label="출하 픽업",
+        actor_name=req.prepared_by_name or req.requested_by_name,
+        actor_employee_id=req.prepared_by_employee_id,
+        reason=req.notes,
+        idempotency_key=f"shipping:{req.request_id}:pickup",
+    )
+    _consume_pickup_allocations(
+        db,
+        req,
+        req.final_pf_item,
+        request_qty,
+        operation=operation,
+    )
     req.status = ShippingRequestStatusEnum.PICKED_UP
     req.picked_up_at = datetime.utcnow()
     req.updated_at = datetime.utcnow()
+    operation_svc.record_effect(
+        db,
+        operation=operation,
+        effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+        subject_type="ShippingRequest",
+        subject_id=req.request_id,
+        role="PICKUP_STATUS",
+        before_state={"status": ShippingRequestStatusEnum.PREPARED.value},
+        after_state={"status": ShippingRequestStatusEnum.PICKED_UP.value},
+    )
     _record_event(db, req, "PICKED_UP", "픽업 완료 처리")
     db.flush()
     return req
 
 
-def pickup_cancel(db: Session, request_id: uuid.UUID) -> ShippingRequest:
-    """실수로 처리한 픽업 완료를 준비 완료 상태로 되돌린다."""
+def pickup_cancel(
+    db: Session,
+    request_id: uuid.UUID,
+    *,
+    actor: Employee | None = None,
+) -> ShippingRequest:
+    """신규 픽업은 별도 역전 작업으로 취소하고 레거시만 기존 방식으로 처리한다."""
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PICKED_UP:
         raise ShippingError("픽업 완료 요청에서만 픽업 완료를 취소할 수 있습니다.")
     if req.final_pf_item is None:
         raise ShippingError("최종 PF가 생성되지 않았습니다.")
+
+    operation = _shipping_workflow_operation(db, req, action="pickup")
+    if operation is not None:
+        _cancel_shipping_operation(
+            db,
+            operation=operation,
+            actor=actor,
+            reason="픽업 완료 취소",
+        )
+        _record_event(db, req, "PICKUP_CANCELLED", "픽업 완료 취소")
+        db.flush()
+        return req
 
     pickup_logs = (
         db.query(TransactionLog)

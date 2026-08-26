@@ -562,8 +562,20 @@ def prepare_complete(
 
 
 @router.post("/requests/{request_id}/prepare-cancel", response_model=ShippingRequestResponse)
-def prepare_cancel(request_id: uuid.UUID, payload: ShippingPrepareCancelRequest, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.prepare_cancel, request_id, payload.reason)
+def prepare_cancel(
+    request_id: uuid.UUID,
+    payload: ShippingPrepareCancelRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    actor = _load_shipping_actor(http_request, db)
+    req = _action_or_422(
+        db,
+        shipping_actions_svc.prepare_cancel,
+        request_id,
+        payload.reason,
+        actor=actor,
+    )
     return _to_response(db, req)
 
 
@@ -574,8 +586,18 @@ def pickup_complete(request_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/requests/{request_id}/pickup-cancel", response_model=ShippingRequestResponse)
-def pickup_cancel(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.pickup_cancel, request_id)
+def pickup_cancel(
+    request_id: uuid.UUID,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    actor = _load_shipping_actor(http_request, db)
+    req = _action_or_422(
+        db,
+        shipping_actions_svc.pickup_cancel,
+        request_id,
+        actor=actor,
+    )
     return _to_response(db, req)
 
 

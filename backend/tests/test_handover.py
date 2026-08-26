@@ -15,10 +15,15 @@ from app.models import (
     HandoverDoc,
     HandoverStatusEnum,
     Inventory,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationRoleEnum,
     InventoryLocation,
     LocationStatusEnum,
     Notification,
     NotificationTypeEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -109,6 +114,12 @@ def test_handover_create_and_receive_moves_stock(client, db_session, make_item):
         db_session, code="HP1", name="고압인수",
         department=DepartmentEnum.HIGH_VOLTAGE, department_role="primary",
     )
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
     db_session.commit()
 
     res = _create_handover(client, author, "고압", item, qty=3)
@@ -138,6 +149,13 @@ def test_handover_create_and_receive_moves_stock(client, db_session, make_item):
     )
     assert len(logs) == 1
     assert logs[0].transfer_qty == Decimal("3")
+    operation = db_session.query(InventoryOperation).one()
+    assert logs[0].operation_id == operation.operation_id
+    assert logs[0].operation_role == InventoryOperationRoleEnum.TRANSFER
+    effect = db_session.query(InventoryOperationEffect).one()
+    assert effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+    assert effect.before_state == {"status": "submitted"}
+    assert effect.after_state == {"status": "received"}
 
 
 def test_handover_receive_prelocks_sorted_unique_inventories(

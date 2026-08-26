@@ -15,6 +15,7 @@ from app.models import (
     Employee,
     Inventory,
     InventoryLocation,
+    InventoryOperationRoleEnum,
     LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
@@ -22,6 +23,7 @@ from app.models import (
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services import defect_records as defect_records_svc
+from app.services import inventory_operations as operation_svc
 from app.services._tx import transactional
 
 
@@ -40,6 +42,21 @@ def quarantine_inventory(
 ) -> Inventory:
     """재고 격리와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
+        operation = operation_svc.create_business_operation(
+            db,
+            domain="defect",
+            action="quarantine",
+            display_label="불량 격리",
+            actor_name=actor.name,
+            actor_employee_id=actor.employee_id,
+            department=target_dept.value,
+            reason=reason_memo,
+            idempotency_key=(
+                f"defect:quarantine:{client_request_id}"
+                if client_request_id
+                else None
+            ),
+        )
         inv = inventory_svc.get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
         cells_before = inv_effect.snapshot_cells(db, item_id)
@@ -74,7 +91,7 @@ def quarantine_inventory(
             reason_category=reason_category,
             memo=reason_memo,
         )
-        db.add(
+        log = operation_svc.attach_transaction(
             TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
@@ -90,7 +107,22 @@ def quarantine_inventory(
                 department=target_dept.value,
                 defect_quarantine_record_id=record.record_id,
                 **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
-            )
+            ),
+            operation,
+            InventoryOperationRoleEnum.PRIMARY,
+        )
+        db.add(log)
+        operation_svc.record_defect_movement(
+            db,
+            operation=operation,
+            record_id=record.record_id,
+            item_id=item_id,
+            department=target_dept.value,
+            movement_type="QUARANTINE",
+            quantity_delta=qty,
+            role="QUARANTINE",
+            actor_name=actor.name,
+            actor_employee_id=actor.employee_id,
         )
     return inv
 
@@ -116,6 +148,16 @@ def unquarantine_inventory(
         )
         if record is not None:
             defect_records_svc.ensure_available(db, record, qty)
+        operation = operation_svc.create_business_operation(
+            db,
+            domain="defect",
+            action="restore",
+            display_label="정상 복귀",
+            actor_name=actor.name,
+            actor_employee_id=actor.employee_id,
+            department=dept.value,
+            reason=reason_memo,
+        )
         inv = inventory_svc.get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
         cells_before = inv_effect.snapshot_cells(db, item_id)
@@ -135,7 +177,7 @@ def unquarantine_inventory(
         if record is not None:
             defect_records_svc.decrement_record(db, record, qty)
         inv = inventory_svc.get_or_create_inventory(db, item_id)
-        db.add(
+        log = operation_svc.attach_transaction(
             TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
@@ -150,6 +192,22 @@ def unquarantine_inventory(
                 department=dept.value,
                 defect_quarantine_record_id=(record.record_id if record else None),
                 **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
-            )
+            ),
+            operation,
+            InventoryOperationRoleEnum.PRIMARY,
         )
+        db.add(log)
+        if record is not None:
+            operation_svc.record_defect_movement(
+                db,
+                operation=operation,
+                record_id=record.record_id,
+                item_id=item_id,
+                department=dept.value,
+                movement_type="RESTORE",
+                quantity_delta=-qty,
+                role="RESTORE",
+                actor_name=actor.name,
+                actor_employee_id=actor.employee_id,
+            )
     return inv

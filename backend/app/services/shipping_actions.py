@@ -135,10 +135,12 @@ def prepare_cancel(
     db: Session,
     request_id: uuid.UUID,
     reason: str | None = None,
+    *,
+    actor: Employee | None = None,
 ) -> ShippingRequest:
     """준비 완료 취소의 재고 원복·원장·상태를 원자적으로 확정한다."""
     with transactional(db):
-        return shipping_svc.prepare_cancel(db, request_id, reason)
+        return shipping_svc.prepare_cancel(db, request_id, reason, actor=actor)
 
 
 def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
@@ -147,7 +149,12 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
         return shipping_svc.pickup_complete(db, request_id)
 
 
-def pickup_cancel(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+def pickup_cancel(
+    db: Session,
+    request_id: uuid.UUID,
+    *,
+    actor: Employee | None = None,
+) -> ShippingRequest:
     """픽업 완료를 재고·원장·배정까지 원자적으로 되돌린다."""
     with transactional(db):
-        return shipping_svc.pickup_cancel(db, request_id)
+        return shipping_svc.pickup_cancel(db, request_id, actor=actor)
