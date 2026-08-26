@@ -112,9 +112,11 @@ function Invoke-EmployeeFrontendBuild {
 
     $previousBackendUrl = $env:BACKEND_INTERNAL_URL
     $previousTelemetry = $env:NEXT_TELEMETRY_DISABLED
+    $previousMesEnv = $env:NEXT_PUBLIC_MES_ENV
     try {
         $env:BACKEND_INTERNAL_URL = "http://localhost:8010"
         $env:NEXT_TELEMETRY_DISABLED = "1"
+        $env:NEXT_PUBLIC_MES_ENV = "employee"
         $result = Invoke-CheckedExternalCommand `
             -FilePath "npm.cmd" `
             -ArgumentList @("run", "build") `
@@ -123,6 +125,7 @@ function Invoke-EmployeeFrontendBuild {
     finally {
         $env:BACKEND_INTERNAL_URL = $previousBackendUrl
         $env:NEXT_TELEMETRY_DISABLED = $previousTelemetry
+        $env:NEXT_PUBLIC_MES_ENV = $previousMesEnv
     }
 
     $buildIdPath = Join-Path $activeBuild "BUILD_ID"

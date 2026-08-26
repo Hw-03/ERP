@@ -143,6 +143,7 @@ Assert-ContentMatch $SyncToEmployeeScript 'runtime-paths\.ps1' "sync-to-employee
 Assert-ContentMatch $SyncToEmployeeScript 'checked-command\.ps1' "sync-to-employee.ps1 must use and copy the checked external-command helper."
 Assert-ContentMatch $SyncToEmployeeScript 'ensure-schema-ready\.ps1' "sync-to-employee.ps1 must copy the shared schema readiness helper."
 Assert-ContentMatch $CheckedCommandScript 'Invoke-CheckedExternalCommand' "checked-command.ps1 must expose checked external command execution."
+Assert-ContentMatch $SyncToEmployeeScript '(?s)function\s+Invoke-EmployeeFrontendBuild.*?\$previousMesEnv\s*=\s*\$env:NEXT_PUBLIC_MES_ENV.*?\$env:NEXT_PUBLIC_MES_ENV\s*=\s*"employee".*?npm\.cmd.*?finally\s*\{.*?\$env:NEXT_PUBLIC_MES_ENV\s*=\s*\$previousMesEnv' "employee frontend builds must force and restore NEXT_PUBLIC_MES_ENV."
 
 Assert-ContentMatch $RuntimePathsScript 'MES_RUNTIME_ROOT' "runtime-paths.ps1 must support the single runtime root override."
 Assert-ContentMatch $RuntimePathsScript '_attic[\\/]runtime' "runtime-paths.ps1 must default permanent artifacts to _attic/runtime."
