@@ -1,26 +1,33 @@
 "use client";
 
-import type { Item, TransactionLog } from "@/lib/api";
-import { useTransactionsQuery } from "@/lib/queries/useTransactionsQuery";
+import type { InventoryOperation, Item } from "@/lib/api";
+import { useInventoryOperationsQuery } from "@/lib/queries/useInventoryOperationsQuery";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "../_history_sections/historyFormat";
-import { getHistoryListOperationLabel } from "../_history_sections/historyPresentation";
-import { getHistoryLogSignedQuantity } from "../_history_sections/historyTableHelpers";
-import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatQty } from "@/lib/mes/format";
 
-function getWorkContext(log: TransactionLog): string {
-  const context = [log.department, log.requester_name ?? log.produced_by]
+function getWorkContext(operation: InventoryOperation): string {
+  const context = [operation.department, operation.actorName]
     .filter((value): value is string => Boolean(value?.trim()))
     .join(" · ");
 
-  return context || log.reference_no || "업무 정보 없음";
+  return context || operation.matchingLines[0]?.referenceNo || "업무 정보 없음";
+}
+
+function getOperationLabel(operation: InventoryOperation): string {
+  if (operation.domain === "department_inventory" && operation.action === "correction") {
+    return operation.kind === "CANCELLATION" ? "부서 입출고 취소" : "부서 입출고";
+  }
+
+  return operation.displayLabel;
 }
 
 export function InventoryRecentHistoryPanel({ item }: { item: Item }) {
-  const { data: logs = [], isLoading, isError, error, refetch } = useTransactionsQuery({
+  const { data, isLoading, isError, error, refetch } = useInventoryOperationsQuery({
     itemId: item.item_id,
     limit: 5,
   });
+  const operations = data?.items ?? [];
 
   if (isLoading) return <LoadingSkeleton rows={3} />;
 
@@ -35,28 +42,31 @@ export function InventoryRecentHistoryPanel({ item }: { item: Item }) {
     );
   }
 
-  if (logs.length === 0) {
+  if (operations.length === 0) {
     return <EmptyState compact title="최근 입출고 내역이 없습니다." />;
   }
 
   return (
-    <ul className="flex flex-col divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
-      {logs.slice(0, 5).map((log) => {
-        const quantity = getHistoryLogSignedQuantity(log).parts.map((part) => part.label).join(" ");
+    <ul className="inventory-recent">
+      {operations.slice(0, 5).map((operation) => {
+        const line = operation.matchingLines[0];
+        if (!line) return null;
+        const cancelledOriginal = operation.effectiveStatus === "cancelled";
+        const quantityValue = line.transferQty == null
+          ? line.quantityChange
+          : Math.sign(line.quantityChange) * Math.abs(line.transferQty);
+        const sign = quantityValue > 0 ? "+" : quantityValue < 0 ? "-" : "";
+        const quantity = `${sign}${formatQty(Math.abs(quantityValue))} ${item.unit}`;
         return (
-          <li key={log.log_id} className="py-3 first:pt-2">
-            <div className="flex items-start justify-between gap-3">
-              <span className="min-w-0 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-                {getHistoryListOperationLabel(log)}
-              </span>
-              <span className="shrink-0 text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                {quantity}
-              </span>
+          <li key={operation.operationId} data-cancelled={cancelledOriginal || undefined}>
+            <div className="inventory-recent-main">
+              <span>{getOperationLabel(operation)}</span>
+              <b>{quantity}</b>
             </div>
-            <div className="mt-1 flex min-w-0 items-center justify-between gap-3 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              <span className="min-w-0 truncate">{getWorkContext(log)}</span>
-              <time className="shrink-0" dateTime={log.requested_at ?? log.created_at}>
-                {formatHistoryDate(log.requested_at ?? log.created_at)}
+            <div className="inventory-recent-meta">
+              <span>{getWorkContext(operation)}</span>
+              <time dateTime={operation.effectiveAt}>
+                {formatHistoryDate(operation.effectiveAt)}
               </time>
             </div>
           </li>
