@@ -271,6 +271,9 @@ def _stock_request_summary(request: StockRequest) -> dict:
         "requires_department_approval": bool(request.requires_department_approval),
         "approver_employee_id": approver_employee_id,
         "approver_name": approver_name,
+        "rejected_by_name": request.rejected_by_name,
+        "rejected_at": request.rejected_at,
+        "rejected_reason": request.rejected_reason,
         "operation_line_ids": [
             line.operation_line_id
             for line in request.lines
@@ -584,7 +587,16 @@ def sync_batch_from_stock_requests(
         return
 
     statuses = {_enum_value(request.status) for request in linked_requests}
-    if statuses == {StockRequestStatusEnum.COMPLETED.value}:
+    is_rejected_adjust_resubmission = (
+        batch.work_type == "process"
+        and batch.sub_type in {"adjust_in", "adjust_out"}
+        and statuses == {
+            StockRequestStatusEnum.REJECTED.value,
+            StockRequestStatusEnum.COMPLETED.value,
+        }
+        and all(request.requires_department_approval for request in linked_requests)
+    )
+    if statuses == {StockRequestStatusEnum.COMPLETED.value} or is_rejected_adjust_resubmission:
         batch.status = "completed"
         batch.completed_at = max(
             (request.completed_at or datetime.utcnow()) for request in linked_requests
@@ -606,6 +618,16 @@ def sync_batch_from_stock_requests(
         batch.completed_at = None
     elif statuses == {StockRequestStatusEnum.CANCELLED.value}:
         batch.status = "cancelled"
+        batch.completed_at = None
+    elif (
+        statuses == {StockRequestStatusEnum.REJECTED.value}
+        and batch.work_type == "process"
+        and batch.sub_type in {"adjust_in", "adjust_out"}
+        and all(request.requires_department_approval for request in linked_requests)
+    ):
+        # 부서 낱개 입출고 조정만 반려 뒤 같은 작성 중 batch로 복귀한다.
+        # StockRequest 자체는 REJECTED 감사 이력을 유지하며, 재제출 때 새 요청을 만든다.
+        batch.status = "draft"
         batch.completed_at = None
     else:
         batch.status = "rejected"

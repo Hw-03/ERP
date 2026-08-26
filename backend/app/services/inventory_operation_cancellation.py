@@ -34,6 +34,7 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestLine,
     TransactionLog,
+    TransactionTypeEnum,
     WarehouseBoxItem,
 )
 from app.services import inv_effect
@@ -144,6 +145,13 @@ def is_same_kst_week(left: datetime, right: datetime) -> bool:
 def normalized_effect_for_cancellation(log: TransactionLog) -> list[dict]:
     """신규 원장의 셀 효과를 검증 가능한 목록으로 정규화한다."""
     effect = log.inventory_effect
+    if (
+        (log.reference_no or "").startswith("defect-disassemble:")
+        and log.transaction_type == TransactionTypeEnum.DEFECT_SCRAP
+        and log.notes == "[rework:scrap_child]"
+        and effect == []
+    ):
+        return []
     if effect is None:
         raise CancellationNotAllowed("재고 효과 기록이 없어 취소할 수 없습니다.")
     if not isinstance(effect, list):

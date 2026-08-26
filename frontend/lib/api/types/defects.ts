@@ -19,6 +19,7 @@ export interface DefectLocation {
   quarantined_by?: string | null;
   quarantined_by_employee_id?: string | null;
   is_legacy: boolean;
+  legacy_origin: "aggregate" | "reconstructed" | null;
   /** BOM 자식 보유 여부. 격리 처리 "재작업" 옵션 노출 조건. */
   has_bom: boolean;
 }

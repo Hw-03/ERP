@@ -13,6 +13,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.models import (
+    BOM,
     Employee,
     InventoryOperation,
     InventoryOperationEffectKindEnum,
@@ -32,6 +33,7 @@ from app.services import inventory_operations as operation_svc
 from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
 from app.services.approval_rules import MEMO_REQUIRED_SUB_TYPES
+from app.services.bom_stock_policy import is_bom_generated_line
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     INTERNAL_USE_SUB_TYPE,
@@ -182,6 +184,155 @@ def _link_stock_request(
 
 def _has_manual_line(lines: Iterable[IoLine]) -> bool:
     return any((getattr(line, "origin", None) or "") in MANUAL_LINE_ORIGINS for line in lines)
+
+
+def _normalize_process_bom_auto_inclusion(batch: IoBatch) -> None:
+    """process BOM 자동 하위의 포함 상태는 수량에서만 결정해 checkbox payload를 무력화한다."""
+    if batch.sub_type not in {"produce", "disassemble"}:
+        return
+    for bundle in batch.bundles:
+        parent = next(
+            (line for line in bundle.lines if line.origin == "direct" and line.item_id == bundle.source_item_id),
+            None,
+        )
+        for line in bundle.lines:
+            if line.origin != "bom_auto":
+                continue
+            if parent is not None and _d(parent.quantity) == 0:
+                line.quantity = Decimal("0")
+                line.included = False
+                line.edited = False
+                line.shortage = Decimal("0")
+            elif not line.bom_stock_exempt:
+                line.included = _d(line.quantity) > 0
+
+
+def _validate_process_bom_parent_lines(batch: IoBatch) -> None:
+    """process BOM 묶음은 DB BOM 비교·실행에 필요한 상위 결과 라인을 반드시 하나 가진다."""
+    if batch.sub_type not in {"produce", "disassemble"}:
+        return
+    for bundle in batch.bundles:
+        if bundle.source_kind != "bom_parent":
+            continue
+        direct_lines = [line for line in bundle.lines if line.origin == "direct"]
+        if (
+            len(direct_lines) != 1
+            or bundle.source_item_id is None
+            or direct_lines[0].item_id != bundle.source_item_id
+        ):
+            raise ValueError("BOM 상위 결과 라인 구성이 올바르지 않습니다.")
+
+
+def _custom_process_bom_bundle_ids(db: Session, batch: IoBatch) -> set[uuid.UUID]:
+    """현재 DB BOM 기준과 하위 구성이 다른 process BOM 묶음 ID를 반환한다."""
+    if batch.sub_type not in {"produce", "disassemble"}:
+        return set()
+    custom_bundle_ids: set[uuid.UUID] = set()
+    for bundle in batch.bundles:
+        if bundle.source_kind != "bom_parent":
+            continue
+        parent = next(
+            (line for line in bundle.lines if line.origin == "direct" and line.item_id == bundle.source_item_id),
+            None,
+        )
+        if parent is None:
+            continue
+        bom_rows = {
+            row.child_item_id: _d(row.quantity)
+            for row in db.query(BOM).filter(BOM.parent_item_id == parent.item_id).all()
+        }
+        auto_lines = [line for line in bundle.lines if line.origin == "bom_auto"]
+        if set(bom_rows) != {line.item_id for line in auto_lines}:
+            custom_bundle_ids.add(bundle.bundle_id)
+            continue
+        for line in auto_lines:
+            if line.origin != "bom_auto" or line.bom_stock_exempt:
+                continue
+            unit_quantity = bom_rows.get(line.item_id)
+            if unit_quantity is None or _d(line.quantity) != _d(parent.quantity) * unit_quantity:
+                custom_bundle_ids.add(bundle.bundle_id)
+                break
+    return custom_bundle_ids
+
+
+def _custom_process_bom_effect_lines(
+    batch: IoBatch,
+    custom_bundle_ids: set[uuid.UUID],
+) -> list[IoLine]:
+    """커스텀 BOM은 상위 결과품을 참고용으로 남기고 실제 하위 라인만 실행한다."""
+    return [
+        line
+        for bundle in batch.bundles
+        for line in bundle.lines
+        if line.included
+        and not (
+            bundle.bundle_id in custom_bundle_ids
+            and line.origin == "direct"
+            and line.item_id == bundle.source_item_id
+        )
+    ]
+
+
+def _mark_custom_process_bom_parents_reference_only(
+    batch: IoBatch,
+    custom_bundle_ids: set[uuid.UUID],
+) -> None:
+    """커스텀 BOM 상위는 수량 기준만 남기고 실행 대상에서는 제외한다."""
+    for bundle in batch.bundles:
+        if bundle.bundle_id not in custom_bundle_ids:
+            continue
+        for line in bundle.lines:
+            if line.origin != "direct" or line.item_id != bundle.source_item_id:
+                continue
+            line.included = False
+            line.shortage = Decimal("0")
+            line.exclusion_note = "커스텀 BOM 상위 미반영"
+
+
+def _normalize_custom_disassemble_effects(
+    db: Session,
+    batch: IoBatch,
+    custom_bundle_ids: set[uuid.UUID],
+) -> None:
+    """커스텀 분해의 서버 발급 회수 라인을 소속 부서 선택 출고로 확정한다."""
+    if batch.sub_type != "disassemble":
+        return
+    for bundle in batch.bundles:
+        if bundle.bundle_id not in custom_bundle_ids:
+            continue
+        for line in bundle.lines:
+            if line.origin != "bom_auto":
+                continue
+            if not is_bom_generated_line(
+                db,
+                bundle_id=bundle.bundle_id,
+                line_id=line.line_id,
+                source_kind=bundle.source_kind,
+                source_item_id=bundle.source_item_id,
+                item_id=line.item_id,
+                work_type=batch.work_type,
+                sub_type=batch.sub_type,
+                direction=line.direction,
+                from_bucket=line.from_bucket,
+                from_department=line.from_department,
+                to_bucket=line.to_bucket,
+                to_department=line.to_department,
+                bom_auto_token=line.bom_auto_token,
+            ):
+                raise ValueError("BOM 자동 하위 품목의 원본 정보가 올바르지 않습니다.")
+            if line.bom_stock_exempt or not line.included or _d(line.quantity) <= 0:
+                line.included = False
+                line.shortage = Decimal("0")
+                continue
+            source_department = line.to_department
+            if not source_department:
+                raise ValueError("BOM 선택 출고 품목의 소속 부서를 찾을 수 없습니다.")
+            line.direction = "out"
+            line.from_bucket = "production"
+            line.from_department = source_department
+            line.to_bucket = "none"
+            line.to_department = None
+            line.shortage = Decimal("0")
 
 
 def _prelock_line_inventories(db: Session, lines: Sequence[IoLine]) -> None:
@@ -353,14 +504,20 @@ def _submit_approval(
     notif_svc.notify_request_arrived(db, request)
 
 
-def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBatch) -> None:
+def _submit_dept_only_approval(
+    db: Session,
+    *,
+    requester: Employee,
+    batch: IoBatch,
+    lines: Sequence[IoLine] | None = None,
+) -> None:
     """낱개(manual/adjust) 라인이 포함된 비-APPROVAL_SUB_TYPES 배치 — 부서 결재만 필요.
 
     실재고 반영은 부서 결재 통과 후 execute_batch_after_dept_approval 가 수행.
     요청자 본인이 부서 결재 정/부 권한자라면 즉시 실행한다.
     """
-    lines = _included_lines(batch)
-    _validate_included_lines(db, lines)
+    effect_lines = list(lines) if lines is not None else _included_lines(batch)
+    _validate_included_lines(db, effect_lines)
     inputs = [
         stock_request_svc.LineInput(
             item_id=line.item_id,
@@ -370,7 +527,7 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
             to_bucket=_request_bucket(line.to_bucket),
             to_department=line.to_department,
         )
-        for line in lines
+        for line in effect_lines
     ]
     request = stock_request_svc.create_manual_adjustment_request(
         db,
@@ -379,20 +536,20 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
         reference_no=batch.reference_no,
         notes=batch.notes,
     )
-    _link_stock_request(db, batch=batch, request=request, lines=lines)
+    _link_stock_request(db, batch=batch, request=request, lines=effect_lines)
 
     # 자가승인 경로 — create_manual_adjustment_request 가 dept_approved 를 이미 마크했으면 즉시 실행.
     if request.department_approved_by_employee_id is not None:
         batch_status_before = batch.status
         request_status_before = request.status
-        _prelock_line_inventories(db, lines)
+        _prelock_line_inventories(db, effect_lines)
         operation = _create_execution_operation(
             db,
             batch=batch,
             actor=requester,
             execution_key=f"request:{request.request_id}",
         )
-        for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
+        for line in sorted(effect_lines, key=lambda line: 0 if line.direction == "out" else 1):
             _apply_line(
                 db,
                 batch=batch,
@@ -442,7 +599,7 @@ def execute_batch_after_dept_approval(
     if request.request_code and not batch.reference_no:
         batch.reference_no = request.request_code
 
-    if batch.sub_type == INTERNAL_USE_SUB_TYPE:
+    if request.lines:
         operation_line_ids = {
             request_line.operation_line_id
             for request_line in request.lines
@@ -457,7 +614,10 @@ def execute_batch_after_dept_approval(
         ]
         if len(lines) != len(operation_line_ids):
             raise ValueError("결재 요청에 연결된 작업 라인을 찾을 수 없습니다.")
+    elif batch.sub_type == INTERNAL_USE_SUB_TYPE:
+        raise ValueError("결재 요청과 작업 라인의 연결 정보가 올바르지 않습니다.")
     else:
+        # operation_line_id 도입 전 생성된 단일 부서 결재 요청 호환.
         lines = _included_lines(batch)
     _validate_included_lines(db, lines)
     batch_status_before = batch.status
@@ -854,6 +1014,8 @@ def _complete_without_inventory(batch: IoBatch) -> None:
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     ensure_batch_is_mutable(batch)
     normalize_batch_bom_stock_exempt(db, batch)
+    _validate_process_bom_parent_lines(batch)
+    _normalize_process_bom_auto_inclusion(batch)
     validate_internal_use_requester(
         requester,
         work_type=batch.work_type,
@@ -890,6 +1052,18 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         (bundle.source_kind for bundle in batch.bundles),
     )
     try:
+        custom_process_bom_bundle_ids = _custom_process_bom_bundle_ids(db, batch)
+        custom_process_bom = bool(custom_process_bom_bundle_ids)
+        if custom_process_bom:
+            _mark_custom_process_bom_parents_reference_only(
+                batch,
+                custom_process_bom_bundle_ids,
+            )
+            _normalize_custom_disassemble_effects(
+                db,
+                batch,
+                custom_process_bom_bundle_ids,
+            )
         included_lines = _included_lines(batch)
         if not included_lines:
             _complete_without_inventory(batch)
@@ -897,9 +1071,20 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
             # 창고 승인 sub_type — manual line 유무 무관, 창고 승인 1회로만.
             # 새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재.
             _submit_approval(db, requester=requester, batch=batch)
-        elif _has_manual_line(included_lines):
-            # 부서 승인만 필요 — manual_adjustment 등.
-            _submit_dept_only_approval(db, requester=requester, batch=batch)
+        elif _has_manual_line(included_lines) or custom_process_bom:
+            # 부서 승인만 필요 — manual_adjustment 또는 기준과 다른 BOM 자동 하위.
+            effect_lines = included_lines
+            if custom_process_bom:
+                effect_lines = _custom_process_bom_effect_lines(
+                    batch,
+                    custom_process_bom_bundle_ids,
+                )
+            _submit_dept_only_approval(
+                db,
+                requester=requester,
+                batch=batch,
+                lines=effect_lines,
+            )
         else:
             _submit_immediate(db, requester=requester, batch=batch)
     except Exception:

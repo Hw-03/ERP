@@ -192,6 +192,47 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it("모바일 상세는 묶음의 실행 로그를 사용해 단품 출고를 감소로 표시한다", async () => {
+    const batch = makeBatch({
+      sub_type: "disassemble",
+      bundles: [{
+        bundle_id: "shipment-bundle",
+        source_kind: "manual",
+        title: "단품 출고",
+        source_item_id: "item-finished",
+        source_mes_code: "PF-001",
+        quantity: 1,
+        expanded_level: 0,
+        lines: [{
+          ...makeBatch().bundles[0].lines[0],
+          line_id: "shipment-line",
+          direction: "adjust",
+          from_bucket: "production",
+          to_bucket: "none",
+          quantity: 1,
+          origin: "manual",
+        }],
+      }],
+    });
+    const selected = makeLog({
+      operation_batch_id: batch.batch_id,
+      operation_line_id: "shipment-line",
+      transaction_type: "ADJUST",
+      quantity_change: -1,
+      quantity_before: 4,
+      quantity_after: 3,
+      inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -1 }],
+    });
+    vi.mocked(ioApi.getBatch).mockResolvedValue(batch);
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected]);
+
+    render(
+      <HistoryDetailPanel panelOpen selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} />,
+    );
+
+    expect(await screen.findByText("단품 출고 -1 EA")).toBeInTheDocument();
+  });
+
   it("keeps loaded edit history visible while a realtime refresh is pending", async () => {
     const existingEdit = { edit_id: "existing", original_log_id: "same-log", edited_by_employee_id: "e1", edited_by_name: "Existing editor", reason: "existing", before_payload: "{}", after_payload: "{}", correction_log_id: null, created_at: "2026-08-04T00:00:00Z" };
     const refresh = deferred<TransactionEditLog[]>();

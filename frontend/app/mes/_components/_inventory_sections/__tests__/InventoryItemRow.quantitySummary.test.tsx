@@ -24,6 +24,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
     spec: null,
     unit: "EA",
     quantity: 15,
+    available_quantity: 15,
     warehouse_qty: 5,
     min_stock: null,
     department: "조립",
@@ -181,7 +182,29 @@ describe("InventoryItemRow quantity summary", () => {
     expect(summary.querySelectorAll("span")).toHaveLength(0);
   });
 
-  it("renames inventory table headers to department stock and total stock", () => {
+  it("uses available quantity for the displayed quantity and stock state while keeping physical stock chips and gauge", () => {
+    render(
+      <table>
+        <tbody>
+          <InventoryItemRow
+            item={makeItem({ quantity: 15, available_quantity: 3, min_stock: 5 })}
+            selected={false}
+            onSelect={() => {}}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByTestId("inventory-total-stock")).toHaveTextContent("3");
+    expect(screen.getByText("부족")).toBeInTheDocument();
+    const summary = screen.getByTestId("inventory-dept-stock-summary");
+    expect(within(summary).getByText("창고 5")).toBeInTheDocument();
+    expect(within(summary).getByText("조립 8")).toBeInTheDocument();
+    expect(within(summary).getByText("불량 2")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /재고 분포/ })).toBeInTheDocument();
+  });
+
+  it("renames inventory table headers to department stock and available stock", () => {
     render(
       <InventoryItemsTable
         error={null}
@@ -199,12 +222,12 @@ describe("InventoryItemRow quantity summary", () => {
     );
 
     expect(screen.getByRole("columnheader", { name: "부서별 재고" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "총재고" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "사용 가능 재고" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "부서" })).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "현재고" })).toBeNull();
   });
 
-  it("uses compact dashboard columns with total stock aligned to its values", () => {
+  it("uses compact dashboard columns with available stock aligned to its values", () => {
     render(
       <InventoryItemsTable
         error={null}
@@ -225,10 +248,10 @@ describe("InventoryItemRow quantity summary", () => {
     expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
       "상태",
       "품목명",
-      "총재고",
+      "사용 가능 재고",
     ]);
     expect(screen.queryByText("3-TR-0001")).toBeNull();
-    expect(screen.getByRole("columnheader", { name: "총재고" })).toHaveClass("text-center");
+    expect(screen.getByRole("columnheader", { name: "사용 가능 재고" })).toHaveClass("text-center");
     expect(screen.getByTestId("inventory-total-stock")).toHaveClass("text-center");
   });
 

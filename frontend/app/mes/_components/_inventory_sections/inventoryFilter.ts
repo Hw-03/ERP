@@ -5,10 +5,13 @@ import type { KpiFilter } from "./InventoryKpiPanel";
 
 export type InventoryFilterLogic = "OR" | "AND";
 export const DEFAULT_INVENTORY_FILTER_LOGIC: InventoryFilterLogic = "AND";
+export type DepartmentFilterBasis = "location" | "code";
+export const DEFAULT_DEPARTMENT_FILTER_BASIS: DepartmentFilterBasis = "location";
 const DISUSED_MATERIAL_TYPE = "불용";
 
 type InventoryCategoryFilters = {
   selectedDepts: string[];
+  departmentFilterBasis: DepartmentFilterBasis;
   selectedSlots: Set<number>;
   showUnclassified: boolean;
   showDisused: boolean;
@@ -47,12 +50,16 @@ export function isDisusedInventoryItem(item: Item): boolean {
   return item.legacy_item_type === DISUSED_MATERIAL_TYPE;
 }
 
-function matchesDepartment(item: Item, department: string): boolean {
+function matchesLocationDepartment(item: Item, department: string): boolean {
   return department === "창고"
     ? (item.warehouse_qty ?? 0) > 0
-    : item.department === department ||
-      mesCodeDept(item.mes_code) === department ||
-      item.locations.some((location) => location.department === department);
+    : item.locations.some(
+        (location) => location.department === department && Number(location.quantity ?? 0) > 0,
+      );
+}
+
+function matchesCodeDepartment(item: Item, department: string): boolean {
+  return mesCodeDept(item.mes_code) === department;
 }
 
 function matchesSelectedGroup(matches: boolean[], logic: InventoryFilterLogic): boolean | null {
@@ -69,7 +76,11 @@ export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCa
     (location) => location.status === "DEFECTIVE" && (location.quantity ?? 0) > 0,
   );
   const departmentMatch = matchesSelectedGroup(
-    filters.selectedDepts.map((department) => matchesDepartment(item, department)),
+    filters.selectedDepts.map((department) =>
+      filters.departmentFilterBasis === "location"
+        ? matchesLocationDepartment(item, department)
+        : matchesCodeDepartment(item, department),
+    ),
     filters.logic,
   );
   const modelMatch = matchesSelectedGroup(
@@ -77,13 +88,13 @@ export function matchesInventoryCategoryFilters(item: Item, filters: InventoryCa
       ...Array.from(filters.selectedSlots, (slot) => item.model_slots.includes(slot)),
       ...(filters.showUnclassified ? [item.model_slots.length === 0] : []),
     ],
-    filters.logic,
+    "OR",
   );
   const processMatch = matchesSelectedGroup(
     filters.selectedProcessSteps.map(
       (processStep) => processStep === stage || (processStep === "DEFECT" && hasDefect),
     ),
-    filters.logic,
+    "OR",
   );
   const disusedMatch = filters.showDisused ? isDisused : null;
   const activeMatches = [departmentMatch, modelMatch, processMatch, disusedMatch].filter(

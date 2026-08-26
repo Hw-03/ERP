@@ -9,6 +9,9 @@ import uuid
 import pytest
 
 from app.models import (
+    DefectInventoryMovement,
+    DefectQuarantineRecord,
+    DefectQuarantineReconstructionAllocation,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -436,6 +439,396 @@ def test_legacy_defect_transaction_is_blocked_without_any_adoption(
     assert inventory_svc.get_or_create_inventory(
         db_session, item.item_id
     ).warehouse_qty == Decimal("5")
+
+
+def test_evidence_backed_legacy_quarantine_is_adopted_and_reversed(
+    client, db_session, make_item, make_location
+) -> None:
+    item = make_item(name="근거 있는 레거시 격리", warehouse_qty=Decimal("8"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("2"),
+    )
+    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    inventory.quantity = Decimal("10")
+    actor = _seed_legacy_actor(db_session, code="LEGACY-DEFECT-EVIDENCE")
+    record = DefectQuarantineRecord(
+        item_id=item.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        original_quantity=Decimal("2"),
+        remaining_quantity=Decimal("2"),
+        quarantined_by_employee_id=actor.employee_id,
+        quarantined_by_name=actor.name,
+    )
+    db_session.add(record)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        quantity_before=Decimal("10"),
+        quantity_after=Decimal("10"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        defect_quarantine_record_id=record.record_id,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": -2},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.HIGH_VOLTAGE.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": 2,
+            },
+        ],
+        created_at=datetime.utcnow() - timedelta(hours=1),
+    )
+    db_session.add(log)
+    _activate_legacy_adoption(db_session)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/cancel",
+        json={
+            "reason": "근거 있는 격리 취소",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    assert db_session.get(TransactionLog, log.log_id).cancelled is False
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == Decimal("0")
+    assert inventory_svc.get_or_create_inventory(
+        db_session, item.item_id
+    ).warehouse_qty == Decimal("10")
+    defective = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.HIGH_VOLTAGE.value,
+            InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+        )
+        .one()
+    )
+    assert defective.quantity == Decimal("0")
+    operations = db_session.query(InventoryOperation).all()
+    assert len(operations) == 2
+    movements = (
+        db_session.query(DefectInventoryMovement)
+        .order_by(DefectInventoryMovement.created_at, DefectInventoryMovement.movement_id)
+        .all()
+    )
+    assert [movement.quantity_delta for movement in movements] == [Decimal("2"), Decimal("-2")]
+    assert movements[1].reverses_movement_id == movements[0].movement_id
+
+
+def test_legacy_quarantine_with_downstream_usage_stays_unchanged(
+    client, db_session, make_item, make_location
+) -> None:
+    item = make_item(name="후속 사용 레거시 격리", warehouse_qty=Decimal("9"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("1"),
+    )
+    inventory_svc.get_or_create_inventory(db_session, item.item_id).quantity = Decimal("10")
+    actor = _seed_legacy_actor(db_session, code="LEGACY-DEFECT-DOWNSTREAM")
+    record = DefectQuarantineRecord(
+        item_id=item.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        original_quantity=Decimal("2"),
+        remaining_quantity=Decimal("1"),
+        quarantined_by_name=actor.name,
+    )
+    db_session.add(record)
+    db_session.flush()
+    source = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        defect_quarantine_record_id=record.record_id,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": -2},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.HIGH_VOLTAGE.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": 2,
+            },
+        ],
+        created_at=datetime.utcnow() - timedelta(hours=2),
+    )
+    downstream = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        defect_quarantine_record_id=record.record_id,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": 1},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.HIGH_VOLTAGE.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": -1,
+            },
+        ],
+        created_at=datetime.utcnow() - timedelta(hours=1),
+    )
+    db_session.add_all([source, downstream])
+    _activate_legacy_adoption(db_session)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{source.log_id}/cancel",
+        json={
+            "reason": "후속 사용이 있는 격리 취소",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"]["message"] == (
+        legacy_adoption_svc.DEFECT_LEGACY_CANCEL_MESSAGE
+    )
+    assert db_session.query(InventoryOperation).count() == 0
+    db_session.refresh(source)
+    assert source.operation_id is None
+    assert source.cancelled is False
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == Decimal("1")
+
+
+def test_evidence_backed_legacy_fifo_restore_is_adopted_and_reversed(
+    client, db_session, make_item, make_location
+) -> None:
+    item = make_item(name="근거 있는 FIFO 복귀", warehouse_qty=Decimal("2"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("2"),
+    )
+    inventory_svc.get_or_create_inventory(db_session, item.item_id).quantity = Decimal("4")
+    actor = _seed_legacy_actor(db_session, code="LEGACY-FIFO-EVIDENCE")
+    records = [
+        DefectQuarantineRecord(
+            item_id=item.item_id,
+            department=DepartmentEnum.HIGH_VOLTAGE.value,
+            original_quantity=Decimal(str(original)),
+            remaining_quantity=Decimal(str(remaining)),
+            quarantined_by_name=actor.name,
+            is_legacy=True,
+        )
+        for original, remaining in ((1, 0), (3, 2))
+    ]
+    db_session.add_all(records)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": 2},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.HIGH_VOLTAGE.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": -2,
+            },
+        ],
+        created_at=datetime.utcnow() - timedelta(hours=1),
+    )
+    db_session.add(log)
+    db_session.flush()
+    db_session.add_all(
+        [
+            DefectQuarantineReconstructionAllocation(
+                transaction_log_id=log.log_id,
+                record_id=record.record_id,
+                quantity=Decimal("1"),
+            )
+            for record in records
+        ]
+    )
+    _activate_legacy_adoption(db_session)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/cancel",
+        json={
+            "reason": "근거 있는 FIFO 복귀 취소",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    assert [
+        db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity
+        for record in records
+    ] == [Decimal("1"), Decimal("3")]
+    assert db_session.query(DefectInventoryMovement).count() == 4
+
+
+def test_evidence_backed_legacy_defect_disassembly_is_adopted_as_one_operation(
+    client, db_session, make_item, make_location
+) -> None:
+    parent = make_item(name="근거 있는 레거시 분해 부모", warehouse_qty=Decimal("0"))
+    normal_child = make_item(name="근거 있는 정상 회수품", warehouse_qty=Decimal("0"))
+    defect_child = make_item(name="근거 있는 불량 회수품", warehouse_qty=Decimal("0"))
+    scrap_child = make_item(name="근거 있는 폐기 회수품", warehouse_qty=Decimal("0"))
+    parent_location = make_location(
+        parent.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("0"),
+    )
+    normal_location = make_location(
+        normal_child.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("1"),
+    )
+    defect_location = make_location(
+        defect_child.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("1"),
+    )
+    actor = _seed_legacy_actor(db_session, code="LEGACY-DISASSEMBLE-EVIDENCE")
+    parent_record = DefectQuarantineRecord(
+        item_id=parent.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        original_quantity=Decimal("1"),
+        remaining_quantity=Decimal("0"),
+        quarantined_by_name=actor.name,
+    )
+    child_record = DefectQuarantineRecord(
+        item_id=defect_child.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE.value,
+        original_quantity=Decimal("1"),
+        remaining_quantity=Decimal("1"),
+        quarantined_by_name=actor.name,
+    )
+    db_session.add_all([parent_record, child_record])
+    db_session.flush()
+    reference = f"defect-disassemble:{uuid.uuid4()}"
+    created_at = datetime.utcnow() - timedelta(hours=1)
+    logs = [
+        TransactionLog(
+            item_id=parent.item_id,
+            transaction_type=TransactionTypeEnum.DISASSEMBLE,
+            quantity_change=Decimal("-1"),
+            produced_by=actor.name,
+            producer_employee_id=actor.employee_id,
+            department=DepartmentEnum.HIGH_VOLTAGE.value,
+            defect_quarantine_record_id=parent_record.record_id,
+            reference_no=reference,
+            notes="[rework:defective]",
+            inventory_effect=[{
+                "scope": "location",
+                "department": DepartmentEnum.HIGH_VOLTAGE.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": -1,
+            }],
+            created_at=created_at,
+        ),
+        TransactionLog(
+            item_id=normal_child.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=Decimal("1"),
+            produced_by=actor.name,
+            producer_employee_id=actor.employee_id,
+            department=DepartmentEnum.HIGH_VOLTAGE.value,
+            reference_no=reference,
+            notes="[rework:normal_child]",
+            inventory_effect=[{
+                "scope": "location",
+                "department": DepartmentEnum.HIGH_VOLTAGE.value,
+                "status": LocationStatusEnum.PRODUCTION.value,
+                "delta": 1,
+            }],
+            created_at=created_at,
+        ),
+        TransactionLog(
+            item_id=defect_child.item_id,
+            transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+            quantity_change=Decimal("1"),
+            produced_by=actor.name,
+            producer_employee_id=actor.employee_id,
+            department=DepartmentEnum.HIGH_VOLTAGE.value,
+            defect_quarantine_record_id=child_record.record_id,
+            reference_no=reference,
+            notes="[rework:defective_child]",
+            inventory_effect=[{
+                "scope": "location",
+                "department": DepartmentEnum.HIGH_VOLTAGE.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": 1,
+            }],
+            created_at=created_at,
+        ),
+        TransactionLog(
+            item_id=scrap_child.item_id,
+            transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
+            quantity_change=Decimal("-1"),
+            produced_by=actor.name,
+            producer_employee_id=actor.employee_id,
+            department=DepartmentEnum.HIGH_VOLTAGE.value,
+            reference_no=reference,
+            notes="[rework:scrap_child]",
+            inventory_effect=[],
+            created_at=created_at,
+        ),
+    ]
+    db_session.add_all(logs)
+    _activate_legacy_adoption(db_session)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{logs[0].log_id}/cancel",
+        json={
+            "reason": "근거 있는 분해 취소",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    assert db_session.get(InventoryLocation, parent_location.location_id).quantity == Decimal("1")
+    assert db_session.get(InventoryLocation, normal_location.location_id).quantity == Decimal("0")
+    assert db_session.get(InventoryLocation, defect_location.location_id).quantity == Decimal("0")
+    assert db_session.get(DefectQuarantineRecord, parent_record.record_id).remaining_quantity == Decimal("1")
+    assert db_session.get(DefectQuarantineRecord, child_record.record_id).remaining_quantity == Decimal("0")
+    assert db_session.query(InventoryOperation).count() == 2
+    assert db_session.query(DefectInventoryMovement).count() == 4
+    originals = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.log_id.in_([log.log_id for log in logs]))
+        .all()
+    )
+    assert {log.operation_role for log in originals} == {
+        InventoryOperationRoleEnum.REWORK_PARENT_DEFECTIVE,
+        InventoryOperationRoleEnum.REWORK_CHILD_NORMAL,
+        InventoryOperationRoleEnum.REWORK_CHILD_DEFECTIVE,
+        InventoryOperationRoleEnum.REWORK_CHILD_SCRAP,
+    }
 
 
 def test_legacy_disassembly_batch_is_blocked_even_without_legacy_note_markers(

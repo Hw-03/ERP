@@ -19,10 +19,12 @@ import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import {
   DEFAULT_INVENTORY_FILTER_LOGIC,
+  DEFAULT_DEPARTMENT_FILTER_BASIS,
   matchesInventoryCategoryFilters,
   matchesKpi,
   matchesSearch,
   type InventoryFilterLogic,
+  type DepartmentFilterBasis,
 } from "./_inventory_sections/inventoryFilter";
 
 const DESKTOP_PAGE_SIZE = 100;
@@ -71,6 +73,7 @@ export function DesktopInventoryView({
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>(DEFAULT_INVENTORY_FILTER_LOGIC);
+  const [departmentFilterBasis, setDepartmentFilterBasis] = useState<DepartmentFilterBasis>(DEFAULT_DEPARTMENT_FILTER_BASIS);
   const [showDisused, setShowDisused] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -107,6 +110,7 @@ export function DesktopInventoryView({
         if (
           !matchesInventoryCategoryFilters(item, {
             selectedDepts,
+            departmentFilterBasis,
             selectedSlots,
             showUnclassified,
             showDisused,
@@ -116,7 +120,7 @@ export function DesktopInventoryView({
         ) return false;
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
+    [items, deferredLocalSearch, selectedDepts, departmentFilterBasis, selectedSlots, showUnclassified, showDisused, selectedProcessSteps, filterLogic],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -142,6 +146,7 @@ export function DesktopInventoryView({
 
   function resetAllFilters() {
     setSelectedDepts([]);
+    setDepartmentFilterBasis(DEFAULT_DEPARTMENT_FILTER_BASIS);
     setSelectedModels([]);
     setSelectedProcessSteps([]);
     setShowDisused(false);
@@ -186,11 +191,13 @@ export function DesktopInventoryView({
             <InventoryFilters
               open={filtersOpen}
               selectedDepts={selectedDepts}
+              departmentFilterBasis={departmentFilterBasis}
               selectedModels={selectedModels}
               selectedProcessSteps={selectedProcessSteps}
               showDisused={showDisused}
               productModels={productModels}
               toggleDept={toggleDept}
+              onDepartmentFilterBasisChange={setDepartmentFilterBasis}
               toggleModel={toggleModel}
               toggleProcessStep={toggleProcessStep}
               toggleDisused={toggleDisused}

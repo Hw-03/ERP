@@ -32,6 +32,23 @@ $EmpLog = Join-Path $EmpRoot "_attic\runtime\logs\backend\mes.log"
 $EmpLegacyLog = Join-Path $EmpBackend "logs\mes.log"
 $EmpDb = Join-Path $EmpBackend "mes.db"
 $EmpPreviousFrontendBuild = Join-Path $EmpRuntimeRoot "frontend-build\previous.next-prod"
+$runtimeScripts = @(
+    "resolve-server-profile.ps1",
+    "ensure-schema-ready.ps1",
+    "checked-command.ps1",
+    "runtime-paths.ps1",
+    "runtime-control.ps1",
+    "service_supervisor.py",
+    "start-backend.ps1",
+    "stop-backend.ps1",
+    "start-frontend.ps1",
+    "stop-frontend.ps1",
+    "stop-servers.ps1",
+    "open-watch.ps1",
+    "watch-service.ps1",
+    "watch-servers.ps1",
+    "status-servers.ps1"
+)
 
 . (Join-Path $DevRoot "scripts\dev\checked-command.ps1")
 
@@ -95,9 +112,11 @@ function Invoke-EmployeeFrontendBuild {
 
     $previousBackendUrl = $env:BACKEND_INTERNAL_URL
     $previousTelemetry = $env:NEXT_TELEMETRY_DISABLED
+    $previousMesEnv = $env:NEXT_PUBLIC_MES_ENV
     try {
         $env:BACKEND_INTERNAL_URL = "http://localhost:8010"
         $env:NEXT_TELEMETRY_DISABLED = "1"
+        $env:NEXT_PUBLIC_MES_ENV = "employee"
         $result = Invoke-CheckedExternalCommand `
             -FilePath "npm.cmd" `
             -ArgumentList @("run", "build") `
@@ -106,6 +125,7 @@ function Invoke-EmployeeFrontendBuild {
     finally {
         $env:BACKEND_INTERNAL_URL = $previousBackendUrl
         $env:NEXT_TELEMETRY_DISABLED = $previousTelemetry
+        $env:NEXT_PUBLIC_MES_ENV = $previousMesEnv
     }
 
     $buildIdPath = Join-Path $activeBuild "BUILD_ID"
@@ -137,6 +157,38 @@ function Write-RecoveryInstructions {
     Write-Host "[$FailedStage] 검증된 백업: $ValidatedBackupPath"
     Write-Host "[$FailedStage] 검토 후 다음 명령으로 수동 복원하세요:"
     Write-Host "  py `"$EmpRoot\scripts\ops\restore_db.py`" --sqlite `"$ValidatedBackupPath`" --target `"$EmpDb`" --check"
+}
+
+function Get-SyncFileSha256 {
+    param([string] $Path)
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace("-", "")
+    }
+    finally {
+        $sha.Dispose()
+        $stream.Dispose()
+    }
+}
+
+function Test-SyncFileDifferent {
+    param(
+        [string] $Source,
+        [string] $Target
+    )
+
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $Target -PathType Leaf)) {
+        return $true
+    }
+    $sourceFile = Get-Item -LiteralPath $Source
+    $targetFile = Get-Item -LiteralPath $Target
+    if ($sourceFile.Length -ne $targetFile.Length) {
+        return $true
+    }
+    return (Get-SyncFileSha256 -Path $Source) -ne (Get-SyncFileSha256 -Path $Target)
 }
 
 Write-Host "===================================================="
@@ -184,9 +236,67 @@ $backendDryRun = robocopy "$DevRoot\backend" $EmpBackend /L /MIR `
     /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" ".testmondata" ".testmondata-*" `
     /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup `
     /NJH /NDL /NP 2>&1 | Out-String -Stream
+$backendDryRunExit = $LASTEXITCODE
+if ($backendDryRunExit -ge 8) {
+    Write-Host "[dry-run] 백엔드 비교 실패 (robocopy exit $backendDryRunExit)"
+    if ($DryRun) { Write-Host "SYNC_CHANGES=ERROR" }
+    exit 4
+}
 $schemaHits = $backendDryRun | Where-Object {
     $line = $_
     $schemaPatterns | Where-Object { $line -match $_ }
+}
+
+$frontendDryRun = @()
+$opsDryRun = @()
+$hasCodeChanges = $false
+if ($DryRun) {
+    $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
+        /XD .next .next-prod node_modules _archive coverage test-results logs `
+        /XF .env.local "tsconfig.tsbuildinfo" `
+        /NJH /NDL /NP 2>&1 | Out-String -Stream
+    $frontendDryRunExit = $LASTEXITCODE
+    $opsDryRun = robocopy (Join-Path $DevRoot "scripts\ops") (Join-Path $EmpRoot "scripts\ops") /L /MIR `
+        /XD __pycache__ /XF "*.pyc" /NJH /NDL /NP 2>&1 | Out-String -Stream
+    $opsDryRunExit = $LASTEXITCODE
+    if ($frontendDryRunExit -ge 8 -or $opsDryRunExit -ge 8) {
+        Write-Host "[dry-run] 코드 비교 실패 - frontend=$frontendDryRunExit ops=$opsDryRunExit"
+        Write-Host "SYNC_CHANGES=ERROR"
+        exit 4
+    }
+
+    $manualFileChanges = $false
+    foreach ($scriptName in $runtimeScripts) {
+        if (Test-SyncFileDifferent `
+            -Source (Join-Path $DevRoot "scripts\dev\$scriptName") `
+            -Target (Join-Path $EmpRoot "scripts\dev\$scriptName")) {
+            $manualFileChanges = $true
+            break
+        }
+    }
+    if (-not $manualFileChanges) {
+        foreach ($relativePath in @(
+            "scripts\runtime_paths.py",
+            "start.bat",
+            "watch.bat",
+            "stop.bat",
+            "status.bat"
+        )) {
+            if (Test-SyncFileDifferent `
+                -Source (Join-Path $DevRoot $relativePath) `
+                -Target (Join-Path $EmpRoot $relativePath)) {
+                $manualFileChanges = $true
+                break
+            }
+        }
+    }
+    $hasCodeChanges = (
+        $backendDryRunExit -ne 0 -or
+        $frontendDryRunExit -ne 0 -or
+        $opsDryRunExit -ne 0 -or
+        $manualFileChanges
+    )
+    Write-Host "SYNC_CHANGES=$(if ($hasCodeChanges) { 1 } else { 0 })"
 }
 
 if ($schemaHits -and -not $AllowSchemaChange) {
@@ -231,12 +341,10 @@ else {
 if ($DryRun) {
     Write-Host "[dry-run] 백엔드 변경 예정 파일:"
     $backendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
-    $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
-        /XD .next .next-prod node_modules _archive coverage test-results logs `
-        /XF .env.local "tsconfig.tsbuildinfo" `
-        /NJH /NDL /NP 2>&1 | Out-String -Stream
     Write-Host "[dry-run] 프론트엔드 변경 예정 파일:"
     $frontendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
+    Write-Host "[dry-run] 운영 스크립트 변경 예정 파일:"
+    $opsDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
     Write-Host "[dry-run] 아무것도 변경하지 않았습니다."
     exit 0
 }
@@ -343,23 +451,6 @@ Write-Host "[build-frontend] 완료"
 Write-Host "[sync] 직원 실행·운영 스크립트 갱신 중..."
 $EmpDevScriptDir = Join-Path $EmpRoot "scripts\dev"
 New-Item -ItemType Directory -Force -Path $EmpDevScriptDir | Out-Null
-$runtimeScripts = @(
-    "resolve-server-profile.ps1",
-    "ensure-schema-ready.ps1",
-    "checked-command.ps1",
-    "runtime-paths.ps1",
-    "runtime-control.ps1",
-    "service_supervisor.py",
-    "start-backend.ps1",
-    "stop-backend.ps1",
-    "start-frontend.ps1",
-    "stop-frontend.ps1",
-    "stop-servers.ps1",
-    "open-watch.ps1",
-    "watch-service.ps1",
-    "watch-servers.ps1",
-    "status-servers.ps1"
-)
 foreach ($scriptName in $runtimeScripts) {
     Copy-Item (Join-Path $DevRoot "scripts\dev\$scriptName") (Join-Path $EmpDevScriptDir $scriptName) -Force
 }

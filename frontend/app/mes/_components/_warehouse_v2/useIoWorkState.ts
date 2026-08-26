@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
-import { DEFAULT_SUB_TYPE, type DeptIoDirection } from "./ioWorkType";
+import {
+  DEFAULT_SUB_TYPE,
+  processBomEffectLine,
+  type DeptIoDirection,
+} from "./ioWorkType";
 import { hasUnselectedInternalUseBomMode } from "./internalUseBom";
 
 export type IoStep = 1 | 2 | 3 | 4 | 5;
@@ -13,7 +17,13 @@ export const IO_STEP_LABELS: Record<IoStep, string> = {
   5: "제출 확인",
 };
 
-export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?: string | null) {
+type GetAvailable = (line: IoLine) => number | null;
+
+export function useIoWorkState(
+  initialWorkType?: IoWorkType,
+  initialDepartment?: string | null,
+  getAvailable?: GetAvailable,
+) {
   const defaultDepartment = initialDepartment || "조립";
   const [workType, setWorkTypeBase] = useState<IoWorkType>(initialWorkType ?? "receive");
   const [subType, setSubType] = useState<IoSubType>("receive_supplier");
@@ -63,8 +73,24 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     () => bundles.flatMap((bundle) => bundle.lines).filter((line) => !line.included),
     [bundles],
   );
-  const hasShortage = includedLines.some((line) => line.shortage > 0);
-  const hasInvalidQuantity = includedLines.some((line) => line.quantity <= 0);
+  const effectIncludedLines = useMemo(
+    () => bundles.flatMap((bundle) =>
+      bundle.lines.flatMap((line) => {
+        const effectLine = processBomEffectLine(subType, bundle, line);
+        return effectLine ? [effectLine] : [];
+      }),
+    ),
+    [bundles, subType],
+  );
+  const hasShortage = effectIncludedLines.some((line) => {
+    if (!getAvailable) return line.shortage > 0;
+    if (line.from_bucket === "none") return false;
+    const available = getAvailable(line);
+    return available == null
+      ? line.shortage > 0
+      : Number(line.quantity) > available;
+  });
+  const hasInvalidQuantity = effectIncludedLines.some((line) => line.quantity <= 0);
   const hasMissingInternalUseBomMode =
     workType === "internal_use" && hasUnselectedInternalUseBomMode(bundles);
 
@@ -78,13 +104,13 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
           : true,
       3: bundles.length > 0,
       4:
-        includedLines.length > 0 &&
+        effectIncludedLines.length > 0 &&
         !hasShortage &&
         !hasInvalidQuantity &&
         !hasMissingInternalUseBomMode,
       5: true,
     };
-  }, [workType, deptIoDirection, toDepartment, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
+  }, [workType, deptIoDirection, toDepartment, bundles.length, effectIncludedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));

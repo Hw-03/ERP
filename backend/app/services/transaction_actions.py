@@ -12,10 +12,14 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.models import (
+    DefectQuarantineRecord,
+    DefectQuarantineReconstructionAllocation,
     Employee,
     InventoryOperationRoleEnum,
     Item,
     LocationStatusEnum,
+    StockRequestLine,
+    StockRequestStatusEnum,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -37,7 +41,7 @@ class TransactionInventoryNotFound(LookupError):
 
 
 class TransactionLogNotFound(LookupError):
-    """메타데이터를 수정할 원본 거래가 없을 때 발생한다."""
+    """수정·취소할 원본 거래가 없을 때 발생한다."""
 
 
 class TransactionItemNotFound(LookupError):
@@ -230,6 +234,148 @@ def _normalize_effect_for_cancel(effect: object) -> object:
     return [effect]
 
 
+def _defective_delta_for_record(
+    effect: object,
+    record: DefectQuarantineRecord,
+) -> Decimal:
+    """거래 효과 중 선택 격리 기록 부서의 불량 위치 증감만 합산한다."""
+    normalized = _normalize_effect_for_cancel(effect)
+    if not isinstance(normalized, list):
+        return Decimal("0")
+    total = Decimal("0")
+    for cell in normalized:
+        if not isinstance(cell, dict):
+            continue
+        if (
+            cell.get("scope") == "location"
+            and str(cell.get("department")) == str(record.department)
+            and str(cell.get("status")) == LocationStatusEnum.DEFECTIVE.value
+        ):
+            total += Decimal(str(cell.get("delta", 0)))
+    return total
+
+
+def _record_for_cancel(
+    db: Session,
+    record_id: uuid.UUID,
+) -> DefectQuarantineRecord:
+    """취소 대상 격리 기록을 잠그고 존재 여부를 검증한다."""
+    query = db.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.record_id == record_id
+    )
+    if db.bind is not None and db.bind.dialect.name != "sqlite":
+        query = query.with_for_update()
+    record = query.first()
+    if record is None:
+        raise ValueError("연결된 격리 기록을 찾을 수 없어 거래를 취소할 수 없습니다.")
+    return record
+
+
+def _restore_reconstruction_allocations(
+    db: Session,
+    log: TransactionLog,
+) -> bool:
+    """과거 FIFO 차감 거래라면 할당된 모든 자식 기록의 잔량을 복원한다."""
+    allocations = (
+        db.query(DefectQuarantineReconstructionAllocation)
+        .filter(
+            DefectQuarantineReconstructionAllocation.transaction_log_id == log.log_id
+        )
+        .order_by(DefectQuarantineReconstructionAllocation.created_at)
+        .all()
+    )
+    if not allocations:
+        return False
+    for allocation in allocations:
+        record = _record_for_cancel(db, allocation.record_id)
+        restored = Decimal(str(record.remaining_quantity)) + Decimal(
+            str(allocation.quantity)
+        )
+        if restored > Decimal(str(record.original_quantity)):
+            raise ValueError("격리 기록의 원수량을 초과해 FIFO 차감을 취소할 수 없습니다.")
+        record.remaining_quantity = restored
+    return True
+
+
+def _has_downstream_defect_usage(
+    db: Session,
+    *,
+    record: DefectQuarantineRecord,
+    source_log_id: uuid.UUID,
+) -> bool:
+    """최초 격리 이후의 직접 처리·복원 할당·승인 예약이 남았는지 확인한다."""
+    direct_log = (
+        db.query(TransactionLog.log_id)
+        .filter(
+            TransactionLog.defect_quarantine_record_id == record.record_id,
+            TransactionLog.log_id != source_log_id,
+            TransactionLog.cancelled.is_(False),
+        )
+        .first()
+    )
+    if direct_log is not None:
+        return True
+    allocated_log = (
+        db.query(DefectQuarantineReconstructionAllocation.allocation_id)
+        .join(
+            TransactionLog,
+            TransactionLog.log_id
+            == DefectQuarantineReconstructionAllocation.transaction_log_id,
+        )
+        .filter(
+            DefectQuarantineReconstructionAllocation.record_id == record.record_id,
+            TransactionLog.cancelled.is_(False),
+        )
+        .first()
+    )
+    if allocated_log is not None:
+        return True
+    pending_line = (
+        db.query(StockRequestLine.line_id)
+        .filter(
+            StockRequestLine.defect_quarantine_record_id == record.record_id,
+            StockRequestLine.status == StockRequestStatusEnum.RESERVED,
+        )
+        .first()
+    )
+    return pending_line is not None
+
+
+def _reverse_linked_defect_record(db: Session, log: TransactionLog) -> None:
+    """거래 취소에 맞춰 직접 연결 또는 복원 FIFO 원장의 잔량을 역전한다."""
+    if _restore_reconstruction_allocations(db, log):
+        return
+    if log.defect_quarantine_record_id is None:
+        return
+
+    record = _record_for_cancel(db, log.defect_quarantine_record_id)
+    delta = _defective_delta_for_record(log.inventory_effect, record)
+    if delta == 0:
+        return
+    if delta < 0:
+        restored = Decimal(str(record.remaining_quantity)) - delta
+        if restored > Decimal(str(record.original_quantity)):
+            raise ValueError("격리 기록의 원수량을 초과해 처리를 취소할 수 없습니다.")
+        record.remaining_quantity = restored
+        return
+
+    original = Decimal(str(record.original_quantity))
+    remaining = Decimal(str(record.remaining_quantity))
+    if (
+        delta != original
+        or remaining != original
+        or _has_downstream_defect_usage(
+            db,
+            record=record,
+            source_log_id=log.log_id,
+        )
+    ):
+        raise ValueError(
+            "후속 처리 또는 승인 예약이 연결된 최초 격리 거래는 취소할 수 없습니다."
+        )
+    record.remaining_quantity = remaining - delta
+
+
 def _cancel_one_log(db: Session, log: TransactionLog) -> None:
     """기록된 재고 효과를 역재생한다."""
     effect = log.inventory_effect
@@ -255,7 +401,65 @@ def _cancel_one_log(db: Session, log: TransactionLog) -> None:
         has_nonzero_delta = False
     if not has_nonzero_delta:
         raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
+    _reverse_linked_defect_record(db, log)
     inv_effect.apply_effect_reverse(db, log.item_id, effect)
+
+
+def _claim_cancel_logs(db: Session, log_id: uuid.UUID) -> list[TransactionLog]:
+    """취소 권한을 원자적으로 선점하고 묶음 로그를 결정적 순서로 잠근다."""
+    target = (
+        db.query(TransactionLog)
+        .populate_existing()
+        .filter(TransactionLog.log_id == log_id)
+        .one_or_none()
+    )
+    if target is None:
+        raise TransactionLogNotFound("거래를 찾을 수 없습니다.")
+    group_query = db.query(TransactionLog)
+    if target.operation_batch_id:
+        group_query = group_query.filter(
+            TransactionLog.operation_batch_id == target.operation_batch_id
+        )
+    elif target.reference_no and target.reference_no.startswith("defect-disassemble:"):
+        group_query = group_query.filter(
+            TransactionLog.reference_no == target.reference_no
+        )
+    else:
+        claimed = (
+            db.query(TransactionLog)
+            .filter(
+                TransactionLog.log_id == log_id,
+                TransactionLog.cancelled.is_(False),
+            )
+            .update({TransactionLog.cancelled: True}, synchronize_session=False)
+        )
+        if claimed != 1:
+            raise ValueError("이미 취소된 거래입니다.")
+        target.cancelled = True
+        return [target]
+
+    group_query = group_query.order_by(TransactionLog.log_id)
+    if db.bind is not None and db.bind.dialect.name != "sqlite":
+        group_query = group_query.with_for_update()
+    group_logs = group_query.populate_existing().all()
+    if not any(str(group_log.log_id) == str(log_id) for group_log in group_logs):
+        raise TransactionLogNotFound("거래 묶음에서 대상 거래를 찾을 수 없습니다.")
+    if any(group_log.cancelled for group_log in group_logs):
+        raise ValueError("이미 취소된 거래가 포함된 묶음입니다.")
+    group_ids = [group_log.log_id for group_log in group_logs]
+    claimed_group = (
+        db.query(TransactionLog)
+        .filter(
+            TransactionLog.log_id.in_(group_ids),
+            TransactionLog.cancelled.is_(False),
+        )
+        .update({TransactionLog.cancelled: True}, synchronize_session=False)
+    )
+    if claimed_group != len(group_ids):
+        raise ValueError("거래 묶음이 다른 요청에서 이미 취소되었습니다.")
+    for group_log in group_logs:
+        group_log.cancelled = True
+    return group_logs
 
 
 def cancel_transaction(
@@ -286,27 +490,7 @@ def cancel_transaction(
                 payload_summary=f"{canceller.name}: {reason}",
             )
             return log
-        batch_logs: list[TransactionLog] = []
-        if log.operation_batch_id:
-            batch_logs = (
-                db.query(TransactionLog)
-                .filter(
-                    TransactionLog.operation_batch_id == log.operation_batch_id,
-                    TransactionLog.cancelled.is_(False),
-                )
-                .all()
-            )
-        elif log.reference_no and log.reference_no.startswith("defect-disassemble:"):
-            batch_logs = (
-                db.query(TransactionLog)
-                .filter(
-                    TransactionLog.reference_no == log.reference_no,
-                    TransactionLog.cancelled.is_(False),
-                )
-                .all()
-            )
-        if not batch_logs:
-            batch_logs = [log]
+        batch_logs = _claim_cancel_logs(db, log.log_id)
 
         inventory_svc.lock_inventories(
             db,
@@ -318,7 +502,6 @@ def cancel_transaction(
                 raise TransactionInventoryNotFound(batch_log.item_id)
             _cancel_one_log(db, batch_log)
             _sync_total(db, inventory)
-            batch_log.cancelled = True
             batch_log.cancel_reason = reason
             batch_log.cancelled_by = canceller.employee_id
             batch_log.cancelled_at = now

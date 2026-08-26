@@ -96,6 +96,97 @@ function DepartmentSingleAdjustHarness({ initialNotes = "" }: { initialNotes?: s
 }
 
 describe("IoConfirmStep", () => {
+  it("커스텀 출고 BOM의 원본 회수 라인을 선택 출고 음수로 표시한다", () => {
+    const customChild = {
+      ...childLine,
+      direction: "in" as const,
+      from_bucket: "none" as const,
+      from_department: null,
+      to_bucket: "production" as const,
+      to_department: "조립",
+      quantity: 2,
+      bom_expected: 1,
+      edited: true,
+    };
+    render(
+      <IoConfirmStep
+        workType="process"
+        subType="disassemble"
+        bundles={[{ ...bundle, quantity: 1, lines: [parentLine, customChild] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="department"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ }));
+    expect(screen.getByText("-2")).toBeInTheDocument();
+    expect(screen.queryByText("+2")).not.toBeInTheDocument();
+  });
+
+  it("커스텀 부서 BOM은 상위를 제외한 하위 품목 수로 결재를 안내한다", () => {
+    const customChild = {
+      ...childLine,
+      direction: "out" as const,
+      from_bucket: "production" as const,
+      from_department: "조립",
+      to_bucket: "none" as const,
+      to_department: null,
+      quantity: 2,
+      bom_expected: 1,
+      edited: true,
+    };
+    render(
+      <IoConfirmStep
+        workType="process"
+        subType="produce"
+        bundles={[{ ...bundle, lines: [parentLine, customChild] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="department"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeEnabled();
+    const card = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
+    expect(within(card).getByText(/상위 변동 없음 · 하위 1/)).toBeInTheDocument();
+    expect(within(card).queryByText("-1")).not.toBeInTheDocument();
+  });
+
+  it("커스텀 분해 BOM은 최종 확인에서도 참고 출고와 상위 미반영을 안내한다", () => {
+    render(
+      <IoConfirmStep
+        workType="process"
+        subType="disassemble"
+        bundles={[{ ...bundle, lines: [parentLine, { ...childLine, quantity: 2 }] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="department"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
+    expect(within(card).getByText(/BOM 참고 출고 · 상위 미반영 · 하위 1/)).toBeInTheDocument();
+  });
+
   it("빈 메모 안내를 입력칸 안에 표시하고 제출은 차단한다", () => {
     render(<DepartmentSingleAdjustHarness />);
 

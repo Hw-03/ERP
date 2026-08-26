@@ -202,6 +202,77 @@ beforeEach(() => {
 });
 
 describe("BomBatchDetail", () => {
+  it("커스텀 BOM 이력은 실행되지 않은 상위를 미반영으로 표시한다", () => {
+    const batch = makeBatch();
+    batch.bundles[0].lines[0] = {
+      ...batch.bundles[0].lines[0],
+      included: false,
+      exclusion_note: "커스텀 BOM 상위 미반영",
+    };
+    batch.bundles[0].lines[1] = {
+      ...batch.bundles[0].lines[1],
+      quantity: 2,
+      edited: true,
+    };
+    const childLog = makeTransactionLog({
+      operation_line_id: "child-line",
+      item_id: "child",
+      quantity_change: -2,
+    });
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={[childLog]} /></tbody></table>,
+    );
+
+    const parentRow = screen.getByText("아주 긴 완제품 구성 묶음 이름").closest("tr");
+    expect(parentRow).not.toBeNull();
+    expect(within(parentRow!).getByText("상위 미반영")).toBeInTheDocument();
+    expect(within(parentRow!).queryByText("+1 EA")).not.toBeInTheDocument();
+  });
+
+  it("단품 출고는 실행 로그의 감소 부호와 재고 스냅샷을 함께 표시한다", () => {
+    const batch = makeBatch();
+    const line = makeLine({
+      line_id: "shipment-line",
+      origin: "manual",
+      direction: "adjust",
+      from_bucket: "production",
+      to_bucket: "none",
+      quantity: 1,
+    });
+    const directBatch: IoBatch = {
+      ...batch,
+      sub_type: "disassemble",
+      bundles: [{
+        bundle_id: "shipment-bundle",
+        source_kind: "manual",
+        title: "단품 출고",
+        source_item_id: line.item_id,
+        source_mes_code: line.mes_code,
+        quantity: 1,
+        expanded_level: 0,
+        lines: [line],
+      }],
+    };
+    const log = makeTransactionLog({
+      operation_line_id: line.line_id,
+      transaction_type: "ADJUST",
+      quantity_change: -1,
+      warehouse_qty_before: 202,
+      warehouse_qty_after: 202,
+      department_qty_before: 4,
+      department_qty_after: 3,
+    });
+
+    render(
+      <table><tbody><BomBatchDetail batchId={directBatch.batch_id} colSpan={8} cache={new Map([[directBatch.batch_id, directBatch]])} onCached={vi.fn()} logs={[log]} /></tbody></table>,
+    );
+
+    expect(screen.getByText("-1 EA")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 전 재고: 창고 202, 부서 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("작업 후 재고: 창고 202, 부서 3")).toBeInTheDocument();
+  });
+
   it("shows unique batch logs on the BOM parent and component rows", () => {
     const batch = makeBatch();
     const logs = [
@@ -597,7 +668,7 @@ describe("BomBatchDetail", () => {
     expect(screen.queryByText("제외")).not.toBeInTheDocument();
   });
 
-  it("uses the current representative log snapshot on a multi-item quantity adjustment", () => {
+  it("keeps summary snapshots unavailable on a multi-item quantity adjustment", () => {
     const batch = makeMultiItemAdjustmentBatch();
     const logs = [
       makeTransactionLog({
@@ -622,9 +693,10 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
     );
 
-    expect(screen.getByLabelText("작업 전 재고: 창고 7, 부서 2")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 후 재고: 창고 8, 부서 3")).toBeInTheDocument();
-    expect(screen.queryByLabelText("작업 전 재고: 창고 40, 부서 4")).not.toBeInTheDocument();
+    const summaryRow = screen.getByText("수량보정 입고").closest("tr")!;
+    expect(within(summaryRow).queryByLabelText(/^작업 전 재고:/)).not.toBeInTheDocument();
+    expect(within(summaryRow).queryByLabelText(/^작업 후 재고:/)).not.toBeInTheDocument();
+    expect(within(summaryRow).getAllByText("—")).toHaveLength(2);
   });
 
   it("uses each line's exact log for a non-summary multi-item batch", () => {

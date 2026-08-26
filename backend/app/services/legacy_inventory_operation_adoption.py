@@ -11,6 +11,8 @@ from sqlalchemy.orm import Query, Session
 
 from app.database import _is_sqlite
 from app.models import (
+    DefectQuarantineRecord,
+    DefectQuarantineReconstructionAllocation,
     Employee,
     InventoryOperation,
     InventoryOperationEffectKindEnum,
@@ -20,6 +22,7 @@ from app.models import (
     ShippingRequest,
     ShippingRequestStatusEnum,
     StockRequest,
+    StockRequestLine,
     StockRequestStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
@@ -50,6 +53,18 @@ class LegacyCancellationAdoption:
     cancellation: InventoryOperation
 
 
+@dataclass(frozen=True)
+class LegacyDefectMovementSpec:
+    """편입할 레거시 거래가 과거 불량 잔량에 적용한 검증된 증감."""
+
+    record_id: uuid.UUID
+    item_id: uuid.UUID
+    department: str
+    quantity_delta: int
+    movement_type: str
+    role: str
+
+
 _DEFECT_TYPES = {
     TransactionTypeEnum.MARK_DEFECTIVE,
     TransactionTypeEnum.UNMARK_DEFECTIVE,
@@ -67,7 +82,7 @@ _SUPPORTED_TYPES = {
     TransactionTypeEnum.TRANSFER_TO_WH,
     TransactionTypeEnum.TRANSFER_DEPT,
     TransactionTypeEnum.INTERNAL_USE,
-}
+} | _DEFECT_TYPES
 _TRANSFER_TYPES = {
     TransactionTypeEnum.TRANSFER_TO_PROD,
     TransactionTypeEnum.TRANSFER_TO_WH,
@@ -102,6 +117,171 @@ _BATCH_DISPLAY_LABELS = {
 def _locked(query: Query) -> Query:
     """PostgreSQL에서는 편입 대상을 잠그고 SQLite의 BEGIN IMMEDIATE는 그대로 쓴다."""
     return query if _is_sqlite else query.with_for_update()
+
+
+def _is_rework_scrap_child(log: TransactionLog) -> bool:
+    return (
+        (log.reference_no or "").startswith("defect-disassemble:")
+        and log.transaction_type == TransactionTypeEnum.DEFECT_SCRAP
+        and log.notes == "[rework:scrap_child]"
+        and log.inventory_effect == []
+    )
+
+
+def _defective_delta(log: TransactionLog, department: str) -> int:
+    effects = cancellation_svc.normalized_effect_for_cancellation(log)
+    return sum(
+        int(effect["delta"])
+        for effect in effects
+        if effect.get("scope") == "location"
+        and str(effect.get("department")) == department
+        and str(effect.get("status")) == "DEFECTIVE"
+    )
+
+
+def _has_downstream_defect_usage(
+    db: Session,
+    *,
+    record_id: uuid.UUID,
+    source_log_id: uuid.UUID,
+) -> bool:
+    direct_log = (
+        db.query(TransactionLog.log_id)
+        .filter(
+            TransactionLog.defect_quarantine_record_id == record_id,
+            TransactionLog.log_id != source_log_id,
+            TransactionLog.cancelled.is_(False),
+        )
+        .first()
+    )
+    if direct_log is not None:
+        return True
+    allocated_log = (
+        db.query(DefectQuarantineReconstructionAllocation.allocation_id)
+        .join(
+            TransactionLog,
+            TransactionLog.log_id
+            == DefectQuarantineReconstructionAllocation.transaction_log_id,
+        )
+        .filter(
+            DefectQuarantineReconstructionAllocation.record_id == record_id,
+            TransactionLog.cancelled.is_(False),
+        )
+        .first()
+    )
+    if allocated_log is not None:
+        return True
+    return (
+        db.query(StockRequestLine.line_id)
+        .filter(
+            StockRequestLine.defect_quarantine_record_id == record_id,
+            StockRequestLine.status == StockRequestStatusEnum.RESERVED,
+        )
+        .first()
+        is not None
+    )
+
+
+def _record_for_movement(
+    db: Session,
+    *,
+    record_id: uuid.UUID,
+    log: TransactionLog,
+) -> DefectQuarantineRecord:
+    record = _locked(
+        db.query(DefectQuarantineRecord).filter(
+            DefectQuarantineRecord.record_id == record_id
+        )
+    ).one_or_none()
+    if (
+        record is None
+        or record.item_id != log.item_id
+        or str(record.department) != str(log.department)
+    ):
+        raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+    return record
+
+
+def _defect_movement_specs(
+    db: Session,
+    log: TransactionLog,
+) -> tuple[LegacyDefectMovementSpec, ...]:
+    allocations = (
+        _locked(
+            db.query(DefectQuarantineReconstructionAllocation).filter(
+                DefectQuarantineReconstructionAllocation.transaction_log_id == log.log_id
+            )
+        )
+        .order_by(DefectQuarantineReconstructionAllocation.created_at)
+        .all()
+    )
+    if allocations:
+        if log.defect_quarantine_record_id is not None:
+            raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+        delta = _defective_delta(log, str(log.department))
+        if delta >= 0 or sum(int(row.quantity) for row in allocations) != -delta:
+            raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+        specs: list[LegacyDefectMovementSpec] = []
+        for allocation in allocations:
+            record = _record_for_movement(
+                db,
+                record_id=allocation.record_id,
+                log=log,
+            )
+            specs.append(
+                LegacyDefectMovementSpec(
+                    record_id=record.record_id,
+                    item_id=record.item_id,
+                    department=str(record.department),
+                    quantity_delta=-int(allocation.quantity),
+                    movement_type=f"LEGACY_{log.transaction_type.value}_FIFO",
+                    role=_role_for(log).value,
+                )
+            )
+        return tuple(specs)
+
+    if log.defect_quarantine_record_id is not None:
+        record = _record_for_movement(
+            db,
+            record_id=log.defect_quarantine_record_id,
+            log=log,
+        )
+        delta = _defective_delta(log, str(record.department))
+        if delta == 0:
+            raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+        if log.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE and delta <= 0:
+            raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+        if log.transaction_type in {
+            TransactionTypeEnum.UNMARK_DEFECTIVE,
+            TransactionTypeEnum.DEFECT_SCRAP,
+            TransactionTypeEnum.DISASSEMBLE,
+            TransactionTypeEnum.SUPPLIER_RETURN,
+        } and delta >= 0:
+            raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+        if delta > 0 and (
+            int(record.original_quantity or 0) != delta
+            or int(record.remaining_quantity or 0) != delta
+            or _has_downstream_defect_usage(
+                db,
+                record_id=record.record_id,
+                source_log_id=log.log_id,
+            )
+        ):
+            raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+        return (
+            LegacyDefectMovementSpec(
+                record_id=record.record_id,
+                item_id=record.item_id,
+                department=str(record.department),
+                quantity_delta=delta,
+                movement_type=f"LEGACY_{log.transaction_type.value}",
+                role=_role_for(log).value,
+            ),
+        )
+
+    if log.transaction_type in _DEFECT_TYPES and not _is_rework_scrap_child(log):
+        raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+    return ()
 
 
 def _scope_logs(
@@ -169,17 +349,12 @@ def _scope_logs(
 
 
 def _validate_scope(
+    db: Session,
     logs: list[TransactionLog],
     *,
     batch: IoBatch | None,
-) -> None:
+) -> dict[uuid.UUID, tuple[LegacyDefectMovementSpec, ...]]:
     if batch is not None and batch.sub_type == "disassemble":
-        raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
-    if any(log.transaction_type in _DEFECT_TYPES for log in logs) or any(
-        (log.reference_no or "").startswith("defect-disassemble:")
-        or (log.notes or "").startswith("[rework:")
-        for log in logs
-    ):
         raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
     if any(log.transaction_type not in _SUPPORTED_TYPES for log in logs):
         raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
@@ -197,6 +372,44 @@ def _validate_scope(
     if len(actor_ids) > 1 or len(actor_names) > 1:
         raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
 
+    rework_logs = [
+        log
+        for log in logs
+        if (log.reference_no or "").startswith("defect-disassemble:")
+        or (log.notes or "").startswith("[rework:")
+    ]
+    if rework_logs:
+        references = {log.reference_no for log in logs}
+        parents = [
+            log
+            for log in logs
+            if log.transaction_type == TransactionTypeEnum.DISASSEMBLE
+            and (log.notes or "").startswith("[rework:defective]")
+            and log.defect_quarantine_record_id is not None
+        ]
+        valid_children = all(
+            log in parents
+            or (
+                log.transaction_type == TransactionTypeEnum.RECEIVE
+                and log.notes == "[rework:normal_child]"
+            )
+            or (
+                log.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
+                and log.notes == "[rework:defective_child]"
+                and log.defect_quarantine_record_id is not None
+            )
+            or _is_rework_scrap_child(log)
+            for log in logs
+        )
+        if (
+            len(rework_logs) != len(logs)
+            or len(references) != 1
+            or not str(next(iter(references)) or "").startswith("defect-disassemble:")
+            or len(parents) != 1
+            or not valid_children
+        ):
+            raise LegacyCancellationAdoptionError(DEFECT_LEGACY_CANCEL_MESSAGE)
+
     if batch is not None:
         expected_types = _BATCH_TYPES.get(batch.sub_type)
         actual_types = {log.transaction_type for log in logs}
@@ -211,14 +424,18 @@ def _validate_scope(
         ):
             raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
 
+    movement_specs: dict[uuid.UUID, tuple[LegacyDefectMovementSpec, ...]] = {}
     for log in logs:
         try:
             effects = cancellation_svc.normalized_effect_for_cancellation(log)
+            movement_specs[log.log_id] = _defect_movement_specs(db, log)
         except cancellation_svc.CancellationNotAllowed as exc:
             raise LegacyCancellationAdoptionError(
                 INCOMPLETE_LEGACY_EFFECT_MESSAGE
             ) from exc
         deltas = [int(effect["delta"]) for effect in effects]
+        if _is_rework_scrap_child(log):
+            continue
         if not deltas or any(delta == 0 for delta in deltas):
             raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
         if log.transaction_type in _TRANSFER_TYPES:
@@ -226,9 +443,19 @@ def _validate_scope(
                 raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
         elif sum(deltas) != int(log.quantity_change or 0):
             raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
+    return movement_specs
 
 
 def _role_for(log: TransactionLog) -> InventoryOperationRoleEnum:
+    if (log.reference_no or "").startswith("defect-disassemble:"):
+        if (log.notes or "").startswith("[rework:defective]"):
+            return InventoryOperationRoleEnum.REWORK_PARENT_DEFECTIVE
+        if log.notes == "[rework:normal_child]":
+            return InventoryOperationRoleEnum.REWORK_CHILD_NORMAL
+        if log.notes == "[rework:defective_child]":
+            return InventoryOperationRoleEnum.REWORK_CHILD_DEFECTIVE
+        if log.notes == "[rework:scrap_child]":
+            return InventoryOperationRoleEnum.REWORK_CHILD_SCRAP
     if log.transaction_type == TransactionTypeEnum.PRODUCE:
         return InventoryOperationRoleEnum.PRODUCT_OUTPUT
     if log.transaction_type == TransactionTypeEnum.BACKFLUSH:
@@ -278,6 +505,16 @@ def _operation_metadata(
             shipping_request.notes,
         )
     transaction_type = logs[0].transaction_type
+    if (logs[0].reference_no or "").startswith("defect-disassemble:"):
+        return (
+            "defect",
+            "rework_defective",
+            "재작업",
+            actor_name,
+            actor_id,
+            logs[0].department,
+            logs[0].reason_memo or logs[0].notes,
+        )
     domain, action, label = {
         TransactionTypeEnum.RECEIVE: ("inventory_io", "receive", "원자재 입고"),
         TransactionTypeEnum.SHIP: ("inventory_io", "ship", "출고"),
@@ -288,6 +525,11 @@ def _operation_metadata(
         TransactionTypeEnum.TRANSFER_TO_WH: ("inventory_io", "transfer", "창고 입출고"),
         TransactionTypeEnum.TRANSFER_DEPT: ("inventory_io", "transfer", "부서 입출고"),
         TransactionTypeEnum.INTERNAL_USE: ("inventory_io", "internal_use", "내부 사용"),
+        TransactionTypeEnum.MARK_DEFECTIVE: ("defect", "quarantine", "불량 격리"),
+        TransactionTypeEnum.UNMARK_DEFECTIVE: ("defect", "restore", "정상 복귀"),
+        TransactionTypeEnum.DEFECT_SCRAP: ("defect", "scrap", "불량 폐기"),
+        TransactionTypeEnum.SUPPLIER_RETURN: ("defect", "return", "불량 반품"),
+        TransactionTypeEnum.DISASSEMBLE: ("defect", "rework_defective", "재작업"),
     }[transaction_type]
     return (
         domain,
@@ -410,7 +652,7 @@ def adopt_and_cancel(
         raise cancellation_svc.CancellationNotAllowed(
             cancellation_svc.PREVIOUS_WEEK_MESSAGE
         )
-    _validate_scope(logs, batch=batch)
+    defect_movements = _validate_scope(db, logs, batch=batch)
     metadata = _operation_metadata(
         logs,
         batch=batch,
@@ -431,6 +673,19 @@ def adopt_and_cancel(
     )
     for source_log in logs:
         operation_svc.attach_transaction(source_log, operation, _role_for(source_log))
+        for movement in defect_movements[source_log.log_id]:
+            operation_svc.record_defect_movement(
+                db,
+                operation=operation,
+                record_id=movement.record_id,
+                item_id=movement.item_id,
+                department=movement.department,
+                movement_type=movement.movement_type,
+                quantity_delta=movement.quantity_delta,
+                role=movement.role,
+                actor_name=metadata[3],
+                actor_employee_id=metadata[4],
+            )
     if batch is not None:
         _record_batch_workflows(db, operation=operation, batch=batch)
     if shipping_request is not None:

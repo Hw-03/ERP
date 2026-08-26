@@ -310,6 +310,47 @@ schtasks /Create /TN "MES Cleanup Monthly" /TR "cmd /d /c `"$(Join-Path $ops 'cl
 
 등록 후 작업 스케줄러 GUI 에서 "가장 높은 권한으로 실행" 옵션 체크 권장. 1회 등록하고 그대로 두면 365일 자동 운영.
 
+### NAS 이중 백업 (매일 22:00 KST)
+
+로컬 백업은 PC 장애에 대비할 수 없으므로, 검증이 끝난 SQLite 백업을 NAS에도 보관한다. NAS의 기존 `mes.db`는 건드리지 않으며 자동 백업은 아래 `scheduled` 폴더에만 날짜·UUID 파일명으로 저장한다.
+
+```powershell
+# 운영 체크아웃 C:\ERP 에 코드가 통합된 뒤 실행한다. .worktrees 경로를 예약 작업에 등록하지 않는다.
+$repoRoot = "C:\ERP"
+$batch = Join-Path $repoRoot "scripts\ops\backup_to_nas.bat"
+$nasDir = "\\192.168.0.45\Nas 문서\03. 생산부\20. 조립공정\4. 김현우\MES\Data Base Beckup\scheduled"
+$taskName = "DEXCOWIN MES DB Backup to NAS"
+$argument = "/d /c call `"$batch`" --nas-dir `"$nasDir`" --keep 30"
+$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument $argument
+$trigger = New-ScheduledTaskTrigger -Daily -At 10:00PM
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
+$credential = Get-Credential -UserName "$env:USERDOMAIN\$env:USERNAME" -Message "Windows 로그인 계정 암호 입력"
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -User $credential.UserName -Password $credential.GetNetworkCredential().Password -Force
+```
+
+- 등록 계정은 NAS 쓰기 권한을 가진 Windows 계정이어야 한다. NAS 계정이 별도라면 작업 등록 전 해당 계정의 Windows 자격 증명 관리자에 `NAS` 접근 자격 증명을 저장한다. 암호를 저장소·스크립트·로그에 기록하지 않는다.
+- 백업은 사용자 쓰기 권한만 사용하므로 관리자 권한으로 실행하지 않는다. 일반 사용자로 등록하면 UAC 승격 없이도 매일 실행된다.
+- 작업 트리에서 검증한 변경은 운영 체크아웃 `C:\ERP`에 통합한 뒤에만 이 작업을 등록한다. 예약 작업이 `.worktrees`를 가리키면 작업 트리 정리 뒤 백업이 중단될 수 있다.
+- 예약 작업은 비대화형 세션에서 `NAS` 이름 해석이 실패하지 않도록 NAS의 고정 IP `192.168.0.45`를 사용한다. 공유 폴더와 NAS 접근 자격 증명은 기존과 같다.
+- 이 설정은 로그아웃 상태와 절전 상태에서도 실행한다. PC가 꺼져 있던 경우에는 다음 부팅 뒤 지연 실행하며, NAS 연결·복사·검증 실패 시 30분 간격으로 최대 3회 재시도한다.
+- 로컬 검증 뒤 NAS 임시 파일에 복사하고 SHA-256 및 DB 검증을 통과할 때만 최종 파일명으로 바꾼다. NAS에는 자동 생성 백업 30개만 남기며 기존 `mes.db`와 수동 파일은 정리하지 않는다.
+
+등록 직후에는 작업을 한 번 즉시 실행하고 결과를 확인한다.
+
+```powershell
+Start-ScheduledTask -TaskName "DEXCOWIN MES DB Backup to NAS"
+Get-ScheduledTaskInfo -TaskName "DEXCOWIN MES DB Backup to NAS"
+Get-Content "_attic\runtime\logs\ops\backup-to-nas.log" -Tail 50
+```
+
+NAS 백업으로 복구할 때는 백엔드·프론트를 먼저 정지한 뒤 NAS 파일을 직접 입력으로 사용한다.
+
+```powershell
+py scripts\ops\restore_db.py --sqlite "\\NAS\Nas 문서\03. 생산부\20. 조립공정\4. 김현우\MES\Data Base Beckup\scheduled\mes_YYYYMMDD_HHMMSS_ffffff_UUID.db" --target "backend\mes.db" --check
+```
+
+복구가 끝나면 백엔드를 다시 시작하고 `operational_readiness.bat`와 `healthcheck.bat`를 실행한다.
+
 ## 보안·권한·CI 관련
 
 이 범위는 본 매뉴얼에서 다루지 않는다. 다음 단계 작업의 별도 문서에서 다룰 예정.

@@ -27,6 +27,7 @@ vi.mock("@/lib/api", () => ({
     getDraft: vi.fn(),
     deleteDraft: vi.fn(),
     submit: vi.fn(),
+    submitDraft: vi.fn(),
     getItemConversionPreview: vi.fn(),
     executeItemConversion: vi.fn(),
   },
@@ -150,6 +151,51 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("작성 중으로 복귀한 작업의 반려 사유를 조합 화면 상단에 표시하지 않는다", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+      <IoComposeView
+        globalSearch=""
+        operator={operator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreDraft={{
+          batch_id: "rejected-draft", work_type: "process", sub_type: "adjust_in", status: "draft",
+          requester_employee_id: operator.employee_id, requester_name: operator.name,
+          requester_department: operator.department, approver_employee_id: null, approver_name: null,
+          from_department: null, to_department: "조립", requires_approval: true,
+          stock_request_id: null, reference_no: "ADJ-1", notes: "재확인", created_at: "2026-08-04T00:00:00Z",
+          updated_at: "2026-08-04T00:00:00Z", submitted_at: null, completed_at: null, bundles: [],
+          stock_requests: [
+            {
+              stock_request_id: "old", request_code: "SR-old", status: "rejected", from_bucket: "none",
+              from_department: null, approval_kind: "department", requires_warehouse_approval: false,
+              requires_department_approval: true, approver_employee_id: null, approver_name: null,
+              rejected_by_name: "이전 결재자", rejected_at: "2026-08-04T00:05:00Z", rejected_reason: "이전 사유",
+            },
+            {
+              stock_request_id: "new", request_code: "SR-new", status: "rejected", from_bucket: "none",
+              from_department: null, approval_kind: "department", requires_warehouse_approval: false,
+              requires_department_approval: true, approver_employee_id: null, approver_name: null,
+              rejected_by_name: "최신 결재자", rejected_at: "2026-08-04T01:05:00Z", rejected_reason: "최신 사유",
+            },
+          ],
+        }}
+      />
+      </QueryClientProvider>
+    );
+
+    expect(screen.queryByText("반려 사유: 최신 사유")).not.toBeInTheDocument();
+    expect(screen.queryByText(/최신 결재자.*2026년 08월 04일 10시 05분/)).not.toBeInTheDocument();
+    expect(screen.queryByText("반려 사유: 이전 사유")).not.toBeInTheDocument();
+  });
+
   it("records detailed warehouse workflow screen arrivals and step moves", async () => {
     renderCompose();
 
@@ -272,7 +318,7 @@ describe("IoComposeView navigation chrome", () => {
   });
 
   it("shows a location-based success title after multiple internal-use approval requests", async () => {
-    vi.mocked(api.submit).mockResolvedValue({
+    vi.mocked(api.submitDraft).mockResolvedValue({
       batch: {},
       status: "submitted",
       requires_approval: true,
@@ -361,6 +407,65 @@ describe("IoComposeView navigation chrome", () => {
 
     expect(await screen.findByText("위치별 결재 요청 완료")).toBeInTheDocument();
     expect(screen.queryByText("원본별 결재 요청 완료")).not.toBeInTheDocument();
+  });
+
+  it("작업자가 바뀐 뒤에는 현재 작업자 ID로 기존 초안을 제출한다", async () => {
+    vi.mocked(api.submitDraft).mockResolvedValue({
+      batch: {},
+      status: "submitted",
+      requires_approval: true,
+      stock_request_id: null,
+      stock_requests: [{ approval_kind: "department" }],
+      message: "부서 결재 요청이 생성되었습니다.",
+    } as never);
+    const previousOperator = { ...operator, employee_id: "dept-approver" };
+    const currentOperator = { ...operator, employee_id: "assembly-staff" };
+    const restoreDraft = {
+      batch_id: "operator-switch-draft",
+      work_type: "process",
+      sub_type: "produce",
+      from_department: "조립",
+      to_department: "조립",
+      reference_no: null,
+      notes: null,
+      bundles: [],
+    } as never;
+    const { rerender } = render(
+      <IoComposeView
+        globalSearch=""
+        operator={previousOperator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={5}
+        restoreDraft={restoreDraft}
+      />,
+    );
+
+    await screen.findByTestId("confirm-submit");
+    rerender(
+      <IoComposeView
+        globalSearch=""
+        operator={currentOperator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={5}
+        restoreDraft={restoreDraft}
+      />,
+    );
+    fireEvent.click(await screen.findByTestId("confirm-submit"));
+
+    await waitFor(() => {
+      expect(api.submitDraft).toHaveBeenCalledWith(
+        "operator-switch-draft",
+        currentOperator.employee_id,
+      );
+    });
   });
 
   it("AS 작업자에게 독립 사용출고 카드를 보이고 품목 전환은 숨긴다", async () => {

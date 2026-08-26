@@ -6,17 +6,34 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = "C:\ERP"
 $SyncScript = Join-Path $RepoRoot "scripts\dev\sync-to-employee.ps1"
 $script:EmployeeSyncExit = 1
+$script:EmployeeSyncOutput = @()
 
 function Invoke-EmployeeSync {
     param([string[]] $Arguments = @())
 
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SyncScript @Arguments | Out-Host
+    $script:EmployeeSyncOutput = @(
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SyncScript @Arguments 2>&1
+    )
     $script:EmployeeSyncExit = [int] $LASTEXITCODE
+    $script:EmployeeSyncOutput | Out-Host
 }
 
 Invoke-EmployeeSync -Arguments @("-DryRun")
 $dryRunExit = $script:EmployeeSyncExit
 if ($dryRunExit -eq 0) {
+    $changeLine = $script:EmployeeSyncOutput |
+        ForEach-Object { [string] $_ } |
+        Where-Object { $_ -match '^SYNC_CHANGES=(0|1)$' } |
+        Select-Object -Last 1
+    if (-not $changeLine) {
+        Write-Host "[auto] dry-run의 SYNC_CHANGES 계약을 확인할 수 없습니다."
+        exit 4
+    }
+    if ($changeLine -eq "SYNC_CHANGES=0") {
+        Write-Host "[auto] 코드 변경 없음 - 직원 서버 stop/build/restart를 생략합니다."
+        Write-Host "AUTO_SYNC_RESULT=NO_CHANGES"
+        exit 0
+    }
     Invoke-EmployeeSync
     exit $script:EmployeeSyncExit
 }

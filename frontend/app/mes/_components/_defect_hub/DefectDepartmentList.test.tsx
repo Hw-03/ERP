@@ -35,6 +35,7 @@ function makeLocation(overrides: Partial<DefectLocation> = {}): DefectLocation {
     quarantined_by: "김길호",
     quarantined_by_employee_id: "employee-1",
     is_legacy: false,
+    legacy_origin: null,
     has_bom: false,
     ...overrides,
   };
@@ -113,6 +114,40 @@ describe("DefectDepartmentList", () => {
     );
     expect(screen.queryByText("처리 가능 3개")).not.toBeInTheDocument();
     expect(screen.getByText("승인 대기 1개")).toBeInTheDocument();
+  });
+
+  it("flags only unresolved legacy aggregates, not reconstructed records", () => {
+    render(
+      <DefectDepartmentList
+        locations={[
+          makeLocation({
+            record_id: "legacy-aggregate",
+            item_id: "aggregate-item",
+            item_name: "기존 합산 품목",
+            is_legacy: true,
+            legacy_origin: "aggregate",
+          } as Partial<DefectLocation> & { legacy_origin: "aggregate" }),
+          makeLocation({
+            record_id: "legacy-reconstructed",
+            item_id: "reconstructed-item",
+            item_name: "기존 복원 품목",
+            is_legacy: true,
+            legacy_origin: "reconstructed",
+          } as Partial<DefectLocation> & { legacy_origin: "reconstructed" }),
+          makeLocation({
+            record_id: "normal-record",
+            item_id: "normal-item",
+            item_name: "일반 격리 품목",
+            is_legacy: false,
+          }),
+        ]}
+        onProcess={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("기존 합산")).toBeInTheDocument();
+    expect(screen.queryByText("기존 복원")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/기존 (합산|복원)/, { selector: "span" })).toHaveLength(1);
   });
 
   it("groups same-item records into an initially collapsed item summary", () => {

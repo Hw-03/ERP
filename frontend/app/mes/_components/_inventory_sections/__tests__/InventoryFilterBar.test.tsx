@@ -5,11 +5,13 @@ import { InventoryFilters, InventoryTableStickyHeader } from "../InventoryFilter
 const baseProps = {
   open: true,
   selectedDepts: [],
+  departmentFilterBasis: "location" as const,
   selectedModels: [],
   selectedProcessSteps: [],
   showDisused: false,
   productModels: [],
   toggleDept: vi.fn(),
+  onDepartmentFilterBasisChange: vi.fn(),
   toggleModel: vi.fn(),
   toggleProcessStep: vi.fn(),
   toggleDisused: vi.fn(),
@@ -21,6 +23,31 @@ const baseProps = {
 };
 
 describe("InventoryFilters", () => {
+  it("부서 칩 해석을 재고 위치와 품목 코드 기준으로 전환한다", () => {
+    const onDepartmentFilterBasisChange = vi.fn();
+    const props = {
+      ...baseProps,
+      selectedDepts: ["조립"],
+      onDepartmentFilterBasisChange,
+    };
+
+    render(<InventoryFilters {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "품목 코드 기준" }));
+
+    expect(onDepartmentFilterBasisChange).toHaveBeenCalledWith("code");
+    expect(screen.getByRole("button", { name: "조립" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("선택된 기준은 부서 칩보다 조금 진한 민트 틴트로 표시한다", () => {
+    render(<InventoryFilters {...baseProps} />);
+
+    expect(screen.getByRole("button", { name: "재고 위치 기준" })).toHaveStyle({
+      background: "color-mix(in srgb, var(--c-green) 20%, transparent)",
+      color: "var(--c-green)",
+    });
+  });
+
   it("보이는 목록 제목 없이 검색 입력 변경을 전달한다", () => {
     const onSearchChange = vi.fn();
     render(

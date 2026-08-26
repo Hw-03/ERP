@@ -155,6 +155,9 @@ export interface IoStockRequestSummary {
   requires_department_approval: boolean;
   approver_employee_id: string | null;
   approver_name: string | null;
+  rejected_by_name?: string | null;
+  rejected_at?: string | null;
+  rejected_reason?: string | null;
   /** 결재 요청이 실제로 반영하는 IoLine. 구 응답에는 없을 수 있다. */
   operation_line_ids?: string[];
 }

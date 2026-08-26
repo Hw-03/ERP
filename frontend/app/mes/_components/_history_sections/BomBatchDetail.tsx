@@ -16,6 +16,7 @@ import {
   getInternalUseHistoryLineEffectLabel,
   getHistoryBomParentLine,
   getDisplayBundles,
+  getHistoryLineExecutionLog,
   getHistoryLineSignedQuantity,
   isManualOnlyProductionBatch,
   type LineSignTone,
@@ -141,10 +142,9 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
   }
 
   if (!batch || batch.bundles.length === 0) return null;
-  const displayBundles = getAdjustmentDisplayBundles(batch).filter((bundle) => {
-    const parentLine = getHistoryBomParentLine(bundle);
-    return parentLine?.included ?? bundle.lines.some((line) => line.included);
-  });
+  const displayBundles = getAdjustmentDisplayBundles(batch).filter((bundle) =>
+    bundle.lines.some((line) => line.included),
+  );
 
   return (
     <>
@@ -242,27 +242,30 @@ function BundleRows({
   const parentLog = parentLine
     ? getBomLineSnapshotLog(parentLine, logs, batch)
     : isAdjustmentSummary
-      ? getBatchRepresentativeSnapshotLog(logs, batch)
+      ? null
       : bundle.lines.length === 1
         ? getBomLineSnapshotLog(bundle.lines[0], logs, batch)
         : null;
   const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
+  const parentNotExecuted = !!parentLine && !parentLine.included;
   const childLines = (parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines)
     .filter((line) => isInternalUseBom || line.included);
   const isSingleLineDirect = !isBomParent && childLines.length === 1;
   const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
 
-  const headerSigned = parentLine
-    ? getHistoryLineSignedQuantity(parentLine, batch, bundle)
+  const headerSigned = parentLine && !parentNotExecuted
+    ? getHistoryLineSignedQuantity(parentLine, batch, bundle, getHistoryLineExecutionLog(parentLine, logs))
     : bundle.lines.length === 1
-      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle)
+      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle, getHistoryLineExecutionLog(bundle.lines[0], logs))
       : null;
   const bundleUnit = (() => {
     const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
     return units.size === 1 ? Array.from(units)[0] : null;
   })();
-  const headerQtyText = headerSigned
+  const headerQtyText = parentNotExecuted
+    ? "상위 미반영"
+    : headerSigned
     ? headerSigned.label
     : bundleUnit
       ? `${formatQty(bundle.quantity)} ${bundleUnit}`
@@ -431,7 +434,12 @@ function BomLineRow({
   const targetPadX = compact ? "px-2" : "px-4";
   const statusPadX = "px-2";
   const cancelled = batch.status === "cancelled";
-  const signed = getHistoryLineSignedQuantity(line, batch, bundle);
+  const signed = getHistoryLineSignedQuantity(
+    line,
+    batch,
+    bundle,
+    log?.operation_line_id === line.line_id ? log : null,
+  );
   const qtyColor = SIGN_TONE_HEX[signed.tone];
   const highlighted = highlightItemId === line.item_id;
   const internalUseEffect = batch.sub_type === "internal_use_out" && bundle.source_kind === "bom_parent"
@@ -506,16 +514,6 @@ function getBomLineSnapshotLog(line: IoLine, logs: TransactionLog[], batch: IoBa
       && (log.operation_line_id === null || log.operation_line_id === undefined),
   );
   return legacyMatches.length === 1 ? legacyMatches[0] : null;
-}
-
-function getBatchRepresentativeSnapshotLog(logs: TransactionLog[], batch: IoBatch): TransactionLog | null {
-  const target = getDisplayBundles(batch)[0];
-  if (!target) return logs[0] ?? null;
-  return logs.find((log) => target.source_item_id && log.item_id === target.source_item_id)
-    ?? logs.find((log) => target.source_mes_code && log.mes_code === target.source_mes_code)
-    ?? logs.find((log) => log.item_name === target.title)
-    ?? logs[0]
-    ?? null;
 }
 
 function LineKindBadge({ line, compact }: { line: IoLine; compact?: boolean }) {

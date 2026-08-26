@@ -2,12 +2,14 @@
 """Restore a DEXCOWIN MES database backup.
 
 SQLite restore validates the backup before replacing the target DB and can run
-inventory integrity verification after restore with --check.
+inventory integrity verification after restore with --check. A new, empty
+pre-migration candidate may opt into structural-only validation.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shutil
 import sqlite3
@@ -37,6 +39,23 @@ def _run(cmd: list[str]) -> None:
 
 def _verify_sqlite_backup(path: Path) -> None:
     _run([sys.executable, str(VERIFY_BACKUP), str(path)])
+
+
+def _verify_sqlite_integrity(path: Path) -> None:
+    """Verify structural SQLite integrity without requiring the current schema."""
+    connection = None
+    try:
+        connection = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+        rows = connection.execute("PRAGMA integrity_check").fetchall()
+    except sqlite3.Error as exc:
+        print(f"[RESTORE] SQLite integrity check failed: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    finally:
+        if connection is not None:
+            connection.close()
+    if rows != [("ok",)]:
+        print(f"[RESTORE] SQLite integrity check failed: {rows}", file=sys.stderr)
+        raise SystemExit(1)
 
 
 def _run_integrity_check(db_url: str) -> None:
@@ -92,6 +111,45 @@ def _create_pre_restore_snapshot(target_path: Path) -> Path:
     return snapshot
 
 
+def _sqlite_snapshot_digest(path: Path) -> str:
+    """Hash a transient online snapshot so WAL-backed state is compared safely."""
+    staged = path.parent / f".{path.name}.digest-{uuid4().hex}.tmp"
+    try:
+        _copy_live_sqlite(path, staged)
+        digest = hashlib.sha256()
+        with staged.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    finally:
+        _remove_sqlite_files(staged)
+
+
+def _resolve_preverified_rollback(path: str, target_path: Path, restore_source: Path) -> Path:
+    """Validate an explicit rollback receipt inside the bounded runtime backup set."""
+    rollback = Path(path).resolve()
+    backup_dir = runtime_path("backups", "sqlite").resolve()
+    if not rollback.is_file():
+        print(f"[RESTORE] preverified rollback missing: {rollback}", file=sys.stderr)
+        raise SystemExit(1)
+    if rollback.parent != backup_dir:
+        print(
+            f"[RESTORE] preverified rollback must be inside {backup_dir}: {rollback}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    _verify_sqlite_backup(rollback)
+    restoring_the_rollback = rollback == restore_source.resolve()
+    if not restoring_the_rollback and _sqlite_snapshot_digest(rollback) != _sqlite_snapshot_digest(target_path):
+        print(
+            f"[RESTORE] preverified rollback does not match current target: {rollback}",
+            file=sys.stderr,
+        )
+        print("RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK", file=sys.stderr)
+        raise SystemExit(3)
+    return rollback
+
+
 def _rollback_quarantined_files(moved: list[tuple[Path, Path]]) -> None:
     """Restore quarantined SQLite files in reverse move order."""
     rollback_errors: list[str] = []
@@ -118,7 +176,12 @@ def _cleanup_quarantined_files(moved: list[tuple[Path, Path]]) -> None:
             )
 
 
-def _replace_sqlite_atomically(source_path: Path, target_path: Path) -> None:
+def _replace_sqlite_atomically(
+    source_path: Path,
+    target_path: Path,
+    *,
+    source_integrity_only: bool = False,
+) -> None:
     """Install a verified staged DB while preserving rollback for every old file."""
     staged = target_path.parent / f".{target_path.name}.restore-{uuid4().hex}.tmp"
     quarantine_base = target_path.parent / f".{target_path.name}.quarantine-{uuid4().hex}"
@@ -126,7 +189,10 @@ def _replace_sqlite_atomically(source_path: Path, target_path: Path) -> None:
     installed = False
     try:
         shutil.copy2(source_path, staged)
-        _verify_sqlite_backup(staged)
+        if source_integrity_only:
+            _verify_sqlite_integrity(staged)
+        else:
+            _verify_sqlite_backup(staged)
         try:
             for suffix in ("-wal", "-shm", "-journal", ""):
                 original = Path(f"{target_path}{suffix}")
@@ -145,22 +211,47 @@ def _replace_sqlite_atomically(source_path: Path, target_path: Path) -> None:
     _cleanup_quarantined_files(moved)
 
 
-def restore_sqlite(backup_path: str, target_path: str, run_check: bool) -> None:
+def restore_sqlite(
+    backup_path: str,
+    target_path: str,
+    run_check: bool,
+    preverified_rollback: str | None = None,
+    source_integrity_only: bool = False,
+) -> None:
     src = _resolve_sqlite_backup(backup_path)
     dst = Path(target_path).resolve()
+
+    if preverified_rollback and not dst.exists():
+        print("[RESTORE] preverified rollback requires an existing target DB", file=sys.stderr)
+        raise SystemExit(1)
+    if source_integrity_only and (preverified_rollback or dst.exists() or run_check):
+        print(
+            "[RESTORE] --source-integrity-only requires a new candidate target without --check",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    snapshot = None
+    if preverified_rollback:
+        snapshot = _resolve_preverified_rollback(preverified_rollback, dst, src)
 
     if not src.exists():
         print(f"[RESTORE] backup file not found: {src}", file=sys.stderr)
         raise SystemExit(1)
 
-    _verify_sqlite_backup(src)
+    if source_integrity_only:
+        _verify_sqlite_integrity(src)
+    else:
+        _verify_sqlite_backup(src)
 
     if dst.exists():
-        snapshot = _create_pre_restore_snapshot(dst)
-        print(f"[RESTORE] current DB snapshot: {snapshot}")
+        if snapshot is None:
+            snapshot = _create_pre_restore_snapshot(dst)
+        print(f"[RESTORE] current DB rollback: {snapshot}")
+        print(f"ROLLBACK_PATH={snapshot.resolve()}")
 
     dst.parent.mkdir(parents=True, exist_ok=True)
-    _replace_sqlite_atomically(src, dst)
+    _replace_sqlite_atomically(src, dst, source_integrity_only=source_integrity_only)
 
     size_kb = dst.stat().st_size // 1024
     print(f"[RESTORE] OK SQLite: {src.name} -> {dst} ({size_kb} KB)")
@@ -222,6 +313,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restore DEXCOWIN MES DB")
     parser.add_argument("--sqlite", metavar="BACKUP_PATH", help="SQLite backup file path")
     parser.add_argument("--target", default=str(PROJECT_ROOT / "backend" / "mes.db"), help="Restore target path")
+    parser.add_argument(
+        "--preverified-rollback",
+        help="Verified rollback snapshot in the runtime backup directory; skips a duplicate pre-restore snapshot",
+    )
+    parser.add_argument(
+        "--source-integrity-only",
+        action="store_true",
+        help="Allow a structurally valid legacy SQLite source only for a new pre-migration candidate",
+    )
     parser.add_argument("--postgres", metavar="BACKUP_SQL", help="PostgreSQL dump file path")
     parser.add_argument("--container", help="Docker container name")
     parser.add_argument("--host", default="localhost")
@@ -239,8 +339,17 @@ def main() -> int:
     print("=" * 54)
 
     if args.sqlite:
-        restore_sqlite(args.sqlite, args.target, args.check)
+        restore_sqlite(
+            args.sqlite,
+            args.target,
+            args.check,
+            args.preverified_rollback,
+            args.source_integrity_only,
+        )
     elif args.postgres:
+        if args.source_integrity_only:
+            print("[RESTORE] --source-integrity-only is only valid for SQLite", file=sys.stderr)
+            return 2
         restore_postgres(args.postgres, args.container, args.host, args.port, args.user, args.dbname, args.check)
     else:
         print("[RESTORE] pass --sqlite <backup> or --postgres <dump>", file=sys.stderr)

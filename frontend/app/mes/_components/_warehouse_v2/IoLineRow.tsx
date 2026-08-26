@@ -24,6 +24,7 @@ import { lineSelected } from "./internalUseBom";
 
 interface Props {
   line: IoLine;
+  inventoryEffect?: IoLine | null;
   subType: IoSubType;
   isChild: boolean;
   item?: Item;
@@ -82,6 +83,7 @@ export function expectedAfter(line: IoLine, available: number | null) {
 
 export function IoLineRow({
   line,
+  inventoryEffect,
   subType,
   isChild,
   item,
@@ -98,22 +100,30 @@ export function IoLineRow({
   const getDeptColor = useDeptColorLookup();
   const [showChildren, setShowChildren] = useState(false);
   const isInternalUse = subType === "internal_use_out";
+  const hasInventoryEffectOverride = inventoryEffect !== undefined;
+  const effectLine = inventoryEffect ?? line;
+  const noInventoryEffect = hasInventoryEffectOverride && inventoryEffect === null;
   const selected = isInternalUse ? lineSelected(line) : line.included;
   const disabled = !line.included;
-  // BOM 강제 모드: process(produce/disassemble) 한정 — bom_auto 하위는 상위 비례 자동 계산 → 체크/수량 차단.
-  // 일반 창고 입출고 BOM은 내부 편집을 허용하고, 연구 사용출고 BOM은 아래 고정 수량 표시로 분리한다.
-  const qtyLocked =
+  // process BOM 자동 하위는 포함 여부만 고정한다. 수량 조정은 부서 결재로 검증한다.
+  const bomCheckboxLocked =
     isBomForced(subType) &&
     line.origin === "bom_auto" &&
     line.bom_expected != null &&
     Number(line.bom_expected) > 0;
   const bomStockExempt = line.origin === "bom_auto" && line.bom_stock_exempt;
   const fixedInternalUseBomQuantity = isInternalUse && line.origin === "bom_auto";
-  const interactionLocked = qtyLocked || bomStockExempt;
-  const stepperDisabled = (!isInternalUse && disabled) || interactionLocked;
+  // 부서 BOM 자동 하위는 포함 상태에서만 체크 해제로 수량 0 제외를 허용한다.
+  // 제외 뒤 재포함은 기존 수량 + 조절기로만 가능하다.
+  const interactionLocked = bomStockExempt || (bomCheckboxLocked && !selected);
+  const stepperDisabled = (!isInternalUse && disabled) || bomStockExempt;
   // 조절기를 사용하는 기존 행은 미체크 상태에서도 + 버튼으로 다시 포함할 수 있다.
-  const incrementDisabled = interactionLocked;
-  const shortage = line.included && line.shortage > 0;
+  const incrementDisabled = bomStockExempt;
+  const shortage = !noInventoryEffect && line.included && (
+    available === null
+      ? effectLine.shortage > 0
+      : isOutgoing(effectLine) && Number(effectLine.quantity) > available
+  );
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
@@ -127,8 +137,12 @@ export function IoLineRow({
   const displayedCurrent = isWarehouseAdjust && item
     ? Number(item.warehouse_qty) || 0
     : available;
-  const expected = bomStockExempt ? displayedCurrent : expectedAfter(line, displayedCurrent);
-  const tag = lineTagLabel(line, subType);
+  const expected = bomStockExempt || noInventoryEffect
+    ? displayedCurrent
+    : expectedAfter(effectLine, displayedCurrent);
+  const tag = noInventoryEffect
+    ? { text: "변동 없음", tone: "muted" as const }
+    : lineTagLabel(effectLine, subType);
   const tagColor = toneToColor(tag.tone);
   const expectedColor =
     expected === null
@@ -143,7 +157,7 @@ export function IoLineRow({
   const currentQty = Number(line.quantity) || 0;
 
   function nextShortageFor(quantity: number) {
-    if (!isOutgoing(line)) return 0;
+    if (noInventoryEffect || !isOutgoing(effectLine)) return 0;
     return available === null ? line.shortage : Math.max(0, quantity - available);
   }
 
@@ -229,8 +243,10 @@ export function IoLineRow({
             <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
               {bomStockExempt
                 ? "BOM 자동 처리 시 재고 미반영"
-                : qtyLocked
-                ? "상위 품목과 함께 자동 처리"
+                : bomCheckboxLocked
+                ? line.included
+                  ? "클릭하면 수량 0으로 제외"
+                  : "수량을 늘리면 재고 반영에 포함"
                 : line.included
                   ? "재고 반영 포함"
                   : line.exclusion_note || "이번 작업 제외"}
@@ -284,10 +300,10 @@ export function IoLineRow({
         <QuantityStepper
           value={currentQty}
           onChange={onStepperChange}
-          disabled={editingDisabled || interactionLocked}
+          disabled={editingDisabled || bomStockExempt}
           decrementDisabled={stepperDisabled}
           incrementDisabled={incrementDisabled}
-          inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
+          inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : undefined}
           className="w-full lg:w-auto"
         />
       )}
@@ -300,7 +316,7 @@ export function IoLineRow({
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          {isWarehouseAdjust ? "현재 창고" : isOutgoing(line) ? "가능 재고" : "현재 재고"}
+          {isWarehouseAdjust ? "현재 창고" : isOutgoing(effectLine) ? "가능 재고" : "현재 재고"}
         </div>
         <div
           className="text-base font-black tabular-nums"

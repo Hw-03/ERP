@@ -1819,6 +1819,21 @@
             "title": "Item Name",
             "type": "string"
           },
+          "legacy_origin": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aggregate",
+                  "reconstructed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Origin"
+          },
           "mes_code": {
             "anyOf": [
               {
@@ -4563,6 +4578,40 @@
             },
             "title": "Operation Line Ids",
             "type": "array"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At"
+          },
+          "rejected_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected By Name"
+          },
+          "rejected_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected Reason"
           },
           "request_code": {
             "anyOf": [

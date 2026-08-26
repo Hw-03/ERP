@@ -72,6 +72,13 @@ export function IoDraftWorkCard({
   onRequestDelete,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const latestRejection = draft.status === "draft"
+    ? (draft.stock_requests ?? [])
+      .filter((request) => request.status === "rejected" && request.rejected_at)
+      .sort((left, right) =>
+        new Date(right.rejected_at!).getTime() - new Date(left.rejected_at!).getTime(),
+      )[0]
+    : undefined;
 
   const meta = useMemo(() => {
     const qty = draft.bundles.reduce(
@@ -208,7 +215,7 @@ export function IoDraftWorkCard({
         >
           {meta.startedText} 작업 시작
         </span>
-        {meta.shortageCount > 0 && (
+      {meta.shortageCount > 0 && (
           <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black"
             style={{ background: tint(LEGACY_COLORS.red, 12), color: LEGACY_COLORS.red }}
@@ -216,8 +223,24 @@ export function IoDraftWorkCard({
             <AlertTriangle className="h-3 w-3" />
             자재 {meta.shortageCount}종 부족
           </span>
-        )}
+      )}
       </div>
+
+      {latestRejection?.rejected_reason && (
+        <div
+          className="mt-3 rounded-[10px] border px-3 py-2 text-[12px] font-semibold"
+          style={{
+            background: tint(LEGACY_COLORS.red, 8),
+            borderColor: tint(LEGACY_COLORS.red, 25),
+            color: LEGACY_COLORS.red,
+          }}
+        >
+          <p className="font-black">반려 사유: {latestRejection.rejected_reason}</p>
+          <p className="mt-0.5">
+            {latestRejection.rejected_by_name ?? "결재자"} · {formatKstDateTime(latestRejection.rejected_at)}
+          </p>
+        </div>
+      )}
 
       {/* 펼침: 자재 목록 */}
       {expanded && (

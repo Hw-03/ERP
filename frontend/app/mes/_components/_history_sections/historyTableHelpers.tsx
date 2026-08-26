@@ -1318,7 +1318,7 @@ export function OpBatchHeader({
     titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
   }
 
-  const summary = getHistoryMovementSummary(first, batch, group.logs.length);
+  const summary = getHistoryMovementSummary(first, batch, group.logs.length, group.logs);
   const presentation: HistoryRowPresentation = {
     ...basePresentation,
     movement: summary,
@@ -1402,15 +1402,17 @@ export function OpBatchHeader({
   );
 }
 
-function getOpBatchRepresentativeLog(logs: TransactionLog[], batch?: IoBatch | null): TransactionLog {
-  const first = logs[0];
-  if (!batch) return first;
-  const target = getDisplayBundles(batch)[0];
-  if (!target) return first;
+function getOpBatchRepresentativeLog(logs: TransactionLog[], batch?: IoBatch | null): TransactionLog | null {
+  const first = logs[0] ?? null;
+  if (!batch) return logs.length === 1 ? first : null;
+  const targets = getDisplayBundles(batch);
+  if (targets.length === 0) return logs.length === 1 ? first : null;
+  if (targets.length > 1) return null;
+  const target = targets[0];
   return logs.find((log) => target.source_item_id && log.item_id === target.source_item_id)
     ?? logs.find((log) => target.source_mes_code && log.mes_code === target.source_mes_code)
     ?? logs.find((log) => log.item_name === target.title)
-    ?? first;
+    ?? null;
 }
 
 function HistoryBatchMetadataPlaceholder({ widthClass }: { widthClass: string }) {

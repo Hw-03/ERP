@@ -25,6 +25,18 @@ export interface OperatorLike {
 
 export type DeptIoDirection = "in" | "out";
 
+export interface IoTargetPickerFilters {
+  department: string;
+  model: string;
+  stage: string;
+}
+
+export const INITIAL_IO_TARGET_PICKER_FILTERS: IoTargetPickerFilters = {
+  department: "ALL",
+  model: "전체",
+  stage: "ALL",
+};
+
 /** 대시보드 빠른작업 → 입출고 위저드 깊은 진입 인텐트.
  *  workType 선택 + direction(process 전용) 또는 subType(warehouse_io/receive 전용)을 담아
  *  위저드가 Step3(대상 선택)에 프리셋된 채로 열린다. */
@@ -56,5 +68,10 @@ export interface IoComposeViewProps {
   onItemConversionFocusChange?: (focused: boolean) => void;
   itemPickerFullscreen?: boolean;
   onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
-  onDraftSaved?: (batchId: string, step: IoStep) => void;
+  /** 새 작업 전환 중 저장한 원 초안은 URL 복원을 남기지 않는다. */
+  onDraftSaved?: (
+    batchId: string,
+    step: IoStep,
+    persistInUrl?: boolean,
+  ) => void;
 }

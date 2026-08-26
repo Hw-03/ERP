@@ -4,6 +4,7 @@ import { Layers, RotateCcw, Search, Sparkles, TrendingUp } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
+import type { DepartmentFilterBasis } from "./inventoryFilter";
 
 const DEPT_CHIPS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
@@ -17,11 +18,13 @@ const PROCESS_STEP_CHIPS: { value: "R" | "A" | "F" | "DEFECT"; label: string }[]
 type FiltersProps = {
   open: boolean;
   selectedDepts: string[];
+  departmentFilterBasis: DepartmentFilterBasis;
   selectedModels: string[];
   selectedProcessSteps: string[];
   showDisused: boolean;
   productModels: ProductModel[];
   toggleDept: (v: string) => void;
+  onDepartmentFilterBasisChange: (basis: DepartmentFilterBasis) => void;
   toggleModel: (v: string) => void;
   toggleProcessStep: (v: string) => void;
   toggleDisused: () => void;
@@ -35,11 +38,13 @@ type FiltersProps = {
 export function InventoryFilters({
   open,
   selectedDepts,
+  departmentFilterBasis,
   selectedModels,
   selectedProcessSteps,
   showDisused,
   productModels,
   toggleDept,
+  onDepartmentFilterBasisChange,
   toggleModel,
   toggleProcessStep,
   toggleDisused,
@@ -53,9 +58,34 @@ export function InventoryFilters({
   return (
     <div id="inventory-filter-panel" className="mt-3 grid gap-3 xl:grid-cols-3">
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-        <div className="mb-2 flex items-center gap-2 text-sm font-bold">
-          <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
-          부서 구분
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-bold">
+            <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
+            부서 구분
+          </div>
+          <div className="inline-flex shrink-0 items-stretch rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+            {([
+              ["location", "재고 위치 기준"],
+              ["code", "품목 코드 기준"],
+            ] as const).map(([basis, label]) => {
+              const active = departmentFilterBasis === basis;
+              return (
+                <button
+                  key={basis}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onDepartmentFilterBasisChange(basis)}
+                  className="rounded-[8px] px-2 py-1 text-xs font-bold transition-colors"
+                  style={{
+                    background: active ? `color-mix(in srgb, ${LEGACY_COLORS.green} 20%, transparent)` : "transparent",
+                    color: active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
           <FilterChip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} className="w-full" />
