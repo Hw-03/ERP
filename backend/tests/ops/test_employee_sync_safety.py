@@ -90,6 +90,28 @@ def _fake_bootstrap_tool() -> str:
     )
 
 
+def _fake_inventory_operation_admin_tool() -> str:
+    return textwrap.dedent(
+        """
+        import os
+        import sys
+        from pathlib import Path
+
+        command = sys.argv[1] if len(sys.argv) > 1 else ""
+        contracts = {
+            "diagnose": ("diagnose-operation-integrity", "FAKE_OPERATION_DIAGNOSE_EXIT"),
+            "activate": ("activate-operation-integrity", "FAKE_OPERATION_ACTIVATE_EXIT"),
+        }
+        if command not in contracts:
+            raise SystemExit(91)
+        event, exit_variable = contracts[command]
+        with Path(os.environ["SYNC_EVENT_LOG"]).open("a", encoding="utf-8") as handle:
+            handle.write(f"{event}\\n")
+        raise SystemExit(int(os.environ.get(exit_variable, "0")))
+        """
+    )
+
+
 def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Path, dict[str, str], Path]:
     dev_root = tmp_path / "dev"
     emp_root = tmp_path / "employee"
@@ -166,6 +188,10 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
         emp_root / "scripts" / "ops" / "check_inventory_integrity.py",
         _fake_python_tool("verify-inventory", "FAKE_INVENTORY_VERIFY_EXIT"),
     )
+    _write(
+        emp_root / "scripts" / "ops" / "inventory_operation_admin.py",
+        _fake_inventory_operation_admin_tool(),
+    )
     _write(emp_root / "backend" / "mes.db", "fake employee database\n")
 
     _write(
@@ -230,6 +256,8 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
             "FAKE_SCHEMA_CHECK_OUTPUT": "ready=true",
             "FAKE_SCHEMA_VERIFY_EXIT": "0",
             "FAKE_INVENTORY_VERIFY_EXIT": "0",
+            "FAKE_OPERATION_DIAGNOSE_EXIT": "0",
+            "FAKE_OPERATION_ACTIVATE_EXIT": "0",
         }
     )
     environment.update(overrides)
@@ -370,6 +398,8 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
         "schema-check",
         "verify-schema",
         "verify-inventory",
+        "diagnose-operation-integrity",
+        "activate-operation-integrity",
         "start-backend",
         "start-frontend",
     ]
@@ -425,6 +455,40 @@ def test_employee_sync_ignores_failed_count_text_when_migrate_exit_is_zero(tmp_p
     assert events[-2:] == ["start-backend", "start-frontend"]
 
 
+def test_employee_sync_operation_diagnosis_failure_keeps_legacy_mode_and_services_stopped(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_OPERATION_DIAGNOSE_EXIT": "18"}
+    )
+
+    result = _run_sync(sync_path, environment)
+    events = _event_kinds(event_log)
+    output = result.stdout + result.stderr
+
+    assert result.returncode == 8, output
+    assert events[-1] == "diagnose-operation-integrity"
+    assert "activate-operation-integrity" not in events
+    assert "start-backend" not in events
+    assert "기존 동작" in output
+    assert "restore_db.py" in output
+
+
+def test_employee_sync_operation_activation_failure_does_not_start_services(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_OPERATION_ACTIVATE_EXIT": "19"}
+    )
+
+    result = _run_sync(sync_path, environment)
+    events = _event_kinds(event_log)
+
+    assert result.returncode == 8, result.stdout + result.stderr
+    assert events[-2:] == ["diagnose-operation-integrity", "activate-operation-integrity"]
+    assert "start-backend" not in events
+
+
 def test_employee_sync_checks_stop_commands_and_actual_ports_before_backup() -> None:
     script = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
 
@@ -470,10 +534,14 @@ def test_employee_sync_runs_schema_and_inventory_verification_before_start() -> 
     schema_check = script.index('"--check"', migrate)
     schema_verify = script.index('$verifyTool = Join-Path $EmpRoot "scripts\\ops\\_verify_backup.py"')
     inventory_verify = script.index('$inventoryVerifyTool = Join-Path $EmpRoot "scripts\\ops\\check_inventory_integrity.py"')
+    operation_diagnose = script.index('"diagnose"', inventory_verify)
+    operation_activate = script.index('"activate"', operation_diagnose)
     start = script.index('Write-Host "[start]')
 
-    assert migrate < schema_check < schema_verify < inventory_verify < start
+    assert migrate < schema_check < schema_verify < inventory_verify < operation_diagnose < operation_activate < start
     assert '"--db-url"' in script[inventory_verify:start]
+    assert '"--validated-backup"' in script[operation_activate:start]
+    assert '"--approved-by"' in script[operation_activate:start]
     assert "Write-RecoveryInstructions" in script[inventory_verify:start]
     assert "exit 8" in script[inventory_verify:start]
 

@@ -439,6 +439,38 @@ if (-not $inventoryVerifyResult.Success) {
     Write-RecoveryInstructions -FailedStage "post-verify" -ValidatedBackupPath $backupPath
     exit 8
 }
+
+$operationIntegrityTool = Join-Path $EmpRoot "scripts\ops\inventory_operation_admin.py"
+$operationDiagnoseResult = Invoke-CheckedExternalCommand `
+    -FilePath "py.exe" `
+    -ArgumentList @(
+        $operationIntegrityTool,
+        "diagnose",
+        "--db-url", $inventoryDbUrl
+    )
+Write-CheckedCommandResult -Label "post-verify-operation-integrity" -Result $operationDiagnoseResult
+if (-not $operationDiagnoseResult.Success) {
+    Write-Host "[post-verify] 취소 원장 정합성 진단 실패 - 신규 원장을 활성화하지 않아 기존 동작을 유지합니다."
+    Write-RecoveryInstructions -FailedStage "post-verify" -ValidatedBackupPath $backupPath
+    exit 8
+}
+
+$operationActivateResult = Invoke-CheckedExternalCommand `
+    -FilePath "py.exe" `
+    -ArgumentList @(
+        $operationIntegrityTool,
+        "activate",
+        "--db-url", $inventoryDbUrl,
+        "--approved-by", "sync-to-employee",
+        "--validated-backup", $backupPath,
+        "--apply"
+    )
+Write-CheckedCommandResult -Label "post-verify-operation-activate" -Result $operationActivateResult
+if (-not $operationActivateResult.Success) {
+    Write-Host "[post-verify] 취소 원장 활성화 실패 - 설정 트랜잭션을 롤백하고 서버를 시작하지 않습니다."
+    Write-RecoveryInstructions -FailedStage "post-verify" -ValidatedBackupPath $backupPath
+    exit 8
+}
 Write-Host "[post-verify] 완료"
 
 # ---------------------------------------------------------------
