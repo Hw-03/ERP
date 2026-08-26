@@ -126,9 +126,15 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 3. `C:\ERP-dev\_attic\runtime\backups\sqlite`에 `sqlite3.backup` 백업 생성·검증(최신 10개 유지)
 4. 코드 동기화 후 `bootstrap_db.py --migrate`로 Alembic upgrade 또는 승인된 레거시 기준선 등록
 5. 실제 직원 DB의 SQLite/필수 테이블 검증과 재고 무결성 검증
-6. 서버 시작과 백엔드·프론트 헬스체크
+6. 취소 원장 정합성 읽기 전용 진단
+7. 진단 통과 시 취소 원장은 즉시, 새 주간보고 기준은 다음 KST 월요일 00:00부터 활성화
+8. 서버 시작과 백엔드·프론트 헬스체크
 
-백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션 또는 사후 검증 실패 시 서버와 DB를 자동 복원하지 않으며, 콘솔에 검증된 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --check` 수동 명령을 출력한다.
+백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션, 사후 검증, 취소 원장 진단 또는 활성화가 실패하면 서버와 DB를 자동 복원하지 않고 기존 설정을 유지한다. 콘솔에는 검증된 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --check` 수동 명령을 출력한다.
+
+주중 동기화가 끝난 주간보고에는 아래 안내가 표시되고, 새 7열 검산 기준은 다음 KST 월요일부터 공개된다.
+
+> 주간보고 계산 기준을 개선 중입니다. 이번 주 수치는 실제 재고와 다를 수 있으며, 다음 주부터 새 기준으로 정확한 정보가 표시됩니다.
 
 미버전 SQLite DB는 검토·고정된 개발/직원 스키마 지문과 정확히 일치할 때만 등록한다. 등록 전 검증 백업을 만들고 업무 데이터 지문을 전후 비교하며, 알 수 없는 구조·데이터 변경·Alembic revision과 상태표 불일치는 모두 서버 시작 전에 중단한다. 임의의 `alembic stamp`로 이 검사를 우회하지 않는다.
 
@@ -330,6 +336,37 @@ python scripts\ops\check_inventory_integrity.py
 ```
 
 직접 실행하면 거래 유형별 `count`, `sample_log_id`, `sample_mes_code`가 함께 출력된다. 운영자는 `sample_log_id`를 기준으로 히스토리/DB 로그를 확인하고, 같은 유형의 과거 로그가 현재 재고에 영향을 줄 수 있는지 판단한다. `operational_readiness.bat`는 아침 점검용 요약만 보여주므로 샘플 ID가 필요하면 직접 진단 스크립트를 실행한다.
+
+## 취소 역전 원장 진단·활성화·복구
+
+취소 정합성 도구는 저장소 루트에서 실행한다. `diagnose`는 읽기 전용이며 물리 불량재고와 불량 이동 원장, 부분·중복 취소, 연결 업무 상태, 출하배정과 주간 미분류 효과를 검사한다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py diagnose
+```
+
+관리자 화면의 `정합성` 탭도 같은 진단 결과만 보여주며 복구 버튼은 제공하지 않는다. 문제 ID, 원인 거래, 현재값, 기대값과 자동 복구 가능 여부를 확인한다.
+
+복구는 한 번에 문제 ID 하나만 선택한다. 기본 명령은 dry-run이고 DB를 변경하지 않는다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py repair --problem-id <문제_ID> --approved-by <승인자>
+```
+
+실제 적용에는 검증된 백업, 승인자와 `--apply`가 모두 필요하다. 도구가 안전하게 결정할 수 있는 업무 상태·출하배정 불일치에만 적용되며 불량 수량처럼 원인을 추정해야 하는 문제는 거부한다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py repair --problem-id <문제_ID> --approved-by <승인자> --validated-backup <백업_절대경로> --apply
+```
+
+활성화도 기본은 dry-run이다. 진단이 0건일 때만 취소 원장 기준 시각과 주간보고 시작 시각을 한 트랜잭션으로 저장한다. `--weekly-start`를 생략하면 다음 KST 월요일 00:00을 사용한다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py activate --approved-by <승인자>
+python scripts\ops\inventory_operation_admin.py activate --approved-by <승인자> --validated-backup <백업_절대경로> --apply
+```
+
+취소 원장 활성화 뒤 신규 작업은 `InventoryOperation`을 필수로 사용한다. 활성화 전에 생성된 같은 주 미취소 거래는 취소 요청 시 전체 재고 효과와 연결 업무를 확정할 수 있는 경우에만 원 작업으로 편입하고 별도 역전 작업을 생성한다. 불량 계보·효과·묶음 범위를 확정할 수 없는 거래는 아무 값도 바꾸지 않고 차단한다. 이미 기존 방식으로 취소된 거래와 과거 주간 스냅샷은 자동 변환하거나 재계산하지 않는다. 활성화와 복구의 전후 값·승인자는 관리자 감사로그에 남는다.
 
 ## Inventory Cutover
 

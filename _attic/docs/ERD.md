@@ -120,7 +120,12 @@ erDiagram
     Employee o|--o{ Inventory : "last_reserver_employee_id (nullable)"
     Item ||--o{ InventoryLocation : "item_id"
     Item ||--o{ TransactionLog : "item_id"
+    InventoryOperation ||--o{ TransactionLog : "operation_id"
+    InventoryOperation o|--o| InventoryOperation : "reverses_operation_id"
+    InventoryOperation ||--o{ InventoryOperationEffect : "operation_id"
+    InventoryOperation ||--o{ DefectInventoryMovement : "operation_id"
     Employee o|--o{ TransactionLog : "producer_employee_id / cancelled_by (nullable)"
+    TransactionLog o|--o| TransactionLog : "reverses_log_id"
     TransactionLog ||--o{ TransactionEditLog : "original_log_id"
     TransactionLog o|--o{ TransactionEditLog : "correction_log_id (nullable)"
     Employee ||--o{ TransactionEditLog : "edited_by_employee_id"
@@ -140,10 +145,41 @@ erDiagram
     }
     TransactionLog {
         uuid item_id FK
+        uuid operation_id FK "nullable for legacy"
+        string operation_role "nullable for legacy"
+        uuid reverses_log_id FK "nullable, unique"
         uuid operation_batch_id FK "nullable"
         uuid shipping_request_id FK "nullable"
         string transaction_type
         int quantity_change
+    }
+    InventoryOperation {
+        uuid operation_id PK
+        string kind "BUSINESS / CANCELLATION"
+        string domain
+        string action
+        string status
+        datetime effective_at
+        uuid reverses_operation_id FK "nullable, unique"
+    }
+    InventoryOperationEffect {
+        uuid effect_id PK
+        uuid operation_id FK
+        string effect_kind
+        string subject_type
+        string subject_id
+        json before_state
+        json after_state
+        uuid reverses_effect_id FK "nullable, unique"
+    }
+    DefectInventoryMovement {
+        uuid movement_id PK
+        uuid operation_id FK
+        uuid record_id FK
+        uuid item_id FK
+        string department
+        int quantity_delta
+        uuid reverses_movement_id FK "nullable, unique"
     }
     TransactionEditLog {
         uuid original_log_id FK
@@ -154,6 +190,8 @@ erDiagram
 
 - `inventory.item_id`는 품목당 하나의 재고 행을 보장한다. `inventory_locations`는 품목·부서·상태 조합의 위치 재고다.
 - 거래 수정 이력은 원본/보정 거래를 분리해 보관한다.
+- 신규 사용자 작업의 거래·불량 이동·비재고 효과는 같은 `inventory_operations.operation_id`에 묶인다. 레거시 거래의 `transaction_logs.operation_id`는 비어 있을 수 있으며, 원장 활성화 뒤 같은 주 미취소 거래를 안전하게 취소할 수 있을 때만 취소 트랜잭션 안에서 원 작업에 편입된다.
+- 취소는 원 작업과 원 로그를 수정하지 않고 고유 `reverses_*` 관계를 가진 반대 작업·로그·효과·불량 이동을 추가한다.
 
 ## 4. 입출고 V2·결재
 
