@@ -109,6 +109,42 @@ def test_postgres_retention_keeps_latest_ten_regular_dumps_and_preserves_pre_sna
     assert pre_snapshot.exists()
 
 
+def test_retention_tolerates_concurrent_windows_delete_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backup_dir = tmp_path / "sqlite"
+    backup_dir.mkdir()
+    regular = []
+    for index in range(11):
+        backup = backup_dir / f"mes_20000101_0000{index:02d}.db"
+        backup.touch()
+        os.utime(backup, (index + 1, index + 1))
+        regular.append(backup)
+    victim = regular[0]
+    original_unlink = Path.unlink
+    raced = False
+
+    def unlink_after_competing_process(
+        path: Path,
+        missing_ok: bool = False,
+    ) -> None:
+        nonlocal raced
+        if path == victim and not raced:
+            raced = True
+            original_unlink(path, missing_ok=missing_ok)
+            raise PermissionError(5, "another backup process removed the file", str(path))
+        original_unlink(path, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", unlink_after_competing_process)
+
+    removed = retain_latest_backups(backup_dir, suffix=".db")
+
+    assert raced is True
+    assert removed == [victim]
+    assert not victim.exists()
+
+
 @pytest.mark.parametrize(
     "name",
     [
