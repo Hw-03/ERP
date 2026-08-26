@@ -211,6 +211,15 @@ def _restore_sqlite_dependents(
         )
 
 
+def _clear_sqlite_dependents(
+    bind: sa.Connection,
+    snapshots: list[tuple[str, list[str], list[str], list[tuple[object, ...]]]],
+) -> None:
+    """부모 테이블 재생성 전에 하위 행을 역순으로 비워 FK 위반을 막는다."""
+    for table_name, *_ in reversed(snapshots):
+        bind.exec_driver_sql(f"DELETE FROM {_quote_identifier(table_name)}")
+
+
 def _create_operation_tables() -> None:
     op.create_table(
         "inventory_operations",
@@ -432,6 +441,18 @@ def _alter_transaction_logs() -> None:
     else:
         bind = op.get_bind()
         snapshots = _snapshot_sqlite_dependents(bind)
+        affected_tables: set[str] = set()
+        baseline_violations: set[tuple[object, ...]] = set()
+        if bind.dialect.name == "sqlite":
+            affected_tables = {"transaction_logs"} | {
+                table_name for table_name, *_ in snapshots
+            }
+            baseline_violations = {
+                tuple(row)
+                for row in bind.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+                if row[0] in affected_tables
+            }
+            _clear_sqlite_dependents(bind, snapshots)
         with op.batch_alter_table("transaction_logs") as batch_op:
             batch_op.add_column(sa.Column("operation_id", sa.String(length=32), nullable=True))
             batch_op.add_column(sa.Column("operation_role", role_enum, nullable=True))
@@ -454,6 +475,18 @@ def _alter_transaction_logs() -> None:
                 "uq_transaction_log_reverses_log", ["reverses_log_id"]
             )
         _restore_sqlite_dependents(bind, snapshots)
+        if bind.dialect.name == "sqlite":
+            violations = {
+                tuple(row)
+                for row in bind.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+                if row[0] in affected_tables
+            }
+            new_violations = violations - baseline_violations
+            if new_violations:
+                raise RuntimeError(
+                    "transaction_logs migration left foreign key violations: "
+                    f"{sorted(new_violations)[:5]}"
+                )
 
     op.create_index("ix_transaction_logs_operation_id", "transaction_logs", ["operation_id"])
     op.create_index("ix_transaction_logs_operation_role", "transaction_logs", ["operation_role"])
