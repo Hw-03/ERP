@@ -22,6 +22,7 @@ from app.schemas import InventoryResponse
 
 from . import (
     query,
+    operations,
     transactions,
     weekly_report,
 )
@@ -32,6 +33,7 @@ router = APIRouter()
 
 # 정적 경로(/transactions/*, /summary, /locations/...)를 동적 catch-all("") 보다 먼저 등록.
 router.include_router(transactions.router)
+router.include_router(operations.router)
 router.include_router(query.router)
 router.include_router(weekly_report.router)
 

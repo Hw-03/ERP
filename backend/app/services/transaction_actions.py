@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
+    InventoryOperationRoleEnum,
     Item,
     LocationStatusEnum,
     TransactionEditLog,
@@ -21,6 +22,8 @@ from app.models import (
 )
 from app.repositories import inventory_repository, item_repository
 from app.services import audit, inv_effect, inventory as inventory_svc
+from app.services import inventory_operations as operation_svc
+from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services._tx import transactional
 from app.services.inv_calc import _sync_total
 
@@ -139,11 +142,22 @@ def correct_transaction_quantity(
 ) -> TransactionLog:
     """재고 보정과 보정 원장·수정 이력·감사를 원자적으로 확정한다."""
     with transactional(db):
+        operation = operation_svc.create_business_operation(
+            db,
+            domain="transaction",
+            action="quantity_correction",
+            display_label="수량 보정",
+            actor_name=editor.name,
+            actor_employee_id=editor.employee_id,
+            department="창고",
+            reason=reason,
+            idempotency_key=f"transaction_correction:{log.log_id}",
+        )
         cells_before = inv_effect.snapshot_cells(db, log.item_id)
         adjusted_inv, qty_before, _applied_delta = inventory_svc.adjust_warehouse(
             db, log.item_id, new_warehouse
         )
-        correction_log = TransactionLog(
+        correction_log = operation_svc.attach_transaction(TransactionLog(
             item_id=log.item_id,
             transaction_type=TransactionTypeEnum.ADJUST,
             quantity_change=delta,
@@ -155,7 +169,7 @@ def correct_transaction_quantity(
             producer_employee_id=editor.employee_id,
             department="창고",
             **inv_effect.capture_log_stock_snapshot(db, log.item_id, cells_before),
-        )
+        ), operation, InventoryOperationRoleEnum.CORRECTION)
         db.add(correction_log)
         db.flush()
 
@@ -254,6 +268,24 @@ def cancel_transaction(
 ) -> TransactionLog:
     """재고 역재생과 거래 취소 상태·감사를 원자적으로 확정한다."""
     with transactional(db):
+        now = datetime.utcnow()
+        if operation_svc.is_ledger_active(db, at=now):
+            legacy_adoption_svc.adopt_and_cancel(
+                db,
+                selected_log_id=log.log_id,
+                canceller=canceller,
+                reason=reason,
+                now=now,
+            )
+            audit.record(
+                db,
+                request=request,
+                action="transaction.cancel",
+                target_type="transaction_log",
+                target_id=str(log.log_id),
+                payload_summary=f"{canceller.name}: {reason}",
+            )
+            return log
         batch_logs: list[TransactionLog] = []
         if log.operation_batch_id:
             batch_logs = (
@@ -280,7 +312,6 @@ def cancel_transaction(
             db,
             sorted({batch_log.item_id for batch_log in batch_logs}),
         )
-        now = datetime.utcnow()
         for batch_log in batch_logs:
             inventory = inventory_repository.get(db, batch_log.item_id)
             if inventory is None:

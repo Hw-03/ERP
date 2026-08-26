@@ -12,6 +12,8 @@ from decimal import Decimal
 
 from app.models import (
     Employee,
+    InventoryOperation,
+    InventoryOperationKindEnum,
     IoBatch,
     ProductSymbol,
     TransactionLog,
@@ -404,6 +406,84 @@ def test_summary_categorizes_by_transaction_type(client, db_session, make_item):
         "dept_count": 2,
         "adjust_count": 1,
         "department_counts": {"창고": 7, "조립": 2},
+    }
+
+
+def test_summary_counts_each_new_operation_once_and_excludes_cancellation_from_adjustment(
+    client, db_session, make_item
+):
+    """부모·하위 로그 수와 무관하게 원 작업과 취소 작업을 각각 한 건으로 센다."""
+    parent = make_item(name="operation-summary-parent", warehouse_qty=Decimal("0"))
+    child = make_item(name="operation-summary-child", warehouse_qty=Decimal("0"))
+    original = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="department_inventory",
+        action="correction",
+        display_label="부서 입출고",
+        actor_name="원 작업자",
+        department="고압",
+    )
+    db_session.add(original)
+    db_session.flush()
+    original_logs = []
+    for item, qty in ((parent, Decimal("-7")), (child, Decimal("-3"))):
+        log = TransactionLog(
+            item_id=item.item_id,
+            operation_id=original.operation_id,
+            transaction_type=TransactionTypeEnum.ADJUST,
+            quantity_change=qty,
+            quantity_before=Decimal("10"),
+            quantity_after=Decimal("10") + qty,
+            department="고압",
+        )
+        db_session.add(log)
+        original_logs.append(log)
+    db_session.flush()
+
+    cancellation = InventoryOperation(
+        kind=InventoryOperationKindEnum.CANCELLATION,
+        domain=original.domain,
+        action=original.action,
+        display_label="부서 입출고 취소",
+        actor_name="취소 작업자",
+        department="고압",
+        reverses_operation_id=original.operation_id,
+    )
+    db_session.add(cancellation)
+    db_session.flush()
+    for original_log in original_logs:
+        db_session.add(
+            TransactionLog(
+                item_id=original_log.item_id,
+                operation_id=cancellation.operation_id,
+                transaction_type=original_log.transaction_type,
+                quantity_change=-original_log.quantity_change,
+                quantity_before=original_log.quantity_after,
+                quantity_after=original_log.quantity_before,
+                department="고압",
+                reverses_log_id=original_log.log_id,
+            )
+        )
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions/summary")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "total": 2,
+        "warehouse_count": 0,
+        "dept_count": 0,
+        "adjust_count": 1,
+        "department_counts": {"고압": 2},
+    }
+
+    operation_logs = client.get(
+        "/api/inventory/transactions",
+        params={"operation_id": str(original.operation_id)},
+    )
+    assert operation_logs.status_code == 200, operation_logs.text
+    assert {row["log_id"] for row in operation_logs.json()} == {
+        str(log.log_id) for log in original_logs
     }
 
 

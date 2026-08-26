@@ -80,6 +80,13 @@ class TransactionLogResponse(BaseModel):
     reason_memo: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
     operation_line_id: Optional[uuid.UUID] = None
+    operation_id: Optional[uuid.UUID] = None
+    operation_role: Optional[str] = None
+    operation_kind: Optional[str] = None
+    operation_display_label: Optional[str] = None
+    operation_effective_status: Optional[str] = None
+    reversal_operation_id: Optional[uuid.UUID] = None
+    reverses_log_id: Optional[uuid.UUID] = None
     shipping_phase: Optional[str] = None
     created_at: UtcDatetime
     edit_count: int = 0
@@ -93,7 +100,7 @@ class TransactionLogResponse(BaseModel):
 class TransactionDisplayGroupResponse(BaseModel):
     """PC 입출고 내역 목록의 대표 행과 그에 속한 전체 거래 로그."""
 
-    type: Literal["solo", "batch", "op_batch", "defect_lifecycle"]
+    type: Literal["solo", "batch", "op_batch", "operation", "defect_lifecycle"]
     key: str
     logs: list[TransactionLogResponse]
 
