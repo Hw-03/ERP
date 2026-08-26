@@ -26,6 +26,9 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationRoleEnum,
     InventoryLocation,
     LocationStatusEnum,
     RequestBucketEnum,
@@ -33,6 +36,7 @@ from app.models import (
     StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -756,6 +760,55 @@ def test_execute_all_lines_multiline(db_session, make_item):
     assert _wh_qty(db_session, item_b.item_id) == D("3")
     assert len(_logs(db_session, item_a.item_id)) == 1
     assert len(_logs(db_session, item_b.item_id)) == 1
+
+
+def test_execute_all_lines_records_one_operation_for_request(db_session, make_item):
+    item_a = make_item(name="원장 요청 A", warehouse_qty=D("0"))
+    item_b = make_item(name="원장 요청 B", warehouse_qty=D("0"))
+    employee = _make_employee(db_session, code="SR-LEDGER")
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.RAW_RECEIVE,
+    )
+    lines = [
+        _add_line(
+            db_session,
+            request,
+            item,
+            quantity=D("1"),
+            from_bucket=RequestBucketEnum.NONE,
+            to_bucket=RequestBucketEnum.WAREHOUSE,
+        )
+        for item in (item_a, item_b)
+    ]
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    svc._execute_all_lines(
+        db_session,
+        request,
+        lines,
+        operator_name=employee.name,
+        approver=employee,
+    )
+    db_session.flush()
+
+    operation = db_session.query(InventoryOperation).one()
+    logs = db_session.query(TransactionLog).order_by(TransactionLog.created_at).all()
+    assert {log.operation_id for log in logs} == {operation.operation_id}
+    assert {log.operation_role for log in logs} == {
+        InventoryOperationRoleEnum.PRIMARY
+    }
+    effect = db_session.query(InventoryOperationEffect).one()
+    assert effect.subject_type == "StockRequest"
+    assert effect.before_state == {"status": "submitted"}
+    assert effect.after_state == {"status": "completed"}
 
 
 # ══════════════════════════ _finalize_submission ══════════════════════════
