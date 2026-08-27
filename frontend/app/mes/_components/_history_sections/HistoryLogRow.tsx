@@ -104,8 +104,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         code={presentation.target.code}
         quantity={<QuantityStockCell presentation={presentation} />}
       />
-      <StockSnapshotCell log={log} moment="before" />
-      <StockSnapshotCell log={log} moment="after" />
+      <StockSnapshotCell log={log} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>

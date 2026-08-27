@@ -118,8 +118,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         compact={compact}
         quantity={<QuantityStockCell presentation={presentation} />}
       />
-      <StockSnapshotCell log={parentLog} moment="before" />
-      <StockSnapshotCell log={parentLog} moment="after" />
+      <StockSnapshotCell log={parentLog} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>

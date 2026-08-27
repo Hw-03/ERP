@@ -38,8 +38,7 @@ const TX_ICON = {
 } as const;
 
 /**
- * 우측 SlidePanel(160ms width transition)에 맞춰 셀 width/padding 변경을 부드럽게 한다.
- * 평상시 ↔ 우측 패널 열림 시 표 열이 jump 없이 축소·복원된다.
+ * 우측 SlidePanel(160ms width transition)에 맞춰 표 셀의 레이아웃 변화도 부드럽게 한다.
  */
 export const HISTORY_CELL_TRANSITION =
   "padding 160ms cubic-bezier(0.4, 0, 0.2, 1), width 160ms cubic-bezier(0.4, 0, 0.2, 1)";
@@ -49,12 +48,13 @@ export const HISTORY_STATUS_CELL_CLASS = "border-b py-0 align-middle";
 export const HISTORY_CHILD_ROW_CLASS = "h-[40px]";
 export const HISTORY_CHILD_CELL_CLASS = "h-[40px] overflow-hidden border-b py-0 align-middle";
 export const HISTORY_TABLE_OPERATION_PILL_CLASS = "w-32 max-w-full min-w-0 overflow-hidden";
-export const HISTORY_ITEM_CODE_WIDTH_PX = 108;
+export const HISTORY_ITEM_CODE_WIDTH_PX = 144;
 export const HISTORY_QUANTITY_WIDTH_PX = 220;
 export const HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX = HISTORY_ITEM_CODE_WIDTH_PX + HISTORY_QUANTITY_WIDTH_PX;
-export const HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX = 40;
+export const HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX = 0;
 export const HISTORY_CODE_QUANTITY_WIDTH_PX = HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX + HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX;
 const STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH = formatQty(10_000).length;
+const STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH = formatQty(100).length;
 
 export function FlowBadge({
   type,
@@ -297,6 +297,26 @@ export function TargetSummaryBlock({
   );
 }
 
+function AlignedItemCode({ code }: { code: string }) {
+  const match = code.match(/^([^-]+)-([A-Z]{2})-([^-]+)$/);
+  if (!match) {
+    return <span className="block min-w-0 truncate text-right">{code}</span>;
+  }
+
+  const [, model, process, serial] = match;
+  return (
+    <span className="flex w-full justify-center">
+      <span className="inline-grid grid-cols-[auto_auto_auto] items-center">
+        <span className="relative before:invisible before:content-['0-']">
+          <span className="absolute right-0 top-0 whitespace-nowrap text-right">{model}-</span>
+        </span>
+        <span>{process}</span>
+        <span className="text-left">-{serial}</span>
+      </span>
+    </span>
+  );
+}
+
 export function ItemCodeQuantityCell({
   code,
   sourceCode,
@@ -314,28 +334,26 @@ export function ItemCodeQuantityCell({
   return (
     <td
       colSpan={2}
-      data-history-collapsible-group="true"
       className={`${dense ? "h-[40px]" : "h-[64px]"} overflow-hidden border-b p-0 align-middle`}
       style={{ borderColor: LEGACY_COLORS.border, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px`, transition: HISTORY_CELL_TRANSITION }}
     >
       <div
-        data-history-collapsible-content="true"
         className={`grid ${dense ? "h-[40px]" : "h-[64px]"}`}
         style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
       >
         <div
-          className={`flex min-w-0 items-center justify-center overflow-hidden whitespace-nowrap ${padX} text-center text-xs font-semibold`}
+          className={`flex min-w-0 items-center justify-end overflow-hidden whitespace-nowrap ${padX} text-right text-xs font-semibold`}
           style={{ color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}
         >
           {sourceCode ? (
-            <div className="flex min-w-0 flex-col items-center leading-tight">
-              <span className="max-w-full truncate">{sourceCode}</span>
-              <span aria-hidden className="leading-none">↓</span>
-              <span className="max-w-full truncate">{code ?? "-"}</span>
+            <div className="flex w-full min-w-0 flex-col items-stretch leading-tight">
+              <AlignedItemCode code={sourceCode} />
+              <span aria-hidden className="self-end leading-none">↓</span>
+              <AlignedItemCode code={code ?? "-"} />
             </div>
-          ) : (code || "-")}
+          ) : <AlignedItemCode code={code || "-"} />}
         </div>
-        <div className="flex min-w-0 items-center justify-center overflow-hidden whitespace-nowrap px-2 text-center">
+        <div className="flex min-w-0 items-center justify-start overflow-hidden whitespace-nowrap px-1 text-center">
           {quantity}
         </div>
       </div>
@@ -363,18 +381,15 @@ export function QuantityStockCell({
 
 export function StockSnapshotCell({
   log,
-  moment,
   dense = false,
   quantityWidth,
 }: {
   log?: TransactionLog | null;
-  moment: "before" | "after";
   dense?: boolean;
   /** 같은 작업 묶음의 최장 재고 표기 폭. */
   quantityWidth?: number;
 }) {
   const cellClass = dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS;
-  const momentLabel = moment === "before" ? "작업 전 재고" : "작업 후 재고";
   if (!log) {
     return (
       <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
@@ -383,34 +398,32 @@ export function StockSnapshotCell({
     );
   }
 
-  const warehouse = moment === "before" ? log.warehouse_qty_before : log.warehouse_qty_after;
-  const department = moment === "before" ? log.department_qty_before : log.department_qty_after;
-  if (warehouse == null || department == null) {
+  const { warehouse_qty_before: warehouseBefore, warehouse_qty_after: warehouseAfter, department_qty_before: departmentBefore, department_qty_after: departmentAfter } = log;
+  if (warehouseBefore == null || warehouseAfter == null || departmentBefore == null || departmentAfter == null) {
     return (
       <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         기록 없음
       </td>
     );
   }
-  const warehouseText = formatQty(warehouse);
-  const departmentText = formatQty(department);
+  const warehouseBeforeText = formatQty(warehouseBefore);
+  const warehouseAfterText = formatQty(warehouseAfter);
+  const departmentBeforeText = formatQty(departmentBefore);
+  const departmentAfterText = formatQty(departmentAfter);
   const chipQuantityWidth = Math.max(
     STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH,
-    quantityWidth ?? Math.max(warehouseText.length, departmentText.length),
+    quantityWidth ?? Math.max(warehouseBeforeText.length, warehouseAfterText.length, departmentBeforeText.length, departmentAfterText.length),
   );
+  const beforeQuantityWidth = chipQuantityWidth;
 
   return (
     <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
       <div
-        aria-label={`${momentLabel}: 창고 ${formatQty(warehouse)}, 부서 ${formatQty(department)}`}
-        className="grid min-w-0 grid-cols-2 items-center gap-1"
+        aria-label={`재고 변동: 창고 ${warehouseBeforeText} → ${warehouseAfterText}, 부서 ${departmentBeforeText} → ${departmentAfterText}`}
+        className={`mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
       >
-        <div className="flex min-w-0 justify-end">
-          <StockSnapshotChip label="창고" quantityText={warehouseText} quantityWidth={chipQuantityWidth} color={LEGACY_COLORS.green} />
-        </div>
-        <div className="flex min-w-0 justify-start">
-          <StockSnapshotChip label="부서" quantityText={departmentText} quantityWidth={chipQuantityWidth} color={LEGACY_COLORS.blue} />
-        </div>
+        <StockSnapshotLine label="창고" beforeText={warehouseBeforeText} afterText={warehouseAfterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={warehouseAfter > warehouseBefore} decreased={warehouseAfter < warehouseBefore} cancelled={log.cancelled} />
+        <StockSnapshotLine label="부서" beforeText={departmentBeforeText} afterText={departmentAfterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={departmentAfter > departmentBefore} decreased={departmentAfter < departmentBefore} cancelled={log.cancelled} />
       </div>
     </td>
   );
@@ -429,35 +442,32 @@ export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | 
     : undefined;
 }
 
-function StockSnapshotChip({
+function StockSnapshotLine({
   label,
-  quantityText,
-  quantityWidth,
-  color,
+  beforeText,
+  afterText,
+  beforeQuantityWidth,
+  afterQuantityWidth,
+  increased,
+  decreased,
+  cancelled,
 }: {
   label: string;
-  quantityText: string;
-  quantityWidth: number;
-  color: string;
+  beforeText: string;
+  afterText: string;
+  beforeQuantityWidth: number;
+  afterQuantityWidth: number;
+  increased: boolean;
+  decreased: boolean;
+  cancelled: boolean;
 }) {
+  const afterColor = increased ? LEGACY_COLORS.blue : decreased ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
   return (
-    <span
-      aria-label={`${label} ${quantityText}`}
-      className="relative inline-grid whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-bold"
-      style={{
-        color,
-        background: `color-mix(in srgb, ${color} 14%, transparent)`,
-        borderColor: `color-mix(in srgb, ${color} 35%, transparent)`,
-      }}
-    >
-      <span aria-hidden className="invisible inline-flex items-center gap-1">
-        <span>{label}</span>
-        <span className="inline-block tabular-nums" style={{ width: `${quantityWidth}ch` }}>{quantityText}</span>
-      </span>
-      <span className="absolute inset-0 flex items-center justify-center gap-1">
-        <span>{label}</span>
-        <span className="tabular-nums">{quantityText}</span>
-      </span>
+    <span aria-label={`${label} ${beforeText} → ${afterText}`} className="inline-flex items-center whitespace-nowrap text-xs font-semibold leading-4">
+      <span className="w-7 text-left" style={{ color: LEGACY_COLORS.muted }}>{label}</span>
+      <span className="text-right tabular-nums" style={{ color: LEGACY_COLORS.muted2, width: `${beforeQuantityWidth}ch` }}>{beforeText}</span>
+      <span style={{ color: LEGACY_COLORS.muted }}>→</span>
+      <span data-history-after-stock={cancelled || undefined} className="min-w-0 shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${afterQuantityWidth}ch` }}>{afterText}</span>
     </span>
   );
 }
@@ -901,8 +911,7 @@ export function BatchHeader({
         sourceCode={presentation.target.sourceCode}
         quantity={<QuantityStockCell presentation={presentation} summary={summary} />}
       />
-      <StockSnapshotCell log={representativeLog} moment="before" />
-      <StockSnapshotCell log={representativeLog} moment="after" />
+      <StockSnapshotCell log={representativeLog} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
@@ -1231,8 +1240,7 @@ function ReferenceBatchLineRow({
           </div>
         )}
       />
-      <StockSnapshotCell log={log} moment="before" dense />
-      <StockSnapshotCell log={log} moment="after" dense />
+      <StockSnapshotCell log={log} dense />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }} />
     </tr>
   );
@@ -1393,8 +1401,7 @@ export function OpBatchHeader({
           <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-28" : "w-48"} />
         )}
       />
-      <StockSnapshotCell log={representativeLog} moment="before" quantityWidth={snapshotQuantityWidth} />
-      <StockSnapshotCell log={representativeLog} moment="after" quantityWidth={snapshotQuantityWidth} />
+      <StockSnapshotCell log={representativeLog} quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} compact={compact} />
       </td>

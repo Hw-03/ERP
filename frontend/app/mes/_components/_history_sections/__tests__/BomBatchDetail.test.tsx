@@ -269,8 +269,7 @@ describe("BomBatchDetail", () => {
     );
 
     expect(screen.getByText("-1 EA")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 전 재고: 창고 202, 부서 4")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 후 재고: 창고 202, 부서 3")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 202 → 202, 부서 4 → 3")).toBeInTheDocument();
   });
 
   it("shows unique batch logs on the BOM parent and component rows", () => {
@@ -300,13 +299,11 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
     );
 
-    expect(screen.getByLabelText("작업 전 재고: 창고 0, 부서 15")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 후 재고: 창고 0, 부서 16")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 0 → 0, 부서 15 → 16")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
-    expect(screen.getByLabelText("작업 전 재고: 창고 10, 부서 3")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 후 재고: 창고 10, 부서 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 10 → 10, 부서 3 → 2")).toBeInTheDocument();
   });
 
   it("prefers the exact operation line log when a BOM component is duplicated", () => {
@@ -338,8 +335,8 @@ describe("BomBatchDetail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
-    expect(screen.getByLabelText("작업 전 재고: 창고 10, 부서 3")).toBeInTheDocument();
-    expect(screen.queryByLabelText("작업 전 재고: 창고 90, 부서 9")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 10 → 10, 부서 3 → 2")).toBeInTheDocument();
+    expect(screen.queryByLabelText("재고 변동: 창고 90 → 90, 부서 9 → 9")).not.toBeInTheDocument();
   });
 
   it("keeps an ambiguous legacy component snapshot empty", () => {
@@ -356,7 +353,7 @@ describe("BomBatchDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
     const row = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
-    expect(within(row).getAllByText("—")).toHaveLength(2);
+    expect(within(row).getAllByText("—")).toHaveLength(1);
   });
 
   it("does not use another line's linked log as a legacy fallback", () => {
@@ -374,7 +371,7 @@ describe("BomBatchDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
     const row = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
-    expect(within(row).getAllByText("—")).toHaveLength(2);
+    expect(within(row).getAllByText("—")).toHaveLength(1);
   });
 
   it("keeps duplicate BOM lines empty when legacy logs cannot identify a line", () => {
@@ -395,7 +392,7 @@ describe("BomBatchDetail", () => {
       screen.getAllByText("아주 긴 구성품 라인 이름").map((element) => element.closest("tr")!),
     ));
     expect(rows).toHaveLength(2);
-    rows.forEach((row) => expect(within(row).getAllByText("—")).toHaveLength(2));
+    rows.forEach((row) => expect(within(row).getAllByText("—")).toHaveLength(1));
   });
 
   it("refreshes an open BOM batch and republishes the fresh batch without collapsing it", async () => {
@@ -694,9 +691,8 @@ describe("BomBatchDetail", () => {
     );
 
     const summaryRow = screen.getByText("수량보정 입고").closest("tr")!;
-    expect(within(summaryRow).queryByLabelText(/^작업 전 재고:/)).not.toBeInTheDocument();
-    expect(within(summaryRow).queryByLabelText(/^작업 후 재고:/)).not.toBeInTheDocument();
-    expect(within(summaryRow).getAllByText("—")).toHaveLength(2);
+    expect(within(summaryRow).queryByLabelText(/^재고 변동:/)).not.toBeInTheDocument();
+    expect(within(summaryRow).getAllByText("—")).toHaveLength(1);
   });
 
   it("uses each line's exact log for a non-summary multi-item batch", () => {
@@ -727,10 +723,8 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
     );
 
-    expect(screen.getByLabelText("작업 전 재고: 창고 7, 부서 2")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 후 재고: 창고 8, 부서 3")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 전 재고: 창고 40, 부서 4")).toBeInTheDocument();
-    expect(screen.getByLabelText("작업 후 재고: 창고 41, 부서 5")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 7 → 8, 부서 2 → 3")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 40 → 41, 부서 4 → 5")).toBeInTheDocument();
   });
 
   it("keeps both stock snapshot cells unavailable for configuration-only rows", () => {
@@ -740,11 +734,11 @@ describe("BomBatchDetail", () => {
     );
 
     const bundleRow = screen.getByText("아주 긴 완제품 구성 묶음 이름").closest("tr")!;
-    expect(within(bundleRow).getAllByText("—")).toHaveLength(2);
+    expect(within(bundleRow).getAllByText("—")).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
     const lineRow = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
-    expect(within(lineRow).getAllByText("—")).toHaveLength(2);
+    expect(within(lineRow).getAllByText("—")).toHaveLength(1);
   });
 
   it("shows the internal-use BOM mode and every child inventory effect", () => {

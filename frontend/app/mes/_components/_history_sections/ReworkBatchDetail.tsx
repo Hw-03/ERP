@@ -125,8 +125,7 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
           </div>
         )}
       />
-      <StockSnapshotCell log={summary.representativeLog} moment="before" dense />
-      <StockSnapshotCell log={summary.representativeLog} moment="after" dense />
+      <StockSnapshotCell log={summary.representativeLog} dense />
       <td className="border-b px-4 py-2 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         -
       </td>

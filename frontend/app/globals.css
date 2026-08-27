@@ -246,27 +246,13 @@
 }
 
 @layer components {
-  /* 품목코드·수량은 하나의 물리 셀로 묶어 우측 상세 패널과 같은 박자로 접는다. */
-  .history-table-panel-motion > :is(thead, tbody) > tr > [data-history-collapsible-group="true"] {
-    overflow: hidden;
-    transition:
-      padding 160ms cubic-bezier(0.4, 0, 0.2, 1),
-      width 160ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .history-table-panel-motion[data-panel-open="true"] > :is(thead, tbody) > tr > [data-history-collapsible-group="true"] {
-    width: 0 !important;
-    padding-right: 0 !important;
-    padding-left: 0 !important;
-  }
-
-  /* 취소 원 작업은 작업 전 재고(5열)와 상태(7열)를 제외한 실제 작업 결과만 무효화해 보인다. */
-  .history-table-panel-motion tr[data-history-cancelled] > :is(td:nth-child(1), td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(6)) {
+  /* 취소 원 작업은 작업 전 재고와 상태를 제외한 실제 작업 결과만 무효화해 보인다. */
+  .history-table-panel-motion tr[data-history-cancelled] > :is(td:nth-child(1), td:nth-child(2), td:nth-child(3), td:nth-child(4)) {
     opacity: .55;
     position: relative;
   }
 
-  .history-table-panel-motion tr[data-history-cancelled] > :is(td:nth-child(1), td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(6))::after {
+  .history-table-panel-motion tr[data-history-cancelled] > :is(td:nth-child(1), td:nth-child(2), td:nth-child(3), td:nth-child(4))::after {
     content: "";
     position: absolute;
     top: 50%;
@@ -291,9 +277,10 @@
     left: 0;
   }
 
-  .history-table-panel-motion tr[data-history-cancelled] > td:nth-child(6)::after {
-    right: .25rem;
-    left: .25rem;
+  .history-table-panel-motion tr[data-history-cancelled] [data-history-after-stock="true"] {
+    opacity: .55;
+    text-decoration: line-through;
+    text-decoration-color: var(--c-muted2);
   }
 
   .history-table-panel-motion tr[data-history-cancellation="true"] {

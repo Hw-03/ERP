@@ -121,11 +121,10 @@ describe("ReworkBatchHeader", () => {
     expect(cells[1].firstElementChild).toHaveClass("px-3");
     expect(cells[2]).toHaveClass("px-2");
     expect(cells[3]).toHaveAttribute("colspan", "2");
-    expect(cells[3]).toHaveAttribute("data-history-collapsible-group", "true");
-    expect(cells[3].firstElementChild?.children[1]).toHaveClass("px-2");
+    expect(cells[3]).not.toHaveAttribute("data-history-collapsible-group");
+    expect(cells[3].firstElementChild?.children[1]).toHaveClass("justify-start", "px-1");
     expect(cells[4]).toHaveClass("px-1");
-    expect(cells[5]).toHaveClass("px-1");
-    expect(cells[6]).toHaveClass("px-2");
+    expect(cells[5]).toHaveClass("px-2");
     expect(quantityPill).toHaveClass("min-w-[12.75rem]");
     expect(quantityPill).not.toHaveClass("min-w-0", "flex-1");
   });

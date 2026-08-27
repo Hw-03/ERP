@@ -70,7 +70,6 @@ type ColSpec = {
   align?: "left" | "center" | "right";
   hidden?: boolean;
   px?: string;
-  collapseWithPanel?: boolean;
   colSpan?: number;
   groupLabels?: readonly [string, string];
 };
@@ -85,12 +84,10 @@ const COLUMNS: ColSpec[] = [
     width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px`,
     align: "center",
     px: "px-0",
-    collapseWithPanel: true,
     colSpan: 2,
     groupLabels: ["품목코드", "수량"],
   },
-  { label: "작업 전 재고", width: "192px", align: "center", px: "px-1" },
-  { label: "작업 후 재고", width: "192px", align: "center", px: "px-1" },
+  { label: "재고 변동", width: "172px", align: "center", px: "px-1" },
   { label: "담당자", width: "132px", align: "center", px: "px-2" },
 ];
 const HISTORY_TABLE_COLUMN_SPAN = COLUMNS.reduce((total, column) => total + (column.colSpan ?? 1), 0);
@@ -152,13 +149,11 @@ function HistoryTableSkeleton() {
                 aria-hidden={column.label ? undefined : true}
                 aria-label={column.groupLabels ? column.label : undefined}
                 colSpan={column.colSpan}
-                data-history-collapsible-group={column.collapseWithPanel ? "true" : undefined}
                 className={historyTableHeaderClass(column, index)}
                 style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
               >
                 {column.groupLabels ? (
                   <div
-                    data-history-collapsible-content="true"
                     className="grid"
                     style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
                   >
@@ -176,13 +171,11 @@ function HistoryTableSkeleton() {
                 <td
                   key={`${column.label}-${columnIndex}`}
                   colSpan={column.colSpan}
-                  data-history-collapsible-group={column.collapseWithPanel ? "true" : undefined}
                   className={column.groupLabels ? "h-[64px] overflow-hidden border-b p-0 align-middle" : "border-b px-4 py-2 align-middle"}
                   style={{ borderColor: LEGACY_COLORS.border, width: column.groupLabels ? column.width : undefined, transition: column.groupLabels ? HISTORY_CELL_TRANSITION : undefined }}
                 >
                   {column.groupLabels ? (
                     <div
-                      data-history-collapsible-content="true"
                       className="grid h-[64px]"
                       style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
                     >
@@ -494,13 +487,11 @@ export function HistoryTable({
                     aria-hidden={column.label ? undefined : true}
                     aria-label={column.groupLabels ? column.label : undefined}
                     colSpan={column.colSpan}
-                    data-history-collapsible-group={column.collapseWithPanel ? "true" : undefined}
                     className={historyTableHeaderClass(column, index)}
                     style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
                     {column.groupLabels ? (
                       <div
-                        data-history-collapsible-content="true"
                         className="grid"
                       style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
                       >

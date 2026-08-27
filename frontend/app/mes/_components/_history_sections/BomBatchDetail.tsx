@@ -382,8 +382,7 @@ function BundleRows({
             </div>
           )}
         />
-        <StockSnapshotCell log={parentLog} moment="before" dense quantityWidth={snapshotQuantityWidth} />
-        <StockSnapshotCell log={parentLog} moment="after" dense quantityWidth={snapshotQuantityWidth} />
+        <StockSnapshotCell log={parentLog} dense quantityWidth={snapshotQuantityWidth} />
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap justify-center gap-1">
             {shortageCount > 0 && <StatusBadge shortage={shortageCount} />}
@@ -488,8 +487,7 @@ function BomLineRow({
           </div>
         )}
       />
-      <StockSnapshotCell log={log} moment="before" dense quantityWidth={snapshotQuantityWidth} />
-      <StockSnapshotCell log={log} moment="after" dense quantityWidth={snapshotQuantityWidth} />
+      <StockSnapshotCell log={log} dense quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex flex-wrap justify-center gap-1">
           {internalUseEffect && <InternalUseEffectBadge label={internalUseEffect} />}
